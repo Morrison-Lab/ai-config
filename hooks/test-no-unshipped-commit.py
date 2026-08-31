@@ -385,3 +385,186 @@ finally:
     os.unlink(ag_push)
 
 print("PASS: Antigravity PLANNER_RESPONSE parses and correctly discharges")
+
+
+# --- ai-config#2727: the verdict comes from repository state ------------------
+# The transcript scan reconstructed history, so a commit deliberately dropped
+# on review advice -- `git reset --hard HEAD~1`, a rebase that drops it --
+# left `pending` set forever with no commit left to push, and every later
+# Stop blocked on a fully-pushed branch: three consecutive misfires in the
+# measured session. The scan now only gates WHETHER to look (a real commit
+# ran this session); `git rev-list --count @{u}..HEAD` answers. These cases
+# need real repositories, because the question is one only git can answer.
+
+import shutil
+import subprocess
+
+
+def gitrepo(*steps):
+    """A temp repo with `origin` pointing at a fresh bare remote.
+
+    Global and system git config are cut off, so ambient `commit.gpgsign`
+    or `core.hooksPath` cannot leak into the fixtures.
+    """
+    root = tempfile.mkdtemp()
+    bare = tempfile.mkdtemp()
+    env = dict(os.environ,
+               GIT_CONFIG_GLOBAL="/dev/null", GIT_CONFIG_SYSTEM="/dev/null",
+               GIT_TERMINAL_PROMPT="0")
+    subprocess.run(["git", "init", "-q", "--bare", bare], check=True, env=env)
+
+    def run(cmd, cwd=None):
+        result = subprocess.run(
+            ["bash", "-c", cmd], cwd=cwd or root, capture_output=True,
+            text=True, env=env)
+        assert result.returncode == 0, f"{cmd!r} failed: {result.stderr}"
+
+    run("git init -q -b main .")
+    run("git config user.email t@t && git config user.name t")
+    for step in steps:
+        run(step.replace("BARE", bare))
+    return root, bare, run
+
+
+BASE = "git commit --allow-empty -m base"
+HOOK = "git commit --allow-empty -m hook"
+
+dropped_root, dropped_bare, _ = gitrepo(
+    BASE,
+    "git remote add origin BARE",
+    "git push -q -u origin main",
+    HOOK,
+    "git reset --hard HEAD~1",  # dropped on review advice
+)
+unpushed_root, unpushed_bare, _ = gitrepo(
+    BASE,
+    "git remote add origin BARE",
+    "git push -q -u origin main",
+    HOOK,
+)
+pushed_root, pushed_bare, _ = gitrepo(
+    BASE,
+    "git remote add origin BARE",
+    "git push -q -u origin main",
+    HOOK,
+    "git push -q origin main",
+)
+no_upstream_root, _, _ = gitrepo(BASE, HOOK)
+plain_push_root, plain_push_bare, _ = gitrepo(
+    BASE,
+    "git remote add origin BARE",
+    "git push -q origin main",  # no -u, so no upstream is configured
+)
+scoped_root, scoped_bare, _ = gitrepo(
+    BASE,
+    "git remote add origin BARE",
+    "git push -q -u origin main",
+    "git commit --allow-empty -m human-wip",  # not this session's commit
+)
+behind_root, behind_bare, run = gitrepo(
+    BASE,
+    "git remote add origin BARE",
+    "git push -q -u origin main",
+)
+
+# Advance origin/main beyond local HEAD from a second clone, then let the
+# subject repo learn about it: the branch is strictly behind, never ahead.
+# `-b main` is load-bearing: a bare repo's HEAD symref still points at git's
+# compiled-in default branch, which the first push never created there, so a
+# plain clone checks out an unborn branch and the later `push origin main`
+# fails with `src refspec main does not match any` (caught by this PR's own
+# CI). Cloning the known branch sidesteps the advertised HEAD entirely.
+other = tempfile.mkdtemp()
+clone_cmd = ("git clone -q -b main " + behind_bare + " ."
+             " && git config user.email t@t && git config user.name t"
+             " && git commit --allow-empty -m ahead && git push -q origin main")
+subprocess.run(["bash", "-c", clone_cmd], cwd=other, check=True,
+               env=dict(os.environ,
+                        GIT_CONFIG_GLOBAL="/dev/null", GIT_CONFIG_SYSTEM="/dev/null",
+                        GIT_TERMINAL_PROMPT="0"))
+run("git fetch -q origin")
+
+no_commit = transcript(["echo hello", "git status"])
+# Fresh fixtures: the `unshipped`/`pushed` paths defined above were unlinked
+# by that block's finally, and a scan of a missing file reports no commit.
+commit_only = transcript(["git commit -m hook"])
+commit_and_push = transcript(["git commit -m hook", "git push origin main"])
+
+# main() end-to-end harness: a private TMPDIR, so the sentinel the hook
+# writes lands inside a directory this suite removes afterwards.
+hook = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                    "no-unshipped-commit.py")
+hook_tmp = tempfile.mkdtemp()
+hook_env = dict(os.environ, TMPDIR=hook_tmp,
+                GIT_CONFIG_GLOBAL="/dev/null", GIT_CONFIG_SYSTEM="/dev/null")
+
+def run_hook(payload):
+    return subprocess.run(
+        [sys.executable, hook], input=json.dumps(payload),
+        capture_output=True, text=True, cwd=hook_tmp, env=hook_env)
+
+try:
+    # THE #2727 regression: the transcript shows a commit with no later push,
+    # but the commit was dropped -- repository state says nothing is unshipped.
+    assert subject.decide(dropped_root, commit_only) == "", \
+        "a dropped commit must not block (ai-config#2727)"
+    # An unpushed session commit blocks, naming the derived count.
+    _reason = subject.decide(unpushed_root, commit_only)
+    assert _reason and _reason.startswith("1 commit(s) on HEAD are not on its upstream"), _reason
+    # A pushed session commit allows, as before.
+    assert subject.decide(pushed_root, commit_and_push) == ""
+    # No upstream and no discharge in sight: genuinely never pushed, still blocks.
+    _reason = subject.decide(no_upstream_root, commit_only)
+    assert _reason and "no upstream" in _reason, _reason
+    # A plain push (no -u) leaves @{u} undefined but discharges via the transcript.
+    assert subject.decide(plain_push_root, commit_and_push) == ""
+    # Session scoping: unpushed commits this session never made are not its debt.
+    assert subject.decide(scoped_root, no_commit) == "", \
+        "a session that never committed is not blocked for pre-existing commits"
+    # Repository state outranks the transcript: a push command that never
+    # landed does not discharge.
+    _reason = subject.decide(unpushed_root, commit_and_push)
+    assert _reason and _reason.startswith("1 commit(s)"), _reason
+    # Ahead-only semantics: a branch behind its upstream counts 0 ---
+    # staleness is not unshippedness.
+    assert subject.unpushed_count(behind_root) == 0
+    assert subject.decide(behind_root, commit_only) == ""
+    # main() end-to-end: the payload's cwd drives the verdict, and the
+    # sentinel keys on the derived reason (fires once, skips the repeat).
+    # Runs before the detach below, which un-defines this repo's upstream.
+    _payload = {"transcript_path": commit_only, "cwd": unpushed_root}
+    _out = run_hook(_payload)
+    _block = json.loads(_out.stdout)
+    assert _block["decision"] == "block", _out.stdout + _out.stderr
+    assert _block["reason"].startswith("1 commit(s) on HEAD"), _out.stdout
+    # Identical state: the sentinel suppresses the repeat.
+    assert run_hook(_payload).stdout.strip() == "", "sentinel did not suppress"
+    # A pushed state clears the verdict on the same transcript.
+    assert run_hook({"transcript_path": commit_only, "cwd": pushed_root}).stdout.strip() == ""
+    # No transcript_path: silent, whatever the repo state.
+    assert run_hook({"cwd": unpushed_root}).stdout.strip() == ""
+    # The count is undefined without an upstream or on a detached HEAD.
+    assert subject.unpushed_count(no_upstream_root) is None
+    run("git checkout -q --detach HEAD", unpushed_root)
+    assert subject.unpushed_count(unpushed_root) is None
+    # No cwd in the payload: repository state is unknowable, so the verdict
+    # falls back to the transcript scan (the old behaviour, both directions).
+    _fallback = subject.decide("", commit_only)
+    assert _fallback.endswith(subject.PUSH_REMEDY), _fallback
+    assert "no later push or PR creation" in _fallback, _fallback
+    assert subject.decide("", commit_and_push) == ""
+finally:
+    for _root in (dropped_root, unpushed_root, pushed_root, no_upstream_root,
+                  plain_push_root, scoped_root, behind_root, other,
+                  dropped_bare, unpushed_bare, pushed_bare, plain_push_bare,
+                  scoped_bare, behind_bare):
+        shutil.rmtree(_root, ignore_errors=True)
+    for _path in (no_commit, commit_only, commit_and_push):
+        os.unlink(_path)
+    shutil.rmtree(hook_tmp, ignore_errors=True)
+
+print("PASS: a dropped commit no longer blocks, while unpushed work still does (ai-config#2727)")
+print("PASS: the derived count names itself, and state outranks a transcript discharge")
+print("PASS: no-upstream falls back to the transcript, and staleness is not unshippedness")
+print("PASS: without a cwd the verdict falls back to the transcript scan")
+print("PASS: main() blocks on the payload cwd's state once, then the sentinel holds")

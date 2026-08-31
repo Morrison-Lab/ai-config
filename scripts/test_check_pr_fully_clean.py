@@ -59,8 +59,15 @@ class CmdRecorder:
         return " ".join(" ".join(c) for c in self.calls)
 
 
+seen_check_names = set()
+
 def check(name: str, condition: bool):
     global passes, failures
+    if name in seen_check_names:
+        print(f"FAIL: duplicated check name: {name}")
+        failures += 1
+        return
+    seen_check_names.add(name)
     if condition:
         print(f"PASS: {name}")
         passes += 1
@@ -1932,9 +1939,7 @@ def main() -> int:
               == "not-clean")
     for unresolved in (
         "hasn\u2019t been fixed",
-        "hasn" + chr(0x2019) + "t been fixed",
         "isn\u2019t fixed",
-        "isn" + chr(0x2019) + "t fixed",
         "has not actually been fixed",
         "has yet to be fixed",
         "cannot be fixed",
@@ -3522,6 +3527,80 @@ def main() -> int:
     check(
         "a sha citation before a posted citation does not shift the veto",
         checker.classify_verdict(both_citations) == "not-clean",
+    )
+    # The gap width is swept rather than assumed. A paragraph-hop
+    # window read a four-newline gap as two boundaries with an empty
+    # phantom paragraph between them and hopped onto the phantom,
+    # restoring the fail-open for one extra blank line. The section
+    # scan has no paragraph arithmetic left to get this wrong, so the
+    # sweep is now a guard against reintroducing any.
+    _gap_failures = []
+    _gap_citation = (
+        "[round 2's finding](https://x) "
+        "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**)."
+    )
+    for _n in range(2, 9):
+        _gap = "\n" * _n
+        for _side, _gap_body in (
+            ("before", "This remains open." + _gap + _gap_citation),
+            ("after", _gap_citation + _gap + "This is still unresolved."),
+        ):
+            if checker.classify_verdict(
+                _gap_body + "\n\n### Verdict\n**Ready for merge**"
+            ) != "not-clean":
+                _gap_failures.append(_side + ":" + str(_n))
+    check(
+        "no blank-line gap width hides a re-raise (%d checked)" % (7 * 2),
+        not _gap_failures,
+    )
+    # A "#" comment inside a fence is not a section heading, and
+    # treating one as a heading clips the veto region short and strips a
+    # live re-raise. The body is kept to one paragraph because that was
+    # what isolated the bug from the paragraph-hop window this scan
+    # replaced; under the section scan the multi-paragraph form works
+    # too, and the single-paragraph shape is retained as the tighter
+    # case.
+    fenced_hash = (
+        "This remains open.\n```\n# c\n```\n"
+        "[round 2's finding](https://x) "
+        "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**)."
+        "\n\n### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a '#' comment inside a fence does not clip the veto window",
+        checker.classify_verdict(fenced_hash) == "not-clean",
+    )
+    # Including an UNCLOSED fence, whose interior lines the safe default
+    # leaves outside fenced_lines -- reachable by a typo, or by GitHub
+    # truncating a long comment mid-block.
+    # The indented case keeps its "#" at column 0: the heading regex is
+    # anchored there, so an indented "#" never matches it fenced or not,
+    # and a body using one would pass with fence-awareness entirely
+    # broken. What it tests is that an INDENTED FENCE still counts as a
+    # fence.
+    for _label, _fence in (("unclosed", "```\n# c\n"),
+                           ("tilde", "~~~\n# c\n~~~\n"),
+                           ("indented", "  ```\n# c\n  ```\n")):
+        _body = (
+            "This remains open.\n" + _fence
+            + "[round 2's finding](https://x) "
+            "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**)."
+            "\n\n### Verdict\n**Ready for merge**"
+        )
+        check(
+            "a '#' inside a " + _label + " fence does not clip the window",
+            checker.classify_verdict(_body) == "not-clean",
+        )
+    # A real heading DOES clip it, which is the intended boundary.
+    real_heading = (
+        "This remains open.\n## Section\n"
+        "[round 2's finding](https://x) "
+        "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**)."
+        "\n\n### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a real heading still clips the veto window (control)",
+        checker.classify_verdict(real_heading) == "clean",
     )
     # A verdict heading inside a FENCE does not license the strip. The
     # gate runs before fences are removed, and a review of this file

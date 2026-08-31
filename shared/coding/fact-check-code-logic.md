@@ -248,12 +248,18 @@ A **skip counted as a pass** hides a weakened run.
 A case inert under some condition --- a permission test as root, a platform-specific path --- recorded via `check(name, True)` makes a suite that skipped it and a suite that ran it print the same total, so the difference between a full run and a partial one is invisible in the one number anybody reads.
 Report skips in their own counter and exclude them from the pass count.
 
+A **duplicated block counted as two passes** inflates the total in the opposite direction: a runner whose `check(name, condition)` keeps no registry of names re-runs a copy-pasted block's assertions a second time and reports a higher count, with nothing distinguishing that from genuine additional coverage.
+`Morrison-Lab/ai-config#2725` measured this directly on `scripts/test_check_pr_fully_clean.py`: two checks each ran twice on `main`, inflating the reported total by exactly the duplicate's size, and it was caught only because a reviewer diffed two line ranges byte for byte while porting tests in a later PR --- not a check anyone runs by habit.
+The pass count is routinely quoted in commit messages and reviews as evidence of coverage, which is exactly what makes a silently double-counted total worth naming as its own hazard alongside the two above.
+
 - **Do:** write the members as literals in the test, and assert separately that the constant contains them.
 - **Do:** compare each mutation run's PASS count against the baseline's, and treat a run that reports no count at all as "mutant not applied".
 - **Don't:** discriminate on exit status --- a malformed mutant and a real failure both exit 1, so it cannot separate them.
 - **Do:** count skips separately, so a weakened run and a full one differ in the totals.
 - **Don't:** generate a test's cases from the value under test --- the DRY form is the defective one here.
 - **Don't:** record a skip with `check(..., True)`; that is a pass asserting nothing.
+- **Do:** have the check runner refuse a name it has already seen (`ai-config#2725`'s suggested fix), turning a silent duplicate into an immediate failure rather than an inflated count.
+- **Don't:** treat a rising pass count as evidence of rising coverage without a name registry (or an equivalent dedup check) backing it.
 
 (Measured 2026-08-28 on [ai-config#2539](https://github.com/Morrison-Lab/ai-config/pull/2539), where it occurred **twice in one file** against two different constants, the second after the first had been fixed --- which is why it is written down rather than noted.
 A third instance in the same suite iterated the flag list, so dropping the flag that marks harness-injected records stayed green.
@@ -1043,6 +1049,38 @@ revert each one flip a case rather than nothing.
 - **Don't:** read "the computation is right now" as the change being finished.
 - **Don't:** rely on an adjacent-comment guard for this; its window is ten
   lines and one file, and these sites are neither.
+
+## A comment describing HOW a mechanism works survives the mechanism, and a superset replacement leaves no test able to catch it
+
+The section above covers a fix that changes what code *computes*, where the remedy is to grep for the old concept across the repo.
+This is the case that remedy does not reach: a fix that changes *how* a mechanism works --- a narrower scan widened, a shared helper given a second caller and then only one, a data structure retired --- while the comment documenting the old design stays in place, worded exactly as it was.
+
+**Nothing turns red.**
+The widened mechanism is a superset of the one it replaced: every assertion the old design satisfied, the new one satisfies too, plus more.
+So the suite that passed before the change passes after it, and it passes identically whether the nearby comment was updated or not.
+Only a reader notices, and a reader is exactly who consults the comment *before* touching the mechanism it describes --- which means the miss is most costly at precisely the moment it matters.
+
+Three confirmed instances from one PR, `Morrison-Lab/ai-config#2668` (`_strip_posted_aside`'s re-raise veto, `scripts/check-pr-fully-clean.py`): a block above `_RERAISE_VOCAB` said the veto scans "the containing sentence BACKWARD and its containing paragraph FORWARD" after the scan had moved to the whole containing section in both directions;
+a block above `_SENTENCE_END_RE` said the regex was "shared by the citation-aside veto and the negated-resolution guard" after the veto stopped using it (it moved to bisecting heading positions, leaving `_sentence_start_before` with exactly one caller);
+and a third comment still named `_paragraph_starts` and `_paragraph_ends`, two variables a later commit in the same PR had already deleted.
+All three were caught, but not by the suite: the third was a reviewer's non-blocking nit in the PR's own final review round and still shipped as-is (no fix for it existed to lose), while the first two were never raised in any of #2668's review rounds at all.
+All three surfaced only in a later retrospective sweep, `Morrison-Lab/ai-config#2722`, and were fixed in the follow-up PR it produced, `#2726`.
+
+**The sweep method matters more than the instance count.**
+Two successive attempts at collecting these each missed at least one, because grepping for the vocabulary of the comments written in the *current* round finds those comments and misses ones written earlier in different words --- "shared by" and "scans ... backward ... forward" do not share a token with each other, let alone with whatever a third, older comment happened to say.
+The sweep that worked instead enumerated the *mechanisms* (the re-raise veto, the shared regex, the paragraph-bound variables) and read every comment touching each one, structurally rather than lexically.
+This sharpens the "derive the sites, do not recall them: grep for it" prescription in the section above: grep is the right instrument when the *sites* are unknown but the *word* naming the changed concept is stable;
+it is the wrong one when the word itself has drifted across rounds, because the search inherits the same blind spot as recall did.
+
+**Record why the abandoned design was abandoned, not only what replaced it.**
+A comment that says "the veto scans the whole containing section" is already accurate, but it gives a future reader no reason not to narrow it back to a sentence-and-paragraph window --- the exact design this PR spent several rounds proving unsafe.
+Naming the failure the narrower version had is what stops it from being reintroduced.
+
+- **Do:** when a fix replaces *how* a mechanism works, enumerate the mechanisms touched and read every comment referencing each one --- not just the comments using the new round's own vocabulary.
+- **Do:** state, in the updated comment, why the retired narrower design was unsafe --- not only what the current one does.
+- **Don't:** trust a green suite as evidence a mechanism-describing comment is current;
+  a superset replacement passes every old assertion by construction, comment or no comment.
+- **Don't:** grep for the concept's *current* name and call the sweep complete --- an older comment describing the same mechanism in different words is invisible to that search.
 
 ## Replacing a mechanism: enumerate what the OLD one handled, not what the new one adds
 

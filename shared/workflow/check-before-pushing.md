@@ -10,7 +10,7 @@ The belief is routinely wrong, and [`claim-pr`](claim-pr.md) already records all
 The `@claude` agent pushes to your branch on PR activity, typically to merge `main` in.
 A second CLI session under the same account can claim the same PR and drive it.
 And a human can push to it at any time.
-None of those announce themselves in your conversation.
+None of those announce themselves in your conversation. (Reconfirmed on `ai-config#2668`, 2026-08-30: a posted claim comment did not stop the first case from recurring --- see [`claim-pr`](claim-pr.md)'s "Third occurrence" note.)
 
 Note which direction the parallelism runs, because it inverts the usual intuition: the more agents are working a repo, the likelier a collision and the less any single session can observe one coming.
 So the check matters most exactly when the evidence for needing it is least visible, which is why judgment does not reach it and an instrument has to.

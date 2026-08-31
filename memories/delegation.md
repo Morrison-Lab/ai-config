@@ -51,6 +51,7 @@ Claude's: `codex`, `agy`, and OpenCode's `opencode-go/*` tier.
 | `agy` (Google Antigravity) | API retired, **CLI available** (2026-08-25) | none --- invoke `agy --print` directly |
 | `opencode` | OpenCode Go (`opencode-go/*`, $10/mo windowed) + free hosted (`opencode/*`, opencode Zen) | [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) (alias `dto`) |
 | `openrouter` | prepaid credit balance, reached through OpenCode's `openrouter` provider | [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md)'s "A third destination" section |
+| `adv` | Multi-engine local reviewer (`pre-push-review.py`) | [`adv`](../skills/adv/SKILL.md) |
 
 Headless dispatch: `agy --print="<prompt>" [--effort low]`,
 or `agy --print "<prompt>" [--effort low]`.

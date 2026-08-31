@@ -591,23 +591,31 @@ A clean automated review from every available provider evaluating the current HE
   round 2 revealed `={3,}` under an outer `*` still backtracked exponentially on the tool's own `"=" * 60` report separator followed by non-matching text (0.50s at 36, 4.01s at 42, 14.18s at 45).
   Fixed by replacing the nested-quantifier regex with a linear line scan (0.36ms at 4000 `=`).
 - **Canonical Rule**: [`regex-backtracking-pitfalls.md`](../shared/coding/regex-backtracking-pitfalls.md) and [`fact-check-code-logic.md`](../shared/coding/fact-check-code-logic.md).
-- **Fix**: Replace repeated ambiguous quantifiers with linear scans or enforce strict disjointness between alternatives under repetition; measure execution time on long pathological inputs.
+- **Fix**: Replace repeated ambiguous quantifiers with linear scans
+  or enforce strict disjointness between alternatives under repetition;
+  measure execution time on long pathological inputs.
 - **Algorithmatizable?**
-  Yes; regex static analyzers or timeout test probes checking for nested quantifiers and overlapping alternations can flag self-ambiguous repeated groups mechanically.
+  Yes.
+  Not yet built --- static regex linters or timeout test probes checking for
+  nested quantifiers and overlapping alternations can flag self-ambiguous
+  repeated groups mechanically.
 
 ## Pattern 32: Treating a Sampling Instrument's Zero as a Result Without Verifying Arm Reach
 - **Do**: When using a corpus-sampling or generator-based instrument (such as `scripts/check-verdict-scan-parity.py`) to verify parity or absence of regressions, explicitly report and verify the **reach** of newly added arms or branches (e.g., confirming the new arm was actually executed and reached, and reporting the number of cases evaluated).
   Place newly added arms where generators and limit/stride logic will not skip or truncate them.
 - **Don't**: Accept a sampling instrument reporting "0 widened, 0 narrowed" as evidence of correctness when the new arm was never reached (e.g. truncated by `--limit`, skipped by strided sampling, bypassed by an earlier deciding branch, or missing from the corpus entirely).
-- **Example**: 2026-08-31, `Morrison-Lab/ai-config` PR [#2736](https://github.com/Morrison-Lab/ai-config/pull/2736) (`scripts/check-verdict-scan-parity.py`): Across rounds 2, 3, and 5, the instrument repeatedly reported 0 widened / 0 narrowed as a coverage statement rather than a verification:
+- **Example**: 2026-08-31, `Morrison-Lab/ai-config` PR [#2736](https://github.com/Morrison-Lab/ai-config/pull/2736) (`scripts/check-verdict-scan-parity.py`): Across rounds 2, 3, and 4, the instrument repeatedly reported 0 widened / 0 narrowed as a coverage statement rather than a verification:
   (1) round 2 yielded the payload arm last at index 241,920 where `--limit` truncated it before execution;
   (2) yielding it first was still lost because `--limit` used strided sampling selecting only 1 of 57 bodies;
-  (3) in round 3, every generated payload body carried a prose `## Verdict:` line that decided before `payload_is_clean` was ever reached (reached 0 of 32 times).
-  Fixed in round 5 by ensuring the arm is evaluated unconditionally and generating payload-only bodies, revealing 1 widening and 5 narrowings previously hidden.
+  (3) in round 3 (`cfdedd9c`), generated payload bodies carried a prose `## Verdict:` line that decided before `payload_is_clean` was ever reached (reached 0 of 32 times), fixed in that round by generating payload-only bodies;
+  (4) in round 4 (`3a7648a7`), the arm still reported 0/0 because `--limit` truncated it before execution.
+  Fixed in round 5 (`fbf50a69`) by appending the arm after `--limit`, revealing 1 widening and 5 narrowings previously hidden.
 - **Canonical Rule**: [`fact-check-code-logic.md`](../shared/coding/fact-check-code-logic.md) ("A sampling instrument's zero is a coverage statement unless the new arm's reach is reported") and [`fail-fast.md`](../shared/principles/fail-fast.md).
 - **Fix**: Measure and report reach counts (e.g. "reached M of N times") on every arm of a sampling instrument, and ensure new arms are appended after sampling limits.
 - **Algorithmatizable?**
-  Yes; the runner can assert non-zero execution counts on every generator arm and fail if any arm executes zero times.
+  Yes.
+  Not yet built --- the test runner can assert non-zero execution counts on
+  every generator arm and fail if any arm executes zero times.
 
 ## Pattern 33: Cross-Artifact Comment Staleness During Multi-Commit PRs
 - **Do**: When modifying an invariant, data format, layout, or implementation across commits in a PR, grep across the entire repository (including tests, documentation, helper scripts, and sister modules) for comments and docstrings that assert the state or layout of the modified artifact.
@@ -618,9 +626,13 @@ A clean automated review from every available provider evaluating the current HE
   (2) `scripts/lib/review_payload.py` still stated that prompts and personas render the payload 3 spaces in.
   Neither was in the diff or within 10 lines of the changed code in their respective files.
 - **Canonical Rule**: [`fact-check-code-logic.md`](../shared/coding/fact-check-code-logic.md) ("A comment asserting the state of ANOTHER artifact is a claim with an expiry across commits").
-- **Fix**: Grep for tokens and cross-references when changing a cross-module contract or layout; audit test comments when reverting or restoring implementation logic.
+- **Fix**: Grep for tokens and cross-references
+  when changing a cross-module contract or layout;
+  audit test comments when reverting or restoring implementation logic.
 - **Algorithmatizable?**
-  Partially; cross-file comment scanning can detect file-name citations and literal quotes, but semantic claims require reading.
+  Partially.
+  Cross-file comment scanning can detect file-name citations and literal quotes,
+  but semantic claims require reading.
 
 ## Pattern 34: Claiming Subsumption Proofs Over Raw Text Without Accounting for Transformations
 - **Do**: When arguing that a structured extraction or parsing branch is redundant and subsumed by a raw text search (e.g. raw substring or regex match), verify whether any transformation (JSON escape decoding like `\u0061`, URL decoding, character set normalization, or whitespace normalization) occurs between the raw text and the parsed value.
@@ -630,5 +642,7 @@ A clean automated review from every available provider evaluating the current HE
 - **Canonical Rule**: [`fact-check-code-logic.md`](../shared/coding/fact-check-code-logic.md) ("A subsumption proof over raw text must account for every transformation before claiming a disjunct is dead").
 - **Fix**: Construct adversarial test fixtures with escaped, decoded, or transformed representations to test whether raw text matching and structured value matching can diverge before deleting extraction logic.
 - **Algorithmatizable?**
-  Partially; mutation testing with encoded/escaped representations detects unhandled transformation divergences.
+  Partially.
+  Mutation testing with encoded/escaped representations detects unhandled
+  transformation divergences.
 

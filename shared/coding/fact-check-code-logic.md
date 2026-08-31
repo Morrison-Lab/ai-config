@@ -469,7 +469,7 @@ A caller reading only the pass/fail bit sees no difference at all.
 - **Don't:** trust an anchored pattern to cover the unanchored case;
   `^marker` and `marker` agree on every example that starts with the marker.
 
-### A subsumption proof over raw text must account for every transformation
+## A subsumption proof over raw text must account for every transformation
 
 When deleting a structured extraction check or parser term on the grounds that
 it is "provably redundant" with a raw substring or regex match over the unparsed

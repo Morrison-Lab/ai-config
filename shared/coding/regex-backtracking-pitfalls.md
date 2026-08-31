@@ -11,18 +11,20 @@ Even when every alternative branch consumes at least one character,
 an alternative that can match the same token in multiple chunk sizes
 is **self-ambiguous** and partitions input exponentially.
 
-For example, `={3,}` under an outer `*` quantifier (such as `(={3,}|\s*)*`)
-can partition a run of 60 `=` characters into chunks of size 3 or greater
+For example, `={3,}` under an outer `*` quantifier
+can partition a run of `=` characters into chunks of size 3 or greater
 in exponentially many distinct ways.
-When followed by text that fails to match the rest of the pattern,
+When matching a trailing tolerance group followed by non-matching text,
 the engine evaluates all partitions before rejecting the input:
 
 ```python
 # Backtracks exponentially on non-matching text following repeated '=':
-pattern = re.compile(r"^(?:={3,}|\s*)*Reviewed-Commit:\s*([0-9a-f]{7,40})")
+pattern = re.compile(
+    r"Reviewed-Commit:\s*[a-f0-9A-F]+(?:\s*(?:[A-Za-z]+|={3,}|\s*))*\Z"
+)
 ```
 
-Measured on a standard `"=" * 60` banner followed by non-matching text:
+Measured on an increasing prefix of a `"=" * 60` banner followed by non-matching text:
 - 36 characters: 0.50s
 - 42 characters: 4.01s
 - 45 characters: 14.18s

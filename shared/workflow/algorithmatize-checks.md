@@ -482,6 +482,71 @@ ships red` and asserts it directly, and `validate.yml` runs that test.
 The whole local `validate` job was then run before the fixing push, which is
 what this section is asking for.)
 
+**Second occurrence, 2026-08-31, and this one consulted no exit code at all.**
+The Do lines above already prescribe the remedy, so nothing here is new advice.
+What is new is the **tell**, because the section states its cause as an exit
+code, and a verification that read no exit code matches none of that wording.
+
+The cause is a **name**.
+A CI job and its best-known step routinely share one, so running that step
+feels like running the job, and the enumeration the first Do line asks for
+never presents itself as owed.
+`Morrison-Lab/gha`'s `lint-markdown` is a composite action, and its
+`action.yml` runs four checkers: `run_markdownlint.mjs`,
+`check_code_block_length.mjs`, `check_list_item_splices.mjs`, and
+`check_table_splits.mjs`.
+Only the first is the tool the job is named after.
+
+Everything else about the verification was right, which is why it is worth an
+entry rather than a note about carelessness.
+`markdownlint-cli2` was run at the version `lint-markdown/package.json` pins,
+rather than at whatever `npx` resolves, which is that repo's own written
+instruction and the step a local run usually skips.
+It reported clean, and it was clean.
+The job was not.
+`check_list_item_splices.mjs` flagged three list items spliced onto a previous
+item's continuation line with no blank line between them, which markdownlint
+has no rule for and so cannot see however correctly it is invoked.
+
+**Enumerating from the workflow is not enough, because the steps sit one layer
+further down.**
+A workflow's step list stops at `uses: ./lint-markdown`, so reading it returns
+a single step and reads as a complete enumeration.
+Open the composite instead:
+
+```bash
+grep -nE '^ +(run|uses):' <repo>/<capability>/action.yml
+```
+
+That form covers a composite whose steps run commands directly.
+A composite step that is itself a `uses:` needs following one layer further,
+per [`fact-check-prose`](../writing/fact-check-prose.md)'s rule that a
+documented command should say which case it covers.
+
+This is [`derive-dont-enumerate`](derive-dont-enumerate.md)'s "A helper's call
+sites are a subset of the effect's sites" met from the caller's side.
+There the helper's name under-counts where an effect happens.
+Here the helper's name under-counts what a single call performs.
+Both times the list that comes to hand is short, genuine, and plausible.
+
+- **Do:** open the composite's `action.yml` and run every checker it names,
+  whenever a job wraps a composite rather than invoking one tool.
+- **Do:** read a shared name between a job and a tool as a reason to
+  enumerate, rather than as evidence the two are the same thing.
+- **Don't:** report a job clean from the one step whose name you already knew.
+- **Don't:** treat a correctly pinned, correctly run, genuinely clean tool as
+  covering the job that wraps it.
+
+(Measured 2026-08-31 on
+[gha#781](https://github.com/Morrison-Lab/gha/pull/781), squash-merged as
+`a0e0342`.
+The four checkers are derived from `lint-markdown/action.yml` at that commit
+by the `grep` above.
+The fix for the missed step is `298e184` on the PR branch, whose message names
+the three spliced items.
+`check_list_item_splices.mjs` exists because markdownlint carries no such rule,
+per its own header comment citing gha#324.)
+
 ## A reference frame chosen from the initial condition expires as the system moves
 
 The section above is about an instrument that **changed**, leaving every figure

@@ -237,6 +237,74 @@ long copy actually supports.
 - **Don't:** read "both are from this turn" as exempting a restatement from
   re-verification; the source's freshness says nothing about the copy.
 
+## A command written into documentation is a condensation of the code that builds it
+
+The two sections above cover prose that distills code and prose that distills
+prose.
+A **command** written into guidance is the same act wearing a disguise: it
+reads as an artifact rather than a claim, because it is copy-pasteable and it
+runs.
+It is still a condensation, and of the least forgiving kind, because what it
+condenses is frequently a script that assembles the command
+**conditionally** --- so the flat form quietly asserts that those conditions
+do not exist.
+
+The carve-outs are what get dropped, and they are the load-bearing part.
+A tool that omits a flag in several cases omits it for reasons, and at least
+one of those reasons is usually safety rather than convenience.
+A reader who follows the documented unconditional form in a carved-out case
+does the unsafe thing while believing they followed the docs, which is worse
+than there having been no documentation for that case at all.
+
+**Having applied the carve-out yourself is not having written it down.**
+That is the part worth naming, because it defeats the remedy the section
+above prescribes.
+There, re-checking the source catches nothing because the verified artifact
+and the false one are different artifacts.
+Here the source was not merely verified: it was **obeyed**, minutes earlier,
+in the same session, correctly.
+Executing a command and documenting one are separate acts, and knowledge that
+reached the first does not cross into the second on its own --- so the
+feeling of knowing the rule is at its strongest exactly while the sentence
+dropping it is being typed.
+
+So when documenting a command that a repo's own tooling constructs, read the
+constructing code and port every branch, or say plainly that the form given
+covers the common case and name where the tool departs from it.
+
+- **Do:** read the script, action, or function that builds the command, and
+  carry each of its conditions into the documented form.
+- **Do:** say which case the documented form covers, when you deliberately
+  give only one.
+- **Don't:** document the unconditional form of a conditionally-constructed
+  command --- the flat version asserts the conditions are absent, and says so
+  silently.
+- **Don't:** treat having just run the command correctly as evidence about
+  the sentence describing it; obeying a rule and stating it are different
+  acts, and only the second one ships.
+
+(`UCD-SERG/shigella#46`, 2026-08-31.
+Guidance was written reading
+`gh workflow run claude-code-review.yml --ref <pr-branch> -f pr_number=<N>`,
+with no conditions attached.
+`Morrison-Lab/gha`'s `.github/workflows/scripts/dispatch-review.sh` omits
+`--ref` in four cases, read at `838011e`: a fork PR, a `PR_BRANCH` it cannot
+resolve, a PR editing top-level `.github/workflows/*.yml`, and a changed-file
+listing it cannot complete.
+Its own header comment names the first three, so the fourth is derivable only
+from the code --- which is the same lesson one level down, since the header
+is itself a condensation of the branches below it.
+The workflow-editing case is a trust boundary rather than a convenience: with
+`--ref` pointed at the PR branch, GitHub executes the PR head's own
+unreviewed caller YAML under the repository's model credentials, which is
+what [`Morrison-Lab/gha#598`](https://github.com/Morrison-Lab/gha/issues/598)
+exists to prevent.
+The same session had applied that carve-out in its own dispatch, choosing the
+default branch as the ref precisely because the PR edited workflow YAML, and
+then wrote the unconditional form into the guidance anyway.
+An [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md) subagent
+found it.)
+
 ## An edit made for precision can assert what the loose version never did
 
 The section above covers a **condensation**, where a shorter restatement widens

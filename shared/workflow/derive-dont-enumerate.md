@@ -108,6 +108,65 @@ count.
   the other forms return the same confident non-empty result for whoever
   checks them next.
 
+### A helper's call sites are a subset of the effect's sites
+
+The section above says to search for the effect rather than for whichever
+command produces it.
+A repo that has already factored the effect into a named helper --- a
+composite action, a wrapper script, a shared function --- offers a third
+spelling that is neither the effect nor one of its commands: the helper's own
+name.
+Grepping for it returns a tidy list, every hit is genuine, and the list is
+short enough to read in full, so nothing about it raises the width question.
+
+What it cannot return is the site performing the effect **inline**, without
+the helper.
+That site exists because somebody needed the effect somewhere the helper did
+not reach, so its conditions are the ones least likely to match the helper's
+--- which makes it simultaneously the hardest site to find and the one most
+likely to behave differently once found.
+
+The fallback that feels more thorough is worse.
+Reading the file and counting the steps whose **names** describe the effect
+enumerates what an author called it rather than what the file does, and a
+step performing the effect as a side errand is named after its main job.
+So both enumerations that come to hand partition the file by something an
+author chose, while the population is defined by what executes.
+
+Derive from the primitive instead: the command, endpoint, or API call the
+helper itself finally makes.
+Grep for that **and** for the helper's name, and report both patterns beside
+their counts, per the parent section.
+
+- **Do:** grep for the primitive the helper wraps, not only for the helper.
+- **Do:** expect the inline site to be the one whose conditions differ, and
+  read it rather than assuming it matches the helper's.
+- **Don't:** enumerate an effect from step names, headings, or any other
+  authored label --- those partition a file by intent rather than by
+  behaviour.
+- **Don't:** read a short, clean, wholly-genuine list of helper call sites as
+  the population.
+
+(`UCD-SERG/shigella#44` and its PR `#46`, filed upstream as
+[`Morrison-Lab/gha#778`](https://github.com/Morrison-Lab/gha/issues/778),
+2026-08-31, while making one repo's `@claude` reviewer on-request only.
+`Morrison-Lab/gha`'s `claude.yml` carries **four** review-dispatch sites.
+Three call the `dispatch-review` composite, at lines 1223, 1291, and 1308 of
+that file at `838011e`.
+The fourth is an inline `gh workflow run "$REVIEW_WF" ... -f pr_number=` at
+line 1532, inside the step named `Finalize PR for issue trigger`, whose main
+job is opening the PR for an issue-triggered run.
+Two of the four dispatch under no review-request condition at all: the
+push-triggered one at 1308 and the inline one.
+The set was undercounted twice before it was derived, once from the
+composite's call sites and once from the step names, and each time the
+resulting list was non-empty and plausible ---
+[`grep-is-not-coverage`](grep-is-not-coverage.md)'s point that a real result
+settles only what it matched.
+Grepping `gh workflow run` across `.github/workflows/claude.yml` and
+`.github/workflows/scripts/dispatch-review.sh` reaches the inline site and
+the composite's own dispatch in one pass.)
+
 ## The weakest population of all is the files already open in front of you
 
 The section above narrows a **query** that was too narrow.

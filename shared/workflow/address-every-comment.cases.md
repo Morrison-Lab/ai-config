@@ -790,6 +790,30 @@ part that memory reshapes, because the fixes feel simultaneous in a way the
 commits are not.
 Reconstruct the sequence from the commit list before writing it down.)
 
+3rd recorded occurrence, 2026-08-31, `UCD-SERG/shigella#46`.
+Priors: the `ai-config#1787` case above, and `Morrison-Lab/gha#745`, whose
+own `CLAUDE.md` records the class in the same words --- "a fix for a review
+finding is the likeliest place for the next one" --- after a fix for an
+unearned clean verdict shipped a fresh unearned clean verdict.
+Here two adversarial-review rounds ran against one PR, and round 2's findings
+were both located in text written to close round 1's.
+A guidance paragraph added to fix an undercounted enumeration documented the
+dispatch command in its unconditional form, dropping carve-outs the same
+session had applied minutes earlier; see
+[`fact-check-prose`](../writing/fact-check-prose.md)'s "A command written
+into documentation is a condensation of the code that builds it".
+
+This meets [`deterministic-tools`](../principles/deterministic-tools.md)'s
+third-occurrence bar and does not yield an instrument, which is worth stating
+rather than leaving as a silent omission.
+Whether a fix reproduces the finding it closes is a judgment about meaning,
+not a condition decidable over a diff, so no hook can decide it.
+The procedural equivalent already exists and simply has to be run: the fix is
+"a diff nobody has read", per
+[`adversarial-self-review`](adversarial-self-review.md)'s "The review gates
+the push, not the work", so brief the reviewer on the **fix** commit rather
+than treating the round as closed once the finding is addressed.
+
 ## A correction added beside the flagged sentence, which survived
 
 (Morrison-Lab/gha#578, 2026-08-21, review round 2: a source comment overstated

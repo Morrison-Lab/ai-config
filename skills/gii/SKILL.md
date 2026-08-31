@@ -38,12 +38,12 @@ Run the full GI procedure:
 1. List open issues, triage/prioritize
 2. Select the highest-priority issue automatically from the triage signals,
    state which one and why, and proceed without pausing for confirmation
-3. Check history
+3. Check history and research existing solutions (DRW check via [`prefer-upstream`](../prefer-upstream/SKILL.md))
 4. Claim the issue
 5. Create a branch
 6. Open the draft PR up front, from an empty commit, before implementing —
    see [`pr-on-claim`](../../shared/workflow/pr-on-claim.md)
-7. Implement
+7. Implement (researching libraries/functions before hand-rolling custom code)
 8. Push and mark the PR ready for review
 9. ARDI to clean
 
@@ -104,6 +104,7 @@ Go back to step (a) with the next issue.
 
 Within an iteration, hand independent sidecar work off to a subagent via the
 `Agent` tool instead of doing it inline --- a history/precedent investigation,
+a DRW research check for existing upstream packages or lab implementations,
 a verification pass on the implementation, research into how a similar issue
 was solved elsewhere. Keep the critical path (claim, draft PR, implement,
 ARDI) on the main thread so the loop keeps moving; this is a single sidecar
@@ -175,6 +176,8 @@ When the loop ends, print a summary:
   out and works it concurrently in worktree-isolated subagents instead of
   serially. This loop stays serial for everything `gip` can't prove independent.
 - **`gi`** — the inner loop; each iteration is a full GI invocation
+- **`prefer-upstream`** — search existing packages, standard libraries, and lab
+  repos before writing custom code to avoid reinventing the wheel
 - **`pr-on-claim`** — each iteration opens its draft PR up front (step 6) so the
   in-flight issue is visible before implementing
 - **`ardi`** — drives each MR/PR to clean review within GI
@@ -228,6 +231,7 @@ A stray, differently-named probe branch left over from before this rule existed 
 
 - ❌ Stacking more than 3–4 MRs deep without asking (merge conflicts compound)
 - ❌ Grabbing issues assigned to someone else
+- ❌ Hand-rolling custom code without researching existing packaged or shared solutions first (violating DRW)
 - ❌ Continuing after a blocked issue without telling the user
 - ❌ Forgetting to note stack dependencies in MR descriptions
 - ❌ Basing on main when the previous MR hasn't merged yet and the next issue

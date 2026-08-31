@@ -105,6 +105,24 @@ and preserve the legacy or alternative behavior behind an explicit, documented o
 environment variable, or configuration toggle.
 See [`shared/principles/prefer-optionality-over-removal.md`](shared/principles/prefer-optionality-over-removal.md).
 
+## Research existing solutions before implementing (DRW)
+
+Before writing custom code or hand-rolling functions and helpers,
+always perform a research step to verify DRW (don't reinvent the wheel)
+and check for existing libraries, functions, or package solutions.
+Search in our own repos (`Morrison-Lab/gha`, lab packages), standard libraries,
+and trustworthy upstream ecosystems (base R, tidyverse / r-lib, PyPI, npm).
+Prefer reusing, depending on, forking, or contributing to an existing
+implementation over building a new one from scratch.
+Record what was searched and what was found.
+See [`shared/principles/dont-reinvent-wheel.md`](shared/principles/dont-reinvent-wheel.md)
+and [`prefer-upstream`](skills/prefer-upstream/SKILL.md).
+
+- **Do:** search our own repos and trustworthy upstream ecosystems for an existing solution before writing custom code.
+- **Do:** note the search terms and candidate packages/functions in the PR description or code comments when choosing to implement custom code.
+- **Don't:** hand-roll a utility or function without performing a DRW research check first.
+- **Don't:** cite a self-imposed constraint (such as a minimal environment chosen by the current change) as justification to avoid using an upstream package.
+
 ## Interpret instructions broadly and maximize safe progress
 
 Unless the user narrows a request, take the broad reading that advances its

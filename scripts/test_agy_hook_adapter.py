@@ -1175,9 +1175,10 @@ class TestAgyHookAdapter(unittest.TestCase):
 
         out = json.loads(mock_stdout.getvalue())
         self.assertEqual(out.get("decision"), "allow")
-        # Both the "Bash" and the wildcard "*" matcher groups fire for a
-        # run_command call, so the mocked message is forwarded from each.
-        self.assertIn("Remember: this directory is protected.", out.get("systemMessage", ""))
+        self.assertNotIn("systemMessage", out)
+        # The message should have been logged to stderr instead
+        stderr_val = mock_stderr.getvalue()
+        self.assertIn("claude-hook-adapter [allow]: Remember: this directory is protected.", stderr_val)
 
     @patch('os.path.exists', return_value=True)
     @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
@@ -1203,7 +1204,8 @@ class TestAgyHookAdapter(unittest.TestCase):
 
         out = json.loads(mock_stdout.getvalue())
         self.assertEqual(out.get("decision"), "deny")
-        self.assertEqual(out.get("systemMessage"), "Writing to /etc is not allowed.")
+        self.assertNotIn("systemMessage", out)
+        self.assertIn("Writing to /etc is not allowed.", out.get("reason", ""))
 
     @patch('os.path.exists', return_value=True)
     @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))

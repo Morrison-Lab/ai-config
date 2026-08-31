@@ -669,10 +669,9 @@ def _sub_with_mask(
     group. Today's callers pass ``" "`` or a callable, and no expansion is
     wanted; the difference is named so a later caller does not assume it.
 
-    A replaced region takes mask 1 only when the WHOLE matched region was
-    masked; a partly-cited match is not a citation. A ``repl`` callable that
-    returns the match unchanged keeps that region's mask, which is what lets
-    ``_blank_quote``'s preserve path survive.
+    A replaced region takes mask 1 when it replaces a span; a ``repl``
+    callable that returns the match unchanged keeps that region's original mask,
+    which is what lets ``_blank_quote``'s preserve path survive.
     """
     out: List[str] = []
     out_mask = bytearray()
@@ -685,11 +684,7 @@ def _sub_with_mask(
         if replacement == match.group(0):
             out_mask.extend(mask[begin:finish])
         else:
-            fill = 1 if finish > begin and (0 not in mask[begin:finish]) else 0
-            if fill:
-                out_mask.extend(b"\x01" * len(replacement))
-            else:
-                out_mask.extend(b"\x00" * len(replacement))
+            out_mask.extend(b"\x01" * len(replacement))
         out.append(replacement)
         prev = finish
     out.append(text[prev:])
@@ -711,7 +706,7 @@ def _strip_fences_with_mask(
     for index, line in enumerate(lines):
         if index in to_strip:
             out.append(" ")
-            out_mask.append(0)
+            out_mask.append(1)
         else:
             out.append(line)
             out_mask.extend(mask[offset:offset + len(line)])
@@ -1310,22 +1305,57 @@ _NEGATOR_RE = re.compile(
 )
 
 
-def _is_resolved_blocking_mention(scan: str, match: re.Match) -> bool:
+_PAST_STATE_RE = re.compile(
+    r"(?:\bpreviously"
+    r"|\bprior(?:\s+(?:round|verdict)(?:['\u2019]s)?"
+    r"|\s+(?:finding|issue)s?)?"
+    r"|\bearlier"
+    r"|\bround-\d+(?:['\u2019]s)?"
+    r")(?:[-\s]+|\s+\*{1,2}|\s+(?:the\s+)?)$",
+    re.IGNORECASE,
+)
+
+
+def _has_resolution_suffix(scan: str, match: re.Match) -> bool:
+    """True when match is followed by a resolution suffix and affirmative follow-up."""
+    suffix = scan[match.end():]
+    # A dot glued to the next character -- a filename ("tactics.qmd"), a
+    # decimal -- is not a sentence end; only [.!?] followed by whitespace
+    # or end-of-text terminates the sentence.
+    sentence = re.match(r"^(?:(?![.!?](?:\s|$))[\s\S])*[.!?]?", suffix)
+    if sentence is None:
+        return False
+    paragraph = re.match(r"^(?:(?!\n[ \t]*\n)[\s\S])*", suffix)
+    if paragraph is None:
+        return False
+    following = paragraph.group(0)[sentence.end():]
+    return (
+        RESOLVED_BLOCKING_SUFFIX.fullmatch(sentence.group(0)) is not None
+        and AFFIRMATIVE_RESOLUTION_FOLLOWUP.fullmatch(following) is not None
+    )
+
+
+def _is_negated_resolution(scan: str, match: re.Match) -> bool:
+    """True when a past-state blocking mention is followed by a resolution verb but negated earlier in the sentence."""
+    if match.group(0).lower() != "blocking":
+        return False
+    prefix = scan[max(0, match.start() - 40):match.start()]
+    if _PAST_STATE_RE.search(prefix) is None:
+        return False
+    sentence_start = _sentence_start_before(scan[:match.start()])
+    if not _NEGATOR_RE.search(scan[sentence_start:match.start()]):
+        return False
+    return _has_resolution_suffix(scan, match)
+
+
+def _is_resolved_blocking_mention(
+    scan: str, match: re.Match, cited: Optional[bytearray] = None
+) -> bool:
     """True for a past blocking state explicitly resolved in the same sentence."""
     if match.group(0).lower() != "blocking":
         return False
     prefix = scan[max(0, match.start() - 40):match.start()]
-    past_state = re.search(
-        r"(?:\bpreviously"
-        r"|\bprior(?:\s+(?:round|verdict)(?:['\u2019]s)?"
-        r"|\s+(?:finding|issue)s?)?"
-        r"|\bearlier"
-        r"|\bround-\d+(?:['\u2019]s)?"
-        r")(?:[-\s]+|\s+\*{1,2}|\s+(?:the\s+)?)$",
-        prefix,
-        re.IGNORECASE,
-    )
-    if past_state is None:
+    if _PAST_STATE_RE.search(prefix) is None:
         return False
     # A negated resolution -- "None of the earlier blocking findings were
     # resolved" -- is a live not-clean statement: the suffix reads as
@@ -1365,21 +1395,9 @@ def _is_resolved_blocking_mention(scan: str, match: re.Match) -> bool:
     sentence_start = _sentence_start_before(scan[:match.start()])
     if _NEGATOR_RE.search(scan[sentence_start:match.start()]):
         return False
-    suffix = scan[match.end():]
-    # A dot glued to the next character -- a filename ("tactics.qmd"), a
-    # decimal -- is not a sentence end; only [.!?] followed by whitespace
-    # or end-of-text terminates the sentence.
-    sentence = re.match(r"^(?:(?![.!?](?:\s|$))[\s\S])*[.!?]?", suffix)
-    if sentence is None:
+    if cited is not None and 1 in cited[sentence_start:match.start()]:
         return False
-    paragraph = re.match(r"^(?:(?!\n[ \t]*\n)[\s\S])*", suffix)
-    if paragraph is None:
-        return False
-    following = paragraph.group(0)[sentence.end():]
-    return (
-        RESOLVED_BLOCKING_SUFFIX.fullmatch(sentence.group(0)) is not None
-        and AFFIRMATIVE_RESOLUTION_FOLLOWUP.fullmatch(following) is not None
-    )
+    return _has_resolution_suffix(scan, match)
 
 # The findings-heading pattern is likewise built once: the two list copies
 # below and the section-resolution wiring in _unresolved_finding_pattern
@@ -1660,9 +1678,10 @@ def classify_verdict(body: str, state: str = "") -> str:
                     continue
             prefix = scan[max(0, match.start() - 25):match.start()]
             if NOT_CLEAN_NEGATION_PREFIX.search(prefix):
-                continue
+                if not _is_negated_resolution(scan, match):
+                    continue
             if pat == _BARE_REJECTION and _is_resolved_blocking_mention(
-                scan, match
+                scan, match, cited
             ):
                 continue
             if pat == r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b":
@@ -1839,9 +1858,10 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
                     continue
             prefix = scan_body[max(0, match.start() - 25):match.start()]
             if NOT_CLEAN_NEGATION_PREFIX.search(prefix):
-                continue
+                if not _is_negated_resolution(scan_body, match):
+                    continue
             if pat == _BARE_REJECTION and _is_resolved_blocking_mention(
-                scan_body, match
+                scan_body, match, cited
             ):
                 continue
             if pat == _FINDINGS_HEADING_PATTERN:

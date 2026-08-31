@@ -2402,6 +2402,30 @@ def main() -> int:
               "- **[Critical]** auth bypass is now resolved.\n\n"
               "### Verdict\nReady for merge\n")
           is None)
+    check("Findings (non-blocking) with 'is being fixed in a follow-up PR' is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (non-blocking)\n\n"
+              "- **[Critical]** auth bypass is being fixed in a follow-up PR\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (non-blocking) with 'fixed only in happy path; error path still leaks' is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (non-blocking)\n\n"
+              "- **[Defect]** the leak is fixed only in the happy path; error path still leaks\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (resolved) with 'was fixed in abc1234 but was later reverted' is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- **[Defect]** was fixed in abc1234 but the fix was later reverted\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (non-blocking) with generic identifier 'fixed in some_function' is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (non-blocking)\n\n"
+              "- **[Major]** bug fixed in some_function\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
 
     # --- ai-config#2402: a structured non-bot clean supersedes that same
     # identity's earlier not-clean, and never counts toward quorum. ---------

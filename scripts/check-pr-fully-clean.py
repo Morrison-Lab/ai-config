@@ -1436,18 +1436,26 @@ _LINE_RESOLUTION_WORDS = re.compile(
     r"(?i)\b(?:"
     r"(?:is|are|was|were)\s+(?:now\s+|also\s+|already\s+|since\s+)?"
     r"(?:fixed|resolved|addressed|closed|removed|corrected|cleared)"
+    r"(?:\s+(?:in|by|via)\s+(?:commit\s+[a-f0-9]+|[a-f0-9]{7,40}|PR\s+#?\d+|#\d+|this\s+round(?:['\u2019]s)?\s+(?:diff|push|commit|changes?|fixes?)))?"
     r"|ha(?:s|ve)\s+(?:since\s+)?been\s+"
     r"(?:fixed|resolved|addressed|closed|removed|corrected|cleared)"
+    r"(?:\s+(?:in|by|via)\s+(?:commit\s+[a-f0-9]+|[a-f0-9]{7,40}|PR\s+#?\d+|#\d+|this\s+round(?:['\u2019]s)?\s+(?:diff|push|commit|changes?|fixes?)))?"
     r"|no\s+longer\s+applies"
-    r"|(?:fixed|resolved|addressed|cleared)\s+(?:in|by|via)\s+[a-z0-9_#.-]+"
     r"|(?:now|already|previously)\s+(?:fixed|resolved|addressed|cleared)"
+    r"|(?:fixed|resolved|addressed|cleared)\s+(?:in|by|via)\s+(?:commit\s+[a-f0-9]+|[a-f0-9]{7,40}|PR\s+#?\d+|#\d+|this\s+round(?:['\u2019]s)?\s+(?:diff|push|commit|changes?|fixes?))"
     r")\b"
 )
 _LINE_UNRESOLVED_WORDS = re.compile(
     r"(?i)\b(?:"
-    r"unresolved|unaddressed|still\s+(?:unresolved|broken|present|failing|reproducible|open)"
-    r"|not\s+(?:resolved|addressed|fixed|closed|cleared)"
+    r"unresolved|unaddressed|partially\s+(?:resolved|addressed|fixed)"
+    r"|still\s+(?:unresolved|broken|present|failing|reproducible|open|leaks?|crashes?|fails?)"
+    r"|not\s+(?:resolved|addressed|fixed|closed|cleared|fully|completely|yet)"
+    r"|(?:is|are|was|were|currently)\s+being\s+(?:fixed|resolved|addressed|closed|corrected|cleared)"
     r"|(?:must|needs?\s+to|should|ought\s+to|has\s+to|remains?\s+to|will|yet\s+to)\s+be\s+(?:fixed|resolved|addressed|closed|corrected|cleared)"
+    r"|(?:fixed|resolved|addressed)\s+only\s+(?:in|for|on|partially)"
+    r"|only\s+(?:fixed|resolved|addressed)\s+(?:in|for|on|partially)"
+    r"|(?:later\s+|was\s+|since\s+)?reverted"
+    r"|(?:in|for|via)\s+(?:a\s+)?(?:follow-?up|later|future|next|subsequent|separate)\s+(?:pr|commit|branch|release|issue|round)"
     r")\b"
     r"|(?<!non-)(?<!non\s)\bblocking\b"
 )
@@ -1462,7 +1470,11 @@ def _section_has_unresolved_blocking_items(section: str) -> bool:
         if _LINE_UNRESOLVED_WORDS.search(line):
             return True
         if _SECTION_SEVERITY_TAG.search(line):
-            if not _LINE_RESOLUTION_WORDS.search(line):
+            res_match = _LINE_RESOLUTION_WORDS.search(line)
+            if not res_match:
+                return True
+            after_res = line[res_match.end():]
+            if re.search(r"(?i)\b(?:but|however|although|except|yet|reverted|partially|only)\b", after_res):
                 return True
     return False
 

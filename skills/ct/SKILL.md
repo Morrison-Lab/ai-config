@@ -13,6 +13,7 @@ allowed-tools:
 
 # ct (alias for `cut-tools`)
 
-This is a short alias. Read and follow the canonical skill:
+This is a short alias.
+Read and follow the canonical skill:
 
 → **[cut-tools](../cut-tools/SKILL.md)**

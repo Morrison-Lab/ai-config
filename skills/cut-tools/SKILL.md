@@ -11,10 +11,11 @@ allowed-tools:
   - Glob
 ---
 
-# cut-tools — audit and disable unneeded MCP servers and toolsets
+# cut-tools --- audit and disable unneeded MCP servers and toolsets
 
 Every active tool and MCP server injects parameter schemas and descriptions into
-the model's base prompt on every interaction. Disabling unused MCP servers and
+the model's base prompt on every interaction.
+Disabling unused MCP servers and
 tool sets directly buys context window space, reduces per-turn latency, costs
 no quota, and requires no permanent code changes.
 
@@ -30,16 +31,17 @@ no quota, and requires no permanent code changes.
 ## Core principle
 
 Tool definitions consume fixed context overhead on every single prompt turn
-before any conversation history or workspace files are read. An environment
+before any conversation history or workspace files are read.
+An environment
 configured with multiple heavyweight MCP servers (such as GitHub, database,
 cloud infrastructure, browser automation, or search servers) can spend
 thousands of tokens purely on tool parameter schemas.
 
 Cutting unneeded tool definitions:
 1. **Directly recovers context budget** for code, diffs, and reasoning.
-2. **Costs zero quota** — reducing system prompt size saves tokens on every
+2. **Costs zero quota** --- reducing system prompt size saves tokens on every
    turn.
-3. **Eliminates tool selection ambiguity** — reduces hallucinated or misrouted
+3. **Eliminates tool selection ambiguity** --- reduces hallucinated or misrouted
    tool calls by presenting only relevant capabilities.
 
 ## Procedure
@@ -51,7 +53,7 @@ active in the session across project and user configuration:
 
 - **Claude Code:** Run `claude mcp list` or inspect `~/.claude.json`,
   `.claude/settings.json`, and `.mcp.json`.
-- **Cursor:** Check `.cursor/mcp.json` and Cursor Settings → Features → MCP.
+- **Cursor:** Check `.cursor/mcp.json` and Cursor Settings -> Features -> MCP.
 - **Antigravity / Gemini CLI:** Check `.agents/plugins.json`, `.agents/skills.json`,
   and `~/.gemini/config/plugins.json`.
 - **Codex / OpenCode:** Check active tool configurations and CLI flags.

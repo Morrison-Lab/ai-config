@@ -304,6 +304,17 @@ mechanical), and
 [`skill-checklists`](../workflow/skill-checklists.md) (the pause-point
 instrument where no script can decide).
 
+## Don't use LLMs for algorithmic thinking --- use validated algorithmic software
+
+Never use probabilistic language models for algorithmic operations:
+counting, arithmetic, symbolic algebra, calculus (derivatives and integrals),
+linear algebra, sorting, or mathematical proof verification.
+Delegate computation to validated deterministic software (e.g. Computer Algebra
+Systems, theorem provers, numerical packages, standard CLI tools),
+or write and validate the software yourself before consuming its output.
+
+Full statement: [`no-llm-algorithmic-thinking`](no-llm-algorithmic-thinking.md).
+
 ## The 3Rs lens — reduce, reuse, recycle
 
 The environmental mnemonic maps cleanly onto the catalog, and makes a
@@ -360,13 +371,15 @@ This governs a present, diagnosed defect in code you are writing now.
 Feeling both at once usually means you are holding a suspicion rather
 than a diagnosis, and the way out is to settle which it is.
 
-Deterministic-tools and algorithmatize-checks are the same instinct at
-two scopes, and the pair is worth keeping distinct rather than merging.
-Algorithmatize-checks governs *verification* and is the older, narrower
-statement; deterministic-tools governs the work itself and adds the
-argument from inspectability.
-Read the narrow one when deciding how to verify something, and the broad
-one when deciding whether a task should still be done by hand at all.
+Deterministic-tools, algorithmatize-checks, and no-llm-algorithmic-thinking
+form a three-part family against model reasoning:
+algorithmatize-checks governs *verification* and is the narrower
+statement;
+deterministic-tools governs the *work itself* and adds the argument
+from inspectability and tooling over time;
+and no-llm-algorithmic-thinking strictly forbids in-context algorithmic
+computation (arithmetic, algebra, calculus, linear algebra, sorting,
+proof verification), mandating execution of validated software.
 
 Deterministic-tools also sits in the same relation to YAGNI that
 don't-incur-technical-debt does, and resolves it the same way.

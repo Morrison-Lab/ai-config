@@ -33,17 +33,23 @@ A session that pursues only the goal builds tooling while deciding the
 thing in front of it by hand.
 Both faces, or neither works.
 
-## Distinct from algorithmatize-checks
+## Distinct from algorithmatize-checks and no-llm-algorithmic-thinking
 
 [`algorithmatize-checks`](../workflow/algorithmatize-checks.md) is the
 checks-shaped special case, and most of the argument for correctness and
 cost already lives there.
-Read it first; this principle extends it on two axes rather than
-restating it.
+[`no-llm-algorithmic-thinking`](no-llm-algorithmic-thinking.md) is the
+computational counterpart, strictly forbidding in-context probabilistic
+reasoning for arithmetic, algebra, calculus, sorting, and proof steps.
+Read them first; this principle extends them on two axes rather than
+restating them.
 
-**Scope.** That rule governs *verification*: never spend reasoning on a
+**Scope.**
+The check rule governs *verification*: never spend reasoning on a
 check an algorithm can decide.
-This one governs the work itself.
+The algorithmic-thinking rule governs *computation*: never spend probabilistic
+tokens on an algorithmic result software can compute.
+This one governs the *workflow itself*.
 Counting, extracting, transforming, resolving a routine merge, composing
 a status line, harvesting job output --- each is doing rather than
 checking, and each is a candidate.

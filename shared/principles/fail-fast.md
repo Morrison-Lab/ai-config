@@ -192,6 +192,77 @@ correct conclusion drawn from a premise nobody had tested.
 - **Don't:** treat matching numbers on re-measurement as retroactive evidence
   that the first measurement was pointed at the right tree.
 
+**Second occurrence, 2026-08-31, and no drift was involved: the tree was
+replaced on purpose, by the harness the check was running inside.**
+The subsection above states its cause as *drift* --- a checkout that fell
+behind, an index carrying another commit's content --- so its remedies aim at
+a copy you could have refreshed.
+A harness that rewrites the checkout deliberately matches none of that
+wording, and there is nothing to refresh.
+The bytes on disk are current, complete, and from the wrong branch by design.
+
+An agent reviewing a pull request reported that its harness had reset the
+working-tree copy of `CLAUDE.md` to the base branch's pre-PR version, so the
+PR's own edits could not alter the reviewer's instructions.
+That is a defensible hardening measure, and it is invisible to every checker
+in the job.
+It is also not the same restore as gha#598's, which replaces
+`.github/workflows/` on a workflow-editing PR, and that PR touched no
+workflow.
+Two different restores, one class.
+
+**A checker that takes its scope from git and its content from disk is where
+this lands.**
+`check-new-line-breaks.py` and `lint-markdown`'s
+`check_list_item_splices.mjs` each read added line numbers from
+`git diff <base>...HEAD`, then read the file itself from the working tree
+(`path.read_text` and `readFileSync`).
+Given a restored tree, the line numbers describe the pull request and the text
+describes the base, so the check reports on a file that exists nowhere.
+No error, no warning, and a clean verdict about content nobody wrote.
+
+The falsifying question settles it in one step.
+Neither tool prints a revision, so neither output can tell the two trees
+apart.
+Establish which tree is on disk before believing a clean result, and where it
+is the wrong one, build the right one rather than editing the checkout:
+
+```bash
+git status --short -- <path>       # did something replace a tracked file?
+git worktree add /tmp/head HEAD    # a tree no harness has rewritten
+```
+
+The `git archive <ref> | tar -x` remedy above does the same job.
+Naming `git worktree` is worth the extra line here because the substituted
+content is a tracked file at its own path.
+That gives `git status` something to report, which is a cheaper check than
+materializing a tree.
+
+- **Do:** ask what *rewrote* the checkout, not only what fell behind it, when
+  a filesystem-reading checker comes back clean inside CI or an agent harness.
+- **Do:** treat a file the harness reads as instructions --- `CLAUDE.md`,
+  `AGENTS.md`, a prompt fragment --- as the likeliest one to have been
+  swapped, since that is exactly why a harness would swap it.
+- **Don't:** read "the checker is diff-scoped" as "the checker reads git
+  objects".
+  Scope from the diff and content from disk is the common shape, and only the
+  first half is pinned to a revision.
+- **Don't:** assume a hardening measure leaves verification intact.
+  Restoring a trusted file silently retargets every whole-tree instrument in
+  the job.
+
+(Measured 2026-08-31 on the review run for
+[gha#781](https://github.com/Morrison-Lab/gha/pull/781),
+[run 33349203163](https://github.com/Morrison-Lab/gha/actions/runs/33349203163).
+The reviewer found this in its own process rather than having it found for it,
+re-ran through a `git worktree` on the real head, and disclosed the vacuous
+first pass in its own report.
+The reset is that reviewer's account of its own harness and is not
+independently confirmed here.
+What is confirmed is the reading pattern, at `check-new-line-breaks.py` line
+569 and `check_list_item_splices.mjs` line 59 in `Morrison-Lab/gha` at
+`a0e0342`.)
+
 ### A fifth cause: the subject's own fallback absorbs what the check looks for
 
 The four causes above all leave the check examining the wrong thing --- a check that broke, an empty input, a selection stage that collapsed, or the wrong subject.

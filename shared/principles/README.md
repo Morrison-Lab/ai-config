@@ -335,6 +335,21 @@ Operationalized by:
 [`least-flexible-tool`](../coding/least-flexible-tool.md) (narrowest construct for the job),
 and [`challenge-the-assignment`](../workflow/challenge-the-assignment.md) (clarifying ambiguity vs resisting explicit direction).
 
+## Prefer optionality over removing functionality
+
+Never remove existing functionality entirely when you can add optionality instead.
+When changing default behavior, fixing an issue, or refactoring a workflow,
+do not delete an existing capability or code path outright if it served a legitimate purpose.
+Instead, make the improved behavior the default
+and preserve the legacy or alternative behavior behind an explicit, documented opt-in parameter,
+environment variable, or configuration toggle.
+
+Full statement: [`prefer-optionality-over-removal`](prefer-optionality-over-removal.md).
+Operationalized by:
+[`configurable-parameters`](../coding/configurable-parameters.md) (expose variations as parameters/toggles),
+[`specific-beats-general`](specific-beats-general.md),
+and the `clean` / `simplify` review passes.
+
 ## The 3Rs lens — reduce, reuse, recycle
 
 The environmental mnemonic maps cleanly onto the catalog, and makes a

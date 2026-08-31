@@ -1034,6 +1034,14 @@ class TestPrePushReview(unittest.TestCase):
 
 
 
+
+    def test_verdict_clean_discussing_blocking_status(self):
+        commit = "12345678abcdef00"
+        report = "### Summary Verdict\nVerdict: Ready for merge\n### Critical Findings\nNone.\n### Observations & Non-Blocking Suggestions\n[INFO] No prior blocking findings were resolved.\n[INFO] The issue of the UI blocking the main thread was fixed.\n### Verification Steps\nNone\nReviewed-Commit: " + commit
+        is_valid, is_clean, _ = reviewer.parse_review_verdict(report, expected_commit_sha=commit)
+        self.assertTrue(is_valid)
+        self.assertTrue(is_clean)
+
     def test_verdict_mislabeled_blocker(self):
         commit = "12345678abcdef00"
         report = "### Summary Verdict\nVerdict: Ready for merge\n### Critical Findings\nNone.\n### Observations & Non-Blocking Suggestions\n[MINOR] The command crashes on every invocation and is not ready for merge.\n### Verification Steps\nNone\nReviewed-Commit: " + commit

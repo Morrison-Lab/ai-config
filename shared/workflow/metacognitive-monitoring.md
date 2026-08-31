@@ -22,6 +22,13 @@ check.
 
 - **State** --- is it green, is it pushed, does it exist, is it public.
   Re-query, never recall.
+- **Capability** --- I cannot read that, no tool covers it, that needs a human
+  with access.
+  Attempt the plainest route once and report what came back.
+  There is nothing to re-query when no call was ever made, which is why this
+  is not the **State** case:
+  see [`growth-mindset`](growth-mindset.md)'s "A limitation you never tested
+  leaves no error to diagnose".
 - **Scope** --- all, every, none, only, the whole corpus.
   Check the population rather than the sample that came to mind.
 - **Cause** --- it failed because, this is flaky, that change broke it.
@@ -34,8 +41,8 @@ check.
 
 ## A premise you were handed is still a claim
 
-All five types above describe assertions **you** generate, so all five trigger
-on the act of writing one.
+Every type above describes an assertion **you** generate, so each one triggers
+on the act of writing it.
 
 - **Do:** restate a load-bearing premise explicitly and name what would
   falsify it, before building on it.
@@ -179,7 +186,7 @@ Each was fixed on its own terms and none of the fixes generalized.)
 
 ## An action you recommend is a claim about state
 
-The five types above fire on an assertion, and the section above extends them
+The claim types above fire on an assertion, and the section above extends them
 to a premise you were handed.
 
 - **Do:** re-query an artifact's state immediately before recommending an

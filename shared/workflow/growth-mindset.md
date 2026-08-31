@@ -175,6 +175,67 @@ still the right move, but it is the case where reading it does not help.
 - **Don't:** reach for installing something to get past a sandbox boundary;
   what you install inherits the boundary.
 
+## A limitation you never tested leaves no error to diagnose
+
+The three sections above all begin with a call that was made and came back
+wrong: a tool errored, a bounded probe returned nothing, a request was
+refused.
+Each remedy reads the artifact that call produced.
+None of them reaches the case where no call was made at all.
+
+The shape is a negative claim about your own capability.
+"That is not readable from this session."
+"Confirming it needs a human with access to the settings page."
+Such a claim is inferred from the shape of the tool surface --- no dedicated
+tool covers the thing, so the data must be out of reach --- and a tool listing
+is a menu rather than a boundary.
+
+Three things make it worse than an ordinary wrong guess.
+
+**It produces no failure to notice.**
+Each of the three cases above announces itself with an error, a timeout, or a
+status code, and each remedy is to read that output more carefully.
+This one leaves nothing red, nothing logged, and no output to re-read.
+The cheap test that would refute it is exactly the test the claim tells you
+not to bother running, so the claim protects itself.
+
+**A positive claim gets tested by being acted on; this one never is.**
+"I can read X" leads to reading X, which either works or does not.
+"I cannot read X" ends the inquiry, so nothing downstream ever disagrees with
+it, and repeating it across several turns feels like consistency rather than
+like an unexamined premise hardening.
+
+**It ships.**
+A capability claim is a natural thing to write into a PR body or an issue as
+a "needs a human with access" note, where it becomes a premise for whoever
+reads it next and outlives the conversation that could have corrected it.
+That is [`challenge-the-assignment`](challenge-the-assignment.md)'s
+"An issue body is an assignment you author" case with a capability claim in
+place of a count, and it puts the sentence under the same bar as any other
+factual claim in a deliverable, per
+[`fact-check-prose`](../writing/fact-check-prose.md).
+
+The test is one call, and it costs less than the sentence asserting the
+limitation.
+Before writing that something cannot be read from this session, run the
+plainest route: a raw HTTP request against the service's documented API with
+whatever credential the environment already holds.
+An MCP tool, a CLI subcommand, and a raw request are three routes to one API,
+so the absence of the first two is no evidence about the third.
+
+- **Do:** attempt the plainest available route once, and report what came
+  back, before claiming a thing cannot be read from this session.
+- **Do:** hold a capability claim in a PR body, an issue, or a handoff to the
+  same standard as any other factual claim in a deliverable.
+- **Don't:** infer a limitation from the tool listing --- it enumerates what
+  is convenient, not what is reachable.
+- **Don't:** count having repeated the limitation across turns as having
+  established it; a claim that ends the inquiry can never be contradicted by
+  it.
+
+See [`growth-mindset.cases.md`](growth-mindset.cases.md), "branch-protection
+settings reported unreadable across several turns, never once queried".
+
 ## Applies to our own metacognitive tooling, too
 
 The same bias governs the skills, memories, and self-improvement loops in these

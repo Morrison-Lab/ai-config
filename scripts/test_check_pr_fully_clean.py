@@ -1998,6 +1998,28 @@ def main() -> int:
         )
         is not None,
     )
+    check(
+        "_unresolved_finding_pattern: '### Nits' with non-blocking item stays not-clean",
+        checker._unresolved_finding_pattern(
+            "### Nits\nnon-blocking: rename variable x for clarity.\n\n### Verdict\n**Ready for merge.**\n"
+        )
+        is not None,
+    )
+    check(
+        "_unresolved_finding_pattern: '### Issues' with non-blocking item stays not-clean",
+        checker._unresolved_finding_pattern(
+            "### Issues\nnon-blocking: there is an off-by-one bug in the loop.\n\n### Verdict\n**Ready for merge.**\n"
+        )
+        is not None,
+    )
+    check(
+        "classify_verdict: 'Needs more work' with non-blocking trailer stays not-clean",
+        checker.classify_verdict(
+            "### Verdict\nNeeds more work: non-blocking issue, please rename variable x.\n",
+            "",
+        )
+        == "not-clean",
+    )
     check("unrelated unresolved wording in a later paragraph does not poison resolution",
           checker.classify_verdict(
               "### Verdict\n**Ready for merge.** The prior verdict's blocking "

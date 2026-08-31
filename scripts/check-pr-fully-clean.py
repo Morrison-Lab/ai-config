@@ -1465,7 +1465,7 @@ NOT_CLEAN_NEGATION_SUFFIX = re.compile(
     r"^\s*(?:"
     r"[*_:.\-]*\s*(?:none\b(?!\s+of\b)|n/a\b|none\s+identified\b|none\s+remaining\b)"
     r"|"
-    r"[:.\-(]*\s*(?:non-blocking\b|nothing\b|0\b|no\s+(?:\w+\s+){0,3}(?:findings|issues|bugs|violations|blockers)|no\s+new\b)"
+    r"[:.\-]*\s*(?:nothing\b|0\b|no\s+(?:\w+\s+){0,3}(?:findings|issues|bugs|violations|blockers)|no\s+new\b)"
     r")",
     re.IGNORECASE,
 )
@@ -1763,6 +1763,16 @@ _SECTION_FINDING_ITEM = re.compile(
 )
 
 
+_FINDINGS_TRAILER_SUFFIX = re.compile(
+    r"^\s*(?:"
+    r"[*_:.\-]*\s*(?:none\b(?!\s+of\b)|n/a\b|none\s+identified\b|none\s+remaining\b)"
+    r"|"
+    r"[:.\-(]*\s*(?:non-blocking\b|nothing\b|0\b|no\s+(?:\w+\s+){0,3}(?:findings|issues|bugs|violations|blockers)|no\s+new\b)"
+    r")",
+    re.IGNORECASE,
+)
+
+
 def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:
     """True when the findings section (on the lines after the heading containing *match_end*) opens with a
     whole-line no-findings statement and carries no finding-shaped content
@@ -1820,7 +1830,7 @@ def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:
     lines = lead + [ln for ln in section.splitlines() if ln.strip()]
     if not lines:
         return False
-    if not NOT_CLEAN_NEGATION_SUFFIX.search(lines[0]):
+    if not _FINDINGS_TRAILER_SUFFIX.search(lines[0]):
         return False
     return not _SECTION_FINDING_ITEM.search("\n".join(lines[1:]))
 

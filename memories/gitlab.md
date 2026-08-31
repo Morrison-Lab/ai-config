@@ -45,6 +45,7 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
   - `docs_check`: runs `roxygen2::roxygenise()` and verifies no changes via `git diff-index HEAD -- man/ NAMESPACE DESCRIPTION`.
   - `version-check`: asserts that the package version in `DESCRIPTION` has been incremented beyond `main`.
   - Push vs comment review triggers: repos overriding `claude-review` with `rules: - when: never` suppress push-triggered reviews in favor of comment-triggered reviews. Request a review on the MR by posting `@claude review` (e.g. `glab mr note <MR_IID> -m "@claude review"`), which triggers the webhook `claude-respond` pipeline on `main`.
+  - Blocking discussions: `glab mr note create` creates a resolvable discussion thread; if the repository enables "All discussions must be resolved before merge", the MR cannot be merged until the thread is resolved via `glab api --method PUT projects/:id/merge_requests/:iid/discussions/:discussion_id -f "resolved=true"`.
 - GitLab CI job token allowlist:
   - When repo A's CI job needs API access to repo B, repo B must add A to its allowlist
   - `glab api --method POST "/projects/<TARGET_ID>/job_token_scope/allowlist" -f "target_project_id=<SOURCE_ID>"`

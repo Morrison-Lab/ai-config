@@ -147,7 +147,7 @@ import sys
 # the correct anchors -- a search for THOSE is the same hand-rolled parse.
 VERDICT_PHRASE = re.compile(
     r"Ready for merge|Needs more work|Needs minor changes|Needs one fix|"
-    r"Needs work|###\s*Verdict|\*\*Claude finished",
+    r"Needs work|Partial review|###\s*Verdict|\*\*Claude finished",
     re.I,
 )
 

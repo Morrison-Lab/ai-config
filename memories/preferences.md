@@ -26,6 +26,11 @@
   hosted quota is unavailable, report the blocker or use deterministic checks instead.
 - **Don't:** run Ollama, LM Studio, llama.cpp, or any other local/on-device model.
   Local inference can crash the user's computer. (User directive, 2026-08-30.)
+- **Never use LLMs for algorithmic thinking; use validated algorithmic software**:
+  Do not rely on probabilistic language model reasoning in-context for arithmetic, counting, algebra, derivatives, integrals, linear algebra, sorting, or mathematical proof verification.
+  Use validated deterministic tools (e.g. `wc -l`, `grep -c`, Python `len()`/`math`, SymPy, NumPy, R, Computer Algebra Systems, or formal proof assistants).
+  When no off-the-shelf software exists, write and validate the algorithmic software yourself before consuming its output.
+  See [`shared/principles/no-llm-algorithmic-thinking.md`](../shared/principles/no-llm-algorithmic-thinking.md). (Issue #2745 / user directive, 2026-08-31.)
 - Treat a request to disable AI review as narrowly repository-scoped: it applies only to the repositories the user explicitly names in that request.
   The invariant is organization-independent --- don't widen a named-repository request into a sibling repository, into the rest of that organization, or into later unrelated PRs, and don't remove review automation anywhere that wasn't named.
   Verify each named repository independently rather than inferring one from another, since App installation is a per-repository fact.

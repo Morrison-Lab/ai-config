@@ -1271,6 +1271,8 @@ def classify_verdict(body: str, state: str = "") -> str:
             # of what precedes the phrase and says nothing about what follows.
             if CLEAN_QUALIFIER.search(_sentence_remainder(scan, match.end())):
                 continue
+            if _unresolved_finding_pattern(body):
+                return "not-clean"
             return "clean"
 
     # A review from a known agent whose format the classifier cannot read is

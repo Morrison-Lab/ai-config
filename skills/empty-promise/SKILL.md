@@ -12,9 +12,10 @@ allowed-tools:
 # empty-promise — audit conversation context and discharge empty promises immediately
 
 Audit recent conversation history and assistant turns for forward-looking
-commitments, debt declarations, and unmonitored automation claims made without an
-immediate enforcement mechanism shipped in the same turn. Identify what mechanism
-is owed and implement or file it immediately to clear the debt.
+commitments, debt declarations, and unmonitored automation claims
+made without an immediate enforcement mechanism shipped in the same turn.
+Identify what mechanism is owed
+and implement or file it immediately to clear the debt.
 
 The operational counterpart to [`shared/workflow/no-empty-promises.md`](../../shared/workflow/no-empty-promises.md)
 and the `AGENTS.md` "No empty promises" rule.
@@ -33,10 +34,11 @@ and the `AGENTS.md` "No empty promises" rule.
 
 ## Two kinds of promises, two kinds of mechanisms
 
-A promise about future behavior is not work: it is a claim that work will happen
-later, made in a conversation that will not outlive it. Every commitment must ship
-an **implemented accountability mechanism in the same turn** — or not be made at
-all.
+A promise about future behavior is not work:
+it is a claim that work will happen later,
+made in a conversation that will not outlive it.
+Every commitment must ship an **implemented accountability mechanism in the same turn** ---
+or not be made at all.
 
 ### 1. Rule promises (standing policy / future behavior)
 
@@ -69,9 +71,10 @@ Commits to one specific outstanding action — *"the UMS pass is owed by me"*,
     or PR watcher / detached poller) carrying the concrete next step, and report
     the firing time in local Pacific Time.
   - File a tracking issue when the debt belongs to somebody else to schedule.
-- **Crucial boundary**: A written memory entry alone is the wrong instinct when
-  the debt is yours and has an actionable next step; documenting an ARDI loop is
-  not running one. Arm or run it!
+- **Crucial boundary**: A written memory entry alone is the wrong instinct
+  when the debt is yours and has an actionable next step;
+  documenting an ARDI loop is not running one.
+  Arm or run it!
 
 ### 3. Future automation claims
 

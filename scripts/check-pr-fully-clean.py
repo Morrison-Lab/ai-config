@@ -1465,6 +1465,8 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
         v_raw = str(structured.get("verdict", "")).strip().upper()
         if v_raw in ("CLEAN", "READY FOR MERGE", "READY_FOR_MERGE", "APPROVED"):
             return None
+        elif v_raw in ("NOT-CLEAN", "NOT_CLEAN", "NEEDS MORE WORK", "NEEDS_MORE_WORK", "CHANGES_REQUESTED", "BLOCK", "BLOCKED"):
+            return f"structured blocking verdict ({v_raw})"
 
     scan_body, cited = strip_cited_finding_vocab_with_mask(body)
     for pat in FINDING_PATTERNS:

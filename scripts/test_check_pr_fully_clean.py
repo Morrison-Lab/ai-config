@@ -3310,6 +3310,71 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     check("extract_structured_review: malformed JSON returns None", checker.extract_structured_review(malformed_struct) is None)
     check("classify_verdict: malformed structured JSON falls back to regex classification", checker.classify_verdict(malformed_struct) == "clean")
 
+    # Structured NOT_CLEAN with empty findings returns unresolved finding
+    struct_not_clean_empty_findings = """
+<!-- review-data:
+{
+  "verdict": "NOT_CLEAN",
+  "findings": []
+}
+-->
+"""
+    check("_unresolved_finding_pattern: NOT_CLEAN with empty findings returns blocking finding", checker._unresolved_finding_pattern(struct_not_clean_empty_findings) is not None)
+
+    # Structured commit_sha matching in check_review_comments
+    target_sha = "3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b"
+    mismatched_sha = "ffffffffffffffffffffffffffffffffffffffff"
+    
+    clean_struct_payload = {
+        "comments": [
+            {
+                "author": {"login": "claude[bot]"},
+                "createdAt": "2026-08-30T20:00:00Z",
+                "authorAssociation": "NONE",
+                "body": f"""
+<!-- review-data:
+{{
+  "schema_version": "1.0",
+  "reviewer": "Claude",
+  "commit_sha": "{target_sha}",
+  "verdict": "CLEAN",
+  "findings": []
+}}
+-->
+""",
+            }
+        ],
+        "reviews": [],
+    }
+    with patch.object(checker, "run_cmd", return_value=json.dumps(clean_struct_payload)):
+        ok, issues = wrapped_check_review_comments("123", target_sha, "octocat/example", quorum=1)
+        check("check_review_comments: matches structured commit_sha matching target HEAD", ok and not any(i for i in issues if not i.startswith("NOTE: ")))
+
+    mismatched_struct_payload = {
+        "comments": [
+            {
+                "author": {"login": "claude[bot]"},
+                "createdAt": "2026-08-30T20:00:00Z",
+                "authorAssociation": "NONE",
+                "body": f"""
+<!-- review-data:
+{{
+  "schema_version": "1.0",
+  "reviewer": "Claude",
+  "commit_sha": "{mismatched_sha}",
+  "verdict": "CLEAN",
+  "findings": []
+}}
+-->
+""",
+            }
+        ],
+        "reviews": [],
+    }
+    with patch.object(checker, "run_cmd", return_value=json.dumps(mismatched_struct_payload)):
+        ok, issues = wrapped_check_review_comments("123", target_sha, "octocat/example", quorum=1)
+        check("check_review_comments: does not match mismatched structured commit_sha", not ok)
+
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 

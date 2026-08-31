@@ -643,3 +643,23 @@ A clean automated review from every available provider evaluating the current HE
   Mutation testing with encoded/escaped representations detects unhandled
   transformation divergences.
 
+## Pattern 36: Fixing the Admitting Site But Not the Branching Site
+- **Do**: When handling a new condition, trigger, or input case, verify both the **admitting site** (the gate deciding whether the code runs) and the **branching site** (the logic deciding what the code does once it runs).
+  Find branching sites by searching for the conditions or variables they test *instead of* the new condition (e.g., variables that go empty, unset, or defaulted in the new case).
+  Test admitted cases by running the actual execution logic against realistic fixtures.
+- **Don't**: Stop after updating the admitting rule named in the issue or finding without auditing downstream branching logic;
+  a fix that admits a case into downstream code that doesn't handle it creates a false sense of completion while silently executing the wrong path.
+- **Example**: 2026-08-29 on `health-analytics-core/HACtions!47` (internal GitLab):
+  A reviewer noted tag pipelines were excluded from a CI job.
+  The fix added `- if: $CI_COMMIT_TAG` to the job's `rules:`, admitting tags.
+  However, the job's downstream script still evaluated `if [ "${CI_COMMIT_BRANCH:-}" = "${CI_DEFAULT_BRANCH:-}" ]` to determine whether to perform a whole-tree scan or a diff against `main`.
+  Because `CI_COMMIT_BRANCH` is empty on tag pipelines, tags took the diff branch against `main` (which tags have no branch relationship to) instead of the intended whole-tree scan.
+  CI was green because CI never ran a tag pipeline in that MR, giving a false appearance of completion until re-reviewed.
+- **Canonical Rule**: [`admitting-vs-branching-site.md`](../shared/principles/admitting-vs-branching-site.md) and [`fail-fast.md`](../shared/principles/fail-fast.md).
+- **Fix**: Identify all downstream branching points that depend on context variables,
+  update branching logic to handle the new case explicitly (e.g. `[ -n "$CI_COMMIT_TAG" ] || [ "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH" ]`),
+  and add execution tests against fixtures simulating the new input state.
+- **Algorithmatizable?**
+  Partially per-domain (e.g. static analyzers checking that CI jobs admitting `$CI_COMMIT_TAG` do not rely exclusively on `CI_COMMIT_BRANCH` in their scripts).
+  General case requires behavioural fixture tests.
+

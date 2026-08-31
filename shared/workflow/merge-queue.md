@@ -79,7 +79,7 @@ In repository settings under **Rulesets** -> **Rules** -> **Require merge queue*
 - **Grouping strategy:**
   - `ALLGREEN`: All PRs in a speculative batch must pass CI before merging together.
   - `HEADGREEN`: PRs merge individually as soon as their speculative prefix passes.
-- **Batch size:** Configure `min_entries_to_merge` (minimum PRs before testing a batch, typically 1) and `max_entries_to_merge_at_once` (maximum batch size, e.g. 5).
+- **Batch size:** Configure `min_entries_to_merge` (minimum PRs before testing a batch, typically 1) and `max_entries_to_merge` (maximum batch size, e.g. 5).
 - **Check response timeout:** Maximum time allowed for CI to complete before timing out a queued entry (e.g. 60 minutes).
 
 ### Workflow event trigger

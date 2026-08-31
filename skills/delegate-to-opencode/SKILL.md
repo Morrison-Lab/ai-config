@@ -95,7 +95,8 @@ An empty `"openrouter": {}` therefore activates the same roster;
 a `models` entry earns its lines only by setting a display name, or by reaching an id the registry does not carry yet:
 
 ```jsonc
-// merged into the existing "provider" block of opencode.jsonc --- not a standalone file
+// Insert inside the existing "provider" object in ~/.config/opencode/opencode.jsonc
+// (add a comma after the preceding sibling entry):
 "openrouter": {
   "models": {
     "stealth/ox-alpha": { "name": "Ox Alpha (stealth, 1M context)" }

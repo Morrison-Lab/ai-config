@@ -108,7 +108,8 @@ Present the question or decision with its structured recommendation:
 - **`AGENTS.md` ("Always give recommendations with questions")**:
   Universal baseline rule requiring recommendations on all questions.
 - **[`prompt-me`](../prompt-me/SKILL.md) / [`pm`](../pm/SKILL.md)**:
-  Surfaces pending questions; pair with `rec` if a surfaced question lacked a recommendation.
+  Surfaces pending questions;
+  pair with `rec` if a surfaced question lacked a recommendation.
 - **[`pending-decisions`](../pending-decisions/SKILL.md) / [`pd`](../pd/SKILL.md)**:
   Presents tracker-level decisions sequentially, with recommendations.
 - **[`brainstorm`](../brainstorm/SKILL.md)**:

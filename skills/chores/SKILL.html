@@ -423,7 +423,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li><strong>patch / minor</strong> — same major and the major is ≥ 1 (<code>3.0.2 → 3.0.3</code>, <code>2.4 → 2.7</code>) → <strong>safe</strong>.</li>
 <li><strong><code>0.x</code> bump</strong> (<code>0.4 → 0.5</code>, <code>0.4.1 → 0.4.2</code>) → <strong>review</strong>; under semver a <code>0.x</code> release may break between minor versions, and many <code>0.x</code> maintainers don’t respect patch semantics either — don’t wave these through as safe.</li>
 <li><strong>major</strong> — leading number increases (<code>4 → 7</code>, <code>2 → 3</code>, <code>1 → 2</code>) → <strong>review</strong>.</li>
-<li><strong>submodule</strong> (<code>chore(submodule):</code>) — no semver; it tracks a moving branch by design. Treat a green submodule bump as <strong>safe</strong> (auto-advancing the pointer is the whole point), unless the diff is unexpectedly large.</li>
+<li><strong>submodule</strong> (<code>chore(submodule):</code>) — no semver; it tracks a moving branch by design. Treat a green submodule bump as <strong>safe</strong> (auto-advancing the pointer is the whole point), unless the diff is unexpectedly large. If the repository has migrated to a native plugin for the vendored tool (e.g.&nbsp;<code>ai-config</code> as a plugin), close the bump PR and remove the redundant submodule instead per <a href="../../shared/workflow/remove-redundant-plugin-submodules.md"><code>remove-redundant-plugin-submodules.md</code></a>.</li>
 </ul>
 <p>When the title has no parseable version (some Renovate digests), fall back to the PR body’s update table or treat it as <strong>review</strong>.</p>
 </section>

@@ -638,7 +638,8 @@ A clean automated review from every available provider evaluating the current HE
   In round 5 (`fbf50a69`), this had to be restored: `json.loads` resolves Unicode escapes (e.g. `"commit_sha": "\u0061bc1234..."`), so a payload with escaped characters matches the parsed SHA while escaping the raw substring disjuncts.
 - **Canonical Rule**: [`fact-check-code-logic.md`](../shared/coding/fact-check-code-logic.md) ("A subsumption proof over raw text must account for every transformation before claiming a disjunct is dead").
 - **Fix**: Construct adversarial test fixtures with escaped, decoded, or transformed representations to test whether raw text matching and structured value matching can diverge before deleting extraction logic.
-## Pattern 35: Unbounded Subset Overlap in Fuzzy Matching Defeating Negative Controls
+
+## Pattern 36: Unbounded Subset Overlap in Fuzzy Matching Defeating Negative Controls
 - **Do**: When implementing fuzzy or token-overlap matching to tolerate subtitles or minor variations, enforce length and density proportionality (e.g. bounded character/token length ratio or Jaccard similarity threshold) alongside token containment.
 - **Don't**: Accept full subset containment (`overlap_coef == 1.0`) of a short needle in a long haystack without bounding the relative lengths or densities;
   a short 2-token title (e.g. "Causal Inference") is a 100% token subset of an arbitrarily long, unrelated review title (e.g. "A Review of Causal Inference Methods in Epidemiology and Public Health Policy"), defeating the tool's fabrication-detection purpose.

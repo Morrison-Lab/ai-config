@@ -224,22 +224,67 @@ def normalize_doi(doi: str | None) -> str:
     return d.strip().strip("/")
 
 
+def split_bibtex_authors(author_str: str) -> list[str]:
+    """Split BibTeX author string by 'and' taking braces into account."""
+    s = author_str.strip()
+    # Strip outer redundant braces if wrapped around the entire author list
+    if s.startswith("{") and s.endswith("}"):
+        # Check if first brace closes only at the end
+        depth = 0
+        closes_at_end = False
+        for idx, char in enumerate(s):
+            if char == "{":
+                depth += 1
+            elif char == "}":
+                depth -= 1
+                if depth == 0:
+                    closes_at_end = (idx == len(s) - 1)
+                    break
+        if closes_at_end:
+            inner = s[1:-1].strip()
+            # If inner contains nested braced blocks separated by 'and', use inner
+            if "{" in inner and " and " in inner.lower():
+                s = inner
+
+    authors: list[str] = []
+    current: list[str] = []
+    depth = 0
+    i = 0
+    n = len(s)
+
+    while i < n:
+        char = s[i]
+        if char == "{":
+            depth += 1
+            current.append(char)
+            i += 1
+        elif char == "}":
+            depth = max(0, depth - 1)
+            current.append(char)
+            i += 1
+        elif depth == 0 and s[i : i + 5].lower() == " and ":
+            auth = "".join(current).strip()
+            if auth:
+                authors.append(auth)
+            current = []
+            i += 5
+        else:
+            current.append(char)
+            i += 1
+
+    remaining = "".join(current).strip()
+    if remaining:
+        authors.append(remaining)
+
+    return authors
+
+
 def extract_first_author_surname(author_field: str | None) -> str:
     """Extract the first author's surname / family name from BibTeX author field."""
     if not author_field:
         return ""
 
-    raw_trimmed = author_field.strip()
-    # Check if the entire author field is wrapped in braces: institutional author
-    # (e.g. {Food and Drug Administration} or {World Health Organization})
-    if raw_trimmed.startswith("{") and raw_trimmed.endswith("}"):
-        inner = raw_trimmed[1:-1].strip()
-        if "," not in inner:
-            return clean_latex(inner)
-
-    cleaned = clean_latex(author_field)
-    # BibTeX authors separated by 'and'
-    authors = re.split(r"\s+and\s+", cleaned, flags=re.IGNORECASE)
+    authors = split_bibtex_authors(author_field)
     if not authors:
         return ""
 
@@ -247,16 +292,24 @@ def extract_first_author_surname(author_field: str | None) -> str:
     if not first_author:
         return ""
 
+    # Check if first author is a braced institutional author, e.g. {World Health Organization}
+    if first_author.startswith("{") and first_author.endswith("}"):
+        inner = first_author[1:-1].strip()
+        if "," not in inner:
+            return clean_latex(inner)
+        first_author = inner
+
+    cleaned = clean_latex(first_author)
     # Check if format is "Last, First"
-    if "," in first_author:
-        surname = first_author.split(",")[0].strip()
+    if "," in cleaned:
+        surname = cleaned.split(",")[0].strip()
     else:
         # Check if "van / von / de / da / del" prefixes exist
-        parts = first_author.split()
+        parts = cleaned.split()
         if len(parts) >= 2 and parts[-2].lower() in ("van", "von", "de", "da", "del", "der", "du"):
             surname = f"{parts[-2]} {parts[-1]}"
         else:
-            surname = parts[-1].strip() if parts else first_author
+            surname = parts[-1].strip() if parts else cleaned
 
     return surname
 

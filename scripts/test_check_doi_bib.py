@@ -97,6 +97,14 @@ def test_extract_first_author_surname() -> None:
         "author_surname: org with and in braces",
         cdb.extract_first_author_surname("{Food and Drug Administration}") == "Food and Drug Administration",
     )
+    check(
+        "author_surname: multi institutional authors",
+        cdb.extract_first_author_surname("{World Health Organization} and {Food and Drug Administration}") == "World Health Organization",
+    )
+    check(
+        "author_surname: double braced multi institutional authors",
+        cdb.extract_first_author_surname("{{World Health Organization} and {Food and Drug Administration}}") == "World Health Organization",
+    )
 
 
 def test_parse_bib_entries() -> None:

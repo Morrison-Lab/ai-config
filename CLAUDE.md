@@ -1227,6 +1227,13 @@ Apply this in review too: error handling that hides failure is a review finding,
 
 [`shared/principles/fail-fast.md`](shared/principles/fail-fast.md)
 
+## Specific beats general
+
+When two instructions, policies, configurations, or design rules apply to the same decision, the narrower, more specific rule takes precedence over the broader, general one.
+Explicit human user instructions in a specific session override general repository defaults, narrow subsystem and file configs override repository-wide policies, and targeted types and condition handlers beat generic catch-alls in code.
+
+[`shared/principles/specific-beats-general.md`](shared/principles/specific-beats-general.md)
+
 ## Coding: KISS is the umbrella principle
 
 Apply KISS to code and prose: use the simplest construct that does the job,

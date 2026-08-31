@@ -60,8 +60,10 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
   An earlier Fix in this pattern recommended those short rollups ---
   that was the wrong instrument for a terminal claim.
   Re-hit 2026-08-31 (Antigravity session, working `ucdavis/matt.contracts` [PR #98](https://github.com/ucdavis/matt.contracts/pull/98)):
-  reported PR as "MERGEABLE" in status recap based on GitHub's git conflict field (`mergeable: MERGEABLE`) while CI checks were red (failing changelog, spellcheck, version check) and external review was not clean. Corrected by user: "stop saying mergeable when there's red CI and/or no clean review".
-  Never use "mergeable" as a status verdict or conflate git mergeability with PR readiness; explicitly report CI check status and review verdict.
+  reported PR as "MERGEABLE" in status recap based on GitHub's git conflict field (`mergeable: MERGEABLE`) while CI checks were red (failing changelog, spellcheck, version check) and external review was not clean.
+  Corrected by user: "stop saying mergeable when there's red CI and/or no clean review".
+  Never use "mergeable" as a status verdict or conflate git mergeability with PR readiness;
+  explicitly report CI check status and review verdict.
 - **Canonical Rule**: `AGENTS.md` ("Request review and drive every started PR to clean"),
   `fully-clean.md`, and `hooks/no-incomplete-check-enumeration.py`.
 - **Do:** Run `python3 scripts/check-pr-fully-clean.py <N> -R <owner>/<repo>`

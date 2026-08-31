@@ -56,8 +56,7 @@ When a user uses profanity or displays intense frustration:
    per [`run-ums-proactively.md`](run-ums-proactively.md).
    Record the failure mode,
    anti-pattern,
-   and resolution in [`memories/mistake-patterns.md`](../../memories/mistake-patterns.md)
-   or [`memories/preferences.md`](../../memories/preferences.md).
+   and resolution in [`memories/preferences.md`](../../memories/preferences.md).
 5. **Prevent recurrence mechanically**:
    Ship an automated check,
    hook,

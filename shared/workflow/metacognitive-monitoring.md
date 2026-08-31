@@ -1032,20 +1032,24 @@ Every case in this section so far shares one instrument: a single command was ru
 The branches-versus-refs gap and the pipe-lines-versus-rows gap both come from one `git` or `grep` invocation whose output got mis-described.
 This is the case where **two separate instruments** each answer a question shaped like "is this covered?", and a sound statement about one is read as though it settled the other.
 Nothing here is even a widening in the sense the rest of this section uses: the two instruments' outputs are not nested, so no single population contains both, and the failure is not noticing that the sentence changed subject entirely between one claim and the next.
+This is also the boundary with ["A re-measurement with a different instrument is a second measurement, not a correction"](#a-re-measurement-with-a-different-instrument-is-a-second-measurement-not-a-correction) above.
+That section's two instruments read the **same** quantity, so its failure is publishing a changed reading as an error, while this section's two instruments answer **different** questions.
 
 A review can hand you exactly this shape, correctly, and the review's own soundness is what supplies the false credibility.
 The finding is impeccable about the instrument it names, and the read-across to a different instrument is a separate claim the review never made and the reader has to supply --- which happens without feeling like an inference, because the second instrument was never named as absent, only as untouched by the first.
 
 (Measured 2026-08-30, while closing out [Morrison-Lab/ai-config#2722](https://github.com/Morrison-Lab/ai-config/issues/2722) in [#2726](https://github.com/Morrison-Lab/ai-config/pull/2726), the follow-up to [#2668](https://github.com/Morrison-Lab/ai-config/pull/2668).
-Three review rounds correctly reported that `scripts/check-verdict-scan-parity.py`'s fuzz corpus never crosses its vocabulary axes with fenced-code content, so its `0 divergences` result said nothing about six fenced-code shapes the rounds had found by hand.
+Three review rounds on [#2668](https://github.com/Morrison-Lab/ai-config/pull/2668) correctly reported that `scripts/check-verdict-scan-parity.py`'s fuzz corpus never crosses its vocabulary axes with fenced-code content, so its zero-divergences result said nothing about six fenced-code shapes those rounds had found by hand.
 Verifying that those six reproducers behaved correctly on merged `main` settled a third, different question --- the scanner's live *behaviour* --- and answered neither the parity corpus's coverage nor the test suite's.
-Reasoning from "the parity corpus doesn't cover this" to "nothing pins this" and adding six regression tests on that premise duplicated tests `main` already carried under different variable names but identical body strings: `fenced_code_comment_forward_reraise` and six siblings, all present on `main` before this incident and confirmed there afterward.
+Reasoning from "the parity corpus doesn't cover this" to "nothing pins this" and adding six regression tests on that premise duplicated tests `main` already carried under different variable names but identical body strings: `fenced_code_comment_forward_reraise` and five siblings, all present on `main` before this incident and confirmed there afterward.
 An adversarial-reviewer subagent caught the duplication and the commit was dropped before it was pushed.
 The cheap check that would have found the duplicates directly --- grep the suite for the reproducer's distinctive **body** text, not for the name a new test would be given --- was never run, because nothing about a true finding on instrument A prompted a check of instrument B at all.)
 
 - **Do:** name the instrument a coverage claim is about, in the sentence that states it, whenever more than one check in the diff answers a question shaped like "is this covered?"
 - **Do:** derive a second instrument's coverage independently --- its own query over its own scope --- rather than inferring it from the first instrument's result.
 - **Don't:** read "instrument A doesn't cover this shape" as "this shape is uncovered", when a different instrument (a test suite, a linter, a second corpus) was never itself checked.
+
+Those three rules belong to this case alone, not to the section's standing Do/Don't list.
 
 - **Do:** write what the measurement establishes and what you are claiming as
   two separate sentences, and confirm the second does not reach past the first.

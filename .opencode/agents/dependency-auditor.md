@@ -35,7 +35,8 @@ Check whichever of these apply to the repo:
 4. **Quarto / other tool versions pinned in CI** --- compare against the
    latest upstream release.
 5. **Git submodules** --- `git submodule status`, then check each submodule's
-   upstream for commits ahead.
+   upstream for commits ahead. If a submodule is also used as a native plugin
+   (e.g. `ai-config`), flag it for removal rather than a pin bump.
 6. **Other manifests present** --- `DESCRIPTION` version floors,
    `package.json` (`npm outdated`), Dockerfile base images.
 

@@ -197,6 +197,17 @@ In every session --- at session start, and again periodically during long sessio
    Ensure `bootstrap.sh` has run so the Gemini/Antigravity registration files (`skills.json` and `plugins.json`, which point at this checkout's own `skills/` and `plugins/ai-config` paths) stay current.
 3. **Working repo checkouts.** Keep `main` updated (`git fetch origin`, `git pull --ff-only`).
 
+## Remove redundant submodules when using native plugins
+
+When a repository configures ai-config (or any other tool) as a native plugin
+(via Claude Code, Cursor, Antigravity, or CI workflows), remove any redundant
+git submodule for that same tool (such as `.ai-config`).
+Native plugins provide direct integration, making redundant submodules
+unnecessary and prone to drift.
+De-initialize and remove the submodule, clean `.gitmodules`, remove legacy
+symlinks (such as `.claude/skills -> ../.ai-config/skills`), and update CI
+checkout settings.
+See [`shared/workflow/remove-redundant-plugin-submodules.md`](shared/workflow/remove-redundant-plugin-submodules.md).
 
 ## Verify changes before pushing
 

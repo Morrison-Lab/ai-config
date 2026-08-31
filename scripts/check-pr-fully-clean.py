@@ -1426,16 +1426,17 @@ _EXEMPT_FINDINGS_HEADING_RESOLVED = re.compile(
 )
 _FINDINGS_HEADING_NOT_EXEMPT = re.compile(
     r"(?i)\b(?:"
-    r"unresolved|unaddressed|unfixed|remaining|still|open|persisting"
-    r"|partially\s+(?:resolved|addressed|fixed|closed|cleared)?"
-    r"|partly\s+(?:resolved|addressed|fixed|closed|cleared)?"
-    r"|not\s+(?:fully\s+|completely\s+|entirely\s+|quite\s+|yet\s+)?(?:resolved|addressed|fixed|closed|cleared)?"
+    r"unresolved|unaddressed|unfixed"
+    r"|partially\s+(?:resolved|addressed|fixed|closed|cleared)"
+    r"|partly\s+(?:resolved|addressed|fixed|closed|cleared)"
+    r"|not\s+(?:fully\s+|completely\s+|entirely\s+|quite\s+|yet\s+)?(?:resolved|addressed|fixed|closed|cleared)"
     r"|never\s+(?:resolved|addressed|fixed|closed|cleared)"
     r"|hardly\s+(?:resolved|addressed|fixed|closed|cleared)"
     r"|scarcely\s+(?:resolved|addressed|fixed|closed|cleared)"
     r"|without\s+(?:a\s+)?fix"
     r"|yet\s+to\s+be\s+(?:resolved|addressed|fixed)"
     r"|to\s+be\s+(?:resolved|addressed|fixed)"
+    r"|still\s+(?:unresolved|open|unaddressed|broken)"
     r")\b"
     r"|(?<!non-)(?<!non\s)\bblocking\b"
 )
@@ -1474,6 +1475,11 @@ _PREFIX_DISQUALIFY_RE = re.compile(
     r"|assumes?|assumed|purports?|purported|alleges?|alleged|supposedly|allegedly"
     r"|apparently|seemingly|presumably|unconfirmed|unverified|reported"
     r"|if|unless|whether|had|though|although"
+    r"|seems?(?:\s+to(?:\s+have(?:\s+been)?)?)?|looks?\s+(?:like|to\s+be)"
+    r"|hopes?|hoping|hoped|hopefully"
+    r"|in\s+theory|theoretically|hypothetically|ostensibly|tentatively"
+    r"|maybe|perhaps|possibly|probably|likely|unclear|unsure|suspects?"
+    r"|appears?(?:\s+to(?:\s+be)?)?"
     r")\b"
 )
 _PREFIX_NON_RESOLUTION_SUBJECT = re.compile(
@@ -1571,6 +1577,9 @@ def _is_exempt_findings_heading(
     if line_end == -1:
         line_end = len(scan_body)
     heading_line = scan_body[line_start:line_end]
+
+    if not re.match(r"^[ \t]*#{1,6}\s", heading_line):
+        return False
 
     if _FINDINGS_HEADING_NOT_EXEMPT.search(heading_line):
         return False

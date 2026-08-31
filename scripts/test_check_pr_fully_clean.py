@@ -2498,6 +2498,36 @@ def main() -> int:
               "- **[Critical]** crash was fixed in commit abc1234.\n\n"
               "### Verdict\nReady for merge\n")
           is not None)
+    check("Findings (resolved) with 'it seems this is fixed' is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- it seems this is fixed\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (resolved) with 'it looks like this is fixed' is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- it looks like this is fixed\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (resolved) with 'this seems to have been fixed' is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- this seems to have been fixed\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (resolved) with 'I hope this is fixed' is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- I hope this is fixed\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (resolved) with 'in theory this is fixed' is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- in theory this is fixed\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
 
     # --- ai-config#2402: a structured non-bot clean supersedes that same
     # identity's earlier not-clean, and never counts toward quorum. ---------

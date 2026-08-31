@@ -100,6 +100,7 @@ cases --- the guard never blocks and never raises, because a `PreToolUse`
 hook that raises is an outage on a tidy-up flag.
 """
 import json
+import os
 import re
 import shlex
 import shutil

@@ -79,6 +79,7 @@ Fails OPEN on any parse trouble. A guard that breaks every agent launch when
 its input is malformed costs more than the omission it reports.
 """
 import json
+import os
 import sys
 
 # The harness declares Explore and Plan as read-only ROLES; that contract, not

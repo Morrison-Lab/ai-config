@@ -724,6 +724,7 @@ def warning_payload(verdict):
             view_mcp=stems["view_mcp"],
             detail=_detail(verdict),
         )
+        system = SYS_MISSING.format(label=label)
     res = {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",

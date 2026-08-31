@@ -93,6 +93,7 @@ Fails OPEN on any parse trouble. A guard that breaks every Bash call when its
 input is malformed costs more than the omission it reports.
 """
 import json
+import os
 import re
 import sys
 

@@ -201,6 +201,7 @@ return 0 with nothing on stdout. A reminder that cannot establish its own
 precondition must not fire --- see `fail-fast.md` on bounding a fallback.
 """
 import json
+import os
 import re
 import sys
 

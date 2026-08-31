@@ -69,6 +69,7 @@ misfires is worse than a missing one" -- no `permissionDecision`, ever.
 Fails OPEN on any parse trouble, same as every guard here.
 """
 import json
+import os
 import re
 import shlex
 import sys

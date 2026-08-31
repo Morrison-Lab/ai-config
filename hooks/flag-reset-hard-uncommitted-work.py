@@ -93,6 +93,7 @@ Fails OPEN on any parse trouble, on `git status`/`git rev-parse` failing or
 timing out, and outside a git repository.
 """
 import json
+import os
 import re
 import shlex
 import subprocess

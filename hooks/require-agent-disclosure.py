@@ -60,6 +60,7 @@ many MCP tool names this file lists.
 Fails OPEN: any parse problem returns 0 with no output.
 """
 import json
+import os
 import re
 import sys
 

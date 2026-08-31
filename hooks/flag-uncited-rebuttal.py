@@ -632,6 +632,7 @@ def main() -> int:
         return 0
 
     url_list = "\n".join(f"  - {u}" for u in urls)
+    note = NOTE.format(urls=url_list)
     out = {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",

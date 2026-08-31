@@ -355,7 +355,8 @@ def main():
                             reason = f"[{desc}] {base_reason}" if desc != "run_command" else base_reason
                             deny_response = {"decision": "deny", "reason": reason}
                             if system_messages:
-                                deny_response["systemMessage"] = "\n\n".join(system_messages)
+                                combined_msgs = "\n\n".join(system_messages)
+                                deny_response["reason"] = f"{reason}\n\n{combined_msgs}"
                             print(json.dumps(deny_response))
                             return
                         if hso.get("additionalContext"):
@@ -365,7 +366,7 @@ def main():
 
         allow_response = {"decision": "allow"}
         if system_messages:
-            allow_response["systemMessage"] = "\n\n".join(system_messages)
+            print(f"claude-hook-adapter [allow]: {' '.join(system_messages)}", file=sys.stderr)
         print(json.dumps(allow_response))
         return
 

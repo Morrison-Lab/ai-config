@@ -459,6 +459,20 @@ label --- plausible output, wrong subject.
 `git status` check ran in the sparta checkout this way, and its output was
 initially read as the ai-config answer.)
 
+**Confirm that a request belongs to the active session before acting on it.**
+An unrelated repository, pull request, file, or feature name can be pasted
+into a session by mistake. Before searching, editing, or reporting on it,
+compare the request with the active workspace and task; when the mismatch is
+complete, ask whether the user intended a different session or repository.
+
+- **Do:** state the active repository/task and confirm the intended session
+  before investigating a request that has no plausible connection to either.
+- **Don't:** treat a completely unrelated request as a prompt to search other
+  repositories or mutate the current checkout.
+
+(2026-08-31: an `abridge` MR session began investigating a `hac.sap` pull
+request after a URL was supplied without its repository context.)
+
 **In an AGENT / subagent thread the cwd behavior INVERTS -- it RESETS to the
 project root between Bash calls, so a `cd` does NOT persist.**
 The main-session persistence above is a property of that tool;

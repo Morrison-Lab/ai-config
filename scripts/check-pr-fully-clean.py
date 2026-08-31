@@ -1032,15 +1032,21 @@ def strip_cited_finding_vocab_with_mask(text: str) -> Tuple[str, bytearray]:
     # preceding and following paragraph bounds around the citation, with
     # the aside itself still excluded so its own verdict text cannot
     # self-veto.
-    _paragraph_starts = [0] + [_p.end() for _p in re.finditer(r"\n[ \t]*\n", text)]
-    _paragraph_ends = [_p.start() for _p in re.finditer(r"\n[ \t]*\n", text)]
-
     _lines = text.split("\n")
     _line_starts = [0]
     for _l in _lines[:-1]:
         _line_starts.append(_line_starts[-1] + len(_l) + 1)
     _fenced_lines, _, _orphan_markers = find_fence_spans(text, swallow_unclosed=True)
     _ignored_lines = _fenced_lines | _orphan_markers
+
+    _paragraph_starts = [0]
+    _paragraph_ends = []
+    for _p in re.finditer(r"\n[ \t]*\n", text):
+        _lineno = bisect.bisect_right(_line_starts, _p.start() + 1) - 1
+        if _lineno not in _ignored_lines:
+            _paragraph_starts.append(_p.end())
+            _paragraph_ends.append(_p.start())
+
     _heading_starts = []
     for _h in re.finditer(r"(?m)^#{1,6}\s", text):
         _lineno = bisect.bisect_right(_line_starts, _h.start()) - 1

@@ -3310,6 +3310,28 @@ def main() -> int:
         "a backward re-raise before a fenced code block with # comments refuses the strip",
         checker.classify_verdict(fenced_code_comment_backward_reraise) == "not-clean",
     )
+    fenced_blank_line_forward_reraise = (
+        "In response to [round 2](https://x) "
+        "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**), noted.\n"
+        "```\ncode line 1\n\ncode line 2\n```\n\n"
+        "and still remains open.\n\n"
+        "### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a forward re-raise past a fenced code block with blank lines refuses the strip",
+        checker.classify_verdict(fenced_blank_line_forward_reraise) == "not-clean",
+    )
+    fenced_blank_line_backward_reraise = (
+        "This is still unresolved.\n\n"
+        "```\ncode line 1\n\ncode line 2\n```\n"
+        "In response to [round 2](https://x) "
+        "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**), thanks.\n\n"
+        "### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a backward re-raise before a fenced code block with blank lines refuses the strip",
+        checker.classify_verdict(fenced_blank_line_backward_reraise) == "not-clean",
+    )
     long_sentence_reraise = (
         "In response to [round 2](https://x) "
         "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**) "

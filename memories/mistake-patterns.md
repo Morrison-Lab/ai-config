@@ -595,10 +595,8 @@ A clean automated review from every available provider evaluating the current HE
   or enforce strict disjointness between alternatives under repetition;
   measure execution time on long pathological inputs.
 - **Algorithmatizable?**
-  Yes.
-  Not yet built --- static regex linters or timeout test probes checking for
-  nested quantifiers and overlapping alternations can flag self-ambiguous
-  repeated groups mechanically.
+  Yes --- static regex linters and timeout probes
+  ([ai-config#2768](https://github.com/Morrison-Lab/ai-config/issues/2768)).
 
 ## Pattern 32: Treating a Sampling Instrument's Zero as a Result Without Verifying Arm Reach
 - **Do**: When using a corpus-sampling or generator-based instrument (such as `scripts/check-verdict-scan-parity.py`) to verify parity or absence of regressions, explicitly report and verify the **reach** of newly added arms or branches (e.g., confirming the new arm was actually executed and reached, and reporting the number of cases evaluated).

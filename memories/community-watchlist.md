@@ -22,6 +22,7 @@ the working Claude-in-Chrome route): [`reddit-access.md`](reddit-access.md).
 | r/AI_Agents | high | Broad agentic-practice surface: orchestration postmortems, token-overhead benchmarks, security incidents, unattended-ops checklists. |
 | r/ClaudeAI | high | Primary-source tips (Claude Code team), rules-file compliance findings, hook patterns, terminal workflow posts; several of the top-scoring practice posts in the run. |
 | r/ClaudeCode | high | Highest density of directly-applicable Claude Code workflow posts: review pipelines, skills with published benchmarks, agent teams, worker pools, token audits. |
+| r/claudeskills | high | Claude Code custom skills, rulesets, and plugin architectures: anti-slop rulesets, post-tool regex & statistical checking hooks, and pattern research. |
 | r/cursor | high | Planning-loop and spec-driven workflows, cost-routing measurements, and the price-vs-actual-cost study; practices transfer to Claude Code with little translation. |
 | r/LocalLLaMA | high | Tool-interface design from experienced builders, skill-file handoff patterns, and the strongest incident threads; noisy with model releases but the practice posts are substantive. |
 | r/mcp | high | Concentrated, convergent clusters on tool-schema bloat, Code Mode, and CLI-over-MCP; small subreddit but nearly every harvested post was on-scope. |

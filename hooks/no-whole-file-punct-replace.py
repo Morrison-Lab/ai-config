@@ -217,11 +217,12 @@ def main() -> int:
     try:
         payload = json.load(sys.stdin)
         tool = payload.get("tool_name") or ""
-        cmd = (payload.get("tool_input") or {}).get("command") or ""
+        inp = payload.get("tool_input") or {}
+        cmd = inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or inp.get("script") or ""
     except Exception:
         return 0  # fail open
 
-    if tool != "Bash" or not cmd:
+    if tool not in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell") or not cmd:
         return 0
 
     # Block only when a SINGLE mutating segment satisfies all conditions on

@@ -1255,12 +1255,12 @@ def main() -> int:
         payload = json.load(sys.stdin)
     except Exception:
         return 0
-    if not isinstance(payload, dict) or payload.get("tool_name") != "Bash":
+    if not isinstance(payload, dict) or payload.get("tool_name") not in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
         return 0
     tool_input = payload.get("tool_input")
     if not isinstance(tool_input, dict):
         return 0
-    command = tool_input.get("command")
+    command = tool_input.get("command") or tool_input.get("CommandLine") or tool_input.get("cmd") or tool_input.get("script")
     if not isinstance(command, str) or not command.strip():
         return 0
 
@@ -1292,17 +1292,19 @@ def main() -> int:
         if len(undischarged) > 3:
             listed += f"\n  - ... and {len(undischarged) - 3} more"
 
-        print(json.dumps({
+        out = {
             "hookSpecificOutput": {
                 "hookEventName": "PreToolUse",
                 "additionalContext": NOTE.format(claims=listed),
             },
-            "systemMessage": (
+        }
+        if not os.environ.get("ANTIGRAVITY_AGENT"):
+            out["systemMessage"] = (
                 f"Forge comment asserts a count/enumeration ({len(undischarged)} "
                 "unverified claim(s)); paste the deriving command or verify "
                 "first."
-            ),
-        }))
+            )
+        print(json.dumps(out))
     except Exception:
         return 0
     return 0

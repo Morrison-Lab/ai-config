@@ -233,49 +233,70 @@ def scan(path):
         if REVIEW_TOOL.search(raw) or REVIEW_WORD.search(raw):
             last_review_at = i
 
-        blocks = (m.get("message") or {}).get("content") or []
-        if not isinstance(blocks, list):
-            continue
-        is_assistant = m.get("type") == "assistant"
+        tool_calls = []
+        text_blocks = []
 
-        for b in blocks:
-            if not isinstance(b, dict):
+        is_assistant = m.get("type") == "assistant" or m.get("role") == "assistant"
+        blocks = (m.get("message") or {}).get("content") or m.get("content") or []
+        if isinstance(blocks, list):
+            for b in blocks:
+                if isinstance(b, dict):
+                    if b.get("type") == "tool_use":
+                        tool_calls.append((b.get("name") or "", b.get("input") or {}))
+                    elif b.get("type") == "text" and is_assistant:
+                        text_blocks.append(b.get("text") or "")
+        elif isinstance(blocks, str) and is_assistant:
+            text_blocks.append(blocks)
+
+        if m.get("type") in {"PLANNER_RESPONSE", "GENERIC"} or m.get("source") == "MODEL":
+            content = m.get("content")
+            if isinstance(content, str):
+                text_blocks.append(content)
+            elif isinstance(content, list):
+                for b in content:
+                    if isinstance(b, dict) and b.get("type") == "text":
+                        text_blocks.append(b.get("text") or "")
+                    elif isinstance(b, str):
+                        text_blocks.append(b)
+            for tc in m.get("tool_calls") or []:
+                if isinstance(tc, dict):
+                    tname = tc.get("name") or (tc.get("function") or {}).get("name") or ""
+                    targs = tc.get("args") or tc.get("input") or (tc.get("function") or {}).get("arguments") or {}
+                    if isinstance(targs, str):
+                        try:
+                            targs = json.loads(targs)
+                        except Exception:
+                            targs = {"command": targs}
+                    tool_calls.append((tname, targs if isinstance(targs, dict) else {}))
+
+        for name, inp in tool_calls:
+            if not isinstance(inp, dict):
+                inp = {}
+            if name in ("Write", "Edit", "NotebookEdit", "write", "edit", "write_to_file", "replace_file_content"):
+                target = str(inp.get("file_path") or inp.get("path") or inp.get("TargetFile") or inp.get("target_file") or "")
+                if MECH_PATH.search(target):
+                    discharge_at = i
                 continue
+            if name in ("Task", "Agent", "invoke_subagent"):
+                blob = str(inp.get("prompt") or inp.get("Prompt") or "") + str(inp.get("description") or "")
+            elif name in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
+                blob = str(inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or "")
+            elif name == "Skill":
+                blob = str(inp.get("skill", "")) + str(inp.get("args", ""))
+            else:
+                blob = ""
+            if blob and UMS_WORD.search(blob):
+                discharge_at = i
 
-            if b.get("type") == "tool_use":
-                name = b.get("name") or ""
-                inp = b.get("input") or {}
-                if not isinstance(inp, dict):
-                    inp = {}
-                if name in ("Write", "Edit", "NotebookEdit"):
-                    # MECHANISM: a write to a hook or CI file. A write to any
-                    # other path -- including the corpus the fix itself edits --
-                    # is deliberately NOT a discharge.
-                    if MECH_PATH.search(str(inp.get("file_path", ""))):
-                        discharge_at = i
-                    continue
-                # LEARNING: an explicit ums / record-learnings pass, or a
-                # subagent dispatched to run one.
-                if name in ("Task", "Agent"):
-                    blob = str(inp.get("prompt", "")) + str(inp.get("description", ""))
-                elif name == "Bash":
-                    blob = str(inp.get("command", ""))
-                elif name == "Skill":
-                    blob = str(inp.get("skill", "")) + str(inp.get("args", ""))
-                else:
-                    blob = ""
-                if blob and UMS_WORD.search(blob):
-                    discharge_at = i
-
-            elif b.get("type") == "text" and is_assistant:
-                prose = visible_prose(b.get("text", ""))
-                if not prose.strip():
-                    continue
-                if NOT_ENCODABLE.search(prose):  # ONE-OFF judgment
-                    discharge_at = i
-                hit = ACCEPT.search(prose)
-                if hit and (i - last_review_at) <= REVIEW_WINDOW:
-                    accept_txt, accept_at = hit.group(0).strip(), i
+        for raw_text in text_blocks:
+            prose = visible_prose(raw_text)
+            if not prose.strip():
+                continue
+            if NOT_ENCODABLE.search(prose):  # ONE-OFF judgment
+                discharge_at = i
+            hit = ACCEPT.search(prose)
+            if hit and (i - last_review_at) <= REVIEW_WINDOW:
+                accept_txt, accept_at = hit.group(0).strip(), i
 
     return accept_txt, accept_at, discharge_at
 

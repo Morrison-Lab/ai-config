@@ -96,26 +96,46 @@ def scan(path):
                 m = json.loads(line)
             except Exception:
                 continue
-            role = m.get("type")
+            role = m.get("type") or m.get("role")
             blocks = (m.get("message") or {}).get("content")
             if blocks is None:
                 blocks = m.get("content") or []
-            if not isinstance(blocks, list):
-                continue
-            for b in blocks:
-                if not isinstance(b, dict):
-                    continue
-                if b.get("type") == "tool_use":
-                    blob = (b.get("name") or "") + " " + json.dumps(b.get("input") or {})
-                    if RX_PUSH.search(blob):
-                        last_push = i
-                    if RX_COMPLETE.search(blob):
-                        last_complete = i
-                    elif RX_PARTIAL.search(blob):
-                        last_partial = i
-                elif b.get("type") == "text" and role == "assistant":
-                    if b.get("text", "").strip():
-                        text = b["text"]
+
+            # Antigravity tool calls
+            if m.get("type") in {"PLANNER_RESPONSE", "GENERIC"} or m.get("source") == "MODEL" or "tool_calls" in m:
+                for tc in m.get("tool_calls") or []:
+                    if isinstance(tc, dict):
+                        blob = (tc.get("name") or "") + " " + json.dumps(tc.get("args") or tc.get("input") or {})
+                        if RX_PUSH.search(blob):
+                            last_push = i
+                        if RX_COMPLETE.search(blob):
+                            last_complete = i
+                        elif RX_PARTIAL.search(blob):
+                            last_partial = i
+
+            # Antigravity text content
+            if m.get("type") in {"PLANNER_RESPONSE", "GENERIC"} or m.get("source") == "MODEL":
+                raw_content = m.get("content")
+                if isinstance(raw_content, str) and raw_content.strip():
+                    text = raw_content
+
+            if isinstance(blocks, list):
+                for b in blocks:
+                    if not isinstance(b, dict):
+                        continue
+                    if b.get("type") == "tool_use":
+                        blob = (b.get("name") or "") + " " + json.dumps(b.get("input") or {})
+                        if RX_PUSH.search(blob):
+                            last_push = i
+                        if RX_COMPLETE.search(blob):
+                            last_complete = i
+                        elif RX_PARTIAL.search(blob):
+                            last_partial = i
+                    elif b.get("type") == "text" and role == "assistant":
+                        if b.get("text", "").strip():
+                            text = b["text"]
+            elif isinstance(blocks, str) and role == "assistant" and blocks.strip():
+                text = blocks
     return last_push, last_partial, last_complete, text
 
 

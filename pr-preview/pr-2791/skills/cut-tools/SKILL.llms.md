@@ -21,7 +21,7 @@ Cutting unneeded tool definitions: 1. **Directly recovers context budget** for c
 Inspect which tools, plugins, and MCP servers are currently registered and active in the session across project and user configuration:
 
 - **Claude Code:** Run `claude mcp list` or inspect `~/.claude.json`, `.claude/settings.json`, and `.mcp.json`.
-- **Cursor:** Check `.cursor/mcp.json` and Cursor Settings → Features → MCP.
+- **Cursor:** Check `.cursor/mcp.json` and Cursor Settings -\> Features -\> MCP.
 - **Antigravity / Gemini CLI:** Check `.agents/plugins.json`, `.agents/skills.json`, and `~/.gemini/config/plugins.json`.
 - **Codex / OpenCode:** Check active tool configurations and CLI flags.
 

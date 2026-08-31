@@ -552,3 +552,15 @@ Pin it: `git init --bare -b main` (git 2.28+).
 (Measured 2026-08-27 on ai-config#2318: the rejected-push test passed
 locally under Apple Git's vendored `main` and failed under
 `GIT_CONFIG_NOSYSTEM=1`; caught by the external review before CI.)
+
+Recurred 2026-08-31 on ai-config#2734: a fresh fixture repeated the
+unpinned-default-branch mistake despite this entry --- the same
+locally-green, CI-red signature (`git init --bare` left the remote's
+HEAD on unborn `master`; a second clone checked out nothing; the later
+`push origin main` failed), again caught by the external review before
+it reached a merge. The `-b main` fix landed on the clone there, which
+sidesteps the advertised HEAD even when the remote is unpinned. The
+entry lives in an on-demand memory file, so writing new git fixtures
+does not surface it; the proposed instrument is a grep-level check over
+`hooks/test-*.py` and `scripts/test_*.py` for `git init --bare` or a
+fixture `git clone` without `-b main`, filed for tracking.

@@ -16,13 +16,22 @@ POLL_SECONDS = 120
 # the TAIL, because glab's `could not authenticate to one or more ...`
 # summary comes last -- but each instance's diagnosis (`API call failed`,
 # `could not read the token`) is the FIRST status line of its block, so the
-# bound has to hold whole blocks rather than line endings. A fully
-# configured instance's block, rendered from status.go's own format strings,
-# is about 480 characters (test-monitor-open-prs.py pins that one fits);
-# 1200 holds two such blocks plus the summary line, so a one- or
-# two-instance config keeps its whole listing and a larger one keeps its
-# last two instances. A `glab api` or `gh` diagnosis is one line.
-ERROR_TAIL = 1200
+# bound has to hold whole blocks rather than line endings. Rendered from
+# status.go's own format strings, a fully configured instance's block is
+# about 480 characters, and the largest single-instance listing status.go
+# produces -- a 401 on an environment-variable token, which adds three
+# hint lines to the block and a three-line trailer before the summary --
+# is about 1450. 4000 holds that largest rendering with room for a second
+# default block, and test-monitor-open-prs.py pins both renderings to fit.
+# A `glab api` or `gh` diagnosis is one line.
+ERROR_TAIL = 4000
+
+# The fields of a merge request kept in the state file, the counterpart of
+# the `--json` list open_prs() asks gh for. The rest of the object is
+# volatile (`user_notes_count`, `detailed_merge_status`, ...) and would
+# change the fingerprint -- and re-inject every description into the next
+# prompt -- on every poll.
+MERGE_REQUEST_FIELDS = ("iid", "references", "title", "updated_at", "web_url")
 # The file and the "kind" marker keep their pre-GitLab names on purpose. A
 # daemon started before the GitLab support landed keeps writing this path
 # every poll, ensure() reads the pid from it, and scripts/install-pr-monitor.py
@@ -170,13 +179,12 @@ def glab_hosts():
     polled host set would depend on where the session happened to start.
     """
     cut_short = None
-    exit_status = None
     try:
         result = subprocess.run(
             [GLAB_PATH, "auth", "status", "--all"],
             capture_output=True, text=True, timeout=POLL_SECONDS)
         output = (result.stdout or "") + (result.stderr or "")
-        exit_status = result.returncode
+        none_listed = f"(exit {result.returncode})"
     except subprocess.TimeoutExpired as error:
         # glab gives each instance its own 30 s, so one unreachable instance
         # can exhaust the budget after the reachable ones already answered.
@@ -185,16 +193,13 @@ def glab_hosts():
         # slow logged-in instance absent from that output is otherwise
         # indistinguishable from one never logged in to.
         output = _captured_text(error.stdout) + _captured_text(error.stderr)
-        if not authenticated_hosts(output):
-            raise OSError(
-                f"{error}; no authenticated host listed before the timeout: "
-                f"{output.strip()[-ERROR_TAIL:]}") from error
+        none_listed = f"({error}; nothing listed before the timeout)"
         cut_short = f"{error}; hosts listed before the timeout were polled"
     hosts = authenticated_hosts(output)
     if not hosts:
         raise OSError(
             f"glab auth status --all listed no authenticated host "
-            f"(exit {exit_status}): {output.strip()[-ERROR_TAIL:]}")
+            f"{none_listed}: {output.strip()[-ERROR_TAIL:]}")
     return hosts, cut_short
 
 
@@ -225,7 +230,8 @@ def host_merge_requests(host):
         if not isinstance(page, list):
             raise ValueError(
                 f"expected a JSON array page from glab api, got {type(page).__name__}")
-        merge_requests.extend(page)
+        merge_requests.extend(
+            {field: item.get(field) for field in MERGE_REQUEST_FIELDS} for item in page)
     return merge_requests
 
 

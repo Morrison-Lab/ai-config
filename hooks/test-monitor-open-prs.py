@@ -55,12 +55,36 @@ GLAB_STATUS_FAILED_FULL = (
     "  \u2713 API calls for gitlab.example.com are made over https protocol.\n"
     "  \u2713 REST API Endpoint: https://gitlab.example.com/api/v4/\n"
     "  \u2713 GraphQL Endpoint: https://gitlab.example.com/api/graphql/\n"
-    "  \u2713 Token found in keyring: **************************\n"
+    "  \u2713 Token found in operating system keyring: **************************\n"
+    "\n"
+    "x could not authenticate to one or more of the configured GitLab instances\n"
+)
+# The largest single-instance listing status.go produces: a 401 on a token
+# taken from an environment variable, which adds three hint lines inside
+# the block (status.go's env-token branch) and a three-line trailer before
+# the summary. ERROR_TAIL must hold this whole rendering, or the tail drops
+# the diagnosis on exactly the configuration that most needs it.
+GLAB_STATUS_ENV_TOKEN_401 = (
+    "gitlab.example.com\n"
+    "  x gitlab.example.com: API call failed: GET https://gitlab.example.com/api/v4/user: 401 {message: 401 Unauthorized}\n"
+    "    ! Token is from environment variable GITLAB_TOKEN. A wrapper may be injecting a different or expired token.\n"
+    "    ! To investigate, run type glab: an alias such as 'op plugin run -- glab' means a wrapper (for example, a 1Password shell plugin) is injecting the token; a plain path rules that out.\n"
+    "    ! To see the token value in use, run: env | grep -E 'GITLAB_TOKEN|GITLAB_ACCESS_TOKEN|OAUTH_TOKEN'\n"
+    "  \u2713 Git operations for gitlab.example.com configured to use https protocol.\n"
+    "  \u2713 API calls for gitlab.example.com are made over https protocol.\n"
+    "  \u2713 REST API Endpoint: https://gitlab.example.com/api/v4/\n"
+    "  \u2713 GraphQL Endpoint: https://gitlab.example.com/api/graphql/\n"
+    "  \u2713 Token found in environment variable GITLAB_TOKEN: **************************\n"
+    "\n"
+    "! Token is from environment variable GITLAB_TOKEN. This takes precedence over tokens stored in config or keyring.\n"
+    "  Run type glab to find the source: an alias such as 'op plugin run -- glab' means a wrapper (for example, a 1Password shell plugin) is injecting it, which is expected and needs no action.\n"
+    "  A plain path means it is set in your environment (for example, a shell profile such as ~/.bashrc or ~/.zshrc, or a CI/CD variable); remove it there so glab uses your stored credentials.\n"
     "\n"
     "x could not authenticate to one or more of the configured GitLab instances\n"
 )
 assert 400 <= len(GLAB_STATUS_FAILED_FULL) <= 600, len(GLAB_STATUS_FAILED_FULL)
-assert 2 * len(GLAB_STATUS_FAILED_FULL) <= subject.ERROR_TAIL
+assert 1300 <= len(GLAB_STATUS_ENV_TOKEN_401) <= 1700, len(GLAB_STATUS_ENV_TOKEN_401)
+assert len(GLAB_STATUS_ENV_TOKEN_401) + len(GLAB_STATUS_FAILED_FULL) <= subject.ERROR_TAIL
 assert subject.authenticated_hosts(GLAB_STATUS) == ["gitlab.com", "gitlab.example.com:8443"]
 assert subject.authenticated_hosts("gitlab.com\n  x gitlab.com: API call failed: 401\n") == []
 assert subject.authenticated_hosts("") == []
@@ -103,10 +127,10 @@ with tempfile.TemporaryDirectory() as d:
             "    sys.stderr.write('invalid hostname' + chr(10))\n"
             "    sys.exit(1)\n"
             "if host == 'noisy.example.org':\n"
-            "    sys.stderr.write('HEAD-OF-STDERR ' + 'x' * 3000 + ' TAIL-OF-STDERR')\n"
+            "    sys.stderr.write('HEAD-OF-STDERR ' + 'x' * 9000 + ' TAIL-OF-STDERR')\n"
             "    sys.exit(1)\n"
             "if host == 'gitlab.com':\n"
-            "    sys.stdout.write('[{\"iid\": 1}, {\"iid\": 2}][{\"iid\": 3}]')\n"
+            "    sys.stdout.write('[{\"iid\": 1, \"description\": \"long\", \"user_notes_count\": 4}, {\"iid\": 2}][{\"iid\": 3}]')\n"
             "elif host == 'object.example.org':\n"
             "    sys.stdout.write('{\"message\": \"401 Unauthorized\"}')\n"
             "else:\n"
@@ -119,13 +143,19 @@ with tempfile.TemporaryDirectory() as d:
         subject.STATE_PATH = os.path.join(d, "state.json")
         if subject.GLAB_PATH is not None:
             # Real glab exits 1 when ANY instance fails, even beside a working
-            # one (status.go, v1.79.0 onward), so a mixed status is exit 1 and
+            # one (status.go; `--all` itself is v1.79.0 onward), so a mixed status is exit 1 and
             # still lists the working hosts -- the exit status is not read
             # when parsing, only carried into the no-host error.
             assert subject.glab_hosts() == (["gitlab.com", "gitlab.example.com:8443"], None)
-            assert subject.host_merge_requests("gitlab.com") == [{"iid": 1}, {"iid": 2}, {"iid": 3}]
+            # Each merge request is projected to MERGE_REQUEST_FIELDS: the
+            # volatile fields the stub carries (a description, a note
+            # count) never reach the state file.
+            def mr(iid):
+                return {field: (iid if field == "iid" else None)
+                        for field in subject.MERGE_REQUEST_FIELDS}
+            assert subject.host_merge_requests("gitlab.com") == [mr(1), mr(2), mr(3)]
             state = subject.poll_once({})
-            assert state["data"] == {"gitlab_merge_requests/gitlab.com": [{"iid": 1}, {"iid": 2}, {"iid": 3}]}, state
+            assert state["data"] == {"gitlab_merge_requests/gitlab.com": [mr(1), mr(2), mr(3)]}, state
             errors = json.loads(state["error"])
             assert list(errors) == ["gitlab_merge_requests/gitlab.example.com:8443"], errors
             refused = errors["gitlab_merge_requests/gitlab.example.com:8443"]
@@ -149,11 +179,11 @@ with tempfile.TemporaryDirectory() as d:
                 subject.glab_hosts = saved_hosts
             noisy = json.loads(state["error"])["gitlab_merge_requests/noisy.example.org"]
             assert noisy.endswith("TAIL-OF-STDERR") and "HEAD-OF-STDERR" not in noisy, noisy[:80]
-            assert len(noisy) <= len("Command  returned non-zero exit status 1.: ") + 200 + subject.ERROR_TAIL, len(noisy)
+            assert len(noisy.rsplit("status 1.: ", 1)[1]) == subject.ERROR_TAIL, len(noisy)
             # ... and an oversized status listing on the no-host route, whose
             # tail still carries a full failed block's first-line diagnosis.
             with open(status_file, "w", encoding="utf-8") as stream:
-                stream.write("HEAD-OF-STATUS " + "y" * 3000 + "\n" + GLAB_STATUS_FAILED_FULL)
+                stream.write("HEAD-OF-STATUS " + "y" * 9000 + "\n" + GLAB_STATUS_ENV_TOKEN_401)
             try:
                 subject.glab_hosts()
                 raise AssertionError("no authenticated hosts should raise")
@@ -229,7 +259,6 @@ finally:
     subject.GLAB_PATH = saved_glab
 
 # Verify read_state / write_state roundtrip preserves reported fingerprint
-import tempfile, os
 with tempfile.TemporaryDirectory() as d:
     orig_path = subject.STATE_PATH
     subject.STATE_PATH = os.path.join(d, "test-prs.json")
@@ -374,7 +403,7 @@ with tempfile.TemporaryDirectory() as d:
         # A source whose CLI is missing is not checked, and its key stays
         # absent: an empty list would assert "none open" about a source the
         # poll never asked. No error either -- the host simply lacks it.
-        saved_gh = subject.GH_PATH
+        gh_before = subject.GH_PATH
         try:
             subject.GH_PATH = None
             state = subject.poll_once(state)
@@ -388,7 +417,7 @@ with tempfile.TemporaryDirectory() as d:
             except OSError as error:
                 assert "nothing to poll" in str(error)
         finally:
-            subject.GH_PATH = saved_gh
+            subject.GH_PATH = gh_before
     finally:
         subject.open_prs = real_open_prs
         subject.glab_hosts = real_glab_hosts

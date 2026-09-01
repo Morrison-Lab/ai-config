@@ -5,8 +5,10 @@ user-invocable: true
 allowed-tools:
   - Bash
   - Read
-  - Edit
   - Write
+  - Edit
+  - Glob
+  - Grep
 ---
 
 # pdc (alias for `prune-dead-code`)

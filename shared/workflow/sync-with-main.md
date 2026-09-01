@@ -242,9 +242,10 @@ saves the sibling's author a round and risks nothing they were relying on.
 The same push onto a branch you do not own --- a colleague's active work, and
 most sharply a release branch carrying an out-of-band process --- can disrupt
 something a comment would not.
-There, name the extraction, the deletion, or the rename
-and where the content went in a PR comment,
-and leave the push to whoever owns the branch.
+There, report the extraction, the deletion, or the rename
+and where the content went to the user,
+who can assign or name the PR if they want it acted on,
+and leave the branch untouched.
 Causing the conflict obliges you to *surface* it.
 It does not by itself license editing someone else's branch.
 See [`batch-merge-and-resolve`](batch-merge-and-resolve.md),

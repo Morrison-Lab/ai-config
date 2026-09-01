@@ -556,7 +556,7 @@ Before pushing to, editing, resolving threads on, or dispatching a paid
 review of any PR, resolve the invoking user and read the PR's author and
 assignees.
 Proceed only when the author is that user (or an alias
-`memories/reviewing-prs.md` lists), the user is among the assignees, the user
+`memories/reviewing-prs.md` lists for that same user), the user is among the assignees, the user
 explicitly asked for work on that PR by name, or the author is the GitHub
 Actions app (`github-actions`).
 A mention such as "do not touch #N" is not a request, a claim comment confers

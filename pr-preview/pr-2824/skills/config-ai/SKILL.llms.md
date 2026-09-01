@@ -65,7 +65,7 @@ Never silently drop a capability request because the current session happens to 
 - **`claude-agent-workflow`**, **`claude-review-workflow`**, **`agy-review-workflow`** – own the bot-CI-tuning row; all document the load-bearing patterns in their respective workflows (`claude.yml`, `claude-code-review.yml`, `antigravity-review.yml`) this skill doesn’t repeat.
 - **`upstream-issues`** (`shared/workflow/upstream-issues.md`) – the general escalation pattern (PR → issue on target → issue on own repo, ask for transfer) this skill’s Step 3 specializes for the `ai-config`/`gha` case, where the “external” repos are the user’s own but may still be out of the current session’s scope.
 - **`issue-first`** (`shared/workflow/issue-first.md`) / **`st`** – the issue-before-PR discipline Step 3’s normal push-access path still follows once a form is chosen.
-- **`use-subagents`** (`shared/workflow/use-subagents.md`) – governs when to fork a session for an emergent workflow vs dispatching a clean subagent for an explicit capability request.
+- **`use-subagents`** (`shared/workflow/use-subagents.md`) – governs when to use conversation-inheriting dispatch for an emergent workflow vs dispatching a clean subagent for an explicit capability request.
 
 ## Anti-patterns
 

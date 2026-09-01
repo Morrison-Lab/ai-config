@@ -25,7 +25,7 @@ Actively review recent session context and update all relevant memory files and 
 - Debugging insights
 - Codebase conventions discovered
 
-*(When delegating UMS to a subagent, prefer **session forking** so the subagent can survey the full conversation history directly without manual serialization from the parent orchestrator — see [`use-subagents`](../../shared/workflow/use-subagents.md).)*
+*(When delegating UMS to a subagent, prefer **conversation-inheriting dispatch** (Agent `subagent_type: "fork"`, `/subtask`, or Antigravity `self`) so the subagent surveys conversation history directly without manual serialization; see [`use-subagents`](../../shared/workflow/use-subagents.md).)*
 
 **Categorize each learning.** For each item, decide:
 

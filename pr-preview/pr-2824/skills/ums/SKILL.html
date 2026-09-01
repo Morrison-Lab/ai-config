@@ -393,7 +393,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li>Debugging insights</li>
 <li>Codebase conventions discovered</li>
 </ul>
-<p><em>(When delegating UMS to a subagent, prefer <strong>session forking</strong> so the subagent can survey the full conversation history directly without manual serialization from the parent orchestrator — see <a href="../../shared/workflow/use-subagents.md"><code>use-subagents</code></a>.)</em></p></li>
+<p><em>(When delegating UMS to a subagent, prefer <strong>conversation-inheriting dispatch</strong> (Agent <code>subagent_type: "fork"</code>, <code>/subtask</code>, or Antigravity <code>self</code>) so the subagent surveys conversation history directly without manual serialization; see <a href="../../shared/workflow/use-subagents.md"><code>use-subagents</code></a>.)</em></p></li>
 <li><p><strong>Categorize each learning.</strong> For each item, decide:</p>
 <ul>
 <li>Is it a <strong>skill update</strong>? (workflow step missing, procedure unclear)</li>

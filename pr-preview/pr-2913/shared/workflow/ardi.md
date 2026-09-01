@@ -151,9 +151,12 @@ When the timer fires:
 - If the reviewer failed, was canceled, skipped with no replacement (e.g. quota limit), or produced a stub review with no stated verdict: invoke self-review fallback per [`self-review-fallback.md`](self-review-fallback.md) rather than stalling the loop.
 - Otherwise, fix any underlying workflow or dispatch issues discovered along the way and schedule another timer to maintain continuous monitoring until a review lands, self-review fallback triggers, or CI completes.
 This applies transitively to PR-driving
-workflows such as `gi`, `gii`, and `ardia`; only monitor PRs the session owns or
-has explicitly claimed, so the rule does not authorize changing someone else's
-work.
+workflows such as `gi`, `gii`, and `ardia`;
+only monitor PRs that pass `memories/reviewing-prs.md`'s scope test
+(opened by or assigned to the invoking user, named in the request, or opened
+by a repository workflow),
+so the rule does not authorize changing someone else's work,
+and a claim comment does not bring another member's PR into scope.
 
 The loop's terminal action is to **report the PR ready, not to merge it**.
 Merging is human-gated --- it happens only on an explicit human "merge it" (the

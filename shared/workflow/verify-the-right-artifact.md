@@ -662,18 +662,24 @@ Name that route whenever you mark a figure unreproducible, since "unreachable" a
 **A ninth: a LOSSY CONVERSION of a document, standing in for the document.**
 
 The shapes above substitute an artifact that is stale, partial, or adjacent.
-This one substitutes an artifact that is current, complete for its own purpose, and **lossy by design**.
-A conversion exists to drop what its target format cannot carry,
-so reading a source document through one is not a shortcut with a staleness risk;
-it is a filter whose omissions are the whole reason the tool is useful.
+This one substitutes an artifact that is current and complete for its own purpose, and **lossy by design**.
+A conversion drops what its target format cannot carry,
+so its omissions are the reason the tool is useful rather than a defect in it.
 
 The tell is that the derived view answers the question you asked and cannot answer the question you meant.
 `pandoc -t markdown` on a `.docx` reports the text a reader sees.
-Asked whether a link is present, it reports nothing about a URL stored as a Word HYPERLINK field code,
-because that URL lives in the field's instruction text rather than in the body text pandoc emits.
-Neither is a listing of `word/_rels/document.xml.rels`,
-which enumerates one of the two ways Word stores a hyperlink and is silent about the other.
-Two independent readings then agree, and neither could have disagreed.
+Asked whether a link is present, it can report nothing about a URL stored as a Word HYPERLINK field code,
+and **where that field sits decides whether it does**.
+Measured on pandoc 3.1.3: a contiguous `fldChar` HYPERLINK field in ordinary body text
+converts to a markdown link with its URL intact,
+while the identical field nested inside a `<w:ins>` tracked insertion loses the URL
+under `--track-changes=accept`.
+The negative control is what identifies the mechanism.
+Without it the omission reads as "pandoc does not carry field-code links at all",
+which is false and was written down that way once before the control was run.
+A listing of `word/_rels/document.xml.rels` is no better:
+it enumerates one of the two ways Word stores a hyperlink and is silent about the other.
+Two independent readings then agree, and the agreement is a property of what both drop.
 
 So before concluding a document does not contain something,
 search the **stored form**: grep the source XML, the raw bytes, the file the application actually writes.
@@ -681,6 +687,8 @@ The converted view is evidence about what a reader sees, which is a different cl
 
 - **Do:** name which representation a negative is about --- rendered text, or stored source --- before reporting it.
 - **Do:** grep the stored form (`word/document.xml`, the raw file) when the claim is that something is absent.
+- **Do:** run a negative control on the conversion before naming a mechanism for what it dropped;
+  an omission with no control behind it is a guess wearing a measurement.
 - **Don't:** read two derived views agreeing as corroboration when both drop the same class of content;
   that is [`grep-is-not-coverage`](grep-is-not-coverage.md)'s guaranteed-either-way null in a new surface.
 - **Don't:** treat "lossy" as "stale" --- refetching a conversion returns the same omissions.
@@ -689,5 +697,8 @@ The converted view is evidence about what a reader sees, which is a different cl
 A manuscript's Shiny-app link was absent from the rels listing and absent from pandoc's markdown output,
 and the conclusion that it had been deleted was written into a draft review finding.
 It was present as a `fldChar` HYPERLINK field code, found by grepping `word/document.xml` for the URL.
+The manuscript is private, but the pandoc behaviour needs no manuscript:
+build a minimal `.docx` carrying the same HYPERLINK field twice,
+once in plain body text and once wrapped in `<w:ins>`, and convert it.
 [`memories/office-open-xml.md`](../../memories/office-open-xml.md) carries the docx-specific mechanics,
 including the two-pandoc-diff verification for a redlined document.)

@@ -22,7 +22,8 @@ and several entries below are about where those helpers and their documentation 
 
 ## A hyperlink can live in the rels file **or** in a field code, so the rels listing is not the whole set
 
-The entry above is right about the relationship form and incomplete as a way to *find* links.
+The `.rels` bullet above is right about the relationship form
+and incomplete as a way to *find* links.
 Word stores hyperlinks two ways:
 as a relationship (`word/_rels/document.xml.rels`, with `TargetMode="External"`),
 and as a `fldChar` HYPERLINK **field code** inline in `word/document.xml`.
@@ -50,6 +51,9 @@ As of 2026-09-01 the `docx` skill documents `merge_runs.py` as merging adjacent 
 in `word/document.xml` "without changing content or rendering",
 and lists it in the standard edit recipe.
 That claim does not hold for a document whose citations are field codes.
+Tracked as [ai-config#2918](https://github.com/Morrison-Lab/ai-config/issues/2918),
+since this is a reproducible defect in a helper we keep using
+rather than a one-off observation.
 
 Measured 2026-09-01 on a manuscript whose citations are Zotero `fldChar`/`instrText` field codes.
 Running `merge_runs.py` alone, with no other edit, merged 942 runs.
@@ -60,11 +64,24 @@ whole clauses reordered across paragraphs,
 and some citation numbers dropped entirely.
 One example: `modern ggplot2-based visualizations (15)` became `modern ggplot2`.
 
+**Those counts and that example come from a private manuscript and are not reproducible from this repository.**
+The recipe below is, on any `.docx` carrying field-code citations:
+
+```bash
+cp original.docx pristine.docx
+python3 /mnt/skills/public/docx/scripts/merge_runs.py pristine.docx   # no other edit
+pandoc -t plain --track-changes=accept original.docx -o before.txt
+pandoc -t plain --track-changes=accept pristine.docx -o after.txt
+diff before.txt after.txt
+```
+
+A non-empty diff is the defect: nothing was edited, so the two conversions should match.
+
 The diagnosis matters as much as the fact.
 The corruption is indistinguishable from "my edits broke the document",
 so the natural response is to hunt through your own edits.
-The cheap discriminator is to run `merge_runs.py` on a **pristine** copy and diff that against the original:
-if the scrambling is already there, the helper is the cause.
+That same recipe is the cheap discriminator:
+if the scrambling is already there on a copy you never touched, the helper is the cause.
 
 Field codes are not rare.
 Zotero, Mendeley, and EndNote citations, cross-references, table-of-contents entries,
@@ -72,8 +89,10 @@ and HYPERLINK fields are all field codes.
 
 - **Do:** edit the pristine XML on any document containing field codes,
   and locate targets by walking `<w:r>` elements rather than merging runs first.
-- **Do:** diff `merge_runs.py` on a pristine copy against the original
-  when a document looks scrambled after an edit session.
+- **Do:** when a document looks scrambled after an edit session,
+  run `merge_runs.py` on an untouched copy and diff that copy's
+  `pandoc -t plain --track-changes=accept` output against the original's,
+  per the recipe above.
 - **Don't:** run `merge_runs.py` as a reflexive first step
   because the skill lists it in the standard edit recipe.
 
@@ -100,9 +119,15 @@ An earlier version collected `(start, end, replacement)` edits and sorted them b
 When a tracked replacement `(s, e, rep)` and a zero-width comment-marker insertion `(s, s, ins)`
 shared a start offset,
 applying the insertion first invalidated the replacement's offsets and produced mismatched tags:
-XML that fails `xml.dom.minidom.parse` at a byte offset in the middle of the edited region.
-Sorting cannot fix this, because the two edits are not disjoint.
-One rewrite per run makes the overlap structurally impossible.
+XML that fails `xml.dom.minidom.parseString` at a byte offset in the middle of the edited region
+(`parseString` rather than `parse`, since the edited XML is an in-memory string;
+the skill's own `comment.py` uses `defusedxml.minidom.parseString` throughout).
+Sorting by start offset **alone** cannot fix this,
+because a zero-width insertion and a replacement sharing a start offset
+need an explicit tie-break to order them (longer span first, say).
+One rewrite per run makes the question moot,
+which is why it is the recommendation rather than a tie-break rule
+that has to be got right and kept right.
 
 - **Do:** key edits to run indices and rewrite each run at most once.
 - **Don't:** collect overlapping `(start, end)` span edits
@@ -120,18 +145,78 @@ Run both on every redlined document, against the original and the output:
   A non-empty reject-diff means something was changed without a `<w:ins>`/`<w:del>` wrapper,
   which is the failure mode that is invisible in Word's accepted view.
 
-The reject-diff is the load-bearing one and is not in the `docx` skill's documentation,
-which recommends `validate.py --author` instead.
+The reject-diff is not in the `docx` skill's documentation,
+which recommends `validate.py --author` for the same failure mode instead.
+Treat the two as independent checks rather than ranking them:
+the reject-diff is format-level and keeps working when the validator fails for an unrelated reason,
+which is exactly the situation the next paragraph describes.
 
 Run that validator too, and **baseline it against the original first**.
-Measured 2026-09-01: on this manuscript it exited on 5 ID-uniqueness violations
-in `word/documenttasks/documenttasks1.xml` before it ever reached the redlining check,
+Measured 2026-09-01: on this manuscript it reported 5 ID-uniqueness violations
+in `word/documenttasks/documenttasks1.xml`,
 and running it on the untouched file showed all 5 were pre-existing.
-A validator that stops early reports a failure about the document rather than about your edits.
+That count also comes from the private manuscript and is not reproducible here;
+what transfers is the baselining step.
+The validator does not skip the redlining check when an earlier one fails
+--- `validate.py:161` reads `success = all([v.validate() for v in validators])`,
+and the list comprehension is materialized, so every validator runs ---
+and inside `validators/docx.py` only `validate_xml()` returns early,
+while `validate_unique_ids()` sets `all_valid = False` and falls through.
+What it does is exit non-zero on **any** validator's failure,
+so a pre-existing ID collision reddens the whole run
+and buries the redlining verdict you were actually asking for.
 
 - **Do:** run both the accept-diff and the reject-diff,
   and baseline `validate.py` against the original before reading its output.
 - **Don't:** read a `validate.py` failure as caused by your edits without that baseline.
+
+## An edit that writes cleanly can still be silently dropped
+
+A tracked edit has two failure modes, and only one of them is loud.
+The loud one is malformed XML, which every check in this file already catches.
+The quiet one is an edit that writes valid XML, parses, validates,
+and then simply **is not there** in the accepted view.
+
+Measured 2026-09-01, three times in one session on the same manuscript.
+The sharpest case: a tracked prose rewrite applied to runs sitting inside a Zotero field region
+wrote valid XML and passed `xml.dom.minidom.parseString`,
+and the accepted view came back reading `"...across sites (12) (13)."`
+--- the replacement text had vanished entirely,
+leaving a sentence with no verb in it.
+An inserted run inside a field region does not survive.
+(That excerpt is from a private manuscript;
+what transfers is the check below, which needs no particular document.)
+
+The check is a diff rather than a parse, and it asks whether the change is there:
+
+```bash
+pandoc -t plain --track-changes=accept original.docx -o before.txt
+pandoc -t plain --track-changes=accept edited.docx   -o after.txt
+diff before.txt after.txt   # the intended change must APPEAR here
+```
+
+A clean parse says the file is well-formed.
+It says nothing about whether Word will render what you wrote,
+so the accepted-view diff is what shows whether an edit landed.
+That is [`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md) again,
+pointed the other way from the entry above:
+there a derived view was read as the document,
+here the document's own bytes were read as the rendering.
+
+The corollary is a scope limit worth knowing before planning an edit pass.
+**Text adjacent to a Zotero citation is not safely editable programmatically**,
+because the surrounding runs may sit inside the field region.
+And a citation's own target can only be changed in Zotero:
+editing the rendered field result edits a cached rendering,
+which reverts on the next field refresh.
+
+- **Do:** diff the `--track-changes=accept` conversion after every tracked edit
+  and confirm the intended change is **present**.
+- **Do:** leave prose adjacent to a field-code citation alone,
+  and route a citation change through Zotero rather than through the XML.
+- **Don't:** read a successful write, a clean `parseString`, or a passing validator
+  as evidence that the edit survived.
+- **Don't:** edit the rendered result of a field code and expect it to persist.
 
 ## LibreOffice can refuse a file outright, so a PDF render is not always available
 

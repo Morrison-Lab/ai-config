@@ -11,7 +11,7 @@ This is not a duplicate of `sync-pr-branch` — it’s an orchestration layer on
 
 ## The procedure
 
-1.  **List every open PR in the repo** (`mcp__github__list_pull_requests` / `gh pr list --json number,headRefName,author,assignees`). Note each PR’s number, `headRefName`, `author`, and `assignees`. Filter the list by `memories/reviewing-prs.md`’s scope test first, as `ardia` step 1 does (opened by or assigned to the invoking user, explicitly requested by name, or opened by a repository workflow), and report the PRs dropped: a resync pushes a merge commit, which that memory forbids on any other PR.
+1.  **List every open PR in the repo** (`mcp__github__list_pull_requests` / `gh pr list --json number,headRefName,author,assignees`). Note each PR’s number, `headRefName`, `author`, and `assignees`. Filter the list by `memories/reviewing-prs.md`’s scope test first, as `ardia` step 1 does (opened by or assigned to the invoking user, explicitly requested by name, or authored by the GitHub Actions app (`github-actions`)), and report the PRs dropped: a resync pushes a merge commit, which that memory forbids on any other PR.
 
 2.  **Check whether main is actually ahead** before touching anything:
 

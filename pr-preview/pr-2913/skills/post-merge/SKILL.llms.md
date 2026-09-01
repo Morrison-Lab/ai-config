@@ -111,7 +111,7 @@ gh pr list --state open \
   --json number,title,headRefName,author,assignees,mergeable,mergeStateStatus,comments   # LIST_PRS
 ```
 
-Filter that list by `memories/reviewing-prs.md`’s scope test first, as `ardia` step 1 does (opened by or assigned to the invoking user, named in the request, or opened by a repository workflow), and report the PRs dropped. A conflict on an out-of-scope PR is reported to the user and the PR left untouched (no comment, no push); a claim comment does not bring it into scope.
+Filter that list by `memories/reviewing-prs.md`’s scope test first, as `ardia` step 1 does (opened by or assigned to the invoking user, named in the request, or authored by the GitHub Actions app (`github-actions`)), and report the PRs dropped. A conflict on an out-of-scope PR is reported to the user and the PR left untouched (no comment, no push); a claim comment does not bring it into scope.
 
 For each in-scope PR where `mergeable == "CONFLICTING"` **or `"UNKNOWN"`** (GitHub can take minutes to finish computing mergeability after a push — a genuinely conflicting PR can sit in `UNKNOWN` and get missed if you filter for `CONFLICTING` alone):
 

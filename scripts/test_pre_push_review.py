@@ -6,7 +6,7 @@ Tests:
 2. Review output validation (rejects empty output, missing sections, and refusal strings).
 3. Diff resolution logic against PR base branch vs main.
 4. Engine detection and automatic fallback chain (claude -> codex -> opencode -> agy).
-5. Model override parameter forwarding.
+5. Model override parameter forwarding and argument ordering (ai-config#2880).
 6. Post review failure exit codes and error handling.
 """
 
@@ -531,11 +531,11 @@ class TestPrePushReview(unittest.TestCase):
             "Verdict: Cannot approve",
             "Verdict: Never approve",
             "Verdict: Do not approve",
-            "Verdict: Ready for merge — must not merge.",
-            "Verdict: Ready for merge — should not be merged.",
-            "Verdict: Ready for merge — unsafe to merge.",
-            "Verdict: Ready for merge — not safe to merge.",
-            "Verdict: Ready for merge — cannot merge.",
+            "Verdict: Ready for merge \u2014 must not merge.",
+            "Verdict: Ready for merge \u2014 should not be merged.",
+            "Verdict: Ready for merge \u2014 unsafe to merge.",
+            "Verdict: Ready for merge \u2014 not safe to merge.",
+            "Verdict: Ready for merge \u2014 cannot merge.",
         ]:
             neg_report = (
                 f"### Summary Verdict\n"
@@ -977,6 +977,164 @@ class TestPrePushReview(unittest.TestCase):
         self.assertEqual(label, "origin/main")
 
     @patch("subprocess.run")
+    def test_resolve_diff_local_branch_before_initial_push_auto_detect_main(self, mock_subproc):
+        def fake_run(cmd, **kwargs):
+            m = MagicMock()
+            if "merge-base" in cmd:
+                m.returncode = 0
+                m.stdout = "mb_commit_111\n"
+            elif "diff" in cmd:
+                m.returncode = 0
+                m.stdout = "diff --git a/new.py b/new.py\n+new line"
+            elif "symbolic-ref" in cmd:
+                m.returncode = 1
+                m.stdout = ""
+            elif "rev-parse" in cmd and "--verify" in cmd:
+                if "origin/main" in cmd:
+                    m.returncode = 0
+                    m.stdout = "main_commit_222\n"
+                else:
+                    m.returncode = 1
+            else:
+                m.returncode = 0
+            return m
+
+        mock_subproc.side_effect = fake_run
+        diff, base_sha, base_ref, label = reviewer.resolve_diff("head123")
+        self.assertIn("+new line", diff)
+        self.assertEqual(base_ref, "origin/main")
+        self.assertEqual(base_sha, "mb_commit_111")
+        self.assertEqual(label, "origin/main")
+
+    @patch("subprocess.run")
+    def test_resolve_diff_symbolic_origin_head(self, mock_subproc):
+        def fake_run(cmd, **kwargs):
+            m = MagicMock()
+            if "merge-base" in cmd:
+                m.returncode = 0
+                m.stdout = "mb_commit_333\n"
+            elif "diff" in cmd:
+                m.returncode = 0
+                m.stdout = "diff --git a/trunk.py b/trunk.py\n+trunk line"
+            elif "symbolic-ref" in cmd:
+                m.returncode = 0
+                m.stdout = "origin/trunk\n"
+            elif "rev-parse" in cmd and "--verify" in cmd:
+                if "origin/trunk" in cmd:
+                    m.returncode = 0
+                    m.stdout = "trunk_commit_444\n"
+                else:
+                    m.returncode = 1
+            else:
+                m.returncode = 0
+            return m
+
+        mock_subproc.side_effect = fake_run
+        diff, base_sha, base_ref, label = reviewer.resolve_diff("head123")
+        self.assertIn("+trunk line", diff)
+        self.assertEqual(base_ref, "origin/trunk")
+        self.assertEqual(base_sha, "mb_commit_333")
+
+    @patch("subprocess.run")
+    def test_resolve_diff_explicit_base_prefers_origin_prefix(self, mock_subproc):
+        def fake_run(cmd, **kwargs):
+            m = MagicMock()
+            if "merge-base" in cmd:
+                m.returncode = 0
+                m.stdout = "mb_commit_555\n"
+            elif "diff" in cmd:
+                m.returncode = 0
+                m.stdout = "diff --git a/a.py b/a.py\n+line"
+            elif "rev-parse" in cmd and "--verify" in cmd:
+                # Both origin/main and main verify, but origin/main should be preferred
+                if "origin/main" in cmd:
+                    m.returncode = 0
+                    m.stdout = "remote_main_sha\n"
+                elif "main" in cmd:
+                    m.returncode = 0
+                    m.stdout = "stale_local_main_sha\n"
+                else:
+                    m.returncode = 1
+            else:
+                m.returncode = 0
+            return m
+
+        mock_subproc.side_effect = fake_run
+        diff, base_sha, base_ref, label = reviewer.resolve_diff("head123", explicit_base="main")
+        self.assertIn("+line", diff)
+        self.assertEqual(base_ref, "origin/main")
+        self.assertEqual(base_sha, "mb_commit_555")
+
+    @patch("subprocess.run")
+    def test_resolve_diff_explicit_base_with_origin_prefix_fallback(self, mock_subproc):
+        def fake_run(cmd, **kwargs):
+            m = MagicMock()
+            if "merge-base" in cmd:
+                m.returncode = 0
+                m.stdout = "mb_commit_666\n"
+            elif "diff" in cmd:
+                m.returncode = 0
+                m.stdout = "diff --git a/a.py b/a.py\n+line"
+            elif "rev-parse" in cmd and "--verify" in cmd:
+                # origin/local-only does not exist on remote, but local-only exists locally
+                if "origin/local-only" in cmd:
+                    m.returncode = 1
+                elif "local-only" in cmd:
+                    m.returncode = 0
+                    m.stdout = "commit_666\n"
+                else:
+                    m.returncode = 1
+            else:
+                m.returncode = 0
+            return m
+
+        mock_subproc.side_effect = fake_run
+        diff, base_sha, base_ref, label = reviewer.resolve_diff("head123", explicit_base="origin/local-only")
+        self.assertIn("+line", diff)
+        self.assertEqual(base_ref, "local-only")
+        self.assertEqual(base_sha, "mb_commit_666")
+
+    @patch("subprocess.run")
+    def test_resolve_diff_explicit_base_without_origin_prefix_fallback(self, mock_subproc):
+        def fake_run(cmd, **kwargs):
+            m = MagicMock()
+            if "merge-base" in cmd:
+                m.returncode = 0
+                m.stdout = "mb_commit_777\n"
+            elif "diff" in cmd:
+                m.returncode = 0
+                m.stdout = "diff --git a/b.py b/b.py\n+line"
+            elif "rev-parse" in cmd and "--verify" in cmd:
+                # origin/local-branch does not exist, but local-branch does
+                if "origin/local-branch" in cmd:
+                    m.returncode = 1
+                elif "local-branch" in cmd:
+                    m.returncode = 0
+                    m.stdout = "commit_888\n"
+                else:
+                    m.returncode = 1
+            else:
+                m.returncode = 0
+            return m
+
+        mock_subproc.side_effect = fake_run
+        diff, base_sha, base_ref, label = reviewer.resolve_diff("head123", explicit_base="local-branch")
+        self.assertIn("+line", diff)
+        self.assertEqual(base_ref, "local-branch")
+
+    @patch("subprocess.run")
+    def test_resolve_diff_missing_explicit_base_exits(self, mock_subproc):
+        def fake_run(cmd, **kwargs):
+            m = MagicMock()
+            m.returncode = 1
+            m.stdout = ""
+            return m
+
+        mock_subproc.side_effect = fake_run
+        with self.assertRaises(SystemExit):
+            reviewer.resolve_diff("head123", explicit_base="totally-nonexistent-ref")
+
+    @patch("subprocess.run")
     @patch.object(reviewer, "get_pr_head_sha")
     def test_post_review_empty_commit_sha_fails_closed(self, mock_get_sha, mock_subproc):
         mock_get_sha.return_value = "remote_sha_9999"
@@ -1057,6 +1215,7 @@ class TestPrePushReview(unittest.TestCase):
         cmd_args = mock_subproc.call_args[0][0]
         self.assertIn("-m", cmd_args)
         self.assertIn("gpt-5.6-sol", cmd_args)
+        self.assertLess(cmd_args.index("-m"), cmd_args.index("-"))
 
     @patch("builtins.open", new_callable=mock_open)
     @patch("os.makedirs")
@@ -1091,6 +1250,7 @@ class TestPrePushReview(unittest.TestCase):
         claude_cmd = mock_subproc.call_args[0][0]
         self.assertIn("--model", claude_cmd)
         self.assertIn("claude-3-5-sonnet", claude_cmd)
+        self.assertLess(claude_cmd.index("--model"), claude_cmd.index("-p"))
 
         # Test Cursor runner
         mock_which.return_value = "/opt/homebrew/bin/agent"
@@ -1124,6 +1284,7 @@ class TestPrePushReview(unittest.TestCase):
         self.assertNotIn("prompt", oc_cmd)
         self.assertIn("-m", oc_cmd)
         self.assertIn("anthropic/claude-3.7-sonnet", oc_cmd)
+        self.assertLess(oc_cmd.index("-m"), oc_cmd.index("--file"))
 
     def test_get_next_alternate_engine_rotation(self):
         engines = ["claude", "cursor", "codex", "opencode", "antigravity"]

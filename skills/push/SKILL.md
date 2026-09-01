@@ -249,6 +249,8 @@ late: fetch, reconcile, re-run the checks).
 
 After a successful push, if the branch has no PR yet, open one (ready for
 review, not a draft).
+Immediately maintain an active monitoring loop or scheduled wake mechanism.
+Actively query current-head CI/pipeline status (`gh pr checks` / `glab ci list` or `glab mr view`) and review verdicts (`gh pr view` / `glab mr view`) until that round reaches a terminal state, re-arming the poll while work remains.
 
 ## Relationship to other skills
 
@@ -272,5 +274,6 @@ review, not a draft).
 - ❌ Pushing onto a `do-not-merge` / `hold` PR without asking (check #4)
 - ❌ Pushing while a `@claude` run is mid-session on the branch (check #5)
 - ❌ Pushing directly to `main` / the default branch (check #1)
+- ❌ Pushing and abandoning active monitoring without polling CI and review to completion
 - ❌ Reporting "pushed" when a check stopped you — say what fired and that you're
   waiting on the user

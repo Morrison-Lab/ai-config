@@ -25,6 +25,13 @@ jobs:
         run: python3 scripts/validate-skills.py
       - name: Check markdown links
         run: python3 scripts/check-links.py
+      - name: Run check-links tests
+        run: python3 scripts/test_check_links.py
+      - name: Check ASCII punctuation in source files
+        # ai-config#2550: ensure .py and .R source files obey the ASCII punctuation policy.
+        run: python3 scripts/check-ascii-punctuation.py
+      - name: Run check-ascii-punctuation tests
+        run: python3 scripts/test_check_ascii_punctuation.py
       - name: Check Jules mention-dispatch wrap
         # ai-config#2280: a uses: step with GITHUB_EVENT_NAME in env looks
         # like a wrap and is a no-op. This gate fails if the mention path
@@ -157,6 +164,11 @@ jobs:
         # `batch-merge-and-resolve.md` warns about, and it is what the
         # hand-run prototype this script replaces actually had.
         run: python3 scripts/test_pr_overlap.py
+      - name: Run upload-skills tests
+        # Only the tests run here. upload_skills.sh itself requires a live
+        # workspace API key, so the offline test suite exercises change
+        # detection, deletion propagation, and state caching with mock curl.
+        run: python3 scripts/test_upload_skills.py
       - name: Run context-closure tests
         run: python3 scripts/test_check_context_closure.py
       - name: Run ai-session MWC grant tests

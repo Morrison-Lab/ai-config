@@ -17,8 +17,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 # Reference link definition (CommonMark 4.7): [label]: destination "optional title"
 REF_DEF = re.compile(
-    r"^[ \t]{0,3}\[(?!\^)([^\]]+)\]:[ \t]*\n?[ \t]*(?:<([^>\n]+)>|(\S+))"
-    r'(?:[ \t]+(?:"([^"\n]*)"|\'([^\'\n]*)\'|\(([^)\n]*)\)))?[ \t]*$',
+    r"^[ \t]{0,3}\[(?!\^)(?P<label>[^\]]+)\]:[ \t]*(?P<target>\S.*)$",
     re.MULTILINE,
 )
 
@@ -85,12 +84,11 @@ def extract_reference_definitions(text: str) -> tuple[dict[str, str], str]:
     """Extract link reference definitions and return definitions dict and remaining text."""
     defs: dict[str, str] = {}
     for match in REF_DEF.finditer(text):
-        raw_label = match.group(1)
-        dest = match.group(2) if match.group(2) is not None else match.group(3)
-        label = normalize_label(raw_label)
-        # In CommonMark, the first definition takes precedence
-        if label and label not in defs:
-            defs[label] = dest
+        label = normalize_label(match.group("label"))
+        raw_target = match.group("target")
+        parsed = parse_link_target(raw_target)
+        if label and label not in defs and parsed:
+            defs[label] = parsed
     # Remove definition lines so they aren't parsed as shortcut links in prose
     text_without_defs = REF_DEF.sub("", text)
     return defs, text_without_defs
@@ -116,17 +114,16 @@ def resolve_target(base_dir: Path, target: str) -> Path | None:
 
 def check_target(target: str, md: Path, root: Path = ROOT) -> None:
     global checked
-    parsed = parse_link_target(target)
-    if not parsed or is_external(parsed):
+    if not target or is_external(target):
         return
-    if "<" in parsed or ">" in parsed:
+    if "<" in target or ">" in target:
         return  # angle-bracket placeholder, e.g. <owner>/<repo>
-    path_part = re.split(r"[#?]", parsed, maxsplit=1)[0]
+    path_part = re.split(r"[#?]", target, maxsplit=1)[0]
     if not path_part:  # pure in-page anchor
         return
-    has_fragment = len(path_part) < len(parsed)
+    has_fragment = len(path_part) < len(target)
     is_bare = "/" not in path_part and "." not in path_part
-    resolved = resolve_target(md.parent, parsed)
+    resolved = resolve_target(md.parent, target)
     if resolved is not None:
         checked += 1
     elif is_bare and not has_fragment:
@@ -137,7 +134,7 @@ def check_target(target: str, md: Path, root: Path = ROOT) -> None:
             rel = md.relative_to(root)
         except ValueError:
             rel = md
-        broken.append(f"{rel} -> {parsed}")
+        broken.append(f"{rel} -> {target}")
 
 
 def check_file(md: Path, root: Path = ROOT) -> None:
@@ -156,7 +153,9 @@ def check_file(md: Path, root: Path = ROOT) -> None:
 
         if inline_url is not None:
             # Inline link: [text](url)
-            check_target(inline_url, md, root=root)
+            parsed = parse_link_target(inline_url)
+            if parsed:
+                check_target(parsed, md, root=root)
         elif ref_label is not None:
             # Full reference link [text][label] or collapsed reference link [label][]
             label = ref_label if ref_label != "" else first_bracket

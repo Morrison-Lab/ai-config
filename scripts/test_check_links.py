@@ -12,6 +12,7 @@ Verifies that:
 6. Reference link definitions ([label]: target "title"), full reference links ([text][label]),
    collapsed reference links ([label][]), and shortcut reference links ([label]) resolve correctly.
 7. Non-link brackets (checkboxes `[x]`, alerts `[NOTE]`, footnote numbers `[1]`) produce no false positives.
+8. Angle-bracket destinations with internal whitespace (`[ref]: <path/to file.md>`) are preserved without truncation.
 """
 from __future__ import annotations
 
@@ -87,6 +88,23 @@ class TestCheckFile(unittest.TestCase):
             doc.write_text(
                 "Here is a shortcut reference link: [target].\n\n"
                 "[target]: target.md\n",
+                encoding="utf-8",
+            )
+
+            check_file(doc, root=td)
+            self.assertEqual(len(mod.broken), 0)
+            self.assertEqual(mod.checked, 1)
+
+    def test_angle_bracket_destination_with_spaces(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            td = Path(tmpdir)
+            target = td / "target file.md"
+            target.write_text("# Target", encoding="utf-8")
+
+            doc = td / "doc.md"
+            doc.write_text(
+                "Here is a link: [target].\n\n"
+                "[target]: <target file.md> 'Title with spaces'\n",
                 encoding="utf-8",
             )
 

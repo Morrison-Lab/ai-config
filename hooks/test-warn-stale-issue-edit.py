@@ -82,12 +82,14 @@ def run_hook(transcript_path, tool_name="Write", extra_input=None):
         "transcript_path": transcript_path,
         "hook_event_name": "PreToolUse",
     })
+    env = {k: v for k, v in os.environ.items() if k != "ANTIGRAVITY_AGENT"}
     proc = subprocess.run(
         [sys.executable, HOOK],
         input=payload,
         capture_output=True,
         text=True,
         timeout=10,
+        env=env,
     )
     if proc.returncode != 0:
         return {"_exit": proc.returncode, "_stderr": proc.stderr}
@@ -703,6 +705,31 @@ check(
     False,
 )
 
+
+# Heredoc stripping & bounding tests (ai-config#2536)
+check(
+    "strip_heredocs removes normal heredoc body",
+    subject.strip_heredocs("cat <<EOF > out.txt\ngh issue view 2282\nEOF\ngit fetch"),
+    "cat  > out.txt\ngit fetch",
+)
+check(
+    "strip_heredocs removes indented heredoc body",
+    subject.strip_heredocs("cat <<- EOF\nbody\n  EOF\ngit fetch"),
+    "cat \ngit fetch",
+)
+check(
+    "strip_heredocs leaves unterminated opener intact without error",
+    subject.strip_heredocs("cat <<EOF > out.txt\nline1\nline2"),
+    "cat <<EOF > out.txt\nline1\nline2",
+)
+
+# Performance test for unterminated openers (ai-config#2536)
+import time
+bad_cmd = "echo start\n" + "cat <<EOF\nhello\n" * 800 + "echo end\n"
+t0 = time.perf_counter()
+subject.strip_heredocs(bad_cmd)
+elapsed = time.perf_counter() - t0
+check("strip_heredocs on 800 unterminated openers runs in under 0.1s", elapsed < 0.1, True)
 
 if failures:
     sys.exit(f"{failures} failure(s)")

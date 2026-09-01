@@ -127,10 +127,8 @@ RX_PULL_URL = re.compile(
     re.I,
 )
 
-RX_HEREDOC = re.compile(
+RX_HEREDOC_OPENER = re.compile(
     r"<<-?\s*['\"]?([A-Za-z_][A-Za-z0-9_]*)['\"]?([^\n]*)\n"
-    r".*?\n[ \t]*\1\b",
-    re.DOTALL,
 )
 
 # Command-position opener. Narrower than a full shell parser: omits `(` / `{`
@@ -208,14 +206,36 @@ def strip_heredocs(command):
     stripped twice. The hook runs on every Write/Edit/NotebookEdit
     (ai-config#2390), so halving the work is worth a cache.
 
-    An early exit from `evaluate`'s loop once `view_after` and `fetch_after`
-    are both set would be the larger win and is NOT safe: that same loop
-    collects `view_results`, and `closed_after` reads the result of the LAST
-    after-view, which arrives in a later entry than the tool_use that set the
-    flag. Breaking would drop it and lose the closed-issue case.
-    ai-config#2536 carries the remaining bound, on RX_HEREDOC itself.
+    Bounded against unterminated openers (ai-config#2536): scans for openers
+    and searches directly for the matching terminator without catastrophic
+    backtracking under re.DOTALL across the rest of the string.
     """
-    return RX_HEREDOC.sub(lambda m: m.group(2), command)
+    if not isinstance(command, str) or "<<" not in command:
+        return command
+    pos = 0
+    chunks = []
+    while True:
+        m = RX_HEREDOC_OPENER.search(command, pos)
+        if not m:
+            chunks.append(command[pos:])
+            break
+        tag = m.group(1)
+        rem = m.group(2)
+        opener_end = m.end()
+        if tag not in command[opener_end:]:
+            chunks.append(command[pos:opener_end])
+            pos = opener_end
+            continue
+        term_re = re.compile(rf"\n[ \t]*{re.escape(tag)}\b")
+        term_m = term_re.search(command, opener_end - 1)
+        if term_m:
+            chunks.append(command[pos:m.start()])
+            chunks.append(rem)
+            pos = term_m.end()
+        else:
+            chunks.append(command[pos:opener_end])
+            pos = opener_end
+    return "".join(chunks)
 
 
 def _mapping_block(text, op_id):

@@ -613,3 +613,6 @@ Stacking is the structural alternative when two PRs genuinely depend on each
 other rather than merely colliding --- see
 [`stack-dont-pause`](stack-dont-pause.md), which keeps the queue moving without
 waiting for a human merge.
+For repositories with strict branch protection,
+enabling a platform merge queue ([`merge-queue`](merge-queue.md))
+eliminates the need for manual batch chasing altogether by speculatively testing queued PRs on the forge side.

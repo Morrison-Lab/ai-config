@@ -195,7 +195,8 @@ The decision stays the human's.
 Two boundaries.
 Efficiency never outranks correctness, so no saving is bought with a skipped verification or a shortened review.
 And restructure in its own issue or PR, not inside whatever task happened to notice it.
-See `shared/workflow/restructure-for-efficiency.md`.
+See [`shared/workflow/restructure-for-efficiency.md`](shared/workflow/restructure-for-efficiency.md)
+and [`shared/workflow/merge-queue.md`](shared/workflow/merge-queue.md).
 
 ## Keep ai-config and repo checkouts fresh
 
@@ -204,7 +205,7 @@ In every session --- at session start, and again periodically during long sessio
 1. **The ai-config checkout.** Check that the local `ai-config` clone is on `main` and run `git pull --ff-only`.
 2. **The consumer install.**
    Claude Code and Cursor read this repo's skills as a native plugin, not a symlink install --- confirm the plugin is enabled and up to date instead of checking for symlinks.
-   Ensure `bootstrap.sh` has run so the Gemini/Antigravity registration files (`skills.json` and `plugins.json`, which point at this checkout's own `skills/` and `plugins/ai-config` paths) stay current.
+   Ensure `bootstrap.sh` has run so the Gemini/Antigravity registration files (`skills.json` and `plugins.json`, which point at this checkout's `skills/` and staged `plugins/ai-config` paths) stay current.
 3. **Working repo checkouts.** Keep `main` updated (`git fetch origin`, `git pull --ff-only`).
 
 ## Remove redundant submodules when using native plugins

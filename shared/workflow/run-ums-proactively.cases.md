@@ -52,3 +52,20 @@ If the re-query confirms the claim, answering is enough and no pass
 is owed.
 The given example names the wrong-claim branch only
 (directive, 2026-08-25, on [ai-config#2261](https://github.com/Morrison-Lab/ai-config/issues/2261)).
+
+## Missed by flawed query or filter omission
+
+An admission explaining why a prior search or query missed a relevant artifact
+("My prior query missed it because it filtered discussion-level timestamps rather than every nested note")
+names the exact gap that owes a recorded learning or improved query practice.
+
+A session that realizes its query missed an unaddressed comment or note,
+explains the flaw in the filter,
+and transitions directly to fixing the code
+leaves the flawed query unrecorded.
+`hooks/remind-ums-after-error.py` catches this admission form
+(`(?:my|our) (?:prior|previous|earlier|last) (?:query|scan|check|search|attempt|pass|run|filter|script) missed`,
+`you are right ... missed`,
+and `filtered ... rather than`),
+ensuring the query failure mode is recorded
+(directive, 2026-08-31, on [ai-config#2775](https://github.com/Morrison-Lab/ai-config/issues/2775)).

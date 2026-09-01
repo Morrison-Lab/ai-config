@@ -105,6 +105,17 @@ ADMISSION = re.compile(
         (?!(?:this|that|it|these|those|my|your|his|her|their|our
             |the|a|an|some|no)\b)
         \w+
+    # Omission admissions & flawed query/scan explanations (ai-config#2775).
+    # Catching "my prior query missed it because...", "you are right ... missed",
+    # and first-person query/scan filter flaws.
+    | \b(?:my|our)\s+(?:(?:prior|previous|earlier|last)\s+)?
+        (?:query|scan|check|search|attempt|pass|run|filter|script)\s+
+        missed\s+(?!(?:nothing|none|zero|no)\b)
+    | \b(?:you\s+are|you""" + _APOS + r"""re)\s+right\b[^\n]*?\b(?:i\s+(?:missed|overlooked)|(?:my|our)\s+\w+\s+missed)\b
+    | \bi\s+(?:missed|overlooked)\s+
+        (?!(?:out|the\s+point)\b)
+        (?:(?:that|this|it|these|those)|(?:(?:the|a|an|that|this|these|those|my|our)\s+)?(?:note|comment|issue|pr|diff|finding|warning|error|file|line)|\w+\s+because)\b
+    | \b(?:it|i|we)\s+filtered\s+[^\n.!?]+?\s+rather\s+than\b
     )""",
     re.I | re.X,
 )

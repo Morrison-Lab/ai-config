@@ -39,10 +39,21 @@ BOLD_CITATION_RE = re.compile(
     r"|(?<!\*)\*\*(?P<md_key>[A-Za-z0-9_#-]+(?:[A-Za-z0-9_#.:-]*[A-Za-z0-9_#-])?)\?\*\*(?!\*)"
 )
 
-# Secondary heuristic: unprocessed raw citation syntax [@key]
-# Must not match footnote references [^1] or [^note]
-RAW_CITATION_RE = re.compile(
-    r"(?<!\w)\[@(?P<key>[A-Za-z0-9_#-]+(?:[A-Za-z0-9_#.:-]*[A-Za-z0-9_#-])?)(?:;\s*@[A-Za-z0-9_#-]+)*\]"
+# Citeproc / Pandoc reference formats:
+# 1. Bracketed citations: [@author2020], [-@author2020], [see @author2020, p. 10; also -@doe2021]
+# Must contain at least one @key or -@key within square brackets, not matching footnotes [^...]
+BRACKETED_CITATION_RE = re.compile(
+    r"\[(?P<inner>[^\]\n]*?(?:(?<![A-Za-z0-9._%+/:!#$&*~?])-?@(?P<lead_key>[A-Za-z0-9_#]+(?:[A-Za-z0-9_#.:-]*[A-Za-z0-9_#-])?))[^\]\n]*?)\]"
+)
+
+# Citation keys inside bracketed citations
+CITE_KEY_IN_BRACKET_RE = re.compile(
+    r"(?<![A-Za-z0-9._%+/:!#$&*~?])-?@(?P<key>[A-Za-z0-9_#]+(?:[A-Za-z0-9_#.:-]*[A-Za-z0-9_#-])?)"
+)
+
+# 2. Standalone narrative / in-text citeproc citations: e.g. @author2020 or -@author2020 in prose
+NARRATIVE_CITATION_RE = re.compile(
+    r"(?<![A-Za-z0-9._%+/:!#$&*~?])(?P<marker>-?@(?P<key>[A-Za-z_][A-Za-z0-9_#.:-]*[A-Za-z0-9_#]|[A-Za-z_]))\b"
 )
 
 # Footnote patterns for explicit validation and ignore
@@ -97,6 +108,7 @@ def scan_content(
     for line_idx, line in enumerate(lines, start=1):
         # Strip inline code spans on the line before searching
         clean_line = INLINE_CODE_RE.sub(" ", line)
+        occupied_spans: list[tuple[int, int]] = []
 
         # 1. Unresolved crossrefs (?@...)
         for match in UNRESOLVED_CROSSREF_RE.finditer(clean_line):
@@ -104,6 +116,7 @@ def scan_content(
             start = max(0, match.start() - 30)
             end = min(len(line), match.end() + 30)
             context = line[start:end].strip()
+            occupied_spans.append((match.start(), match.end()))
             findings.append(
                 ReferenceFinding(
                     file=file_path,
@@ -121,6 +134,7 @@ def scan_content(
             start = max(0, match.start() - 30)
             end = min(len(line), match.end() + 30)
             context = line[start:end].strip()
+            occupied_spans.append((match.start(), match.end()))
             findings.append(
                 ReferenceFinding(
                     file=file_path,
@@ -132,18 +146,49 @@ def scan_content(
                 )
             )
 
-        # 3. Raw unprocessed citation syntax [@key]
-        for match in RAW_CITATION_RE.finditer(clean_line):
-            key = match.group("key")
+        # 3. Bracketed Citeproc / Pandoc citations ([@key], [-@key], [see @key; @key2])
+        for match in BRACKETED_CITATION_RE.finditer(clean_line):
+            span = (match.start(), match.end())
+            if any(s <= match.start() < e or s < match.end() <= e for s, e in occupied_spans):
+                continue
+            occupied_spans.append(span)
+
+            inner_text = match.group("inner")
+            bracket_marker = match.group(0)
             start = max(0, match.start() - 30)
             end = min(len(line), match.end() + 30)
+            context = line[start:end].strip()
+
+            for key_match in CITE_KEY_IN_BRACKET_RE.finditer(inner_text):
+                key = key_match.group("key")
+                findings.append(
+                    ReferenceFinding(
+                        file=file_path,
+                        line=line_idx,
+                        category="unprocessed_citation",
+                        marker=bracket_marker,
+                        context=context,
+                        key=key,
+                    )
+                )
+
+        # 4. Narrative / in-text Citeproc citations (@author2020, -@author2020)
+        for match in NARRATIVE_CITATION_RE.finditer(clean_line):
+            m_start, m_end = match.start(), match.end()
+            if any(s <= m_start < e or s < m_end <= e for s, e in occupied_spans):
+                continue
+            occupied_spans.append((m_start, m_end))
+
+            key = match.group("key")
+            start = max(0, m_start - 30)
+            end = min(len(line), m_end + 30)
             context = line[start:end].strip()
             findings.append(
                 ReferenceFinding(
                     file=file_path,
                     line=line_idx,
                     category="unprocessed_citation",
-                    marker=match.group(0),
+                    marker=match.group("marker"),
                     context=context,
                     key=key,
                 )

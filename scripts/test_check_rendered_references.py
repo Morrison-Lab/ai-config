@@ -62,8 +62,50 @@ class TestCheckRenderedReferences(unittest.TestCase):
     def test_unprocessed_raw_citations(self) -> None:
         content = "As shown in [@doe2022] and [@smith2020; @jones2021].\n"
         findings = crr.scan_content(content, "test.md")
-        self.assertGreaterEqual(len(findings), 1)
+        self.assertEqual(len(findings), 3)
         self.assertEqual(findings[0].category, "unprocessed_citation")
+        self.assertEqual(findings[0].key, "doe2022")
+        self.assertEqual(findings[1].key, "smith2020")
+        self.assertEqual(findings[2].key, "jones2021")
+
+    def test_citeproc_suppressed_author(self) -> None:
+        content = "As discussed previously [-@author2020] and [-@smith2021; -@doe2022].\n"
+        findings = crr.scan_content(content, "test.md")
+        self.assertEqual(len(findings), 3)
+        for f in findings:
+            self.assertEqual(f.category, "unprocessed_citation")
+        self.assertEqual(findings[0].key, "author2020")
+        self.assertEqual(findings[1].key, "smith2021")
+        self.assertEqual(findings[2].key, "doe2022")
+
+    def test_citeproc_bracketed_complex(self) -> None:
+        content = "Evidence in [see @author2020, pp. 10-15; also -@doe2021, chap. 3].\n"
+        findings = crr.scan_content(content, "test.md")
+        self.assertEqual(len(findings), 2)
+        self.assertEqual(findings[0].category, "unprocessed_citation")
+        self.assertEqual(findings[0].key, "author2020")
+        self.assertEqual(findings[1].category, "unprocessed_citation")
+        self.assertEqual(findings[1].key, "doe2021")
+
+    def test_citeproc_narrative_citations(self) -> None:
+        content = (
+            "According to @author2020, this holds.\n"
+            "Also @knuth:1984 [p. 33] and @smith_2022 noted this.\n"
+        )
+        findings = crr.scan_content(content, "test.md")
+        self.assertEqual(len(findings), 3)
+        self.assertEqual(findings[0].category, "unprocessed_citation")
+        self.assertEqual(findings[0].key, "author2020")
+        self.assertEqual(findings[1].key, "knuth:1984")
+        self.assertEqual(findings[2].key, "smith_2022")
+
+    def test_email_and_urls_not_flagged_as_citations(self) -> None:
+        content = (
+            "Contact support at user@example.com or dev.team@sub.domain.org.\n"
+            "Visit https://git@github.com or [Email us](mailto:support@example.org).\n"
+        )
+        findings = crr.scan_content(content, "test.md")
+        self.assertEqual(findings, [])
 
     def test_code_fences_and_spans_ignored(self) -> None:
         content = (

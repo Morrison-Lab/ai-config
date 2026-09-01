@@ -38,7 +38,7 @@ The canonical example: a `@def-coef-interp-procedure` reference with no matching
 |---|---|---|
 | Cross-reference with no target (`@fig-x`, `@def-x`, `@sec-x`, …) | literal `?@x` in the body (often `**?@x**`) | `?@` — **rock-solid, Quarto-specific** |
 | Citation key absent from the bibliography | the key in bold with a trailing `?`: `**key?**` → renders **key?**; render log warns `Citeproc: citation key not found` | bold-with-`?` is heuristic — confirm against the log |
-| Citation never processed (citeproc off / no `bibliography:`) | raw `[@key]` or `@key` left in the body text | `[@` — heuristic, can match intentional literals |
+| Citation never processed (citeproc off / no `bibliography:`) | raw `[@key]`, `[-@key]`, or `@key` left in the body text | `\[-?@` or `@key` — heuristic, can match intentional literals |
 
 `?@` is the one true positive — anything matching it is a broken reference. The
 citation patterns are heuristics: confirm them before reporting (an `@handle` or
@@ -84,7 +84,7 @@ grep -rnoF --include='*.html' '?@' <output-dir>
 grep -rnoE --include='*.html' '<strong>[A-Za-z0-9_:.#-]+\?</strong>' <output-dir>
 
 # Secondary heuristic: raw citation syntax left in the body
-grep -rnoE --include='*.html' '\[@[A-Za-z0-9_:.#-]+' <output-dir>
+grep -rnoE --include='*.html' '\[-?@[A-Za-z0-9_:.#-]+' <output-dir>
 ```
 
 For each `?@…` hit, pull the surrounding text so the report is actionable:

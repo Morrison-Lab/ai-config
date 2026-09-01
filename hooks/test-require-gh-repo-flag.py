@@ -52,6 +52,8 @@ BLOCK = [
      "if (( ... )) arithmetic shift does not mask ungated command"),
     ("sub() (( a << FAKE ))\n" + G + "secret set FOO\nFAKE",
      "function def paren before (( arithmetic shift does not mask ungated command"),
+    ("x=$(( \"\\\"\" << EOF\n))\n" + G + "pr merge 456 --squash\nEOF\necho done",
+     "escaped quote in arithmetic shift does not mask ungated command"),
     ("x=(( a << 1 ))\n" + G + "secret set FOO",
      "assignment before (( arithmetic shift does not mask ungated command"),
     ("(" + G + "secret set FOO)", "bare subshell: (gh secret set)"),

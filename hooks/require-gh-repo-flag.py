@@ -277,9 +277,22 @@ def mask_arithmetic(command: str) -> str:
     n = len(command)
     in_sq = False
     in_dq = False
+    escaped = False
 
     while i < n:
         ch = command[i]
+
+        if escaped:
+            escaped = False
+            out.append(ch)
+            i += 1
+            continue
+
+        if ch == "\\":
+            escaped = True
+            out.append(ch)
+            i += 1
+            continue
 
         if ch == "'" and not in_dq:
             in_sq = not in_sq
@@ -293,41 +306,24 @@ def mask_arithmetic(command: str) -> str:
             continue
 
         if not in_sq and not in_dq:
-            if command.startswith("$((", i):
+            if command.startswith("$((", i) or command.startswith("((", i):
+                is_subst = command.startswith("$((", i)
                 start = i
-                i += 3
+                i += 3 if is_subst else 2
                 depth = 2
                 sub_sq = False
                 sub_dq = False
+                sub_escaped = False
                 while i < n and depth > 0:
                     c = command[i]
-                    if c == "'" and not sub_dq:
-                        sub_sq = not sub_sq
-                    elif c == '"' and not sub_sq:
-                        sub_dq = not sub_dq
-                    elif not sub_sq and not sub_dq:
-                        if c == "(":
-                            depth += 1
-                        elif c == ")":
-                            depth -= 1
-                    i += 1
-                if depth == 0:
-                    span = command[start:i]
-                    out.append("\n" * span.count("\n"))
-                    continue
-                else:
-                    out.append(command[start])
-                    i = start + 1
-                    continue
-
-            if command.startswith("((", i):
-                start = i
-                i += 2
-                depth = 2
-                sub_sq = False
-                sub_dq = False
-                while i < n and depth > 0:
-                    c = command[i]
+                    if sub_escaped:
+                        sub_escaped = False
+                        i += 1
+                        continue
+                    if c == "\\":
+                        sub_escaped = True
+                        i += 1
+                        continue
                     if c == "'" and not sub_dq:
                         sub_sq = not sub_sq
                     elif c == '"' and not sub_sq:

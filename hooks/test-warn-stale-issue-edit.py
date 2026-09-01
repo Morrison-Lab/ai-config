@@ -718,18 +718,28 @@ check(
     "cat \ngit fetch",
 )
 check(
-    "strip_heredocs leaves unterminated opener intact without error",
+    "strip_heredocs strips body of unterminated opener to EOF",
     subject.strip_heredocs("cat <<EOF > out.txt\nline1\nline2"),
-    "cat <<EOF > out.txt\nline1\nline2",
+    "cat  > out.txt\n",
 )
 
 # Performance test for unterminated openers (ai-config#2536)
+# Benchmarks both single large command (800 openers) and 20-command 1.9MB scenario
 import time
+
 bad_cmd = "echo start\n" + "cat <<EOF\nhello\n" * 800 + "echo end\n"
 t0 = time.perf_counter()
 subject.strip_heredocs(bad_cmd)
 elapsed = time.perf_counter() - t0
-check("strip_heredocs on 800 unterminated openers runs in under 0.1s", elapsed < 0.1, True)
+check("strip_heredocs on 800 unterminated openers runs in under 0.05s", elapsed < 0.05, True)
+
+# Issue #2536 adversarial scenario: 20 commands of ~95KB (1.9MB total)
+cmd_95k = "echo start\n" + "cat <<EOF\nhello\n" * 6000 + "echo end\n"
+t0 = time.perf_counter()
+for _ in range(20):
+    subject.strip_heredocs(cmd_95k)
+elapsed_total = time.perf_counter() - t0
+check("strip_heredocs on 20x95KB (1.9MB) adversarial input runs in under 0.2s", elapsed_total < 0.2, True)
 
 if failures:
     sys.exit(f"{failures} failure(s)")

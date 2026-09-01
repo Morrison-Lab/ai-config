@@ -128,7 +128,7 @@ RX_PULL_URL = re.compile(
 )
 
 RX_HEREDOC_OPENER = re.compile(
-    r"<<-?\s*['\"]?([A-Za-z_][A-Za-z0-9_]*)['\"]?([^\n]*)\n"
+    r"<<-?\s*['\"]?([A-Za-z_][A-Za-z0-9_]*)['\"]?([^\n]*)"
 )
 
 # Command-position opener. Narrower than a full shell parser: omits `(` / `{`
@@ -206,36 +206,33 @@ def strip_heredocs(command):
     stripped twice. The hook runs on every Write/Edit/NotebookEdit
     (ai-config#2390), so halving the work is worth a cache.
 
-    Bounded against unterminated openers (ai-config#2536): scans for openers
-    and searches directly for the matching terminator without catastrophic
-    backtracking under re.DOTALL across the rest of the string.
+    Bounded against unterminated openers (ai-config#2536): processes lines in
+    a single linear forward pass in O(length) time without re-scanning or
+    backtracking.
     """
     if not isinstance(command, str) or "<<" not in command:
         return command
-    pos = 0
-    chunks = []
-    while True:
-        m = RX_HEREDOC_OPENER.search(command, pos)
-        if not m:
-            chunks.append(command[pos:])
-            break
-        tag = m.group(1)
-        rem = m.group(2)
-        opener_end = m.end()
-        if tag not in command[opener_end:]:
-            chunks.append(command[pos:opener_end])
-            pos = opener_end
-            continue
-        term_re = re.compile(rf"\n[ \t]*{re.escape(tag)}\b")
-        term_m = term_re.search(command, opener_end - 1)
-        if term_m:
-            chunks.append(command[pos:m.start()])
-            chunks.append(rem)
-            pos = term_m.end()
+    lines = command.splitlines(keepends=True)
+    out = []
+    active_tag = None
+    term_pattern = None
+    for line in lines:
+        if active_tag is None:
+            m = RX_HEREDOC_OPENER.search(line)
+            if m:
+                prefix = line[:m.start()]
+                rem = m.group(2)
+                nl = "\n" if line.endswith("\n") else ""
+                out.append(prefix + rem + nl)
+                active_tag = m.group(1)
+                term_pattern = re.compile(rf"^[ \t]*{re.escape(active_tag)}\b")
+            else:
+                out.append(line)
         else:
-            chunks.append(command[pos:opener_end])
-            pos = opener_end
-    return "".join(chunks)
+            if term_pattern.match(line):
+                active_tag = None
+                term_pattern = None
+    return "".join(out)
 
 
 def _mapping_block(text, op_id):

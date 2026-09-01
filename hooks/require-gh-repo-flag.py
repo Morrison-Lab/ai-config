@@ -68,14 +68,14 @@ HAS_REPO_FLAG = re.compile(
     r"(^|\s)(-R\b|--repo(=|\s)|-o\b|--org(=|\s)|-u\b|--user\b)"
 )
 
-# Match arithmetic expansions like `$(( x << y ))` or `(( x << y ))` where `<<`
-# is a bitwise shift, not a heredoc opener.
-ARITHMETIC = re.compile(r"\$\(\(.*?\)\)|\(\(.*?\)\)")
+# Match arithmetic expansions like `$(( x << y ))` or `(( x << y ))` across
+# single or multiple lines where `<<` is a bitwise shift, not a heredoc opener.
+ARITHMETIC = re.compile(r"\$\(\([\s\S]*?(\)\)|$)|\(\([\s\S]*?(\)\)|$)")
 
 # Match heredoc openers: `<<`, `<<-`, `<<~` followed by quoted, backslash-escaped,
 # or bare word delimiter.
 HEREDOC_OPEN = re.compile(
-    r"""(?<!<)[0-9]*<<([-~]?)[ \t]*(?:'([^']+)'|"([^"]+)"|\\([^\s;|&<>()]+)|([A-Za-z0-9_][A-Za-z0-9_\-]*))"""
+    r"""(?<!<)[0-9]*<<([-~]?)[ \t]*(?:'([^']+)'|"([^"]+)"|\\([^\s;|&<>()]+)|([A-Za-z_][A-Za-z0-9_\-]*))"""
 )
 
 # Split on shell operators so `cd x && gh secret set Y` is judged per segment.
@@ -84,14 +84,20 @@ SPLIT = re.compile(r"&&|\|\||;|\||\n")
 
 def strip_heredocs(command: str) -> str:
     """Drop heredoc body lines and delimiters so interior text is not scanned as commands."""
-    lines = command.split("\n")
+    # Mask arithmetic expansions across the whole command before parsing openers,
+    # preserving line breaks so line counts stay synchronized.
+    command_for_openers = ARITHMETIC.sub(lambda m: "\n" * m.group(0).count("\n"), command)
+    lines_orig = command.split("\n")
+    lines_masked = command_for_openers.split("\n")
+
     out = []
     pending_heredocs = []  # list of (delim: str, is_tab_strip: bool)
+    current_heredoc_buffer = []
 
-    for line in lines:
+    for orig_line, masked_line in zip(lines_orig, lines_masked):
         if pending_heredocs:
             delim, is_tab_strip = pending_heredocs[0]
-            clean_line = line.rstrip("\r")
+            clean_line = orig_line.rstrip("\r")
             if is_tab_strip:
                 # <<- strips leading tabs (and spaces for robustness)
                 matched = (clean_line.lstrip("\t ") == delim)
@@ -99,21 +105,25 @@ def strip_heredocs(command: str) -> str:
                 matched = (clean_line == delim)
             if matched:
                 pending_heredocs.pop(0)
-            # Both body lines and closing delimiter lines are omitted
+                current_heredoc_buffer.clear()
+            else:
+                current_heredoc_buffer.append(orig_line)
             continue
 
-        out.append(line)
-        if not line.strip().startswith("#"):
-            # Mask arithmetic expansions so `$(( 1 << 4 ))` is not misparsed as a heredoc opener
-            line_for_heredocs = ARITHMETIC.sub("", line)
-            for m in HEREDOC_OPEN.finditer(line_for_heredocs):
-                rest = line_for_heredocs[m.end():]
+        out.append(orig_line)
+        if not orig_line.strip().startswith("#"):
+            for m in HEREDOC_OPEN.finditer(masked_line):
+                rest = masked_line[m.end():]
                 if re.match(r"^\s*\)\)", rest):
                     continue
                 strip_flag = m.group(1)
                 delim = m.group(2) or m.group(3) or m.group(4) or m.group(5)
                 if delim:
                     pending_heredocs.append((delim, bool(strip_flag)))
+
+    # If any heredocs were left unclosed at EOF, keep their buffered lines (fail-safe)
+    if pending_heredocs:
+        out.extend(current_heredoc_buffer)
 
     return "\n".join(out)
 

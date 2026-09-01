@@ -41,6 +41,10 @@ BLOCK = [
      "flag bitshift does not mask ungated repo delete"),
     ("(( x << 1 ))\n" + G + "secret set FOO",
      "arithmetic command (( x << 1 )) does not mask ungated command"),
+    ("timeout=$(( base_timeout << retry_count\n))\n" + G + "pr merge 456 --squash",
+     "multi-line arithmetic shift does not mask ungated command"),
+    ("echo $(( 1 <<\n4 ))\n" + G + "secret set FOO",
+     "split numeric shift does not mask ungated command"),
 ]
 
 ALLOW = [

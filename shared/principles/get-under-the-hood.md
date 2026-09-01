@@ -49,7 +49,7 @@ Whenever a function, command, action, or tool behaves unexpectedly or requires
 precise coordination:
 
 - **Locate the definition**:
-  Use codebase search tools (`grep_search`, `find_by_name`)
+  Use codebase search tools (such as Grep, Glob, ripgrep, or search tools)
   or package inspection mechanisms to find the exact file and line where the logic
   is implemented.
 - **Inspect the plumbing**:

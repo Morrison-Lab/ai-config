@@ -922,6 +922,7 @@ class TestPrePushReview(unittest.TestCase):
         cmd_args = mock_subproc.call_args[0][0]
         self.assertIn("-m", cmd_args)
         self.assertIn("gpt-5.6-sol", cmd_args)
+        self.assertLess(cmd_args.index("-m"), cmd_args.index("-"))
 
     @patch("builtins.open", new_callable=mock_open)
     @patch("os.makedirs")
@@ -953,6 +954,7 @@ class TestPrePushReview(unittest.TestCase):
         claude_cmd = mock_subproc.call_args[0][0]
         self.assertIn("--model", claude_cmd)
         self.assertIn("claude-3-5-sonnet", claude_cmd)
+        self.assertLess(claude_cmd.index("--model"), claude_cmd.index("-p"))
 
         # Test Cursor runner
         mock_which.return_value = "/opt/homebrew/bin/agent"
@@ -986,6 +988,7 @@ class TestPrePushReview(unittest.TestCase):
         self.assertNotIn("prompt", oc_cmd)
         self.assertIn("-m", oc_cmd)
         self.assertIn("anthropic/claude-3.7-sonnet", oc_cmd)
+        self.assertLess(oc_cmd.index("-m"), oc_cmd.index("--file"))
 
     def test_get_next_alternate_engine_rotation(self):
         engines = ["claude", "cursor", "codex", "opencode", "antigravity"]

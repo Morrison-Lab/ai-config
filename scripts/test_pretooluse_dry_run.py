@@ -68,7 +68,7 @@ class TestPreToolUseDryRun(unittest.TestCase):
         self.assertNotIn("permissionDecision", out.get("hookSpecificOutput", {}))
 
     def test_no_whole_file_punct_replace(self):
-        code, out, _ = run_hook("no-whole-file-punct-replace.py", ["--dry-run", "sed -i '' 's/—/--/g' file.txt"])
+        code, out, _ = run_hook("no-whole-file-punct-replace.py", ["--dry-run", "sed -i '' 's/\u2014/--/g' file.txt"])
         self.assertEqual(code, 0)
         hso = out.get("hookSpecificOutput", {})
         self.assertEqual(hso.get("permissionDecision"), "deny")

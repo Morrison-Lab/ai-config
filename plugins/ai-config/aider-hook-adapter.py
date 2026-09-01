@@ -272,6 +272,8 @@ def parse_aider_chat_history(content_or_path: str | Path) -> list[dict[str, Any]
                     "content": f"Applied edit to {search_replace_file}",
                 })
             current_lines.append(raw_line)
+            continue
+
         # Check for file path mentions preceding edits
         if not in_search_replace:
             fp = is_likely_file_path(line)

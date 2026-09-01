@@ -73,6 +73,7 @@ Done!
         self.assertEqual(len(turns), 2)
         self.assertEqual(turns[0]["role"], "user")
         self.assertEqual(turns[1]["role"], "assistant")
+        self.assertEqual(turns[1]["content"].count(">>>>>>> REPLACE"), 1)
         self.assertTrue(
             any(
                 tc["name"] == "Edit" and tc["input"].get("file_path") == "src/main.py"

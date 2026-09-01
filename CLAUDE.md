@@ -697,6 +697,13 @@ This one is the other direction: when a server would help, install and register 
 Covers reading `claude mcp list` for transport rather than name (a plugin's remote server can shadow the local one you meant), 400-versus-401 on an uninterpolated credential, supplying tokens by launch wrapper instead of storing them, opt-in toolsets whose selection *replaces* the default, and verifying by a real call rather than by the tool listing.
 Its last section generalizes past MCP: when a standing rule names a mechanism this session doesn't have, look for the local equivalent instead of silently degrading to a worse fallback.
 
+## Search for and install plugins proactively
+
+[shared/workflow/use-plugins.md](shared/workflow/use-plugins.md)
+
+Proactively discover, evaluate, and install plugins across Claude Code (`claude plugin marketplace list`, `claude plugin search`, `claude plugin install`), Antigravity (`.agents/plugins.json`, `~/.gemini/config/plugins.json`), Codex (`codex plugin marketplace add`, `codex plugin add`), and Cursor when a task would benefit from specialized domain tooling or workflow automation.
+Covers marketplace verification, permission review, avoiding redundant submodules, and testing live tool activation.
+
 ## File an issue before starting a new task
 
 @shared/workflow/issue-first.md

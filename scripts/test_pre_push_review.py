@@ -1109,8 +1109,9 @@ class TestPrePushReview(unittest.TestCase):
         self.assertEqual(called_args[print_idx + 1], "my_prompt")
 
 
+    @patch.object(reviewer, "verify_working_state", return_value=(True, "clean"))
     @patch("subprocess.run")
-    def test_sandbox_isolation_removes_agent_configs(self, mock_run):
+    def test_sandbox_isolation_removes_agent_configs(self, mock_run, mock_verify):
         import subprocess
         mock_result = subprocess.CompletedProcess(args=[], returncode=0, stdout="true\n")
         mock_run.return_value = mock_result
@@ -1429,6 +1430,116 @@ class TestPrePushReview(unittest.TestCase):
                     os.environ[k] = v
                 elif k in os.environ:
                     del os.environ[k]
+
+    @patch("subprocess.run")
+    def test_verify_working_state_clean(self, mock_run):
+        mock_run.side_effect = [
+            MagicMock(returncode=0, stdout="/path/to/repo\n"),  # rev-parse --show-toplevel
+            MagicMock(returncode=0, stdout=""),                 # status --porcelain -uno
+            MagicMock(returncode=0, stdout="12345678abcdef\n"), # rev-parse HEAD
+        ]
+        is_valid, msg = reviewer.verify_working_state(".", expected_commit_sha="12345678abcdef")
+        self.assertTrue(is_valid)
+        self.assertIn("clean", msg)
+
+    @patch("subprocess.run")
+    def test_verify_working_state_dirty(self, mock_run):
+        mock_run.side_effect = [
+            MagicMock(returncode=0, stdout="/path/to/repo\n"),
+            MagicMock(returncode=0, stdout=" M modified_file.py\n"),
+        ]
+        is_valid, msg = reviewer.verify_working_state(".", expected_commit_sha="12345678abcdef")
+        self.assertFalse(is_valid)
+        self.assertIn("dirty", msg.lower())
+
+    @patch("subprocess.run")
+    def test_verify_working_state_head_mismatch(self, mock_run):
+        mock_run.side_effect = [
+            MagicMock(returncode=0, stdout="/path/to/repo\n"),
+            MagicMock(returncode=0, stdout=""),
+            MagicMock(returncode=0, stdout="99999999abcdef\n"),
+        ]
+        is_valid, msg = reviewer.verify_working_state(".", expected_commit_sha="12345678abcdef")
+        self.assertFalse(is_valid)
+        self.assertIn("does not match expected commit ref", msg)
+
+    def test_structured_contradiction_commit_sha_mismatch(self):
+        commit = "12345678abcdef00"
+        wrong_commit = "99999999abcdef00"
+        report = (
+            "### Summary Verdict\n"
+            "Verdict: Ready for merge\n\n"
+            "### Critical Findings\n"
+            "None.\n\n"
+            "### Observations & Non-Blocking Suggestions\n"
+            "None.\n\n"
+            "### Verification Steps\n"
+            "None.\n\n"
+            f"Reviewed-Commit: {commit}\n\n"
+            "<!-- review-data:\n"
+            "{\n"
+            '  "schema_version": "1.0",\n'
+            '  "reviewer": "adversarial-reviewer",\n'
+            f'  "commit_sha": "{wrong_commit}",\n'
+            '  "verdict": "CLEAN",\n'
+            '  "findings": []\n'
+            "}\n"
+            "-->"
+        )
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(report, expected_commit_sha=commit)
+        self.assertFalse(is_clean)
+        self.assertIn("Contradictory output: structured review-data commit_sha", reason)
+
+    def test_structured_contradiction_commit_sha_match(self):
+        commit = "12345678abcdef00"
+        report = (
+            "### Summary Verdict\n"
+            "Verdict: Ready for merge\n\n"
+            "### Critical Findings\n"
+            "None.\n\n"
+            "### Observations & Non-Blocking Suggestions\n"
+            "None.\n\n"
+            "### Verification Steps\n"
+            "None.\n\n"
+            f"Reviewed-Commit: {commit}\n\n"
+            "<!-- review-data:\n"
+            "{\n"
+            '  "schema_version": "1.0",\n'
+            '  "reviewer": "adversarial-reviewer",\n'
+            f'  "commit_sha": "{commit}",\n'
+            '  "verdict": "CLEAN",\n'
+            '  "findings": []\n'
+            "}\n"
+            "-->"
+        )
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(report, expected_commit_sha=commit)
+        self.assertTrue(is_valid)
+        self.assertTrue(is_clean)
+
+    @patch("sys.exit", side_effect=lambda code=0: (_ for _ in ()).throw(SystemExit(code)))
+    @patch("os.chdir")
+    @patch.object(reviewer, "verify_working_state", return_value=(False, "dirty state"))
+    @patch.object(reviewer, "get_git_root", return_value="/fake/repo")
+    @patch("subprocess.run")
+    def test_main_rejects_dirty_working_state(self, mock_subproc, mock_root, mock_verify, mock_chdir, mock_exit):
+        mock_subproc.return_value = MagicMock(returncode=0, stdout="fake_sha\n")
+        with patch("sys.argv", ["pre-push-review.py"]):
+            with self.assertRaises(SystemExit) as cm:
+                reviewer.main()
+            self.assertEqual(cm.exception.code, 1)
+
+    @patch("sys.exit", side_effect=lambda code=0: (_ for _ in ()).throw(SystemExit(code)))
+    @patch("os.chdir")
+    @patch.object(reviewer, "resolve_diff", return_value=("", "base", "origin/main", "origin/main"))
+    @patch.object(reviewer, "get_git_root", return_value="/fake/repo")
+    @patch("subprocess.run")
+    def test_main_head_flag_resolves_commit(self, mock_subproc, mock_root, mock_resolve_diff, mock_chdir, mock_exit):
+        mock_subproc.return_value = MagicMock(returncode=0, stdout="explicit_sha\n")
+        with patch("sys.argv", ["pre-push-review.py", "--head", "my-feature-branch"]):
+            with self.assertRaises(SystemExit) as cm:
+                reviewer.main()
+            self.assertEqual(cm.exception.code, 0)
+            mock_resolve_diff.assert_called_with("explicit_sha", pr_number=None, explicit_base="")
 
 if __name__ == "__main__":
     unittest.main()

@@ -753,10 +753,16 @@ See ai-config#694 for the precedent.
   on #311, `8c6c1be` -> `fb8c7ac`;
   on #298, `cb327d7` -> `65fd9fc`, and then `65fd9fc` -> `e76c564`.
   Each arrived one to five minutes after the superseding push,
-  and every one of the three was on a PR that had just been pushed to ---
+  and every one was on a PR that had just been pushed to ---
   the old head's suite simply finishes after the new head exists.
   So the risk concentrates exactly where an iterating session lives,
   rather than being spread evenly across events.
+  Read those counts as a lower bound on an ongoing pattern
+  rather than a fixed tally:
+  a fourth arrived later the same session on
+  `Morrison-Lab/ai-config#2907` (`2450dd3` -> `30e83de`),
+  by the same mechanism,
+  which is what establishes that this is not repo-specific.
   This is the same staleness the failure-event bullet below describes,
   in the direction that is easier to act on wrongly:
   a stale *failure* costs a wasted investigation,

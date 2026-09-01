@@ -1201,11 +1201,9 @@ When adding a coding or review rule, place it under the principle it serves.
 
 [shared/principles/README.md](shared/principles/README.md)
 
-## Don't reinvent the wheel (DRW) — in dev and in review
+## Don't reinvent the wheel (DRW) --- in dev and in review
 
-Before implementing a new function or feature, check that it hasn't already been done — in one of our own repos, or in a trustworthy external source we could depend on instead (base R, r-lib, tidyverse, a well-maintained CRAN package).
-Prefer forking and/or contributing to an existing external source over re-building the functionality from scratch.
-Apply this in review too: a hand-rolled equivalent of functionality that already exists is a review finding, the same weight as any other standing review check.
+Universal DRW policy is in `AGENTS.md` ("Research existing solutions before implementing (DRW)").
 
 [shared/principles/dont-reinvent-wheel.md](shared/principles/dont-reinvent-wheel.md)
 

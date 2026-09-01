@@ -353,6 +353,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#procedure" id="toc-procedure" class="nav-link" data-scroll-target="#procedure">Procedure</a></li>
   <li><a href="#what-to-look-for" id="toc-what-to-look-for" class="nav-link" data-scroll-target="#what-to-look-for">What to look for</a></li>
   <li><a href="#output" id="toc-output" class="nav-link" data-scroll-target="#output">Output</a></li>
+  <li><a href="#proactive-hook-compliance" id="toc-proactive-hook-compliance" class="nav-link" data-scroll-target="#proactive-hook-compliance">Proactive hook compliance</a></li>
   </ul></li>
   </ul>
 <div class="toc-actions"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/check-history/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/check-history/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
@@ -437,6 +438,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h2 class="anchored" data-anchor-id="output">Output</h2>
 <p>Report a brief summary to the user: - Which MRs are relevant to the current work - Any potential conflicts or trade-offs identified - Confirmation that the proposed approach is compatible with prior decisions</p>
 <p>If a conflict is found, surface it before writing code — don’t implement first and discover the regression later.</p>
+</section>
+<section id="proactive-hook-compliance" class="level2">
+<h2 class="anchored" data-anchor-id="proactive-hook-compliance">Proactive hook compliance</h2>
+<ul>
+<li><strong><code>warn-stale-issue-edit.py</code></strong>: Intercepts <code>Write</code>, <code>Edit</code>, and <code>NotebookEdit</code> tool calls and warns if an issue-driven modification begins without a fresh <code>VIEW_ISSUE</code> (<code>gh issue view &lt;N&gt;</code>) and remote default-branch check (<code>git fetch origin main</code>). Running the initial inspection in this skill satisfies the guard proactively (see <a href="../../memories/hooks.md"><code>memories/hooks.md</code></a>).</li>
+</ul>
 
 
 </section>

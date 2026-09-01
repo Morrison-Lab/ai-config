@@ -228,6 +228,10 @@ When dispositioning a finding (step 2) turns up something that needs independent
 
 Give the subagent a stronger model (e.g. `model: 'opus'` on the `Agent` tool call) when the check is judgment-heavy — a subtle behavioral claim, a disputed rebuttal — rather than leaving it at the session default. Symmetrically, drop to a cheaper/faster tier (`model: 'fable'` or `'haiku'`) for a mechanical check (a lookup, confirming a file/symbol still exists); see [`select-model`](../../skills/select-model/SKILL.llms.md)’s decision tree for both directions. For a heavy fan-out verification pass, prefer a separately-billed provider (e.g. the `codex` CLI) first when available — see [`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.llms.md).
 
+## Proactive hook compliance
+
+Active hooks guard review interactions and round responses (see [`memories/hooks.md`](../../memories/hooks.md)): - **`require-agent-disclosure.py`**: All posted round summaries and per-thread replies must include `_Posted by <Agent Name> (AI agent) --- not written by a human._` on its own line after a blank line. Never use the robot emoji. - **`flag-uncited-rebuttal.py`**: If a reviewer finding cites an external documentation URL, always fetch that URL via `WebFetch` or `WebSearch` before posting a rebuttal. - **`flag-uncounted-comment-claims.py`**: When stating file counts or listing identifiers in forge comments, run and cite deriving commands (`grep -c`, `wc -l`) in the session. - **`no-handrolled-verdict-parse.py`**: Always run `python3 scripts/check-pr-fully-clean.py <pr>` to verify review and CI cleanliness. Do not grep comments for ad-hoc verdict keywords. - **`remind-learn-from-review.py` & `remind-ums-on-scrutiny.py`**: Whenever accepting valid reviewer concerns or scrutinizing feedback, run an explicit UMS pass (`skills/ums`) to update memories or skills before ending the loop.
+
 ## Integration with ardi
 
 Inside the `ardi` loop (also reachable as `iterate`):

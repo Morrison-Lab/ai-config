@@ -62,6 +62,10 @@ The UMS pass above ran, or nothing durable emerged and that is stated explicitly
 - **Clean stopping point reached** (nothing open or pending) — end with an explicit stopping-point statement, e.g. `**Stopping Point**: Clean stopping point reached` (“This session is at a good stopping point.”). A silent trailing summary leaves the user unsure whether you’re actually done or just paused.
 - **Not a clean stopping point** (something open or in flight) — an ambiguous review item, a deadlock needing a human reviewer, pending CI/review jobs, unmerged PRs, or a choice only the user can make — state explicitly `**Stopping Point**: Not a clean stopping point — [reason/open items]`, and end the reply **with the open question(s) / pending tasks**, last and clearly visible.
 
+## Proactive hook compliance
+
+Active Stop hooks validate the close-out response (see [`memories/hooks.md`](../../memories/hooks.md)): - **`require-stopping-point.py`**: Conclude with an explicit stopping-point statement (`**Stopping Point**: Clean stopping point reached` or `**Stopping Point**: Not a clean stopping point --- [reason]`). - **`no-unmeasured-clock-claim.py`**: Execute `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"` fresh before including timestamps in recaps. - **`no-empty-promise.py`**: Any commitments made in the wrap-up must ship their mechanism in the same turn or arm an explicit timer. - **`no-offer-to-file.py` & `no-unfiled-finding.py`**: File deferred issues or update memories directly in the same turn instead of offering to do so. - **`flag-cop-out-offer.py`**: Avoid ending the recap on an open offer for already-authorized tasks. - **`no-placeholder-reply.py`**: Deliver a complete, substantive closing report.
+
 ## Relationship to other skills
 
 - **`record-learnings`** (continuous) and **`ums`** (the learnings checkpoint, which this embeds as step 4) — `wrap-up` is their session-level bookend.

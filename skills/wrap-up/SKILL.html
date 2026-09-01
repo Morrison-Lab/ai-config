@@ -356,6 +356,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#report-a-linked-final-summary" id="toc-report-a-linked-final-summary" class="nav-link" data-scroll-target="#report-a-linked-final-summary">3. Report a linked final summary</a></li>
   <li><a href="#run-a-ums-review-then-close-with-the-right-signal" id="toc-run-a-ums-review-then-close-with-the-right-signal" class="nav-link" data-scroll-target="#run-a-ums-review-then-close-with-the-right-signal">4. Run a UMS review, then close with the right signal</a></li>
   </ul></li>
+  <li><a href="#proactive-hook-compliance" id="toc-proactive-hook-compliance" class="nav-link" data-scroll-target="#proactive-hook-compliance">Proactive hook compliance</a></li>
   <li><a href="#relationship-to-other-skills" id="toc-relationship-to-other-skills" class="nav-link" data-scroll-target="#relationship-to-other-skills">Relationship to other skills</a></li>
   <li><a href="#notes" id="toc-notes" class="nav-link" data-scroll-target="#notes">Notes</a></li>
   </ul></li>
@@ -433,6 +434,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </ul>
 </section>
 </section>
+</section>
+<section id="proactive-hook-compliance" class="level2">
+<h2 class="anchored" data-anchor-id="proactive-hook-compliance">Proactive hook compliance</h2>
+<p>Active Stop hooks validate the close-out response (see <a href="../../memories/hooks.md"><code>memories/hooks.md</code></a>): - <strong><code>require-stopping-point.py</code></strong>: Conclude with an explicit stopping-point statement (<code>**Stopping Point**: Clean stopping point reached</code> or <code>**Stopping Point**: Not a clean stopping point --- [reason]</code>). - <strong><code>no-unmeasured-clock-claim.py</code></strong>: Execute <code>TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"</code> fresh before including timestamps in recaps. - <strong><code>no-empty-promise.py</code></strong>: Any commitments made in the wrap-up must ship their mechanism in the same turn or arm an explicit timer. - <strong><code>no-offer-to-file.py</code> &amp; <code>no-unfiled-finding.py</code></strong>: File deferred issues or update memories directly in the same turn instead of offering to do so. - <strong><code>flag-cop-out-offer.py</code></strong>: Avoid ending the recap on an open offer for already-authorized tasks. - <strong><code>no-placeholder-reply.py</code></strong>: Deliver a complete, substantive closing report.</p>
 </section>
 <section id="relationship-to-other-skills" class="level2">
 <h2 class="anchored" data-anchor-id="relationship-to-other-skills">Relationship to other skills</h2>

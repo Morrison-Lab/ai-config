@@ -364,6 +364,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#gitlab-resolve-the-discussion" id="toc-gitlab-resolve-the-discussion" class="nav-link" data-scroll-target="#gitlab-resolve-the-discussion">GitLab — resolve the discussion</a></li>
   <li><a href="#github-post-a-closing-comment" id="toc-github-post-a-closing-comment" class="nav-link" data-scroll-target="#github-post-a-closing-comment">GitHub — post a closing comment</a></li>
   </ul></li>
+  <li><a href="#proactive-hook-compliance" id="toc-proactive-hook-compliance" class="nav-link" data-scroll-target="#proactive-hook-compliance">Proactive hook compliance</a></li>
   <li><a href="#notes" id="toc-notes" class="nav-link" data-scroll-target="#notes">Notes</a></li>
   </ul></li>
   </ul>
@@ -487,6 +488,15 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="st">_Posted by Claude Code (AI agent) --- not written by a human._"</span>      <span class="co"># COMMENT_PR</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
+</section>
+<section id="proactive-hook-compliance" class="level2">
+<h2 class="anchored" data-anchor-id="proactive-hook-compliance">Proactive hook compliance</h2>
+<ul>
+<li><strong><code>require-gh-repo-flag.py</code></strong>: Always supply <code>-R &lt;owner&gt;/&lt;repo&gt;</code> on mutating <code>gh</code> calls (<code>gh pr comment -R ...</code>, <code>gh issue comment -R ...</code>).</li>
+<li><strong><code>require-agent-disclosure.py</code></strong>: Every claim, update, or unclaim comment must include the disclosure trailer <code>_Posted by &lt;Agent Name&gt; (AI agent) --- not written by a human._</code> on its own line after a blank line. Never use the robot emoji.</li>
+<li><strong><code>warn-pr-create-without-dupe-check.py</code> &amp; <code>warn-dupe-check-chained-to-create.py</code></strong>: When opening an immediate PR under <a href="../../shared/workflow/pr-on-claim.md"><code>pr-on-claim</code></a>, search for existing PRs (<code>gh pr list --state all --search "&lt;keywords&gt;"</code>) in a separate tool call before creating the PR.</li>
+<li><strong><code>flag-uncounted-comment-claims.py</code></strong>: When referencing file lists or counts in comments, ensure deriving commands (<code>grep -c</code>, <code>wc -l</code>) ran in the session.</li>
+</ul>
 </section>
 <section id="notes" class="level2">
 <h2 class="anchored" data-anchor-id="notes">Notes</h2>

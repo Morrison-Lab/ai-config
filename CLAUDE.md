@@ -977,7 +977,8 @@ The persona files under `.claude/agents/` and `.opencode/agents/` deliberately c
 - **Don't:** omit `model` and let the launch inherit, which in a Fable session is a Fable launch nobody chose.
 - **Don't:** treat a `daytb`, `away`, or `mwc` grant as covering the model tier; none of them does.
 
-(Directive from the user, 2026-09-01: "have you been spawning subagents using fable? don't ever do that without my explicit specific permission".
+(Directive from the user, 2026-09-01: "have you been spawning subagents using fable?
+don't ever do that without my explicit specific permission".
 Tracked as ai-config#2927.)
 
 ## Derive a set of work items; never hand over an enumeration of it

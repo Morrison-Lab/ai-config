@@ -410,7 +410,8 @@ The strict merge policy below still applies.
 A dispatched worker (a subagent, a workflow `agent()` call, a delegated CLI run) that names no model inherits the conductor's, so in a Fable session omitting the parameter is a Fable launch nobody chose.
 The user's rule: no worker runs on Fable without their explicit permission for that specific dispatch.
 Name the model on every dispatch, a cheaper tier for bounded or mechanical work, and ask before naming Fable.
-On Claude Code, `hooks/no-fable-subagent.py` denies the launch that violates this; other harnesses carry the rule as instruction (ai-config#2927).
+On Claude Code, `hooks/no-fable-subagent.py` denies the launch that violates this.
+Other harnesses carry the rule as instruction (ai-config#2927).
 
 ## Every self-review is an adversarial review by a separate subagent
 

@@ -1502,7 +1502,6 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                     if (
                         (origin_task_id and origin_task_id in reviewer_task_ids)
                         or (sender_id and sender_id in reviewer_task_ids)
-                        or (not origin_task_id and not sender_id and reviewer_task_ids)
                     ):
                         text = str(b.get("text") or b.get("content") or "")
                         found, sha = parse_report(text)

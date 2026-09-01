@@ -3,6 +3,14 @@ A GitHub PR is **fully clean** when **both** of these hold, verified via `python
 For a GitLab MR, establish the same criteria from GitLab's current-head pipeline, review, and discussion APIs;
 `check-pr-fully-clean.py` queries GitHub and cannot verify a GitLab MR.
 
+**Active monitoring and polling are required after every push until fully clean.**
+Reaching fully clean requires an active polling loop or scheduled wake mechanism after each push.
+Do not pause passively or assume check runs and reviews will complete without polling.
+Actively query the current head's CI/pipeline runs and review verdicts (`gh` for GitHub, `glab` for GitLab) until each round reaches a terminal state, re-arming the poll while work remains.
+
+- **Do:** actively poll and re-arm monitoring after every push until CI and review reach a terminal state at the current head.
+- **Don't:** stop polling while CI or reviews are in flight, or assume automated pipelines completed without querying the forge.
+
 **A forge's `mergeable` result is an integration-state signal, not a review verdict.**
 It can be true while a reviewer has left resolvable findings open.
 Do not report a PR/MR fully clean, ready to merge, or merge it until the review thread sweep is also clear.
@@ -23,14 +31,6 @@ Do not report a PR/MR fully clean, ready to merge, or merge it until the review 
 - **Don't:** treat a resolved GitLab discussion sweep as a clean current-head review;
   findings can appear in an overall review note without a resolvable discussion.
 - **Don't:** let an earlier review's green pipeline or later code push erase an unresolved finding without a reviewer-confirmed clean round.
-
-**Active monitoring and polling are required after every push until fully clean.**
-Reaching fully clean requires an active polling loop or scheduled wake mechanism after each push.
-Do not pause passively or assume check runs and reviews will complete without polling.
-Actively query the current head's CI/pipeline runs and review verdicts (`gh` for GitHub, `glab` for GitLab) until each round reaches a terminal state, re-arming the poll while work remains.
-
-- **Do:** actively poll and re-arm monitoring after every push until CI and review reach a terminal state at the current head.
-- **Don't:** stop polling while CI or reviews are in flight, or assume automated pipelines completed without querying the forge.
 
 **In a remote/web session the instrument still runs, and hand-checking the
 axes in its place is not acceptable** (user directive, 2026-08-29,

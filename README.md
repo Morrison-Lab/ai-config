@@ -374,8 +374,8 @@ The event mapping is [docs/cursor-hook-mapping.md](docs/cursor-hook-mapping.md).
 | `no-report-unfixed-hook-test.py` | `Stop` | blocks a status-only reply after CI identifies a missing hook test, until that exact test is written |
 | `no-unmonitored-pr.py` | `Stop` | starts a detached two-minute `gh` poller when no model scheduler was used; blocks only when neither works |
 | `inject-pr-monitor-status.py` | `UserPromptSubmit` | injects changed state from a detached PR poller on the next prompt, and surfaces once a monitor whose last 3 polls all errored with the same text; local pollers cannot wake a terminated model session |
-| `ensure-open-pr-monitor.py` | `UserPromptSubmit` | ensures the agent-independent all-open-PR monitor service is running when an agent session begins |
-| `monitor-open-prs.py` | detached timer | reconciles every open PR authored by the authenticated user every two minutes, including PRs opened outside the current session |
+| `ensure-open-pr-monitor.py` | `UserPromptSubmit` | ensures the agent-independent all-open-PR monitor service (GitHub PRs and GitLab merge requests) is running when an agent session begins |
+| `monitor-open-prs.py` | detached timer | reconciles every open GitHub PR and GitLab merge request authored by the authenticated user every two minutes, including ones opened outside the current session; needs `gh` or `glab`, and polls whichever is installed |
 | `no-heavy-work-on-head-node.py` | `PreToolUse` (Bash) | blocks a heavy R/Quarto command run on a cluster's login node; inert off a cluster |
 | `remind-brief-premises.py` | `PreToolUse` (Agent, Task, SendMessage) | reminds, never blocks, when a brief asserts corpus state that nothing derived --- including a `SendMessage` follow-up to a running agent, where corrections and new premises land |
 | `remind-both-sides-from-git.py` | `UserPromptSubmit` | reminds, never blocks, when a revision-qualified blob is compared against the working-tree copy of that path |
@@ -414,8 +414,10 @@ user service after the hook files are installed:
 python3 scripts/install-pr-monitor.py
 ```
 
-The service polls every open PR authored by the authenticated GitHub user every
-two minutes. It does not depend on Claude, Codex, Gemini, or a project session
+The service polls every open GitHub PR and GitLab merge request authored by the
+authenticated user every two minutes, through whichever of `gh` and `glab` is
+installed.
+It does not depend on Claude, Codex, Gemini, or a project session
 remaining open. If a user systemd bus is unavailable, the installer starts the
 monitor immediately and installs an equivalent per-user cron `@reboot` entry.
 It copies the monitor to `~/.local/share/ai-config/hooks/`, so neither path

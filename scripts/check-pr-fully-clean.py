@@ -45,7 +45,12 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
-from fences import CODE_SPAN_RE, find_fence_spans, strip_code_spans  # noqa: E402
+from fences import (  # noqa: E402
+    CODE_SPAN_RE,
+    find_fence_spans,
+    strip_code_spans,
+    strip_fences,
+)
 from payload_fetcher import PayloadError, PayloadFetcher  # noqa: E402
 from review_payload import (  # noqa: E402
     extract_structured_review,
@@ -358,7 +363,8 @@ def _reviewer_identity(body: str, author: str = "") -> str:
     exclusive = EXCLUSIVE_BOT_IDENTITY.get(login.lower())
     if exclusive:
         return exclusive
-    scan = strip_cited_finding_vocab(strip_code_spans(body or ""))
+    scan = "\n".join(strip_code_spans(ln) for ln in (body or "").splitlines())
+    scan = strip_cited_finding_vocab(scan)
     lines = [ln.strip() for ln in scan.splitlines() if ln.strip()]
     first_line = lines[0] if lines else ""
     last_line = lines[-1] if lines else ""
@@ -2324,7 +2330,9 @@ def _is_structured_review_body(body: str) -> bool:
     #1798's false-CLEAN direction closed while #2402's supersession path
     opens.
     """
-    scan = strip_cited_finding_vocab(strip_code_spans(body))
+    no_fences = strip_fences(body, swallow_unclosed=True)
+    scan = "\n".join(strip_code_spans(ln) for ln in no_fences.splitlines())
+    scan = strip_cited_finding_vocab(scan)
     if not _REVIEW_STRUCTURE_HEADING.search(scan):
         return False
     return bool(re.search(

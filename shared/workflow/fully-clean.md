@@ -1073,6 +1073,29 @@ A PR without a clean review verdict on the latest commit is not merge-ready.
 - **Don't:** treat green CI plus a clean review as sufficient without independently re-checking merge-conflict state.
 - **Don't:** describe a PR that lacks a clean HEAD review as merge-ready, ready to merge, or "green and merge-ready."
 
+**A sync-only push invalidates a clean verdict just as thoroughly as a code push, and arming auto-merge after a sync violates the HEAD review gate.**
+When `main` moves and a direct merge is refused because the branch is not up to date,
+merging `origin/main` in and pushing creates a new HEAD commit ref.
+Arming `gh pr merge --auto` immediately after that sync push ---
+reasoning about it as scheduling a merge already verified rather than authorizing an unreviewed head ---
+violates [Pattern 12](../../memories/mistake-patterns.md).
+GitHub auto-merge fires the moment CI passes,
+racing ahead of and potentially merging before any automated or adversarial reviewer can evaluate the new HEAD commit.
+The sync is content-free (no author code changes),
+which is why it does not feel like a new head needing a new verdict,
+but the new HEAD commit ref is completely unreviewed until a fresh review round posts for that exact SHA.
+
+- **Do:** re-run `scripts/check-pr-fully-clean.py <N>` against the new HEAD commit after any sync push,
+  wait for clean reviews and green CI at that HEAD,
+  and merge directly/synchronously.
+- **Do:** accept that a fast-moving `main` may require repeating the sync-and-verify cycle rather than attempting to bypass it with auto-merge.
+- **Don't:** arm `gh pr merge --auto` after a sync-only push under the impression that prior verification at an older commit carries forward.
+- **Don't:** assume GitHub auto-merge will wait for review comments ---
+  it gates only on native branch protection checks.
+
+See [`fully-clean.cases.md`](fully-clean.cases.md),
+"Auto-merge armed after a sync-only push, having verified the previous head (#2556)".
+
 **Re-check version parity in that same sweep, not only conflict-freedom.**
 
 **Threads:** at fully-clean, every **inline** review thread is resolved, and the only conversation left open is the final all-clear exchange --- the reviewer's all-clear comment and your reply to it. (The all-clear is usually a top-level PR comment, not an inline thread.)

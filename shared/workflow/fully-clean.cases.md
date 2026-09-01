@@ -1356,3 +1356,14 @@ That distinguished "the retry hangs" from "the reviewer is broken", and confirme
 The cited SHA matched nothing on hand, which reads exactly like a fabricated citation.
 The round had two commits: the fix (`004266a`) and a `Merge origin/main` on top of it (`2624610`), and the reviewer had named the commit that actually carried the fix --- arguably the more useful citation of the two.
 `git cat-file -t 004266a` resolving, and `git show -s` placing it in the branch's own history, settled it in one command.)
+
+## Auto-merge armed after a sync-only push, having verified the previous head (#2556)
+
+(`Morrison-Lab/ai-config#2556`, 2026-08-31 / Issue #2558: PR was verified fully clean at `2c1ae45d` --- checker exit 0, verdict `Ready for merge` at that exact SHA, zero unresolved threads.
+A direct merge was refused because `main` had moved (`the head branch is not up to date with the base branch`).
+The author merged `origin/main` in and pushed `54874be0`, then armed `gh pr merge --auto`, reasoning about it as *scheduling a merge already verified* rather than authorizing an unreviewed head.
+The sync was content-free (no author changes), so it did not feel like a new head needing a new verdict.
+However, pushing created a new HEAD commit ref that silently invalidated the prior clean verdict.
+Auto-merge fires server-side as soon as CI passes, with no check of whether a review verdict has posted for the new HEAD.
+A clean verdict for `54874be0` posted at 22:18:44Z and auto-merge fired at 22:20:29Z.
+Had the auto-merge beaten the review, it would have merged a head no reviewer had seen.)

@@ -36,6 +36,19 @@ If the merge has conflicts, resolve them, run the project's standard pre-commit
 checks (render / lint / spell / tests), commit, then push. Don't push a
 half-resolved merge.
 
+**A sync-only push invalidates the previous commit's review verdict; never arm auto-merge after syncing.**
+Merging `origin/main` in and pushing creates a new HEAD commit ref.
+Even if the prior HEAD was verified 100% clean and the sync contained no changes of yours,
+the new HEAD commit ref is unreviewed until fresh reviews land.
+Arming `gh pr merge --auto` after a sync push risks merging the new HEAD as soon as CI passes
+without any review at the new SHA ([Pattern 12](../../memories/mistake-patterns.md)).
+Always wait for fresh reviews and CI on the new head,
+re-verify with `check-pr-fully-clean.py`,
+and merge directly/synchronously.
+
+- **Do:** re-run verification on the new head after every sync push and merge directly once fully clean.
+- **Don't:** arm `gh pr merge --auto` after syncing with `main` to avoid repeating the review wait.
+
 **After merging main, re-check version parity.** In R packages with a
 `version-check` CI job, the branch's `DESCRIPTION` `Version:` must *exceed*
 main's. A conflict-free merge can silently put them at parity — main advanced

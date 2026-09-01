@@ -701,7 +701,7 @@ Its last section generalizes past MCP: when a standing rule names a mechanism th
 
 [shared/workflow/use-plugins.md](shared/workflow/use-plugins.md)
 
-Proactively discover, evaluate, and install plugins across Claude Code (`claude plugin marketplace list`, `claude plugin search`, `claude plugin install`), Antigravity (`.agents/plugins.json`, `~/.gemini/config/plugins.json`), Codex (`codex plugin marketplace add`, `codex plugin add`), and Cursor when a task would benefit from specialized domain tooling or workflow automation.
+Proactively discover, evaluate, and install plugins across Claude Code (`claude plugin marketplace list`, `claude plugin marketplace update`, `claude plugin install`), Antigravity (`.agents/plugins.json`, `~/.gemini/config/plugins.json`), Codex (`codex plugin marketplace add`, `codex plugin add`), and Cursor when a task would benefit from specialized domain tooling or workflow automation.
 Covers marketplace verification, permission review, avoiding redundant submodules, and testing live tool activation.
 
 ## File an issue before starting a new task

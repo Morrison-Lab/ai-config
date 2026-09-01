@@ -195,7 +195,7 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
     auto-merge fired at 04:30Z,
     and it merged over an explicit Needs-more-work verdict ---
     requiring revert (#2268) plus reland-with-fixes (#2269).
-  - 2026-08-31 on `ai-config#2556` (Issue #2558):
+  - 2026-08-28 on `ai-config#2556` (Issue #2558):
     verified fully clean at `2c1ae45d` (checker exit 0, verdict `Ready for merge` at that exact SHA, zero unresolved threads).
     A direct merge was refused because `main` had moved (`the head branch is not up to date with the base branch`).
     Merged `origin/main` in and pushed `54874be0`,

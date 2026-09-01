@@ -25,6 +25,14 @@ jobs:
         run: python3 scripts/validate-skills.py
       - name: Check markdown links
         run: python3 scripts/check-links.py
+      - name: Run check-links tests
+        # ai-config#2881: CommonMark autolinks and relative link verification.
+        run: python3 scripts/test_check_links.py
+      - name: Check ASCII punctuation in source files
+        # ai-config#2550: ensure .py and .R source files obey the ASCII punctuation policy.
+        run: python3 scripts/check-ascii-punctuation.py
+      - name: Run check-ascii-punctuation tests
+        run: python3 scripts/test_check_ascii_punctuation.py
       - name: Check Jules mention-dispatch wrap
         # ai-config#2280: a uses: step with GITHUB_EVENT_NAME in env looks
         # like a wrap and is a no-op. This gate fails if the mention path
@@ -81,6 +89,8 @@ jobs:
         run: python3 scripts/test_check_verdict_scan_parity.py
       - name: Run check-user-quote tests
         run: python3 scripts/test_check_user_quote.py
+      - name: Run check-doi-bib tests
+        run: python3 scripts/test_check_doi_bib.py
       - name: Run test_pull_request tests
         run: python3 scripts/test_pull_request.py
       - name: Run check-pr-body-figures tests
@@ -114,6 +124,9 @@ jobs:
       - name: Run markdown fences library tests
         # ai-config#2540: scripts/lib/fences.py code block and code span parsing.
         run: python3 scripts/test_fences.py
+      - name: Run check-rendered-references tests
+        # ai-config#2879: verify broken rendered reference checking and footnote isolation.
+        run: python3 scripts/test_check_rendered_references.py
       - name: Check that all scripts/test_*.py test suites are gated
         # ai-config#2540: verify every test suite in scripts/ is gated in CI.
         run: python3 scripts/check-test-suites-covered.py
@@ -157,6 +170,11 @@ jobs:
         # `batch-merge-and-resolve.md` warns about, and it is what the
         # hand-run prototype this script replaces actually had.
         run: python3 scripts/test_pr_overlap.py
+      - name: Run upload-skills tests
+        # Only the tests run here. upload_skills.sh itself requires a live
+        # workspace API key, so the offline test suite exercises change
+        # detection, deletion propagation, and state caching with mock curl.
+        run: python3 scripts/test_upload_skills.py
       - name: Run context-closure tests
         run: python3 scripts/test_check_context_closure.py
       - name: Run ai-session MWC grant tests
@@ -175,12 +193,18 @@ jobs:
         # with its subject AND flags any hook missing a test (ai-config#1080),
         # so a tested guard cannot regress and an untested one cannot hide.
         run: python3 scripts/test_hooks.py
+      - name: Run PreToolUse dry-run tests
+        # Tests --dry-run and simulation mode support across PreToolUse hooks offline (ai-config#2557).
+        run: python3 scripts/test_pretooluse_dry_run.py
       - name: Run Antigravity hook adapter tests
         # Tests the Antigravity lifecycle adapter and manifest translation in hermetic isolation.
         run: python3 scripts/test_agy_hook_adapter.py
       - name: Run Aider hook adapter tests
         # Tests Aider markdown history parsing, JSONL generation, and hook translation (ai-config#2659).
         run: python3 scripts/test_aider_hook_adapter.py
+      - name: Run Codex hook adapter tests
+        # Tests Codex dispatch, matcher aliases, and canonical catalog reuse.
+        run: python3 scripts/test_codex_hook_adapter.py
       - name: Run Antigravity merge-gate tests
         # Verdict-parsing and merge-command gating for the Antigravity plugin's
         # enforce-mwc-review-gate.py, incl. the sparta#1427 regression (#2676).

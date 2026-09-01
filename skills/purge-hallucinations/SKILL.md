@@ -88,7 +88,8 @@ the reference type:
   `WebFetch` (remote). **A 404/410 is fabricated; a timeout, 403, 429, or
   DNS failure is *unverifiable*** — distinguish them.
 - **Citation / package** — CRAN: `https://cran.r-project.org/package=<pkg>`;
-  installed: `Rscript -e 'find.package("<pkg>")'`; dep: check `DESCRIPTION`.
+  installed: `Rscript -e 'find.package("<pkg>")'`; dep: check `DESCRIPTION`;
+  DOI / `.bib`: `python3 scripts/check_doi_bib.py <path-to-.bib>` (or `--root <dir> --cited-only`).
 - **Flag / option / config key** — grep the tool's `--help`, its schema, or
   its source; for a YAML key, the consuming code/schema.
 - **API / SDK method or model id** — check the SDK source/docs. For

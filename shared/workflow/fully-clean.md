@@ -3,6 +3,14 @@ A GitHub PR is **fully clean** when **both** of these hold, verified via `python
 For a GitLab MR, establish the same criteria from GitLab's current-head pipeline, review, and discussion APIs;
 `check-pr-fully-clean.py` queries GitHub and cannot verify a GitLab MR.
 
+**Active monitoring and polling are required after every push until fully clean.**
+Reaching fully clean requires an active polling loop or scheduled wake mechanism after each push.
+Do not pause passively or assume check runs and reviews will complete without polling.
+Actively query the current head's CI/pipeline runs and review verdicts (`gh` for GitHub, `glab` for GitLab) until each round reaches a terminal state, re-arming the poll while work remains.
+
+- **Do:** actively poll and re-arm monitoring after every push until CI and review reach a terminal state at the current head.
+- **Don't:** stop polling while CI or reviews are in flight, or assume automated pipelines completed without querying the forge.
+
 **A forge's `mergeable` result is an integration-state signal, not a review verdict.**
 It can be true while a reviewer has left resolvable findings open.
 Do not report a PR/MR fully clean, ready to merge, or merge it until the review thread sweep is also clear.
@@ -1072,6 +1080,29 @@ A PR without a clean review verdict on the latest commit is not merge-ready.
 - **Do:** report a PR as blocked on review when HEAD has no authentic clean verdict, even if GitHub says `CLEAN`.
 - **Don't:** treat green CI plus a clean review as sufficient without independently re-checking merge-conflict state.
 - **Don't:** describe a PR that lacks a clean HEAD review as merge-ready, ready to merge, or "green and merge-ready."
+
+**A sync-only push invalidates a clean verdict just as thoroughly as a code push, and arming auto-merge after a sync violates the HEAD review gate.**
+When `main` moves and a direct merge is refused because the branch is not up to date,
+merging `origin/main` in and pushing creates a new HEAD commit ref.
+Arming `gh pr merge --auto` immediately after that sync push ---
+reasoning about it as scheduling a merge already verified rather than authorizing an unreviewed head ---
+violates [Pattern 12](../../memories/mistake-patterns.md).
+GitHub auto-merge fires the moment CI passes,
+racing ahead of and potentially merging before any automated or adversarial reviewer can evaluate the new HEAD commit.
+The sync is content-free (no author code changes),
+which is why it does not feel like a new head needing a new verdict,
+but the new HEAD commit ref is completely unreviewed until a fresh review round posts for that exact SHA.
+
+- **Do:** re-run `scripts/check-pr-fully-clean.py <N>` against the new HEAD commit after any sync push,
+  wait for clean reviews and green CI at that HEAD,
+  and merge directly/synchronously.
+- **Do:** accept that a fast-moving `main` may require repeating the sync-and-verify cycle rather than attempting to bypass it with auto-merge.
+- **Don't:** arm `gh pr merge --auto` after a sync-only push under the impression that prior verification at an older commit carries forward.
+- **Don't:** assume GitHub auto-merge will wait for review comments ---
+  it gates only on native branch protection checks.
+
+See [`fully-clean.cases.md`](fully-clean.cases.md),
+"Auto-merge armed after a sync-only push, having verified the previous head (#2556)".
 
 **Re-check version parity in that same sweep, not only conflict-freedom.**
 

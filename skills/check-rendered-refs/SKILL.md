@@ -164,8 +164,8 @@ underlying `.qmd` is a normal edit the user can ask for next (or hand to
   reporting anything from it, per
   [`fact-check-prose`](../../shared/writing/fact-check-prose.md)'s "Confirm a
   rendered page carries your commit before reading anything off it".
-- ❌ Reporting every `@`-containing string as a broken citation — `@handle`,
+- ❌ Reporting every `@`-containing string as a broken citation --- `@handle`,
   emails, and code can match. `?@` is certain; `[@…]`/`@key` is heuristic.
 - ❌ Flagging valid markdown footnote references (`[^1]`, `[^note]`, `[^1]:`) as
-  broken reference links or raw citations — footnotes are standard markdown syntax.
+  broken reference links or raw citations --- footnotes are standard markdown syntax.
 - ❌ Dropping the `-F` (or escaping) so the shell/grep mangles `?@`.

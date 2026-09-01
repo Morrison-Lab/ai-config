@@ -343,7 +343,8 @@ def mask_comments_and_arithmetic(command: str) -> str:
                     i += 1
                 if depth == 0:
                     span = command[start:i]
-                    out.append("\n" * span.count("\n"))
+                    for ch_span in span:
+                        out.append("\n" if ch_span == "\n" else " ")
                     continue
                 else:
                     out.append(command[start])

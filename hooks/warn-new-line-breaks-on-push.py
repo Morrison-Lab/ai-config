@@ -79,16 +79,6 @@ ERROR_LINE = re.compile(
     r"^::error file=(?P<path>[^,]+),line=(?P<line>\d+)::(?P<msg>[^:]+):\s*(?P<preview>.*)$"
 )
 
-NOTE = (
-    "This `git push` carries Markdown additions with semantic line break "
-    "(new-line-breaks) violations against `{base_ref}`:\n\n"
-    "{violations_table}\n\n"
-    "CI will fail on the `new-line-breaks` check for these lines.\n\n"
-    "To fix before pushing, run:\n\n"
-    "    {fix_cmd}\n\n"
-    "and commit the formatted files."
-)
-
 
 def _git(args: list[str], cwd: str | None = None, timeout: int = 5) -> str | None:
     """Run git with args; return stripped stdout on success, else None."""
@@ -175,18 +165,31 @@ def format_warning(
     if os.path.isfile(sembr_script):
         files_arg = " ".join(unique_files)
         fix_cmd = f"python3 scripts/semantic-line-breaks.py {files_arg} --write"
+        remediation_advice = (
+            f"To fix before pushing, run:\n\n"
+            f"    {fix_cmd}\n\n"
+            f"and commit the formatted files."
+        )
+        summary = (
+            f"`git push` carries {len(violations)} semantic line break violation(s) "
+            f"in {len(unique_files)} file(s) against `{base_ref}`; run `{fix_cmd}` before pushing."
+        )
     else:
-        files_arg = " ".join(unique_files) if len(unique_files) <= 3 else "<file>"
-        fix_cmd = f"python3 scripts/semantic-line-breaks.py {files_arg} --write"
+        remediation_advice = (
+            "To fix before pushing, break long lines into one sentence/clause "
+            "per line and commit the formatted files."
+        )
+        summary = (
+            f"`git push` carries {len(violations)} semantic line break violation(s) "
+            f"in {len(unique_files)} file(s) against `{base_ref}`; reformat violating lines before pushing."
+        )
 
-    note = NOTE.format(
-        base_ref=base_ref,
-        violations_table=violations_table,
-        fix_cmd=fix_cmd,
-    )
-    summary = (
-        f"`git push` carries {len(violations)} semantic line break violation(s) "
-        f"in {len(unique_files)} file(s) against `{base_ref}`; run `{fix_cmd}` before pushing."
+    note = (
+        f"This `git push` carries Markdown additions with semantic line break "
+        f"(new-line-breaks) violations against `{base_ref}`:\n\n"
+        f"{violations_table}\n\n"
+        f"CI will fail on the `new-line-breaks` check for these lines.\n\n"
+        f"{remediation_advice}"
     )
     return note, summary
 

@@ -40,7 +40,7 @@ def _git(d, *args, env=None):
     ).stdout.strip()
 
 
-def make_repo(with_checker=True) -> str:
+def make_repo(with_checker=True, with_sembr=True) -> str:
     """Create a throwaway git repository with main branch and clean initial commit."""
     d = tempfile.mkdtemp(prefix="nlb-push-test-")
     _git(d, "init", "-q", "-b", "main")
@@ -49,7 +49,7 @@ def make_repo(with_checker=True) -> str:
         os.makedirs(os.path.join(d, "scripts", "vendor"), exist_ok=True)
         if os.path.isfile(REAL_CHECKER):
             shutil.copy(REAL_CHECKER, os.path.join(d, "scripts", "vendor", "gha-check-new-line-breaks.py"))
-        if os.path.isfile(REAL_SEMBR):
+        if with_sembr and os.path.isfile(REAL_SEMBR):
             shutil.copy(REAL_SEMBR, os.path.join(d, "scripts", "semantic-line-breaks.py"))
 
     with open(os.path.join(d, "README.md"), "w", encoding="utf-8") as f:
@@ -60,21 +60,28 @@ def make_repo(with_checker=True) -> str:
     return d
 
 
-REPO_WITH_VIOLATION = make_repo(with_checker=True)
+REPO_WITH_VIOLATION = make_repo(with_checker=True, with_sembr=True)
 _git(REPO_WITH_VIOLATION, "checkout", "-q", "-b", "feat/bad-nlb")
 with open(os.path.join(REPO_WITH_VIOLATION, "bad.md"), "w", encoding="utf-8") as f:
     f.write("# Bad doc\n\nFirst sentence. Second sentence on the same line.\n")
 _git(REPO_WITH_VIOLATION, "add", "-A")
 _git(REPO_WITH_VIOLATION, "commit", "-qm", "Add bad markdown")
 
-REPO_CLEAN = make_repo(with_checker=True)
+REPO_WITHOUT_SEMBR = make_repo(with_checker=True, with_sembr=False)
+_git(REPO_WITHOUT_SEMBR, "checkout", "-q", "-b", "feat/no-sembr")
+with open(os.path.join(REPO_WITHOUT_SEMBR, "bad.md"), "w", encoding="utf-8") as f:
+    f.write("# Bad doc\n\nFirst sentence. Second sentence on the same line.\n")
+_git(REPO_WITHOUT_SEMBR, "add", "-A")
+_git(REPO_WITHOUT_SEMBR, "commit", "-qm", "Add bad markdown without sembr script")
+
+REPO_CLEAN = make_repo(with_checker=True, with_sembr=True)
 _git(REPO_CLEAN, "checkout", "-q", "-b", "feat/clean-nlb")
 with open(os.path.join(REPO_CLEAN, "clean.md"), "w", encoding="utf-8") as f:
     f.write("# Clean doc\n\nFirst sentence.\nSecond sentence on a new line.\n")
 _git(REPO_CLEAN, "add", "-A")
 _git(REPO_CLEAN, "commit", "-qm", "Add clean markdown")
 
-REPO_NO_CHECKER = make_repo(with_checker=False)
+REPO_NO_CHECKER = make_repo(with_checker=False, with_sembr=False)
 _git(REPO_NO_CHECKER, "checkout", "-q", "-b", "feat/no-checker")
 with open(os.path.join(REPO_NO_CHECKER, "bad.md"), "w", encoding="utf-8") as f:
     f.write("# Bad doc\n\nFirst sentence. Second sentence on the same line.\n")
@@ -110,13 +117,15 @@ def run_hook(command, cwd=REPO_WITH_VIOLATION, hook_path=HOOK, extra_env=None):
 
 SHOULD_WARN = [
     ("W1", f"git -C {REPO_WITH_VIOLATION} push origin feat/bad-nlb", REPO_WITH_VIOLATION,
-     "push with new-line-breaks violation warns"),
+     "push with new-line-breaks violation warns and recommends sembr script"),
     ("W2", "git push origin feat/bad-nlb", REPO_WITH_VIOLATION,
      "bare push in dirty branch warns"),
     ("W3", f"cd {REPO_WITH_VIOLATION} && git push origin feat/bad-nlb", ROOT,
      "cd followed by push in bad repo warns"),
     ("W4", f"env git -C {REPO_WITH_VIOLATION} push origin feat/bad-nlb", ROOT,
      "env wrapped git push warns"),
+    ("W5", f"git -C {REPO_WITHOUT_SEMBR} push origin feat/no-sembr", REPO_WITHOUT_SEMBR,
+     "push in repo without sembr reformatter warns with manual advice"),
 ]
 
 SHOULD_STAY_SILENT = [
@@ -153,8 +162,12 @@ def test_main():
         if is_ok and out:
             hso = out.get("hookSpecificOutput", {})
             ctx = hso.get("additionalContext", "")
-            if "bad.md" not in ctx or "semantic-line-breaks.py" not in ctx:
-                is_ok = False
+            if case_id == "W5":
+                if "semantic-line-breaks.py" in ctx or "break long lines" not in ctx:
+                    is_ok = False
+            else:
+                if "bad.md" not in ctx or "semantic-line-breaks.py" not in ctx:
+                    is_ok = False
         wrong += not is_ok
         print(f"  {got:<6} {case_id:<4} {desc}")
 
@@ -189,19 +202,19 @@ MUTATIONS = {
         "checker candidates list must not be empty",
         [('CHECKER_CANDIDATES = (\n    os.path.join("scripts", "vendor", "gha-check-new-line-breaks.py"),\n    os.path.join("scripts", "check-new-line-breaks.py"),\n)',
           'CHECKER_CANDIDATES = ()')],
-        {"W1", "W2", "W3", "W4"},
+        {"W1", "W2", "W3", "W4", "W5"},
     ),
     "M2_base_ref_gate": (
         "resolving base ref is required for diff-scoped check",
         [('        base_ref = _resolve_base_ref(git_root)\n        if not base_ref:\n            continue',
           '        base_ref = None\n        if not base_ref:\n            continue')],
-        {"W1", "W2", "W3", "W4"},
+        {"W1", "W2", "W3", "W4", "W5"},
     ),
     "M3_error_line_parse": (
         "error line parser must match checker error format",
         [(r'r"^::error file=(?P<path>[^,]+),line=(?P<line>\d+)::(?P<msg>[^:]+):\s*(?P<preview>.*)$"',
           r'r"^UNMATCHABLE_ERROR_PATTERN$"')],
-        {"W1", "W2", "W3", "W4"},
+        {"W1", "W2", "W3", "W4", "W5"},
     ),
 }
 
@@ -249,6 +262,6 @@ if __name__ == "__main__":
     w1 = test_main()
     w2 = test_mutations()
     # Cleanup repos
-    for d in (REPO_WITH_VIOLATION, REPO_CLEAN, REPO_NO_CHECKER):
+    for d in (REPO_WITH_VIOLATION, REPO_WITHOUT_SEMBR, REPO_CLEAN, REPO_NO_CHECKER):
         shutil.rmtree(d, ignore_errors=True)
     sys.exit(1 if (w1 or w2) else 0)

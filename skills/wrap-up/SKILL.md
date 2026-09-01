@@ -54,7 +54,11 @@ git log --oneline -5 origin/main           # what actually landed on main
   --json number,title,headRefName,author,mergeable,mergeStateStatus,comments`
   (`LIST_PRS`).
 - **Merge conflict sweep.** Before closing out, check every open PR's
-  `mergeable` field. For each PR with `mergeable == "CONFLICTING"` **or
+  `mergeable` field.
+  Filter the list by `memories/reviewing-prs.md`'s scope test first, as
+  `ardia` step 1 does; for an out-of-scope conflicting PR, post a comment
+  naming the conflict rather than resolving it.
+  For each in-scope PR with `mergeable == "CONFLICTING"` **or
   `"UNKNOWN"`** (see `resolve-conflicts`, "Verify before you act" —
   `UNKNOWN` can mean GitHub hasn't finished computing yet), verify with
   `git merge-tree --write-tree origin/main origin/<branch>` (git ≥ 2.38) before acting,

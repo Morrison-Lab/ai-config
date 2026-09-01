@@ -267,7 +267,13 @@ gh pr list --state open \
   --json number,title,headRefName,mergeable,mergeStateStatus,comments   # LIST_PRS
 ```
 
-For each PR where `mergeable == "CONFLICTING"` **or `"UNKNOWN"`** (GitHub can
+Filter that list by `memories/reviewing-prs.md`'s scope test first, as
+`ardia` step 1 does (opened by or assigned to the invoking user, named in the
+request, or opened by a repository workflow), and report the PRs dropped.
+A conflict on an out-of-scope PR gets an explanatory comment for its author,
+never a push, and a claim comment does not bring it into scope.
+
+For each in-scope PR where `mergeable == "CONFLICTING"` **or `"UNKNOWN"`** (GitHub can
 take minutes to finish computing mergeability after a push — a genuinely
 conflicting PR can sit in `UNKNOWN` and get missed if you filter for
 `CONFLICTING` alone):
@@ -332,7 +338,8 @@ conflicting PR can sit in `UNKNOWN` and get missed if you filter for
    If a live claim stands --- a push or comment within the last 2 hours --- skip the PR.
    Another session owns it.
    An expired claim (over 2 idle hours) no longer blocks.
-   Take over with a fresh claim comment of your own, per [`claim-pr`](../../shared/workflow/claim-pr.md)'s expiration rule.
+   Take over with a fresh claim comment of your own, per [`claim-pr`](../../shared/workflow/claim-pr.md)'s expiration rule;
+   that claim guards against session collisions on a PR already in scope, and never reads an out-of-scope PR into scope.
 4. **Claim it.**
    ```bash
    gh pr comment <N> --body "Working on this — please hold off on pushing to this branch until I'm done.

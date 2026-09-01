@@ -76,7 +76,7 @@ The named-in-request arm came from neither directive: it is carried over from `a
 The narrowing of "workflow-opened" to the `github-actions[bot]` login is also inferred: the example given was a `bump-submodule.yml` PR, and Dependabot and Copilot PRs post under their own logins and were not named.
 That login match covers a workflow that opens its PR with `GITHUB_TOKEN`;
 `gha`'s reusable sync workflows (`bump-submodule.yml`, `bump-dev-version.yml`, `sync-shared-fragments.yml`, `sync-upstream.yml`) hand `open-sync-pr` `${{ secrets.WORKFLOW_TOKEN || github.token }}`, so when the repo sets that secret the PR posts under that token's identity: the PAT holder's own login, or an App's `<slug>[bot]`.
-It is then in scope through the author arm when the PAT is mine, and out of scope under an App token or another member's PAT unless assigned or named.
+Such a PR is then in scope through the author arm when the PAT is mine, and out of scope under an App token or another member's PAT unless assigned or named.
 
 - **Do:** before touching any PR, resolve who you are running as, read the PR's `author.login` and `assignees`, and proceed only when the author is you (or an alias below) or a repository workflow, you are among the assignees, or the user named the PR in the request.
   Match the app slug `github-actions` in whichever form the source returns it: the REST API and the MCP tools suffix it (`github-actions[bot]`), GraphQL and `scripts/pr-sweep.py` return it bare (`github-actions`), and `gh pr list --json author` prefixes it (`app/github-actions`, with `is_bot: true`).
@@ -91,7 +91,7 @@ It is then in scope through the author arm when the PAT is mine, and out of scop
   An explicit `chores` invocation names the Dependabot/Renovate population, which is the named-in-request arm.
 - **Don't:** stand down from a workflow-opened PR on the author test alone --- that is the over-correction the second directive reversed.
 
-The near-miss looks like diligence from the inside, which is why it needs the explicit Don'ts.
+The near-miss looks like diligence from the inside, which is why the rule needs the explicit Don'ts.
 On `UCD-SERG/serodynamics`, 2026-09-01, a `gia` sweep pushed commits to #284, #292, #298 and #311 and dispatched a review on #310 --- four authored by other lab members, one (#292) by `github-actions[bot]`, none assigned to me --- and drove all of them to a clean verdict before the correction arrived.
 The session then stood down from all five, and the user reversed that for the workflow-opened one, #292, which was fine to drive.
 So the population error was the four human-authored PRs, and the over-correction was the fifth.
@@ -99,7 +99,7 @@ Every individual action was a correct ARDI step.
 The error was the population, decided by reading "every open PR" in the skill rather than by asking whose PRs they were.
 Each of those threads got one disclosure comment naming the commits (or, on #310, the dispatched review), so the authors can keep or revert them.
 
-The issue carve-out below is inferred too: nothing in either directive mentioned issues.
+The issue carve-out is inferred too: nothing in either directive mentioned issues.
 An issue on a repo I own is different from a PR on it:
 filing, triaging, and commenting on issues is fine,
 and an issue someone else's open PR already fixes is left to that PR (not grabbed, and that PR not driven either).

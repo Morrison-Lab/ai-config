@@ -228,8 +228,10 @@ merges: `git merge-tree "$(git merge-base origin/main origin/<sibling-branch>)" 
 cleanly. Re-apply the
 sibling PR's actual semantic change (not a mechanical `--theirs`) to the new
 location, verify with a direct diff that the extracted unit now differs from
-`main` by exactly that PR's intended change and nothing else, then push to
-their branch and flag what you did in a PR comment.
+`main` by exactly that PR's intended change and nothing else, then push when
+the sibling PR passes `memories/reviewing-prs.md`'s scope test and flag what
+you did in a PR comment; otherwise leave a comment carrying the re-applied
+diff for its author.
 
 See [`sync-with-main.cases.md`](sync-with-main.cases.md), "Check other open
 PRs after merging an extraction".

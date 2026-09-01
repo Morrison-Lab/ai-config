@@ -37,7 +37,7 @@ mutates a PR stays serial.
      Keep a PR only when its `author.login` is one of those logins or the repository's own workflow bot (the app slug `github-actions`, in whichever form the source returns it;
      `memories/reviewing-prs.md` lists the forms),
      one of those logins is among its `assignees`,
-     or the user named the PR in the request;
+     or the user named the PR (or, via an explicit `chores` call, the bot population) in the request;
      drop every other PR before doing anything else, and name the dropped ones in the report so the user can assign or name any they want driven.
      "Every open PR" anywhere in this skill means every PR that survives this filter.
      A PR by another lab member, or by any other bot (Dependabot, a Copilot agent), is not driven, reviewed, or edited, however clean it looks (see `memories/reviewing-prs.md`, "Only work PRs I opened, am assigned to, or named, or a workflow opened";

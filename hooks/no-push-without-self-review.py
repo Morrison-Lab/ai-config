@@ -1339,17 +1339,46 @@ def parse_report(text: str) -> tuple[str | None, str | None]:
     return verdict, (sha.group(1).lower() if sha else None)
 
 
+def _is_reviewer_record(record: dict) -> bool:
+    """True if this transcript record is attributed to the adversarial reviewer."""
+    candidates: list[str] = []
+    for k in ("attributionAgent", "agent_type", "subagent_type", "subagentType",
+              "TypeName", "Role", "agent", "name", "persona"):
+        val = record.get(k)
+        if isinstance(val, str) and val:
+            candidates.append(val)
+        elif isinstance(val, dict):
+            for sub_k in ("name", "TypeName", "Role", "type"):
+                sub_val = val.get(sub_k)
+                if isinstance(sub_val, str) and sub_val:
+                    candidates.append(sub_val)
+    msg = record.get("message")
+    if isinstance(msg, dict):
+        for k in ("attributionAgent", "agent_type", "subagent_type", "subagentType",
+                  "TypeName", "Role", "agent", "name", "persona", "role"):
+            val = msg.get(k)
+            if isinstance(val, str) and val and val.lower() not in (
+                "user", "assistant", "system", "tool", "model", "planner"
+            ):
+                candidates.append(val)
+    return any(ADVERSARIAL_AGENT_NAME.match(c) for c in candidates)
+
+
 def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bool]:
     """(verdict, reviewed_commit, saw_reviewer_call) from the transcript.
 
-    Only the reviewer's own call results are consulted, and an errored result is
-    skipped -- a failed or interrupted reviewer states no verdict, and
-    `fail-fast` forbids letting that look identical to a clean one.
+    Only the reviewer's own call results and attributed subagent reports are
+    consulted, and an errored result on the dispatch itself is skipped -- a failed
+    or interrupted reviewer states no verdict, and `fail-fast` forbids letting that
+    look identical to a clean one. Transient tool call errors during a subagent's
+    exploration (e.g. bash command syntax retry) do not invalidate an otherwise
+    clean final review verdict.
     """
     reviewer_call_ids: set[str] = set()
     saw_reviewer_call = False
     verdict: str | None = None
     reviewed_commit: str | None = None
+    is_reviewer_transcript = False
 
     with open(transcript_path, "r", encoding="utf-8", errors="ignore") as f:
         for line in f:
@@ -1363,28 +1392,54 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
             if not isinstance(record, dict):
                 continue
 
+            record_is_reviewer = _is_reviewer_record(record)
+            if record_is_reviewer:
+                saw_reviewer_call = True
+                is_reviewer_transcript = True
+
+            if record_is_reviewer or (is_reviewer_transcript and (
+                record.get("type") == "assistant"
+                or (isinstance(record.get("message"), dict)
+                    and record["message"].get("role") == "assistant")
+                or record.get("source") == "MODEL"
+            )):
+                content_text = _result_text(
+                    record.get("message") if isinstance(record.get("message"), dict) else record
+                )
+                if content_text:
+                    found, sha = parse_report(content_text)
+                    if found:
+                        verdict, reviewed_commit = found, sha
+
             for b in _iter_blocks(record):
                 b_type = b.get("type")
 
                 if b_type == "tool_use":
-                    if (b.get("name") or "").lower() not in AGENT_TOOLS:
-                        continue
-                    inp = b.get("input") or {}
-                    sub_types = []
-                    for k in ("subagent_type", "subagentType", "agent_type", "TypeName", "name", "Role"):
-                        if inp.get(k):
-                            sub_types.append(str(inp.get(k)))
-                    if isinstance(inp.get("Subagents"), list):
-                        for sa in inp["Subagents"]:
-                            if isinstance(sa, dict):
-                                for k in ("TypeName", "Role", "name"):
-                                    if sa.get(k):
-                                        sub_types.append(str(sa.get(k)))
-                    if any(ADVERSARIAL_AGENT_NAME.match(st) for st in sub_types):
-                        saw_reviewer_call = True
-                        call_id = b.get("id")
-                        if isinstance(call_id, str) and call_id:
-                            reviewer_call_ids.add(call_id)
+                    tool_name = (b.get("name") or "").lower()
+                    if tool_name in AGENT_TOOLS:
+                        inp = b.get("input") or {}
+                        sub_types = []
+                        for k in ("subagent_type", "subagentType", "agent_type", "TypeName", "name", "Role"):
+                            if inp.get(k):
+                                sub_types.append(str(inp.get(k)))
+                        if isinstance(inp.get("Subagents"), list):
+                            for sa in inp["Subagents"]:
+                                if isinstance(sa, dict):
+                                    for k in ("TypeName", "Role", "name"):
+                                        if sa.get(k):
+                                            sub_types.append(str(sa.get(k)))
+                        if any(ADVERSARIAL_AGENT_NAME.match(st) for st in sub_types):
+                            saw_reviewer_call = True
+                            call_id = b.get("id")
+                            if isinstance(call_id, str) and call_id:
+                                reviewer_call_ids.add(call_id)
+                    elif tool_name == "send_message" and (record_is_reviewer or is_reviewer_transcript):
+                        inp = b.get("input") or {}
+                        msg_text = str(inp.get("Message") or inp.get("message") or "")
+                        if msg_text:
+                            found, sha = parse_report(msg_text)
+                            if found:
+                                verdict, reviewed_commit = found, sha
 
                 elif b_type == "tool_result":
                     if b.get("tool_use_id") not in reviewer_call_ids:

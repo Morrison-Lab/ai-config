@@ -141,4 +141,8 @@ and discover the regression later.
 
 ## Proactive hook compliance
 
-- **`warn-stale-issue-edit.py`**: Intercepts `Write`, `Edit`, and `NotebookEdit` tool calls and warns if an issue-driven modification begins without a fresh `VIEW_ISSUE` (`gh issue view <N>`) and remote default-branch check (`git fetch origin main`). Running the initial inspection in this skill satisfies the guard proactively (see [`memories/hooks.md`](../../memories/hooks.md)).
+- **`warn-stale-issue-edit.py`**: Intercepts `Write`, `Edit`, and `NotebookEdit` tool calls
+  and warns if an issue-driven modification begins without a fresh `VIEW_ISSUE` (`gh issue view <N>`)
+  and remote default-branch check (`git fetch origin main`).
+  Running the initial inspection in this skill satisfies the guard proactively
+  (see [`memories/hooks.md`](../../memories/hooks.md)).

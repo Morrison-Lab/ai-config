@@ -503,8 +503,13 @@ add a review gate for the cases that need one.
 
 ## Proactive hook compliance
 
-Active hooks reinforce continuous learning and error prevention (see [`memories/hooks.md`](../../memories/hooks.md)):
-- **`remind-ums-after-error.py`**: Prompt-injection hook that fires when an admitted mistake has no subsequent memory or skill modification. Satisfy it by executing `ums` immediately upon acknowledging an error.
-- **`remind-ums-on-scrutiny.py`**: Injects a reminder when a review was read or a questioned claim was corrected without a recorded UMS pass.
-- **`remind-learn-from-review.py`**: Reminds when an accepted reviewer finding has no accompanying learning or guard recorded.
-- **`no-mistake-without-a-hook.py`**: Stop guard and reminder that blocks after an admitted, mechanizable mistake until a hook (`hooks/<name>.py`), test (`hooks/test-<name>.py`), and manifest binding (`hooks/hooks.json`) are authored.
+- **`remind-ums-after-error.py`**: Prompt-injection hook that fires
+  when an admitted mistake has no subsequent memory or skill modification.
+  Satisfy it by executing `ums` immediately upon acknowledging an error.
+- **`remind-ums-on-scrutiny.py`**: Injects a reminder when a review was read
+  or a questioned claim was corrected without a recorded UMS pass.
+- **`remind-learn-from-review.py`**: Reminds when an accepted reviewer finding
+  has no accompanying learning or guard recorded.
+- **`no-mistake-without-a-hook.py`**: Stop guard and reminder that blocks after an admitted,
+  mechanizable mistake until a hook (`hooks/<name>.py`), test (`hooks/test-<name>.py`),
+  and manifest binding (`hooks/hooks.json`) are authored.

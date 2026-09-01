@@ -188,6 +188,12 @@ RX_SHORT_BODY_FILE = re.compile(
 # names are only the fallback, so the guard still covers the measured
 # surface if the sibling is ever unavailable.
 _disclosure = _sibling("require-agent-disclosure.py", "_sib_unmeasured_timestamp_disclosure")
+# `gh pr comment --delete-last` deletes a comment rather than posting one, and
+# `--edit-last` with no body flag reopens the previous comment rather than
+# posting new text; neither carries a body to judge (review round on
+# ai-config#2906). The disclosure sibling draws the same line.
+RX_DELETING = getattr(_disclosure, "DELETING_RE", re.compile(r"--delete-last\b|--delete\b"))
+RX_EDIT_LAST = re.compile(r"--edit-last\b")
 MCP_POST_TOOLS = getattr(_disclosure, "MCP_POST_TOOLS", (
     "mcp__github__add_issue_comment",
     "mcp__github__add_reply_to_pull_request_comment",
@@ -271,6 +277,10 @@ def _bash_post(command, cwd):
     if RX_COMMENT_POST is None or strip_heredocs is None or extract_body_text is None:
         return None, None
     stripped = strip_heredocs(command)
+    if RX_DELETING.search(stripped):
+        return None, None
+    if RX_EDIT_LAST.search(stripped) and not RX_REVIEW_BODY_FLAG.search(stripped):
+        return None, None
     posts = bool(RX_COMMENT_POST.search(stripped)) or (
         bool(RX_REVIEW_POST.search(stripped))
         and bool(RX_REVIEW_BODY_FLAG.search(stripped)))

@@ -38,7 +38,7 @@ jobs:
           fetch-depth: 1
 
       - name: Restore skill upload state cache
-        uses: actions/cache/restore@1bd1e32a3bdc45362d1e726936510720a7b30a57 # v4.2.0
+        uses: actions/cache/restore@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0
         with:
           path: .skill_state.json
           key: skill-upload-state-${{ runner.os }}-${{ github.run_id }}
@@ -59,7 +59,7 @@ jobs:
 
       - name: Save skill upload state cache
         if: always()
-        uses: actions/cache/save@1bd1e32a3bdc45362d1e726936510720a7b30a57 # v4.2.0
+        uses: actions/cache/save@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0
         with:
           path: .skill_state.json
           key: skill-upload-state-${{ runner.os }}-${{ github.run_id }}

@@ -31,6 +31,12 @@ repos:
         language: python
         pass_filenames: false
         always_run: true
+      - id: test-check-links
+        name: check-links tests
+        entry: python scripts/test_check_links.py
+        language: python
+        pass_filenames: false
+        always_run: true
       - id: check-ascii-punctuation
         name: check ASCII punctuation in source (.py, .R)
         entry: python scripts/check-ascii-punctuation.py

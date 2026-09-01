@@ -1308,16 +1308,6 @@ def main():
             f.write(report + "\n")
         print(f"Saved report to: {args.output}")
 
-    try:
-        git_dir_res = subprocess.run(["git", "rev-parse", "--git-dir"], capture_output=True, text=True)
-        if git_dir_res.returncode == 0:
-            git_dir = git_dir_res.stdout.strip()
-            report_path = os.path.join(git_dir, "adversarial-review-report.txt")
-            with open(report_path, "w", encoding="utf-8") as f:
-                f.write(report + "\n")
-    except Exception:
-        pass
-
     if args.post:
         if not pr_num:
             log_error("Could not determine PR number to post to. Use --pr <number>.")

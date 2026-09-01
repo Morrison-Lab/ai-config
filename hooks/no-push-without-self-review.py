@@ -1490,10 +1490,21 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                                 saw_reviewer_call = True
                                 verdict, reviewed_commit = found, sha
 
-                # Task notifications in non-assistant system/user message blocks
-                if not is_assistant and b_type != "tool_use" and not b.get("is_error"):
-                    text = _result_text(b) if b_type == "tool_result" else str(b.get("text") or "")
-                    if "<task-notification>" in text:
+                # Genuine task notifications from tracked background reviewer dispatches
+                origin = record.get("origin")
+                is_task_notification = (
+                    isinstance(origin, dict)
+                    and origin.get("kind") in ("task-notification", "task_notification")
+                )
+                if is_task_notification and not is_assistant and not b.get("is_error"):
+                    origin_task_id = str(origin.get("taskId") or origin.get("task_id") or "")
+                    sender_id = str(record.get("sender") or "")
+                    if (
+                        (origin_task_id and origin_task_id in reviewer_task_ids)
+                        or (sender_id and sender_id in reviewer_task_ids)
+                        or (not origin_task_id and not sender_id and reviewer_task_ids)
+                    ):
+                        text = str(b.get("text") or b.get("content") or "")
                         found, sha = parse_report(text)
                         if found:
                             saw_reviewer_call = True

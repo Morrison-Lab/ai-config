@@ -55,6 +55,15 @@ In every session --- at session start, and again periodically during long sessio
    And hooks connect at **session start**, so a mid-session `--fix` arms nothing until a restart.
    Say so rather than reporting the guards as live.
    **On the plugin path nothing else is needed: the plugin loader serves and loads every hook in `hooks/hooks.json` straight from the plugin root.**
+   **That plugin root is the version-cache SNAPSHOT, not the marketplace clone, so pulling the clone does not refresh a running session's hooks.**
+   `${CLAUDE_PLUGIN_ROOT}` resolves to `~/.claude/plugins/cache/<marketplace>/<plugin>/<rev>/`;
+   a `git pull` in `~/.claude/plugins/marketplaces/<marketplace>` updates the clone and changes nothing the harness executes,
+   and overwriting the cache copy directly is denied by the auto-mode permission classifier (reasonably --- an agent rewriting its own active guard).
+   A merged hook fix reaches a plugin-consumer session only when the cache re-snapshots, at plugin update or session start ---
+   so a session restart is the remedy, and reporting "pulled the fix" without one reports a hook as updated that is still running stale.
+   (Measured 2026-09-01: the cache hook at rev `a3e0fdb` predated ai-config#2820's fallback while the marketplace clone had pulled past it;
+   tracked as [ai-config#2899](https://github.com/Morrison-Lab/ai-config/issues/2899);
+   see [`mistake-patterns.md`](../../memories/mistake-patterns.md) Pattern 42 for the full deadlock.)
    `install-hooks.py --fix` covers the non-plugin path only, and its own docstring is explicit about what it does not do: it never places a file, and it does not check that the script it is registering exists.
    `bootstrap.sh` no longer places `hooks/` under `~/.claude` (see its header comment), so this path currently only helps on a machine whose `~/.claude/hooks` already holds the scripts some other way.
    Registering a hook whose file is absent is worse than leaving it unregistered: an unregistered guard is inert, while a registered-but-absent `PreToolUse` `Bash` hook makes `python3` exit 2 on **every** Bash call and takes the shell down.

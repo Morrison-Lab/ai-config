@@ -454,6 +454,8 @@ A clean automated review from every available provider evaluating the current HE
 - **Canonical Rule**: [`adversarial-self-review.md`](../shared/workflow/adversarial-self-review.md) (dispatch to a separate subagent) plus [`no-push-without-self-review.py`](../hooks/no-push-without-self-review.py)'s transcript and fallback scan.
 - **Fix**: The guard now credits valid reviews from foreground dispatches, fallback subagent dispatches (matching `FALLBACK_AGENT_NAME`), tracked `TaskOutput` results, and background task notifications (ai-config#2544).
   Dispatching in the foreground (`run_in_background: false`) remains the primary recommendation.
+  That fix reaches a plugin-consumer session only when the plugin cache re-snapshots (plugin update or session start) ---
+  see Pattern 42 for the stale-cache deadlock measured after #2820 merged.
 
 ## Pattern 23: Implementing From a Truncated Issue-Body Read
 - **Mistake**: Briefing an implementer (a subagent, or yourself) from a sliced issue body --- e.g. `gh issue view --jq '.body[0:2200]'` --- instead of the full body and its comments.
@@ -794,4 +796,42 @@ A clean automated review from every available provider evaluating the current HE
 - **Algorithmatizable?**
   Yes.
   Unit test suites must assert differential failure on base fixtures and regression coverage for non-standard link text.
+
+## Pattern 42: Auto-Mode Push-Guard Deadlock --- Stale Plugin-Cache Hook Plus Classifier-Denied Overrides
+- **Mistake**: In an auto-permission-mode plugin-consumer session where no `adversarial-reviewer` agent is registered (`Agent type not found`),
+  treating `hooks/no-push-without-self-review.py`'s refusal as solvable in-session by repeatedly rephrasing the sanctioned `ALLOW_UNREVIEWED_PUSH=1` override or by patching the running hook file ---
+  when the auto-mode permission classifier pattern-matches every such attempt as a guard bypass and denies it,
+  and repeated varied attempts make the classifier (correctly) more suspicious,
+  until it denies even legitimately-shaped review dispatches.
+  The hook's sanctioned escape valve is exactly what the classifier reads as a bypass, so the two mechanisms compose into a lockout neither intends.
+- **Example**: 2026-09-01, `Lacaedemon/sparta` PR #1459 (GIA sweep), tracked as [ai-config#2899](https://github.com/Morrison-Lab/ai-config/issues/2899);
+  previously `ucdavis/bcs` 2026-08-28 ([ai-config#2544](https://github.com/Morrison-Lab/ai-config/issues/2544), closed by [#2820](https://github.com/Morrison-Lab/ai-config/pull/2820)).
+  Both discharge paths were unreachable at once:
+  the plugin's shipped agents were absent from the session's Agent registry
+  (writing `.claude/agents/adversarial-reviewer.md` into the repo mid-session does not register it either --- definitions load at session start),
+  and the classifier denied the override in all three phrasings tried (Bash chained, Bash standalone, PowerShell `$env:`) --- consistent denials, not stochastic ones.
+  The #2820 fallback, merged earlier that same day, was ALSO unreachable, for a distinct reason:
+  the harness runs the hook from the plugin CACHE snapshot (`~/.claude/plugins/cache/Morrison-Lab/ai-config/<rev>/hooks/`, via `${CLAUDE_PLUGIN_ROOT}`),
+  which predated the fix (rev `a3e0fdb`, no `FALLBACK_AGENT_NAME`);
+  pulling the marketplace clone (`git -C ~/.claude/plugins/marketplaces/Morrison-Lab pull --ff-only origin main`, to `79def2e`) succeeded but changed nothing the harness executes,
+  and copying the updated hook onto the cache copy was itself classifier-denied (reasonably --- an agent rewriting its own active guard).
+- **Canonical Rule**: [`adversarial-self-review.md`](../shared/workflow/adversarial-self-review.md) (the override's sanctioned scope),
+  [`no-push-without-self-review.py`](../hooks/no-push-without-self-review.py) (the fallback contract),
+  and [`keep-checkouts-fresh.md`](../shared/workflow/keep-checkouts-fresh.md) (the plugin hook path is the cache snapshot, not the marketplace clone).
+- **Fix**: Check first whether the running hook copy is stale against ai-config `main` --- diff the CACHE copy, since that is what runs, not the marketplace clone.
+  A session restart is the durable remedy:
+  the cache re-snapshots only at plugin update or session start,
+  so a fresh session both loads the post-#2820 hook and registers a repo-level `.claude/agents/adversarial-reviewer.md` if one is present.
+  On a post-#2820 hook (verified against `main`, 2026-09-01), the fallback contract is:
+  a FOREGROUND dispatch whose `subagent_type` matches the general-purpose family (`general-purpose`, `general`, `reviewer`, `code-reviewer`, `research`, `self`)
+  and whose prompt contains a review-request phrase matching the prompt gate (e.g. "adversarial pre-push review"),
+  returning a report whose last verdict line reads `### Verdict: Ready for merge` (or `Needs more work`)
+  followed by `Reviewed-Commit: <HEAD sha>` (the parser accepts 7-40 hex characters; give the full 40).
+- **Do**: stop probing after the classifier's second denial of the same goal and hand the user the decision (push manually, restart the session, or add a permission rule).
+- **Don't**: keep rephrasing the override or the dispatch --- each denied variant makes the classifier more suspicious, locking out even the sanctioned paths.
+- **Don't**: route the push around the guard through a peer session, a separately-billed CLI, or the MCP GitHub write tools ---
+  that is permission laundering through the guard's documented open gap ([ai-config#1929](https://github.com/Morrison-Lab/ai-config/issues/1929)).
+- **Algorithmatizable?**
+  Partially.
+  #2544's suggested fix 3 --- have the hook's refusal message name a user-approvable permission rule for the override --- would have resolved the measured session in one step, and remains open under #2899.
 

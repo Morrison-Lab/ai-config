@@ -562,7 +562,11 @@
   Until then, skip both the `requested_reviewers` POST for `copilot-pull-request-reviewer[bot]` and the `request_copilot_review` MCP tool: either only produces a `COMMENTED` review whose whole body is *"Copilot was unable to review this pull request because the user who requested the review has reached their quota limit."*, which wastes a round and is not a verdict.
   This is a time-bounded override of two standing instructions that otherwise say to request Copilot every round: `shared/workflow/pr-on-claim.md`'s "Request the external reviewer in the same stride" and `shared/workflow/review-verdict-pitfalls.md`'s fifth case ("Keep re-requesting each round anyway").
   Until September 2026, rely on `claude-review` plus self-review, which is exactly the no-reachable-external-reviewer fallback that fifth case already describes.
-  Re-verify Copilot's quota and re-enable the per-round request after September 2026, per `shared/writing/timestamp-volatile-claims.md`.
+  **Measured 2026-09-01:** Copilot code reviews resumed across Morrison-Lab in September 2026
+  with login `copilot-pull-request-reviewer` and formal verdict headers
+  (`### 🟢 Approval recommended` for clean signoff, `### 🟡 Changes recommended` for changes requested).
+  Review verification tools and mistake patterns (Pattern 40) require recognizing `copilot-pull-request-reviewer`
+  and its clean/not-clean verdict patterns so Copilot reviews are tracked as part of the automated review gate.
   **Re-measured 2026-08-06 with a wider denominator:** across `Morrison-Lab/ai-config`'s last 60 merged PRs, every Copilot review object carries a refusal body and **zero** are substantive (query in [`shared/workflow/pr-on-claim.md`](../shared/workflow/pr-on-claim.md), which also explains why the object count drifts between runs while the zero does not).
   Say *refusals* rather than *quota refusals* when reporting a count like this, because the body alone does not name a cause: the 2026-08-06 Actions incident listed "Copilot code review" among its affected components, so a refusal inside that window has two candidate explanations.
   `Morrison-Lab/ai-config#1223` owns that discrimination and carries the timestamp table --- read it rather than re-deriving.

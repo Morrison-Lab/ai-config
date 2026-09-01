@@ -49,7 +49,6 @@ operation to the equivalent GitHub MCP tool so any model can run a skill.
 | --- | --- | --- | --- |
 | `VIEW_PR` | Read a pull request's details and metadata. | `gh pr view "<N>"` | `mcp__github__pull_request_read (method=get)` |
 | `LIST_PRS` | List pull requests. | `gh pr list` | `mcp__github__list_pull_requests` |
-| `WHO_AM_I` | Resolve the invoking user's login, for the PR-scope filter in `memories/reviewing-prs.md`. | `gh api user --jq .login` | `mcp__github__get_me` |
 | `SEARCH_PRS` | Search pull requests by keyword / query string. | `gh pr list --search "<query>"` | `mcp__github__search_pull_requests` |
 | `DIFF_PR` | Read a pull request's diff. | `gh pr diff "<N>"` | `mcp__github__pull_request_read (method=get_diff)` |
 | `PR_CHECKS` | Read a pull request's CI check / status results. | `gh pr checks "<N>"` | `mcp__github__pull_request_read (method=get_check_runs)` |

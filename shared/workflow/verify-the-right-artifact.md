@@ -658,3 +658,36 @@ Running it against the shipped design reports 0, which any reader can re-run.
 The 3,924 / 108 / 270 / non-zero off-axis figures for the four rejected designs were recorded on that branch before #2515 was **squash-merged** as `07847b9`, so they are not reproducible from `main` --- which is the artifact a reader has.
 They are not lost, though, and the difference matters: GitHub retains `refs/pull/<N>/head`, so `git fetch origin 'refs/pull/2515/head:refs/remotes/pr/2515'` restores the branch and all four designs (`c7ff646`, `4f9d3fc`, `68a14b9`, `a3251bf`) with it.
 Name that route whenever you mark a figure unreproducible, since "unreachable" and "not on the default branch" are different claims and only the second is true here --- the first was asserted in this very section and refuted by one `git ls-remote`.)
+
+**A ninth: a LOSSY CONVERSION of a document, standing in for the document.**
+
+The shapes above substitute an artifact that is stale, partial, or adjacent.
+This one substitutes an artifact that is current, complete for its own purpose, and **lossy by design**.
+A conversion exists to drop what its target format cannot carry,
+so reading a source document through one is not a shortcut with a staleness risk;
+it is a filter whose omissions are the whole reason the tool is useful.
+
+The tell is that the derived view answers the question you asked and cannot answer the question you meant.
+`pandoc -t markdown` on a `.docx` reports the text a reader sees.
+Asked whether a link is present, it reports nothing about a URL stored as a Word HYPERLINK field code,
+because that URL lives in the field's instruction text rather than in the body text pandoc emits.
+Neither is a listing of `word/_rels/document.xml.rels`,
+which enumerates one of the two ways Word stores a hyperlink and is silent about the other.
+Two independent readings then agree, and neither could have disagreed.
+
+So before concluding a document does not contain something,
+search the **stored form**: grep the source XML, the raw bytes, the file the application actually writes.
+The converted view is evidence about what a reader sees, which is a different claim.
+
+- **Do:** name which representation a negative is about --- rendered text, or stored source --- before reporting it.
+- **Do:** grep the stored form (`word/document.xml`, the raw file) when the claim is that something is absent.
+- **Don't:** read two derived views agreeing as corroboration when both drop the same class of content;
+  that is [`grep-is-not-coverage`](grep-is-not-coverage.md)'s guaranteed-either-way null in a new surface.
+- **Don't:** treat "lossy" as "stale" --- refetching a conversion returns the same omissions.
+
+(Measured 2026-09-01 while adding tracked changes and comments to three `.docx` files for a journal resubmission.
+A manuscript's Shiny-app link was absent from the rels listing and absent from pandoc's markdown output,
+and the conclusion that it had been deleted was written into a draft review finding.
+It was present as a `fldChar` HYPERLINK field code, found by grepping `word/document.xml` for the URL.
+[`memories/office-open-xml.md`](../../memories/office-open-xml.md) carries the docx-specific mechanics,
+including the two-pandoc-diff verification for a redlined document.)

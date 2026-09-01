@@ -239,7 +239,7 @@ It is **read-only reporting, not authorization**.
 [`ardi`](ardi.md) limits its monitoring mandate to PRs that pass `memories/reviewing-prs.md`'s scope test (opened by or assigned to the invoking user, named in the request, or opened by a repository workflow),
 and a PR appearing in this sweep does not bring it into scope.
 Surface an out-of-scope stalled PR to the human, who can assign it or name it;
-a claim comment per [`claim-pr`](claim-pr.md) does not.
+a claim comment per [`claim-pr`](claim-pr.md) does not bring it into scope.
 
 [`pr-status-all`](../../skills/pr-status-all/SKILL.md) remains the richer per-PR dashboard.
 This is the cheap standing sweep that says where to point it.

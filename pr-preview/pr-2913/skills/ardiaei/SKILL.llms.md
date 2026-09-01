@@ -2,7 +2,7 @@
 
 Clear the open-PR review queue **and** capture what doing so taught you, by composing two existing skills in sequence:
 
-1.  **Phase 1 — `ardia`** ([ardia](../../skills/ardia/SKILL.llms.md), ARD + Iterate-All): drive every open PR/MR to a clean review verdict, in series.
+1.  **Phase 1 — `ardia`** ([ardia](../../skills/ardia/SKILL.llms.md), ARD + Iterate-All): drive every open PR/MR (every one that passes `ardia`’s scope filter) to a clean review verdict, in series.
 2.  **Phase 2 — `ums`** ([ums](../../skills/ums/SKILL.llms.md), Update Memories and Skills): review what the ARDIA loop surfaced — recurring review findings, CI quirks, tool gotchas, workflow gaps — and persist it by editing memory files and skill definitions.
 
 The order matters: run the full review loop **first** so Phase 2 has the complete set of lessons (every finding, rebuttal, deferral, and CI surprise) to draw on. “Edit instructions” = update the durable guidance (memories + skills), not the PR code.

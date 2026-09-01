@@ -821,7 +821,7 @@ A clean automated review from every available provider evaluating the current HE
   What a restart does refresh is the auto-mode classifier's per-conversation state (the override the prior session's classifier had denied three times was accepted in the fresh one) and the Agent registry (a repo-level `.claude/agents/adversarial-reviewer.md` present at session start registers the reviewer, which satisfies even the stale hook's literal check).
   The hook copy itself moves only when that pin advances.
   The documented way to advance it is the plugin CLI --- `claude plugin marketplace update Morrison-Lab`, then `claude plugin install ai-config@Morrison-Lab`, per [`use-plugins.md`](../shared/workflow/use-plugins.md) --- which this incident did not measure:
-  an agent updating its own active guard mid-session is the same self-modification the classifier denies, so it is the next thing for the USER to run.
+  an agent updating its own active guard mid-session is the same self-modification the classifier denies, so running those two commands is the next thing for the USER to do.
   Verify the pinned copy in `installed_plugins.json` afterwards rather than assuming the pin moved.
   On a post-#2820 hook (verified against `main`, 2026-09-01), the fallback contract is:
   a dispatch whose `subagent_type` matches the general-purpose family (`general-purpose`, `general`, `reviewer`, `code-reviewer`, `research`, `self`)

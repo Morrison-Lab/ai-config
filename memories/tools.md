@@ -47,6 +47,18 @@ codex plugin add <plugin>@<new-name> --json
 ```
 
 Read `marketplaceName` from the add result instead of guessing the renamed selector, then verify both `codex plugin list` and `codex plugin marketplace list`.
+
+## Codex loads project and plugin hooks together
+
+Codex CLI 0.151.0 (measured 2026-09-01) runs matching hooks from both the
+project `.codex/hooks.json` and an enabled plugin manifest. A plugin that
+re-registers the same catalog can therefore execute every hook twice, so use
+one authoritative registration path. Codex Stop
+payloads provide `last_assistant_message`, not Claude's transcript path, so a
+shared Claude-hook adapter must synthesize the minimal transcript input before
+dispatching Stop guards; without a Codex transcript path, prior-turn checks are
+necessarily best-effort. Adapter launch failures, nonzero exits, timeouts, and
+malformed JSON must become explicit blocks rather than silent `{}` results.
 This sequence preserves the source repository while replacing only its stale local registration.
 
 (2026-08-08: `Morrison-Lab/ai-config` changed its manifest marketplace name from `the repository owner` to `Morrison-Lab`;

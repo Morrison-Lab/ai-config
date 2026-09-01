@@ -5,7 +5,10 @@ Codex and Claude use compatible lifecycle names and JSON payloads, but Codex
 discovers project hooks from ``.codex/hooks.json`` and plugin hooks from a
 Codex plugin manifest.  This dispatcher keeps one source of truth in
 ``hooks/hooks.json`` while translating only the small matcher and output
-differences that matter to Codex.
+differences that matter to Codex.  If Codex does not provide a transcript path
+for Stop, only the prompt/tool fields present in that payload and the final
+assistant message can be reconstructed; transcript-dependent checks are then
+necessarily best-effort.
 """
 from __future__ import annotations
 
@@ -15,6 +18,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -91,18 +95,21 @@ def run_entry(entry: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any] 
             check=False,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
-        print(f"codex-hook-adapter: hook execution failed: {exc}", file=sys.stderr)
-        return None
+        return {"decision": "block", "reason": f"ai-config hook execution failed: {exc}"}
     if result.stderr:
         print(result.stderr, file=sys.stderr, end="")
+    if result.returncode != 0:
+        detail = result.stderr.strip() or f"exit code {result.returncode}"
+        return {"decision": "block", "reason": f"ai-config hook failed: {detail}"}
     if not result.stdout.strip():
         return None
     try:
         parsed = json.loads(result.stdout)
     except json.JSONDecodeError as exc:
-        print(f"codex-hook-adapter: invalid hook JSON: {exc}", file=sys.stderr)
-        return None
-    return parsed if isinstance(parsed, dict) else None
+        return {"decision": "block", "reason": f"ai-config hook returned invalid JSON: {exc}"}
+    if not isinstance(parsed, dict):
+        return {"decision": "block", "reason": "ai-config hook returned non-object JSON."}
+    return parsed
 
 
 def output_fields(result: dict[str, Any]) -> tuple[str | None, str | None, str | None]:
@@ -123,14 +130,46 @@ def output_fields(result: dict[str, Any]) -> tuple[str | None, str | None, str |
 def dispatch(event: str, payload: dict[str, Any]) -> dict[str, Any]:
     payload = dict(payload)
     payload["hook_event_name"] = event
+    transcript_path = None
+    if event == "Stop" and not payload.get("transcript_path"):
+        last_message = payload.get("last_assistant_message")
+        records = []
+        if payload.get("prompt"):
+            records.append({"type": "user", "message": {"role": "user",
+                           "content": [{"type": "text", "text": payload["prompt"]}]}})
+        if payload.get("tool_name"):
+            records.append({"type": "assistant", "message": {"role": "assistant",
+                           "content": [{"type": "tool_use", "name": payload["tool_name"],
+                                         "input": payload.get("tool_input") or {}}]}})
+        if last_message:
+            records.append({"type": "assistant", "message": {"role": "assistant",
+                           "content": [{"type": "text", "text": last_message}]}})
+        if records:
+            transcript = tempfile.NamedTemporaryFile(
+                mode="w", encoding="utf-8", suffix=".jsonl", delete=False)
+            transcript.write("\n".join(json.dumps(record) for record in records) + "\n")
+            transcript.close()
+            transcript_path = transcript.name
+            payload["transcript_path"] = transcript_path
     tool_name = str(payload.get("tool_name", ""))
     results = []
-    for entry in load_entries(event):
-        if event == "PreToolUse" and not matcher_hits(entry["matcher"], tool_name):
-            continue
-        result = run_entry(entry, payload)
-        if result is not None:
-            results.append(result)
+    try:
+        entries = load_entries(event)
+        for entry in entries:
+            if event == "PreToolUse" and not matcher_hits(entry["matcher"], tool_name):
+                continue
+            result = run_entry(entry, payload)
+            if result is not None:
+                results.append(result)
+    except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+        return {"decision": "block", "reason":
+                f"ai-config hook catalog could not be loaded: {exc}"}
+    finally:
+        if transcript_path:
+            try:
+                os.unlink(transcript_path)
+            except OSError:
+                pass
 
     decisions: list[str] = []
     reasons: list[str] = []
@@ -167,6 +206,9 @@ def dispatch(event: str, payload: dict[str, Any]) -> dict[str, Any]:
             output["systemMessage"] = context
         return output
     output = {}
+    if any(d in ("deny", "block") for d in decisions):
+        output["decision"] = "block"
+        output["reason"] = "\n".join(dict.fromkeys(reasons)) or "Blocked by ai-config hook."
     if context:
         output["hookSpecificOutput"] = {
             "hookEventName": event,
@@ -183,9 +225,14 @@ def main() -> int:
         payload = json.load(sys.stdin)
     except (json.JSONDecodeError, OSError) as exc:
         print(f"codex-hook-adapter: failed to read payload: {exc}", file=sys.stderr)
-        print("{}")
+        print(json.dumps({"decision": "block", "reason":
+                          f"ai-config hook received invalid input: {exc}"}))
         return 0
-    print(json.dumps(dispatch(args.event, payload if isinstance(payload, dict) else {})))
+    if not isinstance(payload, dict):
+        print(json.dumps({"decision": "block", "reason":
+                          "ai-config hook received a non-object payload."}))
+        return 0
+    print(json.dumps(dispatch(args.event, payload)))
     return 0
 
 

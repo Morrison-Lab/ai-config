@@ -12,11 +12,22 @@ The full detection heuristic, confirmation checklist, and fix menu live in [`sha
 ## Procedure
 
 1.  **Identify the target.** A file, a PR/MR diff, or pasted prose that introduces or edits a worked example (an `{#exm-...}` div, or the equivalent in a non-Quarto project).
-2.  **Grep for candidates** using the patterns in [`hypothetical-examples.md`](../../shared/writing/hypothetical-examples.md#the-detection-heuristic) — the “hypothetical”/“suppose a”/“consider a hypothetical”/“if N% of” signal phrases, plus suspiciously round proportions (`0.1`, `0.3`, `20%`) sitting inside an example or definition div.
+
+2.  **Grep for candidates** using the patterns in [`hypothetical-examples.md`](../../shared/writing/hypothetical-examples.md#the-detection-heuristic) — the “hypothetical”/“suppose a”/“consider a hypothetical”/“if N% of” signal phrases, plus suspiciously round proportions (`0.1`, `0.3`, `20%`) sitting inside an example or definition div:
+
+    ``` bash
+    rg -n '\b(hypothetical|[Ss]uppose a\b|[Ss]uppose the\b|[Ss]uppose only\b|[Ii]n a population where\b|[Cc]onsider a hypothetical|[Ii]f \d+% of\b)' <file>
+    rg -n '\b\d+%|\b0\.[1-9]0?\b' <file>
+    ```
+
 3.  **Check for a real dataset already in scope** — a `read.csv`/ `read_csv`/`glm(...)`-style loading chunk earlier in the same document, or a project-level running-example dataset convention. No real dataset in scope at all means the hit isn’t a finding — skip it.
+
 4.  **Confirm each remaining candidate** against the checklist in the fragment: does the loaded dataset actually have the variables this example needs? Is the example illustrating a general mechanism that never needed a specific number? Would forcing real numbers erase a deliberate edge case or a proof-of-concept introduced before the real data appears? Drop anything that fails the “real data available, number actually needed, no unrealizable edge case” bar.
+
 5.  **Fix each confirmed finding**, per the fragment’s fix menu — recompute from the real dataset first; if the real effect is much weaker, search for a more naturally illustrative real covariate/subset before falling back to explicitly hedged toy numbers; verify any real substitute’s arithmetic numerically against the actual data before publishing.
+
 6.  **Re-check the surrounding text** after substituting real numbers — a sentence built around the invented effect size’s magnitude (“a stark 40 percentage-point gap”) often needs rewording once the real number is much smaller.
+
 7.  **Report.** For each finding: the phrase and location, whether a real substitute worked or the fix was a hedge/search-for-a-better-covariate, the before/after numbers, and the diff.
 
 ## Relationship to other skills

@@ -550,6 +550,22 @@ This grants no merge authority: the strict merge policy below still applies.
   (`gh issue reopen <issue-number>`) per
   [`revert-merge.md`](shared/workflow/revert-merge.md).
 
+## Only work PRs the user opened, is assigned to, asked for, or the Actions app authored
+
+Before pushing to, editing, resolving threads on, or dispatching a paid
+review of any PR, resolve the invoking user and read the PR's author and
+assignees.
+Proceed only when the author is that user (or an alias
+`memories/reviewing-prs.md` lists), the user is among the assignees, the user
+explicitly asked for work on that PR by name, or the author is the GitHub
+Actions app (`github-actions`).
+A mention such as "do not touch #N" is not a request, a claim comment confers
+no scope, and a sweep skill's "every open PR" means every PR that passes this
+test.
+An out-of-scope PR is reported to the user and left untouched.
+`memories/reviewing-prs.md` carries the full rule and its provenance;
+`skills/ardia/SKILL.md` step 1 is the reference implementation.
+
 ## Always arm a persistent PR loop
 
 This applies in any repo, not only Morrison-Lab ones.

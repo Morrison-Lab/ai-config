@@ -86,7 +86,7 @@ Read-only. It reports; it never pushes, comments, closes, or merges.
 Reporting two PRs as colliding is not authorization to drive either one --
 `shared/workflow/ardi.md` limits that to PRs that pass
 `memories/reviewing-prs.md`'s scope test (opened by or assigned to the
-invoking user, explicitly requested by name, or opened by a repository workflow).
+invoking user, explicitly requested by name, or authored by the GitHub Actions app (`github-actions`)).
 """
 from __future__ import annotations
 

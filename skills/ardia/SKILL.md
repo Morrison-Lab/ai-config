@@ -29,12 +29,12 @@ mutates a PR stays serial.
    in the JSON — `glab mr list` alone does not expose these fields.
    State the scope rules when you report, so the user can
    correct:
-   - **Only PRs the user opened, is assigned to, or asked for by name, or a repository workflow opened, are in scope.**
+   - **Only PRs the user opened, is assigned to, or asked for by name, or the Actions app authored, are in scope.**
      Resolve the invoking user first
      --- `gh api user --jq .login` locally, `mcp__github__get_me` in a remote session, `glab api user | jq -r .username` on GitLab, where the fields are `author.username` and `assignees[].username` ---
      and add any aliases `memories/reviewing-prs.md` lists for that person,
      so a lab member running this corpus from a vendored checkout filters on their own identity rather than the corpus owner's.
-     When no identity operation is available, fail closed: leave the author and assignee arms unevaluated, keep only explicitly requested and workflow-opened PRs, and say so in the report.
+     When no identity operation is available, fail closed: leave the author and assignee arms unevaluated, keep only explicitly requested and Actions-app-authored PRs, and say so in the report.
      Normalise the fields first: the author is `author.login` in `gh --json`, `user.login` in REST and `mcp__github__list_pull_requests`, and `author.username` on GitLab;
      assignees are `assignees[].login` (GitHub) or `assignees[].username` (GitLab).
      Keep a PR only when its author is one of those logins or the repository's own workflow bot (the app slug `github-actions`, in whichever form the source returns it;
@@ -45,7 +45,7 @@ mutates a PR stays serial.
      Keep the full listing for the stack detection in step 3, so an in-scope PR based on an out-of-scope PR's branch is still recognised as stacked (it is synced against that base as it stands;
      the base itself is left to its author).
      "Every open PR" anywhere in this skill means every PR that survives this filter.
-     A PR by another lab member, or by any other bot (Dependabot, a Copilot agent), is not driven, reviewed, or edited, however clean it looks (see `memories/reviewing-prs.md`, "Only work PRs I opened, am assigned to, or asked for by name, or a workflow opened";
+     A PR by another lab member, or by any other bot (Dependabot, a Copilot agent), is not driven, reviewed, or edited, however clean it looks (see `memories/reviewing-prs.md`, "Only work PRs I opened, am assigned to, or asked for by name, or the Actions app authored";
      measured on `UCD-SERG/serodynamics` 2026-09-01, where the sweep drove four other authors' PRs before the correction arrived).
    - **Include drafts** (`isDraft: true`) unless another agent is actively driving one.
      A draft is the corpus's own in-flight claim signal ---

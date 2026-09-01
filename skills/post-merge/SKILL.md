@@ -269,7 +269,7 @@ gh pr list --state open \
 
 Filter that list by `memories/reviewing-prs.md`'s scope test first, as
 `ardia` step 1 does (opened by or assigned to the invoking user, named in the
-request, or opened by a repository workflow), and report the PRs dropped.
+request, or authored by the GitHub Actions app (`github-actions`)), and report the PRs dropped.
 A conflict on an out-of-scope PR is reported to the user and the PR left
 untouched (no comment, no push); a claim comment does not bring it into scope.
 

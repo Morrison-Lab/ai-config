@@ -39,7 +39,7 @@ fix for free.
    Note each PR's number, `headRefName`, `author`, and `assignees`.
    Filter the list by `memories/reviewing-prs.md`'s scope test first, as
    `ardia` step 1 does (opened by or assigned to the invoking user,
-   explicitly requested by name, or opened by a repository workflow), and report the PRs
+   explicitly requested by name, or authored by the GitHub Actions app (`github-actions`)), and report the PRs
    dropped: a resync pushes a merge commit, which that memory forbids on any
    other PR.
 

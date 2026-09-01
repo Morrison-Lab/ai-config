@@ -176,7 +176,7 @@ sits unread.
    ```bash
    gh pr list --state open --json number,title,headRefName,author,assignees,mergeable,mergeStateStatus,comments   # LIST_PRS
    ```
-   Filter that list by `memories/reviewing-prs.md`'s scope test first, as `ardia` step 1 does (opened by or assigned to the invoking user, explicitly requested by name, or opened by a repository workflow);
+   Filter that list by `memories/reviewing-prs.md`'s scope test first, as `ardia` step 1 does (opened by or assigned to the invoking user, explicitly requested by name, or authored by the GitHub Actions app (`github-actions`));
    an out-of-scope conflicting PR is reported to the user and left untouched (no comment, no push);
    they can assign or name it if they want it resolved.
    For each in-scope PR where `mergeable == "CONFLICTING"` **or `"UNKNOWN"`** (see `resolve-conflicts`, "Verify before you act" --- `UNKNOWN` can mean GitHub hasn't finished computing yet, not that there's no conflict), verify with `git merge-tree --write-tree origin/main origin/<branch>` (git ≥ 2.38) before acting, then check claim status (most recent comment) and fix unclaimed ones --- same cascade procedure as `post-merge` step 1.5 (claim → isolated worktree → fetch main → merge → `resolve-conflicts` skill → push → unclaim).

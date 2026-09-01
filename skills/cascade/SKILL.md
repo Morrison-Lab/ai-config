@@ -31,7 +31,7 @@ this skill exists to pin the meaning.)
    Keep the full list for mapping the stack, then exclude from the action
    queue every PR that fails `memories/reviewing-prs.md`'s scope test, as
    `ardia` step 1 does (opened by or assigned to the invoking user,
-   explicitly requested by name, or opened by a repository workflow), and
+   explicitly requested by name, or authored by the GitHub Actions app (`github-actions`)), and
    report the PRs excluded: every later step pushes to the branch, which
    that memory forbids on any other PR.
    A stacked PR whose base PR is out of scope is synced against that base

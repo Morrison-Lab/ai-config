@@ -69,6 +69,11 @@ from fences import strip_fences  # noqa: E402
 # Same link-graph vocabulary as scripts/check-links.py, so the two agree on
 # what counts as a relative link.
 LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
+REF_LINK = re.compile(
+    r"^[ ]{0,3}\[(?P<label>(?:\\.|[^\]\\\r\n])+)\]:[ \t]*(?:\r?\n[ \t]*)?(?:<(?P<dest_bracket>[^<>\r\n]+)>|(?P<dest_bare>[^ \t\r\n]+))"
+    r"(?=[ \t]*(?:\r?\n|$)|[ \t]+(?:\"[^\"]*\"|'[^']*'|\([^)\r\n]*\))[ \t]*(?:\r?\n|$))",
+    re.MULTILINE,
+)
 INLINE = re.compile(r"`[^`]*`")
 
 # A Claude Code auto-load import: `@` in the first column, then a path.  These
@@ -113,6 +118,9 @@ def is_external(target: str) -> bool:
 def _clean_target(target: str) -> str | None:
     """Normalize one raw target, or None if it is not a repo-relative path."""
     target = target.strip()
+    if target.startswith("<") and target.endswith(">"):
+        target = target[1:-1].strip()
+    target = target.split(" ", 1)[0]
     if not target or is_external(target):
         return None
     if "<" in target or ">" in target:
@@ -133,6 +141,15 @@ def link_targets(text: str) -> list[str]:
         cleaned = _clean_target(target)
         if cleaned is not None:
             targets.append(cleaned)
+    for match in REF_LINK.finditer(stripped):
+        label = match.group("label").strip()
+        if not label:
+            continue
+        dest = match.group("dest_bracket") or match.group("dest_bare")
+        if dest:
+            cleaned = _clean_target(dest)
+            if cleaned is not None:
+                targets.append(cleaned)
     return targets
 
 

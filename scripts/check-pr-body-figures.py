@@ -293,6 +293,11 @@ def get_link_counts(repo_root: Path) -> Optional[Tuple[int, int]]:
     """Count markdown links across files in repo_root matching check-links.py scope."""
     try:
         link_re = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
+        ref_link_re = re.compile(
+            r"^[ ]{0,3}\[(?P<label>(?:\\.|[^\]\\\r\n])+)\]:[ \t]*(?:\r?\n[ \t]*)?(?:<(?P<dest_bracket>[^<>\r\n]+)>|(?P<dest_bare>[^ \t\r\n]+))"
+            r"(?=[ \t]*(?:\r?\n|$)|[ \t]+(?:\"[^\"]*\"|'[^']*'|\([^)\r\n]*\))[ \t]*(?:\r?\n|$))",
+            re.MULTILINE,
+        )
         inline_re = re.compile(r"`[^`]*`")
         scan_globs = [
             "skills/**/*.md",
@@ -320,6 +325,22 @@ def get_link_counts(repo_root: Path) -> Optional[Tuple[int, int]]:
                 files_checked += 1
                 for m in link_re.finditer(text):
                     tgt = m.group(1).strip()
+                    if tgt.startswith("<") and tgt.endswith(">"):
+                        tgt = tgt[1:-1].strip()
+                    tgt = tgt.split(" ", 1)[0]
+                    if not tgt or tgt.startswith(skip_prefixes) or "://" in tgt:
+                        continue
+                    if "<" in tgt or ">" in tgt:
+                        continue
+                    total_links += 1
+                for m in ref_link_re.finditer(text):
+                    label = m.group("label").strip()
+                    if not label:
+                        continue
+                    tgt = m.group("dest_bracket") or m.group("dest_bare")
+                    if not tgt:
+                        continue
+                    tgt = tgt.strip()
                     if tgt.startswith("<") and tgt.endswith(">"):
                         tgt = tgt[1:-1].strip()
                     tgt = tgt.split(" ", 1)[0]

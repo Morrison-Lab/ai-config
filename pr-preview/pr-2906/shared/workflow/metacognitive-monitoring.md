@@ -1086,7 +1086,10 @@ Those three rules belong to this case alone, not to the section's standing Do/Do
   section covers.
 
 See [`metacognitive-monitoring.cases.md`](metacognitive-monitoring.cases.md),
-"Five sound measurements, five claims beside them".
+"Five sound measurements, five claims beside them", and, for the case where
+the two propositions are a verified **mechanism** and an unverified
+**instance** asserted to fall under it, "A mechanism verified, an unverified
+population asserted to fall under it".
 
 ## Writing is the instrument, when the claim can be wrong
 

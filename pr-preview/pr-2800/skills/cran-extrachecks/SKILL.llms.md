@@ -396,6 +396,20 @@ calc_total <- function(x) sum(x)
 
 ## Useful Tools
 
+Runnable commands via `Rscript`:
+
+``` bash
+# Check and update URLs
+Rscript -e 'urlchecker::url_check()'
+Rscript -e 'urlchecker::url_update()'
+
+# Scaffolding and formatting
+Rscript -e 'devtools::build_readme()'
+Rscript -e 'usethis::use_tidy_description()'
+Rscript -e 'usethis::use_news_md()'
+Rscript -e 'usethis::use_cran_comments()'
+```
+
 - `tools::toTitleCase()` - Format titles with proper capitalization
 - `urlchecker::url_check()` - Find problematic URLs
 - `urlchecker::url_update()` - Fix redirecting URLs

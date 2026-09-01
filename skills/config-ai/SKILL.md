@@ -193,6 +193,10 @@ to lack push access to the target repo -- one of these three always applies.
 - **`issue-first`** (`shared/workflow/issue-first.md`) / **`st`** -- the
   issue-before-PR discipline Step 3's normal push-access path still follows
   once a form is chosen.
+- **`use-subagents`** (`shared/workflow/use-subagents.md`) -- governs when to
+  use conversation-inheriting dispatch for an emergent workflow vs dispatching
+  a clean subagent for an explicit capability request.
+
 
 ## Anti-patterns
 

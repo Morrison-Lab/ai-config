@@ -55,6 +55,9 @@ from pathlib import Path
 OVERRIDE_ENV = "FABLE_SUBAGENT_OK"
 # The subagent-launch tool is reported under three names across harnesses;
 # `remind-ums-after-error.py` and `docs/cursor-hook-mapping.md` carry the same set.
+# Only `Agent` and `Task` are registered in hooks.json: the cross-harness
+# adapter relabels an Antigravity `invoke_subagent` launch as `Agent` before
+# matching, so a dedicated matcher for it would never fire.
 AGENT_TOOLS = ("Agent", "Task", "invoke_subagent")
 TAIL_BYTES = 400_000
 

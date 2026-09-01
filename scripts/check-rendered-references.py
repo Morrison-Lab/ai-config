@@ -53,7 +53,7 @@ CITE_KEY_IN_BRACKET_RE = re.compile(
 
 # 2. Standalone narrative / in-text citeproc citations: e.g. @author2020 or -@author2020 in prose
 NARRATIVE_CITATION_RE = re.compile(
-    r"(?<![A-Za-z0-9._%+/:!#$&*~?])(?P<marker>-?@(?P<key>[A-Za-z_][A-Za-z0-9_#.:-]*[A-Za-z0-9_#]|[A-Za-z_]))\b"
+    r"(?<![A-Za-z0-9._%+/:!#$&*~?])(?P<marker>-?@(?P<key>[A-Za-z_][A-Za-z0-9_#.:-]*[A-Za-z0-9_#]|[A-Za-z_]))(?![/\w])\b"
 )
 
 # Footnote patterns for explicit validation and ignore
@@ -248,11 +248,6 @@ def main(argv: list[str] | None = None) -> int:
         "--json",
         action="store_true",
         help="Emit JSON output format",
-    )
-    parser.add_argument(
-        "--strict",
-        action="store_true",
-        help="Exit non-zero if any heuristic citation findings are detected",
     )
 
     args = parser.parse_args(argv)

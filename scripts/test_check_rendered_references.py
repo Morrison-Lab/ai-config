@@ -121,7 +121,7 @@ class TestCheckRenderedReferences(unittest.TestCase):
         self.assertEqual(len(findings), 0)
 
     def test_valid_markdown_footnotes_not_flagged(self) -> None:
-        """Ensure valid markdown footnote links and definitions are not flagged (Issue #2566)."""
+        """Ensure valid markdown footnote links and definitions are not flagged (ai-config#2879)."""
         content = (
             "# Document Title\n\n"
             "This is a statement with a numerical footnote[^1].\n"

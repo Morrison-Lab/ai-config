@@ -1380,12 +1380,12 @@ def main():
             sys.exit(1)
     else:
         current_head = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
+            ["git", "rev-parse", args.head],
             capture_output=True,
             text=True,
         ).stdout.strip()
         if current_head != initial_head and not (len(initial_head) >= 7 and current_head.startswith(initial_head)):
-            log_error(f"HEAD moved during review (from {initial_head[:8]} to {current_head[:8]}). Verdict is bound to the old commit and cannot be posted/accepted.")
+            log_error(f"Target ref {args.head} moved during review (from {initial_head[:8]} to {current_head[:8]}). Verdict is bound to the old commit and cannot be posted/accepted.")
             sys.exit(1)
 
     if not report:

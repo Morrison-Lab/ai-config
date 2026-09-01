@@ -145,6 +145,12 @@ CASES = [
      bash('gh pr comment 5 -R d-morrison/wai --edit-last --body "Claimed at 12:15 PT."'), True,
      "gh pr comment --edit-last with a body carrying a stamp still warns"),
     ([PROMPT],
+     bash('gh pr comment 5 -R d-morrison/wai --delete-last; gh pr comment 6 -R d-morrison/wai --body "Claimed at 12:15 PT."'), True,
+     "a delete chained before a real post does not hide the post"),
+    ([PROMPT],
+     bash('gh pr comment 5 -R d-morrison/wai --body "please --delete-last the old one; claimed 12:15 PT"'), True,
+     "a --delete-last quoted inside the body is prose, and the post is still judged"),
+    ([PROMPT],
      bash('echo "do not run gh pr review 5 --body \\"12:15 PT\\" yet"'), False,
      "prose that merely mentions gh pr review is not a review"),
 

@@ -194,6 +194,14 @@ _disclosure = _sibling("require-agent-disclosure.py", "_sib_unmeasured_timestamp
 # ai-config#2906). The disclosure sibling draws the same line.
 RX_DELETING = getattr(_disclosure, "DELETING_RE", re.compile(r"--delete-last\b|--delete\b"))
 RX_EDIT_LAST = re.compile(r"--edit-last\b")
+
+
+def _split_segments(text):
+    """Split a command into shell segments, preferring the sibling's splitter."""
+    splitter = getattr(_disclosure, "split_segments", None)
+    if callable(splitter):
+        return list(splitter(text))
+    return [seg for seg in re.split(r"[;&|\n]+", text) if seg.strip()]
 MCP_POST_TOOLS = getattr(_disclosure, "MCP_POST_TOOLS", (
     "mcp__github__add_issue_comment",
     "mcp__github__add_reply_to_pull_request_comment",
@@ -265,6 +273,18 @@ def _short_flag_body(stripped, cwd):
     return _first_group(m) if m else None
 
 
+def _blank_quotes(text):
+    """Replace the inside of quoted strings with spaces, keeping offsets.
+
+    The delete and edit-last checks below must see only the command's own
+    flags: a `--delete-last` quoted inside a `--body` is prose, not a verb
+    (ai-config#2906 review round 3).
+    """
+    return re.sub(r'"[^"]*"|\'[^\']*\'',
+                  lambda m: m.group(0)[0] + " " * (len(m.group(0)) - 2) + m.group(0)[-1],
+                  text)
+
+
 def _bash_post(command, cwd):
     """(kind, body) for a Bash command.
 
@@ -273,25 +293,33 @@ def _bash_post(command, cwd):
     one it cannot: a `--body-file` not on disk yet, `--body-file -`, or
     `--editor`. Heredocs are stripped before matching, as in the rebuttal
     sibling, so a heredoc quoting `gh pr comment` as prose is not a post.
+
+    The command is judged PER SEGMENT, like the disclosure sibling: a
+    chained `gh pr comment --delete-last; gh pr comment --body ...` is a
+    delete followed by a post, and the post is the one that gets read. The
+    first posting segment decides the verdict.
     """
     if RX_COMMENT_POST is None or strip_heredocs is None or extract_body_text is None:
         return None, None
     stripped = strip_heredocs(command)
-    if RX_DELETING.search(stripped):
-        return None, None
-    if RX_EDIT_LAST.search(stripped) and not RX_REVIEW_BODY_FLAG.search(stripped):
-        return None, None
-    posts = bool(RX_COMMENT_POST.search(stripped)) or (
-        bool(RX_REVIEW_POST.search(stripped))
-        and bool(RX_REVIEW_BODY_FLAG.search(stripped)))
-    if not posts:
-        return None, None
-    body = extract_body_text(stripped, cwd)
-    if body is None:
-        body = _short_flag_body(stripped, cwd)
-    if body is None:
-        return "unreadable", None
-    return "body", body
+    for segment in _split_segments(stripped):
+        flags_only = _blank_quotes(segment)
+        if RX_DELETING.search(flags_only):
+            continue
+        if RX_EDIT_LAST.search(flags_only) and not RX_REVIEW_BODY_FLAG.search(flags_only):
+            continue
+        posts = bool(RX_COMMENT_POST.search(segment)) or (
+            bool(RX_REVIEW_POST.search(segment))
+            and bool(RX_REVIEW_BODY_FLAG.search(flags_only)))
+        if not posts:
+            continue
+        body = extract_body_text(segment, cwd)
+        if body is None:
+            body = _short_flag_body(segment, cwd)
+        if body is None:
+            return "unreadable", None
+        return "body", body
+    return None, None
 
 
 def _post_from_payload(tool_name, tool_input, cwd):

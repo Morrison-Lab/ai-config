@@ -455,7 +455,7 @@ A clean automated review from every available provider evaluating the current HE
 - **Fix**: The guard now credits valid reviews from foreground dispatches, fallback subagent dispatches (matching `FALLBACK_AGENT_NAME`), tracked `TaskOutput` results, and background task notifications (ai-config#2544).
   Dispatching in the foreground (`run_in_background: false`) remains the primary recommendation.
   That fix reaches a plugin-consumer session only when the plugin cache re-snapshots (plugin update or session start) ---
-  see Pattern 42 for the stale-cache deadlock measured after #2820 merged.
+  see Pattern 42 for the stale-cache deadlock measured after [#2820](https://github.com/Morrison-Lab/ai-config/pull/2820) merged.
 
 ## Pattern 23: Implementing From a Truncated Issue-Body Read
 - **Mistake**: Briefing an implementer (a subagent, or yourself) from a sliced issue body --- e.g. `gh issue view --jq '.body[0:2200]'` --- instead of the full body and its comments.
@@ -823,14 +823,18 @@ A clean automated review from every available provider evaluating the current HE
   the cache re-snapshots only at plugin update or session start,
   so a fresh session both loads the post-#2820 hook and registers a repo-level `.claude/agents/adversarial-reviewer.md` if one is present.
   On a post-#2820 hook (verified against `main`, 2026-09-01), the fallback contract is:
-  a FOREGROUND dispatch whose `subagent_type` matches the general-purpose family (`general-purpose`, `general`, `reviewer`, `code-reviewer`, `research`, `self`)
+  a dispatch whose `subagent_type` matches the general-purpose family (`general-purpose`, `general`, `reviewer`, `code-reviewer`, `research`, `self`)
   and whose prompt contains a review-request phrase matching the prompt gate (e.g. "adversarial pre-push review"),
   returning a report whose last verdict line reads `### Verdict: Ready for merge` (or `Needs more work`)
   followed by `Reviewed-Commit: <HEAD sha>` (the parser accepts 7-40 hex characters; give the full 40).
+  A foreground dispatch is the simplest credited path and the one the hook's own refusal message recommends,
+  but background fallback dispatches, tracked `TaskOutput` reads, and task notifications are credited too, per Pattern 22.
 - **Do**: stop probing after the classifier's second denial of the same goal and hand the user the decision (push manually, restart the session, or add a permission rule).
 - **Don't**: keep rephrasing the override or the dispatch --- each denied variant makes the classifier more suspicious, locking out even the sanctioned paths.
 - **Don't**: route the push around the guard through a peer session, a separately-billed CLI, or the MCP GitHub write tools ---
-  that is permission laundering through the guard's documented open gap ([ai-config#1929](https://github.com/Morrison-Lab/ai-config/issues/1929)).
+  each is permission laundering:
+  the MCP write tools are the guard's documented open gap ([ai-config#1929](https://github.com/Morrison-Lab/ai-config/issues/1929)),
+  and a peer session or a separate CLI bypasses simply because the hook does not run there.
 - **Algorithmatizable?**
   Partially.
   #2544's suggested fix 3 --- have the hook's refusal message name a user-approvable permission rule for the override --- would have resolved the measured session in one step, and remains open under #2899.

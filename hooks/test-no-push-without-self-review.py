@@ -1536,6 +1536,19 @@ def fallback_cases() -> tuple[int, int]:
     blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
     check("fallback subagent with blocking verdict blocks push", rc == 0 and blocked)
 
+    # 2b. Negative: Untyped Agent call with review prompt is rejected
+    events_untyped = [
+        {"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "id": "c_untyped", "name": "Agent", "input": {"prompt": "quick self-review please, thanks"}}
+        ]}},
+        {"type": "user", "message": {"content": [
+            {"type": "tool_result", "tool_use_id": "c_untyped", "content": body("Ready for merge", HEAD)}
+        ]}},
+    ]
+    rc, out = run_hook(PUSH, events_untyped)
+    blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+    check("untyped Agent call with review prompt is rejected", rc == 0 and blocked)
+
     # 3. TaskOutput delivering review report for tracked task
     task_events = [
         agent_call("adversarial-reviewer", call_id="c_task"),

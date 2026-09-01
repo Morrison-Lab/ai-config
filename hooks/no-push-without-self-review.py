@@ -1446,10 +1446,11 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                         prompt = str(inp.get("prompt") or inp.get("Prompt") or inp.get("instruction") or inp.get("description") or "")
 
                         is_adversarial = any(ADVERSARIAL_AGENT_NAME.match(st) for st in sub_types)
-                        is_fallback = (
-                            any(FALLBACK_AGENT_NAME.match(st) for st in sub_types)
-                            or not sub_types
-                        ) and bool(REVIEW_PROMPT_RE.search(prompt))
+                        is_fallback = bool(
+                            sub_types
+                            and any(FALLBACK_AGENT_NAME.match(st) for st in sub_types)
+                            and REVIEW_PROMPT_RE.search(prompt)
+                        )
 
                         if is_adversarial or is_fallback:
                             saw_reviewer_call = True

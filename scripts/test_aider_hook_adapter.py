@@ -291,6 +291,19 @@ class TestRealHooksIntegration(unittest.TestCase):
 
 I have fixed the bug. Going forward I will always verify the return value before returning.
 """
+        manifest = {
+            "Stop": [
+                {
+                    "matcher": "*",
+                    "hooks": [
+                        {
+                            "command": f"{sys.executable} ${{CLAUDE_PLUGIN_ROOT}}/hooks/no-empty-promise.py",
+                            "timeout": 5,
+                        }
+                    ],
+                }
+            ]
+        }
         with tempfile.TemporaryDirectory() as tmpdir:
             hist_file = Path(tmpdir) / ".aider.chat.history.md"
             hist_file.write_text(md_history, encoding="utf-8")
@@ -300,6 +313,7 @@ I have fixed the bug. Going forward I will always verify the return value before
                 history_path_or_content=hist_file,
                 cwd=tmpdir,
                 repo_root=ROOT,
+                hooks_manifest=manifest,
             )
             self.assertEqual(res["decision"], "block")
             self.assertIn("no-empty-promise", str(res.get("reason", "")))
@@ -312,6 +326,19 @@ I have fixed the bug. Going forward I will always verify the return value before
 
 I have fixed the bug by modifying the return check.
 """
+        manifest = {
+            "Stop": [
+                {
+                    "matcher": "*",
+                    "hooks": [
+                        {
+                            "command": f"{sys.executable} ${{CLAUDE_PLUGIN_ROOT}}/hooks/no-empty-promise.py",
+                            "timeout": 5,
+                        }
+                    ],
+                }
+            ]
+        }
         with tempfile.TemporaryDirectory() as tmpdir:
             hist_file = Path(tmpdir) / ".aider.chat.history.md"
             hist_file.write_text(md_history, encoding="utf-8")
@@ -321,6 +348,7 @@ I have fixed the bug by modifying the return check.
                 history_path_or_content=hist_file,
                 cwd=tmpdir,
                 repo_root=ROOT,
+                hooks_manifest=manifest,
             )
             self.assertEqual(res["decision"], "allow")
 

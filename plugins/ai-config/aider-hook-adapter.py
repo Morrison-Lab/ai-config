@@ -470,10 +470,11 @@ def execute_hooks_for_event(
     cwd: str | Path,
     repo_root: Path | None = None,
     tool_name: str | None = None,
+    hooks_manifest: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Execute all registered hooks for a given event and return aggregated result."""
     root = repo_root or find_repo_root()
-    manifest = load_hooks_manifest(root)
+    manifest = hooks_manifest if hooks_manifest is not None else load_hooks_manifest(root)
     event_groups = manifest.get(event, [])
 
     decision = "allow"
@@ -540,6 +541,7 @@ def adapt_aider_event(
     cwd: str | Path | None = None,
     repo_root: Path | None = None,
     transcript_out: str | Path | None = None,
+    hooks_manifest: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Translate Aider chat history and execute hooks for the specified event."""
     effective_cwd = Path(cwd or os.getcwd()).resolve()
@@ -585,6 +587,7 @@ def adapt_aider_event(
         cwd=effective_cwd,
         repo_root=effective_root,
         tool_name=tool_name,
+        hooks_manifest=hooks_manifest,
     )
     result["transcript_path"] = str(jsonl_path)
     return result

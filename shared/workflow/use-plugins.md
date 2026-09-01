@@ -21,9 +21,14 @@ Search for available plugins proactively when:
 - A workflow demands standard linters, formatters, or verification checkers that exist in maintained ecosystems.
 - A user request asks for a capability that is general-purpose rather than repository-specific.
 
+Don't restrict searches to currently loaded marketplaces.
+Search the broader web (e.g. GitHub repositories, package ecosystems, search queries)
+when registered catalogs don't carry the needed tooling.
+
 ## Where and how to search across harnesses
 
-Different AI agent harnesses manage plugins through distinct discovery and marketplace mechanisms:
+Different AI agent harnesses manage plugins through distinct discovery and marketplace mechanisms.
+Combine local marketplace listings with web search to discover upstream tools:
 
 ### Claude Code
 
@@ -46,6 +51,12 @@ Claude Code supports plugins distributed via Git marketplaces and official regis
    Inspect the source repository's `.claude-plugin/marketplace.json` manifest
    or use the interactive `/plugin` Discover tab to browse available plugins and capabilities.
 
+   When currently registered marketplaces do not carry a needed tool,
+   search the web (e.g. GitHub search, official Anthropic documentation)
+   for plugin marketplaces (`owner/repo`),
+   add the repository via `claude plugin marketplace add <owner/repo>`,
+   and inspect its declared plugins.
+
 3. **Install and enable:**
 
    ```sh
@@ -66,7 +77,9 @@ Antigravity discovers plugins and skill bundles via configuration manifests:
    Check `.agents/plugins.json` and `.agents/skills.json` at the repository root,
    or global settings in `~/.gemini/config/plugins.json`.
 
-2. **Register plugin bundles:**
+2. **Discover and register plugin bundles:**
+   When local configurations do not provide a needed capability,
+   search the web or GitHub for Antigravity-compatible plugin bundles or skill collections.
    Add plugin paths to `plugins.json` pointing to directories containing a valid `plugin.json` manifest.
    Running `bootstrap.sh` in `ai-config` registers local plugin bundles automatically
    without requiring fragile symlinks.
@@ -82,7 +95,10 @@ Codex discovers and manages plugins via marketplace repositories:
    codex plugin list --json
    ```
 
-2. **Add a marketplace and install a plugin:**
+2. **Discover, add a marketplace, and install a plugin:**
+   When registered marketplaces lack a tool,
+   search the web (e.g. GitHub search) for Codex-compatible plugin marketplace repositories (`owner/repo`),
+   then register the repository and install the plugin:
 
    ```sh
    codex plugin marketplace add <owner/repo> --json
@@ -98,6 +114,8 @@ Codex discovers and manages plugins via marketplace repositories:
 
 Cursor manages capabilities via `.cursor-plugin/marketplace.json` and workspace configuration.
 Inspect `.cursor-plugin/` or workspace settings to check available extensions and hooks.
+When local configuration lacks specialized domain tooling,
+search the web and GitHub for community `.cursor-plugin/` or extension bundles.
 
 ## Evaluating plugins before installation
 
@@ -112,7 +130,7 @@ Before installing and enabling a plugin, verify:
    (e.g. bash execution, network access, environment variable read access).
 3. **Collision and redundancy:**
    - Avoid installing a plugin both natively and as a vendored git submodule or symlink
-     (see [`remove-redundant-plugin-submodules.md`](remove-redundant-plugin-submodules.md)).
+   (see [`remove-redundant-plugin-submodules.md`](remove-redundant-plugin-submodules.md)).
    - Check for conflicting hook events or colliding skill names before activating multiple bundles.
 4. **Transport and credential setup:**
    - If the plugin wraps an MCP server,
@@ -133,7 +151,8 @@ Before installing and enabling a plugin, verify:
    Plugins loaded mid-session may require a session restart or harness reload
    before new tool definitions or hooks become active in the agent prompt context.
 
-- **Do:** search official and lab plugin marketplaces before hand-rolling complex external integration tooling.
+- **Do:** search official, lab, and upstream plugin marketplaces and the broader web (GitHub, registries) when registered catalogs lack the needed tool, before hand-rolling complex integration tooling.
 - **Do:** verify marketplace names against the source `marketplace.json` manifest rather than guessing from repo URLs.
+- **Don't:** limit plugin discovery only to currently loaded marketplaces when specialized tools exist upstream.
 - **Don't:** keep duplicate git submodules alongside native plugin configurations.
 - **Don't:** assume a plugin registered mid-session is active without confirming tool availability or restarting the session when needed.

@@ -28,6 +28,9 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+from scripts.lib.ai_cli import find_executable
+
 UNIT = "ai-config-pr-monitor.service"
 SOURCE = ROOT / "systemd" / UNIT
 TARGET = Path.home() / ".config" / "systemd" / "user" / UNIT
@@ -47,12 +50,12 @@ STALE_POLLS = 5
 
 
 def resolve_dependencies():
-    python3 = shutil.which("python3")
+    python3 = find_executable("python3", fallback_to_dirs=False, use_cache=False)
     if python3 is None and IS_NT:
         # Windows rarely ships a python3.exe alias; run the daemon under
         # whatever interpreter is executing this installer.
         python3 = sys.executable
-    gh = shutil.which("gh")
+    gh = find_executable("gh", fallback_to_dirs=False, use_cache=False)
     missing = [name for name, path in (("python3", python3), ("gh", gh)) if not path]
     if missing:
         sys.exit("FATAL: cannot resolve " + ", ".join(missing) + " on PATH; "

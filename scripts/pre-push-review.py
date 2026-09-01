@@ -17,6 +17,12 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from scripts.lib.ai_cli import (
+    DEFAULT_ENGINE_PRIORITY,
+    detect_available_engines as detect_cli_engines,
+    find_executable,
+    is_gh_available,
+)
 from scripts.lib.fences import count_unbalanced_fences, strip_fences
 from scripts.lib.review_payload import (
     extract_structured_review,
@@ -48,7 +54,7 @@ def get_git_root() -> str:
 
 def get_current_pr() -> Optional[int]:
     """Auto-detect PR number for current branch if one exists and gh CLI is available."""
-    if not shutil.which("gh"):
+    if not is_gh_available(use_cache=False):
         return None
     res = subprocess.run(
         ["gh", "pr", "view", "--json", "number"],
@@ -66,7 +72,7 @@ def get_current_pr() -> Optional[int]:
 
 def get_pr_base_branch(pr_number: int) -> Optional[str]:
     """Get the target base branch of a GitHub PR."""
-    if not shutil.which("gh"):
+    if not is_gh_available(use_cache=False):
         return None
     res = subprocess.run(
         ["gh", "pr", "view", str(pr_number), "--json", "baseRefName"],
@@ -161,7 +167,7 @@ def get_repo_guidelines(base_ref: str) -> str:
 
 def get_pr_head_sha(pr_number: int) -> Optional[str]:
     """Get the remote head commit SHA for a GitHub PR."""
-    if not shutil.which("gh"):
+    if not is_gh_available(use_cache=False):
         return None
     res = subprocess.run(
         ["gh", "pr", "view", str(pr_number), "--json", "headRefOid"],
@@ -892,21 +898,10 @@ def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str =
 
 def detect_available_engines() -> List[str]:
     """Return available local engines in preferred fallback priority: claude -> cursor -> codex -> opencode -> agy."""
-    engines = []
-    if resolve_engine_executable("claude"):
-        engines.append("claude")
-    if resolve_engine_executable("agent"):
-        engines.append("cursor")
-    if resolve_engine_executable("codex"):
-        engines.append("codex")
-    if resolve_engine_executable("opencode"):
-        engines.append("opencode")
-    if resolve_engine_executable("agy"):
-        engines.append("antigravity")
-    return engines
+    return detect_cli_engines(ENGINE_ROTATION_ORDER, use_cache=False)
 
 
-ENGINE_ROTATION_ORDER = ["claude", "cursor", "codex", "opencode", "antigravity"]
+ENGINE_ROTATION_ORDER = DEFAULT_ENGINE_PRIORITY
 
 
 def get_next_alternate_engine(available_engines: List[str]) -> str:

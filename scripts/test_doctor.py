@@ -141,19 +141,43 @@ class TestDoctor(unittest.TestCase):
         self.assertEqual(res["status"], "FAIL")
         self.assertIn("Invalid JSON/JSONC", res["details"])
 
+    @patch("lib.ai_cli.get_tool_status_report")
+    def test_check_ai_clis_ok(self, mock_report):
+        mock_report.return_value = {
+            "available_engines": ["claude", "cursor"],
+            "forge_tools": {"gh": {"available": True, "path": "/usr/bin/gh"}},
+        }
+        res = doctor.check_ai_clis()
+        self.assertTrue(res["ok"])
+        self.assertEqual(res["status"], "OK")
+        self.assertIn("claude", res["details"])
+
+    @patch("lib.ai_cli.get_tool_status_report")
+    def test_check_ai_clis_warn_none(self, mock_report):
+        mock_report.return_value = {
+            "available_engines": [],
+            "forge_tools": {"gh": {"available": False, "path": None}},
+        }
+        res = doctor.check_ai_clis()
+        self.assertFalse(res["ok"])
+        self.assertEqual(res["status"], "WARN")
+        self.assertIn("No local AI CLI subagents detected", res["details"])
+
     @patch("doctor.check_git_status")
     @patch("doctor.check_submodules")
     @patch("doctor.check_codex_wrappers")
     @patch("doctor.check_hook_catalog")
     @patch("doctor.check_context_closure")
     @patch("doctor.check_jsonc_configs")
-    def test_run_doctor_healthy(self, m_jsonc, m_closure, m_hooks, m_wrappers, m_subm, m_git):
+    @patch("doctor.check_ai_clis")
+    def test_run_doctor_healthy(self, m_ai, m_jsonc, m_closure, m_hooks, m_wrappers, m_subm, m_git):
         m_git.return_value = {"name": "git_status", "ok": True, "status": "OK", "details": "ok"}
         m_subm.return_value = {"name": "submodules", "ok": True, "status": "OK", "details": "ok"}
         m_wrappers.return_value = {"name": "codex_wrappers", "ok": True, "status": "OK", "details": "ok"}
         m_hooks.return_value = {"name": "hook_catalog", "ok": True, "status": "OK", "details": "ok"}
         m_closure.return_value = {"name": "context_budget", "ok": True, "status": "OK", "details": "ok"}
         m_jsonc.return_value = {"name": "jsonc_configs", "ok": True, "status": "OK", "details": "ok"}
+        m_ai.return_value = {"name": "ai_clis", "ok": True, "status": "OK", "details": "ok"}
 
         report = doctor.run_doctor()
         self.assertTrue(report["all_ok"])

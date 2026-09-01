@@ -20,6 +20,9 @@ from fences import strip_fences  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
+AUTOLINK = re.compile(
+    r"<((?:[a-zA-Z][a-zA-Z0-9+.-]*:[^\s>]+)|(?:[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[^\s>]+))>"
+)
 # Strip code regions first so link-shaped examples inside fences / backticks
 # (regexes, `[text](url)` snippets) aren't mistaken for real links.
 INLINE = re.compile(r"`[^`]*`")
@@ -39,8 +42,26 @@ broken: list[str] = []
 checked = 0
 
 
+def extract_target(raw: str) -> str:
+    """Extract link destination from a raw link capture (stripping angle brackets and title)."""
+    raw = raw.strip()
+    if raw.startswith("<"):
+        m = re.match(r"^<([^>]+)>(?:\s+.*)?$", raw)
+        if m:
+            return m.group(1).strip()
+    return raw.split(" ", 1)[0].strip()
+
+
 def is_external(target: str) -> bool:
-    return target.startswith(SKIP_PREFIXES) or "://" in target
+    """Check if target URL is external (e.g. http, mailto, anchor, email autolink)."""
+    stripped = target.strip()
+    if stripped.startswith("<") and stripped.endswith(">"):
+        stripped = stripped[1:-1].strip()
+    return (
+        stripped.startswith(SKIP_PREFIXES)
+        or "://" in stripped
+        or bool(re.match(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", stripped))
+    )
 
 
 def check_file(md: Path) -> None:
@@ -48,12 +69,14 @@ def check_file(md: Path) -> None:
     text = md.read_text(encoding="utf-8")
     text = strip_fences(text)
     text = INLINE.sub("", text)
+    raw_targets: list[str] = []
     for match in LINK.finditer(text):
-        target = match.group(1).strip()
-        if target.startswith("<") and target.endswith(">"):
-            target = target[1:-1].strip()
-        # drop a trailing `"title"` if present
-        target = target.split(" ", 1)[0]
+        raw_targets.append(match.group(1))
+    for match in AUTOLINK.finditer(text):
+        raw_targets.append(match.group(1))
+
+    for raw in raw_targets:
+        target = extract_target(raw)
         if not target or is_external(target):
             continue
         if "<" in target or ">" in target:
@@ -66,7 +89,11 @@ def check_file(md: Path) -> None:
         checked += 1
         resolved = (md.parent / path_part).resolve()
         if not resolved.exists():
-            broken.append(f"{md.relative_to(ROOT)} -> {target}")
+            try:
+                rel = md.relative_to(ROOT)
+            except ValueError:
+                rel = md
+            broken.append(f"{rel} -> {target}")
 
 
 def main() -> None:

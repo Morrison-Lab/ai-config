@@ -122,10 +122,10 @@ RE_CALL_NAMES = {
 class ScopedRegexExtractor(ast.NodeVisitor):
     """Extract regex pattern strings, line numbers, and flags with lexical scope awareness."""
 
-    def __init__(self, file_path: str):
+    def __init__(self, file_path: str, module_constants: dict[str, str] | None = None):
         self.file_path = file_path
         self.instances: list[RegexInstance] = []
-        self.scopes: list[dict[str, str]] = [{}]  # module scope at index 0
+        self.scopes: list[dict[str, str]] = [dict(module_constants or {})]
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         self.scopes.append({})
@@ -224,7 +224,18 @@ class ScopedRegexExtractor(ast.NodeVisitor):
 
 def extract_regex_instances_from_ast(tree: ast.AST, file_path: str) -> list[RegexInstance]:
     """Extract regex pattern strings, line numbers, and flags from Python AST."""
-    extractor = ScopedRegexExtractor(file_path)
+    module_constants: dict[str, str] = {}
+    if hasattr(tree, "body"):
+        for stmt in tree.body:
+            if isinstance(stmt, ast.Assign) and isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, str):
+                for target in stmt.targets:
+                    if isinstance(target, ast.Name):
+                        module_constants[target.id] = stmt.value.value
+            elif isinstance(stmt, ast.AnnAssign) and isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, str):
+                if isinstance(stmt.target, ast.Name):
+                    module_constants[stmt.target.id] = stmt.value.value
+
+    extractor = ScopedRegexExtractor(file_path, module_constants=module_constants)
     extractor.visit(tree)
     return extractor.instances
 

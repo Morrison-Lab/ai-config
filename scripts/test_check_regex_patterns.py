@@ -229,6 +229,24 @@ def test_synthetic_files() -> None:
             f"reports={reports!r}",
         )
 
+        # Test module-level forward reference (pattern defined below function)
+        fwd_file = Path(td) / "test_fwd.py"
+        fwd_code = (
+            "import re\n\n"
+            "def func():\n"
+            "    return re.search(PATTERN, 'test')\n\n"
+            "PATTERN = r'(a+)+'\n"
+        )
+        fwd_file.write_text(fwd_code, encoding="utf-8")
+        rc, out, err = run_script(["--paths", str(fwd_file), "--json"])
+        data = json.loads(out)
+        reports = data.get("reports", [])
+        check(
+            "module constant forward reference detected in func call line 4",
+            len(reports) == 1 and reports[0]["line_number"] == 4,
+            f"reports={reports!r}",
+        )
+
 
 test_synthetic_files()
 

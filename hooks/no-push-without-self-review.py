@@ -1457,7 +1457,7 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                                 reviewer_call_ids.add(call_id)
                         elif tool_name in ("taskoutput", "task_output", "manage_task"):
                             task_id = str(inp.get("task_id") or inp.get("TaskId") or inp.get("id") or "")
-                            if (task_id and task_id in reviewer_task_ids) or not reviewer_task_ids:
+                            if task_id and task_id in reviewer_task_ids:
                                 if isinstance(call_id, str) and call_id:
                                     reviewer_call_ids.add(call_id)
                     elif tool_name == "send_message" and record_is_reviewer:

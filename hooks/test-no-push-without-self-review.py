@@ -1536,8 +1536,10 @@ def fallback_cases() -> tuple[int, int]:
     blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
     check("fallback subagent with blocking verdict blocks push", rc == 0 and blocked)
 
-    # 3. TaskOutput delivering review report
+    # 3. TaskOutput delivering review report for tracked task
     task_events = [
+        agent_call("adversarial-reviewer", call_id="c_task"),
+        agent_result("c_task", json.dumps({"task_id": "task_123"})),
         {"type": "assistant", "message": {"content": [
             {"type": "tool_use", "id": "t1", "name": "TaskOutput", "input": {"task_id": "task_123"}}
         ]}},
@@ -1548,6 +1550,19 @@ def fallback_cases() -> tuple[int, int]:
     rc, out = run_hook(PUSH, task_events)
     blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
     check("TaskOutput tool result with clean review allows push", rc == 0 and not blocked)
+
+    # 3b. Negative: Untracked/unrelated task_id does NOT authorize push
+    untracked_task_events = [
+        {"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "id": "t_untr", "name": "TaskOutput", "input": {"task_id": "random_task_999"}}
+        ]}},
+        {"type": "user", "message": {"content": [
+            {"type": "tool_result", "tool_use_id": "t_untr", "content": body("Ready for merge", HEAD)}
+        ]}},
+    ]
+    rc, out = run_hook(PUSH, untracked_task_events)
+    blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+    check("untracked TaskOutput task_id does not authorize push", rc == 0 and blocked)
 
     # 4. Negative: Bash commands cannot authorize push via tool_result
     cli_events = [

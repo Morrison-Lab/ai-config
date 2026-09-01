@@ -111,7 +111,9 @@ gh pr list --state open \
   --json number,title,headRefName,mergeable,mergeStateStatus,comments   # LIST_PRS
 ```
 
-For each PR where `mergeable == "CONFLICTING"` **or `"UNKNOWN"`** (GitHub can take minutes to finish computing mergeability after a push — a genuinely conflicting PR can sit in `UNKNOWN` and get missed if you filter for `CONFLICTING` alone):
+Filter that list by `memories/reviewing-prs.md`’s scope test first, as `ardia` step 1 does (opened by or assigned to the invoking user, named in the request, or opened by a repository workflow), and report the PRs dropped. A conflict on an out-of-scope PR gets an explanatory comment for its author, never a push, and a claim comment does not bring it into scope.
+
+For each in-scope PR where `mergeable == "CONFLICTING"` **or `"UNKNOWN"`** (GitHub can take minutes to finish computing mergeability after a push — a genuinely conflicting PR can sit in `UNKNOWN` and get missed if you filter for `CONFLICTING` alone):
 
 1.  **Verify before claiming — don’t trust the flag alone.** See `resolve-conflicts`, “Verify before you act”: `git merge-tree --write-tree origin/main origin/<branch>` gives ground truth without a worktree (git ≥ 2.38). Skip if it comes back clean.
 
@@ -133,7 +135,7 @@ For each PR where `mergeable == "CONFLICTING"` **or `"UNKNOWN"`** (GitHub can ta
 
     Any unrelated comment posted after a claim — a status note, a bot result — becomes the newest comment while the claim is still live, since a claim expires on activity rather than on age. Reading the newest comment alone therefore reports a claimed PR as free. Match the two-word invariant, `hold off` or either retired wording `paws off` / `back off`, case-insensitively — never a whole sentence. The PR and issue claims differ after those two words, and the dash between them is an em-dash in this file’s own claim emitter (step 4), so a quoted prefix misses claims this very skill posts. See [`claim-pr`](../../shared/workflow/claim-pr.md)’s “Match the two-word invariant”.
 
-    **Then check the same comment for a release term, because one release marker contains a claim invariant.** The retired release wording is `... done --- paws off released.`, which matches `paws off` — so the invariant that fixes one bug introduces another, and this one fails the safe way round: a released PR reads as claimed, the sweep skips it, and the conflict is never resolved with nothing reporting why. The sentence matcher this replaced did not collide, so the collision arrived with the fix. Treat the comment as a release, not a claim, if it also matches `unclaim|released|PR is free|now mergeable`. If a live claim stands — a push or comment within the last 2 hours — skip the PR. Another session owns it. An expired claim (over 2 idle hours) no longer blocks. Take over with a fresh claim comment of your own, per [`claim-pr`](../../shared/workflow/claim-pr.md)’s expiration rule.
+    **Then check the same comment for a release term, because one release marker contains a claim invariant.** The retired release wording is `... done --- paws off released.`, which matches `paws off` — so the invariant that fixes one bug introduces another, and this one fails the safe way round: a released PR reads as claimed, the sweep skips it, and the conflict is never resolved with nothing reporting why. The sentence matcher this replaced did not collide, so the collision arrived with the fix. Treat the comment as a release, not a claim, if it also matches `unclaim|released|PR is free|now mergeable`. If a live claim stands — a push or comment within the last 2 hours — skip the PR. Another session owns it. An expired claim (over 2 idle hours) no longer blocks. Take over with a fresh claim comment of your own, per [`claim-pr`](../../shared/workflow/claim-pr.md)’s expiration rule; that claim guards against session collisions on a PR already in scope, and never reads an out-of-scope PR into scope.
 
 4.  **Claim it.**
 

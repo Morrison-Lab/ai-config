@@ -87,8 +87,8 @@ It is then in scope through the author arm when the PAT is mine, and out of scop
 - **Don't:** push commits to, rewrite the title or body of, dispatch a paid review on, or resolve threads on a PR that fails the test.
 - **Don't:** read a skill's "drive every open PR" as a scope grant that overrides this --- "every" means every PR that is mine.
 - **Don't:** treat a PR from a bot other than the repository's workflows (a Dependabot PR, a Copilot-agent PR) as mine by default;
-  an explicit `chores` invocation names the Dependabot/Renovate population and is the named-in-request arm;
-  it needs the assignment like any other.
+  such a PR needs the assignment like any other.
+  An explicit `chores` invocation names the Dependabot/Renovate population, which is the named-in-request arm.
 - **Don't:** stand down from a workflow-opened PR on the author test alone --- that is the over-correction the second directive reversed.
 
 The near-miss looks like diligence from the inside, which is why it needs the explicit Don'ts.

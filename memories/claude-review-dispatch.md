@@ -418,3 +418,73 @@ alone does not.)
   one `workflow_dispatch`.
   (Measured 2026-08-24, ai-config#2074: two rounds burned to this before the
   clean single-dispatch re-review landed the verdict.)
+
+## Review artifact uploads vs forge comment payloads
+
+### Do AI reviews upload Actions artifacts?
+
+Yes, but as an **internal pipeline transport**, not as the consumer-facing review interface.
+
+In `Morrison-Lab/gha` (`.github/workflows/claude-code-review.yml`),
+the model review job (`claude-review`) and posting job (`post-review`)
+are split for least-privilege security (gha#580):
+1. **Model job (`claude-review`)**:
+   Runs Claude Code to generate the review under minimal permissions
+   (`contents: read`, no PR write access).
+   Before completing, it invokes the composite action
+   `Morrison-Lab/gha/.github/actions/pack-review-payload`,
+   which packages `payload.json` (metadata including `schema_version`,
+   `pr_number`, `repo`, `head_sha`, `total_cost_usd`, `resolve_outcome`,
+   `failure_kind`, `denials`, and `denied_tools`),
+   `review.txt` (the raw model review prose),
+   and optional `denied_tools.txt`.
+   This directory is uploaded as a GitHub Actions workflow artifact named
+   `claude-review-payload-${RUN_ID}-${RUN_ATTEMPT}` with a 14-day retention.
+2. **Posting job (`post-review`)**:
+   Runs with elevated privileges (`pull-requests: write`, `issues: write`),
+   downloads `claude-review-payload-${RUN_ID}-${RUN_ATTEMPT}` via
+   `actions/download-artifact`, parses `payload.json` and `review.txt`,
+   and posts the review to the GitHub PR timeline.
+   The comment contains the human-readable Markdown review,
+   the reviewed commit SHA, the run URL link,
+   and the machine-readable payload
+   (`<!-- review-data: {"schema_version": "1.0", "verdict": "CLEAN", ...} -->`).
+
+### Why ai-config agents inspect PR comment payloads instead of Actions artifacts
+
+`ai-config` verification tooling (such as `scripts/check-pr-fully-clean.py`
+and pre-push hooks) inspects the structured `<!-- review-data: ... -->` payload
+embedded directly in PR issue comments and formal reviews via
+`scripts/lib/review_payload.py`, rather than downloading Actions zip artifacts:
+
+1. **Durability vs expiration**:
+   GitHub Actions workflow artifacts expire after 14 days and are purged when
+   workflow runs are deleted.
+   PR timeline comments and reviews are permanent, durable records on the forge.
+2. **Universal protocol across review sources**:
+   Review verdicts originate from multiple modalities:
+   automated GitHub Actions `@claude` runs (`claude-code-review.yml`),
+   in-session subagent self-reviews (`adversarial-reviewer`),
+   local pre-push CLI passes (`scripts/pre-push-review.py`),
+   GitHub Copilot reviews, and human reviews.
+   Only GHA workflows generate Actions artifacts.
+   Embedding the JSON payload inside an HTML comment (`<!-- review-data: ... -->`)
+   provides a single, uniform representation that `scripts/lib/review_payload.py`
+   parses identically across all local, CI, and external review sources.
+3. **Remote session accessibility & latency**:
+   In remote/web sessions without the `gh` CLI, agents gather PR metadata via
+   MCP tools (`pull_request_read`) into a JSON payload for
+   `python3 scripts/check-pr-fully-clean.py --from-json <file>`
+   ([`shared/workflow/fully-clean.md`](../shared/workflow/fully-clean.md)).
+   Reading PR comments is a single GraphQL/REST query.
+   Downloading GHA zip artifacts would require run discovery, binary archive
+   downloads, zip extraction, and disk cleanup.
+4. **Auditability and transparency**:
+   The PR comment is what human maintainers, collaborators, and other agents see.
+   Placing the structured payload in an HTML comment makes it invisible in
+   rendered Markdown while keeping it co-located with the human text.
+5. **Deterministic parsing & safety**:
+   `scripts/lib/review_payload.py` (`extract_structured_review`) safely parses
+   the payload with code-fence, inline-span, and indented-block masking,
+   verdict normalization, and contradiction checks (e.g., rejecting `CLEAN`
+   verdicts that list unresolved findings).

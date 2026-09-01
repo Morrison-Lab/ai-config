@@ -7,7 +7,7 @@ run `python3 scripts/sync-codex-skill-wrappers.py` to regenerate this page and
 the links in `codex-skills/`.
 
 The canonical skills under `skills/` are written for Claude Code and name
-concrete tools — mostly `gh`/`git` commands. This registry maps each canonical
+concrete tools --- mostly `gh`/`git` commands. This registry maps each canonical
 operation to the equivalent GitHub MCP tool so any model can run a skill.
 
 > [!IMPORTANT]
@@ -33,11 +33,11 @@ operation to the equivalent GitHub MCP tool so any model can run a skill.
 
 ## How each model resolves an operation
 
-- **Claude Code** — GitHub MCP tool in remote/web sessions; the CLI command locally.
-- **Codex** — GitHub MCP tool if the session has it; otherwise the CLI command.
-- **VS Code Copilot** — GitHub MCP tool.
-- **Gemini CLI** — GitHub MCP tool if configured in MCP settings; otherwise the CLI command.
-- **Generic shell / CLI** — The CLI command (fallback for any agent that just runs a shell).
+- **Claude Code** --- GitHub MCP tool in remote/web sessions; the CLI command locally.
+- **Codex** --- GitHub MCP tool if the session has it; otherwise the CLI command.
+- **VS Code Copilot** --- GitHub MCP tool.
+- **Gemini CLI** --- GitHub MCP tool if configured in MCP settings; otherwise the CLI command.
+- **Generic shell / CLI** --- The CLI command (fallback for any agent that just runs a shell).
 
 ## Operations
 

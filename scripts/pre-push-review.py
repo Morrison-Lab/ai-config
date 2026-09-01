@@ -18,6 +18,7 @@ from typing import List, Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from scripts.lib.ai_cli import (
+    DEFAULT_ENGINE_PRIORITY,
     detect_available_engines as detect_cli_engines,
     find_executable,
     is_gh_available,
@@ -900,7 +901,7 @@ def detect_available_engines() -> List[str]:
     return detect_cli_engines(ENGINE_ROTATION_ORDER, use_cache=False)
 
 
-ENGINE_ROTATION_ORDER = ["claude", "cursor", "codex", "opencode", "antigravity"]
+ENGINE_ROTATION_ORDER = DEFAULT_ENGINE_PRIORITY
 
 
 def get_next_alternate_engine(available_engines: List[str]) -> str:

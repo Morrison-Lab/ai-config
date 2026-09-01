@@ -36,7 +36,7 @@ If the merge has conflicts, resolve them, run the project's standard pre-commit
 checks (render / lint / spell / tests), commit, then push. Don't push a
 half-resolved merge.
 
-**A sync-only push invalidates the previous commit's review verdict; never arm auto-merge after syncing.**
+**A sync-only push invalidates the previous commit's review verdict --- never arm auto-merge after syncing.**
 Merging `origin/main` in and pushing creates a new HEAD commit ref.
 Even if the prior HEAD was verified 100% clean and the sync contained no changes of yours,
 the new HEAD commit ref is unreviewed until fresh reviews land.

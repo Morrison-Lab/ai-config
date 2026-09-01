@@ -228,7 +228,13 @@ def split_command(command: str) -> list[str]:
 
     seg = "".join(current).strip()
     if seg:
-        segments.append(seg)
+        if stack[-1] in ("SINGLE_QUOTE", "DOUBLE_QUOTE"):
+            for fallback_seg in re.split(r"(?:&&|\|\||[;&|\n])", seg):
+                s = fallback_seg.strip().strip("'\"")
+                if s:
+                    segments.append(s)
+        else:
+            segments.append(seg)
 
     return segments
 

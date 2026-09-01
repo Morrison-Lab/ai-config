@@ -68,12 +68,50 @@ HAS_REPO_FLAG = re.compile(
     r"(^|\s)(-R\b|--repo(=|\s)|-o\b|--org(=|\s)|-u\b|--user\b)"
 )
 
+# Match heredoc openers: `<<`, `<<-`, `<<~` followed by quoted, backslash-escaped,
+# or bare word delimiter.
+HEREDOC_OPEN = re.compile(
+    r"""(?<!<)[0-9]*<<([-~]?)[ \t]*(?:'([^']+)'|"([^"]+)"|\\([^\s;|&<>()]+)|([A-Za-z0-9_][A-Za-z0-9_\-]*))"""
+)
+
 # Split on shell operators so `cd x && gh secret set Y` is judged per segment.
 SPLIT = re.compile(r"&&|\|\||;|\||\n")
 
 
+def strip_heredocs(command: str) -> str:
+    """Drop heredoc body lines and delimiters so interior text is not scanned as commands."""
+    lines = command.split("\n")
+    out = []
+    pending_heredocs = []  # list of (delim: str, is_tab_strip: bool)
+
+    for line in lines:
+        if pending_heredocs:
+            delim, is_tab_strip = pending_heredocs[0]
+            clean_line = line.rstrip("\r")
+            if is_tab_strip:
+                # <<- strips leading tabs (and spaces for robustness)
+                matched = (clean_line.lstrip("\t ") == delim)
+            else:
+                matched = (clean_line == delim)
+            if matched:
+                pending_heredocs.pop(0)
+            # Both body lines and closing delimiter lines are omitted
+            continue
+
+        out.append(line)
+        if not line.strip().startswith("#"):
+            for m in HEREDOC_OPEN.finditer(line):
+                strip_flag = m.group(1)
+                delim = m.group(2) or m.group(3) or m.group(4) or m.group(5)
+                if delim:
+                    pending_heredocs.append((delim, bool(strip_flag)))
+
+    return "\n".join(out)
+
+
 def offending(command: str):
-    for segment in SPLIT.split(command):
+    command_scannable = strip_heredocs(command)
+    for segment in SPLIT.split(command_scannable):
         if "gh" not in segment:
             continue
         if HAS_REPO_FLAG.search(segment):

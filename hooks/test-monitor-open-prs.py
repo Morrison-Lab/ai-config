@@ -59,11 +59,13 @@ GLAB_STATUS_FAILED_FULL = (
     "\n"
     "x could not authenticate to one or more of the configured GitLab instances\n"
 )
-# The largest single-instance listing status.go produces: a 401 on a token
-# taken from an environment variable, which adds three hint lines inside
-# the block (status.go's env-token branch) and a three-line trailer before
-# the summary. ERROR_TAIL must hold this whole rendering, or the tail drops
-# the diagnosis on exactly the configuration that most needs it.
+# status.go's longest branch: a 401 on a token taken from an environment
+# variable, which adds at least three hint lines inside the block (a fourth
+# when the host is configured for OAuth, not rendered here) and a
+# three-line trailer before the summary; Subfolder/SSH Host lines can
+# lengthen any block further, which monitor-open-prs.py's ERROR_TAIL
+# comment sizes for. ERROR_TAIL must hold this whole rendering, or the tail
+# drops the diagnosis on exactly the configuration that most needs it.
 GLAB_STATUS_ENV_TOKEN_401 = (
     "gitlab.example.com\n"
     "  x gitlab.example.com: API call failed: GET https://gitlab.example.com/api/v4/user: 401 {message: 401 Unauthorized}\n"

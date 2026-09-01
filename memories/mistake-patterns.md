@@ -813,7 +813,7 @@ A clean automated review from every available provider evaluating the current HE
   causing status checks to report `STILL INSTALLING` for 40 minutes after the script finished.
   A subsequent script waiting with `while pgrep -f "mut2.sh"; do sleep 3; done` deadlocked on the lingering waiter,
   and a cleanup `pkill -f 'pgrep -f ...'` killed the active Bash execution mid-run.
-- **Canonical Rule**: [`memories/debugging.md`](debugging.md) (Background process waiters section)
+- **Canonical Rule**: [`memories/shell.md`](shell.md) (Background process waiters section)
   and [`shared/workflow/no-empty-promises.md`](../shared/workflow/no-empty-promises.md).
 - **Fix**: Replace process table substring matching with done-file sentinels,
   track and terminate by PID,

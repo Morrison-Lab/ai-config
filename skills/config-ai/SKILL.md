@@ -54,6 +54,7 @@ duplicate their build steps.
 
 | The capability is... | Form | Home | Hand off to |
 |---|---|---|---|
+| A packaged bundle of skills, typed tools, hooks, or subagents in a known marketplace or registry | Plugin | Marketplaces / consumer settings (`~/.claude/settings.json`, `.agents/plugins.json`, Codex marketplaces) | `use-plugins` (`shared/workflow/use-plugins.md`) |
 | A repeatable, multi-step procedure a user (or the `@claude` bot) invokes on demand | Skill | `ai-config` `skills/<name>/` | `skill-builder` |
 | A persistent, read-only fan-out worker persona a heavy skill spawns | Subagent | `ai-config` `.claude/agents/<name>.md` | `agent-builder` |
 | A standing fact, preference, or behavioral rule Claude should just know | Memory / `CLAUDE.md` section | `ai-config` `memories/`, `CLAUDE.md`, or a `shared/<category>/<name>.md` fragment | `memorize` (working repo is `ai-config`) or `push-memory` (working repo is something else) |
@@ -111,6 +112,10 @@ game -- extended the project's existing
 Every mechanism above already has its own extend-first check; run it rather
 than scaffolding cold:
 
+- Plugin → search known marketplaces (`claude plugin marketplace list`,
+  `codex plugin marketplace list`, `.cursor-plugin/`,
+  `claude-plugins-official`) per
+  [`use-plugins`](../../shared/workflow/use-plugins.md).
 - Skill / subagent → `skill-builder` step 0 / `agent-builder` step 0 (search
   `skills/`, scan every branch and worktree, check open PRs).
 - Memory → grep `memories/*.md` and `CLAUDE.md` for the same fact before

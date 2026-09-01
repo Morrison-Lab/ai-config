@@ -29,8 +29,8 @@ field (e.g. "grab an issue", "drive to clean", "update memories and skills").
 
 | Skill | Aliases | What it does |
 |-------|---------|--------------|
-| [`ardi`](skills/ardi/SKILL.md) | `dc`, `drive`, `clean`, `iterate` | Read the latest review, address/rebut/defer every finding, push, re-request review — loop until clean |
-| [`ard`](skills/ard/SKILL.md) | `adr` | Single ARD pass: address, rebut, defer, or acknowledge — without the iterate loop |
+| [`ardi`](skills/ardi/SKILL.md) | `dc`, `drive`, `clean`, `iterate` | Read the latest review, address/rebut/defer every finding, push, re-request review --- loop until clean |
+| [`ard`](skills/ard/SKILL.md) | `adr` | Single ARD pass: address, rebut, defer, or acknowledge --- without the iterate loop |
 | [`resolve-pr-threads`](skills/resolve-pr-threads/SKILL.md) | | Resolve inline review threads that are already settled, without a full ARD pass |
 | [`claim-pr`](skills/claim-pr/SKILL.md) | | Post a claim comment before a work session; unclaim when done |
 | [`request-pr-review`](skills/request-pr-review/SKILL.md) | | Add a human reviewer and @-mention them with context |
@@ -70,7 +70,7 @@ field (e.g. "grab an issue", "drive to clean", "update memories and skills").
 |-------|---------|--------------|
 | [`ums`](skills/ums/SKILL.md) | `update-memories-and-skills` | Capture learnings from the session into memory files and skill definitions |
 | [`memorize`](skills/memorize/SKILL.md) | `remember`, `always` | Save a specific fact or preference to memory |
-| [`push-memory`](skills/push-memory/SKILL.md) | | Push a general-purpose memory into ai-config from a session working in another repo — on a branch + PR |
+| [`push-memory`](skills/push-memory/SKILL.md) | | Push a general-purpose memory into ai-config from a session working in another repo --- on a branch + PR |
 | [`record-learnings`](skills/record-learnings/SKILL.md) | | Structured post-mortem: extract lessons from a completed task |
 | [`consolidate-memory`](skills/consolidate-memory/SKILL.md) | | Merge or deduplicate memory files that have drifted |
 | [`skill-audit`](skills/skill-audit/SKILL.md) | | Report which skills actually fire (and how often) vs. dead weight, and recommend pruning candidates |

@@ -14,12 +14,14 @@ from __future__ import annotations
 import re
 import sys
 from pathlib import Path
+from typing import Iterator
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 from fences import strip_fences  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
+AUTOLINK = re.compile(r"<([^<>\s]+)>")
 # Strip code regions first so link-shaped examples inside fences / backticks
 # (regexes, `[text](url)` snippets) aren't mistaken for real links.
 INLINE = re.compile(r"`[^`]*`")
@@ -34,20 +36,64 @@ SCAN_GLOBS = [
     "*.md",
 ]
 SKIP_PREFIXES = ("http://", "https://", "mailto:", "tel:", "#")
+HTML_TAGS = {
+    "article",
+    "aside",
+    "blockquote",
+    "br",
+    "code",
+    "details",
+    "div",
+    "em",
+    "figcaption",
+    "figure",
+    "footer",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "header",
+    "hr",
+    "iframe",
+    "img",
+    "kbd",
+    "li",
+    "nav",
+    "ol",
+    "p",
+    "pre",
+    "samp",
+    "section",
+    "span",
+    "strong",
+    "summary",
+    "table",
+    "td",
+    "th",
+    "tr",
+    "ul",
+    "var",
+}
 
 broken: list[str] = []
 checked = 0
 
 
 def is_external(target: str) -> bool:
-    return target.startswith(SKIP_PREFIXES) or "://" in target
+    return (
+        target.startswith(SKIP_PREFIXES)
+        or "://" in target
+        or ("@" in target and "/" not in target)
+    )
 
 
-def check_file(md: Path) -> None:
-    global checked
-    text = md.read_text(encoding="utf-8")
+def extract_targets(text: str) -> Iterator[str]:
+    """Yield relative link targets found in stripped markdown text."""
     text = strip_fences(text)
     text = INLINE.sub("", text)
+
     for match in LINK.finditer(text):
         target = match.group(1).strip()
         if target.startswith("<") and target.endswith(">"):
@@ -63,10 +109,41 @@ def check_file(md: Path) -> None:
             continue
         if "/" not in path_part and "." not in path_part:
             continue  # bare-word placeholder in an example, e.g. (url)
+        yield target
+
+    for match in AUTOLINK.finditer(text):
+        target = match.group(1).strip()
+        if not target or is_external(target):
+            continue
+        if target.startswith("/") and "." not in target:
+            continue  # HTML closing tag, e.g. </details>
+        if target.startswith(("!", "?")):
+            continue  # HTML comments / directives
+        if "<" in target or ">" in target:
+            continue  # angle-bracket placeholder
+        path_part = re.split(r"[#?]", target, maxsplit=1)[0]
+        if not path_part:
+            continue
+        if "/" not in path_part and "." not in path_part:
+            continue
+        if path_part.lower() in HTML_TAGS:
+            continue
+        yield target
+
+
+def check_file(md: Path, root: Path = ROOT) -> None:
+    global checked
+    text = md.read_text(encoding="utf-8")
+    try:
+        rel_path = md.relative_to(root)
+    except ValueError:
+        rel_path = md
+    for target in extract_targets(text):
+        path_part = re.split(r"[#?]", target, maxsplit=1)[0]
         checked += 1
         resolved = (md.parent / path_part).resolve()
         if not resolved.exists():
-            broken.append(f"{md.relative_to(ROOT)} -> {target}")
+            broken.append(f"{rel_path} -> {target}")
 
 
 def main() -> None:

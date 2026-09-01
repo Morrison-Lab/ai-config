@@ -75,11 +75,12 @@ The **Don't** side is inferred from the near-miss that prompted it, and is what 
 The named-in-request arm came from neither directive: it is carried over from `ardia`'s former "unless told to" bullet, which this rule replaced.
 The narrowing of "workflow-opened" to the `github-actions[bot]` login is also inferred: the example given was a `bump-submodule.yml` PR, and Dependabot and Copilot PRs post under their own logins and were not named.
 That login match covers a workflow that opens its PR with `GITHUB_TOKEN`;
-`gha`'s reusable sync workflows (`bump-submodule.yml`, `bump-dev-version.yml`, `sync-shared-fragments.yml`, `sync-upstream.yml`) hand `open-sync-pr` `${{ secrets.WORKFLOW_TOKEN || github.token }}`, so when the repo sets that secret the PR posts under the PAT holder's own login, and it is in scope only through the author arm when that PAT is mine.
+`gha`'s reusable sync workflows (`bump-submodule.yml`, `bump-dev-version.yml`, `sync-shared-fragments.yml`, `sync-upstream.yml`) hand `open-sync-pr` `${{ secrets.WORKFLOW_TOKEN || github.token }}`, so when the repo sets that secret the PR posts under that token's identity: the PAT holder's own login, or an App's `<slug>[bot]`.
+It is then in scope through the author arm when the PAT is mine, and out of scope under an App token unless assigned or named.
 
 - **Do:** before touching any PR, resolve who you are running as, read the PR's `author.login` and `assignees`, and proceed only when the author is you (or an alias below) or a repository workflow, you are among the assignees, or the user named the PR in the request.
   Match the app slug `github-actions` in whichever form the source returns it: the REST API and the MCP tools suffix it (`github-actions[bot]`), GraphQL and `scripts/pr-sweep.py` return it bare (`github-actions`), and `gh pr list --json author` prefixes it (`app/github-actions`, with `is_bot: true`).
-- **Do:** treat `d-morrison` and `dem-extra1` as one person --- this corpus's owner --- when either is the invoking user.
+- **Do:** treat `d-morrison` and `dem-extra1` as one person --- this corpus's owner --- when either is the invoking user (the two-account mapping `preferences.md`'s author-identity entry already records).
   They are written as literals here on purpose: `preferences.md`'s "Never hardcode usernames" rule exempts values that must resolve to a real account, and an `author.login` match is exactly that.
   A skill must still resolve the invoking user dynamically and only *add* these aliases, so another lab member running the vendored corpus filters on their own identity, not on these two.
 - **Do:** on a sweep (`ardia`, `gia`, `ardiaei`, `gmd`), filter the PR list by that test first, and say in the report which PRs were excluded and why.

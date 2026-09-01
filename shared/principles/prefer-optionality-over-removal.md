@@ -44,14 +44,15 @@ Wholesale deletion is legitimate when:
 
 Outside those exceptions, prefer optionality over outright removal.
 
-## Boundary with least-flexible-tool, simplify, and KISS
+## Boundary with least-flexible-tool, dead-code-is-tech-debt, simplify, and KISS
 
 This principle does not contradict [`least-flexible-tool`](../coding/least-flexible-tool.md),
+[`dead-code-is-tech-debt`](dead-code-is-tech-debt.md),
 [`simplify`](../../skills/simplify/SKILL.md), or KISS:
 
 - **`least-flexible-tool`** governs *authoring new code*:
   choose the narrowest construct that meets current requirements rather than speculating on unneeded flexibility.
-- **`simplify` and `tidy`** govern *dead or redundant code*:
+- **`dead-code-is-tech-debt`**, **`simplify`**, and **`tidy`** govern *dead or unreachable code*:
   pruning unused abstractions, unreachable branches, and obsolete fallbacks remains mandatory.
 - **`prefer-optionality-over-removal`** governs *active capabilities with legitimate callers*:
   when an issue reports that a default behavior is problematic in a specific scenario,

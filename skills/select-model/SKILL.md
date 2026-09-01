@@ -99,6 +99,9 @@ to use the recommended model for future sessions.
   and the script provides a personalized recommendation and config suggestion.
 - **Chained from assess-model-fit:** If `/assess-model-fit` recommends escalation,
   it auto-invokes `select-model` with your task details.
+- **Holistic stack recommendation ([recm](../recm/SKILL.md)):** Use `recm` when
+  deciding across harnesses (Claude Code, agy, Codex, OpenCode), provider tiers,
+  and review engines rather than only Claude model tiers.
 
 ## FAQ
 

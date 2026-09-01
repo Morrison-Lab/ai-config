@@ -32,7 +32,7 @@ from pathlib import Path
 try:
     import yaml
 except ImportError:  # pragma: no cover
-    sys.exit("validate-skills: PyYAML is required — run `pip install pyyaml`.")
+    sys.exit("validate-skills: PyYAML is required --- run `pip install pyyaml`.")
 
 ROOT = Path(__file__).resolve().parent.parent
 errors: list[str] = []
@@ -233,7 +233,7 @@ TOKEN_PATTERN = re.compile(r"`([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)`")
 
 # Backtick-wrapped ALL_CAPS_WITH_UNDERSCORE tokens already in skill prose for
 # reasons unrelated to the tool-mappings.yml abstract-operation-token pilot
-# (ai-config#195) — env vars, git refs, API constants. Not every such token is
+# (ai-config#195) --- env vars, git refs, API constants. Not every such token is
 # meant to resolve via the registry, so they're exempted rather than flagged.
 NON_OPERATION_TOKENS = {
     # env var: names a session to ai-session.sh, and is where

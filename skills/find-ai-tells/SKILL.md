@@ -46,16 +46,24 @@ reflexes — **not** to ban words or flatten a real human voice.
 2. **First pass, grep the cheap lexical/typographic tells** (catalog below has a
    ready-to-run command). This finds the mechanical ones fast and cheaply.
 3. **Second pass, read for the rhetorical and structural tells** that grep can't
-   see — antithesis, triads, both-sidesing, hollow conclusions, uniform rhythm.
-4. **Report** *(external targets only — skip for the self-check)*. A table —
+   see — copula avoidance, participle commentary, antithesis, triads, both-sidesing,
+   hollow conclusions, uniform rhythm.
+4. **Apply the deletion test** — remove the rhetorical framing and check if any
+   concrete fact remains (a specific name, date, measurement, trade-off, or
+   actionable decision).
+   If nothing remains, the passage has zero information content.
+5. **Report** *(external targets only — skip for the self-check)*.
+   A table —
    *tell · location (`file:line` or quoted snippet) · why it reads as AI ·
-   suggested revision* — followed by a one-line **density verdict**: is this an
-   isolated word or a pervasive pattern? Don't cry wolf on a single innocent
-   em-dash.
-5. **Offer to apply** *(external targets)* / **just fix it silently**
-   *(self-check)*. For an external target, on request rewrite in place with
-   `Edit`, preserving the author's meaning and voice. When scanning my own
-   draft, skip the report (step 4) and simply cut the tells before presenting.
+   suggested revision* — followed by a one-line **density verdict**:
+   is this an isolated word or a pervasive pattern?
+   Don't cry wolf on a single innocent em-dash.
+6. **Offer to apply** *(external targets)* / **just fix it silently**
+   *(self-check)*.
+   For an external target, on request rewrite in place with
+   `Edit`, preserving the author's meaning and voice.
+   When scanning my own draft,
+   skip the report (step 5) and simply cut the tells before presenting.
 
 ## The catalog
 
@@ -74,17 +82,25 @@ Reflex vocabulary that LLMs reach for far more than human writers:
   heart of", "when it comes to", "more than just", "stands as a testament to",
   "plays a crucial/pivotal role".
 
-Quick first-pass grep (case-insensitive, prints `file:line`). Define the
-pattern once, then run it through whichever tool is on hand:
+Quick first-pass grep (case-insensitive, prints `file:line`).
+Define the pattern once, then run it through whichever tool is on hand:
 
 ```bash
-tells='delve|leverage|utilize|seamless(ly)?|robust|holistic|nuanced|multifaceted|intricate|tapestry|testament|realm|landscape|beacon|plethora|myriad|pivotal|crucial|paramount|underscore|foster|harness|embark|unlock|elevate|game-?changer|cutting-edge|state-of-the-art|ever-evolving|treasure trove|fast-paced|in the realm of|at the heart of|more than just|shed light|dive in(to)?|deep dive'
+tells='delve|leverage|utilize|seamless(ly)?|robust|holistic|nuanced|multifaceted|intricate|tapestry|testament|realm|landscape|beacon|plethora|myriad|pivotal|crucial|paramount|underscore|foster|harness|embark|unlock|elevate|game-?changer|cutting-edge|state-of-the-art|ever-evolving|treasure trove|fast-paced|in the realm of|at the heart of|more than just|shed light|dive in(to)?|deep dive|serves as|stands as'
 rg -niE "\b($tells)\b" <target>          # ripgrep
 grep -rniE "\b($tells)\b" <target>       # no ripgrep — same pattern, via grep
 ```
 
 ### B. Rhetorical tells (sentence-level reflexes)
 
+- **Copula avoidance (dodging "is" and "are")** — refusing plain statements
+  of fact in favor of dressed-up constructions ("serves as a", "stands as a",
+  "acts as a", "marks a").
+  Replace with "is" or "are".
+- **Trailing "-ing" participle commentary** — tacking a participial phrase onto
+  the end of a factual clause to simulate analysis ("...thereby highlighting the
+  importance of X", "...ensuring seamless alignment", "...paving the way for").
+  Cut the participle clause or split into a concrete second sentence.
 - **The negation-reversal antithesis** — the single biggest tell:
   "It's not just X, it's Y" / "It isn't about X; it's about Y" / "This isn't
   merely X — it's Z". Grep: `rg -niE "(it'?s|this is) not (just|only|merely|about)"`.
@@ -106,6 +122,11 @@ grep -rniE "\b($tells)\b" <target>       # no ripgrep — same pattern, via grep
 
 ### C. Structural & typographic tells
 
+- **Forced tables and forced structure** — tabulating content that is not
+  multidimensional data, or bulleting narrative paragraphs to mimic analytical
+  rigor.
+- **Lead construction (title as an object)** — opening a document by defining
+  its own title as a noun in the world ("X is a comprehensive guide that outlines...").
 - **Em-dash overuse** — multiple `—` per paragraph used as a default connector.
   (Em-dashes are correct; the tell is *frequency*, not presence.)
   Grep: `rg -n '—' <target>` and judge density.
@@ -138,12 +159,18 @@ grep -rniE "\b($tells)\b" <target>       # no ripgrep — same pattern, via grep
 | em-dash ×5 in one paragraph | intro.md:4–9 | em-dash used as default connector | split into sentences; keep one |
 ```
 
-Then a density verdict, e.g.: *"Pervasive — antithesis + triads in most
-paragraphs; reads strongly AI. Recommend a rewrite pass,"* vs. *"One stray
-'delve'; otherwise clean."*
+Then a density verdict, e.g.:
+*"Pervasive — antithesis + triads in most paragraphs;
+reads strongly AI.
+Recommend a rewrite pass,"*
+vs. *"One stray 'delve'; otherwise clean."*
 
 ## Relationship to other skills
 
+- **[`memories/ai-writing-patterns.md`](../../memories/ai-writing-patterns.md)** —
+  the underlying research catalog (20 core empirical patterns synthesized from
+  community research, statistical detection metrics including burstiness and TTR,
+  and multi-tier anti-slop architectures).
 - **`simplify` / `tidy`** — the code-side analogues (cut dead code / cruft);
   this skill is the prose-side analogue (cut filler / reflexes).
 - **`grade-work`** — when reviewing a deliverable, fold an AI-tells pass into

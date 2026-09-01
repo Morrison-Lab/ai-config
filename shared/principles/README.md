@@ -159,6 +159,21 @@ Contrast with, rather than apply,
 disposition: it governs a finding on code that already exists, and
 licenses nothing about a defect inside the diff you are about to push.
 
+## Dead code is technical debt
+
+Dead code is not harmless surplus; it is active technical debt that accumulates
+carrying costs on every reader, coding agent, search tool, and test suite pass.
+Treat obsolete functions, orphaned configuration files, unreferenced memory entries,
+and commented-out code as defects to be eliminated systematically and promptly,
+not as historical archives to be preserved in place.
+
+Full statement: [`dead-code-is-tech-debt`](dead-code-is-tech-debt.md).
+Operationalized by:
+the [`prune-dead-code`](../../skills/prune-dead-code/SKILL.md) skill (systematic audit and removal procedure),
+the [`tidy`](../../skills/tidy/SKILL.md) and [`simplify`](../../skills/simplify/SKILL.md) skills,
+[`prefer-optionality-over-removal`](prefer-optionality-over-removal.md) (the boundary defining when removal vs optionality applies),
+and [`dont-incur-technical-debt`](dont-incur-technical-debt.md).
+
 ## Modularity — small, single-purpose, composable units
 
 Favor small, single-purpose functions and reusable units over long
@@ -380,6 +395,36 @@ Operationalized by:
 [`fail-fast`](fail-fast.md) (loud failures over silent branching fallbacks)
 and [`algorithmatize-checks`](../workflow/algorithmatize-checks.md) (testable execution scripts).
 
+## Don't take anyone's word for it --- independent verification and constructive pushback
+
+Never accept factual assertions, technical recommendations, or stated preferences blindly.
+Everyone makes mistakes --- all humans, all AI models, peer agents, coordinators, and domain experts alike.
+Always consider the possibility that any assertion may be mistaken, misinformed, outdated, or incomplete,
+and investigate that possibility independently through deterministic queries, source inspection, and clarifying questions.
+Push back constructively whenever you suspect an error or unsound reasoning.
+
+Full statement: [`dont-take-my-word-for-it`](dont-take-my-word-for-it.md).
+Operationalized by:
+[`metacognitive-monitoring`](../workflow/metacognitive-monitoring.md) (re-query state claims),
+[`challenge-the-assignment`](../workflow/challenge-the-assignment.md) (interrogate briefs and instructions),
+[`challenge-unnecessary-complexity`](../workflow/challenge-unnecessary-complexity.md),
+and [`fail-fast`](fail-fast.md).
+
+## Get under the hood --- inspect source code and raw output
+
+When trying to understand what a process is doing,
+diagnose an unexpected failure,
+or determine the behavior of a tool, library, or harness,
+find and inspect the actual source code,
+raw logs,
+job traces,
+and live execution paths rather than treating the component as an opaque black box.
+
+Full statement: [`get-under-the-hood`](get-under-the-hood.md).
+Operationalized by:
+the diagnostic requirements in `AGENTS.md`
+and log-inspection mechanisms.
+
 ## The 3Rs lens — reduce, reuse, recycle
 
 The environmental mnemonic maps cleanly onto the catalog, and makes a
@@ -461,11 +506,14 @@ instructions outrank repository defaults, scoped subsystem configs
 outrank top-level policies, and specific types and handlers outrank
 generic fallbacks in code.
 
-Prefer-optionality-over-removal complements KISS, least-flexible-tool, and simplify:
-while least-flexible-tool guides authoring new code without speculative flexibility,
-and simplify/tidy prune dead or unreferenced code paths,
-prefer-optionality-over-removal protects active capabilities with legitimate callers
-from being deleted outright when a default behavior needs improvement.
+Dead-code-is-tech-debt and prefer-optionality-over-removal draw the boundary
+between code deletion and preservation:
+while prefer-optionality-over-removal protects active capabilities with legitimate callers
+from being deleted outright when improving a default behavior,
+dead-code-is-tech-debt mandates the systematic, complete deletion of uncalled functions,
+orphaned configs, unreferenced memories, and commented-out code blocks that have no live callers.
+Together with least-flexible-tool, simplify, and tidy, they ensure the codebase remains
+compact and free of accumulated maintenance drag.
 
 Think-outside-the-box operates on the problem space itself:
 while challenge-the-assignment questions what you are asked to do or told is true,
@@ -479,6 +527,18 @@ Admitting-vs-branching-site complements fail-fast and algorithmatize-checks:
 it prevents multi-site divergence when enabling new conditions or triggers,
 requiring both admission guards and downstream execution logic to be audited
 and verified with real execution fixtures rather than text-matching tests.
+
+Don't-take-my-word-for-it provides the overarching epistemic posture
+for the entire catalog: it mandates empirical verification over deference to authority,
+extending challenge-the-assignment (which focuses on task briefs) to all factual claims,
+recommendations, and assumptions, while leaning on deterministic-tools and
+algorithmatize-checks as the instruments of independent verification.
+
+Get-under-the-hood provides the diagnostic counterpart to deterministic-tools
+and fail-fast: where fail-fast ensures failure is loud and deterministic-tools
+ensures mechanisms are inspectable, get-under-the-hood demands that investigators
+actually open and read those inspectable mechanics and un-truncated logs rather than
+attempting black-box speculation from surface symptoms or summary error codes.
 
 The remaining principles serve the goals directly: least astonishment
 and self-documenting code serve readability the way modularity serves

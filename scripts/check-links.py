@@ -16,13 +16,23 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
-from fences import strip_fences  # noqa: E402
+from fences import strip_code_spans, strip_fences  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
-# Strip code regions first so link-shaped examples inside fences / backticks
-# (regexes, `[text](url)` snippets) aren't mistaken for real links.
-INLINE = re.compile(r"`[^`]*`")
+# Autolinks in CommonMark: URI autolinks (<scheme:...>) and email autolinks (<user@domain>).
+# Matches inside or alongside HTML elements (<details>, <summary>, <div>, etc.).
+AUTOLINK = re.compile(
+    r"<("
+    r"[a-zA-Z][a-zA-Z0-9+.-]{1,31}:[^<>\x00-\x20]*"
+    r"|"
+    r"[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*"
+    r")>"
+)
+URI_SCHEME_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]*:")
+EMAIL_RE = re.compile(
+    r"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$"
+)
 SCAN_GLOBS = [
     "skills/**/*.md",
     "codex-skills/**/*.md",
@@ -33,27 +43,65 @@ SCAN_GLOBS = [
     "shared/**/*.md",
     "*.md",
 ]
-SKIP_PREFIXES = ("http://", "https://", "mailto:", "tel:", "#")
+SKIP_PREFIXES = (
+    "http://",
+    "https://",
+    "mailto:",
+    "tel:",
+    "ftp://",
+    "ftps://",
+    "file://",
+    "ssh://",
+    "git://",
+    "irc://",
+    "urn:",
+    "#",
+)
 
 broken: list[str] = []
 checked = 0
 
 
 def is_external(target: str) -> bool:
-    return target.startswith(SKIP_PREFIXES) or "://" in target
+    """Return True if target is an external link, anchor, or URI/email."""
+    return (
+        target.startswith(SKIP_PREFIXES)
+        or "://" in target
+        or bool(URI_SCHEME_RE.match(target))
+        or bool(EMAIL_RE.match(target))
+    )
 
 
-def check_file(md: Path) -> None:
-    global checked
-    text = md.read_text(encoding="utf-8")
+def extract_targets(text: str) -> list[str]:
+    """Extract raw link targets (markdown links and autolinks) from markdown text."""
     text = strip_fences(text)
-    text = INLINE.sub("", text)
+    text = strip_code_spans(text)
+    targets: list[str] = []
+
     for match in LINK.finditer(text):
         target = match.group(1).strip()
         if target.startswith("<") and target.endswith(">"):
             target = target[1:-1].strip()
         # drop a trailing `"title"` if present
         target = target.split(" ", 1)[0]
+        if target:
+            targets.append(target)
+
+    # Blank out markdown links so angle-bracket destinations like [text](<url>)
+    # are not matched a second time as autolinks.
+    text_without_links = LINK.sub(" ", text)
+    for match in AUTOLINK.finditer(text_without_links):
+        target = match.group(1).strip()
+        if target:
+            targets.append(target)
+
+    return targets
+
+
+def check_file(md: Path) -> None:
+    global checked
+    text = md.read_text(encoding="utf-8")
+    for target in extract_targets(text):
         if not target or is_external(target):
             continue
         if "<" in target or ">" in target:
@@ -66,7 +114,8 @@ def check_file(md: Path) -> None:
         checked += 1
         resolved = (md.parent / path_part).resolve()
         if not resolved.exists():
-            broken.append(f"{md.relative_to(ROOT)} -> {target}")
+            rel = md.relative_to(ROOT) if md.is_relative_to(ROOT) else md.name
+            broken.append(f"{rel} -> {target}")
 
 
 def main() -> None:

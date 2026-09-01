@@ -60,6 +60,8 @@ BLOCK = [
      "escaped quote in arithmetic shift does not mask ungated command"),
     ("echo a<$((1))<b\n" + G + "secret set FOO\nb\necho done",
      "bridged < arithmetic expansion does not synthesize phantom heredoc opener"),
+    ("x=$(( 1 << EOF\n" + G + "pr merge 456 --squash\nEOF\necho done",
+     "unterminated arithmetic $(( with << does not swallow ungated command"),
     ("x=(( a << 1 ))\n" + G + "secret set FOO",
      "assignment before (( arithmetic shift does not mask ungated command"),
     ("(" + G + "secret set FOO)", "bare subshell: (gh secret set)"),

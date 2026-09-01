@@ -247,10 +247,13 @@ Operationalized by:
 [`type-stable-outputs`](../coding/type-stable-outputs.md) --- the same
 principle applied to shape rather than to errors, since a type-unstable
 call returns a plausible object of the wrong kind instead of failing ---
-and [`errexit-is-not-uniform`](../coding/errexit-is-not-uniform.md), which
+[`errexit-is-not-uniform`](../coding/errexit-is-not-uniform.md), which
 covers the shell case where `set -e` silently stops applying, so a script
 either aborts on an expected non-zero exit or fails to, depending on the
-call site.
+call site,
+and [`regex-backtracking-pitfalls`](../coding/regex-backtracking-pitfalls.md),
+which covers regular expressions that fail by backtracking exponentially
+on non-matching inputs, and prescribes linear scans by construction.
 
 ## Algorithmatize checks — instruments over judgment
 
@@ -314,6 +317,83 @@ Systems, theorem provers, numerical packages, standard CLI tools),
 or write and validate the software yourself before consuming its output.
 
 Full statement: [`no-llm-algorithmic-thinking`](no-llm-algorithmic-thinking.md).
+
+## Specific beats general
+
+When two instructions, policies, configurations, or design rules apply
+to the same decision, the narrower, more specific rule takes precedence
+over the broader, more general one.
+General policies define default baselines for the standard case;
+specific instructions express intentional decisions for the concrete case at hand.
+Explicit human user instructions in a session override general repository defaults,
+narrow subsystem and file configs override repository-wide policies,
+and targeted types and condition handlers beat generic catch-alls.
+
+Full statement: [`specific-beats-general`](specific-beats-general.md).
+Operationalized by:
+[`fail-fast`](fail-fast.md) (specific condition classes over catch-alls),
+[`least-flexible-tool`](../coding/least-flexible-tool.md) (narrowest construct for the job),
+and [`challenge-the-assignment`](../workflow/challenge-the-assignment.md) (clarifying ambiguity vs resisting explicit direction).
+
+## Prefer optionality over removing functionality
+
+Never remove existing functionality entirely when you can add optionality instead.
+When changing default behavior, fixing an issue, or refactoring a workflow,
+do not delete an existing capability or code path outright if it served a legitimate purpose.
+Instead, make the improved behavior the default
+and preserve the legacy or alternative behavior behind an explicit, documented opt-in parameter,
+environment variable, or configuration toggle.
+
+Full statement: [`prefer-optionality-over-removal`](prefer-optionality-over-removal.md).
+Operationalized by:
+[`configurable-parameters`](../coding/configurable-parameters.md) (expose variations as parameters/toggles),
+[`specific-beats-general`](specific-beats-general.md),
+and the `clean` / `simplify` review passes.
+
+## Think outside the box --- distinguish real from artificial limitations
+
+Do not make unnecessary assumptions about structural limitations;
+consider which limitations are real (hard architectural, mathematical,
+security, or physical bounds) and which are artificial (inherited conventions,
+unexamined defaults, obsolete constraints, or local scoping traps).
+When a task or design becomes awkward or overly complex, test the assumed
+constraints empirically and reframe the problem or move the boundary
+rather than building intricate workarounds inside an unnecessary box.
+
+Full statement: [`think-outside-the-box`](think-outside-the-box.md).
+Operationalized by:
+[`challenge-the-assignment`](../workflow/challenge-the-assignment.md) (questioning the premise or mechanism),
+[`restructure-for-efficiency`](../workflow/restructure-for-efficiency.md) (re-architecting workflow shapes),
+and the `simplify` / `tidy` skills.
+
+## Admitting site vs branching site
+
+When enabling a new condition, trigger, or input case,
+that condition must be handled at two distinct sites that must agree:
+the admitting site (the rule or filter deciding whether the code runs)
+and the branching site (the execution logic deciding what the code does once it arrives).
+Updating only the admitting site creates a false sense of completion
+while downstream code silently branches on invalid or empty default variables.
+
+Full statement: [`admitting-vs-branching-site`](admitting-vs-branching-site.md).
+Operationalized by:
+[`fail-fast`](fail-fast.md) (loud failures over silent branching fallbacks)
+and [`algorithmatize-checks`](../workflow/algorithmatize-checks.md) (testable execution scripts).
+
+## Don't take anyone's word for it --- independent verification and constructive pushback
+
+Never accept factual assertions, technical recommendations, or stated preferences blindly.
+Everyone makes mistakes --- all humans, all AI models, peer agents, coordinators, and domain experts alike.
+Always consider the possibility that any assertion may be mistaken, misinformed, outdated, or incomplete,
+and investigate that possibility independently through deterministic queries, source inspection, and clarifying questions.
+Push back constructively whenever you suspect an error or unsound reasoning.
+
+Full statement: [`dont-take-my-word-for-it`](dont-take-my-word-for-it.md).
+Operationalized by:
+[`metacognitive-monitoring`](../workflow/metacognitive-monitoring.md) (re-query state claims),
+[`challenge-the-assignment`](../workflow/challenge-the-assignment.md) (interrogate briefs and instructions),
+[`challenge-unnecessary-complexity`](../workflow/challenge-unnecessary-complexity.md),
+and [`fail-fast`](fail-fast.md).
 
 ## The 3Rs lens — reduce, reuse, recycle
 
@@ -389,6 +469,37 @@ The goal half fires only on the third occurrence, by which point
 recurrence is observed rather than predicted.
 Feeling both at once usually means the count is one or two, and the way
 out is to wait rather than to argue.
+
+Specific-beats-general governs precedence across the entire catalog:
+it resolves conflicts between layers by establishing that explicit user
+instructions outrank repository defaults, scoped subsystem configs
+outrank top-level policies, and specific types and handlers outrank
+generic fallbacks in code.
+
+Prefer-optionality-over-removal complements KISS, least-flexible-tool, and simplify:
+while least-flexible-tool guides authoring new code without speculative flexibility,
+and simplify/tidy prune dead or unreferenced code paths,
+prefer-optionality-over-removal protects active capabilities with legitimate callers
+from being deleted outright when a default behavior needs improvement.
+
+Think-outside-the-box operates on the problem space itself:
+while challenge-the-assignment questions what you are asked to do or told is true,
+think-outside-the-box inspects the structural and procedural limitations you assume
+bind the solution.
+It aids KISS by dissolving artificial boundaries that force complex workarounds,
+while respecting hard boundaries (security policies, permissions, and correctness invariants)
+that must not be circumvented.
+
+Admitting-vs-branching-site complements fail-fast and algorithmatize-checks:
+it prevents multi-site divergence when enabling new conditions or triggers,
+requiring both admission guards and downstream execution logic to be audited
+and verified with real execution fixtures rather than text-matching tests.
+
+Don't-take-my-word-for-it provides the overarching epistemic posture
+for the entire catalog: it mandates empirical verification over deference to authority,
+extending challenge-the-assignment (which focuses on task briefs) to all factual claims,
+recommendations, and assumptions, while leaning on deterministic-tools and
+algorithmatize-checks as the instruments of independent verification.
 
 The remaining principles serve the goals directly: least astonishment
 and self-documenting code serve readability the way modularity serves

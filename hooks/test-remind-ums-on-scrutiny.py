@@ -122,6 +122,11 @@ REMIND = [
     ([Q, WRONG, FIX_SHARED], "a corpus edit is not an explicit UMS pass"),
     ([UMS, Q, WRONG], "UMS before the correction does not count"),
     ([UMS, REVIEW], "UMS before the review-read does not count"),
+    # Flawed query / filter explanation after questioning (ai-config#2775).
+    ([Q, txt("It filtered discussion-level timestamps rather than every nested note.")],
+     "questioned then filtered ... rather than explanation"),
+    ([Q, txt("You are right. Note 14169 is an unresolved diff comment. My prior query missed it because it filtered discussion-level timestamps rather than every nested note.")],
+     "questioned then issue #2775 admission"),
 ]
 
 SILENT = [
@@ -152,6 +157,12 @@ SILENT = [
     ([TASK_VERDICT], "an adversarial-reviewer brief naming ### Verdict is not a review-read"),
     ([txt("I was wrong about this.")],
      "bare admission without a question is the sibling's case"),
+    ([Q, txt("The API filtered results by date rather than author.")],
+     "third-party filtered ... rather than in scrutiny turn"),
+    ([Q, txt("The commit filtered lines rather than files.")],
+     "commit filtered ... rather than (word ending in it)"),
+    ([Q, txt("The audit filtered results rather than users.")],
+     "audit filtered ... rather than (word ending in it)"),
     ([REVIEW], "placeholder -- replaced below for sidechain"),
 ]
 

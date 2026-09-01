@@ -1227,6 +1227,31 @@ Apply this in review too: error handling that hides failure is a review finding,
 
 [`shared/principles/fail-fast.md`](shared/principles/fail-fast.md)
 
+## Specific beats general
+
+When two instructions, policies, configurations, or design rules apply to the same decision, the narrower, more specific rule takes precedence over the broader, general one.
+Explicit human user instructions in a specific session override general repository defaults, narrow subsystem and file configs override repository-wide policies, and targeted types and condition handlers beat generic catch-alls in code.
+
+[`shared/principles/specific-beats-general.md`](shared/principles/specific-beats-general.md)
+
+## Think outside the box --- distinguish real from artificial limitations
+
+Do not make unnecessary assumptions about structural limitations;
+consider which limitations are real (hard architectural, mathematical, security, or physical bounds)
+and which are artificial (inherited conventions, unexamined defaults, or local scoping traps).
+When a task or design becomes awkward or overly complex, test the assumed constraints empirically
+and reframe or dissolve problems rather than building intricate workarounds inside an unnecessary box.
+
+[`shared/principles/think-outside-the-box.md`](shared/principles/think-outside-the-box.md)
+
+## Don't take anyone's word for it --- independent verification and constructive pushback
+
+Never accept factual assertions, technical recommendations, or stated preferences blindly.
+Everyone makes mistakes --- humans, AI models, peer agents, and experts alike.
+Always investigate assertions independently via deterministic queries, source inspection, or clarifying questions, and push back constructively whenever you suspect an error or unsound reasoning.
+
+[`shared/principles/dont-take-my-word-for-it.md`](shared/principles/dont-take-my-word-for-it.md)
+
 ## Coding: KISS is the umbrella principle
 
 Apply KISS to code and prose: use the simplest construct that does the job,
@@ -1340,6 +1365,11 @@ same weight as the other modularity checks above.
 
 <!-- Not yet shared with the lab manual; edit shared/coding/decompose-to-functions.md, not here. -->
 [shared/coding/decompose-to-functions.md](shared/coding/decompose-to-functions.md)
+
+## Coding: avoid catastrophic backtracking in regular expressions
+
+<!-- Not yet shared with the lab manual; edit shared/coding/regex-backtracking-pitfalls.md, not here. -->
+[`shared/coding/regex-backtracking-pitfalls.md`](shared/coding/regex-backtracking-pitfalls.md)
 
 ## Writing style: plain, direct prose
 

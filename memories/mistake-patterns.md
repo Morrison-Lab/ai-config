@@ -659,10 +659,18 @@ A clean automated review from every available provider evaluating the current HE
   In round 5 (`fbf50a69`), this had to be restored: `json.loads` resolves Unicode escapes (e.g. `"commit_sha": "\u0061bc1234..."`), so a payload with escaped characters matches the parsed SHA while escaping the raw substring disjuncts.
 - **Canonical Rule**: [`fact-check-code-logic.md`](../shared/coding/fact-check-code-logic.md) ("A subsumption proof over raw text must account for every transformation before claiming a disjunct is dead").
 - **Fix**: Construct adversarial test fixtures with escaped, decoded, or transformed representations to test whether raw text matching and structured value matching can diverge before deleting extraction logic.
+
+## Pattern 36: Unbounded Subset Overlap in Fuzzy Matching Defeating Negative Controls
+- **Do**: When implementing fuzzy or token-overlap matching to tolerate subtitles or minor variations, enforce length and density proportionality (e.g. bounded character/token length ratio or Jaccard similarity threshold) alongside token containment.
+- **Don't**: Accept full subset containment (`overlap_coef == 1.0`) of a short needle in a long haystack without bounding the relative lengths or densities;
+  a short 2-token title (e.g. "Causal Inference") is a 100% token subset of an arbitrarily long, unrelated review title (e.g. "A Review of Causal Inference Methods in Epidemiology and Public Health Policy"), defeating the tool's fabrication-detection purpose.
+- **Example**: 2026-08-31, `Morrison-Lab/ai-config` PR [#2797](https://github.com/Morrison-Lab/ai-config/pull/2797) (`scripts/check_doi_bib.py`): Round 1 implemented `fuzzy_match_title` with an `(overlap_coef == 1.0 and len(intersection) >= 1)` branch intended for subtitle variations.
+  Review identified that for short generic titles (2 tokens), this branch matched completely unrelated long review papers with a 1.0 score and classified fabricated citations as `MATCH`.
+  Fixed in round 2 by replacing the raw overlap with bounded Jaccard similarity and length proportionality (`jaccard >= 0.60 and len_ratio >= 0.60`), and adding negative control tests for short title containment.
+- **Canonical Rule**: [`fixtures-are-not-evidence.md`](../shared/workflow/fixtures-are-not-evidence.md) and [`fact-check-code-logic.md`](../shared/coding/fact-check-code-logic.md).
+- **Fix**: Require length ratio constraints and bounded Jaccard thresholds for fuzzy matching, and always test negative controls with short generic strings contained in long unrelated targets.
 - **Algorithmatizable?**
-  Partially.
-  Mutation testing with encoded/escaped representations detects unhandled
-  transformation divergences.
+  Yes --- unit test suites asserting negative control rejection of short subset inputs against long distractor strings.
 
 ## Pattern 35: Fixing the Admitting Site But Not the Branching Site
 - **Do**: When handling a new condition, trigger, or input case, verify both the **admitting site** (the gate deciding whether the code runs) and the **branching site** (the logic deciding what the code does once it runs).
@@ -698,4 +706,16 @@ A clean automated review from every available provider evaluating the current HE
 - **Algorithmatizable?**
   Yes;
   unit test suites for shell-parsing hooks must include fixtures combining arithmetic expansions, subshells, pipelines, and heredocs.
+
+## Pattern 37: Discrepancy Between Synthesis Count and Underlying Source Inventory
+- **Do**: Distinguish between the total number of referenced items/files in a source catalog and the count of synthesized/distilled items in your derived document or taxonomy.
+  Ensure summaries, index entries, and cross-references match the exact count in the file they describe.
+- **Don't**: Cite the source catalog's full size (e.g., "29 patterns") as the count of items in a derived taxonomy that only enumerates a subset (e.g., 20 core patterns).
+- **Example**: 2026-08-31, `Morrison-Lab/ai-config` PR [#2800](https://github.com/Morrison-Lab/ai-config/pull/2800): `memories/MEMORY.md` and `skills/find-ai-tells/SKILL.md` described `memories/ai-writing-patterns.md` as an "Empirical synthesis of 29 AI writing patterns", whereas the document's taxonomy enumerated 20 core categories distilled from the source repository's 29 research files.
+- **Canonical Rule**: [`check-info-quality`](../skills/check-info-quality/SKILL.md) and [`timestamp-volatile-claims.md`](../shared/writing/timestamp-volatile-claims.md).
+- **Fix**: Count the actual items in the produced document and verify that descriptions in indices and skills match that exact count.
+- **Algorithmatizable?**
+  Yes.
+  A linter can extract claims of the form `N <nouns>` in docstrings/index entries
+  and compare them against header or bullet counts in target files.
 

@@ -1,18 +1,18 @@
 ---
-name: "pre-push-review"
-description: "Run local adversarial AI code review."
+name: "rech"
+description: "\u2192 recm."
 ---
 
-# pre-push-review (Codex wrapper)
+# rech (Codex wrapper)
 
 This is a generated Codex wrapper around the canonical ai-config Claude skill.
 
-Source: [skills/pre-push-review/SKILL.md](../../skills/pre-push-review/SKILL.md)
+Source: [skills/rech/SKILL.md](../../skills/rech/SKILL.md)
 
 Before acting, read the source skill completely and follow its workflow, adapting it to Codex.
 
-The source lives at `skills/pre-push-review/SKILL.md` in the same ai-config checkout as this wrapper.
-If this wrapper was loaded through `${CODEX_HOME:-$HOME/.codex}/skills/pre-push-review`, resolve the symlink target for this wrapper directory first, then read `../../skills/pre-push-review/SKILL.md` relative to that real directory.
+The source lives at `skills/rech/SKILL.md` in the same ai-config checkout as this wrapper.
+If this wrapper was loaded through `${CODEX_HOME:-$HOME/.codex}/skills/rech`, resolve the symlink target for this wrapper directory first, then read `../../skills/rech/SKILL.md` relative to that real directory.
 Do not resolve that relative path from inside `${CODEX_HOME:-$HOME/.codex}/skills`, because it points back at the wrapper tree.
 
 - Treat `user-invocable` and `allowed-tools` as Claude metadata, not Codex permissions.

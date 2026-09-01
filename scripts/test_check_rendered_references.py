@@ -4,7 +4,7 @@
 Verifies detection of broken rendered cross-references (?@...), missing citations
 (<strong>key?</strong>, **key?**), and unprocessed citations ([@key]), while
 verifying that valid markdown footnote references ([^1], [^note]) and definitions
-([^1]: ...) do not produce false warnings (ai-config#2566).
+([^1]: ...) do not produce false warnings (ai-config#2879).
 """
 from __future__ import annotations
 

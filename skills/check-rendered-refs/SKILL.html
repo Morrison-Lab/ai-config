@@ -409,8 +409,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </tr>
 <tr class="odd">
 <td>Citation never processed (citeproc off / no <code>bibliography:</code>)</td>
-<td>raw <code>[@key]</code> or <code>@key</code> left in the body text</td>
-<td><code>[@</code> — heuristic, can match intentional literals</td>
+<td>raw <code>[@key]</code>, <code>[-@key]</code>, or <code>@key</code> left in the body text</td>
+<td><code>\[-?@</code> or <code>@key</code> — heuristic, can match intentional literals</td>
 </tr>
 </tbody>
 </table>
@@ -434,17 +434,20 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="step-2a-scan-local-output-files" class="level2">
 <h2 class="anchored" data-anchor-id="step-2a-scan-local-output-files">Step 2a — Scan local output files</h2>
-<p>Grep the rendered files. <code>?@</code> is the primary signal; <code>-F</code> keeps <code>?</code> literal:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Primary: unresolved cross-references (and Quarto's unresolved-citation marker)</span></span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">grep</span> <span class="at">-rnoF</span> <span class="at">--include</span><span class="op">=</span><span class="st">'*.html'</span> <span class="st">'?@'</span> <span class="op">&lt;</span>output-dir<span class="op">&gt;</span></span>
+<p>Grep the rendered files or run the automated reference checker (<code>python3 scripts/check-rendered-references.py &lt;output-dir&gt;</code>). <code>?@</code> is the primary signal; <code>-F</code> keeps <code>?</code> literal:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Automated scanner (handles crossrefs, citations, and ignores valid footnotes)</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> scripts/check-rendered-references.py <span class="op">&lt;</span>output-dir<span class="op">&gt;</span></span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Secondary heuristic: missing citation key rendered bold with a trailing ?</span></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="co"># (the **key?** marker becomes &lt;strong&gt;key?&lt;/strong&gt; in HTML, so the greps</span></span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="co"># above miss it)</span></span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="fu">grep</span> <span class="at">-rnoE</span> <span class="at">--include</span><span class="op">=</span><span class="st">'*.html'</span> <span class="st">'&lt;strong&gt;[A-Za-z0-9_:.#-]+\?&lt;/strong&gt;'</span> <span class="op">&lt;</span>output-dir<span class="op">&gt;</span></span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Secondary heuristic: raw citation syntax left in the body</span></span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="fu">grep</span> <span class="at">-rnoE</span> <span class="at">--include</span><span class="op">=</span><span class="st">'*.html'</span> <span class="st">'\[@[A-Za-z0-9_:.#-]+'</span> <span class="op">&lt;</span>output-dir<span class="op">&gt;</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Primary: unresolved cross-references (and Quarto's unresolved-citation marker)</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="fu">grep</span> <span class="at">-rnoF</span> <span class="at">--include</span><span class="op">=</span><span class="st">'*.html'</span> <span class="st">'?@'</span> <span class="op">&lt;</span>output-dir<span class="op">&gt;</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Secondary heuristic: missing citation key rendered bold with a trailing ?</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="co"># (the **key?** marker becomes &lt;strong&gt;key?&lt;/strong&gt; in HTML, so the greps</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="co"># above miss it)</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="fu">grep</span> <span class="at">-rnoE</span> <span class="at">--include</span><span class="op">=</span><span class="st">'*.html'</span> <span class="st">'&lt;strong&gt;[A-Za-z0-9_:.#-]+\?&lt;/strong&gt;'</span> <span class="op">&lt;</span>output-dir<span class="op">&gt;</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="co"># Secondary heuristic: raw citation syntax left in the body</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="fu">grep</span> <span class="at">-rnoE</span> <span class="at">--include</span><span class="op">=</span><span class="st">'*.html'</span> <span class="st">'\[-?@[A-Za-z0-9_:.#-]+'</span> <span class="op">&lt;</span>output-dir<span class="op">&gt;</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>For each <code>?@…</code> hit, pull the surrounding text so the report is actionable:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">grep</span> <span class="at">-rnE</span> <span class="at">--include</span><span class="op">=</span><span class="st">'*.html'</span> <span class="st">'.{0,40}\?@[A-Za-z0-9_:.#-]+.{0,40}'</span> <span class="op">&lt;</span>output-dir<span class="op">&gt;</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Also covers PDF/docx when those are the rendered output — for PDF, extract text first (<code>pdftotext file.pdf - | grep -nF '?@'</code>); a broken crossref shows as <code>?@key</code> there too.</p>
@@ -482,6 +485,7 @@ with a trailing question mark (e.g. **key?**) or any raw '[@key]' text.")</code>
 <li>❌ Trusting a stale <code>_book/</code>/<code>_site/</code> — a fixed-in-source break can still show, and a new break can hide. Re-render when in doubt.</li>
 <li>❌ Scanning a deployed preview URL (Step 2b) without first confirming it was built from your commit. A <code>?@</code> hit on a page that predates your fix reads exactly like a fix that did not work. Grep the fetched page for a string only your commit introduced before reporting anything from it, per <a href="../../shared/writing/fact-check-prose.md"><code>fact-check-prose</code></a>’s “Confirm a rendered page carries your commit before reading anything off it”.</li>
 <li>❌ Reporting every <code>@</code>-containing string as a broken citation — <code>@handle</code>, emails, and code can match. <code>?@</code> is certain; <code>[@…]</code>/<code>@key</code> is heuristic.</li>
+<li>❌ Flagging valid markdown footnote references (<code>[^1]</code>, <code>[^note]</code>, <code>[^1]:</code>) as broken reference links or raw citations — footnotes are standard markdown syntax.</li>
 <li>❌ Dropping the <code>-F</code> (or escaping) so the shell/grep mangles <code>?@</code>.</li>
 </ul>
 

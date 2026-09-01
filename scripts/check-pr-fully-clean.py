@@ -1579,7 +1579,7 @@ def _is_exempt_findings_heading(
     AND the section body underneath it contains no unresolved severity-tagged, untagged, or blocking items.
 
     Exempts headings like '### Findings (non-blocking)', '### Findings (resolved)',
-    '### Findings from prior rounds — now resolved', '### Findings (addressed)', etc.
+    '### Findings from prior rounds --- now resolved', '### Findings (addressed)', etc.
     Does not exempt headings with unaddressed/unresolved or blocking signals, or
     sections containing unresolved blocking/severity-tagged/untagged items.
     """

@@ -2354,12 +2354,12 @@ def main() -> int:
               "### Findings: non-blocking\n\n- Suggestion: rename foo to bar\n\n"
               "### Verdict\nReady for merge\n")
           is None)
-    check("### Findings — non-blocking resolves (#2781)",
+    check("### Findings --- non-blocking resolves (#2781)",
           checker._unresolved_finding_pattern(
               "### Findings \u2014 non-blocking\n\n- Minor formatting note.\n\n"
               "### Verdict\nReady for merge\n")
           is None)
-    check("### Findings from prior rounds — now resolved resolves (#2781)",
+    check("### Findings from prior rounds --- now resolved resolves (#2781)",
           checker._unresolved_finding_pattern(
               "### Findings from prior rounds \u2014 now resolved\n\n"
               "- `foo()` crash was fixed in commit abc1234.\n\n"
@@ -2377,7 +2377,7 @@ def main() -> int:
               "- Fixed in abc1234\n\n"
               "### Verdict\nReady for merge\n")
           is None)
-    check("### Findings from previous rounds — now resolved resolves (#2781)",
+    check("### Findings from previous rounds --- now resolved resolves (#2781)",
           checker._unresolved_finding_pattern(
               "### Findings from previous rounds \u2014 now resolved\n\n"
               "- Resolved.\n\n"
@@ -2496,13 +2496,13 @@ def main() -> int:
               "- **[Defect]** scripts/x.py:10 is still failing and unresolved.\n\n"
               "### Verdict\nReady for merge\n")
           is not None)
-    check("Findings from prior rounds — now resolved citing resolved defect item resolves (#2781)",
+    check("Findings from prior rounds --- now resolved citing resolved defect item resolves (#2781)",
           checker._unresolved_finding_pattern(
               "### Findings from prior rounds \u2014 now resolved\n\n"
               "- **[Defect]** `foo()` crash was fixed in commit abc1234.\n\n"
               "### Verdict\nReady for merge\n")
           is None)
-    check("Findings from prior rounds — now resolved with still broken defect flags (#2781 regression)",
+    check("Findings from prior rounds --- now resolved with still broken defect flags (#2781 regression)",
           checker._unresolved_finding_pattern(
               "### Findings from prior rounds \u2014 now resolved\n\n"
               "- **[Defect]** `foo()` crash is still broken.\n\n"
@@ -2538,13 +2538,13 @@ def main() -> int:
               "- **[Defect]**: race condition should be fixed.\n\n"
               "### Verdict\nReady for merge\n")
           is not None)
-    check("Findings from prior rounds — now resolved with 'has been fixed' resolves (#2781)",
+    check("Findings from prior rounds --- now resolved with 'has been fixed' resolves (#2781)",
           checker._unresolved_finding_pattern(
               "### Findings from prior rounds \u2014 now resolved\n\n"
               "- **[Defect]** `foo()` crash has been fixed in commit abc1234.\n\n"
               "### Verdict\nReady for merge\n")
           is None)
-    check("Findings from prior rounds — now resolved with 'is now resolved' resolves (#2781)",
+    check("Findings from prior rounds --- now resolved with 'is now resolved' resolves (#2781)",
           checker._unresolved_finding_pattern(
               "### Findings from prior rounds \u2014 now resolved\n\n"
               "- **[Critical]** auth bypass is now resolved.\n\n"

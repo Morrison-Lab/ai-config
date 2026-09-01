@@ -20,6 +20,11 @@ from fences import strip_fences  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
+# Autolinks: <https://...>, <http://...>, <mailto:...>, etc.
+# These appear in plain markdown or inside HTML tags (e.g. <summary>See <https://example.com></summary>).
+AUTOLINK = re.compile(
+    r"<((?:[a-zA-Z][a-zA-Z0-9+.-]{1,31}:[^\s<>]+)|(?:[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}))>"
+)
 # Strip code regions first so link-shaped examples inside fences / backticks
 # (regexes, `[text](url)` snippets) aren't mistaken for real links.
 INLINE = re.compile(r"`[^`]*`")
@@ -40,7 +45,29 @@ checked = 0
 
 
 def is_external(target: str) -> bool:
-    return target.startswith(SKIP_PREFIXES) or "://" in target
+    return target.startswith(SKIP_PREFIXES) or "://" in target or "@" in target
+
+
+def extract_links(text: str) -> list[str]:
+    """Extract link targets from markdown text.
+
+    Captures standard inline links [text](url) and autolinks <scheme:url>
+    or <email>, including autolinks inside HTML tags (e.g. <summary>).
+    """
+    links: list[str] = []
+    for match in LINK.finditer(text):
+        target = match.group(1).strip()
+        if target.startswith("<") and target.endswith(">"):
+            target = target[1:-1].strip()
+        # drop a trailing `"title"` if present
+        target = target.split(" ", 1)[0]
+        if target:
+            links.append(target)
+    for match in AUTOLINK.finditer(text):
+        target = match.group(1).strip()
+        if target:
+            links.append(target)
+    return links
 
 
 def check_file(md: Path) -> None:
@@ -48,12 +75,7 @@ def check_file(md: Path) -> None:
     text = md.read_text(encoding="utf-8")
     text = strip_fences(text)
     text = INLINE.sub("", text)
-    for match in LINK.finditer(text):
-        target = match.group(1).strip()
-        if target.startswith("<") and target.endswith(">"):
-            target = target[1:-1].strip()
-        # drop a trailing `"title"` if present
-        target = target.split(" ", 1)[0]
+    for target in extract_links(text):
         if not target or is_external(target):
             continue
         if "<" in target or ">" in target:

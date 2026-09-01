@@ -12,15 +12,29 @@ The full detection heuristic, confirmation checklist, and fix menu live in [`sha
 ## Procedure
 
 1.  **Identify the target.** A file, a PR/MR diff, or pasted prose that introduces new technical content.
-2.  **Grep for candidates** using the two patterns in [`informal-definitions.md`](../../shared/writing/informal-definitions.md#the-detection-heuristic) — a bolded term followed by defining language (`\eqdef`, “is the”, “=”), and a naming sentence ending “is:”/“are:” immediately before a display equation. Run both; each catches phrasing the other misses.
+
+2.  **Grep for candidates** using the two patterns in [`informal-definitions.md`](../../shared/writing/informal-definitions.md#the-detection-heuristic) — a bolded term followed by defining language (`\eqdef`, “is the”, “=”), and a naming sentence ending “is:”/“are:” immediately before a display equation. Run both; each catches phrasing the other misses:
+
+    ``` bash
+    # Pattern 1: bolded term followed by defining language
+    rg -n '\*\*[A-Za-z][a-zA-Z .-]{2,60}\*\*[^.]*(\\eqdef|is (defined|the)\b|=)' <file>
+    # Pattern 2: naming sentence ending with is: or are: before display math
+    rg -n '\bis:\s*$|\bare:\s*$' <file>
+    ```
+
 3.  **For each hit, find its enclosing div** (search backward for the nearest `:::{#...}` opener, forward for its matching closer). It’s a candidate if it sits in no formal-definition div at all, or if it sits inside a *different* concept’s div (riding along inside someone else’s definition).
+
 4.  **Confirm each candidate** against the checklist in the fragment: is it introducing something new (not just reusing an already-defined term)? Is it a practical/tool-usage aside rather than a theoretical concept? Is it part of a deliberately informal list? Is it actually cited downstream? Drop anything that fails the “new, theoretical, not-a-list, worth-citing” bar.
+
 5.  **Fix each confirmed finding**, per the fragment’s fix menu:
+
     - Wrap it in its own formal-definition div, with its own id and heading.
     - Give it its own worked example, immediately after — before any new theoretical claim builds on it.
     - Update anything that already depended on it informally to cite the new id explicitly.
     - If it was riding along inside a different concept’s div, split it out into its own div rather than leaving both sharing one id.
+
 6.  **Re-scan** the touched section after editing — a newly-added definition can itself introduce a forward reference (see `fix-forward-references`) if its worked example isn’t moved to sit right after it.
+
 7.  **Report.** For each finding: the term, its location, whether it had no div at all or was riding along inside another’s, the fix applied (new div id, new example, updated citations), and the diff.
 
 ## Relationship to other skills

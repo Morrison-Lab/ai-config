@@ -27,6 +27,41 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
 </style>
 
 
@@ -343,17 +378,26 @@ ul.task-list li input[type="checkbox"] {
 <section id="procedure" class="level2">
 <h2 class="anchored" data-anchor-id="procedure">Procedure</h2>
 <ol type="1">
-<li><strong>Identify the target.</strong> A file, a PR/MR diff, or pasted prose.</li>
-<li><strong>Grep for candidates</strong> using the heuristic in <a href="../../shared/writing/forward-references.md#the-detection-heuristic"><code>forward-references.md</code></a> — start with the bare directional word (below, later, following, subsequently, further down, next, afterward); use the narrower reference-cue-paired pattern as a higher-confidence secondary filter when the primary grep returns too many idiom hits.</li>
-<li><strong>Confirm each hit.</strong> Read the sentence: is it a genuine reference (not an idiom like “below average”), and does the target really come after the mention (not already earlier, just mis-worded)? Drop anything that fails either check.</li>
-<li><strong>Fix each confirmed forward reference</strong>, in order of preference:
+<li><p><strong>Identify the target.</strong> A file, a PR/MR diff, or pasted prose.</p></li>
+<li><p><strong>Grep for candidates</strong> using the heuristic in <a href="../../shared/writing/forward-references.md#the-detection-heuristic"><code>forward-references.md</code></a> — start with the bare directional word (below, later, following, subsequently, further down, next, afterward); use the narrower reference-cue-paired pattern as a higher-confidence secondary filter when the primary grep returns too many idiom hits:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Primary grep: directional words</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="ex">rg</span> <span class="at">-niE</span> <span class="st">'\b(below|later|following|subsequently|further down|next|afterward)\b'</span> <span class="op">&lt;</span>file<span class="op">&gt;</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Narrower secondary filter: cue paired with directional word</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="ex">rg</span> <span class="at">-niE</span> <span class="st">'(@[a-z0-9_-]+|section|figure|table|chapter)[^.]{0,60}\b(below|later|following|subsequently|further down|next|afterward)\b'</span> <span class="op">&lt;</span>file<span class="op">&gt;</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="ex">rg</span> <span class="at">-niE</span> <span class="st">'\b(below|later|following|subsequently|further down|next|afterward)\b[^.]{0,60}(@[a-z0-9_-]+|section|figure|table|chapter)'</span> <span class="op">&lt;</span>file<span class="op">&gt;</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Numbered procedural pointers (e.g. in sequential steps)</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="ex">rg</span> <span class="at">-niE</span> <span class="st">'\b(per|see|as in|described in|from) (step|item|point) [0-9]+'</span> <span class="op">&lt;</span>file<span class="op">&gt;</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div></li>
+<li><p><strong>Confirm each hit.</strong> Read the sentence: is it a genuine reference (not an idiom like “below average”), and does the target really come after the mention (not already earlier, just mis-worded)? Drop anything that fails either check.</p></li>
+<li><p><strong>Fix each confirmed forward reference</strong>, in order of preference:</p>
 <ul>
 <li><strong>Reorder</strong> — move the referenced section/paragraph/div/figure/table earlier so it precedes the mention. Update the directional word (“below” → “above”) or drop it once a working crossref link carries the point.</li>
 <li><strong>Reword</strong> — only when reordering would break the document’s narrative logic. Replace the vague pointer with a precise, working link/crossref instead of leaving a bare “below”.</li>
 <li><strong>Leave it</strong> when the mention is a deliberate roadmap/overview preview (see the fragment’s “roadmap exception”) — not every forward-pointing sentence is a defect.</li>
 </ul></li>
-<li><strong>Re-scan</strong> the touched section after editing to confirm no new forward reference was introduced by the reordering itself (e.g., a paragraph that used to follow the moved content and referenced it backward now needs the opposite fix).</li>
-<li><strong>Report.</strong> For each finding: the phrase, its location, whether it was fixed by reordering or rewording (or left, with why), and the diff.</li>
+<li><p><strong>Re-scan</strong> the touched section after editing to confirm no new forward reference was introduced by the reordering itself (e.g., a paragraph that used to follow the moved content and referenced it backward now needs the opposite fix).</p></li>
+<li><p><strong>Report.</strong> For each finding: the phrase, its location, whether it was fixed by reordering or rewording (or left, with why), and the diff.</p></li>
 </ol>
 </section>
 <section id="relationship-to-other-skills" class="level2">

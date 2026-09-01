@@ -27,6 +27,41 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
 </style>
 
 
@@ -342,19 +377,23 @@ ul.task-list li input[type="checkbox"] {
 <section id="procedure" class="level2">
 <h2 class="anchored" data-anchor-id="procedure">Procedure</h2>
 <ol type="1">
-<li><strong>Identify the target.</strong> A file, a PR/MR diff, or pasted prose that introduces new technical content.</li>
-<li><strong>Grep for candidates</strong> using the two patterns in <a href="../../shared/writing/informal-definitions.md#the-detection-heuristic"><code>informal-definitions.md</code></a> — a bolded term followed by defining language (<code>\eqdef</code>, “is the”, “=”), and a naming sentence ending “is:”/“are:” immediately before a display equation. Run both; each catches phrasing the other misses.</li>
-<li><strong>For each hit, find its enclosing div</strong> (search backward for the nearest <code>:::{#...}</code> opener, forward for its matching closer). It’s a candidate if it sits in no formal-definition div at all, or if it sits inside a <em>different</em> concept’s div (riding along inside someone else’s definition).</li>
-<li><strong>Confirm each candidate</strong> against the checklist in the fragment: is it introducing something new (not just reusing an already-defined term)? Is it a practical/tool-usage aside rather than a theoretical concept? Is it part of a deliberately informal list? Is it actually cited downstream? Drop anything that fails the “new, theoretical, not-a-list, worth-citing” bar.</li>
-<li><strong>Fix each confirmed finding</strong>, per the fragment’s fix menu:
+<li><p><strong>Identify the target.</strong> A file, a PR/MR diff, or pasted prose that introduces new technical content.</p></li>
+<li><p><strong>Grep for candidates</strong> using the two patterns in <a href="../../shared/writing/informal-definitions.md#the-detection-heuristic"><code>informal-definitions.md</code></a> — a bolded term followed by defining language (<code>\eqdef</code>, “is the”, “=”), and a naming sentence ending “is:”/“are:” immediately before a display equation. Run both; each catches phrasing the other misses:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Pattern 1: bolded term followed by defining language</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="ex">rg</span> <span class="at">-n</span> <span class="st">'\*\*[A-Za-z][a-zA-Z .-]{2,60}\*\*[^.]*(\\eqdef|is (defined|the)\b|=)'</span> <span class="op">&lt;</span>file<span class="op">&gt;</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Pattern 2: naming sentence ending with is: or are: before display math</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="ex">rg</span> <span class="at">-n</span> <span class="st">'\bis:\s*$|\bare:\s*$'</span> <span class="op">&lt;</span>file<span class="op">&gt;</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div></li>
+<li><p><strong>For each hit, find its enclosing div</strong> (search backward for the nearest <code>:::{#...}</code> opener, forward for its matching closer). It’s a candidate if it sits in no formal-definition div at all, or if it sits inside a <em>different</em> concept’s div (riding along inside someone else’s definition).</p></li>
+<li><p><strong>Confirm each candidate</strong> against the checklist in the fragment: is it introducing something new (not just reusing an already-defined term)? Is it a practical/tool-usage aside rather than a theoretical concept? Is it part of a deliberately informal list? Is it actually cited downstream? Drop anything that fails the “new, theoretical, not-a-list, worth-citing” bar.</p></li>
+<li><p><strong>Fix each confirmed finding</strong>, per the fragment’s fix menu:</p>
 <ul>
 <li>Wrap it in its own formal-definition div, with its own id and heading.</li>
 <li>Give it its own worked example, immediately after — before any new theoretical claim builds on it.</li>
 <li>Update anything that already depended on it informally to cite the new id explicitly.</li>
 <li>If it was riding along inside a different concept’s div, split it out into its own div rather than leaving both sharing one id.</li>
 </ul></li>
-<li><strong>Re-scan</strong> the touched section after editing — a newly-added definition can itself introduce a forward reference (see <code>fix-forward-references</code>) if its worked example isn’t moved to sit right after it.</li>
-<li><strong>Report.</strong> For each finding: the term, its location, whether it had no div at all or was riding along inside another’s, the fix applied (new div id, new example, updated citations), and the diff.</li>
+<li><p><strong>Re-scan</strong> the touched section after editing — a newly-added definition can itself introduce a forward reference (see <code>fix-forward-references</code>) if its worked example isn’t moved to sit right after it.</p></li>
+<li><p><strong>Report.</strong> For each finding: the term, its location, whether it had no div at all or was riding along inside another’s, the fix applied (new div id, new example, updated citations), and the diff.</p></li>
 </ol>
 </section>
 <section id="relationship-to-other-skills" class="level2">

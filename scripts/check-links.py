@@ -16,10 +16,13 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
-from fences import strip_fences  # noqa: E402
+from fences import strip_fences, strip_indented_code_blocks  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
+AUTOLINK = re.compile(
+    r"<((?:[a-zA-Z][a-zA-Z0-9+.-]*:[^\s<>]+)|(?:[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}))>"
+)
 # Strip code regions first so link-shaped examples inside fences / backticks
 # (regexes, `[text](url)` snippets) aren't mistaken for real links.
 INLINE = re.compile(r"`[^`]*`")
@@ -33,27 +36,52 @@ SCAN_GLOBS = [
     "shared/**/*.md",
     "*.md",
 ]
-SKIP_PREFIXES = ("http://", "https://", "mailto:", "tel:", "#")
+SKIP_PREFIXES = ("http://", "https://", "mailto:", "tel:", "ftp://", "#")
+EMAIL_RE = re.compile(
+    r"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+)
 
 broken: list[str] = []
 checked = 0
 
 
 def is_external(target: str) -> bool:
-    return target.startswith(SKIP_PREFIXES) or "://" in target
+    return (
+        target.startswith(SKIP_PREFIXES)
+        or "://" in target
+        or bool(EMAIL_RE.match(target))
+    )
 
 
-def check_file(md: Path) -> None:
-    global checked
-    text = md.read_text(encoding="utf-8")
+def extract_targets(text: str) -> list[str]:
     text = strip_fences(text)
+    text = strip_indented_code_blocks(text)
     text = INLINE.sub("", text)
+    targets: list[str] = []
     for match in LINK.finditer(text):
         target = match.group(1).strip()
         if target.startswith("<") and target.endswith(">"):
             target = target[1:-1].strip()
         # drop a trailing `"title"` if present
         target = target.split(" ", 1)[0]
+        if target:
+            targets.append(target)
+    text_no_links = LINK.sub("", text)
+    for match in AUTOLINK.finditer(text_no_links):
+        target = match.group(1).strip()
+        if target:
+            targets.append(target)
+    return targets
+
+
+def check_file(md: Path, root: Path | None = None) -> list[str]:
+    global checked
+    if root is None:
+        root = ROOT
+    text = md.read_text(encoding="utf-8")
+    targets = extract_targets(text)
+    file_broken: list[str] = []
+    for target in targets:
         if not target or is_external(target):
             continue
         if "<" in target or ">" in target:
@@ -66,7 +94,10 @@ def check_file(md: Path) -> None:
         checked += 1
         resolved = (md.parent / path_part).resolve()
         if not resolved.exists():
-            broken.append(f"{md.relative_to(ROOT)} -> {target}")
+            entry = f"{md.relative_to(root)} -> {target}"
+            broken.append(entry)
+            file_broken.append(entry)
+    return file_broken
 
 
 def main() -> None:

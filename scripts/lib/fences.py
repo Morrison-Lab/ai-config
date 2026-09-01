@@ -26,6 +26,8 @@ FENCE_LINE = re.compile(
 CODE_SPAN_RE = re.compile(
     r"(?<!`)(`+)(?!`)(?:[^\n\r]|\r?\n(?![ \t]*\r?\n))*?(?<!`)\1(?!`)"
 )
+LIST_MARKER_RE = re.compile(r"^\s*(?:[-*+]|\d{1,9}[.)]|>)(?:\s|$)")
+
 
 
 def find_fence_spans(
@@ -107,6 +109,69 @@ def strip_fences(
     return "\n".join(out)
 
 
+def find_indented_code_block_lines(text: str) -> set[int]:
+    """Scan text line-by-line for CommonMark indented code blocks.
+
+    Indented code blocks are sequences of lines indented by >= 4 spaces
+    preceded by a blank line (or start of document), excluding indented
+    list items (e.g. `    - `, `    * `, `    1. `) and blockquotes.
+    """
+    lines = text.split("\n")
+    code_lines: set[int] = set()
+    pending_blank_lines: list[int] = []
+    in_code_block = False
+    prev_line_blank = True
+
+    for idx, line in enumerate(lines):
+        line_clean = line.rstrip("\r")
+        if not line_clean.strip():
+            if in_code_block:
+                pending_blank_lines.append(idx)
+            prev_line_blank = True
+            continue
+
+        expanded = line_clean.expandtabs(4)
+        indent_len = len(expanded) - len(expanded.lstrip(" "))
+        is_indented = indent_len >= 4
+
+        if in_code_block:
+            if is_indented:
+                code_lines.update(pending_blank_lines)
+                pending_blank_lines.clear()
+                code_lines.add(idx)
+                prev_line_blank = False
+            else:
+                in_code_block = False
+                pending_blank_lines.clear()
+                prev_line_blank = False
+        else:
+            if is_indented and prev_line_blank:
+                if not LIST_MARKER_RE.match(expanded):
+                    in_code_block = True
+                    code_lines.add(idx)
+            prev_line_blank = False
+
+    return code_lines
+
+
+def strip_indented_code_blocks(
+    text: str,
+    replacement: str = "",
+) -> str:
+    """Strip CommonMark indented code blocks from markdown text."""
+    lines = text.split("\n")
+    code_lines = find_indented_code_block_lines(text)
+    if not code_lines:
+        return text
+    out: list[str] = []
+    for idx, line in enumerate(lines):
+        if idx in code_lines:
+            out.append(replacement)
+        else:
+            out.append(line)
+    return "\n".join(out)
+
+
 def strip_code_spans(text: str, replacement: str = " ") -> str:
     """Strip inline code spans (`...`), bounded by blank lines."""
     return CODE_SPAN_RE.sub(replacement, text)
@@ -118,11 +183,16 @@ def strip_code(
     swallow_unclosed: bool = False,
     fence_replacement: str = "",
     span_replacement: str = " ",
+    strip_indented: bool = False,
 ) -> str:
-    """Strip fenced code blocks and inline code spans."""
+    """Strip fenced code blocks, inline code spans, and optionally indented code blocks."""
     stripped = strip_fences(
         text, swallow_unclosed=swallow_unclosed, replacement=fence_replacement
     )
+    if strip_indented:
+        stripped = strip_indented_code_blocks(
+            stripped, replacement=fence_replacement
+        )
     return strip_code_spans(stripped, replacement=span_replacement)
 
 
@@ -130,3 +200,4 @@ def count_unbalanced_fences(text: str) -> int:
     """Count unclosed / unbalanced fence markers in text."""
     _, unclosed_count, _ = find_fence_spans(text, swallow_unclosed=False)
     return unclosed_count
+

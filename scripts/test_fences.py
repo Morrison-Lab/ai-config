@@ -9,9 +9,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 from fences import (  # noqa: E402
     count_unbalanced_fences,
     find_fence_spans,
+    find_indented_code_block_lines,
     strip_code,
     strip_code_spans,
     strip_fences,
+    strip_indented_code_blocks,
 )
 
 passed = 0
@@ -119,6 +121,58 @@ doc_span_blank = "stray ` backtick\n\nreal prose\n\nclosing ` backtick"
 stripped_span_blank = strip_code_spans(doc_span_blank)
 check("code span stopped by blank line", "real prose" in stripped_span_blank)
 
+# 9. Indented code blocks vs 4-space lists
+doc_indented_code = """Prose before
+
+    def foo():
+        return 42
+
+Prose between
+
+    - list item 1
+    - list item 2
+    * bullet item
+    + plus item
+    1. numbered item
+    - [ ] task item unchecked
+    - [x] task item checked
+
+Prose after"""
+
+stripped_indented = strip_indented_code_blocks(doc_indented_code)
+check("indented code block is stripped", "def foo():" not in stripped_indented and "return 42" not in stripped_indented)
+check("prose before is preserved", "Prose before" in stripped_indented)
+check("prose between is preserved", "Prose between" in stripped_indented)
+check("4-space list item 1 is preserved", "    - list item 1" in stripped_indented)
+check("4-space list item 2 is preserved", "    - list item 2" in stripped_indented)
+check("4-space bullet item is preserved", "    * bullet item" in stripped_indented)
+check("4-space plus item is preserved", "    + plus item" in stripped_indented)
+check("4-space numbered item is preserved", "    1. numbered item" in stripped_indented)
+check("4-space task item unchecked is preserved", "    - [ ] task item unchecked" in stripped_indented)
+check("4-space task item checked is preserved", "    - [x] task item checked" in stripped_indented)
+check("prose after is preserved", "Prose after" in stripped_indented)
+
+# 10. Indented code block with blank line inside
+doc_indented_blank = """Intro
+
+    first line of code
+
+    second line of code after blank
+
+Outro"""
+stripped_indented_blank = strip_indented_code_blocks(doc_indented_blank)
+check("code before blank in block is stripped", "first line of code" not in stripped_indented_blank)
+check("code after blank in block is stripped", "second line of code" not in stripped_indented_blank)
+check("outro after code block is preserved", "Outro" in stripped_indented_blank)
+
+# 11. Lazy paragraph continuation is not a code block
+doc_lazy = """Paragraph text
+    indented continuation line
+still paragraph"""
+stripped_lazy = strip_indented_code_blocks(doc_lazy)
+check("lazy paragraph continuation without blank line is preserved", "indented continuation line" in stripped_lazy)
+
 print(f"\n{passed} passed, {failed} failed")
 if failed:
     sys.exit(1)
+

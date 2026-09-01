@@ -87,7 +87,21 @@ def resolve_diff(head_sha: str, pr_number: Optional[int] = None, explicit_base: 
 
     Always diffs the provided head_sha to include unpushed commits.
     """
-    base_ref = explicit_base
+    base_ref = ""
+    if explicit_base:
+        if explicit_base.startswith("origin/"):
+            cands = [explicit_base, explicit_base[len("origin/"): ]]
+        else:
+            cands = [f"origin/{explicit_base}", explicit_base]
+        for cand in cands:
+            r = subprocess.run(["git", "rev-parse", "--verify", cand], capture_output=True, text=True)
+            if r.returncode == 0:
+                base_ref = cand
+                break
+        if not base_ref:
+            log_error(f"Could not resolve explicit base reference '{explicit_base}'.")
+            sys.exit(1)
+
     if not base_ref and pr_number:
         pr_base = get_pr_base_branch(pr_number)
         if pr_base:
@@ -99,7 +113,20 @@ def resolve_diff(head_sha: str, pr_number: Optional[int] = None, explicit_base: 
                     break
 
     if not base_ref:
-        for cand in ["origin/main", "origin/master", "main", "master"]:
+        candidates = []
+        # Check origin HEAD symbolic ref (e.g. origin/main)
+        r_origin_head = subprocess.run(
+            ["git", "symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
+            capture_output=True,
+            text=True,
+        )
+        if r_origin_head.returncode == 0:
+            sym_ref = r_origin_head.stdout.strip()
+            if sym_ref:
+                candidates.append(sym_ref)
+
+        candidates.extend(["origin/main", "origin/master", "main", "master"])
+        for cand in candidates:
             r = subprocess.run(["git", "rev-parse", "--verify", cand], capture_output=True, text=True)
             if r.returncode == 0:
                 base_ref = cand
@@ -683,14 +710,14 @@ def run_antigravity_review(prompt: str, model: str = "", expected_commit_sha: st
     agy_path = resolve_engine_executable("agy")
     if not agy_path:
         return None
-
     if len(prompt.encode("utf-8")) > 800000:
         print("Notice: Prompt size exceeds ARG_MAX safe limit for Antigravity, skipping...", file=sys.stderr)
         return None
 
-    cmd = [agy_path, "--print", prompt]
+    cmd = [agy_path, "--print"]
     if model:
         cmd.extend(["--model", model])
+    cmd.append(prompt)
 
     label_suffix = f" (model: {model})" if model else ""
     print(f"Running local adversarial review via Google Antigravity (plan mode){label_suffix}...")
@@ -716,9 +743,10 @@ def run_claude_review(prompt: str, model: str = "", expected_commit_sha: str = "
     if not claude_path:
         return None
 
-    cmd = [claude_path, "--permission-mode", "plan", "--safe-mode", "--strict-mcp-config", "-p", "-"]
+    cmd = [claude_path, "--permission-mode", "plan", "--safe-mode", "--strict-mcp-config"]
     if model:
         cmd.extend(["--model", model])
+    cmd.extend(["-p", "-"])
 
     label_suffix = f" (model: {model})" if model else ""
     print(f"Running local adversarial review via Claude CLI (plan mode){label_suffix}...")
@@ -748,9 +776,10 @@ def run_cursor_review(prompt: str, model: str = "", expected_commit_sha: str = "
         print("Notice: Prompt size exceeds ARG_MAX safe limit for Cursor, skipping...", file=sys.stderr)
         return None
 
-    cmd = [cursor_path, "--print", prompt, "--mode", "plan", "--trust"]
+    cmd = [cursor_path, "--mode", "plan", "--trust"]
     if model:
         cmd.extend(["--model", model])
+    cmd.extend(["--print", prompt])
 
     label_suffix = f" (model: {model})" if model else ""
     print(f"Running local adversarial review via Cursor Agent (plan mode){label_suffix}...")
@@ -778,9 +807,10 @@ def run_codex_review(prompt: str, model: str = "", expected_commit_sha: str = ""
 
     label_suffix = f" (model: {model})" if model else " (ChatGPT quota)"
     print(f"Running local adversarial review via OpenAI Codex{label_suffix}...")
-    cmd = [codex_path, "exec", "-s", "read-only", "--skip-git-repo-check", "--ignore-user-config", "--ignore-rules", "--ephemeral", "-"]
+    cmd = [codex_path, "exec", "-s", "read-only", "--skip-git-repo-check", "--ignore-user-config", "--ignore-rules", "--ephemeral"]
     if model:
         cmd.extend(["-m", model])
+    cmd.append("-")
 
     try:
         res = subprocess.run(_prepare_subprocess_cmd(cmd), input=prompt, capture_output=True, text=True, timeout=360)
@@ -830,9 +860,10 @@ def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str =
         if agent_name.endswith(".md"):
             agent_name = agent_name[:-3]
 
-        cmd = [opencode_path, "run", "--agent", agent_name, "--pure", "Review the attached diff.", "--file", prompt_file]
+        cmd = [opencode_path, "run", "--agent", agent_name, "--pure"]
         if model:
             cmd.extend(["-m", model])
+        cmd.extend(["Review the attached diff.", "--file", prompt_file])
 
         res = subprocess.run(_prepare_subprocess_cmd(cmd), capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
@@ -1115,12 +1146,17 @@ def build_review_prompt(diff: str, ref_name: str, guidelines: str, head_sha: str
         f"Context: {branch_name} (diff against {ref_name})",
         f"Reviewed-Commit: {head_sha}",
         "Review Standards & Expectations:",
-        "1. Be adversarial: actively search for regressions, edge-case failures, schema mismatches, syntax errors, omitted instances, and breaking contract changes.",
-        "2. Do NOT rubber-stamp. Scrutinize whether any other files or callers suffer from identical bugs.",
-        "3. Review the code strictly on what the diff and codebase state, not on assumptions.",
-        "4. Structure your response strictly with:",
+        "1. Conduct two independent, rigorous review passes:",
+        "   (a) Detailed implementation defect audit: actively search for regressions, edge-case failures, schema mismatches, syntax errors, omitted instances, and breaking contract changes.",
+        "   (b) Holistic change assessment: evaluate the whole change against requirements, intent, cross-file and cross-module consistency, architectural coherence, integration points, regression risk, and validation completeness.",
+        "2. Review outputs MUST explicitly report both passes, even when one has no findings.",
+        "3. Do NOT rubber-stamp. Scrutinize whether any other files or callers suffer from identical bugs.",
+        "4. Review the code strictly on what the diff and codebase state, not on assumptions.",
+        "5. Structure your response strictly with:",
         "   - ### Summary Verdict",
         "     Verdict: Ready for merge (or Verdict: Needs work with concise reason)",
+        "   - ### Holistic Assessment",
+        "     (Explicit analysis of requirements, intent, architecture, cross-file consistency, integration, regression risk, and validation completeness; must be reported even when clean)",
         "   - ### Critical Findings",
         "     None. (or numbered list of blocking bugs / contract regressions)",
         "   - ### Observations & Non-Blocking Suggestions",

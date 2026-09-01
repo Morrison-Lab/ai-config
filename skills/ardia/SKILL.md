@@ -36,7 +36,7 @@ mutates a PR stays serial.
      one of those logins is among its `assignees`,
      or the user named the PR in the request;
      drop every other PR before doing anything else, and name the dropped ones in the report so the user can assign or name any they want driven.
-     "Every open PR" below means every PR that survives this filter.
+     "Every open PR" anywhere in this skill means every PR that survives this filter.
      A PR by another lab member, or by any other bot (Dependabot, a Copilot agent), is not driven, reviewed, or edited, however clean it looks (see `memories/reviewing-prs.md`, "Only work PRs I opened, am assigned to, or named, or a workflow opened";
      measured on `UCD-SERG/serodynamics` 2026-09-01, where the sweep drove four other authors' PRs before the correction arrived).
    - **Include drafts** (`isDraft: true`) unless another agent is actively driving one.

@@ -45,6 +45,10 @@ assert subject.authenticated_hosts("") == []
 # `glab api --paginate` writes for a multi-page REST response.
 assert subject.json_documents("[1, 2]") == [[1, 2]]
 assert subject.json_documents("[1, 2]\n[3]\n") == [[1, 2], [3]]
+# Real `glab api --paginate` writes the pages with NO separator (a bare
+# io.Copy per page), so the boundary a line-based decoder cannot see is
+# the one that matters.
+assert subject.json_documents("[1, 2][3]") == [[1, 2], [3]]
 assert subject.json_documents("") == []
 
 # glab_hosts, host_merge_requests, and poll_once end to end against a stub
@@ -74,7 +78,7 @@ with tempfile.TemporaryDirectory() as d:
             "    sys.stderr.write('invalid hostname' + chr(10))\n"
             "    sys.exit(1)\n"
             "if host == 'gitlab.com':\n"
-            "    sys.stdout.write('[{\"iid\": 1}, {\"iid\": 2}]\\n[{\"iid\": 3}]\\n')\n"
+            "    sys.stdout.write('[{\"iid\": 1}, {\"iid\": 2}][{\"iid\": 3}]')\n"
             "elif host == 'object.example.org':\n"
             "    sys.stdout.write('{\"message\": \"401 Unauthorized\"}')\n"
             "else:\n"
@@ -129,9 +133,9 @@ with tempfile.TemporaryDirectory() as d:
 # glab_hosts keeps the hosts that answered when `auth status --all` times
 # out on a later instance: the partial output is parsed, not discarded, and
 # the cut is reported so poll_once records it. The fixture carries BYTES,
-# which is what subprocess.run attaches to TimeoutExpired under text=True
-# (measured on CPython 3.11) -- a str fixture would leave a real timeout's
-# TypeError unseen.
+# which is what subprocess.run attaches to TimeoutExpired under text=True on
+# POSIX (measured on CPython 3.11; Windows attaches str) -- a str fixture
+# would leave a real POSIX timeout's TypeError unseen.
 real_run = subject.subprocess.run
 saved_glab = subject.GLAB_PATH
 try:

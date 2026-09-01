@@ -16,8 +16,8 @@ POLL_SECONDS = 120
 # every poll, ensure() reads the pid from it, and scripts/install-pr-monitor.py
 # stops the pid recorded in it -- renaming it would leave that daemon running
 # beside a second one, with both files surfaced whenever either changes.
-# Nothing reads
-# "kind". The file holds GitLab merge requests too; see poll_once().
+# Nothing reads "kind". The file holds GitLab merge requests too; see
+# poll_once().
 STATE_PATH = os.path.join(tempfile.gettempdir(), "claude-pr-monitors", "all-open-prs.json")
 IS_WINDOWS = os.name == "nt"
 
@@ -144,7 +144,7 @@ def json_documents(text):
 
 
 def glab_hosts():
-    """(hosts glab is logged in to, or None-or-text saying the list was cut short).
+    """(hosts, cut_short): hosts glab is logged in to, and None or text saying the list was cut short.
 
     An error when no host is logged in at all. `--all` covers every
     authenticated instance. Without it glab checks only the instance implied
@@ -176,9 +176,10 @@ def glab_hosts():
 
 
 def _captured_text(captured):
-    # subprocess.run attaches BYTES to TimeoutExpired even under text=True
-    # (measured on CPython 3.11), so the decode is what keeps a real timeout
-    # from raising TypeError out of the poll and killing the daemon.
+    # On POSIX subprocess.run attaches BYTES to TimeoutExpired even under
+    # text=True (measured on CPython 3.11; its Windows branch attaches str
+    # via communicate()), so the decode is what keeps a real timeout from
+    # raising TypeError out of the poll and killing the daemon.
     if captured is None:
         return ""
     return captured.decode(errors="replace") if isinstance(captured, bytes) else captured

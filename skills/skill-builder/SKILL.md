@@ -165,6 +165,10 @@ allowed-tools:               # real skill: list its tools. alias: mirror the can
   [`shared/workflow/skill-checklists.md`](../../shared/workflow/skill-checklists.md):
   add one only for repeatable, high-cost, mechanically verifiable failure
   modes. If the skill is mostly judgment/exploration, skip checklist boilerplate.
+- **Include reusable, copy-pasteable shell commands where useful.**
+  Instead of leaving procedural steps as abstract prose ("grep for X", "check CI logs", "query PRs"),
+  provide concrete, tested shell command snippets with realistic placeholders (e.g. `gh pr list ...`, `rg -niE ...`).
+  This ensures agents and users don't have to reformulate or debug command pipelines every time they execute the skill.
 - **Pair short names with spelled-out aliases.** When the canonical skill has an
   acronym/short name (`gi`, `sup`, `ums`, `dc`), also create the spelled-out
   alias dir (`grab-issue`, `send-upstream`, `update-memories-and-skills`) — and

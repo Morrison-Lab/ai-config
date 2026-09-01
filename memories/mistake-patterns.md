@@ -668,5 +668,6 @@ A clean automated review from every available provider evaluating the current HE
 - **Fix**: Mask arithmetic expansions (`ARITHMETIC = re.compile(r"\$\(\(.*?\)\)|\(\(.*?\)\)")`) and verify delimiter termination syntax before entering heredoc-stripping state;
   add regression test cases specifically covering arithmetic expressions preceding gated commands.
 - **Algorithmatizable?**
-  Yes; unit test suites for shell-parsing hooks must include fixtures combining arithmetic expansions, subshells, pipelines, and heredocs.
+  Yes;
+  unit test suites for shell-parsing hooks must include fixtures combining arithmetic expansions, subshells, pipelines, and heredocs.
 

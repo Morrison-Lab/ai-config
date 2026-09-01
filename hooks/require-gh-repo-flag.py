@@ -399,38 +399,6 @@ def mask_comments_and_arithmetic(command: str) -> str:
                 out.append("\n" if sc == "\n" else " ")
             continue
 
-        # Check for let / declare -i / local -i / typeset -i at command position
-        is_cmd_pos = (i == 0 or command[i - 1] in " \t\r\n;|&(`")
-        if is_cmd_pos:
-            m = re.match(r"^(?:let|declare\s+-[a-zA-Z]*i[a-zA-Z]*|local\s+-[a-zA-Z]*i[a-zA-Z]*|typeset\s+-[a-zA-Z]*i[a-zA-Z]*)\b", command[i:])
-            if m:
-                start = i
-                sub_sq = False
-                sub_dq = False
-                sub_escaped = False
-                while i < n:
-                    sc = command[i]
-                    if sub_escaped:
-                        sub_escaped = False
-                        i += 1
-                        continue
-                    if sc == "\\":
-                        sub_escaped = True
-                        i += 1
-                        continue
-                    if sc == "'" and not sub_dq:
-                        sub_sq = not sub_sq
-                    elif sc == '"' and not sub_sq:
-                        sub_dq = not sub_dq
-                    elif not sub_sq and not sub_dq:
-                        if sc in ";\n|&)`":
-                            break
-                    i += 1
-                span = command[start:i]
-                for sc in span:
-                    out.append("\n" if sc == "\n" else " ")
-                continue
-
         if c == "'":
             stack.append("SINGLE_QUOTE")
             out.append(c)

@@ -153,7 +153,7 @@ When the timer fires:
 This applies transitively to PR-driving
 workflows such as `gi`, `gii`, and `ardia`;
 only monitor PRs that pass `memories/reviewing-prs.md`'s scope test
-(opened by or assigned to the invoking user, named in the request, or opened
+(opened by or assigned to the invoking user, explicitly requested by name, or opened
 by a repository workflow),
 so the rule does not authorize changing someone else's work,
 and a claim comment does not bring another member's PR into scope.

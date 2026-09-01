@@ -722,7 +722,7 @@ A clean automated review from every available provider evaluating the current HE
 ## Pattern 38: Atomized Write Fan-Out on Shared Subsystems / Files
 - **Do**: Group cohesive syntax edge cases, parser rules, or multi-case features for the same file or subsystem into unified design specifications and consolidated pull requests.
 - **Don't**: Fan out 20+ parallel micro-issues and micro-PRs targeting isolated syntax permutations in the same source file, which generates massive CI thrashing, review quota exhaustion, merge conflict cascades, and duplicate authoring overhead before ultimately requiring a holistic rewrite.
-- **Example**: 2026-09-01 on `Morrison-Lab/ai-config` (Issues #2509, #2513–#2538):
+- **Example**: 2026-09-01 on `Morrison-Lab/ai-config`:
   Decomposing CommonMark link parsing in `scripts/check-links.py` into 26 separate micro-PRs (#2849–#2874) caused severe review quota exhaustion, merge collisions, and wasted authoring turns.
   The entire problem was ultimately solved by 3 holistic PRs ([#2836](https://github.com/Morrison-Lab/ai-config/pull/2836), [#2839](https://github.com/Morrison-Lab/ai-config/pull/2839), [#2843](https://github.com/Morrison-Lab/ai-config/pull/2843)),
   rendering all 26 micro-PRs redundant and superseded.

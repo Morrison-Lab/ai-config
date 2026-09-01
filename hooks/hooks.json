@@ -451,6 +451,18 @@
         ]
       },
       {
+        "matcher": "Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-fable-subagent.py\"",
+            "timeout": 10,
+            "script": "no-fable-subagent.py",
+            "why": "Denies an Agent/Task dispatch that names no `model` (the worker would silently inherit the session's model -- on a Fable session, a Fable subagent) or that names Fable without ALLOW_FABLE_SUBAGENT=1. User directive 2026-09-01: never spawn a subagent on Fable without explicit, specific permission (ai-config#2929; memory rule in #2924). Denies rather than warns because a warning fires as the forbidden worker starts, and a wrong deny costs one re-issued call with `model` set. Never emits permissionDecision: allow."
+          }
+        ]
+      },
+      {
         "matcher": "Agent",
         "hooks": [
           {

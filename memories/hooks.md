@@ -73,6 +73,7 @@ Blocking hooks deny execution (exit code 2), while warning hooks emit actionable
 | Hook Script | Matcher | Type | Trigger / Purpose | Proactive Compliance Rule |
 |---|---|---|---|---|
 | [`flag-unassigned-worktree.py`](../hooks/flag-unassigned-worktree.py) | `Agent` | Warn | Warns when a write-capable subagent is launched without worktree isolation. | Specify `isolation: "worktree"` (or workspace branch) when launching subagents that perform file modifications. |
+| [`no-fable-subagent.py`](../hooks/no-fable-subagent.py) | `Agent`, `Task` | Deny | Denies a subagent dispatch that names no `model` (it would inherit the session's model, so on a Fable session a Fable worker) or that names Fable without `ALLOW_FABLE_SUBAGENT=1` (user directive 2026-09-01, ai-config#2929). | Pass `model` on every `Agent` call: `sonnet`/`haiku` for mechanical work, `opus` for judgment-heavy work; never `fable` unless the user granted that dispatch in their own words, and then set the override and say which words granted it. |
 | [`remind-brief-premises.py`](../hooks/remind-brief-premises.py) | `Agent`, `Task`, `SendMessage` | Warn / Reminder | Reminds when subagent briefs assert corpus facts or file counts not derived in the session. | Include verified derivation commands or concrete file paths in subagent briefs rather than unverified assertions. |
 
 ### 2.3 MCP Tool Interceptors (`mcp__github__.*`)

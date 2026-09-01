@@ -119,6 +119,9 @@ jobs:
       - name: Run markdown fences library tests
         # ai-config#2540: scripts/lib/fences.py code block and code span parsing.
         run: python3 scripts/test_fences.py
+      - name: Run check-rendered-references tests
+        # ai-config#2566: verify broken rendered reference checking and footnote isolation.
+        run: python3 scripts/test_check_rendered_references.py
       - name: Check that all scripts/test_*.py test suites are gated
         # ai-config#2540: verify every test suite in scripts/ is gated in CI.
         run: python3 scripts/check-test-suites-covered.py

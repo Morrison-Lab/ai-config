@@ -68,9 +68,13 @@ and can show a break already fixed in source.
 
 ## Step 2a — Scan local output files
 
-Grep the rendered files. `?@` is the primary signal; `-F` keeps `?` literal:
+Grep the rendered files or run the automated reference checker (`python3 scripts/check-rendered-references.py <output-dir>`).
+`?@` is the primary signal; `-F` keeps `?` literal:
 
 ```bash
+# Automated scanner (handles crossrefs, citations, and ignores valid footnotes)
+python3 scripts/check-rendered-references.py <output-dir>
+
 # Primary: unresolved cross-references (and Quarto's unresolved-citation marker)
 grep -rnoF --include='*.html' '?@' <output-dir>
 
@@ -162,4 +166,6 @@ underlying `.qmd` is a normal edit the user can ask for next (or hand to
   rendered page carries your commit before reading anything off it".
 - ❌ Reporting every `@`-containing string as a broken citation — `@handle`,
   emails, and code can match. `?@` is certain; `[@…]`/`@key` is heuristic.
+- ❌ Flagging valid markdown footnote references (`[^1]`, `[^note]`, `[^1]:`) as
+  broken reference links or raw citations — footnotes are standard markdown syntax.
 - ❌ Dropping the `-F` (or escaping) so the shell/grep mangles `?@`.

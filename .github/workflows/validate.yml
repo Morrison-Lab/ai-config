@@ -25,6 +25,8 @@ jobs:
         run: python3 scripts/validate-skills.py
       - name: Check markdown links
         run: python3 scripts/check-links.py
+      - name: Run check-links tests
+        run: python3 scripts/test_check_links.py
       - name: Check ASCII punctuation in source files
         # ai-config#2550: ensure .py and .R source files obey the ASCII punctuation policy.
         run: python3 scripts/check-ascii-punctuation.py

@@ -387,7 +387,7 @@ Worked-example case records for the rules below live in
    - **Don't:** resolve a same-name disagreement by workflow name.
      On this shape both runs carry the same one.
 
-   (Measured 2026-08-22 on [ai-config#1884](https://github.com/Morrison-Lab/ai-config/pull/1884).
+   (Measured 2026-08-21 on [ai-config#1884](https://github.com/Morrison-Lab/ai-config/pull/1884).
    Run `32545283504` (`event=push`) and run `32545289903` (`event=pull_request`) both had `head_sha=8c456074`, both were named `new-line-breaks / check-new-line-breaks`, and they concluded `success` and `failure` respectively.
    The push run was read first and taken as the verdict.
    The PR run was the one carrying four real findings.)

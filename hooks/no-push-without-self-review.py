@@ -1378,7 +1378,6 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
     saw_reviewer_call = False
     verdict: str | None = None
     reviewed_commit: str | None = None
-    is_reviewer_transcript = False
 
     with open(transcript_path, "r", encoding="utf-8", errors="ignore") as f:
         for line in f:
@@ -1395,14 +1394,6 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
             record_is_reviewer = _is_reviewer_record(record)
             if record_is_reviewer:
                 saw_reviewer_call = True
-                is_reviewer_transcript = True
-
-            if record_is_reviewer or (is_reviewer_transcript and (
-                record.get("type") == "assistant"
-                or (isinstance(record.get("message"), dict)
-                    and record["message"].get("role") == "assistant")
-                or record.get("source") == "MODEL"
-            )):
                 content_text = _result_text(
                     record.get("message") if isinstance(record.get("message"), dict) else record
                 )
@@ -1433,7 +1424,7 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                             call_id = b.get("id")
                             if isinstance(call_id, str) and call_id:
                                 reviewer_call_ids.add(call_id)
-                    elif tool_name == "send_message" and (record_is_reviewer or is_reviewer_transcript):
+                    elif tool_name == "send_message" and record_is_reviewer:
                         inp = b.get("input") or {}
                         msg_text = str(inp.get("Message") or inp.get("message") or "")
                         if msg_text:

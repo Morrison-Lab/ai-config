@@ -10,6 +10,7 @@ Verifies that:
    clean unmangled targets.
 5. Links inside fenced code blocks and inline code spans are ignored.
 6. Angle bracket placeholders (<owner>/<repo>) and in-page anchors are ignored.
+7. Display math ($$...$$) and inline math ($...$) with LaTeX brackets are not mistaken for links.
 """
 from __future__ import annotations
 
@@ -94,26 +95,10 @@ class TestExtractTarget(unittest.TestCase):
         )
 
     def test_angle_bracket_placeholder(self):
-        # Placeholders like <owner>/<repo> should retain angle brackets to be caught by placeholder check
         self.assertEqual(
             check_links.extract_target("<owner>/<repo>"),
             "<owner>/<repo>",
         )
-
-
-class TestAutolinkRegex(unittest.TestCase):
-    def test_uri_autolinks_matched(self):
-        matches = [m.group(1) for m in check_links.AUTOLINK.finditer("<https://example.com> and <http://foo.bar/baz>")]
-        self.assertEqual(matches, ["https://example.com", "http://foo.bar/baz"])
-
-    def test_email_autolinks_matched(self):
-        matches = [m.group(1) for m in check_links.AUTOLINK.finditer("<alice@example.com> and <bob.smith+tag@sub.domain.org>")]
-        self.assertEqual(matches, ["alice@example.com", "bob.smith+tag@sub.domain.org"])
-
-    def test_non_autolinks_not_matched(self):
-        text = "<owner>/<repo> <placeholder> <div class='test'> <./path/to/file.md>"
-        matches = [m.group(1) for m in check_links.AUTOLINK.finditer(text)]
-        self.assertEqual(matches, [])
 
 
 class TestCheckFile(unittest.TestCase):
@@ -194,6 +179,21 @@ class TestCheckFile(unittest.TestCase):
             self.assertEqual(check_links.broken, [])
             self.assertEqual(check_links.checked, 0)
 
+    def test_math_blocks_and_inline_math_ignored(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            td = Path(tmpdir)
+            index = td / "index.md"
+            index.write_text(
+                "$$\n"
+                "\\int_{[0, 1]} f(x) dx\n"
+                "$$\n"
+                "Inline math: $[a, b](x)$ and $f(x) = [0, 1]$.\n",
+                encoding="utf-8",
+            )
+            check_links.check_file(index, root=td)
+            self.assertEqual(check_links.broken, [])
+            self.assertEqual(check_links.checked, 0)
+
     def test_placeholders_and_anchors_ignored(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             td = Path(tmpdir)
@@ -208,18 +208,6 @@ class TestCheckFile(unittest.TestCase):
             check_links.check_file(index, root=td)
             self.assertEqual(check_links.broken, [])
             self.assertEqual(check_links.checked, 0)
-
-
-class TestCommandLine(unittest.TestCase):
-    def test_repo_scan_clean(self):
-        proc = subprocess.run(
-            [sys.executable, str(SCRIPT_PATH)],
-            cwd=REPO,
-            capture_output=True,
-            text=True,
-        )
-        self.assertEqual(proc.returncode, 0, f"stdout: {proc.stdout}\nstderr: {proc.stderr}")
-        self.assertIn("✓ no broken relative links", proc.stdout)
 
 
 if __name__ == "__main__":

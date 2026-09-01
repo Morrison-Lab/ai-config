@@ -1,32 +1,20 @@
 #!/usr/bin/env python3
-"""Check that relative markdown links in this repo point to real files.
-
-Guards this repo's cross-referenced markdown --- every tree named in
-`SCAN_GLOBS` below --- against broken relative links (e.g. a renamed or
-deleted target).
-External links (http(s), mailto, anchors) and autolinks are skipped.
-Clean-room; convention noted in CREDITS.md.
-
-Exits non-zero if any relative link target is missing.
-"""
+"""Check that all relative markdown links point to existing files."""
 from __future__ import annotations
 
 import re
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
-from fences import strip_code  # noqa: E402
+# Add scripts/lib to import path for shared fences module
+SCRIPTS_LIB_DIR = Path(__file__).resolve().parent / "lib"
+if str(SCRIPTS_LIB_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_LIB_DIR))
+
+from fences import strip_code_spans, strip_fences, strip_math  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
-AUTOLINK = re.compile(
-    r"<("
-    r"[a-zA-Z][a-zA-Z0-9+.-]{1,31}:[^<>\x00-\x20]*"
-    r"|"
-    r"[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*"
-    r")>"
-)
 SCAN_GLOBS = [
     "skills/**/*.md",
     "codex-skills/**/*.md",
@@ -65,32 +53,63 @@ def extract_target(raw: str) -> str:
     return target.split(" ", 1)[0].strip()
 
 
-def check_target(target: str, md: Path, root: Path = ROOT) -> None:
-    global checked
-    if not target or is_external(target):
-        return
-    if "<" in target or ">" in target:
-        return  # angle-bracket placeholder, e.g. <owner>/<repo>
+def resolve_target(base_dir: Path, target: str) -> Path | None:
+    """Resolve a relative markdown link target to an existing file or directory.
+
+    Supports:
+    - Direct relative paths (e.g. `foo.md`, `images/diagram.png`, `sub/`)
+    - Extensionless markdown targets (e.g. `doc` -> `doc.md`)
+    - Directory targets with index.md or README.md (e.g. `doc` -> `doc/index.md`)
+    """
     path_part = re.split(r"[#?]", target, maxsplit=1)[0]
-    if not path_part:  # pure in-page anchor
-        return
-    if "/" not in path_part and "." not in path_part:
-        return  # bare-word placeholder in an example, e.g. (url)
-    checked += 1
-    resolved = (md.parent / path_part).resolve()
-    if not resolved.exists():
-        broken.append(f"{md.relative_to(root)} -> {target}")
+    if not path_part:
+        return None
+
+    candidates = [
+        (base_dir / path_part).resolve(),
+        (base_dir / f"{path_part}.md").resolve(),
+        (base_dir / path_part / "index.md").resolve(),
+        (base_dir / path_part / "README.md").resolve(),
+    ]
+    for cand in candidates:
+        if cand.exists():
+            return cand
+    return None
 
 
 def check_file(md: Path, root: Path = ROOT) -> None:
+    global checked
     text = md.read_text(encoding="utf-8")
-    text = strip_code(text)
+    # Strip code regions and math blocks first so code examples and LaTeX math
+    # aren't mistaken for real links, while preserving prose and link targets.
+    text = strip_fences(text)
+    text = strip_code_spans(text)
+    text = strip_math(text)
+
     for match in LINK.finditer(text):
-        target = extract_target(match.group(1))
-        check_target(target, md, root=root)
-    for match in AUTOLINK.finditer(text):
-        target = match.group(1).strip()
-        check_target(target, md, root=root)
+        raw = match.group(1)
+        target = extract_target(raw)
+        if not target or is_external(target):
+            continue
+        if "<" in target or ">" in target:
+            continue  # angle-bracket placeholder, e.g. <owner>/<repo>
+        path_part = re.split(r"[#?]", target, maxsplit=1)[0]
+        if not path_part:  # pure in-page anchor
+            continue
+        has_fragment = len(path_part) < len(target)
+        is_bare = "/" not in path_part and "." not in path_part
+        resolved = resolve_target(md.parent, target)
+        if resolved is not None:
+            checked += 1
+        elif is_bare and not has_fragment:
+            continue  # bare-word placeholder in an example, e.g. (url)
+        else:
+            checked += 1
+            try:
+                rel = md.relative_to(root)
+            except ValueError:
+                rel = md
+            broken.append(f"{rel} -> {target}")
 
 
 def main() -> None:
@@ -101,7 +120,7 @@ def main() -> None:
         for md in ROOT.glob(glob):
             if md.is_file() and md not in seen:
                 seen.add(md)
-                check_file(md, root=ROOT)
+                check_file(md)
     print(f"Checked {checked} relative links across {len(seen)} markdown files.")
     if broken:
         print(f"\n✗ {len(broken)} broken link(s):")

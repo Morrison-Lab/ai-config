@@ -1227,6 +1227,10 @@ The fragment carries the rest: taking the inventory from gha's README table rath
 
 [shared/principles/dont-incur-technical-debt.md](shared/principles/dont-incur-technical-debt.md)
 
+## Dead code is technical debt
+
+[shared/principles/dead-code-is-tech-debt.md](shared/principles/dead-code-is-tech-debt.md)
+
 ## Fail fast — no silent failures
 
 Detect bad state early and stop with a clear error rather than proceeding on it; never swallow an error into a silent fallback (a bare `except:`, a `tryCatch` returning `NULL`, a shell `|| true`), and make any genuinely wanted fallback explicit, bounded, and observable.

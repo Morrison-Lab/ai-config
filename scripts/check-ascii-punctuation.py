@@ -361,7 +361,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         "-e",
         type=str,
         default=None,
-        help="Comma-separated file extensions to scan (default: .py,.R,.qmd in tree mode; .py,.R,.qmd,.md,.sh,.yml,.yaml in diff mode)",
+        help="Comma-separated file extensions to scan (default: .py,.R in tree mode; .py,.R,.qmd,.md,.sh,.yml,.yaml in diff mode)",
     )
     parser.add_argument(
         "--fail-if-empty",

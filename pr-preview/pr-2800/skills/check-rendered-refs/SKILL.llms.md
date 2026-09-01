@@ -19,7 +19,7 @@ The canonical example: a `@def-coef-interp-procedure` reference with no matching
 |----|----|----|
 | Cross-reference with no target (`@fig-x`, `@def-x`, `@sec-x`, …) | literal `?@x` in the body (often `**?@x**`) | `?@` — **rock-solid, Quarto-specific** |
 | Citation key absent from the bibliography | the key in bold with a trailing `?`: `**key?**` → renders **key?**; render log warns `Citeproc: citation key not found` | bold-with-`?` is heuristic — confirm against the log |
-| Citation never processed (citeproc off / no `bibliography:`) | raw `[@key]` or `@key` left in the body text | `[@` — heuristic, can match intentional literals |
+| Citation never processed (citeproc off / no `bibliography:`) | raw `[@key]`, `[-@key]`, or `@key` left in the body text | `\[-?@` or `@key` — heuristic, can match intentional literals |
 
 `?@` is the one true positive — anything matching it is a broken reference. The citation patterns are heuristics: confirm them before reporting (an `@handle` or an email can match `@key`).
 
@@ -42,9 +42,12 @@ If the rendered tree might be **stale**, say so — the authoritative signal is 
 
 ## Step 2a — Scan local output files
 
-Grep the rendered files. `?@` is the primary signal; `-F` keeps `?` literal:
+Grep the rendered files or run the automated reference checker (`python3 scripts/check-rendered-references.py <output-dir>`). `?@` is the primary signal; `-F` keeps `?` literal:
 
 ``` bash
+# Automated scanner (handles crossrefs, citations, and ignores valid footnotes)
+python3 scripts/check-rendered-references.py <output-dir>
+
 # Primary: unresolved cross-references (and Quarto's unresolved-citation marker)
 grep -rnoF --include='*.html' '?@' <output-dir>
 
@@ -54,7 +57,7 @@ grep -rnoF --include='*.html' '?@' <output-dir>
 grep -rnoE --include='*.html' '<strong>[A-Za-z0-9_:.#-]+\?</strong>' <output-dir>
 
 # Secondary heuristic: raw citation syntax left in the body
-grep -rnoE --include='*.html' '\[@[A-Za-z0-9_:.#-]+' <output-dir>
+grep -rnoE --include='*.html' '\[-?@[A-Za-z0-9_:.#-]+' <output-dir>
 ```
 
 For each `?@…` hit, pull the surrounding text so the report is actionable:
@@ -99,6 +102,7 @@ Distinguish **confirmed** breaks (`?@…`) from **heuristic** citation hits that
 - ❌ Trusting a stale `_book/`/`_site/` — a fixed-in-source break can still show, and a new break can hide. Re-render when in doubt.
 - ❌ Scanning a deployed preview URL (Step 2b) without first confirming it was built from your commit. A `?@` hit on a page that predates your fix reads exactly like a fix that did not work. Grep the fetched page for a string only your commit introduced before reporting anything from it, per [`fact-check-prose`](../../shared/writing/fact-check-prose.md)’s “Confirm a rendered page carries your commit before reading anything off it”.
 - ❌ Reporting every `@`-containing string as a broken citation — `@handle`, emails, and code can match. `?@` is certain; `[@…]`/`@key` is heuristic.
+- ❌ Flagging valid markdown footnote references (`[^1]`, `[^note]`, `[^1]:`) as broken reference links or raw citations — footnotes are standard markdown syntax.
 - ❌ Dropping the `-F` (or escaping) so the shell/grep mangles `?@`.
 
 Back to top

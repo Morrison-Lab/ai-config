@@ -798,6 +798,9 @@ than adding a version, so a workspace copy stayed frozen at whatever
 revision was first uploaded.
 Fixed in ai-config#769: an existing skill now gets a new version
 (`POST /v1/skills/{id}/versions`) on every run instead of being skipped.
+Refined in ai-config#2596 with content change detection (skipping unchanged skills
+without creating redundant API versions), deletion propagation (pruning managed skills
+removed from the repo), and a CI workflow (`upload-skills.yml`) to run on merge to `main`.
 The predicted shape of the drift, while the bug was live, was that the stale
 set was exactly the long-standing skills, while anything added since the
 last upload was still a working symlink -- worth knowing if diagnosing an

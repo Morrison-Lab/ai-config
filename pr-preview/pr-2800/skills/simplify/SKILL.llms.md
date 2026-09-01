@@ -49,5 +49,6 @@ After any change that narrows the invocation context (e.g., a job now only runs 
 
 - **`shared/workflow/challenge-unnecessary-complexity.md`** — the standing review-time counterpart. This skill only prunes *dead* code made unreachable by a narrowed invocation context, triggered after a specific refactor; the fragment is the broader “flag complexity in otherwise-correct, reachable content” rule folded into every review pass (prose and math too, not just code). Run this skill when code just became unreachable; the fragment’s check applies continuously, to code that is fully reachable but more complex than it needs to be.
 - **`tidy`** — the broader on-demand code audit (5 axes, one of which is “Simplify”); this skill is narrower and specifically about dead-code removal after a context change.
+- **`prune-dead-code`** (`pdc`) — the whole-repo audit counterpart for finding and deleting provably unreferenced functions, files, configs, and stale docs across the codebase, whereas this skill specifically sweeps unreachable paths locally after a context-narrowing change.
 
 Back to top

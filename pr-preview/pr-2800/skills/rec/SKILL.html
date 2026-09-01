@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="description" content="Audit codebase to simplify and DRY.">
+<meta name="description" content="Provide recommendations for choices.">
 
 <title>skill – ai-config</title>
 <style>
@@ -26,6 +26,41 @@ ul.task-list li input[type="checkbox"] {
   width: 0.8em;
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
 }
 </style>
 
@@ -311,25 +346,27 @@ ul.task-list li input[type="checkbox"] {
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#tidy" id="toc-tidy" class="nav-link active" data-scroll-target="#tidy">tidy</a>
+  <li><a href="#rec-provide-recommendations-for-choices-and-questions" id="toc-rec-provide-recommendations-for-choices-and-questions" class="nav-link active" data-scroll-target="#rec-provide-recommendations-for-choices-and-questions">rec — provide recommendations for choices and questions</a>
   <ul class="collapse">
   <li><a href="#when-this-fires" id="toc-when-this-fires" class="nav-link" data-scroll-target="#when-this-fires">When this fires</a></li>
-  <li><a href="#scope" id="toc-scope" class="nav-link" data-scroll-target="#scope">Scope</a></li>
-  <li><a href="#what-to-look-for" id="toc-what-to-look-for" class="nav-link" data-scroll-target="#what-to-look-for">What to look for</a>
+  <li><a href="#core-rules" id="toc-core-rules" class="nav-link" data-scroll-target="#core-rules">Core Rules</a>
   <ul class="collapse">
-  <li><a href="#dead-code-unused-features" id="toc-dead-code-unused-features" class="nav-link" data-scroll-target="#dead-code-unused-features">1. Dead code &amp; unused features</a></li>
-  <li><a href="#outsource-to-external-tools" id="toc-outsource-to-external-tools" class="nav-link" data-scroll-target="#outsource-to-external-tools">2. Outsource to external tools</a></li>
-  <li><a href="#dry-dont-repeat-yourself" id="toc-dry-dont-repeat-yourself" class="nav-link" data-scroll-target="#dry-dont-repeat-yourself">3. DRY (Don’t Repeat Yourself)</a></li>
-  <li><a href="#simplify" id="toc-simplify" class="nav-link" data-scroll-target="#simplify">4. Simplify</a></li>
-  <li><a href="#reduce-maintenance-burden" id="toc-reduce-maintenance-burden" class="nav-link" data-scroll-target="#reduce-maintenance-burden">5. Reduce maintenance burden</a></li>
+  <li><a href="#always-include-a-concrete-recommendation" id="toc-always-include-a-concrete-recommendation" class="nav-link" data-scroll-target="#always-include-a-concrete-recommendation">1. Always include a concrete recommendation</a></li>
+  <li><a href="#interactive-tools-format-put-recommendation-first" id="toc-interactive-tools-format-put-recommendation-first" class="nav-link" data-scroll-target="#interactive-tools-format-put-recommendation-first">2. Interactive tools format: put recommendation first</a></li>
+  <li><a href="#visual-tagging-in-chat-output" id="toc-visual-tagging-in-chat-output" class="nav-link" data-scroll-target="#visual-tagging-in-chat-output">3. Visual tagging in chat output</a></li>
+  <li><a href="#do-not-offer-authorized-work-as-an-optional-choice" id="toc-do-not-offer-authorized-work-as-an-optional-choice" class="nav-link" data-scroll-target="#do-not-offer-authorized-work-as-an-optional-choice">4. Do not offer authorized work as an optional choice</a></li>
   </ul></li>
-  <li><a href="#output-format" id="toc-output-format" class="nav-link" data-scroll-target="#output-format">Output format</a></li>
-  <li><a href="#what-not-to-do" id="toc-what-not-to-do" class="nav-link" data-scroll-target="#what-not-to-do">What NOT to do</a></li>
-  <li><a href="#after-the-audit" id="toc-after-the-audit" class="nav-link" data-scroll-target="#after-the-audit">After the audit</a></li>
-  <li><a href="#relationship-to-other-skills" id="toc-relationship-to-other-skills" class="nav-link" data-scroll-target="#relationship-to-other-skills">Relationship to other skills</a></li>
+  <li><a href="#procedure" id="toc-procedure" class="nav-link" data-scroll-target="#procedure">Procedure</a>
+  <ul class="collapse">
+  <li><a href="#step-1-identify-the-choice-or-question" id="toc-step-1-identify-the-choice-or-question" class="nav-link" data-scroll-target="#step-1-identify-the-choice-or-question">Step 1 — Identify the choice or question</a></li>
+  <li><a href="#step-2-evaluate-trade-offs" id="toc-step-2-evaluate-trade-offs" class="nav-link" data-scroll-target="#step-2-evaluate-trade-offs">Step 2 — Evaluate trade-offs</a></li>
+  <li><a href="#step-3-present-the-recommendation" id="toc-step-3-present-the-recommendation" class="nav-link" data-scroll-target="#step-3-present-the-recommendation">Step 3 — Present the recommendation</a></li>
+  </ul></li>
+  <li><a href="#relationship-to-other-skills-and-rules" id="toc-relationship-to-other-skills-and-rules" class="nav-link" data-scroll-target="#relationship-to-other-skills-and-rules">Relationship to other skills and rules</a></li>
+  <li><a href="#anti-patterns" id="toc-anti-patterns" class="nav-link" data-scroll-target="#anti-patterns">Anti-patterns</a></li>
   </ul></li>
   </ul>
-<div class="toc-actions"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/tidy/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/tidy/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
+<div class="toc-actions"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/rec/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/rec/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
     </div>
 <!-- main -->
 <main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"></header>
@@ -338,99 +375,88 @@ ul.task-list li input[type="checkbox"] {
 
 
 
-<section id="tidy" class="level1">
-<h1>tidy</h1>
-<p>Audit the codebase for opportunities to reduce complexity, duplication, and maintenance burden. Produce a <strong>prioritized, actionable</strong> list of suggestions — not vague advice.</p>
+<section id="rec-provide-recommendations-for-choices-and-questions" class="level1">
+<h1>rec — provide recommendations for choices and questions</h1>
+<p>Whenever posing a choice or asking a question to the user, always provide a clear, specific, and grounded recommendation. Never present an unweighted list of options or ask “what should I do?” without declaring your own recommended path.</p>
+<p>This skill is invoked proactively before presenting decisions or questions, or reactively when the user invokes <code>/rec</code>, <code>/recommend</code>, or asks what the agent recommends after an unweighted question was asked.</p>
 <section id="when-this-fires" class="level2">
 <h2 class="anchored" data-anchor-id="when-this-fires">When this fires</h2>
 <ul>
-<li>User says <code>/tidy</code>, “tidy up”, “DRY this”, “what can we remove”, “what can we outsource”, or similar.</li>
-<li>After a large feature lands and the user wants a cleanup pass.</li>
-<li>When reviewing a repo for the first time and looking for quick wins.</li>
+<li><strong>Proactively</strong>: whenever presenting options for a genuine decision, asking a clarifying or architectural question, or using interactive question modals (<code>AskUserQuestion</code> / <code>ask_user_question</code>).</li>
+<li><strong>Reactively</strong>:
+<ul>
+<li>Explicit invocation: <code>/rec</code>, <code>/recommend</code>, “recommend”, “rec”.</li>
+<li>The user asks “what do you recommend?”, “what’s your recommendation?”, “which one should we pick?”, or “give me a recommendation”.</li>
+<li>The agent previously asked a question without a recommendation and needs to supply one now.</li>
+</ul></li>
 </ul>
 </section>
-<section id="scope" class="level2">
-<h2 class="anchored" data-anchor-id="scope">Scope</h2>
-<p>If the user specifies a file, directory, or topic, restrict the audit to that scope. Otherwise, audit the full workspace.</p>
+<section id="core-rules" class="level2">
+<h2 class="anchored" data-anchor-id="core-rules">Core Rules</h2>
+<section id="always-include-a-concrete-recommendation" class="level3">
+<h3 class="anchored" data-anchor-id="always-include-a-concrete-recommendation">1. Always include a concrete recommendation</h3>
+<p>Never leave a decision or question open-ended without a recommended option. State the specific recommendation clearly (e.g., “Recommendation: Proceed with Option A because…”).</p>
 </section>
-<section id="what-to-look-for" class="level2">
-<h2 class="anchored" data-anchor-id="what-to-look-for">What to look for</h2>
-<p>Evaluate the codebase along these axes (in priority order):</p>
-<section id="dead-code-unused-features" class="level3">
-<h3 class="anchored" data-anchor-id="dead-code-unused-features">1. Dead code &amp; unused features</h3>
+<section id="interactive-tools-format-put-recommendation-first" class="level3">
+<h3 class="anchored" data-anchor-id="interactive-tools-format-put-recommendation-first">2. Interactive tools format: put recommendation first</h3>
+<p>When using interactive question tools (<code>AskUserQuestion</code> or <code>ask_user_question</code>): - Place the recommended option <strong>first</strong> in the options array. - Prefix the label with <code>(Recommended)</code> (e.g., <code>(Recommended) Option A: ...</code>).</p>
+</section>
+<section id="visual-tagging-in-chat-output" class="level3">
+<h3 class="anchored" data-anchor-id="visual-tagging-in-chat-output">3. Visual tagging in chat output</h3>
+<p>In conversational responses, format recommendations using the standard category box:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>🧭 **RECOMMENDATION:** <span class="dt">&lt;</span><span class="kw">action</span><span class="dt">&gt;</span>. <span class="dt">&lt;</span><span class="kw">concise</span><span class="ot"> rationale</span><span class="dt">&gt;</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Lead with the specific action, followed by the trade-off rationale.</p>
+</section>
+<section id="do-not-offer-authorized-work-as-an-optional-choice" class="level3">
+<h3 class="anchored" data-anchor-id="do-not-offer-authorized-work-as-an-optional-choice">4. Do not offer authorized work as an optional choice</h3>
+<p>Distinguish genuine decisions from authorized or standard workflow steps: - If an action is already in scope or required by standing rules (e.g., running tests, fixing lints, ARDI loops, drafting issues), perform the work and report in the past tense rather than asking “Let me know if you want me to do X”. - Reserve recommendations for genuine forks in design, architecture, scope trade-offs, or external intent.</p>
+</section>
+</section>
+<section id="procedure" class="level2">
+<h2 class="anchored" data-anchor-id="procedure">Procedure</h2>
+<section id="step-1-identify-the-choice-or-question" class="level3">
+<h3 class="anchored" data-anchor-id="step-1-identify-the-choice-or-question">Step 1 — Identify the choice or question</h3>
 <ul>
-<li>Functions/modules/files never called or imported.</li>
-<li>Feature flags that are always on/off.</li>
-<li>Commented-out code blocks.</li>
+<li><strong>Proactive</strong>: State the decision point, the context that makes it necessary, and the distinct feasible options.</li>
+<li><strong>Reactive</strong> (<code>/rec</code> / <code>/recommend</code>): Scan back through recent conversation turns to locate the latest question or unresolved decision point, restating the options if context is needed.</li>
 </ul>
 </section>
-<section id="outsource-to-external-tools" class="level3">
-<h3 class="anchored" data-anchor-id="outsource-to-external-tools">2. Outsource to external tools</h3>
+<section id="step-2-evaluate-trade-offs" class="level3">
+<h3 class="anchored" data-anchor-id="step-2-evaluate-trade-offs">Step 2 — Evaluate trade-offs</h3>
+<p>Weigh the alternatives across: - <strong>Simplicity and minimal blast radius</strong>: least complex change that solves the issue. - <strong>Project conventions</strong>: alignment with existing codebase patterns and rules. - <strong>Safety and reversibility</strong>: lower operational and maintenance risk. - <strong>Token and execution efficiency</strong>: avoiding unnecessary overhead.</p>
+<p>Select the single strongest path as the recommendation.</p>
+</section>
+<section id="step-3-present-the-recommendation" class="level3">
+<h3 class="anchored" data-anchor-id="step-3-present-the-recommendation">Step 3 — Present the recommendation</h3>
+<p>Present the question or decision with its structured recommendation:</p>
 <ul>
-<li>Hand-rolled logic that a well-maintained package/CLI already handles (e.g., custom YAML parsing → use a library; hand-rolled HTTP retry → use a retry library; custom linting rules → existing linter plugin).</li>
-<li>Vendored code that could be a dependency instead.</li>
-<li>Shell scripts reimplementing <code>jq</code>, <code>yq</code>, <code>sed</code> pipelines that a purpose-built tool does better.</li>
+<li><strong>For interactive GUI modals</strong> (<code>AskUserQuestion</code> or <code>ask_user_question</code>): List the recommended choice as option 1 with the <code>(Recommended)</code> prefix.</li>
+<li><strong>For inline chat questions</strong>: State the context, outline the trade-offs, and attach the boxed recommendation:</li>
+</ul>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>❓ **QUESTION:** <span class="dt">&lt;</span><span class="kw">clear</span><span class="ot"> question</span><span class="dt">&gt;</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Option A**: <span class="dt">&lt;</span><span class="kw">summary</span><span class="ot"> of option A and trade-offs</span><span class="dt">&gt;</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Option B**: <span class="dt">&lt;</span><span class="kw">summary</span><span class="ot"> of option B and trade-offs</span><span class="dt">&gt;</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>🧭 **RECOMMENDATION:** Proceed with Option A because <span class="dt">&lt;</span><span class="kw">rationale</span><span class="dt">&gt;</span>.</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+</section>
+<section id="relationship-to-other-skills-and-rules" class="level2">
+<h2 class="anchored" data-anchor-id="relationship-to-other-skills-and-rules">Relationship to other skills and rules</h2>
+<ul>
+<li><strong><code>AGENTS.md</code> (“Always give recommendations with questions”)</strong>: Universal baseline rule requiring recommendations on all questions.</li>
+<li><strong><a href="../../skills/prompt-me/SKILL.html"><code>prompt-me</code></a> / <a href="../../skills/pm/SKILL.html"><code>pm</code></a></strong>: Surfaces pending questions; pair with <code>rec</code> if a surfaced question lacked a recommendation.</li>
+<li><strong><a href="../../skills/pending-decisions/SKILL.html"><code>pending-decisions</code></a> / <a href="../../skills/pd/SKILL.html"><code>pd</code></a></strong>: Presents tracker-level decisions sequentially, with recommendations.</li>
+<li><strong><a href="../../skills/brainstorm/SKILL.html"><code>brainstorm</code></a></strong>: Interactive Socratic planning loop before implementation; uses <code>rec</code> principles to guide trade-offs.</li>
 </ul>
 </section>
-<section id="dry-dont-repeat-yourself" class="level3">
-<h3 class="anchored" data-anchor-id="dry-dont-repeat-yourself">3. DRY (Don’t Repeat Yourself)</h3>
+<section id="anti-patterns" class="level2">
+<h2 class="anchored" data-anchor-id="anti-patterns">Anti-patterns</h2>
 <ul>
-<li>Duplicated logic across files that could be extracted into a shared helper/module.</li>
-<li>Copy-pasted config blocks that could be templated or parameterized.</li>
-<li>Repeated patterns that suggest a missing abstraction.</li>
-</ul>
-</section>
-<section id="simplify" class="level3">
-<h3 class="anchored" data-anchor-id="simplify">4. Simplify</h3>
-<ul>
-<li>Over-engineered abstractions (more indirection than the problem warrants).</li>
-<li>Deeply nested conditionals that could be flattened with early returns or guard clauses.</li>
-<li>Complex shell pipelines that could be a single tool invocation.</li>
-<li>Overly defensive code for impossible states.</li>
-</ul>
-</section>
-<section id="reduce-maintenance-burden" class="level3">
-<h3 class="anchored" data-anchor-id="reduce-maintenance-burden">5. Reduce maintenance burden</h3>
-<ul>
-<li>Pinned dependency versions that could use ranges.</li>
-<li>CI/CD steps that could be consolidated or parallelized.</li>
-<li>Documentation that duplicates what the code already says.</li>
-<li>Config files with stale/irrelevant entries.</li>
-</ul>
-</section>
-</section>
-<section id="output-format" class="level2">
-<h2 class="anchored" data-anchor-id="output-format">Output format</h2>
-<p>Present findings as a numbered list, grouped by axis, with:</p>
-<ol type="1">
-<li><strong>What</strong>: One-line description of the issue.</li>
-<li><strong>Where</strong>: File(s) and line(s) affected.</li>
-<li><strong>Suggestion</strong>: Concrete action to take (not “consider refactoring” — say exactly what to extract, replace, or delete).</li>
-<li><strong>Impact</strong>: Low / Medium / High — how much maintenance burden it removes.</li>
-<li><strong>Effort</strong>: Low / Medium / High — how much work the fix is.</li>
-</ol>
-<p>Sort within each group by impact÷effort (best bang-for-buck first).</p>
-</section>
-<section id="what-not-to-do" class="level2">
-<h2 class="anchored" data-anchor-id="what-not-to-do">What NOT to do</h2>
-<ul>
-<li>Don’t make the changes yourself unless explicitly asked. This is an audit.</li>
-<li>Don’t suggest changes that alter public API or behavior without flagging the breaking-change risk.</li>
-<li>Don’t suggest “rewrite in language X” — stay within the current stack.</li>
-<li>Don’t flag style/formatting issues — that’s the linter’s job.</li>
-<li>Don’t suggest adding complexity (new abstractions, frameworks) unless it clearly nets out simpler.</li>
-</ul>
-</section>
-<section id="after-the-audit" class="level2">
-<h2 class="anchored" data-anchor-id="after-the-audit">After the audit</h2>
-<p>Ask the user which items (if any) they’d like you to implement. Offer to: - Implement the top-N items in this session. - File issues for deferred items. - Skip items the user disagrees with.</p>
-</section>
-<section id="relationship-to-other-skills" class="level2">
-<h2 class="anchored" data-anchor-id="relationship-to-other-skills">Relationship to other skills</h2>
-<ul>
-<li><strong><code>shared/workflow/challenge-unnecessary-complexity.md</code></strong> — the standing review-time counterpart to this skill’s axis 4 (“Simplify”). That fragment folds an unnecessary-complexity check into every normal review pass (including prose and math, not just code) and runs automatically, not on demand; run <code>/tidy</code> when you want a full prioritized audit across all 5 axes on demand, not just complexity.</li>
-<li><strong><code>prune-dead-code</code></strong> (<code>pdc</code>) — the dedicated dead-code and orphaned-asset removal procedure for axis 1, systematically eliminating dead symbols, orphaned configs, and stale docs.</li>
-<li><strong><code>simplify</code></strong> — the narrow dead-code-removal counterpart, triggered after a refactor narrows invocation context, not an on-demand audit.</li>
+<li>❌ Asking “Which option do you prefer?” or “Should I do A or B?” without declaring a recommendation.</li>
+<li>❌ Using “Let me know if…” to pose authorized work as a choice instead of performing it.</li>
+<li>❌ Providing an ambiguous or fence-sitting recommendation (“Either A or B is fine”).</li>
+<li>❌ Placing the recommended option anywhere other than first in interactive choice lists.</li>
 </ul>
 
 
@@ -861,7 +887,7 @@ ul.task-list li input[type="checkbox"] {
     </div>   
     <div class="nav-footer-center">
 <p>Built with <a href="https://quarto.org/">Quarto</a></p>
-<div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/tidy/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/tidy/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></div>
+<div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/rec/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/rec/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></div>
     <div class="nav-footer-right">
       &nbsp;
     </div>

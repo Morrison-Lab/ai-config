@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="description" content="Audit codebase to simplify and DRY.">
+<meta name="description" content="→ prune-dead-code.">
 
 <title>skill – ai-config</title>
 <style>
@@ -311,25 +311,9 @@ ul.task-list li input[type="checkbox"] {
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#tidy" id="toc-tidy" class="nav-link active" data-scroll-target="#tidy">tidy</a>
-  <ul class="collapse">
-  <li><a href="#when-this-fires" id="toc-when-this-fires" class="nav-link" data-scroll-target="#when-this-fires">When this fires</a></li>
-  <li><a href="#scope" id="toc-scope" class="nav-link" data-scroll-target="#scope">Scope</a></li>
-  <li><a href="#what-to-look-for" id="toc-what-to-look-for" class="nav-link" data-scroll-target="#what-to-look-for">What to look for</a>
-  <ul class="collapse">
-  <li><a href="#dead-code-unused-features" id="toc-dead-code-unused-features" class="nav-link" data-scroll-target="#dead-code-unused-features">1. Dead code &amp; unused features</a></li>
-  <li><a href="#outsource-to-external-tools" id="toc-outsource-to-external-tools" class="nav-link" data-scroll-target="#outsource-to-external-tools">2. Outsource to external tools</a></li>
-  <li><a href="#dry-dont-repeat-yourself" id="toc-dry-dont-repeat-yourself" class="nav-link" data-scroll-target="#dry-dont-repeat-yourself">3. DRY (Don’t Repeat Yourself)</a></li>
-  <li><a href="#simplify" id="toc-simplify" class="nav-link" data-scroll-target="#simplify">4. Simplify</a></li>
-  <li><a href="#reduce-maintenance-burden" id="toc-reduce-maintenance-burden" class="nav-link" data-scroll-target="#reduce-maintenance-burden">5. Reduce maintenance burden</a></li>
-  </ul></li>
-  <li><a href="#output-format" id="toc-output-format" class="nav-link" data-scroll-target="#output-format">Output format</a></li>
-  <li><a href="#what-not-to-do" id="toc-what-not-to-do" class="nav-link" data-scroll-target="#what-not-to-do">What NOT to do</a></li>
-  <li><a href="#after-the-audit" id="toc-after-the-audit" class="nav-link" data-scroll-target="#after-the-audit">After the audit</a></li>
-  <li><a href="#relationship-to-other-skills" id="toc-relationship-to-other-skills" class="nav-link" data-scroll-target="#relationship-to-other-skills">Relationship to other skills</a></li>
-  </ul></li>
+  <li><a href="#pdc-alias-for-prune-dead-code" id="toc-pdc-alias-for-prune-dead-code" class="nav-link active" data-scroll-target="#pdc-alias-for-prune-dead-code">pdc (alias for <code>prune-dead-code</code>)</a></li>
   </ul>
-<div class="toc-actions"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/tidy/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/tidy/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
+<div class="toc-actions"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/pdc/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/pdc/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
     </div>
 <!-- main -->
 <main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"></header>
@@ -338,103 +322,12 @@ ul.task-list li input[type="checkbox"] {
 
 
 
-<section id="tidy" class="level1">
-<h1>tidy</h1>
-<p>Audit the codebase for opportunities to reduce complexity, duplication, and maintenance burden. Produce a <strong>prioritized, actionable</strong> list of suggestions — not vague advice.</p>
-<section id="when-this-fires" class="level2">
-<h2 class="anchored" data-anchor-id="when-this-fires">When this fires</h2>
-<ul>
-<li>User says <code>/tidy</code>, “tidy up”, “DRY this”, “what can we remove”, “what can we outsource”, or similar.</li>
-<li>After a large feature lands and the user wants a cleanup pass.</li>
-<li>When reviewing a repo for the first time and looking for quick wins.</li>
-</ul>
-</section>
-<section id="scope" class="level2">
-<h2 class="anchored" data-anchor-id="scope">Scope</h2>
-<p>If the user specifies a file, directory, or topic, restrict the audit to that scope. Otherwise, audit the full workspace.</p>
-</section>
-<section id="what-to-look-for" class="level2">
-<h2 class="anchored" data-anchor-id="what-to-look-for">What to look for</h2>
-<p>Evaluate the codebase along these axes (in priority order):</p>
-<section id="dead-code-unused-features" class="level3">
-<h3 class="anchored" data-anchor-id="dead-code-unused-features">1. Dead code &amp; unused features</h3>
-<ul>
-<li>Functions/modules/files never called or imported.</li>
-<li>Feature flags that are always on/off.</li>
-<li>Commented-out code blocks.</li>
-</ul>
-</section>
-<section id="outsource-to-external-tools" class="level3">
-<h3 class="anchored" data-anchor-id="outsource-to-external-tools">2. Outsource to external tools</h3>
-<ul>
-<li>Hand-rolled logic that a well-maintained package/CLI already handles (e.g., custom YAML parsing → use a library; hand-rolled HTTP retry → use a retry library; custom linting rules → existing linter plugin).</li>
-<li>Vendored code that could be a dependency instead.</li>
-<li>Shell scripts reimplementing <code>jq</code>, <code>yq</code>, <code>sed</code> pipelines that a purpose-built tool does better.</li>
-</ul>
-</section>
-<section id="dry-dont-repeat-yourself" class="level3">
-<h3 class="anchored" data-anchor-id="dry-dont-repeat-yourself">3. DRY (Don’t Repeat Yourself)</h3>
-<ul>
-<li>Duplicated logic across files that could be extracted into a shared helper/module.</li>
-<li>Copy-pasted config blocks that could be templated or parameterized.</li>
-<li>Repeated patterns that suggest a missing abstraction.</li>
-</ul>
-</section>
-<section id="simplify" class="level3">
-<h3 class="anchored" data-anchor-id="simplify">4. Simplify</h3>
-<ul>
-<li>Over-engineered abstractions (more indirection than the problem warrants).</li>
-<li>Deeply nested conditionals that could be flattened with early returns or guard clauses.</li>
-<li>Complex shell pipelines that could be a single tool invocation.</li>
-<li>Overly defensive code for impossible states.</li>
-</ul>
-</section>
-<section id="reduce-maintenance-burden" class="level3">
-<h3 class="anchored" data-anchor-id="reduce-maintenance-burden">5. Reduce maintenance burden</h3>
-<ul>
-<li>Pinned dependency versions that could use ranges.</li>
-<li>CI/CD steps that could be consolidated or parallelized.</li>
-<li>Documentation that duplicates what the code already says.</li>
-<li>Config files with stale/irrelevant entries.</li>
-</ul>
-</section>
-</section>
-<section id="output-format" class="level2">
-<h2 class="anchored" data-anchor-id="output-format">Output format</h2>
-<p>Present findings as a numbered list, grouped by axis, with:</p>
-<ol type="1">
-<li><strong>What</strong>: One-line description of the issue.</li>
-<li><strong>Where</strong>: File(s) and line(s) affected.</li>
-<li><strong>Suggestion</strong>: Concrete action to take (not “consider refactoring” — say exactly what to extract, replace, or delete).</li>
-<li><strong>Impact</strong>: Low / Medium / High — how much maintenance burden it removes.</li>
-<li><strong>Effort</strong>: Low / Medium / High — how much work the fix is.</li>
-</ol>
-<p>Sort within each group by impact÷effort (best bang-for-buck first).</p>
-</section>
-<section id="what-not-to-do" class="level2">
-<h2 class="anchored" data-anchor-id="what-not-to-do">What NOT to do</h2>
-<ul>
-<li>Don’t make the changes yourself unless explicitly asked. This is an audit.</li>
-<li>Don’t suggest changes that alter public API or behavior without flagging the breaking-change risk.</li>
-<li>Don’t suggest “rewrite in language X” — stay within the current stack.</li>
-<li>Don’t flag style/formatting issues — that’s the linter’s job.</li>
-<li>Don’t suggest adding complexity (new abstractions, frameworks) unless it clearly nets out simpler.</li>
-</ul>
-</section>
-<section id="after-the-audit" class="level2">
-<h2 class="anchored" data-anchor-id="after-the-audit">After the audit</h2>
-<p>Ask the user which items (if any) they’d like you to implement. Offer to: - Implement the top-N items in this session. - File issues for deferred items. - Skip items the user disagrees with.</p>
-</section>
-<section id="relationship-to-other-skills" class="level2">
-<h2 class="anchored" data-anchor-id="relationship-to-other-skills">Relationship to other skills</h2>
-<ul>
-<li><strong><code>shared/workflow/challenge-unnecessary-complexity.md</code></strong> — the standing review-time counterpart to this skill’s axis 4 (“Simplify”). That fragment folds an unnecessary-complexity check into every normal review pass (including prose and math, not just code) and runs automatically, not on demand; run <code>/tidy</code> when you want a full prioritized audit across all 5 axes on demand, not just complexity.</li>
-<li><strong><code>prune-dead-code</code></strong> (<code>pdc</code>) — the dedicated dead-code and orphaned-asset removal procedure for axis 1, systematically eliminating dead symbols, orphaned configs, and stale docs.</li>
-<li><strong><code>simplify</code></strong> — the narrow dead-code-removal counterpart, triggered after a refactor narrows invocation context, not an on-demand audit.</li>
-</ul>
+<section id="pdc-alias-for-prune-dead-code" class="level1">
+<h1>pdc (alias for <code>prune-dead-code</code>)</h1>
+<p>This is a short alias for the <strong>prune-dead-code</strong> skill. Read and follow the canonical skill:</p>
+<p>→ <strong><a href="../../skills/prune-dead-code/SKILL.html">prune-dead-code</a></strong></p>
 
 
-</section>
 </section>
 
 <a onclick="window.scrollTo(0, 0); return false;" role="button" id="quarto-back-to-top"><i class="bi bi-arrow-up"></i> Back to top</a></main> <!-- /main -->
@@ -861,7 +754,7 @@ ul.task-list li input[type="checkbox"] {
     </div>   
     <div class="nav-footer-center">
 <p>Built with <a href="https://quarto.org/">Quarto</a></p>
-<div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/tidy/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/tidy/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></div>
+<div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/pdc/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/pdc/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></div>
     <div class="nav-footer-right">
       &nbsp;
     </div>

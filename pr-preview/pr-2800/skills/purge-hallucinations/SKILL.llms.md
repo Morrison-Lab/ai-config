@@ -48,7 +48,7 @@ Use the cheapest check that *proves existence or absence*. Match the tool to the
 - **Skill name** — `ls skills/<name>/` in the local ai-config directory. If not found locally, check the session’s available-skills list (appears in system reminders) before classifying as ❌; a globally-available system skill with no local directory is ❓ Unverifiable, not ❌ Fabricated.
 - **Memory cross-link** — `[[target]]` links resolve to **skill directories** (`ls skills/<target>/`); if no matching skill, search memory headings (`grep -rn "^# .*<target>" memories/`).
 - **URL / link** — `curl -sSI -o /dev/null -w '%{http_code}' <url>` (local) or `WebFetch` (remote). **A 404/410 is fabricated; a timeout, 403, 429, or DNS failure is *unverifiable*** — distinguish them.
-- **Citation / package** — CRAN: `https://cran.r-project.org/package=<pkg>`; installed: `Rscript -e 'find.package("<pkg>")'`; dep: check `DESCRIPTION`.
+- **Citation / package** — CRAN: `https://cran.r-project.org/package=<pkg>`; installed: `Rscript -e 'find.package("<pkg>")'`; dep: check `DESCRIPTION`; DOI / `.bib`: `python3 scripts/check_doi_bib.py <path-to-.bib>` (or `--root <dir> --cited-only`).
 - **Flag / option / config key** — grep the tool’s `--help`, its schema, or its source; for a YAML key, the consuming code/schema.
 - **API / SDK method or model id** — check the SDK source/docs. For Claude/Anthropic specifics (model ids, params), **defer to the `claude-api` skill** rather than guessing.
 

@@ -365,7 +365,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <section id="adv-adversarial-review" class="level1">
 <h1>adv (Adversarial Review)</h1>
-<p>Runs a local adversarial AI code review on outgoing branch commits using an alternate model/engine available on this machine.</p>
+<p>Runs a detailed and holistic local adversarial AI code review on outgoing branch commits using an alternate model/engine available on this machine (evaluating architecture, conventions, safety, tests, and diff impacts rather than perfunctory surface checks).</p>
 <section id="when-this-fires" class="level2">
 <h2 class="anchored" data-anchor-id="when-this-fires">When this fires</h2>
 <ul>
@@ -403,7 +403,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h2 class="anchored" data-anchor-id="how-it-works">How it works</h2>
 <ol type="1">
 <li>Computes the local outgoing diff against <code>origin/main</code> (or PR base).</li>
-<li>Dispatches the review to the selected alternate model/engine using plan/read-only mode.</li>
+<li>Dispatches the review to the selected alternate model/engine using plan/read-only mode to independently conduct both a detailed implementation defect audit and a holistic change assessment.</li>
 <li>Parses and validates the structured review findings.</li>
 <li>Exits with a nonzero code on blocking findings (unless <code>--allow-findings</code> is specified).</li>
 </ol>

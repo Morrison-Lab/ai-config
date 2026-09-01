@@ -27,6 +27,41 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
 </style>
 
 
@@ -335,12 +370,16 @@ ul.task-list li input[type="checkbox"] {
 <ol type="1">
 <li><p><strong>Confirm this is an R package.</strong> Check that <code>DESCRIPTION</code> exists at the repo root, and that <code>NEWS.md</code> (or <code>NEWS</code>) exists. If either is missing, skip — this skill doesn’t apply, or the package needs to add <code>NEWS.md</code> first (a one-line file with a version heading and no entries is enough to start).</p></li>
 <li><p><strong>Read the existing style.</strong> Look at the last 2–3 entries in <code>NEWS.md</code> and note:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span> <span class="at">-n</span> 40 NEWS.md</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <ul>
 <li>Whether entries sit under a version heading (<code># pkgname 1.2.3</code>) that’s already there for the in-progress version, or need a new one.</li>
 <li>Bullet format (<code>*</code>, <code>-</code>), sentence case vs.&nbsp;lowercase lead word, whether entries end with a period.</li>
 <li>Whether entries cite the author, an issue number, or a PR number (e.g.&nbsp;<code>(#123)</code>, <code>(@username)</code>), and where in the sentence that citation goes.</li>
 </ul></li>
-<li><p><strong>Gather what changed.</strong> Pull recent commits since the last tagged release (<code>git log &lt;last-tag&gt;..HEAD --oneline</code>) or the PR description supplied by the user, and identify the user-facing changes worth an entry — skip pure-internal refactors, CI-only changes, and typo fixes that don’t affect behavior unless the project’s own style includes those too (check step 2’s precedent).</p></li>
+<li><p><strong>Gather what changed.</strong> Pull recent commits since the last tagged release:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="va">LAST_TAG</span><span class="op">=</span><span class="va">$(</span><span class="fu">git</span> describe <span class="at">--tags</span> <span class="at">--abbrev</span><span class="op">=</span>0 <span class="dv">2</span><span class="op">&gt;</span>/dev/null <span class="kw">||</span> <span class="fu">git</span> rev-list <span class="at">--max-parents</span><span class="op">=</span>0 HEAD<span class="va">)</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> log <span class="st">"</span><span class="va">$LAST_TAG</span><span class="st">..HEAD"</span> <span class="at">--oneline</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>or read the PR description supplied by the user, and identify the user-facing changes worth an entry — skip pure-internal refactors, CI-only changes, and typo fixes that don’t affect behavior unless the project’s own style includes those too (check step 2’s precedent).</p></li>
 <li><p><strong>Draft the entry</strong> matching the style read in step 2, one bullet per user-facing change, in plain, direct language (what changed and why it matters to a user — not an internal implementation narrative). Add it under the current in-progress version heading, creating that heading if this is the first entry for the next version.</p></li>
 <li><p><strong>Spellcheck the new text</strong> — hand off to <a href="../../skills/r-pkg-spellcheck/SKILL.html"><code>r-pkg-spellcheck</code></a> before finishing, since new NEWS.md prose is exactly the case that skill exists to check before <code>git push</code>.</p></li>
 </ol>

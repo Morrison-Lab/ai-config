@@ -17,35 +17,65 @@ Run the checks that apply to the project’s type. Sections 1-3 are project-type
 ### 1. R package
 
 - **`renv.lock` completeness.** `renv::status()` — does the lockfile cover every package actually loaded (`renv::dependencies()` diffed against the lockfile), not just the ones someone remembered to snapshot?
+
+  ``` bash
+  Rscript -e 'renv::status()'
+  ```
+
 - **Captured `sessionInfo()`.** Does the repo (or its README/vignette) record the R version and platform a result was generated under? A lockfile pins package versions but not the R version itself.
-- **`DESCRIPTION` completeness.** Every `library()`/`::` call has a matching `Imports`/`Suggests` entry — grep `R/` and `vignettes/` for `library(` and `::` and diff against `DESCRIPTION`.
+
+- **`DESCRIPTION` completeness.** Every `library()`/`::` call has a matching `Imports`/`Suggests` entry — grep `R/` and `vignettes/` for `library(` and `::` and diff against `DESCRIPTION`:
+
+  ``` bash
+  rg -no 'library\([a-zA-Z0-9.]+\)|[a-zA-Z0-9.]+::' R/ vignettes/ | sort -u
+  ```
 
 ### 2. Quarto book/site
 
 - **`_freeze`/`.quarto` determinism.** Does a clean `quarto render` (freeze cache deleted) reproduce the committed output, or does the committed `_freeze/` mask a render that no longer succeeds from scratch? (`reprexes`’ R/Quarto specifics section already covers build artifacts as confounders for render bugs — this check is the whole-project version of that same concern.)
+
+  ``` bash
+  quarto render --no-cache
+  ```
+
 - **Pinned Quarto/R versions.** Is the Quarto CLI version and R version used to render pinned somewhere (`_quarto.yml`, a CI workflow, a README badge), or does the render depend on whatever happens to be installed?
+
 - **External data/asset fetches.** Does the render pull any file from a URL or absolute path outside the repo, silently breaking a clone elsewhere?
 
 ### 3. General script repo
 
-- **Hardcoded absolute paths.** Grep for the tells: `/home/`, `/Users/`, `C:\`, `setwd(`, a bare drive letter, or any string that names a specific machine’s directory layout.
+- **Hardcoded absolute paths.** Grep for the tells: `/home/`, `/Users/`, `C:\`, `setwd(`, a bare drive letter, or any string that names a specific machine’s directory layout:
 
   ``` bash
   grep -rnE '(/home/[a-zA-Z0-9_.-]+|/Users/[a-zA-Z0-9_.-]+|[A-Za-z]:\\{1,2}|setwd\()' \
     --include='*.R' --include='*.py' --include='*.sh' --include='*.qmd' .
   ```
 
-- **Undocumented env vars.** Grep for env-var reads (`Sys.getenv(`, `os.environ`, `os.getenv(`, `$VARNAME` in shell) and confirm each one is documented somewhere a new user would find it (README, `.env.example`, a setup script) — not just referenced in code.
+- **Undocumented env vars.** Grep for env-var reads (`Sys.getenv(`, `os.environ`, `os.getenv(`, `$VARNAME` in shell) and confirm each one is documented somewhere a new user would find it (README, `.env.example`, a setup script) — not just referenced in code:
 
-- **Undocumented prerequisites.** Does the repo state what has to be installed *before* the package manager runs — a system library, a specific interpreter version, a CLI tool the scripts shell out to? Grep for `system(`, `subprocess`, `shell_exec`, or backticked shell calls and confirm each invoked binary is named as a prerequisite.
+  ``` bash
+  rg -n 'Sys\.getenv\(|os\.environ|os\.getenv\(|\$[A-Z_]{2,}' .
+  ```
+
+- **Undocumented prerequisites.** Does the repo state what has to be installed *before* the package manager runs — a system library, a specific interpreter version, a CLI tool the scripts shell out to? Grep for `system(`, `subprocess`, `shell_exec`, or backticked shell calls and confirm each invoked binary is named as a prerequisite:
+
+  ``` bash
+  rg -n 'system\(|subprocess|shell_exec|`[^`]+`' .
+  ```
 
 ### 4. Output traceability (all project types)
 
 For each output artifact a project ships (a figure, a table, a rendered report, a results file), can it be traced back to the **exact script:line** that produced it? Check for:
 
 - A caption, filename, or header comment naming the generating script.
+
 - A single entry-point script/Makefile target that regenerates every output from source, rather than outputs having been produced once by hand and never regenerated since.
-- Seeds captured for anything stochastic (`set.seed(`, `random.seed(`, `np.random.seed(` or a `withr::with_seed()` call per the `prefer-packaged-functions` coding convention) — an unseeded random process makes a result strictly non-reproducible, not just hard to trace.
+
+- Seeds captured for anything stochastic (`set.seed(`, `random.seed(`, `np.random.seed(` or a `withr::with_seed()` call per the `prefer-packaged-functions` coding convention) — an unseeded random process makes a result strictly non-reproducible, not just hard to trace:
+
+  ``` bash
+  rg -n 'set\.seed\(|random\.seed\(|np\.random\.seed\(|withr::with_seed\(' .
+  ```
 
 ### 5. Undocumented prerequisites and environment assumptions (all types)
 

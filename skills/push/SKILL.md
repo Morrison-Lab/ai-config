@@ -250,7 +250,7 @@ late: fetch, reconcile, re-run the checks).
 After a successful push, if the branch has no PR yet, open one (ready for
 review, not a draft).
 Immediately maintain an active monitoring loop or scheduled wake mechanism.
-Actively query current-head CI/pipeline status (`gh pr checks` / `glab ci list` or `glab mr pipeline`) and review verdicts (`gh pr view` / `glab mr view`) until that round reaches a terminal state, re-arming the poll while work remains.
+Actively query current-head CI/pipeline status (`gh pr checks` / `glab ci list` or `glab mr view`) and review verdicts (`gh pr view` / `glab mr view`) until that round reaches a terminal state, re-arming the poll while work remains.
 
 ## Relationship to other skills
 

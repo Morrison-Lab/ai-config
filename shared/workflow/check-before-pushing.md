@@ -194,7 +194,7 @@ The extra commit is squashed cleanly at PR merge, so history tidiness is preserv
 Pushing a commit to a PR/MR branch is the start of the round, not the end of the turn.
 Do not abandon monitoring after pushing or assume automated pipelines and reviewer runs will complete without active polling.
 Immediately maintain an active polling loop or scheduled wake mechanism.
-Actively query current-head CI/pipeline status (`gh pr checks` / `glab ci list` or `glab mr pipeline`) and review verdicts (`gh pr view` / `glab mr view`) until that round reaches a terminal state.
+Actively query current-head CI/pipeline status (`gh pr checks` / `glab ci list` or `glab mr view`) and review verdicts (`gh pr view` / `glab mr view`) until that round reaches a terminal state.
 Re-arm the poll while work remains.
 
 - **Do:** take a fresh `git ls-remote` reading immediately before every push, including on a branch you created and believe you alone are driving.

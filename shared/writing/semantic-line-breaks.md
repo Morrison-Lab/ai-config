@@ -87,6 +87,13 @@ Corpus practice is the clause-wrapped 60-to-80 range this file opens with.
 The construction #2085 closed is the pair of predicates the gate actually
 enforces (multi-sentence lines, and a line whose stripped text is at least 80
 characters with a mid-line semicolon), not every wrap a human would make.
+The tool stays narrower by design (ai-config#2586): natural language clause
+detection at comma and conjunction boundaries requires a syntactic parser;
+regex heuristics over-split clean prose (>50% false positive rate on commas),
+and whole-file `--all` reflow collapses ~31,000 hand-broken clause lines across
+375 files (measured 2026-08-31 over 458 Markdown files).
+Diff-scoping (the default under `--write`) isolates touched sentences and leaves
+untouched multi-line clause breaks intact (ai-config#1599).
 
 `MD013` is off repo-wide in `.markdownlint-cli2.jsonc`, so no width gate
 exists either.
@@ -131,7 +138,9 @@ join that would fail the gate is split rather than written.
 `Morrison-Lab/gha@da46419`, whose `_DEFAULT_CLAUSE_BREAKS` is `True` and
 `_DEFAULT_CLAUSE_MIN_LENGTH` is 80.
 The construction that retired the manufactured-clause half landed 2026-08-26
-as ai-config#2085.)
+as ai-config#2085.
+The narrower-by-design disposition and corpus measurement were confirmed
+2026-08-31 for ai-config#2586.)
 
 **Third dated recurrence, 2026-08-21, and the tell is the tool's name.**
 An `ardia` sweep drove three PRs whose prose it had edited, ran

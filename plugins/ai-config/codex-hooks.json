@@ -1,0 +1,8 @@
+{
+  "description": "Run the canonical ai-config hook catalog through Codex.",
+  "hooks": {
+    "UserPromptSubmit": [{"hooks": [{"type": "command", "command": "python3 \"${PLUGIN_ROOT}/plugins/ai-config/codex-hook-adapter.py\" --event UserPromptSubmit", "timeout": 120, "additionalContextLimit": 5000}]}],
+    "PreToolUse": [{"hooks": [{"type": "command", "command": "python3 \"${PLUGIN_ROOT}/plugins/ai-config/codex-hook-adapter.py\" --event PreToolUse", "timeout": 300, "additionalContextLimit": 5000}]}],
+    "Stop": [{"hooks": [{"type": "command", "command": "python3 \"${PLUGIN_ROOT}/plugins/ai-config/codex-hook-adapter.py\" --event Stop", "timeout": 300, "additionalContextLimit": 5000}]}]
+  }
+}

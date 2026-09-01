@@ -697,6 +697,13 @@ This one is the other direction: when a server would help, install and register 
 Covers reading `claude mcp list` for transport rather than name (a plugin's remote server can shadow the local one you meant), 400-versus-401 on an uninterpolated credential, supplying tokens by launch wrapper instead of storing them, opt-in toolsets whose selection *replaces* the default, and verifying by a real call rather than by the tool listing.
 Its last section generalizes past MCP: when a standing rule names a mechanism this session doesn't have, look for the local equivalent instead of silently degrading to a worse fallback.
 
+## Search for and install plugins proactively
+
+[shared/workflow/use-plugins.md](shared/workflow/use-plugins.md)
+
+Proactively discover, evaluate, and install plugins across Claude Code (`claude plugin marketplace list`, `claude plugin marketplace update`, `claude plugin install`), Antigravity (`.agents/plugins.json`, `~/.gemini/config/plugins.json`), Codex (`codex plugin marketplace add`, `codex plugin add`), and Cursor when a task would benefit from specialized domain tooling or workflow automation.
+Covers marketplace verification, permission review, avoiding redundant submodules, and testing live tool activation.
+
 ## File an issue before starting a new task
 
 @shared/workflow/issue-first.md
@@ -1220,6 +1227,10 @@ The fragment carries the rest: taking the inventory from gha's README table rath
 
 [shared/principles/dont-incur-technical-debt.md](shared/principles/dont-incur-technical-debt.md)
 
+## Dead code is technical debt
+
+[shared/principles/dead-code-is-tech-debt.md](shared/principles/dead-code-is-tech-debt.md)
+
 ## Fail fast — no silent failures
 
 Detect bad state early and stop with a clear error rather than proceeding on it; never swallow an error into a silent fallback (a bare `except:`, a `tryCatch` returning `NULL`, a shell `|| true`), and make any genuinely wanted fallback explicit, bounded, and observable.
@@ -1251,6 +1262,12 @@ Everyone makes mistakes --- humans, AI models, peer agents, and experts alike.
 Always investigate assertions independently via deterministic queries, source inspection, or clarifying questions, and push back constructively whenever you suspect an error or unsound reasoning.
 
 [`shared/principles/dont-take-my-word-for-it.md`](shared/principles/dont-take-my-word-for-it.md)
+
+## Get under the hood --- inspect source code and raw output
+
+When trying to understand what a process is doing, diagnose an unexpected failure, or determine the behavior of a tool, library, or harness, find and inspect the actual source code, raw logs, job output, and live execution paths rather than treating the component as an opaque black box.
+
+[`shared/principles/get-under-the-hood.md`](shared/principles/get-under-the-hood.md)
 
 ## Coding: KISS is the umbrella principle
 

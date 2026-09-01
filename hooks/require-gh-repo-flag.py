@@ -35,7 +35,10 @@ import sys
 # That direction is a false NEGATIVE -- the guard would wave the command
 # through -- which is worse here than the false positive the anchor was added
 # to fix.
-LEAD = r"""^\s*(?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S*)\s+)*gh\s+"""
+# Keywords and wrappers whose operand is itself a command word at command position.
+KEYWORD_PREFIX = r"""(?:(?:!|\{|time|nohup|sudo|then|else|do|if|elif|while|until)\s+)*"""
+ENV_WRAP = r"""(?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S*)\s+)*"""
+LEAD = r"""^\s*""" + KEYWORD_PREFIX + ENV_WRAP + r"""gh\s+"""
 
 GATED = [
     (LEAD + r"secret\s+(set|delete|remove)\b", "gh secret set/delete"),
@@ -68,12 +71,170 @@ HAS_REPO_FLAG = re.compile(
     r"(^|\s)(-R\b|--repo(=|\s)|-o\b|--org(=|\s)|-u\b|--user\b)"
 )
 
-# Split on shell operators so `cd x && gh secret set Y` is judged per segment.
-SPLIT = re.compile(r"&&|\|\||;|\||\n")
+
+def split_command(command: str) -> list[str]:
+    """Split a shell command into executable segments, respecting quotes and subshells."""
+    segments = []
+    current = []
+    stack = ["ROOT"]
+    escaped = False
+    i = 0
+    n = len(command)
+
+    while i < n:
+        c = command[i]
+
+        if escaped:
+            current.append(c)
+            escaped = False
+            i += 1
+            continue
+
+        top = stack[-1]
+
+        if top == "SINGLE_QUOTE":
+            if c == "'":
+                stack.pop()
+            current.append(c)
+            i += 1
+            continue
+
+        if c == "\\" and top != "SINGLE_QUOTE":
+            escaped = True
+            current.append(c)
+            i += 1
+            continue
+
+        if top == "DOUBLE_QUOTE":
+            if c == '"':
+                stack.pop()
+                current.append(c)
+                i += 1
+                continue
+            if c == "$" and i + 1 < n and command[i + 1] == "(":
+                seg = "".join(current).strip()
+                if seg:
+                    segments.append(seg)
+                current = []
+                stack.append("COMMAND_SUBST")
+                i += 2
+                continue
+            if c == "`":
+                seg = "".join(current).strip()
+                if seg:
+                    segments.append(seg)
+                current = []
+                stack.append("BACKTICK")
+                i += 1
+                continue
+            current.append(c)
+            i += 1
+            continue
+
+        # top is ROOT, PAREN, COMMAND_SUBST, or BACKTICK
+        if c == "'":
+            stack.append("SINGLE_QUOTE")
+            current.append(c)
+            i += 1
+            continue
+
+        if c == '"':
+            stack.append("DOUBLE_QUOTE")
+            current.append(c)
+            i += 1
+            continue
+
+        if c == "$" and i + 1 < n and command[i + 1] == "(":
+            seg = "".join(current).strip()
+            if seg:
+                segments.append(seg)
+            current = []
+            stack.append("COMMAND_SUBST")
+            i += 2
+            continue
+
+        if c == "`":
+            if top == "BACKTICK":
+                seg = "".join(current).strip()
+                if seg:
+                    segments.append(seg)
+                current = []
+                stack.pop()
+                i += 1
+                continue
+            else:
+                seg = "".join(current).strip()
+                if seg:
+                    segments.append(seg)
+                current = []
+                stack.append("BACKTICK")
+                i += 1
+                continue
+
+        if c == "(":
+            seg = "".join(current).strip()
+            if seg:
+                segments.append(seg)
+            current = []
+            stack.append("PAREN")
+            i += 1
+            continue
+
+        if c == ")":
+            seg = "".join(current).strip()
+            if seg:
+                segments.append(seg)
+            current = []
+            if top in ("PAREN", "COMMAND_SUBST"):
+                stack.pop()
+            i += 1
+            continue
+
+        # 2-char operators: &&, ||, |&, ;;
+        if i + 1 < n and command[i:i + 2] in ("&&", "||", "|&", ";;"):
+            seg = "".join(current).strip()
+            if seg:
+                segments.append(seg)
+            current = []
+            i += 2
+            continue
+
+        # 1-char operators / delimiters: ;, |, \n
+        if c in (";", "|", "\n"):
+            seg = "".join(current).strip()
+            if seg:
+                segments.append(seg)
+            current = []
+            i += 1
+            continue
+
+        # Standalone & (background operator, not part of &>, >&, or 2>&1)
+        if c == "&":
+            prev_char = command[i - 1] if i > 0 else ""
+            next_char = command[i + 1] if i + 1 < n else ""
+            if prev_char == ">" or next_char == ">":
+                current.append(c)
+                i += 1
+                continue
+            seg = "".join(current).strip()
+            if seg:
+                segments.append(seg)
+            current = []
+            i += 1
+            continue
+
+        current.append(c)
+        i += 1
+
+    seg = "".join(current).strip()
+    if seg:
+        segments.append(seg)
+
+    return segments
 
 
 def offending(command: str):
-    for segment in SPLIT.split(command):
+    for segment in split_command(command):
         if "gh" not in segment:
             continue
         if HAS_REPO_FLAG.search(segment):

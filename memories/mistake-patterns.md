@@ -692,3 +692,15 @@ A clean automated review from every available provider evaluating the current HE
   Partially per-domain (e.g. static analyzers checking that CI jobs admitting `$CI_COMMIT_TAG` do not rely exclusively on `CI_COMMIT_BRANCH` in their scripts).
   General case requires behavioural fixture tests.
 
+## Pattern 37: Discrepancy Between Synthesis Count and Underlying Source Inventory
+- **Do**: Distinguish between the total number of referenced items/files in a source catalog and the count of synthesized/distilled items in your derived document or taxonomy.
+  Ensure summaries, index entries, and cross-references match the exact count in the file they describe.
+- **Don't**: Cite the source catalog's full size (e.g., "29 patterns") as the count of items in a derived taxonomy that only enumerates a subset (e.g., 20 core patterns).
+- **Example**: 2026-08-31, `Morrison-Lab/ai-config` PR [#2800](https://github.com/Morrison-Lab/ai-config/pull/2800): `memories/MEMORY.md` and `skills/find-ai-tells/SKILL.md` described `memories/ai-writing-patterns.md` as an "Empirical synthesis of 29 AI writing patterns", whereas the document's taxonomy enumerated 20 core categories distilled from the source repository's 29 research files.
+- **Canonical Rule**: [`check-info-quality`](../skills/check-info-quality/SKILL.md) and [`timestamp-volatile-claims.md`](../shared/writing/timestamp-volatile-claims.md).
+- **Fix**: Count the actual items in the produced document and verify that descriptions in indices and skills match that exact count.
+- **Algorithmatizable?**
+  Yes.
+  A linter can extract claims of the form `N <nouns>` in docstrings/index entries
+  and compare them against header or bullet counts in target files.
+

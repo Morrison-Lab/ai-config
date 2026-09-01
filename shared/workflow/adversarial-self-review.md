@@ -391,17 +391,23 @@ Reviewed-Commit: <sha>
 
 <!-- review-data:
 {
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "reviewer": "<agent/bot name>",
   "commit_sha": "<full sha>",
   "verdict": "CLEAN",
-  "findings": []
+  "findings": [],
+  "detailed_assessment": "No detailed findings after tracing changed paths and failure modes.",
+  "holistic_assessment": "No whole-change concerns after checking requirements, integration, regression risk, scope, and validation."
 }
 -->
 ```
 
 For a not-clean verdict, set `"verdict": "NOT_CLEAN"` and give `"findings"` one object per finding, each with the four keys `file`, `line`, `category`, and `message`.
 State those keys in any brief you write, rather than only asking for "finding objects" --- a reviewer that guesses the key names produces `structured finding in unknown: ` as the reported blocking reason.
+Every schema `1.1` payload requires distinct `"detailed_assessment"` and `"holistic_assessment"` fields with at least six distinct words each.
+The detailed assessment names a changed path, failure mode, or concrete defect.
+The holistic assessment names a requirement, integration, regression, scope, or validation concern.
+Local review gates refuse a clean verdict that lacks this pass-specific evidence.
 
 Three rules govern how the payload is read, and each exists because its absence inverted a verdict:
 

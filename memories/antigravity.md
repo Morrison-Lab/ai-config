@@ -118,3 +118,16 @@ Three layers had to fail together, and each is worth checking separately when au
 - Do not poll `manage_task(Action='status')` or run repetitive checks in a loop while waiting for a long-running background command or test suite to finish.
 - After launching an asynchronous task or schedule timer, end the tool turn and let the reactive system wakeup resume execution when the process exits or the timer expires.
   (Observed in live Antigravity sessions 2026-08-30.)
+
+## Python SDK (`antigravity-sdk-python`) vs declarative plugins and CLI
+
+The [`google-antigravity/antigravity-sdk-python`](https://github.com/google-antigravity/antigravity-sdk-python) library is the programmatic Python SDK for building, orchestrating, and embedding Antigravity agents (evaluated 2026-08-31).
+
+- **Declarative plugin & skill boundary:**
+  Antigravity IDE, Desktop 2.0, and `agy` discover skills and hooks declaratively via `plugins/ai-config/plugin.json`, `hooks.json`, and markdown skills.
+  The Python SDK is designed for embedding an agent inside a custom Python application or test process, not for authoring plugin configurations or ambient agent behavior.
+- **Review dispatcher parity (`pre-push-review.py`):**
+  Single-turn local code review uses `agy --print` (alongside `claude`, `codex`, `cursor`, `opencode`) to tap into the user's active local CLI subscription login without extra Python runtime dependencies or API key management.
+- **Future adoption trigger:**
+  Evaluate adopting `antigravity-sdk-python` if building Python-native automated agent benchmarking suites, synthetic skill evaluation harnesses, or headless CI pipelines that require typed step streams and programmatic tool registration.
+

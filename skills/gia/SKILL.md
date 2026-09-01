@@ -51,6 +51,13 @@ several repos (e.g. a web session scoped to multiple repos). If the working dir
 isn't itself a single repo, or more than one repo is in scope, ask which repo's
 queue to clear before surveying --- don't assume the first one found.
 
+**Confirm whose PRs are in scope, too.**
+Both phases act only on PRs the user opened (`d-morrison` / `dem-extra1`) or
+is assigned to; `ardia`'s step 1 applies that filter and reports what it
+dropped.
+A PR another lab member or a bot opened stays theirs, and an issue such a PR
+already fixes is left to it rather than grabbed.
+
 ### Phase 1 — ARDIA (existing open PRs/MRs)
 
 Run the full [`ardia`](../ardia/SKILL.md) procedure: list every open PR/MR and
@@ -162,3 +169,4 @@ and [`delegate-to-codex`](../delegate-to-codex/SKILL.md).
 - ❌ Running Phase 2 unbounded — keep GII's wave boundary.
 - ❌ Starting the next wave on your own once the current one is fully finished — stop and ask, with a recommendation, per "Stopping conditions".
 - ❌ Grabbing an issue a pending Phase-1 PR already closes.
+- ❌ Driving, reviewing, or editing a PR the user neither opened nor is assigned to --- "every open PR" means every one of the user's.

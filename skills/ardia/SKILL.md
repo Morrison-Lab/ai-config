@@ -29,6 +29,18 @@ mutates a PR stays serial.
    in the JSON — `glab mr list` alone does not expose these fields.
    State the scope rules when you report, so the user can
    correct:
+   - **Only the user's own PRs are in scope.**
+     Keep a PR only when `author.login` is the user (`d-morrison` or
+     `dem-extra1`) or the user is among its `assignees`;
+     drop every other PR from the list before doing anything else, and name
+     the dropped ones in the report so the user can reassign any they want
+     driven.
+     "Every open PR" below means every PR that survives this filter.
+     A PR by another lab member or by a bot is not driven, reviewed, or
+     edited, however clean it looks
+     (see `memories/preferences.md`, "Only work PRs I opened or am assigned
+     to"; measured on `UCD-SERG/serodynamics` 2026-09-01, where the sweep
+     drove four other authors' PRs before the correction arrived).
    - **Include drafts** (`isDraft: true`) unless another agent is actively driving one.
      A draft is the corpus's own in-flight claim signal ---
      [`pr-on-claim`](../../shared/workflow/pr-on-claim.md) opens one from an empty `start:` scaffold commit before any code exists ---

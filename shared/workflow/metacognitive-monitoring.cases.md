@@ -673,3 +673,36 @@ Any flag that skips environment setup --- a `--no-config`, a bare interpreter,
 a container built without the optional extras --- can shrink what is being
 measured without shrinking the figure reported.
 The shrunken run is usually the faster one, so the habit is self-reinforcing.
+
+## A mechanism verified, an unverified population asserted to fall under it
+
+`UCD-SERG/serocalculator#668`, 2026-09-01.
+A fix removed an RNG-kind leak from a simulation function, and part of
+reviewing the fix was predicting which existing snapshot tests would change
+once it landed --- a real cost, since a changed snapshot needs re-baselining
+and a reviewer's time to confirm the new values are still correct.
+
+The reasoning traced, correctly, which branch of `RNGseq_seed()` a call
+takes depending on whether a `.Random.seed` already exists in the session.
+That is the mechanism, and it was verified by reading the function.
+The claim built on top of it was that specific existing test calls would hit
+the fixed branch and their snapshots would change.
+
+Nobody checked what those calls actually ran under.
+They used the package's multi-core default for `num_cores`, which on the
+test runner's platform forks the R process for `%dopar%` rather than
+building a cluster --- so the leak the PR fixed, which the mechanism
+analysis correctly traced, never reached those particular calls at all.
+The prediction was withdrawn once `grep`-ing the test file for its
+`num_cores` argument showed the actual value.
+
+The mechanism was verified.
+The instance was asserted.
+Those are the two different propositions
+["A sound measurement does not license the claim standing next to it"](metacognitive-monitoring.md#a-sound-measurement-does-not-license-the-claim-standing-next-to-it)
+names: a claim about how `RNGseq_seed()` branches, and a claim about which
+recorded test calls take that branch, standing in one paragraph as though
+verifying the first settled the second.
+The remedy that section gives is the one that closed it here too --- derive
+the population (grep the calls' actual `num_cores`) rather than reasoning
+from the mechanism to the instance.

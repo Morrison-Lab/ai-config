@@ -64,12 +64,11 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
-from fences import strip_fences  # noqa: E402
+from fences import strip_code_spans, strip_fences  # noqa: E402
 
 # Same link-graph vocabulary as scripts/check-links.py, so the two agree on
 # what counts as a relative link.
 LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
-INLINE = re.compile(r"`[^`]*`")
 
 # A Claude Code auto-load import: `@` in the first column, then a path.  These
 # are how CLAUDE.md pulls in shared/ fragments, and they are invisible to LINK.
@@ -127,7 +126,7 @@ def _clean_target(target: str) -> str | None:
 
 def link_targets(text: str) -> list[str]:
     """Relative markdown-link targets in `text`, ignoring code."""
-    stripped = INLINE.sub("", strip_fences(text))
+    stripped = strip_code_spans(strip_fences(text), replacement="")
     targets = []
     for target in LINK.findall(stripped):
         cleaned = _clean_target(target)
@@ -138,7 +137,7 @@ def link_targets(text: str) -> list[str]:
 
 def import_targets(text: str) -> list[str]:
     """Every Claude Code auto-load import (`@path` in col 1) in `text`."""
-    stripped = INLINE.sub("", strip_fences(text))
+    stripped = strip_code_spans(strip_fences(text), replacement="")
     targets = []
     for match in AUTOLOAD.finditer(stripped):
         target = match.group(1).strip()

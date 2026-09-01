@@ -420,6 +420,14 @@ check(
     csr.link_targets("`[x](a.md)` [y](b.md)") == ["b.md"],
 )
 check(
+    "links inside multi-backtick inline code spans are ignored",
+    csr.link_targets("`` `[x](a.md)` `` [y](b.md)") == ["b.md"],
+)
+check(
+    "autoload imports inside multi-backtick inline code spans are ignored",
+    csr.import_targets("`` `@shared/doc.md` ``\n@shared/live.md") == ["shared/live.md"],
+)
+check(
     "an angle-bracket placeholder is not treated as a path",
     csr.link_targets("[x](<owner>/<repo>/a.md) [y](b.md)") == ["b.md"],
 )

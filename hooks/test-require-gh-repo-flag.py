@@ -47,6 +47,14 @@ BLOCK = [
      "split numeric shift does not mask ungated command"),
     ("timeout=$(( (base + (extra)) << EOF ))\n" + G + "pr merge 456 --squash\nEOF\necho done",
      "nested parens in arithmetic shift before EOF delimiter does not mask ungated command"),
+    ("case $x in\n*)(( a << FAKE ))\n" + G + "pr merge 456 --squash\nFAKE\nesac",
+     "case pattern closing paren before arithmetic shift does not mask ungated command"),
+    ("if (( a << FAKE )); then\n" + G + "secret set FOO\nFAKE\nfi",
+     "if (( ... )) arithmetic shift does not mask ungated command"),
+    ("sub() (( a << FAKE ))\n" + G + "secret set FOO\nFAKE",
+     "function def paren before (( arithmetic shift does not mask ungated command"),
+    ("x=(( a << 1 ))\n" + G + "secret set FOO",
+     "assignment before (( arithmetic shift does not mask ungated command"),
 ]
 
 ALLOW = [

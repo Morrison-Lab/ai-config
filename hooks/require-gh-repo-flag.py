@@ -83,50 +83,77 @@ def mask_arithmetic(command: str) -> str:
     out = []
     i = 0
     n = len(command)
+    in_sq = False
+    in_dq = False
+
     while i < n:
-        if command.startswith("$((", i):
-            depth = 2
-            start = i
-            i += 3
-            in_sq = False
-            in_dq = False
-            while i < n and depth > 0:
-                ch = command[i]
-                if ch == "'" and not in_dq:
-                    in_sq = not in_sq
-                elif ch == '"' and not in_sq:
-                    in_dq = not in_dq
-                elif not in_sq and not in_dq:
-                    if ch == "(":
-                        depth += 1
-                    elif ch == ")":
-                        depth -= 1
-                i += 1
-            span = command[start:i]
-            out.append("\n" * span.count("\n"))
+        ch = command[i]
+
+        if ch == "'" and not in_dq:
+            in_sq = not in_sq
+            out.append(ch)
+            i += 1
+            continue
+        elif ch == '"' and not in_sq:
+            in_dq = not in_dq
+            out.append(ch)
+            i += 1
             continue
 
-        if command.startswith("((", i) and (i == 0 or command[i-1] in " \t\n;&|"):
-            depth = 2
-            start = i
-            i += 2
-            in_sq = False
-            in_dq = False
-            while i < n and depth > 0:
-                ch = command[i]
-                if ch == "'" and not in_dq:
-                    in_sq = not in_sq
-                elif ch == '"' and not in_sq:
-                    in_dq = not in_dq
-                elif not in_sq and not in_dq:
-                    if ch == "(":
-                        depth += 1
-                    elif ch == ")":
-                        depth -= 1
-                i += 1
-            span = command[start:i]
-            out.append("\n" * span.count("\n"))
-            continue
+        if not in_sq and not in_dq:
+            if command.startswith("$((", i):
+                start = i
+                i += 3
+                depth = 2
+                sub_sq = False
+                sub_dq = False
+                while i < n and depth > 0:
+                    c = command[i]
+                    if c == "'" and not sub_dq:
+                        sub_sq = not sub_sq
+                    elif c == '"' and not sub_sq:
+                        sub_dq = not sub_dq
+                    elif not sub_sq and not sub_dq:
+                        if c == "(":
+                            depth += 1
+                        elif c == ")":
+                            depth -= 1
+                    i += 1
+                if depth == 0:
+                    span = command[start:i]
+                    out.append("\n" * span.count("\n"))
+                    continue
+                else:
+                    out.append(command[start])
+                    i = start + 1
+                    continue
+
+            if command.startswith("((", i):
+                start = i
+                i += 2
+                depth = 2
+                sub_sq = False
+                sub_dq = False
+                while i < n and depth > 0:
+                    c = command[i]
+                    if c == "'" and not sub_dq:
+                        sub_sq = not sub_sq
+                    elif c == '"' and not sub_sq:
+                        sub_dq = not sub_dq
+                    elif not sub_sq and not sub_dq:
+                        if c == "(":
+                            depth += 1
+                        elif c == ")":
+                            depth -= 1
+                    i += 1
+                if depth == 0:
+                    span = command[start:i]
+                    out.append("\n" * span.count("\n"))
+                    continue
+                else:
+                    out.append(command[start])
+                    i = start + 1
+                    continue
 
         out.append(command[i])
         i += 1

@@ -45,6 +45,8 @@ BLOCK = [
      "multi-line arithmetic shift does not mask ungated command"),
     ("echo $(( 1 <<\n4 ))\n" + G + "secret set FOO",
      "split numeric shift does not mask ungated command"),
+    ("timeout=$(( (base + (extra)) << EOF ))\n" + G + "pr merge 456 --squash\nEOF\necho done",
+     "nested parens in arithmetic shift before EOF delimiter does not mask ungated command"),
 ]
 
 ALLOW = [

@@ -68,10 +68,6 @@ HAS_REPO_FLAG = re.compile(
     r"(^|\s)(-R\b|--repo(=|\s)|-o\b|--org(=|\s)|-u\b|--user\b)"
 )
 
-# Match arithmetic expansions like `$(( x << y ))` or `(( x << y ))` across
-# single or multiple lines where `<<` is a bitwise shift, not a heredoc opener.
-ARITHMETIC = re.compile(r"\$\(\([\s\S]*?(\)\)|$)|\(\([\s\S]*?(\)\)|$)")
-
 # Match heredoc openers: `<<`, `<<-`, `<<~` followed by quoted, backslash-escaped,
 # or bare word delimiter.
 HEREDOC_OPEN = re.compile(
@@ -82,11 +78,67 @@ HEREDOC_OPEN = re.compile(
 SPLIT = re.compile(r"&&|\|\||;|\||\n")
 
 
+def mask_arithmetic(command: str) -> str:
+    """Mask $(( ... )) and (( ... )) arithmetic expansions with balanced parentheses."""
+    out = []
+    i = 0
+    n = len(command)
+    while i < n:
+        if command.startswith("$((", i):
+            depth = 2
+            start = i
+            i += 3
+            in_sq = False
+            in_dq = False
+            while i < n and depth > 0:
+                ch = command[i]
+                if ch == "'" and not in_dq:
+                    in_sq = not in_sq
+                elif ch == '"' and not in_sq:
+                    in_dq = not in_dq
+                elif not in_sq and not in_dq:
+                    if ch == "(":
+                        depth += 1
+                    elif ch == ")":
+                        depth -= 1
+                i += 1
+            span = command[start:i]
+            out.append("\n" * span.count("\n"))
+            continue
+
+        if command.startswith("((", i) and (i == 0 or command[i-1] in " \t\n;&|"):
+            depth = 2
+            start = i
+            i += 2
+            in_sq = False
+            in_dq = False
+            while i < n and depth > 0:
+                ch = command[i]
+                if ch == "'" and not in_dq:
+                    in_sq = not in_sq
+                elif ch == '"' and not in_sq:
+                    in_dq = not in_dq
+                elif not in_sq and not in_dq:
+                    if ch == "(":
+                        depth += 1
+                    elif ch == ")":
+                        depth -= 1
+                i += 1
+            span = command[start:i]
+            out.append("\n" * span.count("\n"))
+            continue
+
+        out.append(command[i])
+        i += 1
+
+    return "".join(out)
+
+
 def strip_heredocs(command: str) -> str:
     """Drop heredoc body lines and delimiters so interior text is not scanned as commands."""
     # Mask arithmetic expansions across the whole command before parsing openers,
     # preserving line breaks so line counts stay synchronized.
-    command_for_openers = ARITHMETIC.sub(lambda m: "\n" * m.group(0).count("\n"), command)
+    command_for_openers = mask_arithmetic(command)
     lines_orig = command.split("\n")
     lines_masked = command_for_openers.split("\n")
 

@@ -1143,7 +1143,10 @@ The second wake named the live head, and still arrived inside that window.
 
 What the wake's body says about its own scope is not reproduced here, because it lives only in that session's transcript and no later reader can check it.
 What is checkable is the pair of fields above: the event's `head_sha`, and a check-runs read on the PR's actual head.
-Compare the first, then run the second.)
+Compare the first, then run the second.
+The success-direction framing, the exclusions the event body itself declares, and later occurrences across two further repositories are in
+[`memories/github-mcp-tools.md`](../../memories/github-mcp-tools.md),
+"A `check_suite.completed` event can name a superseded head".)
 
 ## A poller exited on an empty check list
 

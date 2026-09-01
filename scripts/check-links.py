@@ -20,6 +20,8 @@ from fences import strip_fences  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
+URI_SCHEME = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]{1,31}:")
+AUTOLINK = re.compile(r"<((?:[a-zA-Z][a-zA-Z0-9+.-]{1,31}:[^<>\s]+|[^<>\s@/]+@[^<>\s/]+))>")
 # Strip code regions first so link-shaped examples inside fences / backticks
 # (regexes, `[text](url)` snippets) aren't mistaken for real links.
 INLINE = re.compile(r"`[^`]*`")
@@ -40,33 +42,44 @@ checked = 0
 
 
 def is_external(target: str) -> bool:
-    return target.startswith(SKIP_PREFIXES) or "://" in target
+    return (
+        target.startswith(SKIP_PREFIXES)
+        or "://" in target
+        or bool(URI_SCHEME.match(target))
+        or ("@" in target and "/" not in target)
+    )
+
+
+def check_target(target: str, md: Path) -> None:
+    global checked
+    target = target.strip()
+    if target.startswith("<") and target.endswith(">"):
+        target = target[1:-1].strip()
+    # drop a trailing `"title"` if present
+    target = target.split(" ", 1)[0]
+    if not target or is_external(target):
+        return
+    if "<" in target or ">" in target:
+        return  # angle-bracket placeholder, e.g. <owner>/<repo>
+    path_part = re.split(r"[#?]", target, maxsplit=1)[0]
+    if not path_part:  # pure in-page anchor
+        return
+    if "/" not in path_part and "." not in path_part:
+        return  # bare-word placeholder in an example, e.g. (url)
+    checked += 1
+    resolved = (md.parent / path_part).resolve()
+    if not resolved.exists():
+        broken.append(f"{md.relative_to(ROOT)} -> {target}")
 
 
 def check_file(md: Path) -> None:
-    global checked
     text = md.read_text(encoding="utf-8")
     text = strip_fences(text)
     text = INLINE.sub("", text)
     for match in LINK.finditer(text):
-        target = match.group(1).strip()
-        if target.startswith("<") and target.endswith(">"):
-            target = target[1:-1].strip()
-        # drop a trailing `"title"` if present
-        target = target.split(" ", 1)[0]
-        if not target or is_external(target):
-            continue
-        if "<" in target or ">" in target:
-            continue  # angle-bracket placeholder, e.g. <owner>/<repo>
-        path_part = re.split(r"[#?]", target, maxsplit=1)[0]
-        if not path_part:  # pure in-page anchor
-            continue
-        if "/" not in path_part and "." not in path_part:
-            continue  # bare-word placeholder in an example, e.g. (url)
-        checked += 1
-        resolved = (md.parent / path_part).resolve()
-        if not resolved.exists():
-            broken.append(f"{md.relative_to(ROOT)} -> {target}")
+        check_target(match.group(1), md)
+    for match in AUTOLINK.finditer(text):
+        check_target(match.group(1), md)
 
 
 def main() -> None:

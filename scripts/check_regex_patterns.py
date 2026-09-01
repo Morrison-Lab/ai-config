@@ -119,28 +119,49 @@ RE_CALL_NAMES = {
 }
 
 
-def extract_regex_instances_from_ast(tree: ast.AST, file_path: str) -> list[RegexInstance]:
-    """Extract regex pattern strings, line numbers, and flags from Python AST."""
-    string_constants: dict[str, str] = {}
-    instances: list[RegexInstance] = []
+class ScopedRegexExtractor(ast.NodeVisitor):
+    """Extract regex pattern strings, line numbers, and flags with lexical scope awareness."""
 
-    # First pass: collect string constants across all scopes (module, class, function)
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Assign):
+    def __init__(self, file_path: str):
+        self.file_path = file_path
+        self.instances: list[RegexInstance] = []
+        self.scopes: list[dict[str, str]] = [{}]  # module scope at index 0
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        self.scopes.append({})
+        self.generic_visit(node)
+        self.scopes.pop()
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+        self.scopes.append({})
+        self.generic_visit(node)
+        self.scopes.pop()
+
+    def visit_ClassDef(self, node: ast.ClassDef) -> None:
+        self.scopes.append({})
+        self.generic_visit(node)
+        self.scopes.pop()
+
+    def visit_Assign(self, node: ast.Assign) -> None:
+        if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
             for target in node.targets:
-                if isinstance(target, ast.Name) and isinstance(node.value, ast.Constant):
-                    if isinstance(node.value.value, str):
-                        string_constants[target.id] = node.value.value
-        elif isinstance(node, ast.AnnAssign):
-            if isinstance(node.target, ast.Name) and isinstance(node.value, ast.Constant):
-                if isinstance(node.value.value, str):
-                    string_constants[node.target.id] = node.value.value
+                if isinstance(target, ast.Name):
+                    self.scopes[-1][target.id] = node.value.value
+        self.generic_visit(node)
 
-    # Second pass: walk all call nodes
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Call):
-            continue
+    def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
+        if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+            if isinstance(node.target, ast.Name):
+                self.scopes[-1][node.target.id] = node.value.value
+        self.generic_visit(node)
 
+    def _lookup_constant(self, name: str) -> str | None:
+        for scope in reversed(self.scopes):
+            if name in scope:
+                return scope[name]
+        return None
+
+    def visit_Call(self, node: ast.Call) -> None:
         func = node.func
         call_name = ""
         is_re_call = False
@@ -150,60 +171,62 @@ def extract_regex_instances_from_ast(tree: ast.AST, file_path: str) -> list[Rege
                 is_re_call = True
                 call_name = f"re.{func.attr}"
 
-        if not is_re_call or not node.args:
-            continue
+        if is_re_call and node.args:
+            arg0 = node.args[0]
+            pattern_str: str | None = None
 
-        arg0 = node.args[0]
-        pattern_str: str | None = None
+            if isinstance(arg0, ast.Constant) and isinstance(arg0.value, str):
+                pattern_str = arg0.value
+            elif isinstance(arg0, ast.Name):
+                pattern_str = self._lookup_constant(arg0.id)
 
-        if isinstance(arg0, ast.Constant) and isinstance(arg0.value, str):
-            pattern_str = arg0.value
-        elif isinstance(arg0, ast.Name) and arg0.id in string_constants:
-            pattern_str = string_constants[arg0.id]
+            if pattern_str is not None:
+                # Extract flags
+                flags = 0
+                if call_name == "re.compile":
+                    if len(node.args) >= 2:
+                        flags = evaluate_ast_flags(node.args[1])
+                    for kw in node.keywords:
+                        if kw.arg == "flags":
+                            flags |= evaluate_ast_flags(kw.value)
+                elif call_name in ("re.search", "re.match", "re.fullmatch", "re.findall", "re.finditer"):
+                    if len(node.args) >= 3:
+                        flags = evaluate_ast_flags(node.args[2])
+                    for kw in node.keywords:
+                        if kw.arg == "flags":
+                            flags |= evaluate_ast_flags(kw.value)
+                elif call_name == "re.split":
+                    if len(node.args) >= 4:
+                        flags = evaluate_ast_flags(node.args[3])
+                    for kw in node.keywords:
+                        if kw.arg == "flags":
+                            flags |= evaluate_ast_flags(kw.value)
+                elif call_name in ("re.sub", "re.subn"):
+                    if len(node.args) >= 5:
+                        flags = evaluate_ast_flags(node.args[4])
+                    for kw in node.keywords:
+                        if kw.arg == "flags":
+                            flags |= evaluate_ast_flags(kw.value)
 
-        if pattern_str is None:
-            continue
+                self.instances.append(
+                    RegexInstance(
+                        file_path=self.file_path,
+                        line_number=node.lineno,
+                        col_offset=node.col_offset,
+                        pattern_str=pattern_str,
+                        flags=flags,
+                        source_call=call_name,
+                    )
+                )
 
-        # Extract flags
-        flags = 0
-        if call_name == "re.compile":
-            if len(node.args) >= 2:
-                flags = evaluate_ast_flags(node.args[1])
-            for kw in node.keywords:
-                if kw.arg == "flags":
-                    flags |= evaluate_ast_flags(kw.value)
-        elif call_name in ("re.search", "re.match", "re.fullmatch", "re.findall", "re.finditer"):
-            if len(node.args) >= 3:
-                flags = evaluate_ast_flags(node.args[2])
-            for kw in node.keywords:
-                if kw.arg == "flags":
-                    flags |= evaluate_ast_flags(kw.value)
-        elif call_name == "re.split":
-            # re.split(pattern, string, maxsplit=0, flags=0)
-            if len(node.args) >= 4:
-                flags = evaluate_ast_flags(node.args[3])
-            for kw in node.keywords:
-                if kw.arg == "flags":
-                    flags |= evaluate_ast_flags(kw.value)
-        elif call_name in ("re.sub", "re.subn"):
-            if len(node.args) >= 5:
-                flags = evaluate_ast_flags(node.args[4])
-            for kw in node.keywords:
-                if kw.arg == "flags":
-                    flags |= evaluate_ast_flags(kw.value)
+        self.generic_visit(node)
 
-        instances.append(
-            RegexInstance(
-                file_path=file_path,
-                line_number=node.lineno,
-                col_offset=node.col_offset,
-                pattern_str=pattern_str,
-                flags=flags,
-                source_call=call_name,
-            )
-        )
 
-    return instances
+def extract_regex_instances_from_ast(tree: ast.AST, file_path: str) -> list[RegexInstance]:
+    """Extract regex pattern strings, line numbers, and flags from Python AST."""
+    extractor = ScopedRegexExtractor(file_path)
+    extractor.visit(tree)
+    return extractor.instances
 
 
 # --- Static Pattern Analysis ---

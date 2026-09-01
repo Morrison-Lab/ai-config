@@ -208,6 +208,27 @@ def test_synthetic_files() -> None:
             f"out={out!r}",
         )
 
+        # Test lexical scope isolation between functions
+        scope_file = Path(td) / "test_scopes.py"
+        scope_code = (
+            "import re\n\n"
+            "def func_safe():\n"
+            "    pat = r'^[a-z]+$'\n"
+            "    return re.search(pat, 'test')\n\n"
+            "def func_danger():\n"
+            "    pat = r'(a+)+'\n"
+            "    return re.search(pat, 'test')\n"
+        )
+        scope_file.write_text(scope_code, encoding="utf-8")
+        rc, out, err = run_script(["--paths", str(scope_file), "--json"])
+        data = json.loads(out)
+        reports = data.get("reports", [])
+        check(
+            "lexical scope correctly attributes vulnerability to func_danger line 9",
+            len(reports) == 1 and reports[0]["line_number"] == 9,
+            f"reports={reports!r}",
+        )
+
 
 test_synthetic_files()
 

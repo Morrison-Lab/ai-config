@@ -177,7 +177,8 @@ sits unread.
    gh pr list --state open --json number,title,headRefName,author,assignees,mergeable,mergeStateStatus,comments   # LIST_PRS
    ```
    Filter that list by `memories/reviewing-prs.md`'s scope test first, as `ardia` step 1 does (opened by or assigned to the invoking user, explicitly requested by name, or opened by a repository workflow);
-   an out-of-scope conflicting PR gets a comment naming the conflict, never a push.
+   an out-of-scope conflicting PR is reported to the user and left untouched (no comment, no push);
+   they can assign or name it if they want it resolved.
    For each in-scope PR where `mergeable == "CONFLICTING"` **or `"UNKNOWN"`** (see `resolve-conflicts`, "Verify before you act" --- `UNKNOWN` can mean GitHub hasn't finished computing yet, not that there's no conflict), verify with `git merge-tree --write-tree origin/main origin/<branch>` (git ≥ 2.38) before acting, then check claim status (most recent comment) and fix unclaimed ones --- same cascade procedure as `post-merge` step 1.5 (claim → isolated worktree → fetch main → merge → `resolve-conflicts` skill → push → unclaim).
    A merge to `main` during your ARDI loop can create new conflicts in sibling PRs; clearing them while waiting for the next verdict is better than letting them pile up.
 
@@ -249,7 +250,7 @@ How depends on the repo's review trigger first, and on whether this round pushed
      --jq '.[] | select(.mergeable == "CONFLICTING" or .mergeable == "UNKNOWN")'   # LIST_PRS
    ```
    Apply the same scope test as the sweep above before touching a candidate;
-   an out-of-scope one gets a comment, never a push.
+   an out-of-scope one is reported to the user and left untouched.
    Verify each in-scope candidate with `git merge-tree --write-tree origin/main
    origin/<branch>` (git ≥ 2.38; see `resolve-conflicts`, "Verify before you act") before
    claiming --- `UNKNOWN` isn't proof of a real conflict, and `CONFLICTING` can

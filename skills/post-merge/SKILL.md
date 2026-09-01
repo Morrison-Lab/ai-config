@@ -270,8 +270,8 @@ gh pr list --state open \
 Filter that list by `memories/reviewing-prs.md`'s scope test first, as
 `ardia` step 1 does (opened by or assigned to the invoking user, named in the
 request, or opened by a repository workflow), and report the PRs dropped.
-A conflict on an out-of-scope PR gets an explanatory comment for its author,
-never a push, and a claim comment does not bring it into scope.
+A conflict on an out-of-scope PR is reported to the user and the PR left
+untouched (no comment, no push); a claim comment does not bring it into scope.
 
 For each in-scope PR where `mergeable == "CONFLICTING"` **or `"UNKNOWN"`** (GitHub can
 take minutes to finish computing mergeability after a push — a genuinely

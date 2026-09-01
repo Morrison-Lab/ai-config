@@ -230,8 +230,8 @@ sibling PR's actual semantic change (not a mechanical `--theirs`) to the new
 location, verify with a direct diff that the extracted unit now differs from
 `main` by exactly that PR's intended change and nothing else, then push when
 the sibling PR passes `memories/reviewing-prs.md`'s scope test and flag what
-you did in a PR comment; otherwise leave a comment carrying the re-applied
-diff for its author.
+you did in a PR comment; otherwise report the prepared diff to the user and
+leave the sibling PR untouched, since they can assign or name it first.
 
 See [`sync-with-main.cases.md`](sync-with-main.cases.md), "Check other open
 PRs after merging an extraction".

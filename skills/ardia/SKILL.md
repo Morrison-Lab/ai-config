@@ -35,7 +35,9 @@ mutates a PR stays serial.
      and add any aliases `memories/reviewing-prs.md` lists for that person,
      so a lab member running this corpus from a vendored checkout filters on their own identity rather than the corpus owner's.
      When no identity operation is available, fail closed: leave the author and assignee arms unevaluated, keep only explicitly requested and workflow-opened PRs, and say so in the report.
-     Keep a PR only when its `author.login` is one of those logins or the repository's own workflow bot (the app slug `github-actions`, in whichever form the source returns it;
+     Normalise the fields first: the author is `author.login` in `gh --json`, `user.login` in REST and `mcp__github__list_pull_requests`, and `author.username` on GitLab;
+     assignees are `assignees[].login` (GitHub) or `assignees[].username` (GitLab).
+     Keep a PR only when its author is one of those logins or the repository's own workflow bot (the app slug `github-actions`, in whichever form the source returns it;
      `memories/reviewing-prs.md` lists the forms),
      one of those logins is among its `assignees`,
      or the user explicitly asked for work on that PR (or, via an explicit `chores` call, on the bot population) --- a mention such as "do not touch #284" is not a request;

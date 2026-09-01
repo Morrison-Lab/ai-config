@@ -8,5 +8,6 @@
   "homepage": "https://github.com/Morrison-Lab/ai-config",
   "repository": "https://github.com/Morrison-Lab/ai-config",
   "keywords": ["skills", "pr-workflow", "review", "hooks", "r-packages"],
-  "skills": "codex-skills"
+  "skills": "codex-skills",
+  "hooks": "./plugins/ai-config/codex-hooks.json"
 }

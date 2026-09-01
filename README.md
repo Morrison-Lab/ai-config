@@ -75,13 +75,11 @@ strict `name`/`description` frontmatter. Each wrapper tells Codex to read the
 matching canonical skill from `skills/<name>/SKILL.md` and adapt Claude-only
 metadata or tools to the current Codex session.
 
-Codex can load this repository as a plugin through [`.codex-plugin/plugin.json`](.codex-plugin/plugin.json) for its generated wrappers.
-The repository-local [`.codex/hooks.json`](.codex/hooks.json) is the single authoritative hook registration.
-It routes the canonical catalog through `plugins/ai-config/codex-hook-adapter.py`.
-Keeping one registration avoids Codex running the catalog twice when the plugin is enabled in this checkout.
+Codex can load this repository as a plugin through [`.codex-plugin/plugin.json`](.codex-plugin/plugin.json).
+The plugin manifest explicitly routes hooks to `plugins/ai-config/codex-hooks.json`, avoiding Codex's default discovery of the Claude catalog at `hooks/hooks.json`.
+That Codex hook manifest routes the canonical catalog through `plugins/ai-config/codex-hook-adapter.py`.
 The first session opening a new or changed hook must review and trust it in Codex's hook browser before it runs.
-For a user-global install, register the plugin with Codex for skills.
-Hook activation is intentionally checkout-local through `.codex/hooks.json`.
+For a user-global install, register the plugin with Codex for skills and hooks.
 After adding or editing a canonical skill, regenerate the wrappers:
 
 ```sh
@@ -622,7 +620,7 @@ activated.")
 - `skills/` --- reusable workflow skills (Claude Code and Cursor via plugin install, and Gemini/Antigravity via the `skills.json` registration `bootstrap.sh` writes against the checkout's own `skills/` path)
 - `codex-skills/` --- generated Codex wrappers
 - `.codex-plugin/` --- Codex plugin manifest for generated wrappers
-- `.codex/` --- Codex project hook registration that dispatches the canonical catalog
+- `plugins/ai-config/codex-hooks.json` --- Codex plugin hook registration that dispatches the canonical catalog
 - `cursor-rules/` --- user-global Cursor rules (shipped by the Cursor plugin's `rules` field, `~/.cursor/rules/`)
 - `.cursor/rules/` --- project Cursor rules for this repo as a workspace
 - `.cursor/hooks.json` --- Cursor-native project hooks (Cloud agents load these)

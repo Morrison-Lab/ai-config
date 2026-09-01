@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import re
 import subprocess
@@ -32,19 +33,42 @@ TOOL_ALIASES = {
 
 def load_entries(event: str) -> list[dict[str, Any]]:
     data = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise TypeError("hook catalog root must be a JSON object")
+    catalog = data.get("hooks", {})
+    if not isinstance(catalog, dict):
+        raise TypeError("hook catalog 'hooks' must be an object")
+    groups = catalog.get(event, [])
+    if not isinstance(groups, list):
+        raise TypeError(f"hook catalog event {event!r} must be an array")
     entries: list[dict[str, Any]] = []
-    for group in data.get("hooks", {}).get(event, []):
+    for group in groups:
+        if not isinstance(group, dict):
+            raise TypeError("hook catalog event groups must be objects")
         matcher = group.get("matcher")
-        for hook in group.get("hooks", []):
+        if matcher is not None and not isinstance(matcher, str):
+            raise TypeError("hook catalog matchers must be strings")
+        hooks = group.get("hooks", [])
+        if not isinstance(hooks, list):
+            raise TypeError("hook catalog group hooks must be an array")
+        for hook in hooks:
+            if not isinstance(hook, dict):
+                raise TypeError("hook catalog hook entries must be objects")
             if hook.get("type", "command") != "command":
                 continue
             command = hook.get("command")
+            if not isinstance(command, str):
+                raise TypeError("hook catalog commands must be strings")
             if not command:
-                continue
+                raise TypeError("hook catalog commands must be non-empty")
+            timeout = hook.get("timeout", 600)
+            if (not isinstance(timeout, (int, float)) or isinstance(timeout, bool)
+                    or not math.isfinite(timeout) or timeout <= 0):
+                raise TypeError("hook catalog timeouts must be finite positive numbers")
             entries.append({
                 "matcher": matcher,
                 "command": command,
-                "timeout": hook.get("timeout", 600),
+                "timeout": timeout,
             })
     return entries
 
@@ -95,20 +119,24 @@ def run_entry(entry: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any] 
             check=False,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
-        return {"decision": "block", "reason": f"ai-config hook execution failed: {exc}"}
+        return {"systemMessage": f"ai-config hook execution failed: {exc}"}
     if result.stderr:
         print(result.stderr, file=sys.stderr, end="")
     if result.returncode != 0:
         detail = result.stderr.strip() or f"exit code {result.returncode}"
-        return {"decision": "block", "reason": f"ai-config hook failed: {detail}"}
+        if result.returncode == 2:
+            return {"decision": "block", "reason": f"ai-config hook failed: {detail}"}
+        # Codex reserves exit 2 for blocking; other failures are reported but
+        # must not deny the tool or turn (the documented hook contract).
+        return {"systemMessage": f"ai-config hook failed: {detail}"}
     if not result.stdout.strip():
         return None
     try:
         parsed = json.loads(result.stdout)
     except json.JSONDecodeError as exc:
-        return {"decision": "block", "reason": f"ai-config hook returned invalid JSON: {exc}"}
+        return {"systemMessage": f"ai-config hook returned invalid JSON: {exc}"}
     if not isinstance(parsed, dict):
-        return {"decision": "block", "reason": "ai-config hook returned non-object JSON."}
+        return {"systemMessage": "ai-config hook returned non-object JSON."}
     return parsed
 
 

@@ -39,19 +39,27 @@ assert not mod.matcher_hits("Bash", "apply_patch")
 
 plugin_manifest = json.loads((ROOT / ".codex-plugin/plugin.json").read_text())
 assert plugin_manifest["skills"] == "codex-skills"
-project_hooks = json.loads((ROOT / ".codex/hooks.json").read_text())
-assert "codex-hook-adapter.py" in json.dumps(project_hooks)
-assert "hooks" not in plugin_manifest
+plugin_hooks = json.loads((ROOT / "plugins/ai-config/codex-hooks.json").read_text())
+assert "${PLUGIN_ROOT}" in json.dumps(plugin_hooks)
+assert plugin_manifest["hooks"] == "./plugins/ai-config/codex-hooks.json"
 
 failed = mod.run_entry({"command": "exit 2", "timeout": 1}, {})
 assert failed and failed["decision"] == "block"
+nonblocking_failure = mod.run_entry({"command": "exit 1", "timeout": 1}, {})
+assert nonblocking_failure and "systemMessage" in nonblocking_failure
 malformed = mod.run_entry({"command": "printf invalid-json", "timeout": 1}, {})
-assert malformed and malformed["decision"] == "block"
+assert malformed and "systemMessage" in malformed
 
 original_manifest = mod.MANIFEST
 mod.MANIFEST = ROOT / "does-not-exist-hooks.json"
 assert mod.dispatch("PreToolUse", {"tool_name": "Bash"})["decision"] == "block"
+with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as invalid_catalog:
+    invalid_catalog.write(json.dumps({"hooks": [{"hooks": [{"command": "", "timeout": 0}]}]}))
+    invalid_catalog_path = invalid_catalog.name
+mod.MANIFEST = Path(invalid_catalog_path)
+assert mod.dispatch("PreToolUse", {"tool_name": "Bash"})["decision"] == "block"
 mod.MANIFEST = original_manifest
+os.unlink(invalid_catalog_path)
 
 pretool = run("PreToolUse", {
     "session_id": f"test-{os.getpid()}",

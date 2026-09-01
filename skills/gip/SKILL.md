@@ -249,7 +249,7 @@ signal is present; otherwise propose with a cost estimate first.
   inline because subagents start fresh.
 - **`prefer-upstream`** --- search existing packages, standard libraries, and lab
   repos before writing custom code to avoid reinventing the wheel
-- **`pr-on-claim`** — the rule behind each subagent's step 4: open the draft PR
+- **`pr-on-claim`** --- the rule behind each subagent's step 5: open the draft PR
   up front so parallel workers see the in-flight issue before implementing.
 - **`gia`** — clears the whole queue (clean open PRs, then work issues); compose
   GIP into its issue phase when that phase's issues are independent.

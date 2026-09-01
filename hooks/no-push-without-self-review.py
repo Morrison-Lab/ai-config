@@ -139,7 +139,6 @@ REVIEW_PROMPT_RE = re.compile(
 )
 
 AGENT_TOOLS = {"agent", "task", "invoke_subagent", "taskoutput", "task_output", "manage_task"}
-CLI_REVIEW_TOOLS = {"bash", "run_command", "execute_command", "terminal", "shell"}
 
 OVERRIDE_ENV = re.compile(r"\AALLOW_UNREVIEWED_PUSH=1\Z")
 

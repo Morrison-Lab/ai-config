@@ -49,7 +49,7 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_WORKSPACE_API_KEY || secrets.ANTHROPIC_API_KEY }}
           FORCE: ${{ inputs.force && '1' || '0' }}
-          PRUNE: ${{ inputs.prune == false && '0' || '1' }}
+          PRUNE: ${{ github.event_name == 'workflow_dispatch' && inputs.prune == false && '0' || '1' }}
         run: |
           if [ -z "$ANTHROPIC_API_KEY" ]; then
             echo "ANTHROPIC_API_KEY secret not configured; skipping upload"

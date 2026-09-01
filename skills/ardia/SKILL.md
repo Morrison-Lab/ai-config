@@ -35,13 +35,16 @@ mutates a PR stays serial.
      `memories/reviewing-prs.md` lists for that person, so a lab member
      running this corpus from a vendored checkout filters on their own
      identity rather than the corpus owner's.
-     Keep a PR only when its `author.login` is one of those logins, one of
-     them is among its `assignees`, or the user named the PR in the request;
+     Keep a PR only when its `author.login` is one of those logins or the
+     repository's own workflow bot (`github-actions[bot]` via the API,
+     `app/github-actions` in `gh pr list` output), one of those logins is
+     among its `assignees`, or the user named the PR in the request;
      drop every other PR before doing anything else, and name the dropped
      ones in the report so the user can assign or name any they want driven.
      "Every open PR" below means every PR that survives this filter.
-     A PR by another lab member or by a bot is not driven, reviewed, or
-     edited, however clean it looks
+     A PR by another lab member, or by any other bot (Dependabot, a
+     Copilot agent), is not driven, reviewed, or edited, however clean it
+     looks
      (see `memories/reviewing-prs.md`, "Only work PRs I opened or am assigned
      to"; measured on `UCD-SERG/serodynamics` 2026-09-01, where the sweep
      drove four other authors' PRs before the correction arrived).

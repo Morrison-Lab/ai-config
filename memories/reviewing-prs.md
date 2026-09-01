@@ -66,19 +66,29 @@ branch, not when you were asked only to read it.
 See also [`shared/workflow/ardi.md`](../shared/workflow/ardi.md).
 ## Only work PRs I opened or am assigned to
 
-Work only on pull requests opened by me (`d-morrison` or `dem-extra1`) or
-assigned to me.
-A PR opened by another lab member, or by a bot, is not mine to drive unless it
-is assigned to me --- however clean, stale, or easy it looks, and however a
-sweep skill words its scope.
+Work only on pull requests opened by me (`d-morrison` or `dem-extra1`),
+assigned to me, or opened by one of the repository's own workflows
+(`github-actions[bot]` --- a submodule bump, an automated sync PR).
+A PR opened by another lab member, or by any other bot, is not mine to drive
+unless it is assigned to me --- however clean, stale, or easy it looks, and
+however a sweep skill words its scope.
 
-The user stated the **Do** side; the **Don't** side is inferred from the
-near-miss that prompted it, and is what makes the rule checkable.
+The user stated the **Do** side, in two steps: first the author/assignee
+test, then (same day) that workflow-opened PRs such as a submodule bump are
+fine.
+The **Don't** side is inferred from the near-miss that prompted it, and is
+what makes the rule checkable.
+The narrowing of "workflow-opened" to the `github-actions[bot]` login is also
+inferred: the example given was a `bump-submodule.yml` PR, and Dependabot and
+Copilot PRs post under their own logins and were not named.
 
 - **Do:** before touching any PR, resolve who you are running as, read the
   PR's `author.login` and `assignees`, and proceed only when the author is
-  you (or an alias below), you are among the assignees, or the user named
-  the PR in the request.
+  you (or an alias below) or a repository workflow, you are among the
+  assignees, or the user named the PR in the request.
+  The workflow login is spelled `github-actions[bot]` by the REST API and
+  the MCP tools and `app/github-actions` (with `is_bot: true`) by
+  `gh pr list --json author`, so match either.
 - **Do:** treat `d-morrison` and `dem-extra1` as one person --- this
   corpus's owner --- when either is the invoking user.
   They are written as literals here on purpose: `preferences.md`'s
@@ -93,16 +103,23 @@ near-miss that prompted it, and is what makes the rule checkable.
   review on, or resolve threads on a PR that fails the test.
 - **Don't:** read a skill's "drive every open PR" as a scope grant that
   overrides this --- "every" means every PR that is mine.
-- **Don't:** treat a bot-opened PR (a submodule bump, a Dependabot PR) as
-  mine by default; it needs the assignment like any other.
+- **Don't:** treat a PR from a bot other than the repository's workflows
+  (a Dependabot PR, a Copilot-agent PR) as mine by default; it needs the
+  assignment like any other.
+- **Don't:** stand down from a workflow-opened PR on the author test alone
+  --- that is the over-correction the second directive reversed.
 
 The near-miss looks like diligence from the inside, which is why it needs
 the explicit Don'ts.
 On `UCD-SERG/serodynamics`, 2026-09-01, a `gia` sweep pushed commits
 to #284, #292, #298 and #311 and dispatched a review on #310 --- four
-authored by other lab members, one by `github-actions[bot]`, none assigned
-to me --- and drove all of them to a clean verdict before the correction
-arrived.
+authored by other lab members, one (#292) by `github-actions[bot]`, none
+assigned to me --- and drove all of them to a clean verdict before the
+correction arrived.
+The session then stood down from all five, and the user reversed that
+for the workflow-opened one, #292, which was fine to drive.
+So the population error was the four human-authored PRs, and the
+over-correction was the fifth.
 Every individual action was a correct ARDI step.
 The error was the population, decided by reading "every open PR" in the
 skill rather than by asking whose PRs they were.

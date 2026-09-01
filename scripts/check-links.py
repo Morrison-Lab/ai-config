@@ -1,21 +1,16 @@
 #!/usr/bin/env python3
-"""Check that relative markdown links in this repo point to real files.
-
-Guards this repo's cross-referenced markdown --- every tree named in
-`SCAN_GLOBS` below --- against broken relative links (e.g. a renamed or
-deleted target).
-External links (http(s), mailto, anchors) are skipped.
-Clean-room; convention noted in CREDITS.md.
-
-Exits non-zero if any relative link target is missing.
-"""
+"""Check that all relative markdown links point to existing files."""
 from __future__ import annotations
 
 import re
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
+# Add scripts/lib to import path for shared fences module
+SCRIPTS_LIB_DIR = Path(__file__).resolve().parent / "lib"
+if str(SCRIPTS_LIB_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_LIB_DIR))
+
 from fences import strip_code_spans, strip_fences, strip_math  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -27,9 +22,6 @@ REF_DEF = re.compile(
     re.MULTILINE,
 )
 
-# External schemes and pure in-page anchors
-EXTERNAL_PREFIXES = ("http://", "https://", "mailto:", "tel:", "#", "ftp://")
-
 SCAN_GLOBS = [
     "skills/**/*.md",
     "codex-skills/**/*.md",
@@ -40,13 +32,24 @@ SCAN_GLOBS = [
     "shared/**/*.md",
     "*.md",
 ]
+SKIP_PREFIXES = ("http://", "https://", "mailto:", "tel:", "#", "ftp://")
+URI_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]{1,31}:")
+EMAIL_RE = re.compile(
+    r"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$"
+)
 
 broken: list[str] = []
 checked = 0
 
 
 def is_external(target: str) -> bool:
-    return any(target.startswith(p) for p in EXTERNAL_PREFIXES) or "://" in target
+    if target.startswith(SKIP_PREFIXES) or "://" in target:
+        return True
+    if URI_RE.match(target):
+        return True
+    if EMAIL_RE.match(target):
+        return True
+    return False
 
 
 def parse_link_target(raw: str) -> str:
@@ -99,7 +102,7 @@ def resolve_target(base_dir: Path, target: str) -> Path | None:
     return None
 
 
-def check_file(md: Path) -> None:
+def check_file(md: Path, root: Path = ROOT) -> None:
     global checked
     text = md.read_text(encoding="utf-8")
     # Strip code regions and math blocks first so code examples and LaTeX math
@@ -133,7 +136,7 @@ def check_file(md: Path) -> None:
         else:
             checked += 1
             try:
-                rel = md.relative_to(ROOT)
+                rel = md.relative_to(root)
             except ValueError:
                 rel = md
             broken.append(f"{rel} -> {target}")

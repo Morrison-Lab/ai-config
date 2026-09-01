@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
-"""Unit tests for scripts/check-links.py (ai-config#2842).
+"""Tests for scripts/check-links.py (ai-config#2881).
 
 Verifies that:
-1. External link schemes, email addresses, and in-page anchors are recognized and skipped.
-2. Link destinations with titles in quotes/parens or angle brackets are parsed cleanly.
-3. Link reference definitions ([label]: target "title") are recognized and validated.
-4. Extensionless markdown targets and directory index/README files resolve.
-5. Anchor fragments (#section) on extensionless targets are handled correctly.
-6. Broken links (including broken extensionless targets with anchors) are caught.
-7. Bare-word placeholders and code-fenced examples are skipped.
-8. Display math ($$...$$) and inline math ($...$) with LaTeX brackets are not mistaken for links.
+1. External URI schemes and email addresses are recognized as external.
+2. Link destinations in angle brackets (<...>) are extracted cleanly without mangling.
+3. CommonMark autolinks (<https://...> and <user@domain.tld>) are recognized
+   and not treated as broken local file paths.
+4. Relative links to existing files pass, while links to missing files fail with
+   clean unmangled targets.
+5. Links inside fenced code blocks and inline code spans are ignored.
+6. Angle bracket placeholders (<owner>/<repo>) and in-page anchors are ignored.
+7. Display math ($$...$$) and inline math ($...$) with LaTeX brackets are not mistaken for links.
+8. Link reference definitions ([label]: target "title") validate correctly.
 """
 from __future__ import annotations
 
@@ -21,121 +23,193 @@ import unittest
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-SCRIPT = REPO / "scripts" / "check-links.py"
+SCRIPT_PATH = REPO / "scripts" / "check-links.py"
 
-spec = importlib.util.spec_from_file_location("check_links", SCRIPT)
-mod = importlib.util.module_from_spec(spec)
-sys.modules["check_links"] = mod
-spec.loader.exec_module(mod)
-
-check_file = mod.check_file
-is_external = mod.is_external
-parse_link_target = mod.parse_link_target
-resolve_target = mod.resolve_target
+spec = importlib.util.spec_from_file_location("check_links", SCRIPT_PATH)
+check_links = importlib.util.module_from_spec(spec)
+sys.modules["check_links"] = check_links
+spec.loader.exec_module(check_links)
 
 
-class TestCheckLinks(unittest.TestCase):
-    def setUp(self) -> None:
-        mod.broken.clear()
-        mod.checked = 0
+class TestIsExternal(unittest.TestCase):
+    def test_standard_prefixes(self):
+        self.assertTrue(check_links.is_external("http://example.com"))
+        self.assertTrue(check_links.is_external("https://example.com/path?foo=bar"))
+        self.assertTrue(check_links.is_external("mailto:user@example.com"))
+        self.assertTrue(check_links.is_external("tel:+1234567890"))
+        self.assertTrue(check_links.is_external("#heading-anchor"))
 
-    def test_is_external(self) -> None:
-        self.assertTrue(is_external("https://example.com"))
-        self.assertTrue(is_external("http://example.com/page"))
-        self.assertTrue(is_external("mailto:user@example.com"))
-        self.assertTrue(is_external("tel:+1234567890"))
-        self.assertTrue(is_external("#heading-anchor"))
-        self.assertTrue(is_external("ftp://example.com"))
-        self.assertFalse(is_external("relative/path/to/file.md"))
-        self.assertFalse(is_external("../sibling.md"))
-        self.assertFalse(is_external("file.md#anchor"))
+    def test_custom_schemes(self):
+        self.assertTrue(check_links.is_external("ftp://ftp.example.org/resource"))
+        self.assertTrue(check_links.is_external("vscode://file/path/to/file"))
+        self.assertTrue(check_links.is_external("conversation://82f24413-64c3"))
+        self.assertTrue(check_links.is_external("data:text/plain;base64,SGVsbG8="))
 
-    def test_parse_link_target(self) -> None:
-        self.assertEqual(parse_link_target("target.md"), "target.md")
-        self.assertEqual(parse_link_target('<target.md> "Title"'), "target.md")
-        self.assertEqual(parse_link_target("<target.md>"), "target.md")
-        self.assertEqual(parse_link_target("target.md 'Single Quoted Title'"), "target.md")
-        self.assertEqual(parse_link_target("target.md (Parenthesized Title)"), "target.md")
-        self.assertEqual(parse_link_target(""), "")
+    def test_email_addresses(self):
+        self.assertTrue(check_links.is_external("user@domain.tld"))
+        self.assertTrue(check_links.is_external("first.last+tag@sub.domain.co.uk"))
 
-    def test_valid_relative_links(self) -> None:
+    def test_relative_paths(self):
+        self.assertFalse(check_links.is_external("docs/guide.md"))
+        self.assertFalse(check_links.is_external("./guide.md"))
+        self.assertFalse(check_links.is_external("../shared/doc.md"))
+        self.assertFalse(check_links.is_external("guide.md#section"))
+        self.assertFalse(check_links.is_external("images/diagram.png"))
+
+
+class TestExtractTarget(unittest.TestCase):
+    def test_plain_target(self):
+        self.assertEqual(check_links.parse_link_target("path/to/file.md"), "path/to/file.md")
+
+    def test_target_with_title(self):
+        self.assertEqual(
+            check_links.parse_link_target('path/to/file.md "Document Title"'),
+            "path/to/file.md",
+        )
+
+    def test_angle_bracket_target(self):
+        self.assertEqual(
+            check_links.parse_link_target("<path/to/file.md>"),
+            "path/to/file.md",
+        )
+
+    def test_angle_bracket_target_with_title(self):
+        self.assertEqual(
+            check_links.parse_link_target('<path/to/file.md> "Document Title"'),
+            "path/to/file.md",
+        )
+
+    def test_angle_bracket_url(self):
+        self.assertEqual(
+            check_links.parse_link_target("<https://example.com/path>"),
+            "https://example.com/path",
+        )
+        self.assertEqual(
+            check_links.parse_link_target('<https://example.com/path> "Web Link"'),
+            "https://example.com/path",
+        )
+
+    def test_angle_bracket_email(self):
+        self.assertEqual(
+            check_links.parse_link_target("<user@domain.tld>"),
+            "user@domain.tld",
+        )
+
+    def test_angle_bracket_placeholder(self):
+        self.assertEqual(
+            check_links.parse_link_target("<owner>/<repo>"),
+            "<owner>/<repo>",
+        )
+
+
+class TestCheckFile(unittest.TestCase):
+    def setUp(self):
+        check_links.broken = []
+        check_links.checked = 0
+
+    def test_valid_relative_links(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             td = Path(tmpdir)
             target = td / "target.md"
             target.write_text("# Target", encoding="utf-8")
-            source = td / "source.md"
-            source.write_text(
-                "Check [target](target.md) and [subtarget](target.md#section).\n"
-                "Also [ref link][ref-1].\n\n"
+            index = td / "index.md"
+            index.write_text(
+                "[link1](target.md)\n"
+                "[link2](<target.md>)\n"
+                '[link3](<target.md> "Title")\n'
+                "[link4](target.md#section)\n"
                 '[ref-1]: target.md "Target Title"\n',
                 encoding="utf-8",
             )
+            check_links.check_file(index, root=td)
+            self.assertEqual(check_links.broken, [])
+            self.assertEqual(check_links.checked, 5)
 
-            check_file(source)
-            self.assertEqual(len(mod.broken), 0)
-            self.assertEqual(mod.checked, 3)
-
-    def test_broken_relative_links(self) -> None:
+    def test_broken_relative_links(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             td = Path(tmpdir)
-            source = td / "source.md"
-            source.write_text(
-                "Check [missing](missing.md) and [broken](nonexistent/dir/file.md).\n"
-                "[bad-ref]: missing_ref.md\n",
+            index = td / "index.md"
+            index.write_text(
+                "[link1](missing.md)\n"
+                "[link2](<missing.md>)\n"
+                '[link3](<missing.md> "Title")\n',
                 encoding="utf-8",
             )
+            check_links.check_file(index, root=td)
+            self.assertEqual(
+                check_links.broken,
+                [
+                    "index.md -> missing.md",
+                    "index.md -> missing.md",
+                    "index.md -> missing.md",
+                ],
+            )
+            self.assertEqual(check_links.checked, 3)
 
-            check_file(source)
-            self.assertEqual(len(mod.broken), 3)
-            self.assertEqual(mod.checked, 3)
-
-    def test_code_fences_and_spans_ignored(self) -> None:
+    def test_autolinks_and_emails_not_treated_as_broken(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             td = Path(tmpdir)
-            source = td / "source.md"
-            source.write_text(
-                "```python\n"
-                "# [fake link](missing1.md)\n"
-                "```\n"
-                "Here is `[inline](missing2.md)` in code span.\n",
+            index = td / "index.md"
+            index.write_text(
+                "Contact: <user@domain.tld>\n"
+                "Website: <https://example.com/docs>\n"
+                "Inquiry: <mailto:support@domain.tld>\n"
+                "[Contact 1](user@domain.tld)\n"
+                "[Contact 2](<user@domain.tld>)\n"
+                "[Contact 3](mailto:user@domain.tld)\n"
+                "[Site 1](<https://example.com>)\n",
                 encoding="utf-8",
             )
+            check_links.check_file(index, root=td)
+            self.assertEqual(check_links.broken, [])
+            self.assertEqual(check_links.checked, 0)
 
-            check_file(source)
-            self.assertEqual(len(mod.broken), 0)
-            self.assertEqual(mod.checked, 0)
-
-    def test_math_blocks_and_inline_math_ignored(self) -> None:
+    def test_code_fences_and_spans_ignored(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             td = Path(tmpdir)
-            source = td / "source.md"
-            source.write_text(
+            index = td / "index.md"
+            index.write_text(
+                "```markdown\n"
+                "[code_link](nonexistent_in_fence.md)\n"
+                "<https://example.com/in_fence>\n"
+                "<missing_in_fence@domain.tld>\n"
+                "```\n\n"
+                "Here is inline: `[code_link](nonexistent_in_span.md)` and `<not_a_link@span.tld>`\n",
+                encoding="utf-8",
+            )
+            check_links.check_file(index, root=td)
+            self.assertEqual(check_links.broken, [])
+            self.assertEqual(check_links.checked, 0)
+
+    def test_math_blocks_and_inline_math_ignored(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            td = Path(tmpdir)
+            index = td / "index.md"
+            index.write_text(
                 "$$\n"
                 "\\int_{[0, 1]} f(x) dx\n"
                 "$$\n"
                 "Inline math: $[a, b](x)$ and $f(x) = [0, 1]$.\n",
                 encoding="utf-8",
             )
+            check_links.check_file(index, root=td)
+            self.assertEqual(check_links.broken, [])
+            self.assertEqual(check_links.checked, 0)
 
-            check_file(source)
-            self.assertEqual(len(mod.broken), 0)
-            self.assertEqual(mod.checked, 0)
-
-    def test_link_placeholders_and_titles(self) -> None:
+    def test_placeholders_and_anchors_ignored(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             td = Path(tmpdir)
-            target = td / "real.md"
-            target.write_text("# Real", encoding="utf-8")
-            source = td / "source.md"
-            source.write_text(
-                "Examples: [bare](url), [placeholder](<owner>/<repo>), "
-                "[title](real.md \"Title\"), [bracketed](<real.md>).\n",
+            index = td / "index.md"
+            index.write_text(
+                "[Anchor](#heading)\n"
+                "[Placeholder](<owner>/<repo>)\n"
+                "[Bareword](url)\n"
+                "Prose placeholder: <owner>/<repo>\n",
                 encoding="utf-8",
             )
-
-            check_file(source)
-            self.assertEqual(len(mod.broken), 0)
-            self.assertEqual(mod.checked, 2)
+            check_links.check_file(index, root=td)
+            self.assertEqual(check_links.broken, [])
+            self.assertEqual(check_links.checked, 0)
 
 
 if __name__ == "__main__":

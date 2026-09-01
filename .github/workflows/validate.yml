@@ -26,6 +26,7 @@ jobs:
       - name: Check markdown links
         run: python3 scripts/check-links.py
       - name: Run check-links tests
+        # ai-config#2881: CommonMark autolinks and relative link verification.
         run: python3 scripts/test_check_links.py
       - name: Check ASCII punctuation in source files
         # ai-config#2550: ensure .py and .R source files obey the ASCII punctuation policy.

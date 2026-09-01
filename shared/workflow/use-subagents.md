@@ -124,10 +124,10 @@ or start with a **clean context** (receiving only a scoped brief).
 > **Disambiguation from skill frontmatter `context: fork`:**
 > In Claude Code, setting `context: fork` in a skill's YAML frontmatter (such as in `skill-audit` or `find-overlap`) runs that skill in **isolation without conversation history**.
 > In contrast, **conversation-inheriting subagent dispatch** refers to cloning the active session's transcript into the worker ---
-> invoked programmatically via the `Agent` tool (`subagent_type: "fork"` in Claude Code, or `invoke_subagent` with `TypeName: "self"` in Antigravity)
+> invoked programmatically via the `Agent` tool (`subagent_type: "fork"` in Claude Code)
 > or interactively via `/subtask`.
-> Where a harness lacks native runtime inheritance flags,
-> point the subagent at the session's on-disk transcript log or provide a focused milestone summary.
+> Where a harness starts subagents with a clean context window by default (e.g. Antigravity, Gemini CLI, OpenAI Codex),
+> point the subagent at the session's on-disk transcript log (`transcript.jsonl`) or provide a focused milestone summary.
 
 ### UMS: Conversation inheritance for reflective sweeps, clean brief for isolated items
 
@@ -164,7 +164,7 @@ or start with a **clean context** (receiving only a scoped brief).
   When the request is already self-contained (such as "cai: add a skill for X with Y options"),
   a clean subagent is strictly cheaper and avoids inheriting irrelevant conversation history.
 
-- **Do:** use conversation-inheriting dispatch (`subagent_type: "fork"` / `/subtask` / `self`) for reflective UMS passes and emergent CAI workflows so the subagent has the full transcript.
+- **Do:** use conversation-inheriting dispatch (`subagent_type: "fork"` in Claude Code) or supply the on-disk transcript path (`transcript.jsonl`) for reflective UMS passes and emergent CAI workflows so the subagent has the full transcript.
 - **Do:** explicitly scope the inherited subagent's prompt to UMS or CAI to prevent it from continuing the parent's task.
 - **Do:** use a clean subagent when the parent session is near context limits or when the brief is already fully specified.
 - **Don't:** serialize an entire session's history into a manual brief when conversation-inheriting dispatch is available.

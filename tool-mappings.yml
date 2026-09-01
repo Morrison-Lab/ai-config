@@ -13,7 +13,7 @@
 # script to regenerate both. CI (`validate`) fails if either is out of sync.
 
 # How each model resolves an operation. Most agents converge on "use the
-# GitHub MCP tool when the session has it, otherwise the CLI command" — only
+# GitHub MCP tool when the session has it, otherwise the CLI command" --- only
 # the default differs, so we state the rule once here rather than repeating a
 # near-identical column per model.
 models:

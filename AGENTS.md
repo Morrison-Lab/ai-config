@@ -195,7 +195,8 @@ The decision stays the human's.
 Two boundaries.
 Efficiency never outranks correctness, so no saving is bought with a skipped verification or a shortened review.
 And restructure in its own issue or PR, not inside whatever task happened to notice it.
-See `shared/workflow/restructure-for-efficiency.md`.
+See [`shared/workflow/restructure-for-efficiency.md`](shared/workflow/restructure-for-efficiency.md)
+and [`shared/workflow/merge-queue.md`](shared/workflow/merge-queue.md).
 
 ## Keep ai-config and repo checkouts fresh
 

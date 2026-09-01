@@ -7,13 +7,21 @@ split at the gate's own flagged boundaries -- currently a sufficiently long
 line broken at a mid-line semicolon. Never break a phrase mid-way at a
 column boundary.
 
-This is NARROWER than the house style documented in
+This is NARROWER by design than the house style documented in
 `shared/writing/semantic-line-breaks.md` ("one clause per line"), which also
 breaks at comma and conjunction boundaries this tool does not detect.
 Prose hand-broken at those wider boundaries gets REJOINED into one line when
-run through this tool, since it first joins a paragraph's lines and then
-only re-splits at the sentence/semicolon boundaries above (ai-config#1416).
-Don't run `--all` over already-compliant prose expecting it to be a no-op.
+run through this tool in whole-file mode (`--all`), since it first joins a
+paragraph's lines and then only re-splits at the sentence/semicolon boundaries
+above (ai-config#1416, #2586).
+The tool deliberately stays narrower by design: natural language clause
+detection at comma and coordinating-conjunction boundaries requires a full
+syntactic parser; heuristic regex splits on those boundaries yield massive
+false-positive rates (>50% on commas per check-new-line-breaks measurements)
+and diverge from CI.
+Don't run `--all` over already-compliant prose expecting it to be a no-op;
+use diff-scoping (the default for `--write`) which preserves hand-broken clause
+formatting on untouched sentences in modified paragraphs (ai-config#1599).
 
 Sentence and clause predicates come from the same
 `check-new-line-breaks.py` CI pins in `.github/workflows/validate.yml`
@@ -369,7 +377,7 @@ def reformat(original: str, changed: set[int] | None = None) -> str:
             i += 1
             continue
 
-        # Fenced code blocks — track opening fence length and character so
+        # Fenced code blocks --- track opening fence length and character so
         # inner fences of a different character, or fewer characters, are
         # treated as content rather than closers (CommonMark §4.5).
         fence_m = _FENCE_RE.match(stripped)
@@ -386,7 +394,7 @@ def reformat(original: str, changed: set[int] | None = None) -> str:
                 fence_char_count = 0
                 fence_open_char = None
             # else: a shorter fence, or one using a different character,
-            # inside a code block — emit it verbatim as content.
+            # inside a code block --- emit it verbatim as content.
             else:
                 output.append(line)
                 i += 1
@@ -400,7 +408,7 @@ def reformat(original: str, changed: set[int] | None = None) -> str:
             i += 1
             continue
 
-        # HTML comments — may span multiple lines; track open/close so
+        # HTML comments --- may span multiple lines; track open/close so
         # interior prose isn't reflowed.
         if _HTML_COMMENT_RE.match(line):
             output.append(line)
@@ -426,7 +434,7 @@ def reformat(original: str, changed: set[int] | None = None) -> str:
             i += 1
             continue
 
-        # Blockquotes — process line by line
+        # Blockquotes --- process line by line
         if _BQ_RE.match(line):
             # Process the blockquote line-by-line, tracking fence state so
             # code blocks nested inside blockquotes are emitted verbatim.
@@ -488,7 +496,7 @@ def reformat(original: str, changed: set[int] | None = None) -> str:
                 ns = nl.strip()
                 if not ns:
                     break
-                # Stop at a fenced code block — emit the rest verbatim.
+                # Stop at a fenced code block --- emit the rest verbatim.
                 if _FENCE_RE.match(nl):
                     break
                 nl_lead = len(nl) - len(nl.lstrip())

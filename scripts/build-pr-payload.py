@@ -57,8 +57,19 @@ def _token() -> str:
     return token
 
 
-def rest_get(path: str, token: str) -> Any:
-    """GET a single REST resource, paginating a list response to completion."""
+def rest_get(path: str, token: str, envelope: Optional[str] = None) -> Any:
+    """GET a REST resource, paginating a list response to completion.
+
+    A bare-array endpoint (reviews, comments, commits) paginates until a page
+    comes back short. An enveloped endpoint (check-runs answers with
+    ``{"total_count": N, "<envelope>": [...]}``) paginates the same way over
+    the list under *envelope*, because returning the first envelope as-is
+    silently drops every item past the first page -- a truncated
+    ``check_runs[]`` is indistinguishable from a complete one, which is the
+    one error the fully-clean instrument exists to prevent (ai-config#2909
+    review round 1). A single-object endpoint (the PR itself) returns its
+    dict on the first page.
+    """
     items: List[Any] = []
     page = 1
     while True:
@@ -79,10 +90,17 @@ def rest_get(path: str, token: str) -> Any:
             body = exc.read().decode("utf-8", "replace")
             raise PayloadBuildError(f"GET {path} failed: {exc.code} {body}") from exc
         if isinstance(data, dict):
-            return data
-        items.extend(data)
-        if len(data) < 100:
-            return items
+            if envelope is None:
+                return data
+            chunk = data.get(envelope, [])
+            items.extend(chunk)
+            total = data.get("total_count")
+            if len(chunk) < 100 or (isinstance(total, int) and len(items) >= total):
+                return items
+        else:
+            items.extend(data)
+            if len(data) < 100:
+                return items
         page += 1
 
 
@@ -190,8 +208,9 @@ def fetch_payload(owner_repo: str, pr_number: int, token: str) -> Dict[str, Any]
     reviews_raw = rest_get(f"{base}/pulls/{pr_number}/reviews", token)
     comments_raw = rest_get(f"{base}/issues/{pr_number}/comments", token)
     commits_raw = rest_get(f"{base}/pulls/{pr_number}/commits", token)
-    check_runs_resp = rest_get(f"{base}/commits/{pr_raw['head']['sha']}/check-runs", token)
-    check_runs_raw = check_runs_resp.get("check_runs", []) if isinstance(check_runs_resp, dict) else check_runs_resp
+    check_runs_raw = rest_get(
+        f"{base}/commits/{pr_raw['head']['sha']}/check-runs", token, envelope="check_runs"
+    )
     return build_payload(owner_repo, pr_raw, reviews_raw, comments_raw, commits_raw, check_runs_raw)
 
 

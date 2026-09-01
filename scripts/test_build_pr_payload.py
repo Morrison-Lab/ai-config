@@ -183,6 +183,56 @@ def test_main_fails_fast_with_no_token():
         check("no output file is written on the fail-fast path", not Path(out).exists())
 
 
+def test_rest_get_paginates_enveloped_check_runs():
+    """/check-runs answers with an envelope; every page must be gathered.
+
+    ai-config#2909 review round 1 reproduced the truncation: 150 check runs
+    over two pages yielded 100 with one HTTP call, silently. A dropped
+    still-red run past position 100 would score a PR clean on incomplete
+    evidence, the one error the fully-clean instrument exists to prevent.
+    """
+    import io
+    import urllib.request
+
+    calls = []
+    runs = [{"name": f"job-{i}", "status": "completed", "conclusion": "success",
+             "started_at": None, "completed_at": None, "html_url": ""} for i in range(150)]
+
+    class _Resp(io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    def fake_urlopen(req):
+        url = req.full_url
+        calls.append(url)
+        page = int(url.rsplit("page=", 1)[1])
+        if "/check-runs" in url:
+            chunk = runs[(page - 1) * 100:page * 100]
+            body = {"total_count": len(runs), "check_runs": chunk}
+        elif "/reviews" in url:
+            body = [{"state": "APPROVED"}] * 100 if page == 1 else [{"state": "APPROVED"}] * 7
+        else:
+            body = {"number": 1}
+        return _Resp(json.dumps(body).encode())
+
+    real = urllib.request.urlopen
+    urllib.request.urlopen = fake_urlopen
+    try:
+        got = build_pr_payload.rest_get("/repos/o/r/commits/abc/check-runs", "t", envelope="check_runs")
+        check("enveloped check-runs gathers all 150 items", len(got) == 150)
+        check("enveloped check-runs requests two pages", len([c for c in calls if "/check-runs" in c]) == 2)
+        check("enveloped check-runs stops after the short page", not any("page=3" in c for c in calls))
+        reviews = build_pr_payload.rest_get("/repos/o/r/pulls/1/reviews", "t")
+        check("bare-array endpoint gathers 107 items across two pages", len(reviews) == 107)
+        single = build_pr_payload.rest_get("/repos/o/r/pulls/1", "t")
+        check("single-object endpoint returns its dict on the first page", single == {"number": 1})
+    finally:
+        urllib.request.urlopen = real
+
+
 def main():
     test_maps_pr_fields()
     test_state_merged()
@@ -191,6 +241,7 @@ def main():
     test_review_decision_no_terminal_reviews_is_empty()
     test_comments_mapped()
     test_check_runs_bare_list_accepted_by_payload_fetcher()
+    test_rest_get_paginates_enveloped_check_runs()
     test_main_fails_fast_with_no_token()
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0

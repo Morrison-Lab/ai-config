@@ -1404,3 +1404,18 @@ on itself and added one datum: its review's JSON gave only a seven-character
 trailer's `4059bf08` was the tip.
 Whether `a1081f5` was the merge ref is therefore unconfirmed, and is recorded
 as such; the trailer settled it either way.)
+
+## A clean round that names a prior finding reads as not clean
+
+(Morrison-Lab/ai-config#2906 and wai#174, 2026-09-01.
+A round with `"verdict": "CLEAN"` and an empty findings array still failed
+`check-pr-fully-clean.py`, because its prose said "the prior blocking
+finding" in one case and carried a `### Findings (non-blocking)` heading in
+the other.
+That is the classifier working as designed: the prose scan runs before
+`payload_is_clean`, and prose wins the contradiction (#2736).
+The driver-side remedy is not to argue with the instrument or to hand-read
+the round as clean.
+Push the next code change, or the round's own follow-up, so a fresh round is
+worded cleanly, and let the instrument read that one.
+Only a round with no such phrase and no such heading exits 0.)

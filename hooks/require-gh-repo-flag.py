@@ -306,7 +306,7 @@ def mask_comments_and_arithmetic(command: str) -> str:
             continue
 
         if not in_sq and not in_dq:
-            if ch == "#" and (i == 0 or command[i - 1] in " \t;|&(\n"):
+            if ch == "#" and (i == 0 or command[i - 1] in " \t\r\n;|&()<>{}"):
                 # Mask comment until next newline or EOF
                 while i < n and command[i] != "\n":
                     out.append(" ")

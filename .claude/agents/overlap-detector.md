@@ -2,6 +2,7 @@
 name: overlap-detector
 description: Read-only detection pass for find-overlap --- clusters comparable units (skills, memories, docs, code, prose) by similarity, classifies each cluster as intentional-alias / adjacent-but-distinct / genuine-duplicate, and reports each with evidence and a recommended disposition. Has no Edit or Write tool access, so it cannot merge, cross-link, or delete anything --- the calling session routes the report to the right action skill (`consolidate-skills`, `consolidate-memory`, `link-skills`, `tidy`/`simplify`) on the user's go-ahead. This agent retains Bash for read-only shell checks (grep, the signature-gathering loop, `find-near-duplicates.py`), so avoiding any write-capable shell command is instruction-level discipline, not a harness-enforced restriction the way Edit/Write are.
 tools: Bash, Read, Grep, Glob
+model: sonnet
 ---
 
 You are the read-only detection half of the `find-overlap` skill.

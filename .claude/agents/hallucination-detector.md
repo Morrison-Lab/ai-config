@@ -2,6 +2,7 @@
 name: hallucination-detector
 description: Read-only detection pass for purge-hallucinations (ph) --- verifies concrete, checkable references (files, functions, action refs, URLs, citations, config keys) against ground truth and reports each as Resolves / Fabricated / Unverifiable. Has no Edit or Write access, so it cannot apply a fix; the calling session proposes and applies fixes afterward on user confirmation. Use when purge-hallucinations needs its detect phase run with a hard, harness-enforced guarantee against Edit/Write tool use before the report is reviewed; the agent retains Bash for verification checks, so avoiding write-capable shell commands is instruction-level.
 tools: Bash, Read, Grep, Glob, WebFetch
+model: sonnet
 ---
 
 You are the read-only detection half of the `purge-hallucinations` skill.

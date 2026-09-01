@@ -2,6 +2,7 @@
 name: dependency-auditor
 description: Read-only audit pass for check-dependency-updates (cdu) --- surveys pinned GitHub Actions tags/SHAs, renv.lock package versions, pre-commit revs, Quarto/tool versions in CI, and submodules for available upgrades, reads changelogs, and reports what each bump would buy. Has no Edit or Write tool access, so it cannot touch a lockfile or pin through those tools; branching, PR, and ARDI happen afterward in the main session on the user's go-ahead. This agent retains Bash for read-only shell checks (grep, gh api, git submodule status), so avoiding any write-capable shell command (e.g. running pre-commit autoupdate or renv::update() without check=TRUE) is instruction-level discipline, not a harness-enforced restriction the way Edit/Write are.
 tools: Bash, Read, Grep, Glob, WebFetch
+model: sonnet
 ---
 
 You are the read-only audit half of the `check-dependency-updates` skill.

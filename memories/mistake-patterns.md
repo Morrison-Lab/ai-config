@@ -735,4 +735,31 @@ A clean automated review from every available provider evaluating the current HE
   Yes.
   Check file footprints during orchestration and gate multi-subagent dispatch when targets share the same file footprint.
 
-
+## Pattern 39: Merging Over Unaddressed Review Bot Findings Due to Incomplete Bot Identity and Verdict Header Scanning in ARDI Verifier
+- **Do**: Register all active external and automated review bot logins
+  (such as `copilot-pull-request-reviewer`, `jules`, `cursor`, `claude[bot]`)
+  in `EXCLUSIVE_BOT_IDENTITY` and `_is_bot_author` within `scripts/check-pr-fully-clean.py`,
+  and parse their standard verdict formats
+  (e.g. `### 🟢 Approval recommended` for clean signoff and `### 🟡 Changes recommended` for changes requested)
+  to ensure all automated review comments are strictly tracked and enforced by ARDI verification.
+- **Don't**: Rely on an incomplete list of review bot logins
+  or omit distinct forge/bot verdict headers in `check-pr-fully-clean.py`;
+  missing a bot identity causes its review comments to be ignored by the automated review gate,
+  allowing PRs with outstanding findings or comments to falsely pass ARDI checks and merge.
+- **Example**: 2026-09-01 on `Morrison-Lab/wai` PR [#161](https://github.com/Morrison-Lab/wai/pull/161):
+  When Copilot code reviews resumed in September 2026,
+  Copilot posted review `5073770958` with login `copilot-pull-request-reviewer`
+  leaving an unresolved finding regarding missing Windows platform support in `chapters/ai-tools/antigravity-python-sdk.qmd`.
+  Because `scripts/check-pr-fully-clean.py` only scanned for `github-actions`, `claude[bot]`, `jules`, and `cursor`
+  and did not recognize Copilot's `### 🟢 Approval recommended` / `### 🟡 Changes recommended` headers,
+  the ARDI checker reported clean and permitted merging over the unaddressed comment.
+- **Canonical Rule**: [`fully-clean.md`](../shared/workflow/fully-clean.md) (Criterion 2, `EXCLUSIVE_BOT_IDENTITY`).
+- **Fix**: Registered `copilot-pull-request-reviewer` in `EXCLUSIVE_BOT_IDENTITY` and `_is_bot_author`,
+  added Copilot's `Approval recommended` / `Changes recommended` verdict patterns,
+  and addressed the missing Windows platform documentation in `Morrison-Lab/wai` PR [#169](https://github.com/Morrison-Lab/wai/pull/169)
+  (closing [Issue #168](https://github.com/Morrison-Lab/wai/issues/168)).
+- **Algorithmatizable?**
+  Yes.
+  Test suites for ARDI verification scripts must maintain unit fixtures covering all active review bots
+  (Copilot, Claude, Jules, Cursor)
+  and their exact clean / changes-requested verdict headers.

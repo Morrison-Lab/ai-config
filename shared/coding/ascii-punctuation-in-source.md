@@ -77,6 +77,8 @@ multiplication sign, U+00D7) ASCII anyway.
 Treat adding or extending the repo's non-ASCII check to also scan `.md` as
 the enforcement follow-up: a repo with no such check yet needs to add one, and
 a repo whose check already scans `.R`/`.qmd` needs to extend it.
+In `ai-config` itself, `scripts/check-ascii-punctuation.py` gates `.py` and `.R`
+files and can scan added lines in PRs and working trees (ai-config#2550).
 For `Morrison-Lab/gha`'s `check-non-standard-chars` specifically, that follow-up is tracked in gha#322, which is now **partly done**.
 
 Both halves were re-measured on 2026-08-17, by reading `check-non-standard-chars/check-non-standard-chars.py` at the `v2` tag --- the ref consumers actually pin --- and they now differ:

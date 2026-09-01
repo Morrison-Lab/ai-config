@@ -399,11 +399,11 @@ class TestPrePushReview(unittest.TestCase):
             "Verdict: Cannot approve",
             "Verdict: Never approve",
             "Verdict: Do not approve",
-            "Verdict: Ready for merge — must not merge.",
-            "Verdict: Ready for merge — should not be merged.",
-            "Verdict: Ready for merge — unsafe to merge.",
-            "Verdict: Ready for merge — not safe to merge.",
-            "Verdict: Ready for merge — cannot merge.",
+            "Verdict: Ready for merge \u2014 must not merge.",
+            "Verdict: Ready for merge \u2014 should not be merged.",
+            "Verdict: Ready for merge \u2014 unsafe to merge.",
+            "Verdict: Ready for merge \u2014 not safe to merge.",
+            "Verdict: Ready for merge \u2014 cannot merge.",
         ]:
             neg_report = (
                 f"### Summary Verdict\n"

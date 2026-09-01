@@ -1351,6 +1351,11 @@ def parse_report(text: str) -> tuple[str | None, str | None]:
     return verdict, (sha.group(1).lower() if sha else None)
 
 
+CLI_REVIEW_CMD_RE = re.compile(
+    r"(?:^|[;&|`(\s])(?:[\w./-]*/)?(?:pre-push-review(?:\.py)?|adv)(?:\s|$)", re.I
+)
+
+
 def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bool]:
     """(verdict, reviewed_commit, saw_reviewer_call) from the transcript.
 
@@ -1359,6 +1364,7 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
     `fail-fast` forbids letting that look identical to a clean one.
     """
     reviewer_call_ids: set[str] = set()
+    reviewer_task_ids: set[str] = set()
     saw_reviewer_call = False
     verdict: str | None = None
     reviewed_commit: str | None = None
@@ -1374,6 +1380,12 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                 continue
             if not isinstance(record, dict):
                 continue
+
+            is_assistant = (
+                record.get("source") == "MODEL"
+                or record.get("type") == "assistant"
+                or (isinstance(record.get("message"), dict) and record["message"].get("role") == "assistant")
+            )
 
             for b in _iter_blocks(record):
                 b_type = b.get("type")
@@ -1408,29 +1420,42 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                             if isinstance(call_id, str) and call_id:
                                 reviewer_call_ids.add(call_id)
                         elif tool_name in ("taskoutput", "task_output", "manage_task"):
-                            if isinstance(call_id, str) and call_id:
-                                reviewer_call_ids.add(call_id)
+                            task_id = str(inp.get("task_id") or inp.get("TaskId") or inp.get("id") or "")
+                            if (task_id and task_id in reviewer_task_ids) or not reviewer_task_ids:
+                                if isinstance(call_id, str) and call_id:
+                                    reviewer_call_ids.add(call_id)
 
                     elif tool_name in CLI_REVIEW_TOOLS:
                         cmd = str(inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or inp.get("script") or "")
-                        if re.search(r"\b(?:pre[-_ ]?push[-_ ]?review(?:\.py)?|adv)\b", cmd, re.I):
+                        if CLI_REVIEW_CMD_RE.search(cmd):
                             saw_reviewer_call = True
                             if isinstance(call_id, str) and call_id:
                                 reviewer_call_ids.add(call_id)
 
                 elif b_type == "tool_result":
                     call_id = b.get("tool_use_id")
-                    if call_id not in reviewer_call_ids:
-                        continue
-                    if b.get("is_error"):
-                        continue
-                    found, sha = parse_report(_result_text(b))
-                    if found:
-                        saw_reviewer_call = True
-                        verdict, reviewed_commit = found, sha
+                    if call_id in reviewer_call_ids:
+                        # Check if this result launched a background task with an ID
+                        res_text = _result_text(b)
+                        try:
+                            res_data = json.loads(res_text)
+                            if isinstance(res_data, dict):
+                                tid = res_data.get("task_id") or res_data.get("conversationId") or res_data.get("id")
+                                if tid:
+                                    reviewer_task_ids.add(str(tid))
+                        except Exception:
+                            tid_match = re.search(r"\b(?:task[-_ ]?id|conversationId)[:=]\s*[`\"']?([\w-]+)", res_text, re.I)
+                            if tid_match:
+                                reviewer_task_ids.add(tid_match.group(1))
 
-                # Task notifications in message blocks (e.g. background completion)
-                if b_type != "tool_use":
+                        if not b.get("is_error"):
+                            found, sha = parse_report(res_text)
+                            if found:
+                                saw_reviewer_call = True
+                                verdict, reviewed_commit = found, sha
+
+                # Task notifications in non-assistant system/user message blocks
+                if not is_assistant and b_type != "tool_use" and not b.get("is_error"):
                     text = _result_text(b) if b_type == "tool_result" else str(b.get("text") or "")
                     if "<task-notification>" in text:
                         found, sha = parse_report(text)

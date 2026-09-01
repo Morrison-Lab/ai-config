@@ -9,7 +9,7 @@ and citations that failed at render time and leaked into output files:
 
 Explicitly distinguishes and ignores valid markdown footnote references
 (`[^1]`, `[^note]`) and footnote definitions (`[^1]: ...`), preventing false
-warnings on valid footnote markup (ai-config#2566).
+warnings on valid footnote markup (ai-config#2879).
 """
 from __future__ import annotations
 

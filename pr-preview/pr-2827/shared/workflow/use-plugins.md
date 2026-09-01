@@ -36,16 +36,15 @@ Claude Code supports plugins distributed via Git marketplaces and official regis
    claude plugin list
    ```
 
-2. **Search available marketplaces:**
-   Search official or registered marketplaces
-   (such as `claude-plugins-official` or `Morrison-Lab`):
+2. **Discover available plugins:**
+   Update registered marketplaces and inspect declared plugins:
 
    ```sh
-   claude plugin search <query>
+   claude plugin marketplace update <marketplace-name>
    ```
 
    Inspect marketplace manifests under `~/.claude/plugins/marketplaces/<marketplace-name>/`
-   to see declared plugins and capabilities.
+   or use the interactive `/plugin` Discover tab to browse available plugins and capabilities.
 
 3. **Install and enable:**
 

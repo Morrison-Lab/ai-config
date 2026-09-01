@@ -1352,7 +1352,8 @@ def parse_report(text: str) -> tuple[str | None, str | None]:
 
 
 CLI_REVIEW_CMD_RE = re.compile(
-    r"(?:^|[;&|`(\s])(?:[\w./-]*/)?(?:pre-push-review(?:\.py)?|adv)(?:\s|$)", re.I
+    r"""(?:^|[;&`(\n]|\$\()\s*(?:(?:!|\{|time|nohup|sudo|then|else|do|if|elif|while|until|exec|builtin|env(?:\s+-[^\s]+)*(?:\s+\w+=\S+)*)\s+)*(?:python[0-9.]*\s+)?(?:[\w./-]*/)?(?:pre-push-review(?:\.py)?|adv)(?:\s+|$|[;&|])""",
+    re.I | re.MULTILINE,
 )
 
 
@@ -1466,7 +1467,8 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
 
                     elif tool_name in CLI_REVIEW_TOOLS:
                         cmd = str(inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or inp.get("script") or "")
-                        if CLI_REVIEW_CMD_RE.search(cmd):
+                        clean_cmd = re.sub(r"(?m)(?:^|\s+)#.*$", "", cmd)
+                        if CLI_REVIEW_CMD_RE.search(clean_cmd):
                             saw_reviewer_call = True
                             if isinstance(call_id, str) and call_id:
                                 reviewer_call_ids.add(call_id)

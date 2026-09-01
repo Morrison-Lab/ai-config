@@ -736,7 +736,7 @@ See ai-config#694 for the precedent.
   say in full: a `check_suite.completed` event is delivered when no
   third-party check suite on a head is still running or failed.**
   Measured 2026-09-01 in a Claude Code remote session on
-  `UCD-SERG/serodynamics`, where seven arrived across six PRs.
+  `UCD-SERG/serodynamics`, where nine arrived across six PRs.
   Its own body states the limits, and they matter:
   cancelled suites, suites with no runs, the GitHub App's own suites
   and legacy commit statuses are **not** covered.
@@ -748,10 +748,14 @@ See ai-config#694 for the precedent.
   wording invites you to act on it anyway.**
   The event body says "If you were waiting on CI, continue with the next
   step", which reads as an all-clear for the PR rather than for one commit.
-  Two of the seven measured above named a head that a later push had already
-  replaced (`8c6c1be` on #311 after `fb8c7ac`;
-  `cb327d7` on #298 after `65fd9fc`),
-  each arriving one to five minutes after the superseding push.
+  Three of the nine measured above named a head that a later push had
+  already replaced: `8c6c1be` on #311 after `fb8c7ac`,
+  then `cb327d7` and `65fd9fc` on #298 after `65fd9fc` and `e76c564`.
+  Each arrived one to five minutes after the superseding push,
+  and every one of the three was on a PR that had just been pushed to ---
+  the old head's suite simply finishes after the new head exists.
+  So the risk concentrates exactly where an iterating session lives,
+  rather than being spread evenly across events.
   This is the same staleness the failure-event bullet below describes,
   in the direction that is easier to act on wrongly:
   a stale *failure* costs a wasted investigation,
@@ -759,6 +763,11 @@ See ai-config#694 for the precedent.
   whose CI never ran.
   Compare `head_sha` against the PR's live `.head.sha`
   before treating any such event as progress.
+  This stays a memory rather than a hook despite clearing
+  [`deterministic-tools`](../shared/principles/deterministic-tools.md)'s
+  third-occurrence bar:
+  deciding it needs a live API read of the PR's current head,
+  which is not a condition a transcript-scanning hook can evaluate.
 - **A CI-failure webhook event's `HeadSHA` can be stale — compare it against
   the PR's actual current head before investigating.** Pushing a fix-up commit
   right after a bad one (e.g. correcting an encoding mistake seconds later)

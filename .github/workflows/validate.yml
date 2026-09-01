@@ -162,6 +162,11 @@ jobs:
         # `batch-merge-and-resolve.md` warns about, and it is what the
         # hand-run prototype this script replaces actually had.
         run: python3 scripts/test_pr_overlap.py
+      - name: Run upload-skills tests
+        # Only the tests run here. upload_skills.sh itself requires a live
+        # workspace API key, so the offline test suite exercises change
+        # detection, deletion propagation, and state caching with mock curl.
+        run: python3 scripts/test_upload_skills.py
       - name: Run context-closure tests
         run: python3 scripts/test_check_context_closure.py
       - name: Run ai-session MWC grant tests

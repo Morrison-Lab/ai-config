@@ -29,22 +29,38 @@ assert "--paginate" in subject.host_merge_requests.__code__.co_consts
 assert "--all" in subject.glab_hosts.__code__.co_consts
 
 # authenticated_hosts reads real `glab auth status --all` shape: a host line,
-# then indented status lines. A failed instance between two working ones is
-# not credited with a neighbour's login, a host may carry a port (glab api
-# then refuses it, and that lands under the host's own error key below), and
-# no login at all is an empty list, which glab_hosts turns into an error
-# rather than a silent zero.
+# then indented status lines, with the next instance's block starting on the
+# very next line (status.go prints no separator). A failed instance between
+# two working ones is not credited with a neighbour's login, a host may
+# carry a port (glab api then refuses it, and that lands under the host's
+# own error key below), and no login at all is an empty list, which
+# glab_hosts turns into an error rather than a silent zero.
 GLAB_STATUS = (
     "gitlab.com\n"
     "  \u2713 Logged in to gitlab.com as ezra (keyring)\n"
     "  \u2713 Git operations for gitlab.com configured to use https protocol.\n"
-    "\n"
     "old.example.org\n"
     "  x old.example.org: API call failed: 401 Unauthorized\n"
-    "\n"
     "gitlab.example.com:8443\n"
     "  \u2713 Logged in to gitlab.example.com:8443 as ezra (token)\n"
 )
+# A fully configured instance whose token expired, rendered line for line
+# from status.go's format strings, plus glab's trailing summary. Its
+# diagnosis is the FIRST status line, which is why ERROR_TAIL is sized to
+# whole blocks: the tail of a no-host error must still carry that line.
+GLAB_STATUS_FAILED_FULL = (
+    "gitlab.example.com\n"
+    "  x gitlab.example.com: API call failed: GET https://gitlab.example.com/api/v4/user: 401 {message: 401 Unauthorized}\n"
+    "  \u2713 Git operations for gitlab.example.com configured to use https protocol.\n"
+    "  \u2713 API calls for gitlab.example.com are made over https protocol.\n"
+    "  \u2713 REST API Endpoint: https://gitlab.example.com/api/v4/\n"
+    "  \u2713 GraphQL Endpoint: https://gitlab.example.com/api/graphql/\n"
+    "  \u2713 Token found in keyring: **************************\n"
+    "\n"
+    "x could not authenticate to one or more of the configured GitLab instances\n"
+)
+assert 400 <= len(GLAB_STATUS_FAILED_FULL) <= 600, len(GLAB_STATUS_FAILED_FULL)
+assert 2 * len(GLAB_STATUS_FAILED_FULL) <= subject.ERROR_TAIL
 assert subject.authenticated_hosts(GLAB_STATUS) == ["gitlab.com", "gitlab.example.com:8443"]
 assert subject.authenticated_hosts("gitlab.com\n  x gitlab.com: API call failed: 401\n") == []
 assert subject.authenticated_hosts("") == []
@@ -86,6 +102,9 @@ with tempfile.TemporaryDirectory() as d:
             "if ':' in host:\n"
             "    sys.stderr.write('invalid hostname' + chr(10))\n"
             "    sys.exit(1)\n"
+            "if host == 'noisy.example.org':\n"
+            "    sys.stderr.write('HEAD-OF-STDERR ' + 'x' * 3000 + ' TAIL-OF-STDERR')\n"
+            "    sys.exit(1)\n"
             "if host == 'gitlab.com':\n"
             "    sys.stdout.write('[{\"iid\": 1}, {\"iid\": 2}][{\"iid\": 3}]')\n"
             "elif host == 'object.example.org':\n"
@@ -120,6 +139,28 @@ with tempfile.TemporaryDirectory() as d:
             assert calls[3].startswith("api --hostname gitlab.com --paginate "), calls
             assert calls[4].startswith("api --hostname gitlab.example.com:8443 --paginate "), calls
             assert len(calls) == 5, calls
+            # Both routes that keep a CLI's own output keep a bounded tail:
+            # an oversized stderr on the api route ...
+            saved_hosts = subject.glab_hosts
+            try:
+                subject.glab_hosts = lambda: (["noisy.example.org"], None)
+                state = subject.poll_once({})
+            finally:
+                subject.glab_hosts = saved_hosts
+            noisy = json.loads(state["error"])["gitlab_merge_requests/noisy.example.org"]
+            assert noisy.endswith("TAIL-OF-STDERR") and "HEAD-OF-STDERR" not in noisy, noisy[:80]
+            assert len(noisy) <= len("Command  returned non-zero exit status 1.: ") + 200 + subject.ERROR_TAIL, len(noisy)
+            # ... and an oversized status listing on the no-host route, whose
+            # tail still carries a full failed block's first-line diagnosis.
+            with open(status_file, "w", encoding="utf-8") as stream:
+                stream.write("HEAD-OF-STATUS " + "y" * 3000 + "\n" + GLAB_STATUS_FAILED_FULL)
+            try:
+                subject.glab_hosts()
+                raise AssertionError("no authenticated hosts should raise")
+            except OSError as error:
+                text = str(error)
+                assert "(exit 1)" in text and "API call failed" in text and "HEAD-OF-STATUS" not in text, text[:120]
+                assert len(text.split("): ", 1)[1]) == subject.ERROR_TAIL, len(text)
             # A page that is not a JSON array is an error, never stored as
             # merge requests (an error object would flatten to its keys).
             try:
@@ -172,14 +213,17 @@ try:
     assert hosts == ["gitlab.com", "gitlab.example.com:8443"]
     assert "timed out" in cut_short and "polled" in cut_short, cut_short
 
-    def timing_out_empty(*args, **kwargs):
-        raise subject.subprocess.TimeoutExpired(args[0], kwargs.get("timeout"), output=b"", stderr=b"")
-    subject.subprocess.run = timing_out_empty
+    # A timeout with no host answered is an error too, and it keeps the
+    # partial output glab did write, exactly as the completed-run branch does.
+    def timing_out_failed(*args, **kwargs):
+        raise subject.subprocess.TimeoutExpired(
+            args[0], kwargs.get("timeout"), output=b"", stderr=GLAB_STATUS_FAILED_FULL.encode())
+    subject.subprocess.run = timing_out_failed
     try:
         subject.glab_hosts()
         raise AssertionError("a timeout with no host answered should raise")
-    except subject.subprocess.TimeoutExpired:
-        pass
+    except OSError as error:
+        assert "timed out" in str(error) and "API call failed" in str(error), error
 finally:
     subject.subprocess.run = real_run
     subject.GLAB_PATH = saved_glab
@@ -364,4 +408,4 @@ if os.name == "nt":
     assert subject._alive_windows(os.getpid()) is True
 
 print("PASS: GitHub and GitLab CLIs are resolved or refused at startup; "
-    "failures accumulate an error streak that success resets")
+      "failures accumulate an error streak that success resets")

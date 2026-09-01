@@ -12,12 +12,17 @@ import time
 
 POLL_SECONDS = 120
 # How much of a CLI's own output an error entry keeps. The entry reaches the
-# next prompt through inject-pr-monitor-status.py, so it is bounded; the
-# TAIL is kept because a CLI prints its diagnosis last. 300 characters hold
-# a refused-flag message (about 60) or the last two or three instance blocks
-# of `glab auth status --all` (about 100 each), which is the diagnosis and
-# not the whole listing.
-ERROR_TAIL = 300
+# next prompt through inject-pr-monitor-status.py, so it is bounded. It is
+# the TAIL, because glab's `could not authenticate to one or more ...`
+# summary comes last -- but each instance's diagnosis (`API call failed`,
+# `could not read the token`) is the FIRST status line of its block, so the
+# bound has to hold whole blocks rather than line endings. A fully
+# configured instance's block, rendered from status.go's own format strings,
+# is about 480 characters (test-monitor-open-prs.py pins that one fits);
+# 1200 holds two such blocks plus the summary line, so a one- or
+# two-instance config keeps its whole listing and a larger one keeps its
+# last two instances. A `glab api` or `gh` diagnosis is one line.
+ERROR_TAIL = 1200
 # The file and the "kind" marker keep their pre-GitLab names on purpose. A
 # daemon started before the GitLab support landed keeps writing this path
 # every poll, ensure() reads the pid from it, and scripts/install-pr-monitor.py
@@ -181,7 +186,9 @@ def glab_hosts():
         # indistinguishable from one never logged in to.
         output = _captured_text(error.stdout) + _captured_text(error.stderr)
         if not authenticated_hosts(output):
-            raise
+            raise OSError(
+                f"{error}; no authenticated host listed before the timeout: "
+                f"{output.strip()[-ERROR_TAIL:]}") from error
         cut_short = f"{error}; hosts listed before the timeout were polled"
     hosts = authenticated_hosts(output)
     if not hosts:

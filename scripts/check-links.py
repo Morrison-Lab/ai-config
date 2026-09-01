@@ -22,8 +22,7 @@ REF_DEF = re.compile(
 )
 
 # Inline, full reference, collapsed reference, or shortcut reference links
-# (excluding footnote reference markers `[^...]` per CommonMark footnote syntax)
-LINK_PATTERN = re.compile(r"(?<!!)\[(?!\^)([^\]]*)\](?:\(([^)]+)\)|\[([^\]]*)\])?")
+LINK_PATTERN = re.compile(r"(?<!!)\[([^\]]*)\](?:\(([^)]+)\)|\[([^\]]*)\])?")
 
 SCAN_GLOBS = [
     "skills/**/*.md",

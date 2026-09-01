@@ -216,6 +216,23 @@ class TestCheckFile(unittest.TestCase):
             self.assertEqual(len(mod.broken), 1)
             self.assertIn("missing.md", mod.broken[0])
 
+    def test_link_text_starting_with_caret_is_checked(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            td = Path(tmpdir)
+            target = td / "target.md"
+            target.write_text("# Target", encoding="utf-8")
+
+            doc = td / "doc.md"
+            doc.write_text(
+                "Link with caret: [^valid link](target.md) and broken: [^broken link](missing.md).\n",
+                encoding="utf-8",
+            )
+
+            check_file(doc, root=td)
+            self.assertEqual(len(mod.broken), 1)
+            self.assertIn("missing.md", mod.broken[0])
+            self.assertEqual(mod.checked, 2)
+
 
 if __name__ == "__main__":
     unittest.main()

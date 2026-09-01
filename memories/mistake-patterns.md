@@ -772,3 +772,26 @@ A clean automated review from every available provider evaluating the current HE
   Test suites for ARDI verification scripts must maintain unit fixtures covering all active review bots
   (Copilot, Claude, Jules, Cursor)
   and their exact clean / changes-requested verdict headers.
+
+## Pattern 41: Claiming a Fix Without Differential Verification on Base vs Head
+- **Do**: When claiming a bug fix or edge-case resolution,
+  verify differential behavior by writing tests that fail on base (pre-fix)
+  and pass on head (post-fix),
+  and verify that the proposed regex/parser change does not inadvertently suppress genuine inputs
+  (such as negative lookahead `(?!\^)` on link text suppressing links whose text starts with `^`).
+- **Don't**: Assume an issue report describes an unhandled bug without reproducing the failure on base first;
+  adding unneeded exclusions can introduce false negatives on real inputs.
+- **Example**: 2026-09-01 on `Morrison-Lab/ai-config` PR [#2894](https://github.com/Morrison-Lab/ai-config/pull/2894) (Issue #2877):
+  An issue reported markdown footnote references (`[^1]`) could be mistakenly matched by link regexes as file paths.
+  Adding `(?!\^)` to `LINK_PATTERN` was redundant because `REF_DEF`'s existing `(?!\^)` exclusion already prevented footnote definitions from entering `defs`,
+  and introduced a false negative on valid links whose text began with `^` (e.g. `[^link](target.md)`).
+  Caught in review by Claude review bot on PR #2894.
+- **Canonical Rule**: [`fixtures-are-not-evidence.md`](../shared/workflow/fixtures-are-not-evidence.md)
+  and [`fact-check-code-logic.md`](../shared/coding/fact-check-code-logic.md).
+- **Fix**: Revert redundant regex restrictions,
+  add positive and negative test cases verifying that footnote markers are ignored while links starting with `^` are checked,
+  and verify base vs head behavior before claiming a bug fix.
+- **Algorithmatizable?**
+  Yes.
+  Unit test suites must assert differential failure on base fixtures and regression coverage for non-standard link text.
+

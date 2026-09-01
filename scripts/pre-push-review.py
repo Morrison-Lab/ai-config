@@ -632,14 +632,14 @@ def run_antigravity_review(prompt: str, model: str = "", expected_commit_sha: st
     if not os.path.isfile(agy_path) and not shutil.which("agy"):
         return None
 
-
     if len(prompt.encode("utf-8")) > 800000:
         print("Notice: Prompt size exceeds ARG_MAX safe limit for Antigravity, skipping...", file=sys.stderr)
         return None
 
-    cmd = [agy_path, "--print", prompt]
+    cmd = [agy_path, "--print"]
     if model:
         cmd.extend(["--model", model])
+    cmd.append(prompt)
 
     label_suffix = f" (model: {model})" if model else ""
     print(f"Running local adversarial review via Google Antigravity (plan mode){label_suffix}...")
@@ -665,9 +665,10 @@ def run_claude_review(prompt: str, model: str = "", expected_commit_sha: str = "
     if not os.path.isfile(claude_path) and not shutil.which("claude"):
         return None
 
-    cmd = [claude_path, "--permission-mode", "plan", "--safe-mode", "--strict-mcp-config", "-p", "-"]
+    cmd = [claude_path, "--permission-mode", "plan", "--safe-mode", "--strict-mcp-config"]
     if model:
         cmd.extend(["--model", model])
+    cmd.extend(["-p", "-"])
 
     label_suffix = f" (model: {model})" if model else ""
     print(f"Running local adversarial review via Claude CLI (plan mode){label_suffix}...")
@@ -693,14 +694,14 @@ def run_cursor_review(prompt: str, model: str = "", expected_commit_sha: str = "
     if not os.path.isfile(cursor_path) and not shutil.which("agent"):
         return None
 
-
     if len(prompt.encode("utf-8")) > 800000:
         print("Notice: Prompt size exceeds ARG_MAX safe limit for Cursor, skipping...", file=sys.stderr)
         return None
 
-    cmd = [cursor_path, "--print", prompt, "--mode", "plan", "--trust"]
+    cmd = [cursor_path, "--mode", "plan", "--trust"]
     if model:
         cmd.extend(["--model", model])
+    cmd.extend(["--print", prompt])
 
     label_suffix = f" (model: {model})" if model else ""
     print(f"Running local adversarial review via Cursor Agent (plan mode){label_suffix}...")
@@ -728,9 +729,10 @@ def run_codex_review(prompt: str, model: str = "", expected_commit_sha: str = ""
 
     label_suffix = f" (model: {model})" if model else " (ChatGPT quota)"
     print(f"Running local adversarial review via OpenAI Codex{label_suffix}...")
-    cmd = [codex_path, "exec", "-s", "read-only", "--skip-git-repo-check", "--ignore-user-config", "--ignore-rules", "--ephemeral", "-"]
+    cmd = [codex_path, "exec", "-s", "read-only", "--skip-git-repo-check", "--ignore-user-config", "--ignore-rules", "--ephemeral"]
     if model:
         cmd.extend(["-m", model])
+    cmd.append("-")
 
     try:
         res = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=360)
@@ -780,9 +782,10 @@ def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str =
         if agent_name.endswith(".md"):
             agent_name = agent_name[:-3]
 
-        cmd = [opencode_path, "run", "--agent", agent_name, "--pure", "Review the attached diff.", "--file", prompt_file]
+        cmd = [opencode_path, "run", "--agent", agent_name, "--pure"]
         if model:
             cmd.extend(["-m", model])
+        cmd.extend(["Review the attached diff.", "--file", prompt_file])
 
         res = subprocess.run(cmd, capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:

@@ -114,30 +114,37 @@ Open PR #1407 had touched those exact files sixteen minutes earlier, and a `pr-s
 The two PRs conflicted as a result.
 Extending `pr-sweep.py` to print each PR's file set --- so this check needs no separate round of calls --- was filed as [#1419](https://github.com/Morrison-Lab/ai-config/issues/1419) and shipped in [#1421](https://github.com/Morrison-Lab/ai-config/pull/1421), merged 2026-08-13T16:28:22Z, which is why the guidance above leads with the sweep rather than with a per-PR call.)
 
-## Forking a session vs. clean-context dispatch for UMS and CAI
+## Conversation-inheriting subagent dispatch vs. clean-context dispatch for UMS and CAI
 
 When delegating sidecar work like UMS (`update-memories-and-skills`) or CAI (`config-ai`),
-choose whether the subagent should **fork the parent session** (inheriting full conversation history)
+choose whether the subagent should use **conversation-inheriting dispatch** (cloning the full conversation history)
 or start with a **clean context** (receiving only a scoped brief).
-Where a harness lacks native runtime session-forking flags,
-point the subagent at the session's on-disk transcript log or provide a focused milestone summary.
 
-### UMS: Fork for reflective sweeps, clean brief for isolated items
+> [!NOTE]
+> **Disambiguation from skill frontmatter `context: fork`:**
+> In Claude Code, setting `context: fork` in a skill's YAML frontmatter (such as in `skill-audit` or `find-overlap`) runs that skill in **isolation without conversation history**.
+> In contrast, **conversation-inheriting subagent dispatch** refers to cloning the active session's transcript into the worker ---
+> invoked programmatically via the `Agent` tool (`subagent_type: "fork"` in Claude Code, or `invoke_subagent` with `TypeName: "self"` in Antigravity)
+> or interactively via `/subtask`.
+> Where a harness lacks native runtime inheritance flags,
+> point the subagent at the session's on-disk transcript log or provide a focused milestone summary.
 
-- **Fork the session for reflective passes and end-of-task sweeps.**
+### UMS: Conversation inheritance for reflective sweeps, clean brief for isolated items
+
+- **Use conversation inheritance for reflective passes and end-of-task sweeps.**
   A comprehensive UMS sweep must survey the full conversation trajectory:
   mistakes corrected, tool quirks discovered, user preferences stated, and debugging insights.
-  A forked subagent already holds that entire history directly in its context.
+  A conversation-inheriting subagent already holds that entire history directly in its context.
   It does not require the parent orchestrator to spend tokens manually summarizing, transcribing, or briefing every learning ---
   which avoids communication overhead and prevents subtle mistakes from being dropped.
   The heavy downstream work of UMS
   (reading long memory files, grepping the corpus, running validation, committing in a dedicated worktree, and opening PRs)
-  executes entirely in the forked worker,
+  executes entirely in the worker,
   preserving the parent's remaining context budget.
-- **Scope the forked brief strictly to prevent memory bleed and role confusion.**
-  Because a forked worker inherits the parent's original goal and task history,
+- **Scope the brief strictly to prevent memory bleed and role confusion.**
+  Because a conversation-inheriting worker carries the parent's original goal and task history,
   it can be tempted to continue the primary task rather than focus on UMS.
-  Give the forked subagent a bounded, single-purpose prompt:
+  Give the subagent a bounded, single-purpose prompt:
   specify that its sole objective is to extract learnings, update memories/skills in a dedicated worktree,
   run validation, open the PR, and report back with a concise summary.
 - **Dispatch a clean subagent or run inline when learnings are already isolated.**
@@ -146,22 +153,23 @@ point the subagent at the session's on-disk transcript log or provide a focused 
   dispatch a fresh, clean subagent with the explicit brief.
   For a trivial 1-line note noted immediately mid-turn, apply it inline if no subagent capability is available.
 
-### CAI: Fork for emergent workflows, clean brief for explicit capability requests
+### CAI: Conversation inheritance for emergent workflows, clean brief for explicit requests
 
-- **Fork the session when CAI is prompted by an emergent workflow.**
+- **Use conversation inheritance when CAI is prompted by an emergent workflow.**
   When the user says "teach the AI how to do what we just did"
   or when a complex pattern emerges from recent tool interactions,
-  a forked subagent has the immediate context of the commands run, tools used, and errors encountered
+  a conversation-inheriting subagent has the immediate context of the commands run, tools used, and errors encountered
   without needing a multi-page transcription.
 - **Use a clean subagent for explicit, self-contained capability requests.**
   When the request is already self-contained (such as "cai: add a skill for X with Y options"),
   a clean subagent is strictly cheaper and avoids inheriting irrelevant conversation history.
 
-- **Do:** fork the session for reflective UMS passes and emergent CAI workflows so the subagent has the full transcript.
-- **Do:** explicitly scope the forked subagent's prompt to UMS or CAI to prevent it from continuing the parent's task.
+- **Do:** use conversation-inheriting dispatch (`subagent_type: "fork"` / `/subtask` / `self`) for reflective UMS passes and emergent CAI workflows so the subagent has the full transcript.
+- **Do:** explicitly scope the inherited subagent's prompt to UMS or CAI to prevent it from continuing the parent's task.
 - **Do:** use a clean subagent when the parent session is near context limits or when the brief is already fully specified.
-- **Don't:** serialize an entire session's history into a manual brief when session forking is available.
-- **Don't:** fork a session for a trivial, already-isolated 1-line memory note when inline capture or a clean brief suffices.
+- **Don't:** serialize an entire session's history into a manual brief when conversation-inheriting dispatch is available.
+- **Don't:** clone a large session history for a trivial, already-isolated 1-line memory note when inline capture or a clean brief suffices.
+
 
 
 

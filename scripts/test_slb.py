@@ -122,7 +122,7 @@ check(
 )
 
 # Bug 4: a mid-sentence prose line starting with "@" must not be treated
-# as a directive — only a standalone "@path.md" line is a directive.
+# as a directive --- only a standalone "@path.md" line is a directive.
 check(
     "prose line starting with @ is still sentence-split",
     "Comments come from the bot, by a human, or by a re-trigger,\n"
@@ -207,7 +207,7 @@ check(
 
 # Bug 8: a GitHub alert marker (`> [!IMPORTANT]`, `[!NOTE]`, `[!WARNING]`,
 # `[!TIP]`, `[!CAUTION]`) inside a blockquote must never be joined onto the
-# following prose line — GitHub only renders the alert when the marker sits
+# following prose line --- GitHub only renders the alert when the marker sits
 # alone on the blockquote's first line (ai-config#1799, #1821).
 check(
     "blockquote alert marker preserved, not joined to prose",

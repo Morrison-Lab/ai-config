@@ -369,7 +369,7 @@ def reformat(original: str, changed: set[int] | None = None) -> str:
             i += 1
             continue
 
-        # Fenced code blocks — track opening fence length and character so
+        # Fenced code blocks --- track opening fence length and character so
         # inner fences of a different character, or fewer characters, are
         # treated as content rather than closers (CommonMark §4.5).
         fence_m = _FENCE_RE.match(stripped)
@@ -386,7 +386,7 @@ def reformat(original: str, changed: set[int] | None = None) -> str:
                 fence_char_count = 0
                 fence_open_char = None
             # else: a shorter fence, or one using a different character,
-            # inside a code block — emit it verbatim as content.
+            # inside a code block --- emit it verbatim as content.
             else:
                 output.append(line)
                 i += 1
@@ -400,7 +400,7 @@ def reformat(original: str, changed: set[int] | None = None) -> str:
             i += 1
             continue
 
-        # HTML comments — may span multiple lines; track open/close so
+        # HTML comments --- may span multiple lines; track open/close so
         # interior prose isn't reflowed.
         if _HTML_COMMENT_RE.match(line):
             output.append(line)
@@ -426,7 +426,7 @@ def reformat(original: str, changed: set[int] | None = None) -> str:
             i += 1
             continue
 
-        # Blockquotes — process line by line
+        # Blockquotes --- process line by line
         if _BQ_RE.match(line):
             # Process the blockquote line-by-line, tracking fence state so
             # code blocks nested inside blockquotes are emitted verbatim.
@@ -488,7 +488,7 @@ def reformat(original: str, changed: set[int] | None = None) -> str:
                 ns = nl.strip()
                 if not ns:
                     break
-                # Stop at a fenced code block — emit the rest verbatim.
+                # Stop at a fenced code block --- emit the rest verbatim.
                 if _FENCE_RE.match(nl):
                     break
                 nl_lead = len(nl) - len(nl.lstrip())

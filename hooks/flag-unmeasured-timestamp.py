@@ -280,7 +280,9 @@ def _blank_quotes(text):
     flags: a `--delete-last` quoted inside a `--body` is prose, not a verb
     (ai-config#2906 review round 3).
     """
-    return re.sub(r'"[^"]*"|\'[^\']*\'',
+    # Escape-aware, the shape the rebuttal sibling's RX_BODY_LITERAL uses, so
+    # a backslash-escaped quote inside the string does not end it early.
+    return re.sub(r'"(?:[^"\\\\]|\\\\.)*"|\'[^\']*\'',
                   lambda m: m.group(0)[0] + " " * (len(m.group(0)) - 2) + m.group(0)[-1],
                   text)
 

@@ -151,6 +151,9 @@ CASES = [
      bash('gh pr comment 5 -R d-morrison/wai --body "please --delete-last the old one; claimed 12:15 PT"'), True,
      "a --delete-last quoted inside the body is prose, and the post is still judged"),
     ([PROMPT],
+     bash('gh pr comment 5 -R d-morrison/wai --body "say \\"hi\\" --delete-last; claimed 12:15 PT"'), True,
+     "an escaped quote inside the body does not end the quoted span early"),
+    ([PROMPT],
      bash('echo "do not run gh pr review 5 --body \\"12:15 PT\\" yet"'), False,
      "prose that merely mentions gh pr review is not a review"),
 

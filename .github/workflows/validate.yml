@@ -89,6 +89,12 @@ jobs:
         # must never be mistaken for one. See shared/workflow/fully-clean.md
         # for why that, rather than a false clean, is the hazard.
         run: python3 scripts/test_payload_fetcher.py
+      - name: Run build-pr-payload tests
+        # ai-config#2908: a remote/web session's GraphQL surface can be
+        # pinned to a fixed operation set while plain REST stays reachable,
+        # so build-pr-payload.py builds a --from-json payload from REST
+        # alone. Tested against canned REST fixtures, no token or network.
+        run: python3 scripts/test_build_pr_payload.py
       - name: Run verdict-scan parity tool tests
         run: python3 scripts/test_check_verdict_scan_parity.py
       - name: Run check-user-quote tests

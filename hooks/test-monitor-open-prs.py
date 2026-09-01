@@ -133,6 +133,8 @@ with tempfile.TemporaryDirectory() as d:
             "    sys.stdout.write('[{\"iid\": 1, \"description\": \"long\", \"user_notes_count\": 4}, {\"iid\": 2}][{\"iid\": 3}]')\n"
             "elif host == 'object.example.org':\n"
             "    sys.stdout.write('{\"message\": \"401 Unauthorized\"}')\n"
+            "elif host == 'scalars.example.org':\n"
+            "    sys.stdout.write('[1, 2]')\n"
             "else:\n"
             "    sys.stdout.write('[]')\n")
     os.chmod(stub, os.stat(stub).st_mode | stat.S_IEXEC)
@@ -198,6 +200,14 @@ with tempfile.TemporaryDirectory() as d:
                 raise AssertionError("a non-array page should raise")
             except ValueError as error:
                 assert "expected a JSON array page" in str(error)
+            # ... and so is an array whose elements are not objects: a
+            # ValueError lands under the host's error key, where an
+            # AttributeError would have ended the daemon.
+            try:
+                subject.host_merge_requests("scalars.example.org")
+                raise AssertionError("a page of non-objects should raise")
+            except ValueError as error:
+                assert "expected merge-request objects" in str(error)
             # No authenticated host is an error, never a silent empty list.
             with open(status_file, "w", encoding="utf-8") as stream:
                 stream.write("gitlab.com\n  x gitlab.com: API call failed: 401\n")
@@ -232,7 +242,7 @@ with tempfile.TemporaryDirectory() as d:
 # POSIX (measured on CPython 3.11; Windows attaches str) -- a str fixture
 # would leave a real POSIX timeout's TypeError unseen.
 real_run = subject.subprocess.run
-saved_glab = subject.GLAB_PATH
+glab_before_timeout_case = subject.GLAB_PATH
 try:
     def timing_out(*args, **kwargs):
         raise subject.subprocess.TimeoutExpired(
@@ -256,7 +266,7 @@ try:
         assert "timed out" in str(error) and "API call failed" in str(error), error
 finally:
     subject.subprocess.run = real_run
-    subject.GLAB_PATH = saved_glab
+    subject.GLAB_PATH = glab_before_timeout_case
 
 # Verify read_state / write_state roundtrip preserves reported fingerprint
 with tempfile.TemporaryDirectory() as d:

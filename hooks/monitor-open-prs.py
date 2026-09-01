@@ -18,12 +18,14 @@ POLL_SECONDS = 120
 # `could not read the token`) is the FIRST status line of its block, so the
 # bound has to hold whole blocks rather than line endings. Rendered from
 # status.go's own format strings, a fully configured instance's block is
-# about 480 characters, and the largest single-instance listing status.go
-# produces -- a 401 on an environment-variable token, which adds three
-# hint lines to the block and a three-line trailer before the summary --
-# is about 1450. 4000 holds that largest rendering with room for a second
-# default block, and test-monitor-open-prs.py pins both renderings to fit.
-# A `glab api` or `gh` diagnosis is one line.
+# about 480 characters. The longest branch -- a 401 on an
+# environment-variable token -- adds at least three hint lines to the block
+# (a fourth when the host is configured for OAuth) and a three-line trailer
+# before the summary, for about 1450, and optional `Subfolder:` and
+# `SSH Host:` lines can take one block past 1700. 4000 holds that with room
+# for a second default block; test-monitor-open-prs.py pins the env-token
+# rendering and a default block to fit together. A `glab api` or `gh`
+# diagnosis is one line.
 ERROR_TAIL = 4000
 
 # The fields of a merge request kept in the state file, the counterpart of
@@ -230,8 +232,11 @@ def host_merge_requests(host):
         if not isinstance(page, list):
             raise ValueError(
                 f"expected a JSON array page from glab api, got {type(page).__name__}")
-        merge_requests.extend(
-            {field: item.get(field) for field in MERGE_REQUEST_FIELDS} for item in page)
+        for item in page:
+            if not isinstance(item, dict):
+                raise ValueError(
+                    f"expected merge-request objects from glab api, got {type(item).__name__}")
+            merge_requests.append({field: item.get(field) for field in MERGE_REQUEST_FIELDS})
     return merge_requests
 
 

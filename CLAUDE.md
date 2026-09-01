@@ -1244,6 +1244,14 @@ and reframe or dissolve problems rather than building intricate workarounds insi
 
 [`shared/principles/think-outside-the-box.md`](shared/principles/think-outside-the-box.md)
 
+## Don't take anyone's word for it --- independent verification and constructive pushback
+
+Never accept factual assertions, technical recommendations, or stated preferences blindly.
+Everyone makes mistakes --- humans, AI models, peer agents, and experts alike.
+Always investigate assertions independently via deterministic queries, source inspection, or clarifying questions, and push back constructively whenever you suspect an error or unsound reasoning.
+
+[`shared/principles/dont-take-my-word-for-it.md`](shared/principles/dont-take-my-word-for-it.md)
+
 ## Coding: KISS is the umbrella principle
 
 Apply KISS to code and prose: use the simplest construct that does the job,

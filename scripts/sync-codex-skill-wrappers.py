@@ -145,9 +145,17 @@ Resolve those operations using the full per-model reference at [tool-mappings.md
 """
 
 
+def format_model_bullet(label: str, resolves: str) -> str:
+    line = f"- **{label}** --- {resolves}"
+    if len(line) > 80 and "; " in line:
+        head, tail = line.split("; ", 1)
+        return f"{head};\n  {tail}"
+    return line
+
+
 def reference_doc(mappings: dict) -> str:
     model_lines = [
-        f"- **{md_cell(m['label'])}** --- {collapse(m['resolves'])}"
+        format_model_bullet(md_cell(m["label"]), collapse(m["resolves"]))
         for m in mappings["models"]
     ]
     return f"""# Cross-model tool mappings
@@ -159,7 +167,8 @@ run `python3 scripts/sync-codex-skill-wrappers.py` to regenerate this page and
 the links in `codex-skills/`.
 
 The canonical skills under `skills/` are written for Claude Code and name
-concrete tools --- mostly `gh`/`git` commands. This registry maps each canonical
+concrete tools --- mostly `gh`/`git` commands.
+This registry maps each canonical
 operation to the equivalent GitHub MCP tool so any model can run a skill.
 
 > [!IMPORTANT]

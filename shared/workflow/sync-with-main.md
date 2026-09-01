@@ -6,7 +6,7 @@ Worked-example case records for the rules below live in
 [`sync-with-main.cases.md`](sync-with-main.cases.md), moved out of the auto-loaded context.
 
 This fragment covers the single-branch-vs-`main` case. When orchestrating a
-multi-agent `ultracode` session, merges can happen at more points than that —
+multi-agent `ultracode` session, merges can happen at more points than that ---
 see [`ultracode-merge-conflicts`](ultracode-merge-conflicts.md) for the
 broader check (worktree-isolated agent branches, concurrent `parallel()`
 results) and the note on GitHub's mergeable indicator not evaluating custom
@@ -43,7 +43,7 @@ Always wait for fresh reviews and CI on the new head, re-verify with `check-pr-f
 
 **After merging main, re-check version parity.** In R packages with a
 `version-check` CI job, the branch's `DESCRIPTION` `Version:` must *exceed*
-main's. A conflict-free merge can silently put them at parity — main advanced
+main's. A conflict-free merge can silently put them at parity --- main advanced
 (e.g. another PR merged between when you last bumped and now). After every merge
 of main, compare versions:
 
@@ -104,13 +104,13 @@ extracted script, a doc example) needs the copy re-synced too, not just the
 conflicted file resolved.** When a PR extracts inline logic (e.g. a workflow
 step's shell block) into a standalone script for testability, and `main`
 independently changes that same inline logic while the PR is open, resolving
-the merge conflict in the workflow file is not enough — the extracted script
+the merge conflict in the workflow file is not enough --- the extracted script
 must be updated to match `main`'s new logic exactly, or the PR silently
 reverts `main`'s fix the moment it merges. Diff the extracted copy against
 `main`'s current inline version line-for-line (strip indentation, `diff`) to
 confirm an exact match, not just "looks about right." If the PR carries tests
 against the extracted copy (fixtures, unit tests), add regression coverage for
-whatever `main`'s change fixed — the merge is the natural moment to catch a
+whatever `main`'s change fixed --- the merge is the natural moment to catch a
 gap the original PR's tests didn't anticipate, and to prove the new fixtures
 actually catch the regression (temporarily revert the fix, confirm the test
 fails, then restore).

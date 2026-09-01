@@ -43,7 +43,8 @@ Search for blocks of code disabled behind comment characters:
    - R: `grep -rnE '^\s*#\s*([a-zA-Z0-9_.]+\s*<-\s*function|library\(|source\()' <path>`
    - Shell: `grep -rnE '^\s*#\s*(function |alias |export )' <path>`
 2. Distinguish informative comments (explanations, rationale, citations, constraints) from disabled code blocks.
-3. Remove disabled code blocks completely. Rely on git history as the permanent archive.
+3. Remove disabled code blocks completely.
+   Rely on git history as the permanent archive.
 
 ### Step 2: Unused symbols, functions, and imports
 

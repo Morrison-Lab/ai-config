@@ -33,6 +33,14 @@ BLOCK = [
      "heredoc input to gated command without target"),
     ("cat <<'EOF'\nfoo\nEOF\n" + G + "secret set FOO",
      "command after heredoc without target"),
+    ("timeout=$(( base_timeout << retry_count ))\n" + G + "pr merge 456 --squash",
+     "arithmetic shift in preceding line does not mask ungated command"),
+    ("echo $(( 1 << 4 ))\n" + G + "secret set FOO",
+     "numeric arithmetic shift does not mask ungated command"),
+    ("result=$((flags << 1))\n" + G + "repo delete something --yes",
+     "flag bitshift does not mask ungated repo delete"),
+    ("(( x << 1 ))\n" + G + "secret set FOO",
+     "arithmetic command (( x << 1 )) does not mask ungated command"),
 ]
 
 ALLOW = [
@@ -78,6 +86,10 @@ ALLOW = [
      "command after heredoc with explicit -R"),
     (G + 'issue create -R a/b --title "title" --body "$(cat <<\'EOF\'\nExample:\n' + G + 'secret set FOO\nEOF\n)"',
      "heredoc in subshell inside command with -R"),
+    ("timeout=$(( base_timeout << retry_count ))\n" + G + "pr merge 456 --repo a/b --squash",
+     "arithmetic shift followed by explicit -R command"),
+    ("echo $(( 1 << 4 ))\n" + G + "secret set FOO -R a/b",
+     "numeric shift followed by explicit -R command"),
 ]
 
 

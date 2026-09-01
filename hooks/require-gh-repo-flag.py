@@ -68,6 +68,10 @@ HAS_REPO_FLAG = re.compile(
     r"(^|\s)(-R\b|--repo(=|\s)|-o\b|--org(=|\s)|-u\b|--user\b)"
 )
 
+# Match arithmetic expansions like `$(( x << y ))` or `(( x << y ))` where `<<`
+# is a bitwise shift, not a heredoc opener.
+ARITHMETIC = re.compile(r"\$\(\(.*?\)\)|\(\(.*?\)\)")
+
 # Match heredoc openers: `<<`, `<<-`, `<<~` followed by quoted, backslash-escaped,
 # or bare word delimiter.
 HEREDOC_OPEN = re.compile(
@@ -100,7 +104,12 @@ def strip_heredocs(command: str) -> str:
 
         out.append(line)
         if not line.strip().startswith("#"):
-            for m in HEREDOC_OPEN.finditer(line):
+            # Mask arithmetic expansions so `$(( 1 << 4 ))` is not misparsed as a heredoc opener
+            line_for_heredocs = ARITHMETIC.sub("", line)
+            for m in HEREDOC_OPEN.finditer(line_for_heredocs):
+                rest = line_for_heredocs[m.end():]
+                if re.match(r"^\s*\)\)", rest):
+                    continue
                 strip_flag = m.group(1)
                 delim = m.group(2) or m.group(3) or m.group(4) or m.group(5)
                 if delim:

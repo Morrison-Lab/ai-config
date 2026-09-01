@@ -29,14 +29,14 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/ensure-open-pr-monitor.py\"",
             "timeout": 10,
             "script": "ensure-open-pr-monitor.py",
-            "why": "Ensures one detached timer continuously reconciles every open PR authored by the authenticated user, including PRs opened outside this session."
+            "why": "Ensures one detached timer continuously reconciles every open GitHub PR and GitLab merge request authored by the authenticated user, including reviews opened outside this session."
           },
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/inject-pr-monitor-status.py\"",
             "timeout": 10,
             "script": "inject-pr-monitor-status.py",
-            "why": "Surfaces changed state from no-unmonitored-pr.py's detached timer on the next prompt. The fallback observes a PR while the session is absent but cannot wake a terminated model."
+            "why": "Surfaces changed state from the detached open-review monitor on the next prompt. The fallback observes GitHub PRs and GitLab merge requests while the session is absent but cannot wake a terminated model."
           },
           {
             "type": "command",

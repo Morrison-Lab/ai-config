@@ -8,8 +8,10 @@ subject = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(subject)
 
 assert subject.POLL_SECONDS == 120
-assert subject.STATE_PATH.endswith("all-open-prs.json")
+assert subject.STATE_PATH.endswith("all-open-reviews.json")
 assert any(isinstance(c, (str, tuple, list)) and "--author" in c for c in subject.open_prs.__code__.co_consts)
+assert any(isinstance(c, (str, tuple, list)) and "created_by_me" in c for c in subject.open_merge_requests.__code__.co_consts)
+assert "--hostname" in subject.open_merge_requests.__code__.co_consts
 # The command must run the absolutely-resolved GH_PATH; the literal "gh"
 # reappearing in open_prs would be a revert of the #1953 fix. CPython folds
 # a list display into a tuple inside co_consts, so nested consts are
@@ -41,22 +43,27 @@ with tempfile.TemporaryDirectory() as d:
     finally:
         subject.STATE_PATH = orig_path
 
-# require_gh fails fast instead of starting a monitor that can only error
+# require_cli fails fast instead of starting a monitor that can only error.
 saved_gh = subject.GH_PATH
+saved_glab = subject.GLAB_PATH
 try:
     subject.GH_PATH = None
+    subject.GLAB_PATH = None
     try:
-        subject.require_gh()
-        raise AssertionError("require_gh should exit when gh is unresolvable")
+        subject.require_cli()
+        raise AssertionError("require_cli should exit when no CLI is resolvable")
     except SystemExit as exit_call:
         assert "gh" in str(exit_call.code)
 finally:
     subject.GH_PATH = saved_gh
+    subject.GLAB_PATH = saved_glab
 
-# Consecutive failures accumulate an error_streak; success resets it.
+# A GitHub failure must not suppress GitLab monitoring. Consecutive failures
+# accumulate an error_streak; a full success resets it.
 with tempfile.TemporaryDirectory() as d:
     orig_path = subject.STATE_PATH
     real_open_prs = subject.open_prs
+    real_open_merge_requests = subject.open_merge_requests
 
     def failing():
         raise OSError("[Errno 2] No such file or directory: 'gh'")
@@ -64,12 +71,17 @@ with tempfile.TemporaryDirectory() as d:
     def working():
         return [{"number": 7}]
 
+    def working_gitlab():
+        return [{"iid": 8}]
+
     try:
         subject.STATE_PATH = os.path.join(d, "streak.json")
         subject.open_prs = failing
+        subject.open_merge_requests = working_gitlab
         state = subject.poll_once({})
-        assert state["error"].endswith("'gh'")
-        assert "data" not in state
+        assert "github_prs" not in state["data"]
+        assert state["data"]["gitlab_merge_requests"] == [{"iid": 8}]
+        assert "github_prs" in state["error"]
         assert state["error_streak"] == 1
         state = subject.poll_once(state)
         assert state["error_streak"] == 2
@@ -82,18 +94,23 @@ with tempfile.TemporaryDirectory() as d:
 
         subject.open_prs = failing_differently
         state = subject.poll_once(state)
-        assert state["error"] == "connection timed out"
+        assert "connection timed out" in state["error"]
         assert state["error_streak"] == 1
         state = subject.poll_once(state)
         assert state["error_streak"] == 2
 
         subject.open_prs = working
+        subject.open_merge_requests = working_gitlab
         state = subject.poll_once(state)
         assert "error" not in state
         assert state["error_streak"] == 0
-        assert state["data"] == [{"number": 7}]
+        assert state["data"] == {
+            "github_prs": [{"number": 7}],
+            "gitlab_merge_requests": [{"iid": 8}]
+        }
     finally:
         subject.open_prs = real_open_prs
+        subject.open_merge_requests = real_open_merge_requests
         subject.STATE_PATH = orig_path
 
 # alive() must be truthful on every platform: signal-0 does not track
@@ -107,5 +124,5 @@ assert subject.alive(2 ** 30) is False
 if os.name == "nt":
     assert subject._alive_windows(os.getpid()) is True
 
-print("PASS: gh is resolved or refused at startup; failures accumulate an "
-      "error streak that success resets")
+print("PASS: GitHub and GitLab CLIs are resolved or refused at startup; "
+    "failures accumulate an error streak that success resets")

@@ -5,9 +5,9 @@ A monitor that tracks a consecutive-error streak (today only the
 all-open-PRs monitor writes `error_streak`) is surfaced too once its last
 N polls all errored with the same text: a watcher answering "no" forever
 in the same words must stay distinguishable from a watcher finding
-nothing.  A state file with no `error_streak` (the per-PR watchers, a
+nothing.  A state file with no `error_streak` (the per-review watchers, a
 pre-fix daemon) surfaces only on change --- ai-config#2035 tracks
-extending the streak to the per-PR watchers.
+extending the streak to the per-review watchers.
 """
 import hashlib
 import json

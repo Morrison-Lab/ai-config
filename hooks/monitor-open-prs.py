@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Continuously poll every open PR authored by the authenticated GitHub user."""
+"""Continuously poll open GitHub PRs and GitLab merge requests authored by the user."""
 import json
 import os
 import shutil
@@ -7,9 +7,10 @@ import subprocess
 import sys
 import tempfile
 import time
+import re
 
 POLL_SECONDS = 120
-STATE_PATH = os.path.join(tempfile.gettempdir(), "claude-pr-monitors", "all-open-prs.json")
+STATE_PATH = os.path.join(tempfile.gettempdir(), "claude-pr-monitors", "all-open-reviews.json")
 IS_WINDOWS = os.name == "nt"
 
 
@@ -78,15 +79,18 @@ def read_state():
 
 
 GH_PATH = shutil.which("gh")
+GLAB_PATH = shutil.which("glab")
 
 
-def require_gh():
-    if GH_PATH is None:
-        sys.exit("FATAL: cannot resolve 'gh' on PATH; refusing to start a "
-                 "monitor that can only error every poll")
+def require_cli():
+    if GH_PATH is None and GLAB_PATH is None:
+        sys.exit("FATAL: cannot resolve 'gh' or 'glab' on PATH; refusing to "
+                 "start a monitor that can only error every poll")
 
 
 def open_prs():
+    if GH_PATH is None:
+        return []
     result = subprocess.run(
         [GH_PATH, "search", "prs", "--author", "@me", "--state", "open", "--limit", "1000",
          "--json", "number,repository,title,updatedAt,url"],
@@ -94,14 +98,50 @@ def open_prs():
     return json.loads(result.stdout)
 
 
+def open_merge_requests():
+    if GLAB_PATH is None:
+        return []
+    result = subprocess.run(
+        [GLAB_PATH, "auth", "status"],
+        capture_output=True, text=True, timeout=30)
+    hosts = re.findall(
+        r"^([A-Za-z0-9.-]+)\n\s+.*Logged in to \1 as ",
+        result.stdout + result.stderr,
+        flags=re.MULTILINE
+    )
+    merge_requests = []
+    for host in hosts:
+        response = subprocess.run(
+            [
+                GLAB_PATH, "api", "--hostname", host,
+                "merge_requests?scope=created_by_me&state=opened&per_page=100"
+            ],
+            capture_output=True, text=True, timeout=60, check=True)
+        merge_requests.extend(json.loads(response.stdout))
+    if not hosts:
+        raise OSError("glab has no authenticated hosts")
+    return merge_requests
+
+
 def poll_once(state):
     state.update({"kind": "all_open_prs", "pid": os.getpid(), "checked_at": time.time()})
-    try:
-        state["data"] = open_prs()
+    data = {}
+    errors = {}
+    for name, query in {
+        "github_prs": open_prs,
+        "gitlab_merge_requests": open_merge_requests
+    }.items():
+        try:
+            data[name] = query()
+        except (OSError, ValueError, subprocess.SubprocessError) as error:
+            errors[name] = str(error)
+
+    state["data"] = data
+    if not errors:
         state.pop("error", None)
         state["error_streak"] = 0
-    except (OSError, ValueError, subprocess.SubprocessError) as error:
-        message = str(error)
+    else:
+        message = json.dumps(errors, sort_keys=True)
         # The streak counts consecutive polls of the SAME error text, so a
         # text change starts a fresh streak and earns its own persistent
         # report downstream; state still holds the previous poll's error here.
@@ -109,7 +149,6 @@ def poll_once(state):
             state["error_streak"] = int(state.get("error_streak") or 0) + 1
         else:
             state["error_streak"] = 1
-        state.pop("data", None)
         state["error"] = message
     write_state(state)
     return state
@@ -137,7 +176,7 @@ def ensure():
 
 
 if __name__ == "__main__":
-    require_gh()
+    require_cli()
     if sys.argv[1:] == ["--monitor"]:
         monitor()
     else:

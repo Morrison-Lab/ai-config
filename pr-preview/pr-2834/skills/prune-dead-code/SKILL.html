@@ -454,7 +454,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h3 class="anchored" data-anchor-id="step-4-unreferenced-memory-entries-and-documentation">Step 4: Unreferenced memory entries and documentation</h3>
 <p>Detect stale memories and documentation orphans:</p>
 <ol type="1">
-<li>Check <code>memories/</code> for files not linked from <code>memories/README.md</code> or referenced in any active rules/skills.</li>
+<li>Run <code>python3 scripts/check-stale-records.py</code> to identify unreferenced memory entries and documentation files not linked from <code>memories/README.md</code> or other catalog files.</li>
 <li>Check for documentation referencing deleted CLI commands, removed options, or obsolete architecture.</li>
 <li>Run <code>python3 scripts/check-links.py</code> (or repo link checker) to ensure no broken relative links exist.</li>
 </ol>

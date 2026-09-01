@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Unit tests for scripts/check-links.py (ai-config#2578).
+"""Unit tests for scripts/check-links.py (ai-config#2878).
 
 Verifies that:
 1. External link schemes and in-page anchors are recognized and skipped.

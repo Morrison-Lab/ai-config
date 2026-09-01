@@ -134,6 +134,6 @@ Apply this principle during code review and adversarial self-review:
   Deterministic tools provide inspectable, reproducible mechanisms;
   getting under the hood is the diagnostic practice of actually inspecting
   those mechanisms when understanding or troubleshooting them.
-- **Supports Diagnostic Mandate** ([`run-ums-proactively`](../workflow/run-ums-proactively.md)):
-  Diagnostic requests require inspecting live state and raw outputs to deliver
+- **Supports Diagnostic Mandate** ([`AGENTS.md`](../../AGENTS.md)):
+  Diagnostic requests mandate inspecting live state and raw outputs to deliver
   concrete fixes rather than speculative explanations.

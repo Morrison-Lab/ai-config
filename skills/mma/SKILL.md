@@ -38,8 +38,8 @@ fix for free.
    `gh pr list --json number,headRefName,author,assignees`).
    Note each PR's number, `headRefName`, `author`, and `assignees`.
    Filter the list by `memories/reviewing-prs.md`'s scope test first, as
-   `ardia` step 1 does (opened by or assigned to the invoking user, named
-   in the request, or opened by a repository workflow), and report the PRs
+   `ardia` step 1 does (opened by or assigned to the invoking user,
+   explicitly requested by name, or opened by a repository workflow), and report the PRs
    dropped: a resync pushes a merge commit, which that memory forbids on any
    other PR.
 

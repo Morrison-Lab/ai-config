@@ -34,10 +34,11 @@ mutates a PR stays serial.
      --- `gh api user --jq .login` locally, `mcp__github__get_me` in a remote session, `glab api user | jq -r .username` on GitLab, where the fields are `author.username` and `assignees[].username` ---
      and add any aliases `memories/reviewing-prs.md` lists for that person,
      so a lab member running this corpus from a vendored checkout filters on their own identity rather than the corpus owner's.
+     When no identity operation is available, fail closed: leave the author and assignee arms unevaluated, keep only explicitly requested and workflow-opened PRs, and say so in the report.
      Keep a PR only when its `author.login` is one of those logins or the repository's own workflow bot (the app slug `github-actions`, in whichever form the source returns it;
      `memories/reviewing-prs.md` lists the forms),
      one of those logins is among its `assignees`,
-     or the user named the PR (or, via an explicit `chores` call, the bot population) in the request;
+     or the user explicitly asked for work on that PR (or, via an explicit `chores` call, on the bot population) --- a mention such as "do not touch #284" is not a request;
      exclude every other PR from the action queue before doing anything else, and name the excluded ones in the report so the user can assign or name any they want driven.
      Keep the full listing for the stack detection in step 3, so an in-scope PR based on an out-of-scope PR's branch is still recognised as stacked (it is synced against that base as it stands;
      the base itself is left to its author).

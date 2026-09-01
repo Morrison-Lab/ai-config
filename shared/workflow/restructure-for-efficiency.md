@@ -30,7 +30,7 @@ Each is a fragment this corpus already has, read for its **cost** rather than fo
   Those two argue correctness and inspectability.
   The token saving is real and additional, since an instrument's verdict costs a tool call where the judgment costs a reasoning pass every time.
 - **A serial loop whose base moves faster than one round of it.**
-  Batch it, per [`batch-merge-and-resolve`](batch-merge-and-resolve.md), which supplies the two measurements that decide it rather than leaving it to judgment.
+  Batch it, per [`batch-merge-and-resolve`](batch-merge-and-resolve.md), or eliminate the serial re-review penalty via a forge [`merge-queue`](merge-queue.md).
 - **A brief that hands over an enumerated set rather than the query deriving it.**
   Per [`derive-dont-enumerate`](derive-dont-enumerate.md): a stale list costs a re-dispatch, and the items that appear between the lists are covered by nobody.
 - **Work sitting at the conductor's tier that a cheaper or unbilled one could do.**

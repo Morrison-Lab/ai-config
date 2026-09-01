@@ -397,6 +397,20 @@ The authoring session cannot perform this itself.
 It knows what the change was meant to say, so it reads the diff and recovers the intent --- confirmation rather than review --- and nothing in the output distinguishes that from a real pass.
 Brief the reviewer with the diff and the standards, never with the rationale for the change.
 
+## AI reviews require detailed and holistic passes
+
+Every AI review must independently perform and report both passes.
+The detailed pass identifies concrete defects in code, prose, tests, behavior,
+security, and reproducibility, with evidence sufficient for the author to
+locate and evaluate each finding.
+The holistic pass evaluates the entire change against its requirements and
+intent, cross-file consistency, architecture and integration, regression risk,
+scope, and validation gaps.
+Report the result of both passes even when one found no issue.
+Do not mirror only the author's or a human reviewer's attention: use the
+complete diff and relevant surrounding context to look for the underlying
+pattern and its effects beyond any already-enumerated example.
+
 Pushing without a clean self-review is mechanistically blocked by pre-push
 guards on Claude Code.
 Morrison-Lab/ai-config's Cursor adapter skips `no-push-without-self-review.py`

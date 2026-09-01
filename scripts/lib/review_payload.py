@@ -48,6 +48,19 @@ _PAYLOAD_RE = re.compile(
     re.IGNORECASE,
 )
 
+_MEANINGFUL_ASSESSMENT = re.compile(r"(?:[A-Za-z][A-Za-z'-]*\s+){2,}[A-Za-z][A-Za-z'-]*")
+_ASSESSMENT_WORDS = re.compile(r"[A-Za-z][A-Za-z'-]*")
+_ASSESSMENT_EVIDENCE = {
+    "detailed_assessment": re.compile(
+        r"\b(?:call|path|failure|edge|defect|test|code|change|line|branch|input)\w*\b",
+        re.IGNORECASE,
+    ),
+    "holistic_assessment": re.compile(
+        r"\b(?:requirement|intent|integration|cross-file|regression|scope|validation|consumer|architecture)\w*\b",
+        re.IGNORECASE,
+    ),
+}
+
 
 def normalize_verdict(raw: Any) -> str:
     """Fold a payload ``verdict`` value to the form the frozensets above use."""
@@ -192,9 +205,44 @@ def payload_findings_malformed(payload: Optional[Dict[str, Any]]) -> bool:
     return "findings" in payload and not isinstance(payload["findings"], list)
 
 
+def payload_assessments_malformed(payload: Optional[Dict[str, Any]]) -> bool:
+    """True when a schema 1.1 review omits either required review pass.
+
+    Schema 1.1 adds separate detailed and holistic assessment fields.  Older
+    reports remain valid historical inputs; new reports must state both passes
+    so an empty whole-change review cannot be mistaken for a thorough one.
+    """
+    if not payload or str(payload.get("schema_version", "")).strip() != "1.1":
+        return False
+    detailed = payload.get("detailed_assessment")
+    holistic = payload.get("holistic_assessment")
+    if isinstance(detailed, str) and isinstance(holistic, str):
+        if detailed.strip().casefold() == holistic.strip().casefold():
+            return True
+    for field, evidence in _ASSESSMENT_EVIDENCE.items():
+        value = payload.get(field)
+        if not isinstance(value, str) or not _MEANINGFUL_ASSESSMENT.search(value.strip()):
+            return True
+        if len({word.lower() for word in _ASSESSMENT_WORDS.findall(value)}) < 6:
+            return True
+        if not evidence.search(value):
+            return True
+    return False
+
+
+def payload_has_required_assessments(payload: Optional[Dict[str, Any]]) -> bool:
+    """True when a current review payload records both mandatory passes."""
+    return (
+        bool(payload)
+        and payload_is_clean(payload)
+        and not payload_assessments_malformed(payload)
+        and str(payload.get("schema_version", "")).strip() == "1.1"
+    )
+
+
 def payload_is_blocking(payload: Optional[Dict[str, Any]]) -> bool:
     """True when the payload blocks: a not-clean verdict, any finding, or a
-    malformed ``findings`` field.
+    malformed ``findings`` field, or malformed required schema 1.1 assessments.
 
     Findings alone block regardless of the stated verdict, because a reviewer
     that enumerates findings and then labels itself clean is contradicting
@@ -202,7 +250,7 @@ def payload_is_blocking(payload: Optional[Dict[str, Any]]) -> bool:
     """
     if not payload:
         return False
-    if payload_findings_malformed(payload):
+    if payload_findings_malformed(payload) or payload_assessments_malformed(payload):
         return True
     if payload_findings(payload):
         return True

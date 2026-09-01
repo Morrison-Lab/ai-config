@@ -40,7 +40,23 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
    - Documentation, manifests, and catalogs still in sync with the implementation.
    - Duplication of something the repo (or a trustworthy upstream) already provides.
 
-4. **Deliver a structured verdict**
+4. **The Slop Detector**
+    - Flag placeholder comments, copy-paste artifacts, cargo-cult code, dead
+       code, genuinely uninformative naming, unrelated responsibilities,
+       inconsistent patterns, and unused imports as concrete defects with file,
+       line, failure, and fix.
+    - Judge the artifact rather than surrounding comments or the author's
+       account of it; a stated intention is not an implemented behavior.
+
+5. **Perform a holistic whole-change assessment**
+    - Check whether the change satisfies the requirement its diff establishes,
+       and whether its behavior remains coherent across callers, consumers,
+       documentation, configuration, tests, and integration boundaries.
+    - Assess regression risk, omitted instances of the same underlying pattern,
+       scope, and whether the validation performed could expose the relevant
+       failure modes.
+
+6. **Deliver a structured verdict**
 
    - `### Summary of Changes`: a brief neutral summary of the inspected diff.
    - `### Findings`: an itemized list, each tagged **[Defect]**, **[Factual Error]**, **[Convention]**, or **[Edge Case]**, and each naming the file and line plus the concrete failure it would produce.
@@ -48,7 +64,7 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
     You must append a machine-readable block at the end of the findings section (as a bare line, not inside a fence or backticks): [FINDINGS_COUNT: <N>] where <N> is the integer number of findings.
    - `### Verdict`: exactly one of `### Verdict: Ready for merge` (only if no actionable finding remains) or `### Verdict: Needs more work`.
 
-5. **Fingerprint what you read and include structured data**
+7. **Fingerprint what you read and include structured data**
 
    End the report, after the verdict, with the commit you reviewed
    as a bare line, not inside a fence:
@@ -60,17 +76,19 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
 
 <!-- review-data:
 {
-  "schema_version": "1.0",
+   "schema_version": "1.1",
   "reviewer": "adversarial-reviewer",
   "commit_sha": "<full sha from git rev-parse HEAD>",
-  "verdict": "CLEAN",
-  "findings": []
+   "verdict": "CLEAN",
+   "findings": [],
+   "detailed_assessment": "State the result of the detailed pass, including an explicit no-findings statement when applicable.",
+   "holistic_assessment": "State the result of the holistic pass, including an explicit no-concerns statement when applicable."
 }
 -->
 
    (For a not-clean verdict, set "verdict": "NOT_CLEAN" and give "findings" one object per finding, each with exactly these four keys: {"file": "<repo-relative path>", "line": <1-indexed int>, "category": "<kebab-case slug>", "message": "<one sentence stating the defect>"}.
    Use those key names literally -- a consumer that cannot find them reports the finding as "structured finding in unknown: ", which names nothing.
-   Any finding listed here blocks, whatever the "verdict" string says, and a CLEAN payload requires an explicit empty "findings" array -- omitting the key does not clear.)
+   Any finding listed here blocks, whatever the "verdict" string says, and a CLEAN payload requires an explicit empty "findings" array. Schema 1.1 requires distinct "detailed_assessment" and "holistic_assessment" strings with at least six distinct words each. The detailed assessment must name a changed path, failure mode, or concrete defect; the holistic assessment must name a requirement, integration, regression, scope, or validation concern. Report both passes even when they found no issue.)
 
    Read that sha yourself rather than taking it from the brief.
    On Claude Code, the pre-push guard resolves what the push would actually ship --- reading its refspec, not just HEAD --- and compares, which is what ties your verdict to those commits.

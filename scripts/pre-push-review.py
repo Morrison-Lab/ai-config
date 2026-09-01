@@ -20,8 +20,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from scripts.lib.fences import count_unbalanced_fences, strip_fences
 from scripts.lib.review_payload import (
     extract_structured_review,
+    payload_assessments_malformed,
     payload_findings,
     payload_findings_malformed,
+    payload_has_required_assessments,
     payload_is_blocking,
     normalize_verdict,
 )
@@ -284,6 +286,8 @@ def _structured_contradiction(report: str) -> Optional[str]:
             "a `findings` field that is present but is not a list "
             f"({type(structured.get('findings')).__name__})"
         )
+    elif payload_assessments_malformed(structured):
+        detail = "a schema 1.1 payload missing a non-empty detailed or holistic assessment"
     elif findings:
         detail = f"{len(findings)} finding(s)"
     else:
@@ -330,7 +334,7 @@ def _parse_persona_verdict(report: str, expected_commit_sha: str = "") -> Tuple[
             "Comment stripping synthesized a fence marker; report unparseable."
         )
 
-    verdict, reviewed_commit = hook.parse_report(stripped)
+    verdict, reviewed_commit = hook.parse_report(report)
     if verdict is None:
         return False, False, "Persona-contract report has no verdict line parse_report() recognizes."
 
@@ -376,7 +380,11 @@ def _parse_persona_verdict(report: str, expected_commit_sha: str = "") -> Tuple[
     return True, False, "Needs work (persona contract)"
 
 
-def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -> Tuple[bool, bool, str]:
+def parse_review_verdict(
+    report: Optional[str],
+    expected_commit_sha: str = "",
+    require_current_assessments: bool = False,
+) -> Tuple[bool, bool, str]:
     """Parse structured review output and return (is_valid, is_clean, reason).
 
     Returns:
@@ -585,6 +593,13 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
         contradiction = _structured_contradiction(report)
         if contradiction:
             return False, False, contradiction
+        if require_current_assessments and not payload_has_required_assessments(
+            extract_structured_review(report)
+        ):
+            return False, False, (
+                "A clean current review requires schema 1.1 review-data with "
+                "meaningful detailed and holistic assessments."
+            )
 
     refusal = _refusal_reason(report)
     if refusal:
@@ -594,7 +609,11 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
 
 
 def validate_review_output(report: Optional[str], expected_commit_sha: str = "") -> bool:
-    is_valid, _, reason = parse_review_verdict(report, expected_commit_sha=expected_commit_sha)
+    is_valid, _, reason = parse_review_verdict(
+        report,
+        expected_commit_sha=expected_commit_sha,
+        require_current_assessments=True,
+    )
     if not is_valid:
         print(f"Notice: Rejected invalid report: {reason}", file=sys.stderr)
     return is_valid
@@ -1041,7 +1060,8 @@ def build_review_prompt(diff: str, ref_name: str, guidelines: str, head_sha: str
         "1. Be adversarial: actively search for regressions, edge-case failures, schema mismatches, syntax errors, omitted instances, and breaking contract changes.",
         "2. Do NOT rubber-stamp. Scrutinize whether any other files or callers suffer from identical bugs.",
         "3. Review the code strictly on what the diff and codebase state, not on assumptions.",
-        "4. Structure your response strictly with:",
+        "4. Perform two independent passes: a detailed pass that traces changed call paths, failure modes, and concrete defects; and a holistic pass that evaluates requirements, intent, cross-file consistency, integration, regression risk, scope, and validation sufficiency.",
+        "5. Structure your response strictly with:",
         "   - ### Summary Verdict",
         "     Verdict: Ready for merge (or Verdict: Needs work with concise reason)",
         "   - ### Critical Findings",
@@ -1056,11 +1076,13 @@ def build_review_prompt(diff: str, ref_name: str, guidelines: str, head_sha: str
         "   leading spaces make it a Markdown indented code block, and a payload inside one is ignored.",
         "<!-- review-data:",
         "{",
-        '  "schema_version": "1.0",',
+        '  "schema_version": "1.1",',
         '  "reviewer": "adversarial-reviewer",',
         f'  "commit_sha": "{head_sha}",',
         '  "verdict": "CLEAN",',
-        '  "findings": []',
+        '  "findings": [],',
+        '  "detailed_assessment": "No actionable detailed findings after tracing the changed paths and failure modes.",',
+        '  "holistic_assessment": "No whole-change concerns after checking requirements, integration, regression risk, scope, and validation."',
         "}",
         "-->",
         "   (For a not-clean verdict, set \"verdict\": \"NOT_CLEAN\" and give \"findings\" one object per",
@@ -1069,7 +1091,10 @@ def build_review_prompt(diff: str, ref_name: str, guidelines: str, head_sha: str
         "   Use those key names literally -- a consumer that cannot find them reports the finding as",
         "   \"structured finding in unknown: \", which names nothing.",
         "   Any finding listed here blocks whatever the \"verdict\" string says, and a CLEAN payload",
-        "   requires an EXPLICIT empty \"findings\" array -- omitting the key does not clear.)",
+        "   requires an EXPLICIT empty \"findings\" array. Schema 1.1 also requires distinct",
+        "   \"detailed_assessment\" and \"holistic_assessment\" strings with at least six distinct",
+        "   words each: detailed assessment names a changed path, failure mode, or concrete defect;",
+        "   holistic assessment names a requirement, integration, regression, scope, or validation concern.)",
         "CRITICAL: The closing '-->' of the review-data comment MUST be the absolute final line of your output. Do NOT include any conversational filler, markdown formatting, or text after it.",
         "CRITICAL: Emit the review-data comment as raw unfenced text. A payload inside a code fence, an inline code span, or an indented block is deliberately ignored, so a fenced payload authorizes nothing.",
     ]
@@ -1183,7 +1208,11 @@ def main():
         log_error("Adversarial review failed to produce a valid report across all attempted engines.")
         sys.exit(1)
 
-    is_valid, is_clean, verdict_reason = parse_review_verdict(report, expected_commit_sha=initial_head)
+    is_valid, is_clean, verdict_reason = parse_review_verdict(
+        report,
+        expected_commit_sha=initial_head,
+        require_current_assessments=True,
+    )
 
     print("\n" + "=" * 60)
     print(f"LOCAL ADVERSARIAL REVIEW REPORT ({engine_label})")

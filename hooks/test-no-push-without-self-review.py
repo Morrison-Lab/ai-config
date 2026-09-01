@@ -124,8 +124,21 @@ def body(verdict="Ready for merge", commit=None, fingerprint=True):
             "### Findings\nNo actionable findings identified.\n\n"
             f"### Verdict: {verdict}")
     if fingerprint:
-        text += f"\n\nReviewed-Commit: {commit or HEAD}"
+        text += (
+            f"\n\nReviewed-Commit: {commit or HEAD}\n\n"
+            '<!-- review-data: {"schema_version": "1.1", "verdict": "CLEAN", '
+            '"findings": [], "detailed_assessment": "No detailed findings after tracing changed paths.", '
+            '"holistic_assessment": "No whole-change concerns after integration review."} -->'
+        )
     return text
+
+
+def current_payload():
+    return (
+        '\n\n<!-- review-data: {"schema_version": "1.1", "verdict": "CLEAN", '
+        '"findings": [], "detailed_assessment": "No detailed findings after tracing changed paths.", '
+        '"holistic_assessment": "No whole-change concerns after integration review."} -->'
+    )
 
 
 def agent_call(agent_name="adversarial-reviewer", call_id=None, tool="Agent",
@@ -154,10 +167,13 @@ def agent_result(call_id, text, shape="str", is_error=False):
 
 def reviewed(text=None, agent_name="adversarial-reviewer", tool="Agent",
              key="subagent_type", shape="str", is_error=False,
-             prompt="Review the diff"):
+             prompt="Review the diff", add_payload=True):
     call_id = _fresh_id()
+    text = text if text is not None else body()
+    if add_payload and re.search(r"Verdict:\s*(?:\*\*)?Ready for merge", text) and "<!-- review-data:" not in text:
+        text += current_payload()
     return [agent_call(agent_name, call_id, tool, key, prompt),
-            agent_result(call_id, text if text is not None else body(), shape, is_error)]
+            agent_result(call_id, text, shape, is_error)]
 
 
 def poison_denial():
@@ -222,6 +238,24 @@ CASES = [
 
     # --- verdict provenance ---
     (PUSH, reviewed(), False, "a clean verdict from the reviewer's own call allows the push"),
+    (PUSH, reviewed(body()[:body().index("<!-- review-data:")], add_payload=False), True,
+     "a clean verdict without the required dual-pass payload blocks"),
+    (PUSH, reviewed(
+        f"### Verdict: Ready for merge\n\nReviewed-Commit: {HEAD}\n\n"
+        '<!-- review-data: {"schema_version": "1.1", "verdict": "CLEAN", "findings": [], '
+        '"detailed_assessment": ".", "holistic_assessment": "."} -->'),
+     True, "placeholder dual-pass assessments do not authorize a push"),
+    (PUSH, reviewed(
+        f"### Verdict: Ready for merge\n\nReviewed-Commit: {HEAD}\n\n"
+        '<!-- review-data: {"schema_version": "1.1", "verdict": "UNKNOWN", "findings": [], '
+        '"detailed_assessment": "No detailed findings after tracing paths.", '
+        '"holistic_assessment": "No whole-change concerns after integration review."} -->'),
+     True, "a non-clean schema 1.1 payload does not authorize a push"),
+    (PUSH, reviewed(
+        f"### Verdict: Ready for merge\n\nReviewed-Commit: {HEAD}\n\n"
+        '<!-- review-data: {"schema_version": "1.1", "verdict": "CLEAN", "findings": [], '
+        '"detailed_assessment": "foo bar baz", "holistic_assessment": "one two three"} -->'),
+     True, "generic dual-pass assessments do not authorize a push"),
     (PUSH, reviewed(shape="list"), False, "a result whose content is a block list is read"),
     (PUSH, reviewed(shape="output"), False, "a result carrying its payload under `output` is read"),
     (PUSH, reviewed(shape="text"), False, "a result carrying its payload under `text` is read"),
@@ -608,7 +642,8 @@ CASES = [
      "a clean verdict inside an HTML comment does not decide the report",
      "returned a blocking verdict"),
     (PUSH, reviewed(
-        f"### Verdict: Ready for merge\nReviewed-Commit: {HEAD}\n\n<!--\nunterminated"),
+        f"### Verdict: Ready for merge\nReviewed-Commit: {HEAD}\n\n<!--\nunterminated",
+        add_payload=False),
      True, "a report whose HTML comment never closes states no verdict",
      "no verdict came back"),
     # Render fidelity decides the interleavings (#2479 review rounds): the
@@ -690,11 +725,14 @@ CASES = [
      "returned a blocking verdict"),
     (PUSH, reviewed(
         f"### Verdict: Ready for merge\n\nReviewed-Commit: {HEAD}\n\n"
-        '<!-- review-data: {"schema_version": "1.0", "verdict": "CLEAN", "findings": []} -->'),
+        '<!-- review-data: {"schema_version": "1.1", "verdict": "CLEAN", "findings": [], '
+        '"detailed_assessment": "No detailed findings after tracing changed paths.", '
+        '"holistic_assessment": "No whole-change concerns after integration review."} -->'),
      False, "a matching clean payload allows the push"),
     (PUSH, reviewed(
         f"### Verdict: Ready for merge\n\nReviewed-Commit: {HEAD}\n\n"
-        '```text\n<!-- review-data: {"schema_version": "1.0", "verdict": "NOT_CLEAN", "findings": []} -->\n```'),
+        '```text\n<!-- review-data: {"schema_version": "1.0", "verdict": "NOT_CLEAN", "findings": []} -->\n```'
+        + current_payload()),
      False, "a fenced NOT_CLEAN payload is ignored as an example"),
     (PUSH, reviewed(
         f"### Verdict: Needs more work\n\nReviewed-Commit: {HEAD}\n\n"
@@ -1259,7 +1297,9 @@ def structured_payload_cases() -> tuple[int, int]:
     r3 = (
         "### Verdict: Ready for merge\n\n"
         f"Reviewed-Commit: {HEAD}\n\n"
-        '<!-- review-data: {"schema_version": "1.0", "verdict": "CLEAN", "findings": []} -->'
+        '<!-- review-data: {"schema_version": "1.1", "verdict": "CLEAN", "findings": [], '
+        '"detailed_assessment": "No detailed findings after tracing changed paths.", '
+        '"holistic_assessment": "No whole-change concerns after integration review."} -->'
     )
     v, s = mod.parse_report(r3)
     check("parse_report: CLEAN payload with empty findings retains clean verdict", v, s, "clean", HEAD.lower())
@@ -1270,7 +1310,7 @@ def structured_payload_cases() -> tuple[int, int]:
         f"Reviewed-Commit: {HEAD}\n\n"
         "```json\n"
         '<!-- review-data: {"schema_version": "1.0", "verdict": "NOT_CLEAN", "findings": []} -->\n'
-        "```"
+        "```" + current_payload()
     )
     v, s = mod.parse_report(r4)
     check("parse_report: fenced NOT_CLEAN payload is ignored and retains clean verdict", v, s, "clean", HEAD.lower())

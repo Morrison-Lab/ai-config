@@ -276,9 +276,10 @@ def _load_review_payload():
     try:
         from scripts.lib.review_payload import (
             extract_review_payload,
+            payload_has_required_assessments,
             payload_is_blocking,
         )
-        return extract_review_payload, payload_is_blocking
+        return extract_review_payload, payload_has_required_assessments, payload_is_blocking
     except ImportError:
         pass
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -295,18 +296,19 @@ def _load_review_payload():
                 module = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(module)
                 extract_fn = getattr(module, "extract_review_payload", None) or getattr(module, "extract_structured_review", None)
+                assessments_fn = getattr(module, "payload_has_required_assessments", None)
                 blocking_fn = getattr(module, "payload_is_blocking", None)
-                if extract_fn and blocking_fn:
-                    return extract_fn, blocking_fn
+                if extract_fn and assessments_fn and blocking_fn:
+                    return extract_fn, assessments_fn, blocking_fn
         except Exception:
             pass
-    return None, None
+    return None, None, None
 
 
 try:
-    _extract_review_payload, _payload_is_blocking = _load_review_payload()
+    _extract_review_payload, _payload_has_required_assessments, _payload_is_blocking = _load_review_payload()
 except Exception:
-    _extract_review_payload, _payload_is_blocking = None, None
+    _extract_review_payload, _payload_has_required_assessments, _payload_is_blocking = None, None, None
 
 
 ENV_ASSIGNMENT = re.compile(r"\A[A-Za-z_][A-Za-z0-9_]*=")
@@ -1329,13 +1331,20 @@ def parse_report(text: str) -> tuple[str | None, str | None]:
     last = matches[-1]
     verdict = "clean" if last.group(1).lower().startswith("ready") else "needs_work"
     sha = REVIEWED_COMMIT.search(blanked, last.end())
-    if verdict == "clean" and _extract_review_payload is not None and _payload_is_blocking is not None:
+    if verdict == "clean":
         try:
-            payload = _extract_review_payload(text)
-            if _payload_is_blocking(payload):
+            if (
+                _extract_review_payload is None
+                or _payload_has_required_assessments is None
+                or _payload_is_blocking is None
+            ):
                 verdict = "needs_work"
+            else:
+                payload = _extract_review_payload(text)
+                if _payload_is_blocking(payload) or not _payload_has_required_assessments(payload):
+                    verdict = "needs_work"
         except Exception:
-            pass
+            verdict = "needs_work"
     return verdict, (sha.group(1).lower() if sha else None)
 
 

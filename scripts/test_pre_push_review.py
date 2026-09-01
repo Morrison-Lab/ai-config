@@ -58,7 +58,9 @@ class TestPrePushReview(unittest.TestCase):
             '  "reviewer": "adversarial-reviewer",\n'
             f'  "commit_sha": "{commit}",\n'
             '  "verdict": "CLEAN",\n'
-            '  "findings": []\n'
+            '  "findings": [],\n'
+            '  "detailed_assessment": "No detailed findings after tracing changed paths and failure modes.",\n'
+            '  "holistic_assessment": "No whole-change concerns after checking requirements and integration."\n'
             "}\n"
             "-->\n\n"
             "============================================================\n"
@@ -68,6 +70,135 @@ class TestPrePushReview(unittest.TestCase):
         is_valid, is_clean, reason = reviewer.parse_review_verdict(report, expected_commit_sha=commit)
         self.assertTrue(is_valid, f"Expected valid report, got: {reason}")
         self.assertTrue(is_clean, f"Expected clean report, got: {reason}")
+
+    def test_schema_1_1_payload_requires_both_review_passes(self):
+        commit = "12345678abcdef00"
+        report = self._clean_report(commit, tail=(
+            '\n\n<!-- review-data: {"schema_version": "1.1", "verdict": "CLEAN", '
+            '"findings": [], "detailed_assessment": "No detailed findings."} -->'))
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(
+            report, expected_commit_sha=commit)
+        self.assertFalse(is_valid)
+        self.assertFalse(is_clean)
+        self.assertIn("detailed or holistic assessment", reason)
+
+    def test_current_review_rejects_placeholder_assessments(self):
+        commit = "12345678abcdef00"
+        report = self._clean_report(commit, tail=(
+            '\n\n<!-- review-data: {"schema_version": "1.1", "verdict": "CLEAN", '
+            '"findings": [], "detailed_assessment": ".", "holistic_assessment": "."} -->'))
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(
+            report,
+            expected_commit_sha=commit,
+            require_current_assessments=True,
+        )
+        self.assertFalse(is_valid)
+        self.assertFalse(is_clean)
+        self.assertIn("detailed or holistic assessment", reason)
+
+    def test_current_review_rejects_generic_assessments(self):
+        commit = "12345678abcdef00"
+        report = self._clean_report(commit, tail=(
+            '\n\n<!-- review-data: {"schema_version": "1.1", "verdict": "CLEAN", '
+            '"findings": [], "detailed_assessment": "foo bar baz", '
+            '"holistic_assessment": "one two three"} -->'))
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(
+            report,
+            expected_commit_sha=commit,
+            require_current_assessments=True,
+        )
+        self.assertFalse(is_valid)
+        self.assertFalse(is_clean)
+        self.assertIn("detailed or holistic assessment", reason)
+
+    def test_current_review_rejects_repeated_assessment_tokens(self):
+        commit = "12345678abcdef00"
+        report = self._clean_report(commit, tail=(
+            '\n\n<!-- review-data: {"schema_version": "1.1", "verdict": "CLEAN", '
+            '"findings": [], "detailed_assessment": "test test test", '
+            '"holistic_assessment": "integration integration integration"} -->'))
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(
+            report,
+            expected_commit_sha=commit,
+            require_current_assessments=True,
+        )
+        self.assertFalse(is_valid)
+        self.assertFalse(is_clean)
+        self.assertIn("detailed or holistic assessment", reason)
+
+    def test_current_review_rejects_padded_repeated_assessment_tokens(self):
+        commit = "12345678abcdef00"
+        report = self._clean_report(commit, tail=(
+            '\n\n<!-- review-data: {"schema_version": "1.1", "verdict": "CLEAN", '
+            '"findings": [], "detailed_assessment": "test test test failure code", '
+            '"holistic_assessment": "integration integration integration scope requirement"} -->'))
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(
+            report,
+            expected_commit_sha=commit,
+            require_current_assessments=True,
+        )
+        self.assertFalse(is_valid)
+        self.assertFalse(is_clean)
+        self.assertIn("detailed or holistic assessment", reason)
+
+    def test_current_review_rejects_identical_assessments(self):
+        commit = "12345678abcdef00"
+        assessment = "Traced changed paths and integration requirements across consumers."
+        report = self._clean_report(commit, tail=(
+            '\n\n<!-- review-data: {"schema_version": "1.1", "verdict": "CLEAN", '
+            f'"findings": [], "detailed_assessment": "{assessment}", '
+            f'"holistic_assessment": "{assessment}"}} -->'))
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(
+            report,
+            expected_commit_sha=commit,
+            require_current_assessments=True,
+        )
+        self.assertFalse(is_valid)
+        self.assertFalse(is_clean)
+        self.assertIn("detailed or holistic assessment", reason)
+
+    def test_review_producers_describe_the_current_assessment_contract(self):
+        root = Path(__file__).parent.parent
+        producer_text = "\n".join(
+            (root / path).read_text(encoding="utf-8")
+            for path in (
+                "scripts/pre-push-review.py",
+                ".claude/agents/adversarial-reviewer.md",
+                ".opencode/agents/adversarial-reviewer.md",
+            )
+        )
+        self.assertIn("schema 1.1", producer_text.lower())
+        self.assertIn("six distinct", producer_text.lower())
+        self.assertIn("changed path, failure mode, or concrete defect", producer_text)
+        self.assertIn("requirement, integration, regression, scope, or validation", producer_text)
+
+    def test_current_review_rejects_a_legacy_payload(self):
+        commit = "12345678abcdef00"
+        report = self._clean_report(commit, tail=(
+            '\n\n<!-- review-data: {"schema_version": "1.0", "verdict": "CLEAN", "findings": []} -->'))
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(
+            report,
+            expected_commit_sha=commit,
+            require_current_assessments=True,
+        )
+        self.assertFalse(is_valid)
+        self.assertFalse(is_clean)
+        self.assertIn("requires schema 1.1", reason)
+
+    def test_current_review_rejects_a_non_clean_schema_1_1_payload(self):
+        commit = "12345678abcdef00"
+        report = self._clean_report(commit, tail=(
+            '\n\n<!-- review-data: {"schema_version": "1.1", "verdict": "UNKNOWN", '
+            '"findings": [], "detailed_assessment": "No detailed findings after tracing paths.", '
+            '"holistic_assessment": "No whole-change concerns after integration review."} -->'))
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(
+            report,
+            expected_commit_sha=commit,
+            require_current_assessments=True,
+        )
+        self.assertFalse(is_valid)
+        self.assertFalse(is_clean)
+        self.assertIn("requires schema 1.1", reason)
 
     # --- Regression tests for the post-merge adversarial review of #2736 ---
 
@@ -261,13 +392,14 @@ class TestPrePushReview(unittest.TestCase):
             "## Summary\n\nLooks fine.\n\n"
             "## Findings\n\nNone.\n\n"
             f"### Verdict: Ready for merge\n\nReviewed-Commit: {commit}\n\n"
-            '<!-- review-data: {"verdict": "NOT_CLEAN", "findings": '
-            '[{"file": "a.py", "message": "boom"}]} -->'
+            '<!-- review-data: {"schema_version": "1.1", "verdict": "NOT_CLEAN", "findings": '
+            '[{"file": "a.py", "message": "boom"}], "detailed_assessment": "A defect was found.", '
+            '"holistic_assessment": "The change has a whole-change concern."} -->'
         )
         is_valid, is_clean, reason = reviewer._parse_persona_verdict(
             report, expected_commit_sha=commit)
         self.assertFalse(is_clean, f"persona path must honour a blocking payload: {reason}")
-        self.assertIn("Contradictory output", reason)
+        self.assertIn("Needs work", reason)
 
     def test_malformed_findings_reason_names_the_actual_cause(self):
         commit = "12345678abcdef00"
@@ -910,7 +1042,10 @@ class TestPrePushReview(unittest.TestCase):
             "### Critical Findings\nNone.\n\n"
             "### Observations\nNone.\n\n"
             "### Verification Steps\nNone.\n"
-            "Reviewed-Commit: abc12345"
+            "Reviewed-Commit: abc12345\n\n"
+            '<!-- review-data: {"schema_version": "1.1", "verdict": "CLEAN", "findings": [], '
+            '"detailed_assessment": "No detailed findings after tracing the changed paths.", '
+            '"holistic_assessment": "No whole-change concerns after checking integration and validation."} -->'
         )
         mock_res = MagicMock()
         mock_res.returncode = 0
@@ -939,7 +1074,10 @@ class TestPrePushReview(unittest.TestCase):
             "### Critical Findings\nNone.\n\n"
             "### Observations\nNone.\n\n"
             "### Verification Steps\nNone.\n"
-            "Reviewed-Commit: abc12345"
+            "Reviewed-Commit: abc12345\n\n"
+            '<!-- review-data: {"schema_version": "1.1", "verdict": "CLEAN", "findings": [], '
+            '"detailed_assessment": "No detailed findings after tracing the changed paths.", '
+            '"holistic_assessment": "No whole-change concerns after checking integration and validation."} -->'
         )
         mock_res = MagicMock()
         mock_res.returncode = 0
@@ -1156,7 +1294,10 @@ class TestPrePushReview(unittest.TestCase):
             "### Findings\n"
             "No actionable findings identified.\n\n"
             "### Verdict: Ready for merge\n\n"
-            f"Reviewed-Commit: {commit}\n"
+            f"Reviewed-Commit: {commit}\n\n"
+            '<!-- review-data: {"schema_version": "1.1", "verdict": "CLEAN", "findings": [], '
+            '"detailed_assessment": "No detailed findings after tracing changed paths.", '
+            '"holistic_assessment": "No whole-change concerns after integration review."} -->'
         )
         is_valid, is_clean, reason = reviewer.parse_review_verdict(report, expected_commit_sha=commit)
         self.assertTrue(is_valid, reason)
@@ -1253,7 +1394,10 @@ class TestPrePushReview(unittest.TestCase):
             "### Summary of Changes\nx\n\n"
             "### Findings\n1. [Defect] XYZ is broken.\n\n"
             "### Verdict: Ready for merge -- after fixing XYZ\n\n"
-            f"Reviewed-Commit: {commit}\n"
+            f"Reviewed-Commit: {commit}\n\n"
+            '<!-- review-data: {"schema_version": "1.1", "verdict": "CLEAN", "findings": [], '
+            '"detailed_assessment": "No detailed findings after tracing changed paths.", '
+            '"holistic_assessment": "No whole-change concerns after integration review."} -->'
         )
         is_valid, is_clean, reason = reviewer.parse_review_verdict(report, expected_commit_sha=commit)
         self.assertFalse(is_valid, reason)

@@ -176,7 +176,7 @@ When the loop ends, print a summary:
   out and works it concurrently in worktree-isolated subagents instead of
   serially. This loop stays serial for everything `gip` can't prove independent.
 - **`gi`** — the inner loop; each iteration is a full GI invocation
-- **`prefer-upstream`** — search existing packages, standard libraries, and lab
+- **`prefer-upstream`** --- search existing packages, standard libraries, and lab
   repos before writing custom code to avoid reinventing the wheel
 - **`pr-on-claim`** — each iteration opens its draft PR up front (step 6) so the
   in-flight issue is visible before implementing

@@ -309,7 +309,7 @@ dependency, needs design decision, upstream bug):
 ## Relationship to other skills
 
 - **`check-history`** — invoked in step 5 to avoid undoing past work
-- **`prefer-upstream`** — search existing packages, standard libraries, and lab
+- **`prefer-upstream`** --- search existing packages, standard libraries, and lab
   repos before writing custom code to avoid reinventing the wheel
 - **`scout-peers`** --- suggested in step 5 to check how peers solved a problem so you don't reinvent the wheel (distinct from `oppo`, which finds *what* to build)
 - **`ardi`** — invoked in step 11 to drive the MR/PR to clean

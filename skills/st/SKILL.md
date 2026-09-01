@@ -93,7 +93,7 @@ glab issue create --title "<concise title>" --description "<what & why>
 
 ### 4. Check history and research DRW
 
-- Invoke `check-history` before implementing — review merged/closed MRs that
+- Invoke `check-history` before implementing --- review merged/closed MRs that
   touched the same area so you don't undo past progress.
 - Perform a research step to check whether the functionality or helper already
   exists (Don't Reinvent the Wheel / DRW): search our own repos
@@ -144,7 +144,7 @@ Linked issue + PR, ARDI round count, and any deferred follow-up issues.
   scratch.
 - **`gi`** — once the issue exists, the implement → PR → ARDI tail is the same;
   `st` is "`gi`, but you write the issue first."
-- **`prefer-upstream`** — search existing packages and tools before writing
+- **`prefer-upstream`** --- search existing packages and tools before writing
   custom code to prevent reinventing the wheel.
 - **`defer-issue`** — same issue-creation mechanics, for sub-tasks that emerge.
 - **`check-history`**, **`claim-pr`**, **`pr-on-claim`**,

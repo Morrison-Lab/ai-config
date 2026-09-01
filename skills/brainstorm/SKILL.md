@@ -69,7 +69,7 @@ filing an issue now would lock in the wrong scope.
 - **`gi`** — if an issue already exists but its scope is unclear or
   disputed, use this skill to resolve the ambiguity before implementing,
   then resume `gi`'s normal flow.
-- **`prefer-upstream`** — search existing packages and tools during the planning
+- **`prefer-upstream`** --- search existing packages and tools during the planning
   phase to avoid planning custom code where solutions already exist.
 - **`split-concerns`** — if brainstorming reveals the request is really
   several independent concerns, split them into separate plan files/issues

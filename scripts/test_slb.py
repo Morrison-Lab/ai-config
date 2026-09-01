@@ -911,8 +911,8 @@ expect(
     == [None, None],
 )
 
-# #2081 is the comma-clause join. The gate does not flag commas, so this
-# change must not start splitting them --- that would be a different issue.
+# #2081 and #2586: the tool stays narrower by design (no comma/conjunction/em-dash
+# splits in whole-file mode, matching the gate).
 LONG_COMMA = (
     "They are explicit that it disables the check outright rather than "
     "allowlisting one host, so they advise pairing it with WebFetch permission "
@@ -928,6 +928,45 @@ expect(
     slb.reformat(LONG_COMMA) == LONG_COMMA,
     f"len={len(slb.reformat(LONG_COMMA).strip())} "
     f"lines={slb.reformat(LONG_COMMA).count(chr(10))}",
+)
+
+# #2586: coordinating conjunctions and em-dash clause boundaries are also left whole
+# in whole-file mode (not split, matching the gate's lack of a parser).
+LONG_CONJUNCTION_EMDASH = (
+    "The first clause establishes the primary mechanism --- which is verified "
+    "by automated tests --- and then the following conjunction continues the "
+    "explanation without introducing a second independent sentence boundary.\n"
+)
+expect(
+    "a long conjunction and em-dash sentence is not a gate violation",
+    checker.classify_line(LONG_CONJUNCTION_EMDASH.strip()) is None,
+)
+expect(
+    "#2586 conjunction/em-dash sentence is left as one line in whole-file mode",
+    slb.reformat(LONG_CONJUNCTION_EMDASH) == LONG_CONJUNCTION_EMDASH,
+    repr(slb.reformat(LONG_CONJUNCTION_EMDASH)),
+)
+
+# #2586 / #1599: hand-broken clause lines in an UNTOUCHED sentence are preserved
+# under diff-scoping even when an adjacent sentence in the paragraph is changed.
+HAND_BROKEN_CLAUSES_PARA = (
+    "Break lines in prose at major phrase and sentence boundaries ---\n"
+    "one clause per line, roughly 60 to 80 characters ---\n"
+    "rather than wrapping at a fixed column.\n"
+    "Sentence two is touched. Sentence three is also touched.\n"
+)
+scoped_clauses_res = slb.reformat(HAND_BROKEN_CLAUSES_PARA, changed={4})
+expected_scoped_clauses = (
+    "Break lines in prose at major phrase and sentence boundaries ---\n"
+    "one clause per line, roughly 60 to 80 characters ---\n"
+    "rather than wrapping at a fixed column.\n"
+    "Sentence two is touched.\n"
+    "Sentence three is also touched.\n"
+)
+expect(
+    "#2586 diff-scoping preserves hand-broken clause lines in untouched sentence",
+    scoped_clauses_res == expected_scoped_clauses,
+    f"expected:\n{expected_scoped_clauses!r}\ngot:\n{scoped_clauses_res!r}",
 )
 
 # Bullet continuation: first piece keeps the marker, later pieces indent.

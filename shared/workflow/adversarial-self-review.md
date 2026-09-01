@@ -276,6 +276,32 @@ An instrument with no such result is a finding on its own terms, per [`verify-th
 Five adversarial rounds each found real defects against a fully green suite, and three of the five found them in the verification tooling rather than in the change: a parity metric that could not fail, a negative control patching a function that had moved off the execution path, and an assertion comparing a function against itself.
 The last of those had let a previously-rejected design pass 299 tests.)
 
+## Require detailed and holistic review passes
+
+Reviewers must independently assess both detailed, evidence-backed implementation defects and the whole change:
+requirements, intent, cross-file consistency, integration, regression risk, and validation.
+A perfunctory scan of isolated diff hunks misses both subtle line-level bugs and systemic architectural drift.
+
+The two passes evaluate complementary failure modes:
+
+1. **Detailed implementation defect audit**:
+   - Trace control flow, edge cases, error handling, syntax, regex greediness, and path-escaping at the line level.
+   - Fact-check external tool behaviour and claims against direct documentation rather than trusting prose.
+   - Detect placeholder comments, cargo-cult code, uninformative naming, and dead code.
+
+2. **Holistic change assessment**:
+   - Evaluate whether the implementation satisfies the stated requirements and broader intent.
+   - Check cross-file and cross-module consistency across the entire repository.
+   - Analyze architectural coherence, integration boundaries, downstream contract impacts, and regression risks.
+   - Verify test suite adequacy and whether validation steps would actually fail if the underlying logic broke.
+
+Review outputs must explicitly report both passes, even when one has no findings.
+An explicit evaluation of the holistic assessment alongside an itemized findings list (or an affirmative clean declaration `No actionable findings identified.`) proves that both dimensions were thoroughly examined.
+
+- **Do:** require reviewers to conduct and explicitly document both a detailed implementation defect audit and a holistic change assessment.
+- **Do:** report the holistic assessment explicitly in review outputs, even when no architectural, integration, or regression issues are found.
+- **Don't:** accept a review that stops at superficial surface checks without evaluating the systemic impact on requirements, architecture, cross-file consistency, and validation rigor.
+
 ## The posted fallback comment is the reviewer's report, not an author composite
 
 When the self-review is posted as a PR comment, the comment body **is**

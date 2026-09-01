@@ -175,22 +175,41 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
 - **Fix**: Verify every path, test suite name, and CI workflow against the target repository's tree before committing.
   Use absolute GitHub URLs for any cross-repository references to `ai-config` files.
 
-## Pattern 12: Arming Auto-Merge While Review Findings Are Still Open
+## Pattern 12: Arming Auto-Merge While Review Findings Are Still Open or at an Unreviewed Head After Sync
 - **Mistake**: Running `gh pr merge --auto` (or any deferred/auto merge) on a PR that still has open review findings or no verdict at head.
   Treating the arming as harmless because CI is red ignores that the robot fires later,
   the moment checks go green,
   with no re-check of review state.
-- **Example**: 2026-08-26 on `ai-config#2226`:
-  armed `--squash --auto` while round-1 findings were open and the reviewer was quota-skipping.
-  Hours later a push turned `validate` green,
-  auto-merge fired at 04:30Z,
-  and it merged over an explicit Needs-more-work verdict ---
-  requiring revert (#2268) plus reland-with-fixes (#2269).
+  A second route to the same failure is arming `--auto` immediately after a sync-only push
+  (e.g. merging `origin/main` in when a direct merge was refused due to an out-of-date branch):
+  reasoning about `--auto` as *scheduling a merge already verified* ignores that the sync-only push created a new HEAD commit ref
+  that silently invalidates the prior clean verdict.
+  The sync is content-free (no code change by the author),
+  which is why it does not feel like a new head needing a new review verdict,
+  but auto-merge fires the instant CI finishes,
+  before any reviewer can evaluate the new head.
+- **Example**:
+  - 2026-08-26 on `ai-config#2226`:
+    armed `--squash --auto` while round-1 findings were open and the reviewer was quota-skipping.
+    Hours later a push turned `validate` green,
+    auto-merge fired at 04:30Z,
+    and it merged over an explicit Needs-more-work verdict ---
+    requiring revert (#2268) plus reland-with-fixes (#2269).
+  - 2026-08-28 on `ai-config#2556` (Issue #2558):
+    verified fully clean at `2c1ae45d` (checker exit 0, verdict `Ready for merge` at that exact SHA, zero unresolved threads).
+    A direct merge was refused because `main` had moved (`the head branch is not up to date with the base branch`).
+    Merged `origin/main` in and pushed `54874be0`,
+    then armed `--auto` reasoning that the merge was already verified.
+    A clean review verdict for `54874be0` landed at 22:18:44Z and auto-merge fired at 22:20:29Z;
+    had auto-merge fired before the review posted,
+    it would have merged an unreviewed head.
 - **Canonical Rule**: [`fully-clean.md`](../shared/workflow/fully-clean.md).
-  See also [`check-before-pushing.md`](../shared/workflow/check-before-pushing.md):
+  See also [`check-before-pushing.md`](../shared/workflow/check-before-pushing.md)
+  and [`sync-with-main.md`](../shared/workflow/sync-with-main.md):
   the remote can act between your commands,
   and an armed automation is exactly such an action you scheduled against yourself.
 - **Fix**: Never arm `gh pr merge --auto` on a PR whose merge gate includes a posted review verdict, which is every PR here.
+  A sync-only push invalidates a clean verdict just as thoroughly as a code push.
   Auto-merge fires server-side the moment CI passes,
   so a review landing seconds later cannot block it,
   and no reactive disable can win that race.
@@ -198,7 +217,9 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
   it gates native approvals, not verdicts posted as comments.
   Merge synchronously instead,
   only after `scripts/check-pr-fully-clean.py <N>` exits clean ---
-  CI green and the all-clear verdict both verified at the shipping head.
+  CI green and the all-clear verdict both verified at the new shipping head.
+  Accept that a moving base may require repeating the sync and re-verification cycle,
+  rather than arming an automation that cannot re-check review state.
   If something is found already armed, disable it at once ---
   `gh pr merge <N> --repo <r> --disable-auto`,
   verified with `gh pr view <N> --repo <r> --json autoMergeRequest` ---
@@ -650,4 +671,24 @@ A clean automated review from every available provider evaluating the current HE
 - **Fix**: Require length ratio constraints and bounded Jaccard thresholds for fuzzy matching, and always test negative controls with short generic strings contained in long unrelated targets.
 - **Algorithmatizable?**
   Yes --- unit test suites asserting negative control rejection of short subset inputs against long distractor strings.
+
+## Pattern 35: Fixing the Admitting Site But Not the Branching Site
+- **Do**: When handling a new condition, trigger, or input case, verify both the **admitting site** (the gate deciding whether the code runs) and the **branching site** (the logic deciding what the code does once it runs).
+  Find branching sites by searching for the conditions or variables they test *instead of* the new condition (e.g., variables that go empty, unset, or defaulted in the new case).
+  Test admitted cases by running the actual execution logic against realistic fixtures.
+- **Don't**: Stop after updating the admitting rule named in the issue or finding without auditing downstream branching logic;
+  a fix that admits a case into downstream code that doesn't handle it creates a false sense of completion while silently executing the wrong path.
+- **Example**: 2026-08-29 on `health-analytics-core/HACtions!47` (internal GitLab):
+  A reviewer noted tag pipelines were excluded from a CI job.
+  The fix added `- if: $CI_COMMIT_TAG` to the job's `rules:`, admitting tags.
+  However, the job's downstream script still evaluated `if [ "${CI_COMMIT_BRANCH:-}" = "${CI_DEFAULT_BRANCH:-}" ]` to determine whether to perform a whole-tree scan or a diff against `main`.
+  Because `CI_COMMIT_BRANCH` is empty on tag pipelines, tags took the diff branch against `main` (which tags have no branch relationship to) instead of the intended whole-tree scan.
+  CI was green because CI never ran a tag pipeline in that MR, giving a false appearance of completion until re-reviewed.
+- **Canonical Rule**: [`admitting-vs-branching-site.md`](../shared/principles/admitting-vs-branching-site.md) and [`fail-fast.md`](../shared/principles/fail-fast.md).
+- **Fix**: Identify all downstream branching points that depend on context variables,
+  update branching logic to handle the new case explicitly (e.g. `[ -n "$CI_COMMIT_TAG" ] || [ "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH" ]`),
+  and add execution tests against fixtures simulating the new input state.
+- **Algorithmatizable?**
+  Partially per-domain (e.g. static analyzers checking that CI jobs admitting `$CI_COMMIT_TAG` do not rely exclusively on `CI_COMMIT_BRANCH` in their scripts).
+  General case requires behavioural fixture tests.
 

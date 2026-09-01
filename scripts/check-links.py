@@ -20,6 +20,9 @@ from fences import strip_fences  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
+AUTOLINK = re.compile(
+    r"<((?:[a-zA-Z][a-zA-Z0-9+.-]+:[^\s>]+)|(?:[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+))>"
+)
 # Strip code regions first so link-shaped examples inside fences / backticks
 # (regexes, `[text](url)` snippets) aren't mistaken for real links.
 INLINE = re.compile(r"`[^`]*`")
@@ -40,21 +43,38 @@ checked = 0
 
 
 def is_external(target: str) -> bool:
-    return target.startswith(SKIP_PREFIXES) or "://" in target
+    return target.startswith(SKIP_PREFIXES) or "://" in target or "@" in target
 
 
-def check_file(md: Path) -> None:
-    global checked
-    text = md.read_text(encoding="utf-8")
+def extract_targets(text: str) -> list[str]:
+    """Extract link targets from markdown text (both inline links and autolinks)."""
     text = strip_fences(text)
     text = INLINE.sub("", text)
+    targets: list[str] = []
     for match in LINK.finditer(text):
         target = match.group(1).strip()
         if target.startswith("<") and target.endswith(">"):
             target = target[1:-1].strip()
         # drop a trailing `"title"` if present
         target = target.split(" ", 1)[0]
-        if not target or is_external(target):
+        if target:
+            targets.append(target)
+    for match in AUTOLINK.finditer(text):
+        target = match.group(1).strip()
+        if target:
+            targets.append(target)
+    return targets
+
+
+def check_file(md: Path, root: Path = ROOT) -> None:
+    global checked
+    text = md.read_text(encoding="utf-8")
+    try:
+        rel_path = md.relative_to(root)
+    except ValueError:
+        rel_path = md
+    for target in extract_targets(text):
+        if is_external(target):
             continue
         if "<" in target or ">" in target:
             continue  # angle-bracket placeholder, e.g. <owner>/<repo>
@@ -66,7 +86,7 @@ def check_file(md: Path) -> None:
         checked += 1
         resolved = (md.parent / path_part).resolve()
         if not resolved.exists():
-            broken.append(f"{md.relative_to(ROOT)} -> {target}")
+            broken.append(f"{rel_path} -> {target}")
 
 
 def main() -> None:

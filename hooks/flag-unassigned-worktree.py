@@ -167,7 +167,7 @@ def _read_payload() -> tuple[dict, bool]:
                     return json.loads(raw_cmd), True
                 except Exception:
                     pass
-            return {"tool_name": "Bash", "tool_input": {"command": raw_cmd}}, True
+            return {"tool_name": "Agent", "tool_input": {"subagent_type": raw_cmd}}, True
 
     try:
         payload = json.load(sys.stdin)

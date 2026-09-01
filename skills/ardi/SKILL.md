@@ -137,7 +137,7 @@ sits unread.
    **When the loop reaches the local self-review step, don't perform it.**
    Hand the review to a separate [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md) subagent (foreground, read-only), briefed with the base ref, the paths, and the standards that apply --- never with your rationale for the change, which is what makes a reviewer agree with you.
    The session that wrote the diff knows what it was meant to say, so an inline pass reads the artifact and recovers the intent: confirmation rather than review, and indistinguishable from the real thing in the output (see [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md)).
-   Its brief covers what an inline pass would have done.
+   Its brief covers what an inline pass would have done: independently assessing both line-level implementation defects and the whole change (requirements, intent, cross-file consistency, integration, regression risk, and validation), explicitly reporting both passes in the structured verdict.
    This includes the current PR diff against its base, each changed call path and edge case, the focused tests, and the relevant lint/documentation checks.
    You must Address, Rebut, or Defer every finding it returns.
    If a provider skips or cannot produce a verdict (quota, offline), note the skip in your ARD summary comment.

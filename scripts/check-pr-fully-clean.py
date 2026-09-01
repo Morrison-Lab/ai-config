@@ -1166,14 +1166,21 @@ _BARE_REJECTION = (
 RESOLVED_BLOCKING_SUFFIX = re.compile(
     r"^(?:(?!\b(?:and|but|while|although|however)\b)"
     r"(?:\([^()\n]{0,120}\)|[^,:;.!?()])){0,120}\b(?:"
-    r"(?:is|are|was|were)\s+(?:now\s+)?"
+    r"(?:is|are|was|were)\s+(?:(?:now|since|already|also|fully|completely|satisfactorily|properly|cleanly|successfully)\s+)?"
     r"(?:fixed|resolved|addressed|closed|removed|corrected)"
-    r"|ha(?:s|ve)\s+(?:since\s+)?been\s+"
+    r"|ha(?:s|ve)\s+(?:(?:since|already|also)\s+)?been\s+(?:(?:now|fully|completely|satisfactorily|properly|cleanly|successfully)\s+)?"
     r"(?:fixed|resolved|addressed|closed|removed|corrected)"
     r"|no\s+longer\s+applies"
     r")\b"
-    r"(?:\s+(?:by|in|via)\s+this\s+round(?:['\u2019]s)?\s+"
-    r"(?:diff|push|commit|changes?|fixes?))?"
+    r"(?:\s+(?:by|in|via|with|through|as|per|on)\b"
+    r"(?:(?!\b(?:and|but|while|although|however|yet|though|"
+    r"not|never|neither|nor|no|none|nothing|without|"
+    r"hardly|barely|scarcely|zero|"
+    r"partially?|incomplete(?:ly)?|ignor(?:e|ed|ing|es)?|omit(?:s|ted|ting)?|skip(?:s|ped|ping)?|"
+    r"except|unresolved|unfixed|unaddressed|open|reproduce[s]?|broken|failing|fails?|"
+    r"(?:suppress|disabl|mut|weaken|bypass|silenc|remov|delet|revert)(?:e|ed|ing)?\s+(?:(?:the|an?|all|these|those|that|our|any)\s+)?(?:[a-z0-9_-]+\s+)?(?:tests?|checks?|assertions?|warnings?|linters?|guards?|lints?|detectors?|errors?)|"
+    r"comment(?:ed|ing)?\s+out\s+(?:(?:the|an?|all|these|those|that|our|any)\s+)?(?:[a-z0-9_-]+\s+)?(?:tests?|checks?|assertions?|warnings?|linters?|guards?|lints?|detectors?|errors?))\b)"
+    r"(?:\([^()\n]{0,120}\)|[^;:,.!?()]|\.(?!\s|$))){1,180})?"
     r"(?:"
     r"\s+and\s+(?:confirmed\s+)?passing"
     r"|,?\s+and\s+(?:(?![.!?])[\s\S]){1,180}\b"
@@ -1307,8 +1314,7 @@ _NEGATOR_RE = re.compile(
 
 _PAST_STATE_RE = re.compile(
     r"(?:\bpreviously"
-    r"|\bprior(?:\s+(?:round|verdict)(?:['\u2019]s)?"
-    r"|\s+(?:finding|issue)s?)?"
+    r"|\bprior(?:\s+(?:round|verdict|finding|issue)s?(?:['\u2019]s?)?)?"
     r"|\bearlier"
     r"|\bround-\d+(?:['\u2019]s)?"
     r")(?:[-\s]+|\s+\*{1,2}|\s+(?:the\s+)?)$",
@@ -1944,6 +1950,16 @@ def classify_verdict(body: str, state: str = "") -> str:
 
 
 
+_FINDINGS_TRAILER_SUFFIX = re.compile(
+    r"^\s*(?:"
+    r"[*_:.\-]*\s*(?:none\b(?!\s+of\b)|n/a\b|none\s+identified\b|none\s+remaining\b)"
+    r"|"
+    r"[:.\-(]*\s*(?:non-blocking\b|nothing\b|0\b|no\s+(?:\w+\s+){0,3}(?:findings|issues|bugs|violations|blockers)|no\s+new\b)"
+    r")",
+    re.IGNORECASE,
+)
+
+
 def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:
     """True when the findings section (on the lines after the heading containing *match_end*) opens with a
     whole-line no-findings statement and carries no finding-shaped content
@@ -1953,7 +1969,7 @@ def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:
     heading, not the section body, so scanning starts on the following line
     (ai-config#2459). The section runs from there to the next heading or end
     of body. The FIRST non-empty line must match the
-    NOT_CLEAN_NEGATION_SUFFIX allowlist -- the same trigger the old 60-char
+    _FINDINGS_TRAILER_SUFFIX allowlist -- the same trigger the old 60-char
     suffix shortcut keyed on, made line-anchored -- and everything after it
     must clear the item veto.
 
@@ -2001,7 +2017,7 @@ def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:
     lines = lead + [ln for ln in section.splitlines() if ln.strip()]
     if not lines:
         return False
-    if not NOT_CLEAN_NEGATION_SUFFIX.search(lines[0]):
+    if not _FINDINGS_TRAILER_SUFFIX.search(lines[0]):
         return False
     return not _SECTION_FINDING_ITEM.search("\n".join(lines[1:]))
 

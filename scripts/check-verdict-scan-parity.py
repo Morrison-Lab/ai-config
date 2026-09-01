@@ -355,6 +355,78 @@ def widening_is_on_axis(new, body) -> bool:
     )
 
 
+class ReachAssertionError(ValueError):
+    """Raised when a generator arm or sampling branch produces zero cases."""
+    pass
+
+
+def assert_arm_reach(arm_counts: dict[str, int]) -> None:
+    """Verify that every generator arm or sampling branch produced >= 1 case.
+
+    A sampling instrument's zero is a coverage statement unless the reach of
+    every arm is verified (Pattern 32). Zero cases on any generator arm means
+    the run cannot establish parity.
+    """
+    zero_arms = [name for name, count in arm_counts.items() if count <= 0]
+    if zero_arms:
+        raise ReachAssertionError(
+            f"Generator arm reach assertion failed: {', '.join(zero_arms)} "
+            f"produced 0 cases (cannot establish parity with 0 coverage)"
+        )
+
+
+def build_corpus(
+    args: argparse.Namespace,
+    generator_arms: dict[str, callable] | None = None,
+) -> tuple[list[tuple[str, str]], dict[str, int]]:
+    """Assemble corpus from all arms and verify reach."""
+    arm_counts: dict[str, int] = {}
+    corpus: list[tuple[str, str]] = []
+
+    if getattr(args, "corpus", None):
+        real_bodies = []
+        for path in args.corpus:
+            for record in json.loads(Path(path).read_text()):
+                real_bodies.append(record["body"])
+        arm_counts["real"] = len(real_bodies)
+        corpus.extend([("real", b) for b in real_bodies])
+
+    if generator_arms is None:
+        # Default generator arms: prose combinatorics and structured payloads
+        prose = list(generated_bodies(getattr(args, "exhaustive", False)))
+        limit = getattr(args, "limit", 0)
+        if limit and limit < len(prose):
+            # Strided, not a prefix. The generator varies its last fragment fastest,
+            # so a contiguous head shares one leading fragment throughout and is a
+            # biased sample -- measured: the first 8,000 bodies contain no shape the
+            # negative control can even detect, so a capped run reported itself
+            # blind. A stride spreads the sample across the product space.
+            # Index by a fractional step rather than a slice stride. An integer
+            # stride collapses to 1 for any limit above half the corpus, which
+            # silently degenerates to exactly the contiguous prefix the comment
+            # above says was measured to leave the negative control blind.
+            step = len(prose) / limit
+            prose = [prose[int(i * step)] for i in range(limit)]
+        arm_counts["prose"] = len(prose)
+        corpus.extend([("generated", b) for b in prose])
+
+        # AFTER the limit, unconditionally: the payload arm is bounded (57 bodies)
+        # and every one of them must be examined on every run, including a capped
+        # smoke run. See `payload_bodies`'s own comment for the two placements
+        # inside `generated_bodies` that each silently dropped it.
+        payload = list(payload_bodies())
+        arm_counts["payload"] = len(payload)
+        corpus.extend([("generated", b) for b in payload])
+    else:
+        for name, arm_gen in generator_arms.items():
+            bodies = list(arm_gen(args))
+            arm_counts[name] = len(bodies)
+            corpus.extend([("generated", b) for b in bodies])
+
+    assert_arm_reach(arm_counts)
+    return corpus, arm_counts
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-rev", default="origin/main")
@@ -386,29 +458,11 @@ def main(argv=None):
         )
     )
 
-    corpus = []
-    for path in args.corpus:
-        for record in json.loads(Path(path).read_text()):
-            corpus.append(("real", record["body"]))
-    generated = list(generated_bodies(args.exhaustive))
-    if args.limit and args.limit < len(generated):
-        # Strided, not a prefix. The generator varies its last fragment fastest,
-        # so a contiguous head shares one leading fragment throughout and is a
-        # biased sample -- measured: the first 8,000 bodies contain no shape the
-        # negative control can even detect, so a capped run reported itself
-        # blind. A stride spreads the sample across the product space.
-        # Index by a fractional step rather than a slice stride. An integer
-        # stride collapses to 1 for any limit above half the corpus, which
-        # silently degenerates to exactly the contiguous prefix the comment
-        # above says was measured to leave the negative control blind.
-        step = len(generated) / args.limit
-        generated = [generated[int(i * step)] for i in range(args.limit)]
-    corpus += [("generated", b) for b in generated]
-    # AFTER the limit, unconditionally: the payload arm is bounded (57 bodies)
-    # and every one of them must be examined on every run, including a capped
-    # smoke run. See `payload_bodies`'s own comment for the two placements
-    # inside `generated_bodies` that each silently dropped it.
-    corpus += [("generated", b) for b in payload_bodies()]
+    try:
+        corpus, arm_counts = build_corpus(args)
+    except ReachAssertionError as err:
+        print(f"ERROR: {err}", file=sys.stderr)
+        return 1
 
     # THE primary invariant, checked before anything else. Every fail-open the
     # four rejected designs produced was a downstream pass reading text
@@ -457,6 +511,8 @@ def main(argv=None):
     print(f"bodies examined    : {len(corpus)} "
           f"({sum(1 for o, _ in corpus if o == 'real')} real, "
           f"{sum(1 for o, _ in corpus if o == 'generated')} generated)")
+    arm_summary = ", ".join(f"{name}={count}" for name, count in arm_counts.items())
+    print(f"arm reach counts   : {arm_summary}")
     print(f"negative control   : {control} divergences -> "
           f"{'DISCRIMINATES' if control else 'BLIND, do not trust this run'}")
     on_axis = [w for w in widened if widening_is_on_axis(new, w[3])]

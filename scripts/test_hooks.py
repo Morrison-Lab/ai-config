@@ -167,6 +167,7 @@ def run_one_suite(test_path, subject, timeout):
     # subprocess, and a SyntaxWarning injected into one of them (verified
     # empirically) still passed cleanly under the `-W`-only form.
     env = dict(os.environ, PYTHONWARNINGS="error::SyntaxWarning")
+    env.pop("ANTIGRAVITY_AGENT", None)
     proc = subprocess.Popen(
         [sys.executable, test_path, subject],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)

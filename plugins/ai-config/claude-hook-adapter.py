@@ -202,6 +202,50 @@ def extract_hook_list(groups_or_hooks):
                 print(f"claude-hook-adapter: ignoring unrecognized hook item: {item}", file=sys.stderr)
     return out
 
+def find_repo_root(start_file=None):
+    """Derive the repository root directory containing `hooks/hooks.json`.
+
+    Supports:
+    1. Standard layout: 3 levels above `start_file` (or `__file__`), resolving
+       any symlinks via realpath.
+    2. Staged runtime layout: `hooks/` symlinked into the plugin directory
+       containing `start_file` (or `__file__`).
+    3. Staged runtime layout: `.ai-config-repo`, `.repo`, or `repo` symlinks
+       in the plugin directory.
+    4. Environment variable override (`AI_CONFIG_ROOT` or `CLAUDE_PLUGIN_ROOT`).
+    """
+    target_file = start_file or __file__
+
+    # 1. Standard layout: realpath(__file__) -> plugins/ai-config/claude-hook-adapter.py
+    candidate = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(target_file))))
+    if os.path.isfile(os.path.join(candidate, "hooks", "hooks.json")):
+        return candidate
+
+    # 2. Staged layout: `hooks/` directory next to the adapter
+    adapter_dir = os.path.dirname(os.path.abspath(target_file))
+    staged_hooks = os.path.join(adapter_dir, "hooks")
+    if os.path.isdir(staged_hooks) and os.path.isfile(os.path.join(staged_hooks, "hooks.json")):
+        real_hooks = os.path.realpath(staged_hooks)
+        parent_candidate = os.path.dirname(real_hooks)
+        if os.path.isfile(os.path.join(parent_candidate, "hooks", "hooks.json")):
+            return parent_candidate
+
+    # 3. Staged layout: symlinked repo pointer
+    for link_name in (".ai-config-repo", ".repo", "repo"):
+        staged_repo = os.path.join(adapter_dir, link_name)
+        if os.path.exists(staged_repo):
+            repo_candidate = os.path.realpath(staged_repo)
+            if os.path.isfile(os.path.join(repo_candidate, "hooks", "hooks.json")):
+                return repo_candidate
+
+    # 4. Environment override
+    for env_var in ("AI_CONFIG_ROOT", "CLAUDE_PLUGIN_ROOT"):
+        val = os.environ.get(env_var)
+        if val and os.path.isfile(os.path.join(val, "hooks", "hooks.json")):
+            return os.path.abspath(val)
+
+    return candidate
+
 def main():
     try:
         payload = json.load(sys.stdin)
@@ -224,7 +268,7 @@ def main():
         print(json.dumps({"decision": "allow"}))
         return
 
-    repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+    repo_root = find_repo_root()
     claude_hooks_json_path = os.path.join(repo_root, "hooks", "hooks.json")
     
     if not os.path.exists(claude_hooks_json_path):

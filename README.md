@@ -4,8 +4,7 @@ Portable AI agent config --- skills, memories, and commands
 synced across machines via git.
 Works with Claude Code, Codex, [Gemini CLI](https://github.com/google-gemini/gemini-cli), [Cursor](https://cursor.com), VS Code Copilot, and any agent that reads markdown instruction files.
 
-Claude Code and Cursor install this repo's skills natively as a plugin (see each harness's section below);
-Codex has no plugin mechanism yet ([#2352](https://github.com/Morrison-Lab/ai-config/issues/2352)).
+Claude Code, Codex, and Cursor install this repo's skills natively as plugins (see each harness's section below);
 `bootstrap.sh` handles what a plugin install can't: Gemini CLI / Antigravity config and per-machine dotfiles.
 
 ## Setup on a new machine
@@ -39,7 +38,7 @@ In a Claude Code or Cursor session with the plugin installed (see each harness's
 
 `ai-config` natively integrates with **Google Antigravity** (`agy` CLI, Antigravity IDE, and Antigravity 2.0) and **Gemini CLI**:
 
-- **Global Plugin**: `bootstrap.sh` writes `~/.gemini/config/plugins.json` and `skills.json`, registering this checkout's `plugins/ai-config` and `skills/` paths directly (no symlink).
+- **Global Plugin**: `bootstrap.sh` stages the plugin layout under `~/.gemini/config/plugins/ai-config` and writes `~/.gemini/config/plugins.json` and `skills.json` (registering the staged `plugins/ai-config` path and the checkout's `skills/` path directly).
 - **Workspace Plugin**: Opening this repository directly in Antigravity automatically discovers `.agents/skills.json` and `.agents/plugins.json` to load all skills, rules (`AGENTS.md`), and plugin features.
 
 ### opencode
@@ -76,7 +75,11 @@ strict `name`/`description` frontmatter. Each wrapper tells Codex to read the
 matching canonical skill from `skills/<name>/SKILL.md` and adapt Claude-only
 metadata or tools to the current Codex session.
 
-`bootstrap.sh` no longer places those wrappers on disk for Codex (see its header comment) --- Codex has no marketplace-plugin mechanism analogous to Claude Code's or Cursor's, so until a replacement lands ([#2352](https://github.com/Morrison-Lab/ai-config/issues/2352)), reach `codex-skills/` by symlinking or copying it into `${CODEX_HOME:-$HOME/.codex}/skills` by hand.
+Codex can load this repository as a plugin through [`.codex-plugin/plugin.json`](.codex-plugin/plugin.json).
+The plugin manifest explicitly routes hooks to `plugins/ai-config/codex-hooks.json`, avoiding Codex's default discovery of the Claude catalog at `hooks/hooks.json`.
+That Codex hook manifest routes the canonical catalog through `plugins/ai-config/codex-hook-adapter.py`.
+The first session opening a new or changed hook must review and trust it in Codex's hook browser before it runs.
+For a user-global install, register the plugin with Codex for skills and hooks.
 After adding or editing a canonical skill, regenerate the wrappers:
 
 ```sh
@@ -400,6 +403,7 @@ The event mapping is [docs/cursor-hook-mapping.md](docs/cursor-hook-mapping.md).
 | `require-agent-disclosure.py` | `PreToolUse` (Bash, mcp__github__.*) | warns, never blocks, on a `gh`/`glab` command or MCP call that posts a forge comment without the agent-disclosure marker -- such a comment carries the account holder's own login and reads as `type: User`, indistinguishable from one they typed. Three verdicts, not one: the marker is missing, the body is somewhere the check cannot read (`--body-file`, `--editor`, `$BODY`) so it says so rather than accusing, or the body discloses with the robot emoji, which `check-pr-fully-clean.py` matches as a review-body marker |
 | `flag-uncounted-comment-claims.py` | `PreToolUse` (Bash) | warns, never blocks, on a `gh pr comment`/`gh issue comment`/`gh api .../comments` body about to post an unverified count (`grep -c`/`wc -l`-shaped discharge) or a hand-typed enumerated list of hyphenated identifiers with no deriving command beside it in the body or elsewhere in the same Bash call -- `remind-brief-premises.py`'s cardinality/enumeration heuristic extended to forge-comment bodies, since that hook's own PATH clause is anchored to this corpus and a comment can be about any repo (ai-config#2377's sparta file-list incident) |
 | `warn-stale-issue-edit.py` | `PreToolUse` (Write, Edit, NotebookEdit) | warns, never blocks, when an issue-driven `Write`/`Edit` has no fresh VIEW_ISSUE and remote/default-branch check after the request that named the issue, or when the latest view shows the issue closed |
+| `warn-new-line-breaks-on-push.py` | `PreToolUse` (Bash) | warns, never blocks, before a `git push` carrying newly-added Markdown lines that violate semantic line breaks against the default base branch (e.g. `origin/main`), naming the file and line to fix before pushing |
 
 For agent-independent monitoring across all projects and sessions, install the
 user service after the hook files are installed:
@@ -614,7 +618,9 @@ activated.")
 ## What's tracked
 
 - `skills/` --- reusable workflow skills (Claude Code and Cursor via plugin install, and Gemini/Antigravity via the `skills.json` registration `bootstrap.sh` writes against the checkout's own `skills/` path)
-- `codex-skills/` --- generated Codex wrappers (no install path yet --- [#2352](https://github.com/Morrison-Lab/ai-config/issues/2352))
+- `codex-skills/` --- generated Codex wrappers
+- `.codex-plugin/` --- Codex plugin manifest for generated wrappers
+- `plugins/ai-config/codex-hooks.json` --- Codex plugin hook registration that dispatches the canonical catalog
 - `cursor-rules/` --- user-global Cursor rules (shipped by the Cursor plugin's `rules` field, `~/.cursor/rules/`)
 - `.cursor/rules/` --- project Cursor rules for this repo as a workspace
 - `.cursor/hooks.json` --- Cursor-native project hooks (Cloud agents load these)
@@ -699,7 +705,7 @@ These are either machine-specific, sensitive, or pure session state:
 - `cache/`, `shell-snapshots/`, `file-history/`, `ide/`, `telemetry/`,
   `backups/`, `downloads/`, `session-env/` — ephemera.
 - `plugins/` (in `~/.claude`) --- managed by Claude Code itself from marketplaces. (Note: The top-level `plugins/` directory in this repo contains Antigravity plugin manifests.
-  `bootstrap.sh` registers `~/.gemini/config/plugins.json` with this checkout's path, no symlink.)
+  `bootstrap.sh` stages `plugins/ai-config` into `~/.gemini/config/plugins/ai-config` and registers it in `~/.gemini/config/plugins.json`.)
 
 If a per-machine variation appears that's worth syncing (e.g., a global `CLAUDE.md`), add it as a top-level entry here and wire it into whichever install path (plugin manifest, or `bootstrap.sh` itself) needs to know about it.
 

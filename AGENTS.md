@@ -195,7 +195,8 @@ The decision stays the human's.
 Two boundaries.
 Efficiency never outranks correctness, so no saving is bought with a skipped verification or a shortened review.
 And restructure in its own issue or PR, not inside whatever task happened to notice it.
-See `shared/workflow/restructure-for-efficiency.md`.
+See [`shared/workflow/restructure-for-efficiency.md`](shared/workflow/restructure-for-efficiency.md)
+and [`shared/workflow/merge-queue.md`](shared/workflow/merge-queue.md).
 
 ## Keep ai-config and repo checkouts fresh
 
@@ -204,7 +205,7 @@ In every session --- at session start, and again periodically during long sessio
 1. **The ai-config checkout.** Check that the local `ai-config` clone is on `main` and run `git pull --ff-only`.
 2. **The consumer install.**
    Claude Code and Cursor read this repo's skills as a native plugin, not a symlink install --- confirm the plugin is enabled and up to date instead of checking for symlinks.
-   Ensure `bootstrap.sh` has run so the Gemini/Antigravity registration files (`skills.json` and `plugins.json`, which point at this checkout's own `skills/` and `plugins/ai-config` paths) stay current.
+   Ensure `bootstrap.sh` has run so the Gemini/Antigravity registration files (`skills.json` and `plugins.json`, which point at this checkout's `skills/` and staged `plugins/ai-config` paths) stay current.
 3. **Working repo checkouts.** Keep `main` updated (`git fetch origin`, `git pull --ff-only`).
 
 ## Remove redundant submodules when using native plugins
@@ -545,12 +546,18 @@ Another harness: its own scheduler or timer.
 A question like "are you monitoring that PR?" is a status check, not a reason to stay idle.
 Start the loop if it is not already running, then answer.
 
+After every push to a PR/MR, actively poll the forge until the current head's CI/pipeline and review reach a terminal state.
+Use `gh` for GitHub and `glab` for GitLab when those CLIs are available;
+query the PR/MR, current-head checks or pipeline, and review comments or notes rather than assuming an event-triggered reviewer completed.
+Re-arm the poll while work remains.
+
 Baking a self-merge directive into the loop/wakeup prompt is allowed only under a standing merge-when-confident (`mwc`) session grant.
 A one-off "merge this PR" instruction authorizes merging the current head once.
 It never licenses a later wake to self-merge a different head.
 
 - **Do:** arm a persistent loop in the same turn you open, push to, or take over a PR, and skip starting a second one if a loop is already running.
-- **Don't:** treat a subscription or a one-shot poll as watching, or refuse to start a loop because the latest message only asked about status.
+- **Do:** after every push, actively query the current head's CI/pipeline and review state with `gh` or `glab` until that round is terminal.
+- **Don't:** treat a subscription or a one-shot poll as watching, treat event-triggered automation as evidence of completion, or refuse to start a loop because the latest message only asked about status.
 
 ## Request review and drive every started PR to clean
 

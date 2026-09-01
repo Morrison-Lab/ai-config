@@ -806,7 +806,7 @@ A clean automated review from every available provider evaluating the current HE
   previously `ucdavis/bcs` 2026-08-28 ([ai-config#2544](https://github.com/Morrison-Lab/ai-config/issues/2544), closed by [#2820](https://github.com/Morrison-Lab/ai-config/pull/2820)).
   Both discharge paths were unreachable at once:
   the plugin's shipped agents were absent from the session's Agent registry
-  (writing `.claude/agents/adversarial-reviewer.md` into the repo mid-session does not register it either --- definitions load at session start),
+  (writing `.claude/agents/adversarial-reviewer.md` into the repo mid-session does not register it immediately or reliably --- definitions load at session start, and the one measured mid-session appearance came about fifty minutes after the write, by a mechanism not yet identified),
   and the classifier denied the override in all three phrasings tried (Bash chained, Bash standalone, PowerShell `$env:`) --- consistent denials, not stochastic ones.
   The #2820 fallback, merged earlier that same day, was ALSO unreachable, for a distinct reason:
   the harness runs the hook from the plugin CACHE snapshot (`~/.claude/plugins/cache/Morrison-Lab/ai-config/<rev>/hooks/`, via `${CLAUDE_PLUGIN_ROOT}`),

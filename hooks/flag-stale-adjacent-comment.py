@@ -425,14 +425,6 @@ def main() -> int:
         return run_cli(sys.argv[1:])
 
     payload, is_dry_run = _read_payload()
-    if not payload and not is_dry_run:
-        try:
-            payload = json.load(sys.stdin)
-        except Exception as exc:  # fail open, but say so
-            print(f"flag-stale-adjacent-comment: unreadable hook input ({exc})",
-                  file=sys.stderr)
-            return 0
-
     if not payload:
         return 0
 

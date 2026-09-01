@@ -9,6 +9,7 @@ spec.loader.exec_module(subject)
 
 assert subject.POLL_SECONDS == 120
 assert subject.STATE_PATH.endswith("all-open-reviews.json")
+assert "all_open_reviews" in subject.poll_once.__code__.co_consts
 assert any(isinstance(c, (str, tuple, list)) and "--author" in c for c in subject.open_prs.__code__.co_consts)
 assert any(isinstance(c, (str, tuple, list)) and "created_by_me" in c for c in subject.open_merge_requests.__code__.co_consts)
 assert "--hostname" in subject.open_merge_requests.__code__.co_consts
@@ -98,6 +99,21 @@ with tempfile.TemporaryDirectory() as d:
         assert state["error_streak"] == 1
         state = subject.poll_once(state)
         assert state["error_streak"] == 2
+
+        # Every source failing keeps "data" present (empty) so a consumer
+        # can tell "polled, nothing answered" from "never polled"; the
+        # error names every failed source.  inject-pr-monitor-status.py's
+        # fingerprint covers the error text beside the data, so a changed
+        # error text under this constant empty data still surfaces.
+        def failing_gitlab():
+            raise OSError("glab has no authenticated hosts")
+
+        subject.open_prs = failing_differently
+        subject.open_merge_requests = failing_gitlab
+        state = subject.poll_once(state)
+        assert state["data"] == {}
+        assert "github_prs" in state["error"] and "gitlab_merge_requests" in state["error"]
+        assert state["error_streak"] == 1
 
         subject.open_prs = working
         subject.open_merge_requests = working_gitlab

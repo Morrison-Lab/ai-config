@@ -124,7 +124,7 @@ def open_merge_requests():
 
 
 def poll_once(state):
-    state.update({"kind": "all_open_prs", "pid": os.getpid(), "checked_at": time.time()})
+    state.update({"kind": "all_open_reviews", "pid": os.getpid(), "checked_at": time.time()})
     data = {}
     errors = {}
     for name, query in {
@@ -170,7 +170,7 @@ def ensure():
     except OSError:
         return False
     state = read_state()
-    state.update({"kind": "all_open_prs", "pid": process.pid, "started_at": time.time()})
+    state.update({"kind": "all_open_reviews", "pid": process.pid, "started_at": time.time()})
     write_state(state)
     return True
 

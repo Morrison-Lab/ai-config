@@ -18,6 +18,14 @@ assert subject.fingerprint(first) == subject.fingerprint(first)
 assert subject.fingerprint(first) != subject.fingerprint(second)
 assert subject.fingerprint({"error": "offline"}) != subject.fingerprint(first)
 assert subject.fingerprint({"error": "offline"}) == subject.fingerprint({"error": "offline"})
+# A multi-source monitor keeps partial (or empty) data beside its error, so
+# the error text is part of the observation: same data, different error
+# text is a change (ai-config#2896 review).
+partial_a = {"data": {"gitlab_merge_requests": []}, "error": "gh: timeout"}
+partial_b = {"data": {"gitlab_merge_requests": []}, "error": "gh: auth expired"}
+assert subject.fingerprint(partial_a) != subject.fingerprint(partial_b)
+assert subject.fingerprint({"data": {}, "error": "e1"}) != subject.fingerprint({"data": {}, "error": "e2"})
+assert subject.fingerprint({"data": {}, "error": "e1"}) != subject.fingerprint({"data": {}})
 
 
 def run_main():
@@ -86,6 +94,30 @@ with tempfile.TemporaryDirectory() as d:
         write_state(path, {"url": "u", "error": "", "error_streak": 3, "checked_at": 9})
         assert run_main() != ""
         assert read_state(path)["persistent_error_reported"] is True
+    finally:
+        subject.STATE_DIR = orig_dir
+
+# A total failure of a multi-source monitor leaves "data" present but empty
+# beside the error, and every later error-text change must still surface --
+# the both-sources-fail path the first draft of #2896 never exercised.
+with tempfile.TemporaryDirectory() as d:
+    orig_dir = subject.STATE_DIR
+    try:
+        subject.STATE_DIR = d
+        path = os.path.join(d, "all-open-reviews.json")
+        write_state(path, {"data": {"github_prs": [{"number": 7}]}, "error_streak": 0, "checked_at": 1})
+        assert '"number": 7' in run_main()
+        write_state(path, {**read_state(path), "data": {}, "error": "gh error 1", "error_streak": 1, "checked_at": 2})
+        assert "gh error 1" in run_main()
+        write_state(path, {**read_state(path), "error": "gh error 2 - totally different", "error_streak": 1, "checked_at": 3})
+        assert "gh error 2" in run_main()
+        # Partial failure: unchanged surviving data, changed error text.
+        write_state(path, {**read_state(path), "data": {"gitlab_merge_requests": [{"iid": 8}]}, "error": "gh down", "error_streak": 1, "checked_at": 4})
+        assert "gh down" in run_main()
+        write_state(path, {**read_state(path), "error": "gh still down, differently", "error_streak": 1, "checked_at": 5})
+        assert "differently" in run_main()
+        write_state(path, {**read_state(path), "checked_at": 6})
+        assert run_main() == ""
     finally:
         subject.STATE_DIR = orig_dir
 

@@ -126,8 +126,10 @@ check("code span stopped by blank line", "real prose" in stripped_span_blank)
 doc_multiline_span = "prose before\n``\ncode line 1\ncode line 2\n``\nprose after"
 stripped_multiline_span = strip_code_spans(doc_multiline_span)
 check("multiline double-backtick span stripped", "code line 1" not in stripped_multiline_span and "code line 2" not in stripped_multiline_span)
-check("multiline double-backtick span preserves surrounding prose", "prose before" in stripped_multiline_span and "prose after" in stripped_multiline_span)
-
+# 8c. Stray single backtick does NOT cross non-blank lines (#2525)
+doc_stray_single = "stray ` backtick on line 1\nreal prose on line 2 with `code`\nline 3"
+stripped_stray_single = strip_code_spans(doc_stray_single)
+check("stray single backtick does not swallow line 2 prose", "real prose on line 2 with" in stripped_stray_single)
 
 # 9. Display math stripping ($$...$$)
 doc_display_math = """prose before

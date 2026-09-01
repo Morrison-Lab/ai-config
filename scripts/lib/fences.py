@@ -26,6 +26,12 @@ FENCE_LINE = re.compile(
 CODE_SPAN_RE = re.compile(
     r"(?<!`)(`+)(?!`)(?:[^\n\r]|\r?\n(?![ \t]*\r?\n))*?(?<!`)\1(?!`)"
 )
+MULTI_BACKTICK_SPAN_RE = re.compile(
+    r"(?<!`)(`{2,})(?!`)(?:[^\n\r]|\r?\n(?![ \t]*\r?\n))*?(?<!`)\1(?!`)"
+)
+SINGLE_LINE_SPAN_RE = re.compile(
+    r"(?<!`)(`+)(?!`)[^\n\r`]+?(?<!`)\1(?!`)"
+)
 DISPLAY_MATH_RE = re.compile(
     r"(?<!\\)\$\$.*?(?<!\\)\$\$", re.DOTALL
 )
@@ -114,8 +120,15 @@ def strip_fences(
 
 
 def strip_code_spans(text: str, replacement: str = " ") -> str:
-    """Strip inline code spans (`...`), bounded by blank lines."""
-    return CODE_SPAN_RE.sub(replacement, text)
+    """Strip inline code spans (`...`), bounded by blank lines.
+
+    Multi-backtick spans (2+ backticks) may cross non-blank newlines to match
+    CommonMark code spans enclosing multi-line content. Single-backtick spans
+    are bounded to a single line so an unclosed stray backtick cannot match
+    across lines to swallow distant content or dead links.
+    """
+    s = MULTI_BACKTICK_SPAN_RE.sub(replacement, text)
+    return SINGLE_LINE_SPAN_RE.sub(replacement, s)
 
 
 def strip_code(

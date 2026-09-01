@@ -21,9 +21,14 @@ Search for available plugins proactively when:
 - A workflow demands standard linters, formatters, or verification checkers that exist in maintained ecosystems.
 - A user request asks for a capability that is general-purpose rather than repository-specific.
 
+Don't restrict searches to currently loaded marketplaces.
+Search the broader web (e.g. GitHub repositories, package ecosystems, search queries)
+when registered catalogs don't carry the needed tooling.
+
 ## Where and how to search across harnesses
 
-Different AI agent harnesses manage plugins through distinct discovery and marketplace mechanisms:
+Different AI agent harnesses manage plugins through distinct discovery and marketplace mechanisms.
+Combine local marketplace listings with web search to discover upstream tools:
 
 ### Claude Code
 
@@ -45,6 +50,12 @@ Claude Code supports plugins distributed via Git marketplaces and official regis
 
    Inspect the source repository's `.claude-plugin/marketplace.json` manifest
    or use the interactive `/plugin` Discover tab to browse available plugins and capabilities.
+
+   When currently registered marketplaces do not carry a needed tool,
+   search the web (e.g. GitHub search, official Anthropic documentation)
+   for plugin marketplaces (`owner/repo`),
+   add the repository via `claude plugin marketplace add <owner/repo>`,
+   and inspect its declared plugins.
 
 3. **Install and enable:**
 
@@ -133,7 +144,9 @@ Before installing and enabling a plugin, verify:
    Plugins loaded mid-session may require a session restart or harness reload
    before new tool definitions or hooks become active in the agent prompt context.
 
-- **Do:** search official and lab plugin marketplaces before hand-rolling complex external integration tooling.
+- **Do:** search official, lab, and upstream plugin marketplaces and the web before hand-rolling complex external integration tooling.
+- **Do:** search the broader web (GitHub, registries) for plugin marketplaces when currently registered catalogs lack the needed tool.
 - **Do:** verify marketplace names against the source `marketplace.json` manifest rather than guessing from repo URLs.
+- **Don't:** limit plugin discovery only to currently loaded marketplaces when specialized tools exist upstream.
 - **Don't:** keep duplicate git submodules alongside native plugin configurations.
 - **Don't:** assume a plugin registered mid-session is active without confirming tool availability or restarting the session when needed.

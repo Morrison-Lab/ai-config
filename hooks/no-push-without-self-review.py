@@ -1352,7 +1352,7 @@ def parse_report(text: str) -> tuple[str | None, str | None]:
 
 
 CLI_REVIEW_CMD_RE = re.compile(
-    r"""(?:^|[;&`(\n]|\$\()\s*(?:(?:!|\{|time|nohup|sudo|then|else|do|if|elif|while|until|exec|builtin|env(?:\s+-[^\s]+)*(?:\s+\w+=\S+)*)\s+)*(?:python[0-9.]*\s+)?(?:[\w./-]*/)?(?:pre-push-review(?:\.py)?|adv)(?:\s+|$|[;&|])""",
+    r"""(?:^|[;&`(\n]|\$\()\s*(?:(?:!|\{|time|nohup|sudo|then|else|do|if|elif|while|until|exec|builtin|env(?:\s+-[^\s]+)*(?:\s+\w+=\S+)*)\s+)*(?:python[0-9.]*\s+)?(?:[\w./-]*/)?pre-push-review(?:\.py)?(?:\s+|$|[;&|])""",
     re.I | re.MULTILINE,
 )
 

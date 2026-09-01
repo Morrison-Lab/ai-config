@@ -41,20 +41,13 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
    - Duplication of something the repo (or a trustworthy upstream) already provides.
 
 4. **The Slop Detector**
-    - Flag placeholder comments, copy-paste artifacts, cargo-cult code, dead
-       code, genuinely uninformative naming, unrelated responsibilities,
-       inconsistent patterns, and unused imports as concrete defects with file,
-       line, failure, and fix.
-    - Judge the artifact rather than surrounding comments or the author's
-       account of it; a stated intention is not an implemented behavior.
+   - Flag placeholder comments, copy-paste artifacts, cargo-cult code, dead code, genuinely uninformative naming, unrelated responsibilities, inconsistent patterns, and unused imports as concrete defects with file, line, failure, and fix.
+   - Judge the artifact rather than surrounding comments or the author's account of it;
+     a stated intention is not an implemented behavior.
 
 5. **Perform a holistic whole-change assessment**
-    - Check whether the change satisfies the requirement its diff establishes,
-       and whether its behavior remains coherent across callers, consumers,
-       documentation, configuration, tests, and integration boundaries.
-    - Assess regression risk, omitted instances of the same underlying pattern,
-       scope, and whether the validation performed could expose the relevant
-       failure modes.
+    - Check whether the change satisfies the requirement its diff establishes, and whether its behavior remains coherent across callers, consumers, documentation, configuration, tests, and integration boundaries.
+    - Assess regression risk, omitted instances of the same underlying pattern, scope, and whether the validation performed could expose the relevant failure modes.
 
 6. **Deliver a structured verdict**
 
@@ -88,7 +81,12 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
 
    (For a not-clean verdict, set "verdict": "NOT_CLEAN" and give "findings" one object per finding, each with exactly these four keys: {"file": "<repo-relative path>", "line": <1-indexed int>, "category": "<kebab-case slug>", "message": "<one sentence stating the defect>"}.
    Use those key names literally -- a consumer that cannot find them reports the finding as "structured finding in unknown: ", which names nothing.
-   Any finding listed here blocks, whatever the "verdict" string says, and a CLEAN payload requires an explicit empty "findings" array. Schema 1.1 requires distinct "detailed_assessment" and "holistic_assessment" strings with at least six distinct words each. The detailed assessment must name a changed path, failure mode, or concrete defect; the holistic assessment must name a requirement, integration, regression, scope, or validation concern. Report both passes even when they found no issue.)
+   Any finding listed here blocks, whatever the "verdict" string says.
+   A CLEAN payload requires an explicit empty "findings" array.
+   Schema 1.1 requires distinct "detailed_assessment" and "holistic_assessment" strings with at least six distinct words each.
+   The detailed assessment must name a changed path, failure mode, or concrete defect.
+   The holistic assessment must name a requirement, integration, regression, scope, or validation concern.
+   Report both passes even when they found no issue.)
 
    Read that sha yourself rather than taking it from the brief.
    On Claude Code, the pre-push guard resolves what the push would actually ship --- reading its refspec, not just HEAD --- and compares, which is what ties your verdict to those commits.

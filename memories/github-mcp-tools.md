@@ -775,6 +775,11 @@ See ai-config#694 for the precedent.
   whose CI never ran.
   Compare `head_sha` against the PR's live `.head.sha`
   before treating any such event as progress.
+  The earliest measurement of this shape predates this bullet and lives in
+  [`fully-clean.cases.md`](../shared/workflow/fully-clean.cases.md),
+  "A `check_suite.completed` wake at a superseded head"
+  (`ucdavis/bcs#732`, 2026-08-23), which this bullet was written without
+  having found; read the two together.
   This stays a memory rather than a hook despite clearing
   [`deterministic-tools`](../shared/principles/deterministic-tools.md)'s
   third-occurrence bar:

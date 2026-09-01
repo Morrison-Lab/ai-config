@@ -1788,6 +1788,9 @@ must itself contain a backslash escape.
   on this platform, measured 2026-08-22, it does not.
 - **Don't:** carry the claim to another platform without re-measuring; it did
   not reproduce in a Linux CI runner.
+  It also did not reproduce in a Linux remote Claude Code container on
+  2026-09-01: the same reproducer left both backslashes of `a\\nb` intact
+  under `repr()`.
 - **Don't:** trust a green suite after writing a regex through a heredoc; read
   the emitted line back.
 

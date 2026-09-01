@@ -191,6 +191,14 @@ committed pass.
    every `git add`/`commit`/`push` from inside it -- never `cd` straight
    into the shared checkout itself to make a change.
 
+   **Run the repo's own gates on the files you touched before the commit**,
+   since a UMS PR fails CI on the same checks as any other:
+   `python3 scripts/check-memory-file-size.py --strict` (a memory file over
+   1250 lines fails; split it, as `memories/markdownlint.md` was split from
+   `tools.md` on 2026-09-01 when a UMS append crossed the budget),
+   `NLB_BASE_REF=origin/main python3 scripts/vendor/gha-check-new-line-breaks.py`,
+   `python3 scripts/check-links.py`, and `markdownlint` on the changed files.
+
    **If a push is rejected non-fast-forward:** fetch first and diff before
    assuming a real conflict -- the branch may have picked up another
    session's commit that needs separating out (`git revert <their-commit>`)

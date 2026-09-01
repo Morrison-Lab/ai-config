@@ -132,6 +132,9 @@ When authoring a new hook:
 2. Add comprehensive unit tests in `hooks/test-<name>.py`.
 3. Register the hook in [`hooks/hooks.json`](../hooks/hooks.json) under the correct event and matcher.
 4. Add a row to the README hooks table in [`README.md`](../README.md#enforcement-hooks-hooks).
+   The row's matcher list must equal the `hooks.json` groups for that script joined by `, `, in file order:
+   `check-hook-catalog.py` concatenates the groups as it meets them and compares the string, so `(Agent, Task, Workflow)` fails against a manifest that lists `Task` before `Agent`.
+   Write the manifest first, then copy its order into the row (measured 2026-09-01, ai-config#2930).
 5. Update this catalog in [`memories/hooks.md`](hooks.md).
 6. Validate with:
    ```bash

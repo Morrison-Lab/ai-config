@@ -349,6 +349,28 @@ def mask_arithmetic(command: str) -> str:
     return "".join(out)
 
 
+def strip_unquoted_trailing_comment(line: str) -> str:
+    """Strip trailing # comment if outside single/double quotes."""
+    in_sq = False
+    in_dq = False
+    escaped = False
+    for i, c in enumerate(line):
+        if escaped:
+            escaped = False
+            continue
+        if c == "\\":
+            escaped = True
+            continue
+        if c == "'" and not in_dq:
+            in_sq = not in_sq
+        elif c == '"' and not in_sq:
+            in_dq = not in_dq
+        elif c == "#" and not in_sq and not in_dq:
+            if i == 0 or line[i - 1] in " \t;|&":
+                return line[:i]
+    return line
+
+
 def strip_heredocs(command: str) -> str:
     """Drop heredoc body lines and delimiters so interior text is not scanned as commands."""
     # Mask arithmetic expansions across the whole command before parsing openers,
@@ -378,15 +400,15 @@ def strip_heredocs(command: str) -> str:
             continue
 
         out.append(orig_line)
-        if not orig_line.strip().startswith("#"):
-            for m in HEREDOC_OPEN.finditer(masked_line):
-                rest = masked_line[m.end():]
-                if re.match(r"^\s*\)\)", rest):
-                    continue
-                strip_flag = m.group(1)
-                delim = m.group(2) or m.group(3) or m.group(4) or m.group(5)
-                if delim:
-                    pending_heredocs.append((delim, bool(strip_flag)))
+        line_to_scan = strip_unquoted_trailing_comment(masked_line)
+        for m in HEREDOC_OPEN.finditer(line_to_scan):
+            rest = line_to_scan[m.end():]
+            if re.match(r"^\s*\)\)", rest):
+                continue
+            strip_flag = m.group(1)
+            delim = m.group(2) or m.group(3) or m.group(4) or m.group(5)
+            if delim:
+                pending_heredocs.append((delim, bool(strip_flag)))
 
     # If any heredocs were left unclosed at EOF, keep their buffered lines (fail-safe)
     if pending_heredocs:

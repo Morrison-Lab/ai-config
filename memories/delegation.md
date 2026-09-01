@@ -394,7 +394,8 @@ The canonical trade-off analysis, context-budget rationale, and Do/Don't directi
 
 - **Do:** use conversation-inheriting dispatch (`subagent_type: "fork"`, `/subtask`, or `self`) for reflective UMS sweeps and emergent CAI workflows per [`use-subagents`](../shared/workflow/use-subagents.md).
 - **Do:** clearly distinguish the `Agent` tool's conversation-inheriting `subagent_type: "fork"` from skill frontmatter `context: fork` (which isolates and omits conversation history).
-- **Don't:** duplicate the full trade-off rationale across multiple files; keep the normative guidance in [`use-subagents`](../shared/workflow/use-subagents.md).
+- **Don't:** duplicate the full trade-off rationale across multiple files ---
+  keep the normative guidance in [`use-subagents`](../shared/workflow/use-subagents.md).
 
 
 

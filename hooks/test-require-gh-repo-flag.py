@@ -68,6 +68,8 @@ BLOCK = [
      "arithmetic $(( with << inside double-quoted string does not swallow ungated command"),
     ("echo \"$(( 2 << EOF\n))\"\n" + G + "secret set TOKEN --body x\nEOF\necho done",
      "echo $(( with << inside double quotes does not mask ungated command"),
+    ("echo \"no real heredoc here << EOF\"\n" + G + "pr merge 456 --squash\ncat <<EOF\nsome doc text\nEOF\n",
+     "quoted string containing << does not mask ungated command"),
     ("x=(( a << 1 ))\n" + G + "secret set FOO",
      "assignment before (( arithmetic shift does not mask ungated command"),
     ("(" + G + "secret set FOO)", "bare subshell: (gh secret set)"),

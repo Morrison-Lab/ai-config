@@ -247,42 +247,45 @@ def split_command(command: str) -> list[str]:
 
 
 def mask_comments_and_arithmetic(command: str) -> str:
-    """Mask comments and $(( ... )) / (( ... )) arithmetic expansions with spaces/newlines."""
+    """Mask comments, strings (preserving heredoc openers & command substitutions), and arithmetic expansions."""
     out = []
+    stack = ["ROOT"]
+    escaped = False
     i = 0
     n = len(command)
-    in_sq = False
-    in_dq = False
-    escaped = False
 
     while i < n:
-        ch = command[i]
+        c = command[i]
+        top = stack[-1]
 
         if escaped:
             escaped = False
-            out.append(ch)
+            out.append(c)
             i += 1
             continue
 
-        if ch == "\\":
+        if c == "\\" and top != "SINGLE_QUOTE":
             escaped = True
-            out.append(ch)
+            out.append(c)
             i += 1
             continue
 
-        if ch == "'" and not in_dq:
-            in_sq = not in_sq
-            out.append(ch)
-            i += 1
-            continue
-        elif ch == '"' and not in_sq:
-            in_dq = not in_dq
-            out.append(ch)
+        if top == "SINGLE_QUOTE":
+            if c == "'":
+                stack.pop()
+                out.append(c)
+            else:
+                out.append("\n" if c == "\n" else " ")
             i += 1
             continue
 
-        if not in_sq:
-            if command.startswith("$((", i):
+        if top == "DOUBLE_QUOTE":
+            if c == '"':
+                stack.pop()
+                out.append(c)
+                i += 1
+                continue
+            if c == "$" and command.startswith("$((", i):
                 start = i
                 i += 3
                 depth = 2
@@ -290,71 +293,124 @@ def mask_comments_and_arithmetic(command: str) -> str:
                 sub_dq = False
                 sub_escaped = False
                 while i < n and depth > 0:
-                    c = command[i]
+                    sc = command[i]
                     if sub_escaped:
                         sub_escaped = False
                         i += 1
                         continue
-                    if c == "\\":
+                    if sc == "\\":
                         sub_escaped = True
                         i += 1
                         continue
-                    if c == "'" and not sub_dq:
+                    if sc == "'" and not sub_dq:
                         sub_sq = not sub_sq
-                    elif c == '"' and not sub_sq:
+                    elif sc == '"' and not sub_sq:
                         sub_dq = not sub_dq
                     elif not sub_sq and not sub_dq:
-                        if c == "(":
+                        if sc == "(":
                             depth += 1
-                        elif c == ")":
+                        elif sc == ")":
                             depth -= 1
                     i += 1
                 span = command[start:i]
-                for ch_span in span:
-                    out.append("\n" if ch_span == "\n" else " ")
+                for sc in span:
+                    out.append("\n" if sc == "\n" else " ")
                 continue
-
-        if not in_sq and not in_dq:
-            if ch == "#" and (i == 0 or command[i - 1] in " \t\r\n;|&()<>"):
-                # Mask comment until next newline or EOF
-                while i < n and command[i] != "\n":
-                    out.append(" ")
-                    i += 1
-                continue
-
-            if command.startswith("((", i):
-                start = i
+            if c == "$" and i + 1 < n and command[i + 1] == "(":
+                stack.append("COMMAND_SUBST")
+                out.append("$(")
                 i += 2
-                depth = 2
-                sub_sq = False
-                sub_dq = False
-                sub_escaped = False
-                while i < n and depth > 0:
-                    c = command[i]
-                    if sub_escaped:
-                        sub_escaped = False
-                        i += 1
-                        continue
-                    if c == "\\":
-                        sub_escaped = True
-                        i += 1
-                        continue
-                    if c == "'" and not sub_dq:
-                        sub_sq = not sub_sq
-                    elif c == '"' and not sub_sq:
-                        sub_dq = not sub_dq
-                    elif not sub_sq and not sub_dq:
-                        if c == "(":
-                            depth += 1
-                        elif c == ")":
-                            depth -= 1
-                    i += 1
-                span = command[start:i]
-                for ch_span in span:
-                    out.append("\n" if ch_span == "\n" else " ")
                 continue
+            if c == "`":
+                stack.append("BACKTICK")
+                out.append("`")
+                i += 1
+                continue
+            out.append("\n" if c == "\n" else " ")
+            i += 1
+            continue
 
-        out.append(command[i])
+        # top is ROOT, PAREN, COMMAND_SUBST, or BACKTICK
+        if c == "#" and (i == 0 or command[i - 1] in " \t\r\n;|&()<>"):
+            while i < n and command[i] != "\n":
+                out.append(" ")
+                i += 1
+            continue
+
+        if command.startswith("$((", i) or command.startswith("((", i):
+            is_subst = command.startswith("$((", i)
+            start = i
+            i += 3 if is_subst else 2
+            depth = 2
+            sub_sq = False
+            sub_dq = False
+            sub_escaped = False
+            while i < n and depth > 0:
+                sc = command[i]
+                if sub_escaped:
+                    sub_escaped = False
+                    i += 1
+                    continue
+                if sc == "\\":
+                    sub_escaped = True
+                    i += 1
+                    continue
+                if sc == "'" and not sub_dq:
+                    sub_sq = not sub_sq
+                elif sc == '"' and not sub_sq:
+                    sub_dq = not sub_dq
+                elif not sub_sq and not sub_dq:
+                    if sc == "(":
+                        depth += 1
+                    elif sc == ")":
+                        depth -= 1
+                i += 1
+            span = command[start:i]
+            for sc in span:
+                out.append("\n" if sc == "\n" else " ")
+            continue
+
+        if c == "'":
+            stack.append("SINGLE_QUOTE")
+            out.append(c)
+            i += 1
+            continue
+
+        if c == '"':
+            stack.append("DOUBLE_QUOTE")
+            out.append(c)
+            i += 1
+            continue
+
+        if c == "$" and i + 1 < n and command[i + 1] == "(":
+            stack.append("COMMAND_SUBST")
+            out.append("$(")
+            i += 2
+            continue
+
+        if c == "`":
+            if top == "BACKTICK":
+                stack.pop()
+            else:
+                stack.append("BACKTICK")
+            out.append("`")
+            i += 1
+            continue
+
+        if c == "(":
+            stack.append("PAREN")
+            out.append(c)
+            i += 1
+            continue
+
+        if c == ")":
+            if top in ("PAREN", "COMMAND_SUBST"):
+                stack.pop()
+            out.append(c)
+            i += 1
+            continue
+
+        out.append(c)
         i += 1
 
     return "".join(out)
@@ -394,7 +450,8 @@ def strip_heredocs(command: str) -> str:
             if re.match(r"^\s*\)\)", rest):
                 continue
             strip_flag = m.group(1)
-            delim = m.group(2) or m.group(3) or m.group(4) or m.group(5)
+            orig_m = HEREDOC_OPEN.search(orig_line, pos=m.start())
+            delim = (orig_m.group(2) or orig_m.group(3) or orig_m.group(4) or orig_m.group(5)) if orig_m else (m.group(2) or m.group(3) or m.group(4) or m.group(5))
             if delim:
                 pending_heredocs.append((delim, bool(strip_flag)))
 

@@ -1590,16 +1590,16 @@ def verify_review(transcript_path: str, directory: str | None,
 DENY_TAIL = (
     "\n\nStanding rule: every self-review is an adversarial review by a separate "
     "subagent. Dispatch `adversarial-reviewer` in the foreground against your "
-    "committed diff (or use `scripts/pre-push-review.py` / a fallback reviewer "
-    "subagent when the persona is unregistered), address or rebut every finding, "
-    "and let its report state the commit it read.\n\n"
+    "committed diff (or dispatch a fallback reviewer subagent such as `general-purpose` "
+    "or `self` with an adversarial review prompt when the persona is unregistered), "
+    "address or rebut every finding, and let its report state the commit it read.\n\n"
     "Only that reviewer's own result or report counts -- this message does not, "
     "and neither does reading a file that quotes a verdict.\n\n"
     "Override by prefixing the push itself with `ALLOW_UNREVIEWED_PUSH=1` when no "
     "verdict can exist for the guard to check: an initial empty PR branch (per "
-    "pr-on-claim), an auto-mode session where the reviewer agent is unregistered, "
+    "pr-on-claim), an auto-mode session where no subagent tool exists, "
     "or an emergency. In auto mode, if the permission classifier denies the env "
-    "prefix, run `scripts/pre-push-review.py` or request a Bash permission rule. "
+    "prefix, request a Bash permission rule. "
     "Say in your reply that you used the override and why."
 )
 

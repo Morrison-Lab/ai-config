@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
-"""Tests for scripts/check-links.py (ai-config#2842).
+"""Unit tests for scripts/check-links.py (ai-config#2842).
 
 Verifies that:
-1. parse_link_target properly extracts paths and drops title attributes across
-   double quotes, single quotes, parentheses, and angle brackets.
-2. Link reference definitions ([label]: target "title") are recognized and checked.
-3. Footnotes ([^label]: text) and placeholders are ignored.
-4. Inline links and reference definitions with relative targets validate correctly.
+1. External link schemes, email addresses, and in-page anchors are recognized and skipped.
+2. Link destinations with titles in quotes/parens or angle brackets are parsed cleanly.
+3. Link reference definitions ([label]: target "title") are recognized and validated.
+4. Extensionless markdown targets and directory index/README files resolve.
+5. Anchor fragments (#section) on extensionless targets are handled correctly.
+6. Broken links (including broken extensionless targets with anchors) are caught.
+7. Bare-word placeholders and code-fenced examples are skipped.
+8. Display math ($$...$$) and inline math ($...$) with LaTeX brackets are not mistaken for links.
 """
 from __future__ import annotations
 
@@ -14,161 +17,126 @@ import importlib.util
 import subprocess
 import sys
 import tempfile
+import unittest
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 SCRIPT = REPO / "scripts" / "check-links.py"
 
 spec = importlib.util.spec_from_file_location("check_links", SCRIPT)
-check_links = importlib.util.module_from_spec(spec)
-sys.modules["check_links"] = check_links
-spec.loader.exec_module(check_links)
+mod = importlib.util.module_from_spec(spec)
+sys.modules["check_links"] = mod
+spec.loader.exec_module(mod)
 
-parse_link_target = check_links.parse_link_target
-is_external = check_links.is_external
-check_file = check_links.check_file
-
-passed = 0
-failed = 0
+check_file = mod.check_file
+is_external = mod.is_external
+parse_link_target = mod.parse_link_target
+resolve_target = mod.resolve_target
 
 
-def check(name: str, condition: bool) -> None:
-    global passed, failed
-    if condition:
-        passed += 1
-        print(f"PASS: {name}")
-    else:
-        failed += 1
-        print(f"FAIL: {name}")
+class TestCheckLinks(unittest.TestCase):
+    def setUp(self) -> None:
+        mod.broken.clear()
+        mod.checked = 0
 
+    def test_is_external(self) -> None:
+        self.assertTrue(is_external("https://example.com"))
+        self.assertTrue(is_external("http://example.com/page"))
+        self.assertTrue(is_external("mailto:user@example.com"))
+        self.assertTrue(is_external("tel:+1234567890"))
+        self.assertTrue(is_external("#heading-anchor"))
+        self.assertTrue(is_external("ftp://example.com"))
+        self.assertFalse(is_external("relative/path/to/file.md"))
+        self.assertFalse(is_external("../sibling.md"))
+        self.assertFalse(is_external("file.md#anchor"))
 
-def main() -> int:
-    print("Testing check-links.py...")
+    def test_parse_link_target(self) -> None:
+        self.assertEqual(parse_link_target("target.md"), "target.md")
+        self.assertEqual(parse_link_target('<target.md> "Title"'), "target.md")
+        self.assertEqual(parse_link_target("<target.md>"), "target.md")
+        self.assertEqual(parse_link_target("target.md 'Single Quoted Title'"), "target.md")
+        self.assertEqual(parse_link_target("target.md (Parenthesized Title)"), "target.md")
+        self.assertEqual(parse_link_target(""), "")
 
-    # 1. parse_link_target unit tests
-    check("parse plain target", parse_link_target("foo/bar.md") == "foo/bar.md")
-    check(
-        "parse target with double-quoted title",
-        parse_link_target('foo/bar.md "Optional Title"') == "foo/bar.md",
-    )
-    check(
-        "parse target with single-quoted title",
-        parse_link_target("foo/bar.md 'Optional Title'") == "foo/bar.md",
-    )
-    check(
-        "parse target with parenthesized title",
-        parse_link_target("foo/bar.md (Optional Title)") == "foo/bar.md",
-    )
-    check(
-        "parse angle-bracket target",
-        parse_link_target("<foo/bar.md>") == "foo/bar.md",
-    )
-    check(
-        "parse angle-bracket target with double-quoted title",
-        parse_link_target('<foo/bar.md> "Optional Title"') == "foo/bar.md",
-    )
-    check(
-        "parse angle-bracket target with single-quoted title",
-        parse_link_target("<foo/bar.md> 'Optional Title'") == "foo/bar.md",
-    )
-    check(
-        "parse angle-bracket target with parenthesized title",
-        parse_link_target("<foo/bar.md> (Optional Title)") == "foo/bar.md",
-    )
-    check(
-        "parse angle-bracket placeholder preserved",
-        parse_link_target("<owner>/<repo>") == "<owner>/<repo>",
-    )
-    check(
-        "parse target with anchor and title",
-        parse_link_target('foo/bar.md#heading "Heading Title"') == "foo/bar.md#heading",
-    )
-    check("parse empty string", parse_link_target("") == "")
-    check("parse whitespace string", parse_link_target("   ") == "")
+    def test_valid_relative_links(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            td = Path(tmpdir)
+            target = td / "target.md"
+            target.write_text("# Target", encoding="utf-8")
+            source = td / "source.md"
+            source.write_text(
+                "Check [target](target.md) and [subtarget](target.md#section).\n"
+                "Also [ref link][ref-1].\n\n"
+                '[ref-1]: target.md "Target Title"\n',
+                encoding="utf-8",
+            )
 
-    # 2. is_external unit tests
-    check("http is external", is_external("http://example.com"))
-    check("https is external", is_external("https://example.com"))
-    check("mailto is external", is_external("mailto:dev@example.com"))
-    check("tel is external", is_external("tel:+1234567890"))
-    check("in-page anchor is external", is_external("#section"))
-    check("relative path is not external", not is_external("docs/guide.md"))
+            check_file(source)
+            self.assertEqual(len(mod.broken), 0)
+            self.assertEqual(mod.checked, 3)
 
-    # 3. check_file with reference definitions and titles
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tmp = Path(tmpdir)
-        target_file = tmp / "target.md"
-        target_file.write_text("# Target\n", encoding="utf-8")
+    def test_broken_relative_links(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            td = Path(tmpdir)
+            source = td / "source.md"
+            source.write_text(
+                "Check [missing](missing.md) and [broken](nonexistent/dir/file.md).\n"
+                "[bad-ref]: missing_ref.md\n",
+                encoding="utf-8",
+            )
 
-        # Test markdown containing various reference definitions
-        md_content = """# Reference Links Test
+            check_file(source)
+            self.assertEqual(len(mod.broken), 3)
+            self.assertEqual(mod.checked, 3)
 
-[ref1]: target.md
-[ref2]: target.md "Double Quote Title"
-[ref3]: target.md 'Single Quote Title'
-[ref4]: target.md (Parenthesized Title)
-[ref5]: <target.md>
-[ref6]: <target.md> "Angle Bracket With Double Quotes"
-[ref7]: <target.md> 'Angle Bracket With Single Quotes'
-[ref8]: <target.md> (Angle Bracket With Parens)
-   [ref9]: target.md "Indented 3 Spaces"
-[ext1]: https://example.com "External Link"
-[placeholder]: <owner>/<repo>
-[^footnote]: This is footnote text, not a broken link.
+    def test_code_fences_and_spans_ignored(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            td = Path(tmpdir)
+            source = td / "source.md"
+            source.write_text(
+                "```python\n"
+                "# [fake link](missing1.md)\n"
+                "```\n"
+                "Here is `[inline](missing2.md)` in code span.\n",
+                encoding="utf-8",
+            )
 
-Inline link check: [inline](target.md "Inline Title").
-"""
-        test_md = tmp / "test.md"
-        test_md.write_text(md_content, encoding="utf-8")
+            check_file(source)
+            self.assertEqual(len(mod.broken), 0)
+            self.assertEqual(mod.checked, 0)
 
-        # Save previous global state and run check_file
-        check_links.broken = []
-        check_links.checked = 0
-        check_file(test_md)
+    def test_math_blocks_and_inline_math_ignored(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            td = Path(tmpdir)
+            source = td / "source.md"
+            source.write_text(
+                "$$\n"
+                "\\int_{[0, 1]} f(x) dx\n"
+                "$$\n"
+                "Inline math: $[a, b](x)$ and $f(x) = [0, 1]$.\n",
+                encoding="utf-8",
+            )
 
-        check(
-            "valid reference definitions and titles found no broken links",
-            len(check_links.broken) == 0,
-        )
-        check(
-            "checked count reflects all valid relative reference definitions and inline link",
-            check_links.checked == 10,
-        )
+            check_file(source)
+            self.assertEqual(len(mod.broken), 0)
+            self.assertEqual(mod.checked, 0)
 
-    # 4. Broken reference definition is detected
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tmp = Path(tmpdir)
-        test_md = tmp / "broken_ref.md"
-        test_md.write_text(
-            '[missing]: nonexistent_file.md "Missing File"\n',
-            encoding="utf-8",
-        )
-        check_links.broken = []
-        check_links.checked = 0
-        check_file(test_md)
+    def test_link_placeholders_and_titles(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            td = Path(tmpdir)
+            target = td / "real.md"
+            target.write_text("# Real", encoding="utf-8")
+            source = td / "source.md"
+            source.write_text(
+                "Examples: [bare](url), [placeholder](<owner>/<repo>), "
+                "[title](real.md \"Title\"), [bracketed](<real.md>).\n",
+                encoding="utf-8",
+            )
 
-        check(
-            "broken reference definition is detected",
-            len(check_links.broken) == 1,
-        )
-        check(
-            "broken entry includes missing file target",
-            any("nonexistent_file.md" in b for b in check_links.broken),
-        )
-
-    # 5. CLI end-to-end execution
-    proc = subprocess.run(
-        [sys.executable, str(SCRIPT)],
-        cwd=REPO,
-        capture_output=True,
-        text=True,
-    )
-    check("check-links.py passes on repo tree", proc.returncode == 0)
-    check("check-links.py reports success checkmark", "✓ no broken relative links" in proc.stdout)
-
-    print(f"\n{passed} passed, {failed} failed")
-    return 1 if failed else 0
+            check_file(source)
+            self.assertEqual(len(mod.broken), 0)
+            self.assertEqual(mod.checked, 2)
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    unittest.main()

@@ -159,6 +159,21 @@ Contrast with, rather than apply,
 disposition: it governs a finding on code that already exists, and
 licenses nothing about a defect inside the diff you are about to push.
 
+## Dead code is technical debt
+
+Dead code is not harmless surplus; it is active technical debt that accumulates
+carrying costs on every reader, coding agent, search tool, and test suite pass.
+Treat obsolete functions, orphaned configuration files, unreferenced memory entries,
+and commented-out code as defects to be eliminated systematically and promptly,
+not as historical archives to be preserved in place.
+
+Full statement: [`dead-code-is-tech-debt`](dead-code-is-tech-debt.md).
+Operationalized by:
+the [`prune-dead-code`](../../skills/prune-dead-code/SKILL.md) skill (systematic audit and removal procedure),
+the [`tidy`](../../skills/tidy/SKILL.md) and [`simplify`](../../skills/simplify/SKILL.md) skills,
+[`prefer-optionality-over-removal`](prefer-optionality-over-removal.md) (the boundary defining when removal vs optionality applies),
+and [`dont-incur-technical-debt`](dont-incur-technical-debt.md).
+
 ## Modularity — small, single-purpose, composable units
 
 Favor small, single-purpose functions and reusable units over long
@@ -491,11 +506,14 @@ instructions outrank repository defaults, scoped subsystem configs
 outrank top-level policies, and specific types and handlers outrank
 generic fallbacks in code.
 
-Prefer-optionality-over-removal complements KISS, least-flexible-tool, and simplify:
-while least-flexible-tool guides authoring new code without speculative flexibility,
-and simplify/tidy prune dead or unreferenced code paths,
-prefer-optionality-over-removal protects active capabilities with legitimate callers
-from being deleted outright when a default behavior needs improvement.
+Dead-code-is-tech-debt and prefer-optionality-over-removal draw the boundary
+between code deletion and preservation:
+while prefer-optionality-over-removal protects active capabilities with legitimate callers
+from being deleted outright when improving a default behavior,
+dead-code-is-tech-debt mandates the systematic, complete deletion of uncalled functions,
+orphaned configs, unreferenced memories, and commented-out code blocks that have no live callers.
+Together with least-flexible-tool, simplify, and tidy, they ensure the codebase remains
+compact and free of accumulated maintenance drag.
 
 Think-outside-the-box operates on the problem space itself:
 while challenge-the-assignment questions what you are asked to do or told is true,

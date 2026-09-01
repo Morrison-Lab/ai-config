@@ -108,7 +108,7 @@ A squash-merge on `main` can knock previously-mergeable open PRs into conflict. 
 
 ``` bash
 gh pr list --state open \
-  --json number,title,headRefName,mergeable,mergeStateStatus,comments   # LIST_PRS
+  --json number,title,headRefName,author,assignees,mergeable,mergeStateStatus,comments   # LIST_PRS
 ```
 
 Filter that list by `memories/reviewing-prs.md`’s scope test first, as `ardia` step 1 does (opened by or assigned to the invoking user, named in the request, or opened by a repository workflow), and report the PRs dropped. A conflict on an out-of-scope PR gets an explanatory comment for its author, never a push, and a claim comment does not bring it into scope.

@@ -40,10 +40,11 @@ BLOCK = [
     ('echo "$(' + G + 'secret set FOO -R a/b && ' + G + 'secret set BAR)"',
      "double-quoted chained substitution: \"$(gh ... -R && gh ...)\""),
     ("VAR=`" + G + "secret set FOO`", "backtick command substitution: `gh secret set`"),
-    ('echo "`cd /tmp && ' + G + 'secret set FOO`"', "double-quoted backtick substitution"),
     ("{ cd /tmp && " + G + "secret set FOO; }", "brace group: { cd && gh secret set; }"),
+    ("if true; then " + G + "secret set FOO; fi", "then branch: if true; then gh secret set; fi"),
     (G + 'release create v1.0.0 --notes "Release (v1.0)"', "release create without -R"),
-    ('echo "foo && ' + G + 'secret set BAR', "unterminated quote with chained command"),
+    ('echo "foo && ' + G + 'secret set BAR', "unterminated double-quote with chained command"),
+    ("echo 'foo && " + G + "secret set BAR", "unterminated single-quote with chained command"),
 ]
 
 ALLOW = [

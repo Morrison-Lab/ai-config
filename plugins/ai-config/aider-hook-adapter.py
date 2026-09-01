@@ -434,8 +434,16 @@ def run_hook_command(
     payload: dict[str, Any],
     cwd: str | Path,
     timeout_val: float,
+    root: Path | None = None,
 ) -> tuple[int, str, str]:
-    """Execute a single hook command with JSON payload on stdin."""
+    """Execute a single hook command with piped payload, returning (code, stdout, stderr)."""
+    env = os.environ.copy()
+    if root:
+        env.update({
+            "AI_CONFIG_ROOT": str(root),
+            "CLAUDE_PLUGIN_ROOT": str(root),
+            "PLUGIN_ROOT": str(root),
+        })
     try:
         proc = subprocess.run(
             cmd,
@@ -443,7 +451,7 @@ def run_hook_command(
             input=json.dumps(payload),
             text=True,
             capture_output=True,
-            env=os.environ,
+            env=env,
             cwd=str(cwd),
             timeout=timeout_val,
         )
@@ -484,10 +492,10 @@ def execute_hooks_for_event(
             if not raw_cmd:
                 continue
 
-            cmd = raw_cmd.replace("${CLAUDE_PLUGIN_ROOT}", str(root))
+            cmd = raw_cmd.replace("${CLAUDE_PLUGIN_ROOT}", str(root)).replace("${PLUGIN_ROOT}", str(root))
             timeout_val = float(hook_entry.get("timeout") or DEFAULT_HOOK_TIMEOUT)
 
-            code, out_txt, err_txt = run_hook_command(cmd, payload, cwd, timeout_val)
+            code, out_txt, err_txt = run_hook_command(cmd, payload, cwd, timeout_val, root=root)
 
             # Check JSON stdout from hook
             if out_txt.strip():
@@ -507,14 +515,14 @@ def execute_hooks_for_event(
                     # Non-JSON stdout
                     pass
 
-            # Hook exit code contract: exit code 2 blocks; exit code 1 warns (non-blocking)
-            if code == 2:
-                decision = "block"
-                if err_txt.strip():
-                    reasons.append(err_txt.strip())
-            elif code == 1:
-                if err_txt.strip():
-                    warnings.append(err_txt.strip())
+            # Exit code contract: only exit code 2 blocks; other non-zero exit codes warn
+            if code != 0:
+                detail = err_txt.strip() or f"exit code {code}"
+                if code == 2:
+                    decision = "block"
+                    reasons.append(detail)
+                else:
+                    warnings.append(detail)
 
     return {
         "decision": decision,

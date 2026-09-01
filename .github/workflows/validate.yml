@@ -25,6 +25,9 @@ jobs:
         run: python3 scripts/validate-skills.py
       - name: Check markdown links
         run: python3 scripts/check-links.py
+      - name: Run check-links tests
+        # ai-config#2881: CommonMark autolinks and relative link verification.
+        run: python3 scripts/test_check_links.py
       - name: Check ASCII punctuation in source files
         # ai-config#2550: ensure .py and .R source files obey the ASCII punctuation policy.
         run: python3 scripts/check-ascii-punctuation.py
@@ -119,6 +122,9 @@ jobs:
       - name: Run markdown fences library tests
         # ai-config#2540: scripts/lib/fences.py code block and code span parsing.
         run: python3 scripts/test_fences.py
+      - name: Run check-rendered-references tests
+        # ai-config#2879: verify broken rendered reference checking and footnote isolation.
+        run: python3 scripts/test_check_rendered_references.py
       - name: Check that all scripts/test_*.py test suites are gated
         # ai-config#2540: verify every test suite in scripts/ is gated in CI.
         run: python3 scripts/check-test-suites-covered.py
@@ -162,6 +168,11 @@ jobs:
         # `batch-merge-and-resolve.md` warns about, and it is what the
         # hand-run prototype this script replaces actually had.
         run: python3 scripts/test_pr_overlap.py
+      - name: Run upload-skills tests
+        # Only the tests run here. upload_skills.sh itself requires a live
+        # workspace API key, so the offline test suite exercises change
+        # detection, deletion propagation, and state caching with mock curl.
+        run: python3 scripts/test_upload_skills.py
       - name: Run context-closure tests
         run: python3 scripts/test_check_context_closure.py
       - name: Run ai-session MWC grant tests

@@ -729,9 +729,31 @@ See ai-config#694 for the precedent.
   (ai-config#373: `mergeable_state: unstable` right after a push was CI still
   running, not a conflict signal.)
 - **`gh pr merge` can return "Head branch is out of date" even after syncing; verify with SHAs before looping, and re-establish fully-clean before retrying.** When this error repeats, first read the PR's actual base branch (`gh pr view <N> --json baseRefName -q .baseRefName`) — do **not** assume `main`; stacked and release PRs target a different base — then fetch and merge that base into the branch. Merging the base creates a new head SHA, which invalidates the CI/review "fully clean" snapshot that authorized the original merge attempt (a repo that doesn't make every workflow/review a required branch-protection check can otherwise merge an unreviewed/untested new head) — re-run the `fully-clean.md` check against the new SHA before retrying the merge, not just the merge command itself. If it still fails, don't compare against `origin` blindly: for a cross-fork PR, `origin` is the *base* repo, not necessarily where the head branch lives, so `git ls-remote origin refs/heads/<branch>` can silently read a missing ref or an unrelated same-named branch in the base repo. Get the actual head repo and ref from the PR API first (`gh pr view <N> --json headRepositoryOwner,headRepository,headRefName`), query *that* repo's ref (`gh api repos/<head-owner>/<head-repo>/git/refs/heads/<head-ref> --jq .object.sha` — verified this endpoint works), and compare it against the PR API's own `.head.sha` (`gh api repos/<o>/<r>/pulls/<N> --jq .head.sha`); the PR object can lag the branch ref briefly, so **wait** until the two SHAs agree rather than retrying. If branch protection still blocks the merge, only use `gh pr merge --admin` when the user has **separately and explicitly** authorized the bypass itself — ordinary merge authorization does **not** cover it (see `preferences.md`) — otherwise stop and surface it as a blocker.
-- Webhook PR-activity events cover comments/reviews/CI *failures* but NOT CI
-  *success*, new pushes, or merge-conflict transitions — don't rely on events
-  alone to know a PR went green or merged; re-check explicitly.
+- Webhook PR-activity events cover comments/reviews/CI *failures* but NOT
+  new pushes or merge-conflict transitions — don't rely on events alone to
+  know a PR merged; re-check explicitly.
+  **CI success is now partly covered, contrary to what this bullet used to
+  say in full: a `check_suite.completed` event is delivered when no
+  third-party check suite on a head is still running or failed.** Measured
+  2026-09-01 in a Claude Code remote session on `UCD-SERG/serodynamics`,
+  where seven arrived across six PRs. Its own body states the limits, and
+  they matter: cancelled suites, suites with no runs, the GitHub App's own
+  suites and legacy commit statuses are **not** covered. So it is a prompt
+  to verify, not a green light — a PR can carry a still-running
+  `review / claude-review` (an App suite) while this event says CI is done.
+  Read the check runs before calling anything clean.
+- **A `check_suite.completed` event can name a superseded head, and its
+  wording invites you to act on it anyway.** The event body says "If you were
+  waiting on CI, continue with the next step", which reads as an all-clear
+  for the PR rather than for one commit. Two of the seven measured above
+  named a head that a later push had already replaced (`8c6c1be` on #311
+  after `fb8c7ac`; `cb327d7` on #298 after `65fd9fc`), each arriving one to
+  five minutes after the superseding push. This is the same staleness the
+  failure-event bullet below describes, in the direction that is easier to
+  act on wrongly: a stale *failure* costs a wasted investigation, while a
+  stale *success* can license declaring a head green whose CI never ran.
+  Compare `head_sha` against the PR's live `.head.sha` before treating any
+  such event as progress.
 - **A CI-failure webhook event's `HeadSHA` can be stale — compare it against
   the PR's actual current head before investigating.** Pushing a fix-up commit
   right after a bad one (e.g. correcting an encoding mistake seconds later)

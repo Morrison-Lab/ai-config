@@ -61,7 +61,8 @@ In every session --- at session start, and again periodically during long sessio
    and overwriting the cache copy directly is denied by the auto-mode permission classifier (reasonably --- an agent rewriting its own active guard).
    A merged hook fix reaches a plugin-consumer session only when the plugin pin in `~/.claude/plugins/installed_plugins.json` advances to a snapshot that contains it ---
    a session restart alone does not advance it (measured 2026-09-01: a fresh session still ran `a3e0fdb` with a `79def2e` snapshot sitting unpinned beside it),
-   so reporting "pulled the fix" or "restarted" reports a hook as updated that is still running stale; update the plugin so the pin moves, then verify the pinned copy.
+   so reporting "pulled the fix" or "restarted" reports a hook as updated that is still running stale.
+   Advance the pin through the plugin CLI (`claude plugin marketplace update <marketplace>`, then `claude plugin install <plugin>@<marketplace>`, per [`use-plugins.md`](use-plugins.md)), then verify the pinned copy in `installed_plugins.json`.
    (Measured 2026-09-01: the cache hook at rev `a3e0fdb` predated ai-config#2820's fallback while the marketplace clone had pulled past it;
    tracked as [ai-config#2899](https://github.com/Morrison-Lab/ai-config/issues/2899);
    see [`mistake-patterns.md`](../../memories/mistake-patterns.md) Pattern 42 for the full deadlock.)

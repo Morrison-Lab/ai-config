@@ -454,8 +454,6 @@ A clean automated review from every available provider evaluating the current HE
 - **Canonical Rule**: [`adversarial-self-review.md`](../shared/workflow/adversarial-self-review.md) (dispatch to a separate subagent) plus [`no-push-without-self-review.py`](../hooks/no-push-without-self-review.py)'s transcript and fallback scan.
 - **Fix**: The guard now credits valid reviews from foreground dispatches, fallback subagent dispatches (matching `FALLBACK_AGENT_NAME`), tracked `TaskOutput` results, and background task notifications (ai-config#2544).
   Dispatching in the foreground (`run_in_background: false`) remains the primary recommendation.
-  That fix reaches a plugin-consumer session only when the plugin cache re-snapshots (plugin update or session start) ---
-  see Pattern 42 for the stale-cache deadlock measured after [#2820](https://github.com/Morrison-Lab/ai-config/pull/2820) merged.
 
 ## Pattern 23: Implementing From a Truncated Issue-Body Read
 - **Mistake**: Briefing an implementer (a subagent, or yourself) from a sliced issue body --- e.g. `gh issue view --jq '.body[0:2200]'` --- instead of the full body and its comments.
@@ -821,7 +819,10 @@ A clean automated review from every available provider evaluating the current HE
 - **Fix**: Check first whether the running hook copy is stale against ai-config `main` --- diff the copy that `~/.claude/plugins/installed_plugins.json` pins (its per-scope `version` / `installPath`), since that is what runs: not the marketplace clone, and not merely the newest directory under the cache.
   A session restart alone does NOT advance that pin (measured 2026-09-01: a continuation session started 35 minutes after the marketplace pull still ran rev `a3e0fdb`, and after a later app update the cache held a `79def2e` snapshot containing the fix while every scope stayed pinned to `a3e0fdb`).
   What a restart does refresh is the auto-mode classifier's per-conversation state (the override the prior session's classifier had denied three times was accepted in the fresh one) and the Agent registry (a repo-level `.claude/agents/adversarial-reviewer.md` present at session start registers the reviewer, which satisfies even the stale hook's literal check).
-  The hook copy itself moves only when the plugin is updated so that the pin advances; verify the pinned copy rather than the clone.
+  The hook copy itself moves only when that pin advances.
+  The documented way to advance it is the plugin CLI --- `claude plugin marketplace update Morrison-Lab`, then `claude plugin install ai-config@Morrison-Lab`, per [`use-plugins.md`](../shared/workflow/use-plugins.md) --- which this incident did not measure:
+  an agent updating its own active guard mid-session is the same self-modification the classifier denies, so it is the next thing for the USER to run.
+  Verify the pinned copy in `installed_plugins.json` afterwards rather than assuming the pin moved.
   On a post-#2820 hook (verified against `main`, 2026-09-01), the fallback contract is:
   a dispatch whose `subagent_type` matches the general-purpose family (`general-purpose`, `general`, `reviewer`, `code-reviewer`, `research`, `self`)
   and whose prompt contains a review-request phrase matching the prompt gate (e.g. "adversarial pre-push review"),

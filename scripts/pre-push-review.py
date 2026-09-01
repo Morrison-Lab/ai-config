@@ -17,6 +17,11 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from scripts.lib.ai_cli import (
+    detect_available_engines as detect_cli_engines,
+    find_executable,
+    is_gh_available,
+)
 from scripts.lib.fences import count_unbalanced_fences, strip_fences
 from scripts.lib.review_payload import (
     extract_structured_review,
@@ -48,7 +53,7 @@ def get_git_root() -> str:
 
 def get_current_pr() -> Optional[int]:
     """Auto-detect PR number for current branch if one exists and gh CLI is available."""
-    if not shutil.which("gh"):
+    if not is_gh_available(use_cache=False):
         return None
     res = subprocess.run(
         ["gh", "pr", "view", "--json", "number"],
@@ -66,7 +71,7 @@ def get_current_pr() -> Optional[int]:
 
 def get_pr_base_branch(pr_number: int) -> Optional[str]:
     """Get the target base branch of a GitHub PR."""
-    if not shutil.which("gh"):
+    if not is_gh_available(use_cache=False):
         return None
     res = subprocess.run(
         ["gh", "pr", "view", str(pr_number), "--json", "baseRefName"],
@@ -134,7 +139,7 @@ def get_repo_guidelines(base_ref: str) -> str:
 
 def get_pr_head_sha(pr_number: int) -> Optional[str]:
     """Get the remote head commit SHA for a GitHub PR."""
-    if not shutil.which("gh"):
+    if not is_gh_available(use_cache=False):
         return None
     res = subprocess.run(
         ["gh", "pr", "view", str(pr_number), "--json", "headRefOid"],
@@ -601,10 +606,9 @@ def validate_review_output(report: Optional[str], expected_commit_sha: str = "")
 
 
 def run_antigravity_review(prompt: str, model: str = "", expected_commit_sha: str = "") -> Optional[str]:
-    agy_path = shutil.which("agy") or os.path.expanduser("~/.local/bin/agy")
-    if not os.path.isfile(agy_path) and not shutil.which("agy"):
+    agy_path = find_executable("agy", use_cache=False) or find_executable("antigravity", use_cache=False)
+    if not agy_path:
         return None
-
 
     if len(prompt.encode("utf-8")) > 800000:
         print("Notice: Prompt size exceeds ARG_MAX safe limit for Antigravity, skipping...", file=sys.stderr)
@@ -634,8 +638,8 @@ def run_antigravity_review(prompt: str, model: str = "", expected_commit_sha: st
 
 
 def run_claude_review(prompt: str, model: str = "", expected_commit_sha: str = "") -> Optional[str]:
-    claude_path = shutil.which("claude") or os.path.expanduser("~/.local/bin/claude")
-    if not os.path.isfile(claude_path) and not shutil.which("claude"):
+    claude_path = find_executable("claude", use_cache=False)
+    if not claude_path:
         return None
 
     cmd = [claude_path, "--permission-mode", "plan", "--safe-mode", "--strict-mcp-config", "-p", "-"]
@@ -662,10 +666,9 @@ def run_claude_review(prompt: str, model: str = "", expected_commit_sha: str = "
 
 
 def run_cursor_review(prompt: str, model: str = "", expected_commit_sha: str = "") -> Optional[str]:
-    cursor_path = shutil.which("agent") or os.path.expanduser("~/.local/bin/agent")
-    if not os.path.isfile(cursor_path) and not shutil.which("agent"):
+    cursor_path = find_executable("agent", use_cache=False) or find_executable("cursor", use_cache=False)
+    if not cursor_path:
         return None
-
 
     if len(prompt.encode("utf-8")) > 800000:
         print("Notice: Prompt size exceeds ARG_MAX safe limit for Cursor, skipping...", file=sys.stderr)
@@ -695,8 +698,8 @@ def run_cursor_review(prompt: str, model: str = "", expected_commit_sha: str = "
 
 
 def run_codex_review(prompt: str, model: str = "", expected_commit_sha: str = "") -> Optional[str]:
-    codex_path = shutil.which("codex") or os.path.expanduser("~/.local/bin/codex")
-    if not os.path.isfile(codex_path) and not shutil.which("codex"):
+    codex_path = find_executable("codex", use_cache=False)
+    if not codex_path:
         return None
 
     label_suffix = f" (model: {model})" if model else " (ChatGPT quota)"
@@ -723,8 +726,8 @@ def run_codex_review(prompt: str, model: str = "", expected_commit_sha: str = ""
 
 
 def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str = "") -> Optional[str]:
-    opencode_path = shutil.which("opencode") or os.path.expanduser("~/.local/bin/opencode")
-    if not os.path.isfile(opencode_path) and not shutil.which("opencode"):
+    opencode_path = find_executable("opencode", use_cache=False)
+    if not opencode_path:
         return None
 
     label_suffix = f" (model: {model})" if model else ""
@@ -786,18 +789,7 @@ def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str =
 
 def detect_available_engines() -> List[str]:
     """Return available local engines in preferred fallback priority: claude -> cursor -> codex -> opencode -> agy."""
-    engines = []
-    if shutil.which("claude") or os.path.isfile(os.path.expanduser("~/.local/bin/claude")):
-        engines.append("claude")
-    if shutil.which("agent") or os.path.isfile(os.path.expanduser("~/.local/bin/agent")):
-        engines.append("cursor")
-    if shutil.which("codex") or os.path.isfile(os.path.expanduser("~/.local/bin/codex")):
-        engines.append("codex")
-    if shutil.which("opencode") or os.path.isfile(os.path.expanduser("~/.local/bin/opencode")):
-        engines.append("opencode")
-    if shutil.which("agy") or os.path.isfile(os.path.expanduser("~/.local/bin/agy")):
-        engines.append("antigravity")
-    return engines
+    return detect_cli_engines(ENGINE_ROTATION_ORDER, use_cache=False)
 
 
 ENGINE_ROTATION_ORDER = ["claude", "cursor", "codex", "opencode", "antigravity"]

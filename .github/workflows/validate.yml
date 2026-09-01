@@ -111,6 +111,9 @@ jobs:
       - name: Run doctor tests
         # ai-config#2540: doctor.py install diagnostics and path checks.
         run: python3 scripts/test_doctor.py
+      - name: Run AI CLI helper and detection tests
+        # ai-config#2543: scripts/lib/ai_cli.py tool availability detection.
+        run: python3 scripts/test_ai_cli.py
       - name: Run markdown fences library tests
         # ai-config#2540: scripts/lib/fences.py code block and code span parsing.
         run: python3 scripts/test_fences.py

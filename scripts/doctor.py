@@ -301,6 +301,34 @@ def check_jsonc_configs() -> Dict[str, Any]:
     }
 
 
+def check_ai_clis() -> Dict[str, Any]:
+    """Check availability of AI CLI subagents and developer tools."""
+    from lib import ai_cli
+
+    report = ai_cli.get_tool_status_report()
+    available_engines = report.get("available_engines", [])
+    gh_available = report.get("forge_tools", {}).get("gh", {}).get("available", False)
+
+    if not available_engines:
+        return {
+            "name": "ai_clis",
+            "ok": False,
+            "status": "WARN",
+            "available_engines": [],
+            "gh_available": gh_available,
+            "details": "No local AI CLI subagents detected (claude, cursor, codex, opencode, antigravity).",
+        }
+
+    return {
+        "name": "ai_clis",
+        "ok": True,
+        "status": "OK",
+        "available_engines": available_engines,
+        "gh_available": gh_available,
+        "details": f"Available AI engines: {', '.join(available_engines)}; GitHub CLI (gh): {'available' if gh_available else 'not found'}",
+    }
+
+
 def run_doctor() -> Dict[str, Any]:
     """Execute all diagnostic health checks."""
     checks = [
@@ -310,6 +338,7 @@ def run_doctor() -> Dict[str, Any]:
         check_hook_catalog(),
         check_context_closure(),
         check_jsonc_configs(),
+        check_ai_clis(),
     ]
 
     all_ok = all(c["ok"] for c in checks)

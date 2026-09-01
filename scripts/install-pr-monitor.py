@@ -55,8 +55,16 @@ def resolve_dependencies():
         # Windows rarely ships a python3.exe alias; run the daemon under
         # whatever interpreter is executing this installer.
         python3 = sys.executable
+    # The monitor polls through whichever of gh (GitHub) and glab (GitLab)
+    # is installed -- the same rule as its own require_cli() -- so one of
+    # the two is enough, and neither is a refusal.
     gh = find_executable("gh", fallback_to_dirs=False, use_cache=False)
-    missing = [name for name, path in (("python3", python3), ("gh", gh)) if not path]
+    glab = find_executable("glab", fallback_to_dirs=False, use_cache=False)
+    missing = []
+    if not python3:
+        missing.append("python3")
+    if not gh and not glab:
+        missing.append("gh or glab")
     if missing:
         sys.exit("FATAL: cannot resolve " + ", ".join(missing) + " on PATH; "
                  "refusing to install a monitor that can only error every poll")

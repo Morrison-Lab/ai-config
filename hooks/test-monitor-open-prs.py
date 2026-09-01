@@ -8,11 +8,92 @@ subject = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(subject)
 
 assert subject.POLL_SECONDS == 120
-assert subject.STATE_PATH.endswith("all-open-reviews.json")
-assert "all_open_reviews" in subject.poll_once.__code__.co_consts
+# The state file and "kind" keep their pre-GitLab names: a daemon started
+# before GitLab support keeps writing this path, and the installer stops the
+# pid recorded in it, so a rename would leave two daemons and two files.
+assert subject.STATE_PATH.endswith("all-open-prs.json")
+assert "all_open_prs" in subject.poll_once.__code__.co_consts
 assert any(isinstance(c, (str, tuple, list)) and "--author" in c for c in subject.open_prs.__code__.co_consts)
 assert any(isinstance(c, (str, tuple, list)) and "created_by_me" in c for c in subject.open_merge_requests.__code__.co_consts)
 assert "--hostname" in subject.open_merge_requests.__code__.co_consts
+assert "--paginate" in subject.open_merge_requests.__code__.co_consts
+assert "--all" in subject.open_merge_requests.__code__.co_consts
+
+# authenticated_hosts reads real `glab auth status --all` shape: a host line,
+# then indented status lines. A failed instance between two working ones is
+# not credited with a neighbour's login, a host may carry a port, and no
+# login at all is an empty list (which open_merge_requests turns into an
+# error rather than a silent zero).
+GLAB_STATUS = (
+    "gitlab.com\n"
+    "  \u2713 Logged in to gitlab.com as ezra (keyring)\n"
+    "  \u2713 Git operations for gitlab.com configured to use https protocol.\n"
+    "\n"
+    "old.example.org\n"
+    "  x old.example.org: API call failed: 401 Unauthorized\n"
+    "\n"
+    "gitlab.example.com:8443\n"
+    "  \u2713 Logged in to gitlab.example.com:8443 as ezra (token)\n"
+)
+assert subject.authenticated_hosts(GLAB_STATUS) == ["gitlab.com", "gitlab.example.com:8443"]
+assert subject.authenticated_hosts("gitlab.com\n  x gitlab.com: API call failed: 401\n") == []
+assert subject.authenticated_hosts("") == []
+
+# json_documents reads one page or several back to back, which is what
+# `glab api --paginate` writes for a multi-page REST response.
+assert subject.json_documents("[1, 2]") == [[1, 2]]
+assert subject.json_documents("[1, 2]\n[3]\n") == [[1, 2], [3]]
+assert subject.json_documents("") == []
+
+# open_merge_requests end to end against a stub glab: the hosts come from
+# `auth status --all`, every host is queried with --paginate, and the pages
+# are concatenated. The stub records its argv so the flags are asserted
+# rather than assumed.
+import os
+import stat
+import tempfile
+with tempfile.TemporaryDirectory() as d:
+    argv_log = os.path.join(d, "argv.log")
+    status_file = os.path.join(d, "status.txt")
+    with open(status_file, "w", encoding="utf-8") as stream:
+        stream.write(GLAB_STATUS)
+    stub = os.path.join(d, "glab")
+    with open(stub, "w", encoding="utf-8") as stream:
+        stream.write(
+            "#!/usr/bin/env python3\n"
+            "import sys\n"
+            f"open({argv_log!r}, 'a').write(' '.join(sys.argv[1:]) + chr(10))\n"
+            "if sys.argv[1:3] == ['auth', 'status']:\n"
+            f"    sys.stderr.write(open({status_file!r}, encoding='utf-8').read())\n"
+            "    sys.exit(0)\n"
+            "host = sys.argv[sys.argv.index('--hostname') + 1]\n"
+            "if host == 'gitlab.com':\n"
+            "    sys.stdout.write('[{\"iid\": 1}, {\"iid\": 2}]\\n[{\"iid\": 3}]\\n')\n"
+            "else:\n"
+            "    sys.stdout.write('[{\"iid\": 8443}]')\n")
+    os.chmod(stub, os.stat(stub).st_mode | stat.S_IEXEC)
+    saved_glab = subject.GLAB_PATH
+    try:
+        subject.GLAB_PATH = stub if os.name != "nt" else None
+        if subject.GLAB_PATH is not None:
+            assert subject.open_merge_requests() == [
+                {"iid": 1}, {"iid": 2}, {"iid": 3}, {"iid": 8443}]
+            with open(argv_log, encoding="utf-8") as stream:
+                calls = stream.read().splitlines()
+            assert calls[0] == "auth status --all", calls
+            assert calls[1].startswith("api --hostname gitlab.com --paginate "), calls
+            assert calls[2].startswith("api --hostname gitlab.example.com:8443 --paginate "), calls
+            assert len(calls) == 3, calls
+            # No authenticated host is an error, never a silent empty list.
+            with open(status_file, "w", encoding="utf-8") as stream:
+                stream.write("gitlab.com\n  x gitlab.com: API call failed: 401\n")
+            try:
+                subject.open_merge_requests()
+                raise AssertionError("no authenticated hosts should raise")
+            except OSError as error:
+                assert "no authenticated hosts" in str(error)
+    finally:
+        subject.GLAB_PATH = saved_glab
 # The command must run the absolutely-resolved GH_PATH; the literal "gh"
 # reappearing in open_prs would be a revert of the #1953 fix. CPython folds
 # a list display into a tuple inside co_consts, so nested consts are
@@ -75,7 +156,12 @@ with tempfile.TemporaryDirectory() as d:
     def working_gitlab():
         return [{"iid": 8}]
 
+    # poll_once queries only the sources whose CLI resolves, so both paths
+    # are pinned to a placeholder here: the queries themselves are stubbed.
+    saved_paths = (subject.GH_PATH, subject.GLAB_PATH)
     try:
+        subject.GH_PATH = subject.GH_PATH or "gh"
+        subject.GLAB_PATH = subject.GLAB_PATH or "glab"
         subject.STATE_PATH = os.path.join(d, "streak.json")
         subject.open_prs = failing
         subject.open_merge_requests = working_gitlab
@@ -100,9 +186,8 @@ with tempfile.TemporaryDirectory() as d:
         state = subject.poll_once(state)
         assert state["error_streak"] == 2
 
-        # Every source failing keeps "data" present (empty) so a consumer
-        # can tell "polled, nothing answered" from "never polled"; the
-        # error names every failed source.  inject-pr-monitor-status.py's
+        # Every source failing leaves "data" present but empty, with the
+        # error naming every failed source. inject-pr-monitor-status.py's
         # fingerprint covers the error text beside the data, so a changed
         # error text under this constant empty data still surfaces.
         def failing_gitlab():
@@ -124,9 +209,22 @@ with tempfile.TemporaryDirectory() as d:
             "github_prs": [{"number": 7}],
             "gitlab_merge_requests": [{"iid": 8}]
         }
+
+        # A source whose CLI is missing is not checked, and its key stays
+        # absent: an empty list would assert "none open" about a source the
+        # poll never asked. No error either -- the host simply lacks it.
+        saved_gh = subject.GH_PATH
+        try:
+            subject.GH_PATH = None
+            state = subject.poll_once(state)
+            assert state["data"] == {"gitlab_merge_requests": [{"iid": 8}]}
+            assert "error" not in state
+        finally:
+            subject.GH_PATH = saved_gh
     finally:
         subject.open_prs = real_open_prs
         subject.open_merge_requests = real_open_merge_requests
+        subject.GH_PATH, subject.GLAB_PATH = saved_paths
         subject.STATE_PATH = orig_path
 
 # alive() must be truthful on every platform: signal-0 does not track

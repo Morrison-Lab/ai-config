@@ -368,42 +368,48 @@ ul.task-list li input[type="checkbox"] {
 </thead>
 <tbody>
 <tr class="odd">
+<td>A packaged bundle of skills, typed tools, hooks, or subagents in a known marketplace or registry</td>
+<td>Plugin</td>
+<td>Marketplaces / consumer settings (<code>~/.claude/settings.json</code>, <code>.agents/plugins.json</code>, Codex marketplaces)</td>
+<td><code>use-plugins</code> (<code>shared/workflow/use-plugins.md</code>)</td>
+</tr>
+<tr class="even">
 <td>A repeatable, multi-step procedure a user (or the <code>@claude</code> bot) invokes on demand</td>
 <td>Skill</td>
 <td><code>ai-config</code> <code>skills/&lt;name&gt;/</code></td>
 <td><code>skill-builder</code></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>A persistent, read-only fan-out worker persona a heavy skill spawns</td>
 <td>Subagent</td>
 <td><code>ai-config</code> <code>.claude/agents/&lt;name&gt;.md</code></td>
 <td><code>agent-builder</code></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>A standing fact, preference, or behavioral rule Claude should just know</td>
 <td>Memory / <code>CLAUDE.md</code> section</td>
 <td><code>ai-config</code> <code>memories/</code>, <code>CLAUDE.md</code>, or a <code>shared/&lt;category&gt;/&lt;name&gt;.md</code> fragment</td>
 <td><code>memorize</code> (working repo is <code>ai-config</code>) or <code>push-memory</code> (working repo is something else)</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>An automated action the harness itself must trigger on an event Claude doesn’t control the timing of (session start, before/after a tool call, on stop)</td>
 <td>Hook</td>
 <td><code>ai-config</code> <code>.claude/settings.json</code> (project-level; a user-level hook goes in <code>~/.claude/settings.json</code> instead, which is not synced from this repo)</td>
 <td>the harness’s built-in <code>update-config</code> skill (not part of this repo’s <code>skills/</code> tree)</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>Reusable text shared verbatim across multiple skills or docs – not itself a rule</td>
 <td>Shared prompt fragment</td>
 <td><code>ai-config</code> <code>shared/&lt;category&gt;/&lt;name&gt;.md</code>, referenced with <code>@shared/...</code></td>
 <td>no builder skill owns this; follow the existing <code>shared/</code> layout (<code>coding/</code>, <code>vendored/</code>, <code>workflow/</code>, <code>writing/</code>) and wire the <code>@shared/...</code> reference into <code>CLAUDE.md</code> and/or the skill(s) that need it</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>A capability <em>other repos’</em> CI should be able to call – a composite action a workflow step runs, or a <code>workflow_call</code> reusable workflow consumers pin to <code>@v1</code></td>
 <td>GitHub Action</td>
 <td><code>gha</code> repo root composite + <code>.github/workflows/&lt;name&gt;.yml</code> wrapper + <code>examples/&lt;name&gt;.yml</code></td>
 <td>follow <code>gha</code>’s own <code>CLAUDE.md</code> “Layout” section: composite (+ helper script if R/Python) → wrapper → example stub → <code>README.md</code>/<code>website/</code> doc sync (see its “new <code>workflow_call</code> input” doc-sync-site list)</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>A change to how the <code>@claude</code> or <code>@agy</code> bot itself behaves when invoked on a PR/issue – not what it can do for consumers, how <em>it</em> runs</td>
 <td>Bot CI workflow</td>
 <td><code>gha</code> <code>.github/workflows/claude.yml</code>, <code>claude-code-review.yml</code>, <code>antigravity-review.yml</code>, or <code>antigravity-code-review.yml</code></td>
@@ -419,6 +425,7 @@ ul.task-list li input[type="checkbox"] {
 <h2 class="anchored" data-anchor-id="step-2-reuse-check-before-building-anything">Step 2 – Reuse-check before building anything</h2>
 <p>Every mechanism above already has its own extend-first check; run it rather than scaffolding cold:</p>
 <ul>
+<li>Plugin → search known marketplaces (<code>claude plugin marketplace list</code>, <code>codex plugin marketplace list</code>, <code>.cursor-plugin/</code>, <code>claude-plugins-official</code>) per <a href="../../shared/workflow/use-plugins.md"><code>use-plugins</code></a>.</li>
 <li>Skill / subagent → <code>skill-builder</code> step 0 / <code>agent-builder</code> step 0 (search <code>skills/</code>, scan every branch and worktree, check open PRs).</li>
 <li>Memory → grep <code>memories/*.md</code> and <code>CLAUDE.md</code> for the same fact before adding a new bullet.</li>
 <li>Shared fragment → grep <code>shared/**/*.md</code> for the same content before writing a new file.</li>

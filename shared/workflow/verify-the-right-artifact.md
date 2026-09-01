@@ -669,12 +669,23 @@ so its omissions are the reason the tool is useful rather than a defect in it.
 The tell is that the derived view answers the question you asked and cannot answer the question you meant.
 `pandoc -t markdown` on a `.docx` reports the text a reader sees.
 Asked whether a link is present, it can report nothing about a URL stored as a Word HYPERLINK field code,
-and **where that field sits decides whether it does**.
-Measured on pandoc 3.1.3: a contiguous `fldChar` HYPERLINK field in ordinary body text
-converts to a markdown link with its URL intact,
-while the identical field nested inside a `<w:ins>` tracked insertion loses the URL
-under `--track-changes=accept`.
-The negative control is what identifies the mechanism.
+and **more than one thing decides whether it does**.
+All three arms below were measured on pandoc 3.1.3 under `--track-changes=accept`.
+A `fldChar` HYPERLINK field in ordinary body text whose `instrText` sits in a single run
+converts to a markdown link with its URL intact.
+Splitting that same `instrText` across two runs, at the space before the quoted URL,
+still emits a link and empties its target: `[anchor]()`.
+The identical single-run field nested inside a `<w:ins>` tracked insertion drops the link entirely,
+leaving bare text.
+So `<w:ins>` is **sufficient** to lose the URL without being the determinant,
+since the split-run arm loses it with no `<w:ins>` anywhere in the document.
+The split-run arm is not a corner case either:
+Word and Zotero routinely split `instrText` across runs,
+which is the premise of [`memories/office-open-xml.md`](../../memories/office-open-xml.md)'s sibling entry
+and the reason its `merge_runs.py` exists at all.
+Say "single-run" rather than "contiguous", which this entry reached for first and which decides nothing:
+a field split across *paragraphs*, its `instrText` still in one run, converts with the URL intact.
+The negative control is what identifies each mechanism.
 Without it the omission reads as "pandoc does not carry field-code links at all",
 which is false and was written down that way once before the control was run.
 A listing of `word/_rels/document.xml.rels` is no better:
@@ -689,6 +700,8 @@ The converted view is evidence about what a reader sees, which is a different cl
 - **Do:** grep the stored form (`word/document.xml`, the raw file) when the claim is that something is absent.
 - **Do:** run a negative control on the conversion before naming a mechanism for what it dropped;
   an omission with no control behind it is a guess wearing a measurement.
+- **Don't:** promote one mechanism to *the* determinant once a control has shown it sufficient;
+  sufficient and necessary are different findings, and only a further arm separates them.
 - **Don't:** read two derived views agreeing as corroboration when both drop the same class of content;
   that is [`grep-is-not-coverage`](grep-is-not-coverage.md)'s guaranteed-either-way null in a new surface.
 - **Don't:** treat "lossy" as "stale" --- refetching a conversion returns the same omissions.
@@ -697,8 +710,16 @@ The converted view is evidence about what a reader sees, which is a different cl
 A manuscript's Shiny-app link was absent from the rels listing and absent from pandoc's markdown output,
 and the conclusion that it had been deleted was written into a draft review finding.
 It was present as a `fldChar` HYPERLINK field code, found by grepping `word/document.xml` for the URL.
+In that manuscript the field carries exactly one `instrText` element and *is* wrapped in `<w:ins>`,
+so the tracked insertion really is the operative cause there;
+the split-run mechanism generalizes the entry rather than retracting its case.
 The manuscript is private, but the pandoc behaviour needs no manuscript:
-build a minimal `.docx` carrying the same HYPERLINK field twice,
-once in plain body text and once wrapped in `<w:ins>`, and convert it.
+build a minimal `.docx` carrying the same HYPERLINK field three times ---
+once in plain body text with its `instrText` in a single run,
+once in plain body text with that `instrText` split across two runs at the space before the quoted URL,
+and once single-run but wrapped in `<w:ins>` --- then convert with `--track-changes=accept`.
+The three arms emit the URL, an empty target, and bare text respectively.
+Read a `w:ins` grep over `word/document.xml` carefully when building the split arm:
+`w:instrText` contains the substring `w:ins`, so a plain `grep -c` reports a match in a document that has none.
 [`memories/office-open-xml.md`](../../memories/office-open-xml.md) carries the docx-specific mechanics,
 including the two-pandoc-diff verification for a redlined document.)

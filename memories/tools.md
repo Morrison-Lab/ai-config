@@ -200,9 +200,10 @@ this entry is the transferable authoring lesson, not the checker patch.)
 
 ## Office Open XML (`.docx` / `.xlsx`)
 
-Editing committed `.docx`/`.xlsx` content, redlining a document with tracked changes and
-comments, and the `docx` skill's helper scripts now live in
-[`office-open-xml.md`](office-open-xml.md).
+Editing committed `.docx`/`.xlsx` content,
+redlining a document with tracked changes and comments,
+and the `docx` skill's helper scripts
+now live in [`office-open-xml.md`](office-open-xml.md).
 
 ## Evergreen-conditional citation phrasing can still regress in adjacent prose
 

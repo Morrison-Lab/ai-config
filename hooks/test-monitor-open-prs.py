@@ -71,8 +71,9 @@ with tempfile.TemporaryDirectory() as d:
             "import sys\n"
             f"open({argv_log!r}, 'a').write(' '.join(sys.argv[1:]) + chr(10))\n"
             "if sys.argv[1:3] == ['auth', 'status']:\n"
-            f"    sys.stderr.write(open({status_file!r}, encoding='utf-8').read())\n"
-            "    sys.exit(0)\n"
+            f"    text = open({status_file!r}, encoding='utf-8').read()\n"
+            "    sys.stderr.write(text)\n"
+            "    sys.exit(1 if text.startswith('Error:') else 0)\n"
             "host = sys.argv[sys.argv.index('--hostname') + 1]\n"
             "if ':' in host:\n"
             "    sys.stderr.write('invalid hostname' + chr(10))\n"
@@ -121,10 +122,21 @@ with tempfile.TemporaryDirectory() as d:
                 subject.glab_hosts()
                 raise AssertionError("no authenticated hosts should raise")
             except OSError as error:
-                assert "no authenticated hosts" in str(error)
+                assert "listed no authenticated host (exit 0)" in str(error), error
+                assert "API call failed: 401" in str(error), error
             state = subject.poll_once({})
             assert state["data"] == {}
-            assert json.loads(state["error"]) == {"gitlab_merge_requests": "glab has no authenticated hosts"}
+            assert list(json.loads(state["error"])) == ["gitlab_merge_requests"]
+            # An invocation glab REFUSES (a glab older than v1.79.0 has no
+            # `--all`) is not an authentication state: the error carries
+            # glab's exit status and its own message.
+            with open(status_file, "w", encoding="utf-8") as stream:
+                stream.write("Error: unknown flag: --all\n")
+            try:
+                subject.glab_hosts()
+                raise AssertionError("a refused status call should raise")
+            except OSError as error:
+                assert "(exit 1)" in str(error) and "unknown flag: --all" in str(error), error
         else:
             print("SKIP: stub-glab end-to-end block (needs a POSIX executable stub)")
     finally:
@@ -253,7 +265,7 @@ with tempfile.TemporaryDirectory() as d:
         # fingerprint covers the error text beside the data, so a changed
         # error text under this constant empty data still surfaces.
         def no_hosts():
-            raise OSError("glab has no authenticated hosts")
+            raise OSError("glab auth status --all listed no authenticated host (exit 0): ")
 
         subject.glab_hosts = no_hosts
         state = subject.poll_once(state)

@@ -146,18 +146,23 @@ def json_documents(text):
 def glab_hosts():
     """(hosts, cut_short): hosts glab is logged in to, and None or text saying the list was cut short.
 
-    An error when no host is logged in at all. `--all` covers every
+    An error when the status lists no logged-in host, carrying glab's exit
+    status and its own message, since the two causes differ: no login at
+    all, or an invocation glab refused (a glab older than v1.79.0 has no
+    `--all`, an unreadable config). `--all` covers every
     authenticated instance. Without it glab checks only the instance implied
     by the cwd's git remote or GITLAB_HOST when that is not gitlab.com -- and
     this daemon inherits the cwd of whichever session spawned it, so the
     polled host set would depend on where the session happened to start.
     """
     cut_short = None
+    exit_status = None
     try:
         result = subprocess.run(
             [GLAB_PATH, "auth", "status", "--all"],
             capture_output=True, text=True, timeout=POLL_SECONDS)
         output = (result.stdout or "") + (result.stderr or "")
+        exit_status = result.returncode
     except subprocess.TimeoutExpired as error:
         # glab gives each instance its own 30 s, so one unreachable instance
         # can exhaust the budget after the reachable ones already answered.
@@ -171,7 +176,9 @@ def glab_hosts():
         cut_short = f"{error}; hosts listed before the timeout were polled"
     hosts = authenticated_hosts(output)
     if not hosts:
-        raise OSError("glab has no authenticated hosts")
+        raise OSError(
+            f"glab auth status --all listed no authenticated host "
+            f"(exit {exit_status}): {output.strip()[-300:]}")
     return hosts, cut_short
 
 

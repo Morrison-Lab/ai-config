@@ -87,7 +87,7 @@ committed pass.
    - Codebase conventions discovered
 
    *(When delegating UMS to a subagent, prefer **conversation-inheriting dispatch**
-   (Agent `subagent_type: "fork"`, `/subtask`, or Antigravity `self`)
+   (Agent `subagent_type: "fork"` or `/subtask` in Claude Code, or providing the transcript log path in clean-slate harnesses)
    so the subagent surveys conversation history directly without manual serialization;
    see [`use-subagents`](../../shared/workflow/use-subagents.md).)*
 

@@ -567,7 +567,7 @@ check("glab issue list: repeated --search, LAST one clean, discharges",
           'glab issue list --all --search "is:open cp1252" '
           '--search "cp1252"'), True)
 
-# ---------------- embedded long-form --search substring, ai-config#2427
+# ---------------- embedded long-form --search/--state/--all substring, ai-config#2427, #2481
 
 check("gh issue list: embedded --search substring does not discharge",
       hook.command_has_issue_dupe_check(
@@ -582,6 +582,26 @@ check("gh issue list: embedded substring does not consume genuine --search",
 check("gh issue list: plain long-form --search still discharges",
       hook.command_has_issue_dupe_check(
           'gh issue list --state all --search "foo"'), True)
+
+check("gh issue list: embedded --state all substring does not discharge",
+      hook.command_has_issue_dupe_check(
+          'gh issue list --label needs--state all --search "foo"'), False)
+check("gh issue list: embedded --state open substring does not override --state all",
+      hook.command_has_issue_dupe_check(
+          'gh issue list --state all --label needs--state open --search "foo"'), True)
+check("gh issue list: embedded substring does not consume genuine --state all",
+      hook.command_has_issue_dupe_check(
+          'gh issue list --label needs--state stuff --state all --search "foo"'), True)
+check("gh search issues: embedded --state open substring does not disqualify",
+      hook.command_has_issue_dupe_check(
+          'gh search issues --label needs--state=open "foo"'), True)
+
+check("glab issue list: embedded --all substring does not discharge",
+      hook.command_has_issue_dupe_check(
+          'glab issue list --label needs--all foo --search "foo"'), False)
+check("glab issue list: embedded substring does not consume genuine --all",
+      hook.command_has_issue_dupe_check(
+          'glab issue list --label needs--all foo --all --search "foo"'), True)
 
 check("mcp search_issues query carrying is:open does not discharge",
       hook._mcp_is_issue_search("mcp__github__search_issues",

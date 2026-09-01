@@ -269,19 +269,47 @@ def head_branch_of(repo, target):
     return branch or None
 
 
-def main():
+def _read_payload() -> tuple[dict, bool]:
+    """Parse payload from sys.argv (--dry-run / --simulate) or sys.stdin."""
+    args = sys.argv[1:]
+    is_dry_run = "--dry-run" in args or "--simulate" in args
+    if is_dry_run:
+        positional = [a for a in args if not a.startswith("-")]
+        if positional:
+            raw_cmd = positional[0].strip()
+            if raw_cmd.startswith("{") and raw_cmd.endswith("}"):
+                try:
+                    return json.loads(raw_cmd), True
+                except Exception:
+                    pass
+            return {"tool_name": "Bash", "tool_input": {"command": raw_cmd}}, True
+
     try:
         payload = json.load(sys.stdin)
-    except Exception:
+        return (payload if isinstance(payload, dict) else {}), is_dry_run
+    except Exception as exc:
+        print(f"no-delete-branch-under-stacked-pr: unreadable hook input ({exc})",
+
+              file=sys.stderr)
+        return {}, is_dry_run
+
+
+def main():
+    payload, is_dry_run = _read_payload()
+    if not payload:
         return 0
 
     if payload.get("tool_name") not in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
+        if is_dry_run:
+            print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
         return 0
     inp = payload.get("tool_input") or {}
     command = inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or inp.get("script") or ""
 
     argvs = _simple_commands(command)
     if not argvs:
+        if is_dry_run:
+            print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
         return 0
 
     # Only the `gh pr merge` segments matter. A `git branch -d` elsewhere in
@@ -296,9 +324,11 @@ def main():
             target, repo, verb = t, r, merge_argv[2]
             break
     if not target or not repo:
+        if is_dry_run:
+            print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
         return 0
 
-    if not shutil.which("gh"):
+    if not shutil.which("gh") and not is_dry_run:
         return 0
 
     branch = head_branch_of(repo, target)

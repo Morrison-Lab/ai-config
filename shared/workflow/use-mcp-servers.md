@@ -28,6 +28,26 @@ permission-gated, logged, and retried.
 Keep using the CLI where no equivalent exists --- the point is to stop
 *defaulting* to the shell, not to avoid it.
 
+When MCP tools are declared available in tool configuration or registered in
+the session, invoke them directly rather than probing for CLI presence
+(`which gh glab`, `type gh`, `command -v gh`) first.
+Because the typed tool is preferred regardless of whether the CLI is on
+`PATH`, probing the CLI first tests a fact with no bearing on the next action
+and inverts the policy default into "check CLI, fall back to MCP".
+
+The discriminator is **decision-relevance**, not a license to assume environment
+state without testing:
+probe an environment claim when the outcome changes what you do next
+(such as testing remote push permissions where rejection caps a batch),
+but skip probes when the MCP tool is selected either way.
+
+- **Do:** invoke declared MCP tools directly without probing whether the CLI
+  counterpart is installed.
+- **Do:** probe environment claims when the answer changes the subsequent
+  action or strategy.
+- **Don't:** run exploratory CLI presence checks (`which gh glab`) before using
+  an available MCP tool --- the outcome cannot change the tool selection.
+
 ## Before installing, read what is already registered
 
 ```sh

@@ -283,7 +283,8 @@ The near-miss is inferring the current time from how much work has happened sinc
 That inference feels safe because the earlier reading really was measured, but the clock keeps moving while a tool-call count does not track it, so the two drift apart the same way an unrefreshed chat timestamp does, and the drift compounds across several comments posted in sequence from the same stale reading.
 (Measured 2026-09-01: one real reading at 12:02 PDT was followed by claim comments on wai#81, wai#96, and wai#95 stamped "12:15 PT", "12:40 PT", and "12:58 PT" and by notebook headings "12:25", "12:55", "13:20", all extrapolated from elapsed tool calls.
 The next real reading, taken when a PR head commit's timestamp was needed, came back 12:21 PDT --- up to an hour behind the invented stamps.
-The brief that dispatched this entry itself asserted that `claim-pr` inserts the timestamp, which the skill's templates do not do; the review caught it, and it is the same class of unmeasured claim.)
+The brief that dispatched this entry itself asserted that `claim-pr` inserts the timestamp, which the skill's templates do not do.
+The review caught it, and it is the same class of unmeasured claim.)
 
 - **Do:** run the clock command again immediately before typing a time into a forge comment, exactly as before a chat recap or a file edit.
 - **Don't:** infer a clock time from the number of tool calls or actions taken since the last real reading.

@@ -818,10 +818,10 @@ A clean automated review from every available provider evaluating the current HE
 - **Canonical Rule**: [`adversarial-self-review.md`](../shared/workflow/adversarial-self-review.md) (the override's sanctioned scope),
   [`no-push-without-self-review.py`](../hooks/no-push-without-self-review.py) (the fallback contract),
   and [`keep-checkouts-fresh.md`](../shared/workflow/keep-checkouts-fresh.md) (the plugin hook path is the cache snapshot, not the marketplace clone).
-- **Fix**: Check first whether the running hook copy is stale against ai-config `main` --- diff the CACHE copy, since that is what runs, not the marketplace clone.
-  A session restart is the durable remedy:
-  the cache re-snapshots only at plugin update or session start,
-  so a fresh session both loads the post-#2820 hook and registers a repo-level `.claude/agents/adversarial-reviewer.md` if one is present.
+- **Fix**: Check first whether the running hook copy is stale against ai-config `main` --- diff the copy that `~/.claude/plugins/installed_plugins.json` pins (its per-scope `version` / `installPath`), since that is what runs: not the marketplace clone, and not merely the newest directory under the cache.
+  A session restart alone does NOT advance that pin (measured 2026-09-01: a continuation session started 35 minutes after the marketplace pull still ran rev `a3e0fdb`, and after a later app update the cache held a `79def2e` snapshot containing the fix while every scope stayed pinned to `a3e0fdb`).
+  What a restart does refresh is the auto-mode classifier's per-conversation state (the override the prior session's classifier had denied three times was accepted in the fresh one) and the Agent registry (a repo-level `.claude/agents/adversarial-reviewer.md` present at session start registers the reviewer, which satisfies even the stale hook's literal check).
+  The hook copy itself moves only when the plugin is updated so that the pin advances; verify the pinned copy rather than the clone.
   On a post-#2820 hook (verified against `main`, 2026-09-01), the fallback contract is:
   a dispatch whose `subagent_type` matches the general-purpose family (`general-purpose`, `general`, `reviewer`, `code-reviewer`, `research`, `self`)
   and whose prompt contains a review-request phrase matching the prompt gate (e.g. "adversarial pre-push review"),

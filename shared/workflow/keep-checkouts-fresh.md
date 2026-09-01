@@ -59,8 +59,9 @@ In every session --- at session start, and again periodically during long sessio
    `${CLAUDE_PLUGIN_ROOT}` resolves to `~/.claude/plugins/cache/<marketplace>/<plugin>/<rev>/`;
    a `git pull` in `~/.claude/plugins/marketplaces/<marketplace>` updates the clone and changes nothing the harness executes,
    and overwriting the cache copy directly is denied by the auto-mode permission classifier (reasonably --- an agent rewriting its own active guard).
-   A merged hook fix reaches a plugin-consumer session only when the cache re-snapshots, at plugin update or session start ---
-   so a session restart is the remedy, and reporting "pulled the fix" without one reports a hook as updated that is still running stale.
+   A merged hook fix reaches a plugin-consumer session only when the plugin pin in `~/.claude/plugins/installed_plugins.json` advances to a snapshot that contains it ---
+   a session restart alone does not advance it (measured 2026-09-01: a fresh session still ran `a3e0fdb` with a `79def2e` snapshot sitting unpinned beside it),
+   so reporting "pulled the fix" or "restarted" reports a hook as updated that is still running stale; update the plugin so the pin moves, then verify the pinned copy.
    (Measured 2026-09-01: the cache hook at rev `a3e0fdb` predated ai-config#2820's fallback while the marketplace clone had pulled past it;
    tracked as [ai-config#2899](https://github.com/Morrison-Lab/ai-config/issues/2899);
    see [`mistake-patterns.md`](../../memories/mistake-patterns.md) Pattern 42 for the full deadlock.)

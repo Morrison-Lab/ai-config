@@ -371,3 +371,33 @@ skill's step 2 ("Prepare the prompt").
   deterministic way to check the result ---
   this success was confirmed by four independent test suites,
   not by inspecting the diff.
+
+## Conversation-inheriting subagent dispatch vs. clean-context dispatch for UMS and CAI
+
+When delegating UMS (`update-memories-and-skills`) or CAI (`config-ai`) as subagents,
+harnesses support either **conversation-inheriting dispatch** (inheriting the full conversation transcript and tool history)
+or **clean-context dispatch** (starting a fresh conversation with a standalone prompt brief).
+The canonical trade-off analysis, context-budget rationale, and Do/Don't directives live in [`use-subagents`](../shared/workflow/use-subagents.md).
+
+### Concrete invocation mechanics across harnesses
+
+- **Claude Code programmatic subagents:**
+  Pass `subagent_type: "fork"` to the `Agent` tool to clone the current session's conversation history into the worker.
+  Do not confuse this with skill frontmatter `context: fork` (which runs a skill in isolated context *without* conversation history, as in `skill-audit` and `find-overlap`).
+- **Claude Code interactive sessions:**
+  Use `/subtask` to fork the active conversation interactively into a subagent with full history.
+- **Antigravity:**
+  Pass `TypeName: "self"` to `invoke_subagent` to inherit the parent agent's tools, system prompt, and model configuration (with `Workspace: "inherit"` to share the underlying working directory).
+  Subagents start with a clean conversation context;
+  supply conversation history by passing the path to `transcript.jsonl` under `<appDataDir>/brain/<conversation-id>/.system_generated/logs/` in the prompt.
+- **Gemini CLI, OpenAI Codex, and headless CLIs without runtime forking:**
+  Subagents start with a clean context window by default (e.g. `@subagent_name` in Gemini CLI);
+  provide the path to the on-disk conversation log or a focused milestone summary in the prompt brief.
+
+- **Do:** use conversation-inheriting dispatch (`subagent_type: "fork"` in Claude Code) or pass the transcript log path (`transcript.jsonl`) for reflective UMS sweeps and emergent CAI workflows per [`use-subagents`](../shared/workflow/use-subagents.md).
+- **Do:** clearly distinguish the `Agent` tool's conversation-inheriting `subagent_type: "fork"` from skill frontmatter `context: fork` (which isolates and omits conversation history).
+- **Don't:** duplicate the full trade-off rationale across multiple files ---
+  keep the normative guidance in [`use-subagents`](../shared/workflow/use-subagents.md).
+
+
+

@@ -160,12 +160,6 @@ class TestMatcherAndToolHelpers(unittest.TestCase):
         self.assertTrue(adapter.matches_tool("mcp__github__.*", "mcp__github__create_issue"))
         self.assertFalse(adapter.matches_tool("mcp__github__.*", "Bash"))
 
-    def test_clean_path(self):
-        self.assertEqual(adapter._clean_path("  /tmp/foo  "), "/tmp/foo")
-        self.assertEqual(adapter._clean_path("file:///tmp/foo%20bar"), "/tmp/foo bar")
-        self.assertIsNone(adapter._clean_path(""))
-        self.assertIsNone(adapter._clean_path(123))
-
     def test_is_likely_file_path(self):
         self.assertEqual(adapter.is_likely_file_path("path/to/file.py"), "path/to/file.py")
         self.assertEqual(adapter.is_likely_file_path("SKILL.md"), "SKILL.md")

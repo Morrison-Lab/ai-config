@@ -87,16 +87,6 @@ def is_likely_file_path(line: str) -> str | None:
     return None
 
 
-def _clean_path(raw: Any) -> str | None:
-    """Normalize a path string, decoding file:// URIs and stripping whitespace."""
-    if not isinstance(raw, str) or not raw.strip():
-        return None
-    p = raw.strip()
-    if p.startswith("file://"):
-        p = urllib.parse.unquote(p[7:]).strip()
-    return p if p else None
-
-
 def find_repo_root(start_file: str | Path | None = None) -> Path:
     """Derive the repository root directory containing `hooks/hooks.json`."""
     target_file = Path(start_file or __file__).resolve()

@@ -452,7 +452,7 @@ A clean automated review from every available provider evaluating the current HE
 - **Mistake**: Dispatching the final adversarial-reviewer round with `run_in_background: true` (or resuming a completed reviewer via `SendMessage`) and then pushing on the strength of its clean report, when older revisions of `hooks/no-push-without-self-review.py` only scanned the foreground tool results and missed background task notifications / TaskOutput.
 - **Example**: 2026-08-27, ai-config#2483: a fresh "Ready for merge / Reviewed-Commit: 6d1e7ace..." report arrived via a task notification, and the very next push of that exact commit was refused with "The clean verdict is for commit 0825a859..." --- a stale earlier verdict --- forcing an `ALLOW_UNREVIEWED_PUSH` override for a genuinely reviewed head.
 - **Canonical Rule**: [`adversarial-self-review.md`](../shared/workflow/adversarial-self-review.md) (dispatch to a separate subagent) plus [`no-push-without-self-review.py`](../hooks/no-push-without-self-review.py)'s transcript and fallback scan.
-- **Fix**: The guard now credits valid reviews from foreground dispatches, `TaskOutput` results, background task notifications, `pre-push-review.py` CLI runs, and `.git/adversarial-review-report.txt` on-disk reports (ai-config#2544).
+- **Fix**: The guard now credits valid reviews from foreground dispatches, fallback subagent dispatches (matching `FALLBACK_AGENT_NAME`), tracked `TaskOutput` results, and background task notifications (ai-config#2544).
   Dispatching in the foreground (`run_in_background: false`) remains the primary recommendation.
 
 ## Pattern 23: Implementing From a Truncated Issue-Body Read

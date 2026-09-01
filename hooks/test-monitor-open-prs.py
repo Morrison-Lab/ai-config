@@ -86,13 +86,14 @@ with tempfile.TemporaryDirectory() as d:
         subject.GLAB_PATH = stub if os.name != "nt" else None
         subject.STATE_PATH = os.path.join(d, "state.json")
         if subject.GLAB_PATH is not None:
-            assert subject.glab_hosts() == ["gitlab.com", "gitlab.example.com:8443"]
+            assert subject.glab_hosts() == (["gitlab.com", "gitlab.example.com:8443"], None)
             assert subject.host_merge_requests("gitlab.com") == [{"iid": 1}, {"iid": 2}, {"iid": 3}]
             state = subject.poll_once({})
             assert state["data"] == {"gitlab_merge_requests/gitlab.com": [{"iid": 1}, {"iid": 2}, {"iid": 3}]}, state
             errors = json.loads(state["error"])
             assert list(errors) == ["gitlab_merge_requests/gitlab.example.com:8443"], errors
-            assert "returned non-zero exit status 1" in errors["gitlab_merge_requests/gitlab.example.com:8443"]
+            refused = errors["gitlab_merge_requests/gitlab.example.com:8443"]
+            assert "returned non-zero exit status 1" in refused and "invalid hostname" in refused, refused
             with open(argv_log, encoding="utf-8") as stream:
                 calls = stream.read().splitlines()
             assert calls[0] == "auth status --all", calls
@@ -120,21 +121,31 @@ with tempfile.TemporaryDirectory() as d:
             state = subject.poll_once({})
             assert state["data"] == {}
             assert json.loads(state["error"]) == {"gitlab_merge_requests": "glab has no authenticated hosts"}
+        else:
+            print("SKIP: stub-glab end-to-end block (needs a POSIX executable stub)")
     finally:
         subject.GH_PATH, subject.GLAB_PATH, subject.STATE_PATH = saved
 
 # glab_hosts keeps the hosts that answered when `auth status --all` times
-# out on a later instance: the partial output is parsed, not discarded.
+# out on a later instance: the partial output is parsed, not discarded, and
+# the cut is reported so poll_once records it. The fixture carries BYTES,
+# which is what subprocess.run attaches to TimeoutExpired under text=True
+# (measured on CPython 3.11) -- a str fixture would leave a real timeout's
+# TypeError unseen.
 real_run = subject.subprocess.run
+saved_glab = subject.GLAB_PATH
 try:
     def timing_out(*args, **kwargs):
-        raise subject.subprocess.TimeoutExpired(args[0], kwargs.get("timeout"), output="", stderr=GLAB_STATUS)
+        raise subject.subprocess.TimeoutExpired(
+            args[0], kwargs.get("timeout"), output=b"", stderr=GLAB_STATUS.encode())
     subject.subprocess.run = timing_out
-    saved_glab = subject.GLAB_PATH
     subject.GLAB_PATH = subject.GLAB_PATH or "glab"
-    assert subject.glab_hosts() == ["gitlab.com", "gitlab.example.com:8443"]
+    hosts, cut_short = subject.glab_hosts()
+    assert hosts == ["gitlab.com", "gitlab.example.com:8443"]
+    assert "timed out" in cut_short and "polled" in cut_short, cut_short
+
     def timing_out_empty(*args, **kwargs):
-        raise subject.subprocess.TimeoutExpired(args[0], kwargs.get("timeout"), output="", stderr="")
+        raise subject.subprocess.TimeoutExpired(args[0], kwargs.get("timeout"), output=b"", stderr=b"")
     subject.subprocess.run = timing_out_empty
     try:
         subject.glab_hosts()
@@ -197,7 +208,7 @@ with tempfile.TemporaryDirectory() as d:
         return [{"number": 7}]
 
     def one_host():
-        return ["gitlab.com"]
+        return ["gitlab.com"], None
 
     def working_gitlab(host):
         return [{"iid": 8}]
@@ -249,7 +260,7 @@ with tempfile.TemporaryDirectory() as d:
         # One GitLab host failing costs only its own entry: the other
         # host's merge requests are kept and the error names the host.
         def two_hosts():
-            return ["gitlab.com", "down.example.org"]
+            return ["gitlab.com", "down.example.org"], None
 
         def one_down(host):
             if host == "down.example.org":
@@ -265,6 +276,18 @@ with tempfile.TemporaryDirectory() as d:
             "gitlab_merge_requests/gitlab.com": [{"iid": 8}]
         }, state
         assert json.loads(state["error"]) == {"gitlab_merge_requests/down.example.org": "connection refused"}
+
+        # A host list cut short by the auth-status timeout is an error
+        # beside the hosts that did answer, never a clean poll.
+        def cut_short():
+            return ["gitlab.com"], "Command timed out after 120 seconds; hosts listed before the timeout were polled"
+
+        subject.glab_hosts = cut_short
+        subject.host_merge_requests = working_gitlab
+        state = subject.poll_once(state)
+        assert state["data"]["gitlab_merge_requests/gitlab.com"] == [{"iid": 8}]
+        assert json.loads(state["error"]) == {
+            "gitlab_merge_requests": "Command timed out after 120 seconds; hosts listed before the timeout were polled"}
 
         subject.glab_hosts = one_host
         subject.host_merge_requests = working_gitlab

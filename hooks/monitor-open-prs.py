@@ -111,8 +111,9 @@ def open_prs():
 # neighbour's login. A host may carry a port: `glab auth login` accepts one,
 # so it can appear here, while `glab api --hostname` refuses any host with a
 # ':' (gitlab-org/cli internal/glinstance/host.go, HostnameValidator). It is
-# matched anyway, so that refusal lands in state["error"] under the host's
-# own key rather than the host silently going unpolled.
+# matched anyway, so that refusal -- exit status plus glab's own
+# `invalid hostname` -- lands in state["error"] under the host's key rather
+# than the host silently going unpolled.
 GLAB_LOGGED_IN_RE = re.compile(
     r"^([A-Za-z0-9.-]+(?::[0-9]+)?)\n\s+.*Logged in to \1 as ",
     re.MULTILINE)
@@ -143,14 +144,15 @@ def json_documents(text):
 
 
 def glab_hosts():
-    """Every GitLab host glab is logged in to; an error when there is none.
+    """(hosts glab is logged in to, or None-or-text saying the list was cut short).
 
-    `--all` covers every authenticated instance. Without it glab checks only
-    the instance implied by the cwd's git remote or GITLAB_HOST when that is
-    not gitlab.com -- and this daemon inherits the cwd of whichever session
-    spawned it, so the polled host set would depend on where the session
-    happened to start.
+    An error when no host is logged in at all. `--all` covers every
+    authenticated instance. Without it glab checks only the instance implied
+    by the cwd's git remote or GITLAB_HOST when that is not gitlab.com -- and
+    this daemon inherits the cwd of whichever session spawned it, so the
+    polled host set would depend on where the session happened to start.
     """
+    cut_short = None
     try:
         result = subprocess.run(
             [GLAB_PATH, "auth", "status", "--all"],
@@ -158,19 +160,25 @@ def glab_hosts():
         output = (result.stdout or "") + (result.stderr or "")
     except subprocess.TimeoutExpired as error:
         # glab gives each instance its own 30 s, so one unreachable instance
-        # can exhaust the budget after the reachable ones already answered;
-        # the partial output names those, and they are polled rather than
-        # lost with the timeout.
+        # can exhaust the budget after the reachable ones already answered.
+        # The partial output names those, and they are polled rather than
+        # lost with the timeout -- but the cut is reported back, since a
+        # slow logged-in instance absent from that output is otherwise
+        # indistinguishable from one never logged in to.
         output = _captured_text(error.stdout) + _captured_text(error.stderr)
         if not authenticated_hosts(output):
             raise
+        cut_short = f"{error}; hosts listed before the timeout were polled"
     hosts = authenticated_hosts(output)
     if not hosts:
         raise OSError("glab has no authenticated hosts")
-    return hosts
+    return hosts, cut_short
 
 
 def _captured_text(captured):
+    # subprocess.run attaches BYTES to TimeoutExpired even under text=True
+    # (measured on CPython 3.11), so the decode is what keeps a real timeout
+    # from raising TypeError out of the poll and killing the daemon.
     if captured is None:
         return ""
     return captured.decode(errors="replace") if isinstance(captured, bytes) else captured
@@ -214,6 +222,11 @@ def poll_once(state):
     def run(name, query):
         try:
             data[name] = query()
+        except subprocess.CalledProcessError as error:
+            # The exit status alone names no cause; the CLI's stderr does
+            # (`invalid hostname`, an auth failure), so it rides along.
+            stderr = (error.stderr or "").strip()
+            errors[name] = f"{error}: {stderr}" if stderr else str(error)
         except caught as error:
             errors[name] = str(error)
 
@@ -225,10 +238,12 @@ def poll_once(state):
         run("github_prs", open_prs)
     if GLAB_PATH is not None:
         try:
-            hosts = glab_hosts()
+            hosts, cut_short = glab_hosts()
         except caught as error:
             errors["gitlab_merge_requests"] = str(error)
         else:
+            if cut_short:
+                errors["gitlab_merge_requests"] = cut_short
             for host in hosts:
                 run(f"gitlab_merge_requests/{host}",
                     functools.partial(host_merge_requests, host))

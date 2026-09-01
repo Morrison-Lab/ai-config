@@ -228,7 +228,7 @@ def subagent_transcript(text=None, agent_name="adversarial-reviewer",
             ]}
         })
 
-    if text is not None or text != "":
+    if text is None or text != "":
         verdict_text = text if text is not None else body()
         if send_msg:
             events.append({

@@ -316,6 +316,20 @@ def mask_comments_and_arithmetic(command: str) -> str:
                 for sc in span:
                     out.append("\n" if sc == "\n" else " ")
                 continue
+            if c == "$" and command.startswith("$[", i):
+                start = i
+                i += 2
+                depth = 1
+                while i < n and depth > 0:
+                    if command[i] == "[":
+                        depth += 1
+                    elif command[i] == "]":
+                        depth -= 1
+                    i += 1
+                span = command[start:i]
+                for sc in span:
+                    out.append("\n" if sc == "\n" else " ")
+                continue
             if c == "$" and i + 1 < n and command[i + 1] == "(":
                 stack.append("COMMAND_SUBST")
                 out.append("$(")
@@ -369,6 +383,35 @@ def mask_comments_and_arithmetic(command: str) -> str:
             for sc in span:
                 out.append("\n" if sc == "\n" else " ")
             continue
+
+        if command.startswith("$[", i):
+            start = i
+            i += 2
+            depth = 1
+            while i < n and depth > 0:
+                if command[i] == "[":
+                    depth += 1
+                elif command[i] == "]":
+                    depth -= 1
+                i += 1
+            span = command[start:i]
+            for sc in span:
+                out.append("\n" if sc == "\n" else " ")
+            continue
+
+        # Check for let / declare -i / local -i / typeset -i at command position
+        is_cmd_pos = (i == 0 or command[i - 1] in " \t\r\n;|&(`")
+        if is_cmd_pos:
+            m = re.match(r"^(?:let|declare\s+-[a-zA-Z]*i[a-zA-Z]*|local\s+-[a-zA-Z]*i[a-zA-Z]*|typeset\s+-[a-zA-Z]*i[a-zA-Z]*)\b", command[i:])
+            if m:
+                start = i
+                # Mask through end of statement (;, \n, &&, ||, |, ), `, or EOF)
+                while i < n and command[i] not in ";\n|&)`":
+                    i += 1
+                span = command[start:i]
+                for sc in span:
+                    out.append("\n" if sc == "\n" else " ")
+                continue
 
         if c == "'":
             stack.append("SINGLE_QUOTE")

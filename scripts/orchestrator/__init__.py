@@ -4,7 +4,7 @@ Backed by an external SQLite state database, dynamic task queue with DAG support
 and specialized sub-agents.
 """
 
-from .engine import OrchestratorEngine
+from .engine import OrchestratorEngine, ensure_git_identity
 from .models import (
     SubagentResult,
     Task,
@@ -40,4 +40,5 @@ __all__ = [
     "TaskQueue",
     "TaskStatus",
     "TesterSubagent",
+    "ensure_git_identity",
 ]

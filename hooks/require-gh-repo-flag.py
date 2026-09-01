@@ -35,7 +35,10 @@ import sys
 # That direction is a false NEGATIVE -- the guard would wave the command
 # through -- which is worse here than the false positive the anchor was added
 # to fix.
-LEAD = r"""^\s*(?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S*)\s+)*gh\s+"""
+# Keywords and wrappers whose operand is itself a command word at command position.
+KEYWORD_PREFIX = r"""(?:(?:!|\{|time|nohup|sudo|then|else|do|if|elif|while|until)\s+)*"""
+ENV_WRAP = r"""(?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S*)\s+)*"""
+LEAD = r"""^\s*""" + KEYWORD_PREFIX + ENV_WRAP + r"""gh\s+"""
 
 GATED = [
     (LEAD + r"secret\s+(set|delete|remove)\b", "gh secret set/delete"),
@@ -74,8 +77,197 @@ HEREDOC_OPEN = re.compile(
     r"""(?<!<)[0-9]*<<([-~]?)[ \t]*(?:'([^']+)'|"([^"]+)"|\\([^\s;|&<>()]+)|([A-Za-z_][A-Za-z0-9_\-]*))"""
 )
 
-# Split on shell operators so `cd x && gh secret set Y` is judged per segment.
-SPLIT = re.compile(r"&&|\|\||;|\||\n")
+
+def strip_heredocs(command: str) -> str:
+    """Omit heredoc body lines and closing delimiters from a multi-line shell command."""
+    lines = command.splitlines(keepends=True)
+    out_lines: list[str] = []
+    active_delimiter: str | None = None
+    strip_tabs = False
+
+    for line in lines:
+        if active_delimiter is not None:
+            check_line = line.lstrip("\t") if strip_tabs else line
+            if check_line.rstrip("\r\n") == active_delimiter:
+                active_delimiter = None
+            continue
+
+        out_lines.append(line)
+        matches = list(HEREDOC_OPEN.finditer(line))
+        if matches:
+            last_match = matches[-1]
+            strip_tabs = bool(last_match.group(1))
+            delim = next(g for g in last_match.groups()[1:] if g is not None)
+            active_delimiter = delim
+
+    return "".join(out_lines)
+
+
+def split_command(command: str) -> list[str]:
+    """Split a shell command into executable segments, respecting quotes and subshells."""
+    segments = []
+    current = []
+    stack = ["ROOT"]
+    escaped = False
+    i = 0
+    n = len(command)
+
+    while i < n:
+        c = command[i]
+
+        if escaped:
+            current.append(c)
+            escaped = False
+            i += 1
+            continue
+
+        top = stack[-1]
+
+        if top == "SINGLE_QUOTE":
+            if c == "'":
+                stack.pop()
+            current.append(c)
+            i += 1
+            continue
+
+        if c == "\\" and top != "SINGLE_QUOTE":
+            escaped = True
+            current.append(c)
+            i += 1
+            continue
+
+        if top == "DOUBLE_QUOTE":
+            if c == '"':
+                stack.pop()
+                current.append(c)
+                i += 1
+                continue
+            if c == "$" and i + 1 < n and command[i + 1] == "(":
+                seg = "".join(current).strip()
+                if seg:
+                    segments.append(seg)
+                current = []
+                stack.append("COMMAND_SUBST")
+                i += 2
+                continue
+            if c == "`":
+                seg = "".join(current).strip()
+                if seg:
+                    segments.append(seg)
+                current = []
+                stack.append("BACKTICK")
+                i += 1
+                continue
+            current.append(c)
+            i += 1
+            continue
+
+        # top is ROOT, PAREN, COMMAND_SUBST, or BACKTICK
+        if c == "'":
+            stack.append("SINGLE_QUOTE")
+            current.append(c)
+            i += 1
+            continue
+
+        if c == '"':
+            stack.append("DOUBLE_QUOTE")
+            current.append(c)
+            i += 1
+            continue
+
+        if c == "$" and i + 1 < n and command[i + 1] == "(":
+            seg = "".join(current).strip()
+            if seg:
+                segments.append(seg)
+            current = []
+            stack.append("COMMAND_SUBST")
+            i += 2
+            continue
+
+        if c == "`":
+            if top == "BACKTICK":
+                seg = "".join(current).strip()
+                if seg:
+                    segments.append(seg)
+                current = []
+                stack.pop()
+                i += 1
+                continue
+            else:
+                seg = "".join(current).strip()
+                if seg:
+                    segments.append(seg)
+                current = []
+                stack.append("BACKTICK")
+                i += 1
+                continue
+
+        if c == "(":
+            seg = "".join(current).strip()
+            if seg:
+                segments.append(seg)
+            current = []
+            stack.append("PAREN")
+            i += 1
+            continue
+
+        if c == ")":
+            seg = "".join(current).strip()
+            if seg:
+                segments.append(seg)
+            current = []
+            if top in ("PAREN", "COMMAND_SUBST"):
+                stack.pop()
+            i += 1
+            continue
+
+        # 2-char operators: &&, ||, |&, ;;
+        if i + 1 < n and command[i:i + 2] in ("&&", "||", "|&", ";;"):
+            seg = "".join(current).strip()
+            if seg:
+                segments.append(seg)
+            current = []
+            i += 2
+            continue
+
+        # 1-char operators / delimiters: ;, |, \n
+        if c in (";", "|", "\n"):
+            seg = "".join(current).strip()
+            if seg:
+                segments.append(seg)
+            current = []
+            i += 1
+            continue
+
+        # Standalone & (background operator, not part of &>, >&, or 2>&1)
+        if c == "&":
+            prev_char = command[i - 1] if i > 0 else ""
+            next_char = command[i + 1] if i + 1 < n else ""
+            if prev_char == ">" or next_char == ">":
+                current.append(c)
+                i += 1
+                continue
+            seg = "".join(current).strip()
+            if seg:
+                segments.append(seg)
+            current = []
+            i += 1
+            continue
+
+        current.append(c)
+        i += 1
+
+    seg = "".join(current).strip()
+    if seg:
+        if stack[-1] in ("SINGLE_QUOTE", "DOUBLE_QUOTE"):
+            for fallback_seg in re.split(r"(?:&&|\|\||[;&|\n])", seg):
+                s = fallback_seg.strip().strip("'\"")
+                if s:
+                    segments.append(s)
+        else:
+            segments.append(seg)
+
+    return segments
 
 
 def mask_arithmetic(command: str) -> str:
@@ -209,7 +401,7 @@ def strip_heredocs(command: str) -> str:
 
 def offending(command: str):
     command_scannable = strip_heredocs(command)
-    for segment in SPLIT.split(command_scannable):
+    for segment in split_command(command_scannable):
         if "gh" not in segment:
             continue
         if HAS_REPO_FLAG.search(segment):
@@ -222,11 +414,34 @@ def offending(command: str):
     return None
 
 
-def main() -> int:
+def _read_payload() -> tuple[dict, bool]:
+    """Parse payload from sys.argv (--dry-run / --simulate) or sys.stdin."""
+    args = sys.argv[1:]
+    is_dry_run = "--dry-run" in args or "--simulate" in args
+    if is_dry_run:
+        positional = [a for a in args if not a.startswith("-")]
+        if positional:
+            raw_cmd = positional[0].strip()
+            if raw_cmd.startswith("{") and raw_cmd.endswith("}"):
+                try:
+                    return json.loads(raw_cmd), True
+                except Exception:
+                    pass
+            return {"tool_name": "Bash", "tool_input": {"command": raw_cmd}}, True
+
     try:
         payload = json.load(sys.stdin)
-    except Exception as exc:  # fail open, but say so
-        print(f"require-gh-repo-flag: unreadable hook input ({exc})", file=sys.stderr)
+        return (payload if isinstance(payload, dict) else {}), is_dry_run
+    except Exception as exc:
+        print(f"require-gh-repo-flag: unreadable hook input ({exc})",
+
+              file=sys.stderr)
+        return {}, is_dry_run
+
+
+def main() -> int:
+    payload, is_dry_run = _read_payload()
+    if not payload:
         return 0
 
     if payload.get("tool_name") not in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
@@ -236,6 +451,8 @@ def main() -> int:
     command = inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or inp.get("script") or ""
     hit = offending(command)
     if not hit:
+        if is_dry_run:
+            print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
         return 0
 
     label, segment = hit

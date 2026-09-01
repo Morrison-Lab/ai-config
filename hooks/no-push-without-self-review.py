@@ -1339,12 +1339,40 @@ def parse_report(text: str) -> tuple[str | None, str | None]:
     return verdict, (sha.group(1).lower() if sha else None)
 
 
+def _is_reviewer_record(record: dict) -> bool:
+    """True if this transcript record is attributed to the adversarial reviewer."""
+    candidates: list[str] = []
+    for k in ("attributionAgent", "agent_type", "subagent_type", "subagentType",
+              "TypeName", "Role", "agent", "name", "persona"):
+        val = record.get(k)
+        if isinstance(val, str) and val:
+            candidates.append(val)
+        elif isinstance(val, dict):
+            for sub_k in ("name", "TypeName", "Role", "type"):
+                sub_val = val.get(sub_k)
+                if isinstance(sub_val, str) and sub_val:
+                    candidates.append(sub_val)
+    msg = record.get("message")
+    if isinstance(msg, dict):
+        for k in ("attributionAgent", "agent_type", "subagent_type", "subagentType",
+                  "TypeName", "Role", "agent", "name", "persona", "role"):
+            val = msg.get(k)
+            if isinstance(val, str) and val and val.lower() not in (
+                "user", "assistant", "system", "tool", "model", "planner"
+            ):
+                candidates.append(val)
+    return any(ADVERSARIAL_AGENT_NAME.match(c) for c in candidates)
+
+
 def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bool]:
     """(verdict, reviewed_commit, saw_reviewer_call) from the transcript.
 
-    Only the reviewer's own call results are consulted, and an errored result is
-    skipped -- a failed or interrupted reviewer states no verdict, and
-    `fail-fast` forbids letting that look identical to a clean one.
+    Only the reviewer's own call results and attributed subagent reports are
+    consulted, and an errored result on the dispatch itself is skipped -- a failed
+    or interrupted reviewer states no verdict, and `fail-fast` forbids letting that
+    look identical to a clean one. Transient tool call errors during a subagent's
+    exploration (e.g. bash command syntax retry) do not invalidate an otherwise
+    clean final review verdict.
     """
     reviewer_call_ids: set[str] = set()
     saw_reviewer_call = False
@@ -1363,28 +1391,46 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
             if not isinstance(record, dict):
                 continue
 
+            record_is_reviewer = _is_reviewer_record(record)
+            if record_is_reviewer:
+                saw_reviewer_call = True
+                content_text = _result_text(
+                    record.get("message") if isinstance(record.get("message"), dict) else record
+                )
+                if content_text:
+                    found, sha = parse_report(content_text)
+                    if found:
+                        verdict, reviewed_commit = found, sha
+
             for b in _iter_blocks(record):
                 b_type = b.get("type")
 
                 if b_type == "tool_use":
-                    if (b.get("name") or "").lower() not in AGENT_TOOLS:
-                        continue
-                    inp = b.get("input") or {}
-                    sub_types = []
-                    for k in ("subagent_type", "subagentType", "agent_type", "TypeName", "name", "Role"):
-                        if inp.get(k):
-                            sub_types.append(str(inp.get(k)))
-                    if isinstance(inp.get("Subagents"), list):
-                        for sa in inp["Subagents"]:
-                            if isinstance(sa, dict):
-                                for k in ("TypeName", "Role", "name"):
-                                    if sa.get(k):
-                                        sub_types.append(str(sa.get(k)))
-                    if any(ADVERSARIAL_AGENT_NAME.match(st) for st in sub_types):
-                        saw_reviewer_call = True
-                        call_id = b.get("id")
-                        if isinstance(call_id, str) and call_id:
-                            reviewer_call_ids.add(call_id)
+                    tool_name = (b.get("name") or "").lower()
+                    if tool_name in AGENT_TOOLS:
+                        inp = b.get("input") or {}
+                        sub_types = []
+                        for k in ("subagent_type", "subagentType", "agent_type", "TypeName", "name", "Role"):
+                            if inp.get(k):
+                                sub_types.append(str(inp.get(k)))
+                        if isinstance(inp.get("Subagents"), list):
+                            for sa in inp["Subagents"]:
+                                if isinstance(sa, dict):
+                                    for k in ("TypeName", "Role", "name"):
+                                        if sa.get(k):
+                                            sub_types.append(str(sa.get(k)))
+                        if any(ADVERSARIAL_AGENT_NAME.match(st) for st in sub_types):
+                            saw_reviewer_call = True
+                            call_id = b.get("id")
+                            if isinstance(call_id, str) and call_id:
+                                reviewer_call_ids.add(call_id)
+                    elif tool_name == "send_message" and record_is_reviewer:
+                        inp = b.get("input") or {}
+                        msg_text = str(inp.get("Message") or inp.get("message") or "")
+                        if msg_text:
+                            found, sha = parse_report(msg_text)
+                            if found:
+                                verdict, reviewed_commit = found, sha
 
                 elif b_type == "tool_result":
                     if b.get("tool_use_id") not in reviewer_call_ids:
@@ -1495,15 +1541,46 @@ def deny(reason: str) -> None:
     }))
 
 
-def main() -> int:
+def _read_payload() -> tuple[dict, bool]:
+    """Parse payload from sys.argv (--dry-run / --simulate) or sys.stdin."""
+    args = sys.argv[1:]
+    is_dry_run = "--dry-run" in args or "--simulate" in args
+    if is_dry_run:
+        positional = [a for a in args if not a.startswith("-")]
+        if positional:
+            raw_cmd = positional[0].strip()
+            if raw_cmd.startswith("{") and raw_cmd.endswith("}"):
+                try:
+                    return json.loads(raw_cmd), True
+                except Exception:
+                    pass
+            return {"tool_name": "Bash", "tool_input": {"command": raw_cmd}}, True
+
     try:
         payload = json.load(sys.stdin)
+        return (payload if isinstance(payload, dict) else {}), is_dry_run
+    except Exception as exc:
+        print(f"no-push-without-self-review: unreadable hook input ({exc})",
+
+              file=sys.stderr)
+        return {}, is_dry_run
+
+
+def main() -> int:
+    payload, is_dry_run = _read_payload()
+    if not payload:
+        return 0
+    try:
         if (payload.get("tool_name") or "") not in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
+            if is_dry_run:
+                print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
             return 0
 
         inp = payload.get("tool_input") or {}
         cmd = inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or inp.get("script") or ""
         if not cmd:
+            if is_dry_run:
+                print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
             return 0
 
         if _SIBLING is None:

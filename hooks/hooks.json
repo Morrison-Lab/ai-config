@@ -440,6 +440,13 @@
             "timeout": 10,
             "script": "flag-uncounted-comment-claims.py",
             "why": "ai-config#2377's sparta file-list incident (2026-08-26): a forge comment posted an enumerated file list recalled from memory rather than derived, and it was wrong. Warns, never blocks, when a `gh pr comment`/`gh issue comment`/`gh api .../comments` body about to post asserts an unverified count (no `grep -c`/`wc -l`-shaped discharge nearby) or a hand-typed enumerated list of hyphenated identifiers with no deriving command beside it in the body or elsewhere in the same Bash call -- `remind-brief-premises.py`'s cardinality/enumeration heuristic extended past Agent/Task/SendMessage briefs to forge-comment bodies, since that hook's own PATH clause is anchored to this corpus and a comment can be about any repo."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-new-line-breaks-on-push.py\"",
+            "timeout": 15,
+            "script": "warn-new-line-breaks-on-push.py",
+            "why": "memories/mistake-patterns.md Pattern 25, ai-config#2590 (2026-08-29): warns, never blocks, before a `git push` carrying newly-added Markdown lines that violate semantic line breaks against the default base branch (e.g. origin/main)."
           }
         ]
       },

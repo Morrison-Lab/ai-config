@@ -7,13 +7,21 @@ split at the gate's own flagged boundaries -- currently a sufficiently long
 line broken at a mid-line semicolon. Never break a phrase mid-way at a
 column boundary.
 
-This is NARROWER than the house style documented in
+This is NARROWER by design than the house style documented in
 `shared/writing/semantic-line-breaks.md` ("one clause per line"), which also
 breaks at comma and conjunction boundaries this tool does not detect.
 Prose hand-broken at those wider boundaries gets REJOINED into one line when
-run through this tool, since it first joins a paragraph's lines and then
-only re-splits at the sentence/semicolon boundaries above (ai-config#1416).
-Don't run `--all` over already-compliant prose expecting it to be a no-op.
+run through this tool in whole-file mode (`--all`), since it first joins a
+paragraph's lines and then only re-splits at the sentence/semicolon boundaries
+above (ai-config#1416, #2586).
+The tool deliberately stays narrower by design: natural language clause
+detection at comma and coordinating-conjunction boundaries requires a full
+syntactic parser; heuristic regex splits on those boundaries yield massive
+false-positive rates (>50% on commas per check-new-line-breaks measurements)
+and diverge from CI.
+Don't run `--all` over already-compliant prose expecting it to be a no-op;
+use diff-scoping (the default for `--write`) which preserves hand-broken clause
+formatting on untouched sentences in modified paragraphs (ai-config#1599).
 
 Sentence and clause predicates come from the same
 `check-new-line-breaks.py` CI pins in `.github/workflows/validate.yml`

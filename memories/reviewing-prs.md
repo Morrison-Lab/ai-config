@@ -65,10 +65,10 @@ A later request to iterate is a driving request.
 branch, not when you were asked only to read it.
 See also [`shared/workflow/ardi.md`](../shared/workflow/ardi.md).
 
-## Only work PRs I opened, am assigned to, or named, or a workflow opened
+## Only work PRs I opened, am assigned to, or asked for by name, or a workflow opened
 
-Work only on pull requests opened by me (`d-morrison` or `dem-extra1`), assigned to me, named by me in the request, or opened by one of the repository's own workflows (`github-actions[bot]` --- a submodule bump, an automated sync PR).
-A PR opened by another lab member, or by any other bot, is not mine to drive unless it is assigned to me or I named it --- however clean, stale, or easy it looks, and however a sweep skill words its scope.
+Work only on pull requests opened by me (`d-morrison` or `dem-extra1`), assigned to me, explicitly asked for by name in the request, or opened by one of the repository's own workflows (`github-actions[bot]` --- a submodule bump, an automated sync PR).
+A PR opened by another lab member, or by any other bot, is not mine to drive unless it is assigned to me or I explicitly asked for it --- however clean, stale, or easy it looks, and however a sweep skill words its scope.
 
 The user stated the **Do** side, in two steps: first the author/assignee test, then (same day) that workflow-opened PRs such as a submodule bump are fine.
 The **Don't** side is inferred from the near-miss that prompted it, and is what makes the rule checkable.

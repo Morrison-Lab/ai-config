@@ -236,7 +236,7 @@ Per [`algorithmatize-checks`](algorithmatize-checks.md), "which PRs are stalled"
 The script is also an instance of [`deterministic-tools`](../principles/deterministic-tools.md): judging coverage by eye is exactly the recurring judgment task that fragment says should become a tool.
 
 It is **read-only reporting, not authorization**.
-[`ardi`](ardi.md) limits its monitoring mandate to PRs that pass `memories/reviewing-prs.md`'s scope test (opened by or assigned to the invoking user, named in the request, or opened by a repository workflow),
+[`ardi`](ardi.md) limits its monitoring mandate to PRs that pass `memories/reviewing-prs.md`'s scope test (opened by or assigned to the invoking user, explicitly requested by name, or opened by a repository workflow),
 and a PR appearing in this sweep does not bring it into scope.
 Surface an out-of-scope stalled PR to the human, who can assign it or name it;
 a claim comment per [`claim-pr`](claim-pr.md) does not bring it into scope.

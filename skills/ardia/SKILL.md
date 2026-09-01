@@ -29,7 +29,7 @@ mutates a PR stays serial.
    in the JSON — `glab mr list` alone does not expose these fields.
    State the scope rules when you report, so the user can
    correct:
-   - **Only PRs the user opened, is assigned to, or named, or a repository workflow opened, are in scope.**
+   - **Only PRs the user opened, is assigned to, or asked for by name, or a repository workflow opened, are in scope.**
      Resolve the invoking user first
      --- `gh api user --jq .login` locally, `mcp__github__get_me` in a remote session, `glab api user | jq -r .username` on GitLab, where the fields are `author.username` and `assignees[].username` ---
      and add any aliases `memories/reviewing-prs.md` lists for that person,
@@ -42,7 +42,7 @@ mutates a PR stays serial.
      Keep the full listing for the stack detection in step 3, so an in-scope PR based on an out-of-scope PR's branch is still recognised as stacked (it is synced against that base as it stands;
      the base itself is left to its author).
      "Every open PR" anywhere in this skill means every PR that survives this filter.
-     A PR by another lab member, or by any other bot (Dependabot, a Copilot agent), is not driven, reviewed, or edited, however clean it looks (see `memories/reviewing-prs.md`, "Only work PRs I opened, am assigned to, or named, or a workflow opened";
+     A PR by another lab member, or by any other bot (Dependabot, a Copilot agent), is not driven, reviewed, or edited, however clean it looks (see `memories/reviewing-prs.md`, "Only work PRs I opened, am assigned to, or asked for by name, or a workflow opened";
      measured on `UCD-SERG/serodynamics` 2026-09-01, where the sweep drove four other authors' PRs before the correction arrived).
    - **Include drafts** (`isDraft: true`) unless another agent is actively driving one.
      A draft is the corpus's own in-flight claim signal ---

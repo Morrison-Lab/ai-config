@@ -1043,13 +1043,7 @@ checkout, and on a `pull_request`-triggered run that is the synthetic merge
 commit GitHub builds at `refs/pull/N/merge`, not the branch tip.
 The `Reviewed commit:` trailer the workflow appends beneath the JSON named the
 branch tip in every case observed.
-Measured 2026-09-01 across two repositories in one session:
-on `Morrison-Lab/ai-config#2907` (auto-reviewed on push) the JSON said
-`da51b7b` while the trailer said `ce35063`, and `da51b7b` resolved to
-`Merge ce35063 into 10d438f` with exactly those two parents;
-on `UCD-SERG/serodynamics#298` (dispatched by a `/review` comment, which
-checks out the PR head explicitly) the two fields agreed on `6b101d8`.
-So the same reviewer emits a trustworthy field on one trigger and a
+The same reviewer emits a trustworthy field on one trigger and a
 misleading one on the other, with nothing in the comment saying which.
 The failure this produces is a needless re-request: a script comparing
 JSON `commit_sha` against the PR's `head.sha` reads a verdict on the current
@@ -1066,6 +1060,9 @@ head as a verdict on an unknown commit.
   when the review is current.
 - **Don't:** read the two repositories' agreement or disagreement as a
   property of the repository; it is a property of the trigger.
+
+See [`fully-clean.cases.md`](fully-clean.cases.md),
+"The review JSON's `commit_sha` named the synthetic merge commit".
 
 **`check-pr-fully-clean.py` uses the same unreliable body-text surface, and
 whichever SHA that text happens to contain --- present, absent, or wrong ---

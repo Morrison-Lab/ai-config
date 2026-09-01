@@ -203,6 +203,9 @@ jobs:
       - name: Run Antigravity hook adapter tests
         # Tests the Antigravity lifecycle adapter and manifest translation in hermetic isolation.
         run: python3 scripts/test_agy_hook_adapter.py
+      - name: Run Aider hook adapter tests
+        # Tests Aider markdown history parsing, JSONL generation, and hook translation (ai-config#2659).
+        run: python3 scripts/test_aider_hook_adapter.py
       - name: Run Codex hook adapter tests
         # Tests Codex dispatch, matcher aliases, and canonical catalog reuse.
         run: python3 scripts/test_codex_hook_adapter.py

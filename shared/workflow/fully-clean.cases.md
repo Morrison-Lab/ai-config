@@ -1359,7 +1359,7 @@ The round had two commits: the fix (`004266a`) and a `Merge origin/main` on top 
 
 ## Auto-merge armed after a sync-only push, having verified the previous head (#2556)
 
-(`Morrison-Lab/ai-config#2556`, 2026-08-31 / Issue #2558: PR was verified fully clean at `2c1ae45d` --- checker exit 0, verdict `Ready for merge` at that exact SHA, zero unresolved threads.
+(`Morrison-Lab/ai-config#2556`, 2026-08-28 / Issue #2558: PR was verified fully clean at `2c1ae45d` --- checker exit 0, verdict `Ready for merge` at that exact SHA, zero unresolved threads.
 A direct merge was refused because `main` had moved (`the head branch is not up to date with the base branch`).
 The author merged `origin/main` in and pushed `54874be0`, then armed `gh pr merge --auto`, reasoning about it as *scheduling a merge already verified* rather than authorizing an unreviewed head.
 The sync was content-free (no author changes), so it did not feel like a new head needing a new verdict.

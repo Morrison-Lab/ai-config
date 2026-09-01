@@ -1524,37 +1524,6 @@ def verify_review(transcript_path: str, directory: str | None,
         except Exception as e:
             return False, f"Failed reading transcript: {e}"
 
-    if not saw_reviewer_call or verdict is None:
-        target_dir = directory if directory and os.path.exists(directory) else os.getcwd()
-        report_candidates = [
-            os.path.join(target_dir, ".git", "adversarial-review-report.txt"),
-            os.path.join(target_dir, ".git", "pre-push-review-report.txt"),
-            os.path.join(target_dir, ".adversarial-review-report.txt"),
-        ]
-        try:
-            r = subprocess.run(["git", "-C", target_dir, "rev-parse", "--git-dir"], capture_output=True, text=True)
-            if r.returncode == 0:
-                gd = r.stdout.strip()
-                if not os.path.isabs(gd):
-                    gd = os.path.normpath(os.path.join(target_dir, gd))
-                report_candidates.insert(0, os.path.join(gd, "adversarial-review-report.txt"))
-                report_candidates.insert(1, os.path.join(gd, "pre-push-review-report.txt"))
-        except Exception:
-            pass
-
-        for path in report_candidates:
-            if os.path.isfile(path):
-                try:
-                    with open(path, "r", encoding="utf-8", errors="ignore") as f:
-                        file_text = f.read()
-                    found, sha = parse_report(file_text)
-                    if found:
-                        saw_reviewer_call = True
-                        verdict, reviewed_commit = found, sha
-                        break
-                except Exception:
-                    pass
-
     if not transcript_path and not saw_reviewer_call:
         return False, "No transcript available to verify the adversarial self-review."
 

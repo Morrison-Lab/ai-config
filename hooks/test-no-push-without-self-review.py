@@ -1562,7 +1562,7 @@ def fallback_cases() -> tuple[int, int]:
     blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
     check("pre-push-review.py run in Bash tool result allows push", rc == 0 and not blocked)
 
-    # 5. On-disk report file (.git/adversarial-review-report.txt)
+    # 5. Negative: On-disk report file without transcript is rejected (no unauthenticated forge)
     report_file = os.path.join(REPO, ".git", "adversarial-review-report.txt")
     with open(report_file, "w") as f:
         f.write(body("Ready for merge", HEAD))
@@ -1570,14 +1570,7 @@ def fallback_cases() -> tuple[int, int]:
         # Run with no transcript events
         rc, out = run_hook(PUSH, [])
         blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
-        check("on-disk report file in .git/ allows push when no transcript verdict", rc == 0 and not blocked)
-
-        # Run with on-disk report for outdated commit
-        with open(report_file, "w") as f:
-            f.write(body("Ready for merge", PREV))
-        rc, out = run_hook(PUSH, [])
-        blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
-        check("on-disk report file for older commit blocks push", rc == 0 and blocked)
+        check("on-disk report file without transcript is rejected", rc == 0 and blocked)
     finally:
         if os.path.exists(report_file):
             os.remove(report_file)

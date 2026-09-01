@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests for scripts/check-links.py (ai-config#2546).
+"""Tests for scripts/check-links.py (ai-config#2881).
 
 Verifies that:
 1. External URI schemes and email addresses are recognized as external.

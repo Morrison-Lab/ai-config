@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 # Reference link definition (CommonMark 4.7): [label]: destination "optional title"
 REF_DEF = re.compile(
-    r"^[ \t]{0,3}\[([^\]]+)\]:[ \t]*\n?[ \t]*(?:<([^>\n]+)>|(\S+))"
+    r"^[ \t]{0,3}\[(?!\^)([^\]]+)\]:[ \t]*\n?[ \t]*(?:<([^>\n]+)>|(\S+))"
     r'(?:[ \t]+(?:"([^"\n]*)"|\'([^\'\n]*)\'|\(([^)\n]*)\)))?[ \t]*$',
     re.MULTILINE,
 )

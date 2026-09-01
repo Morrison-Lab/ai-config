@@ -679,7 +679,7 @@ def resolve_engine_executable(name: str) -> Optional[str]:
 
 
 def _prepare_subprocess_cmd(cmd: List[str]) -> List[str]:
-    """Wrap Windows batch/cmd scripts to execute reliably without shell injection vulnerabilities."""
+    """Wrap Windows batch/cmd scripts (.cmd, .bat) with comspec for execution when invoked on Windows."""
     if (os.name == "nt" or sys.platform == "win32") and cmd:
         exe = cmd[0]
         if exe.lower().endswith((".cmd", ".bat")):
@@ -702,8 +702,8 @@ def _clean_sandbox_configs(sandbox_dir: Path):
                 shutil.rmtree(target, ignore_errors=True)
             elif target.exists() or target.is_symlink():
                 target.unlink(missing_ok=True)
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"Warning: failed to remove {target}: {e}", file=sys.stderr)
 
 
 def run_antigravity_review(prompt: str, model: str = "", expected_commit_sha: str = "") -> Optional[str]:

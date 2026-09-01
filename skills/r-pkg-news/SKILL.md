@@ -33,6 +33,9 @@ inconsistency the next release notices.
 
 2. **Read the existing style.** Look at the last 2–3 entries in
    `NEWS.md` and note:
+   ```bash
+   head -n 40 NEWS.md
+   ```
    - Whether entries sit under a version heading (`# pkgname 1.2.3`) that's
      already there for the in-progress version, or need a new one.
    - Bullet format (`* `, `- `), sentence case vs. lowercase lead word,
@@ -42,8 +45,12 @@ inconsistency the next release notices.
      citation goes.
 
 3. **Gather what changed.** Pull recent commits since the last tagged
-   release (`git log <last-tag>..HEAD --oneline`) or the PR description
-   supplied by the user, and identify the user-facing changes worth an
+   release:
+   ```bash
+   LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || git rev-list --max-parents=0 HEAD)
+   git log "$LAST_TAG..HEAD" --oneline
+   ```
+   or read the PR description supplied by the user, and identify the user-facing changes worth an
    entry — skip pure-internal refactors, CI-only changes, and typo fixes
    that don't affect behavior unless the project's own style includes
    those too (check step 2's precedent).

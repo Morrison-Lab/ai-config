@@ -366,6 +366,35 @@ Operationalized by:
 [`restructure-for-efficiency`](../workflow/restructure-for-efficiency.md) (re-architecting workflow shapes),
 and the `simplify` / `tidy` skills.
 
+## Admitting site vs branching site
+
+When enabling a new condition, trigger, or input case,
+that condition must be handled at two distinct sites that must agree:
+the admitting site (the rule or filter deciding whether the code runs)
+and the branching site (the execution logic deciding what the code does once it arrives).
+Updating only the admitting site creates a false sense of completion
+while downstream code silently branches on invalid or empty default variables.
+
+Full statement: [`admitting-vs-branching-site`](admitting-vs-branching-site.md).
+Operationalized by:
+[`fail-fast`](fail-fast.md) (loud failures over silent branching fallbacks)
+and [`algorithmatize-checks`](../workflow/algorithmatize-checks.md) (testable execution scripts).
+
+## Don't take anyone's word for it --- independent verification and constructive pushback
+
+Never accept factual assertions, technical recommendations, or stated preferences blindly.
+Everyone makes mistakes --- all humans, all AI models, peer agents, coordinators, and domain experts alike.
+Always consider the possibility that any assertion may be mistaken, misinformed, outdated, or incomplete,
+and investigate that possibility independently through deterministic queries, source inspection, and clarifying questions.
+Push back constructively whenever you suspect an error or unsound reasoning.
+
+Full statement: [`dont-take-my-word-for-it`](dont-take-my-word-for-it.md).
+Operationalized by:
+[`metacognitive-monitoring`](../workflow/metacognitive-monitoring.md) (re-query state claims),
+[`challenge-the-assignment`](../workflow/challenge-the-assignment.md) (interrogate briefs and instructions),
+[`challenge-unnecessary-complexity`](../workflow/challenge-unnecessary-complexity.md),
+and [`fail-fast`](fail-fast.md).
+
 ## The 3Rs lens — reduce, reuse, recycle
 
 The environmental mnemonic maps cleanly onto the catalog, and makes a
@@ -460,6 +489,17 @@ bind the solution.
 It aids KISS by dissolving artificial boundaries that force complex workarounds,
 while respecting hard boundaries (security policies, permissions, and correctness invariants)
 that must not be circumvented.
+
+Admitting-vs-branching-site complements fail-fast and algorithmatize-checks:
+it prevents multi-site divergence when enabling new conditions or triggers,
+requiring both admission guards and downstream execution logic to be audited
+and verified with real execution fixtures rather than text-matching tests.
+
+Don't-take-my-word-for-it provides the overarching epistemic posture
+for the entire catalog: it mandates empirical verification over deference to authority,
+extending challenge-the-assignment (which focuses on task briefs) to all factual claims,
+recommendations, and assumptions, while leaning on deterministic-tools and
+algorithmatize-checks as the instruments of independent verification.
 
 The remaining principles serve the goals directly: least astonishment
 and self-documenting code serve readability the way modularity serves

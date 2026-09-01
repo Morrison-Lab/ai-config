@@ -274,20 +274,46 @@ NOTE = (
 )
 
 
-def main() -> int:
+def _read_payload() -> tuple[dict, bool]:
+    """Parse payload from sys.argv (--dry-run / --simulate) or sys.stdin."""
+    args = sys.argv[1:]
+    is_dry_run = "--dry-run" in args or "--simulate" in args
+    if is_dry_run:
+        positional = [a for a in args if not a.startswith("-")]
+        if positional:
+            raw_cmd = positional[0].strip()
+            if raw_cmd.startswith("{") and raw_cmd.endswith("}"):
+                try:
+                    return json.loads(raw_cmd), True
+                except Exception:
+                    pass
+            return {"tool_name": "Bash", "tool_input": {"command": raw_cmd}}, True
+
     try:
         payload = json.load(sys.stdin)
-    except Exception as exc:  # fail open, but say so
-        print(f"flag-add-a-outside-pathspec: unreadable hook input ({exc})",
-              file=sys.stderr)
+        return (payload if isinstance(payload, dict) else {}), is_dry_run
+    except Exception as exc:
+        if is_dry_run:
+            print(f"flag-add-a-outside-pathspec: unreadable hook input ({exc})",
+                  file=sys.stderr)
+        return {}, is_dry_run
+
+
+def main() -> int:
+    payload, is_dry_run = _read_payload()
+    if not payload:
         return 0
 
     if payload.get("tool_name") not in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
+        if is_dry_run:
+            print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
         return 0
 
     inp = payload.get("tool_input") or {}
     command = inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or inp.get("script")
     if not isinstance(command, str) or not command.strip():
+        if is_dry_run:
+            print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
         return 0
 
     try:
@@ -298,11 +324,19 @@ def main() -> int:
         return 0
 
     if hit is None:
+        if is_dry_run:
+            print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
         return 0
 
     segment, scope, excludes = hit
-    untracked = _untracked_files()
+    sim_untracked = os.environ.get("SIMULATE_UNTRACKED")
+    if sim_untracked is not None:
+        untracked = [u.strip() for u in sim_untracked.split(",") if u.strip()]
+    else:
+        untracked = _untracked_files()
     if untracked is None:
+        if is_dry_run:
+            print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
         return 0  # not a repo, git unreachable, or timed out -- fail open
 
     if scope == "cwd":

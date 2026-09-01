@@ -180,6 +180,9 @@ jobs:
         # with its subject AND flags any hook missing a test (ai-config#1080),
         # so a tested guard cannot regress and an untested one cannot hide.
         run: python3 scripts/test_hooks.py
+      - name: Run PreToolUse dry-run tests
+        # Tests --dry-run and simulation mode support across PreToolUse hooks offline (ai-config#2557).
+        run: python3 scripts/test_pretooluse_dry_run.py
       - name: Run Antigravity hook adapter tests
         # Tests the Antigravity lifecycle adapter and manifest translation in hermetic isolation.
         run: python3 scripts/test_agy_hook_adapter.py

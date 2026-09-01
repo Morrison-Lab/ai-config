@@ -712,12 +712,34 @@ def _emit(note):
     }))
 
 
-def main():
+def _read_payload() -> tuple[dict, bool]:
+    """Parse payload from sys.argv (--dry-run / --simulate) or sys.stdin."""
+    args = sys.argv[1:]
+    is_dry_run = "--dry-run" in args or "--simulate" in args
+    if is_dry_run:
+        positional = [a for a in args if not a.startswith("-")]
+        if positional:
+            raw_cmd = positional[0].strip()
+            if raw_cmd.startswith("{") and raw_cmd.endswith("}"):
+                try:
+                    return json.loads(raw_cmd), True
+                except Exception:
+                    pass
+            return {"tool_name": "Bash", "tool_input": {"command": raw_cmd}}, True
+
     try:
         payload = json.load(sys.stdin)
-    except Exception as exc:  # fail open, but say so
-        print("warn-pr-create-without-dupe-check: unreadable hook input "
-              f"({exc})", file=sys.stderr)
+        return (payload if isinstance(payload, dict) else {}), is_dry_run
+    except Exception as exc:
+        if is_dry_run:
+            print(f"warn-pr-create-without-dupe-check: unreadable hook input ({exc})",
+                  file=sys.stderr)
+        return {}, is_dry_run
+
+
+def main():
+    payload, is_dry_run = _read_payload()
+    if not payload:
         return 0
 
     if not isinstance(payload, dict):

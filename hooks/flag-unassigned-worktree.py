@@ -154,21 +154,40 @@ def unassigned(payload):
     return subagent_type or "(unspecified, defaults to write-capable)"
 
 
-def main() -> int:
+def _read_payload() -> tuple[dict, bool]:
+    """Parse payload from sys.argv (--dry-run / --simulate) or sys.stdin."""
+    args = sys.argv[1:]
+    is_dry_run = "--dry-run" in args or "--simulate" in args
+    if is_dry_run:
+        positional = [a for a in args if not a.startswith("-")]
+        if positional:
+            raw_cmd = positional[0].strip()
+            if raw_cmd.startswith("{") and raw_cmd.endswith("}"):
+                try:
+                    return json.loads(raw_cmd), True
+                except Exception:
+                    pass
+            return {"tool_name": "Bash", "tool_input": {"command": raw_cmd}}, True
+
     try:
         payload = json.load(sys.stdin)
-    except Exception as exc:  # fail open, but say so
-        print(f"flag-unassigned-worktree: unreadable hook input ({exc})",
-              file=sys.stderr)
-        return 0
+        return (payload if isinstance(payload, dict) else {}), is_dry_run
+    except Exception as exc:
+        if is_dry_run:
+            print(f"flag-unassigned-worktree: unreadable hook input ({exc})",
+                  file=sys.stderr)
+        return {}, is_dry_run
 
-    if not isinstance(payload, dict):
-        print("flag-unassigned-worktree: hook input was not an object",
-              file=sys.stderr)
+
+def main() -> int:
+    payload, is_dry_run = _read_payload()
+    if not payload:
         return 0
 
     subagent_type = unassigned(payload)
     if subagent_type is None:
+        if is_dry_run:
+            print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
         return 0
 
     note = NOTE.format(subagent_type=subagent_type)

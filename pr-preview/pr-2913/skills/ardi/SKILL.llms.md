@@ -83,10 +83,10 @@ Skip if your most recent comment already says so and is still live — claims ex
     **Opportunistic conflict sweep.** After pushing (or after any round where all findings were Rebutted/Deferred with no push), scan other open PRs in the same repo for merge conflicts:
 
     ``` bash
-    gh pr list --state open --json number,title,headRefName,mergeable,mergeStateStatus,comments   # LIST_PRS
+    gh pr list --state open --json number,title,headRefName,author,assignees,mergeable,mergeStateStatus,comments   # LIST_PRS
     ```
 
-    For each PR where `mergeable == "CONFLICTING"` **or `"UNKNOWN"`** (see `resolve-conflicts`, “Verify before you act” — `UNKNOWN` can mean GitHub hasn’t finished computing yet, not that there’s no conflict), verify with `git merge-tree --write-tree origin/main origin/<branch>` (git ≥ 2.38) before acting, then check claim status (most recent comment) and fix unclaimed ones — same cascade procedure as `post-merge` step 1.5 (claim → isolated worktree → fetch main → merge → `resolve-conflicts` skill → push → unclaim). A merge to `main` during your ARDI loop can create new conflicts in sibling PRs; clearing them while waiting for the next verdict is better than letting them pile up.
+    Filter that list by `memories/reviewing-prs.md`’s scope test first, as `ardia` step 1 does (opened by or assigned to the invoking user, named in the request, or opened by a repository workflow); an out-of-scope conflicting PR gets a comment naming the conflict, never a push. For each in-scope PR where `mergeable == "CONFLICTING"` **or `"UNKNOWN"`** (see `resolve-conflicts`, “Verify before you act” — `UNKNOWN` can mean GitHub hasn’t finished computing yet, not that there’s no conflict), verify with `git merge-tree --write-tree origin/main origin/<branch>` (git ≥ 2.38) before acting, then check claim status (most recent comment) and fix unclaimed ones — same cascade procedure as `post-merge` step 1.5 (claim → isolated worktree → fetch main → merge → `resolve-conflicts` skill → push → unclaim). A merge to `main` during your ARDI loop can create new conflicts in sibling PRs; clearing them while waiting for the next verdict is better than letting them pile up.
 
 5.  **Post the ARD summary** as a comment on the MR/PR (table format per the ARD skill).
 
@@ -110,11 +110,11 @@ Skip if your most recent comment already says so and is still live — claims ex
     **While waiting, keep checking for merge conflicts.** Other PRs in this repo can become conflicting at any time (someone merges to `main` while the review runs). Poll every few minutes with `/loop` or a manual re-check:
 
     ``` bash
-    gh pr list --state open --json number,title,headRefName,mergeable,mergeStateStatus,comments \
+    gh pr list --state open --json number,title,headRefName,author,assignees,mergeable,mergeStateStatus,comments \
       --jq '.[] | select(.mergeable == "CONFLICTING" or .mergeable == "UNKNOWN")'   # LIST_PRS
     ```
 
-    Verify each candidate with `git merge-tree --write-tree origin/main origin/<branch>` (git ≥ 2.38; see `resolve-conflicts`, “Verify before you act”) before claiming — `UNKNOWN` isn’t proof of a real conflict, and `CONFLICTING` can be stale if a sibling PR merged since GitHub last computed it. Claim and fix confirmed conflicts using the cascade procedure in `post-merge` step 1.5. Re-check after each resolution — new ones can appear at any time. This turns idle wait time into productive conflict prevention.
+    Apply the same scope test as the sweep above before touching a candidate; an out-of-scope one gets a comment, never a push. Verify each in-scope candidate with `git merge-tree --write-tree origin/main origin/<branch>` (git ≥ 2.38; see `resolve-conflicts`, “Verify before you act”) before claiming — `UNKNOWN` isn’t proof of a real conflict, and `CONFLICTING` can be stale if a sibling PR merged since GitHub last computed it. Claim and fix confirmed conflicts using the cascade procedure in `post-merge` step 1.5. Re-check after each resolution — new ones can appear at any time. This turns idle wait time into productive conflict prevention.
 
 ### Per-round checklist
 

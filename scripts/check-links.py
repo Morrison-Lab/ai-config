@@ -16,13 +16,10 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
-from fences import strip_fences  # noqa: E402
+from fences import strip_code_spans, strip_fences, strip_math  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
-# Strip code regions first so link-shaped examples inside fences / backticks
-# (regexes, `[text](url)` snippets) aren't mistaken for real links.
-INLINE = re.compile(r"`[^`]*`")
 SCAN_GLOBS = [
     "skills/**/*.md",
     "codex-skills/**/*.md",
@@ -70,8 +67,11 @@ def resolve_target(base_dir: Path, target: str) -> Path | None:
 def check_file(md: Path) -> None:
     global checked
     text = md.read_text(encoding="utf-8")
+    # Strip code regions and math blocks first so code examples and LaTeX math
+    # aren't mistaken for real links, while preserving prose and link targets.
     text = strip_fences(text)
-    text = INLINE.sub("", text)
+    text = strip_code_spans(text)
+    text = strip_math(text)
     for match in LINK.finditer(text):
         target = match.group(1).strip()
         if target.startswith("<") and target.endswith(">"):

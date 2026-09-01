@@ -43,7 +43,7 @@ Claude Code supports plugins distributed via Git marketplaces and official regis
    claude plugin marketplace update <marketplace-name>
    ```
 
-   Inspect marketplace manifests under `~/.claude/plugins/marketplaces/<marketplace-name>/`
+   Inspect the source repository's `.claude-plugin/marketplace.json` manifest
    or use the interactive `/plugin` Discover tab to browse available plugins and capabilities.
 
 3. **Install and enable:**

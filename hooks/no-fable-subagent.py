@@ -15,7 +15,7 @@ ones that did not.
 
 ## What it decides
 
-For an `Agent` launch:
+For an `Agent` launch (also reported as `Task` or `invoke_subagent`):
 
   - `model` names Fable (`fable` anywhere in the value, case-insensitive)
     -> DENY, unless `FABLE_SUBAGENT_OK=1` is set.
@@ -34,8 +34,9 @@ a run that may set `model` on every call.
 
 The session model comes from the transcript the harness names in the
 payload (`transcript_path`), read from the tail: the latest `assistant`
-record carries `message.model`. That is the same read
-`no-unmeasured-clock-claim.py` and `no-unauthorized-merge.py` already do.
+record that carries `message.model` decides. No other hook reads that
+field; `no-unmeasured-clock-claim.py` reads the same file for its clock
+text, and that is the precedent for reading the transcript at all.
 
 ## The override is a grant, not a habit
 
@@ -52,6 +53,9 @@ import sys
 from pathlib import Path
 
 OVERRIDE_ENV = "FABLE_SUBAGENT_OK"
+# The subagent-launch tool is reported under three names across harnesses;
+# `remind-ums-after-error.py` and `docs/cursor-hook-mapping.md` carry the same set.
+AGENT_TOOLS = ("Agent", "Task", "invoke_subagent")
 TAIL_BYTES = 400_000
 
 
@@ -112,7 +116,7 @@ def decide(payload):
     """(decision, text): decision in {"deny", "warn", None}."""
     tool = payload.get("tool_name") or ""
     inp = payload.get("tool_input") or {}
-    if tool == "Agent":
+    if tool in AGENT_TOOLS:
         model = inp.get("model")
         if isinstance(model, str) and model.strip():
             if not is_fable(model):

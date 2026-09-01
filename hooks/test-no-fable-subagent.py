@@ -116,6 +116,28 @@ check("--dry-run prints the empty PreToolUse shape when silent",
 res = subprocess.run([sys.executable, HOOK], input="not json", capture_output=True, encoding="utf-8")
 check("malformed stdin exits 0 with no output", res.returncode == 0 and not res.stdout.strip())
 
+for name in ("Task", "invoke_subagent"):
+    p = agent(); p["tool_name"] = name
+    rc, out = run(p)
+    check(f"tool name {name} is judged like Agent (denied when inheriting Fable)", decision(out) == "deny")
+
+rc, out = run(agent(model=""))
+check("an empty-string model is treated as absent and denied in a Fable session", decision(out) == "deny")
+
+for val in ("true", "yes", "0"):
+    rc, out = run(agent(model="fable"), {"FABLE_SUBAGENT_OK": val})
+    check(f"FABLE_SUBAGENT_OK={val} is not a grant", decision(out) == "deny")
+
+fd, big = tempfile.mkstemp(suffix=".jsonl")
+with os.fdopen(fd, "w") as fh:
+    fh.write(json.dumps({"type": "assistant", "message": {"model": "claude-sonnet-5", "content": []}}) + "\n")
+    for _ in range(3000):
+        fh.write(json.dumps({"type": "user", "message": {"content": "x" * 200}}) + "\n")
+    fh.write(json.dumps({"type": "assistant", "message": {"model": "claude-fable-5-1", "content": []}}) + "\n")
+rc, out = run(agent(tpath=big))
+check("a transcript larger than the tail window is read from its tail", decision(out) == "deny")
+os.unlink(big)
+
 for p in (FABLE, SONNET):
     os.unlink(p)
 print(f"\n{passes} passed, {failures} failed")

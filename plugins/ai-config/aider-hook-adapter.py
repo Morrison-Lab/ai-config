@@ -62,6 +62,31 @@ COMMIT_LINE = re.compile(
 )
 
 
+COMMON_EXTENSIONS = {
+    ".c", ".cc", ".cfg", ".conf", ".cpp", ".css", ".go", ".h", ".hpp",
+    ".html", ".ini", ".java", ".js", ".json", ".jsx", ".md", ".py",
+    ".qmd", ".r", ".rb", ".rs", ".sh", ".sql", ".toml", ".ts", ".tsx",
+    ".txt", ".yaml", ".yml",
+}
+
+
+def is_likely_file_path(line: str) -> str | None:
+    """Return cleaned file path if string represents a target file path, otherwise None."""
+    cleaned = line.strip().strip("`'\"*#")
+    if not cleaned or " " in cleaned:
+        return None
+    if cleaned.endswith((".", "!", "?", ":", ",", ";")):
+        return None
+    if cleaned.startswith(("http://", "https://", "ftp://")):
+        return None
+    if "/" in cleaned or "\\" in cleaned:
+        return cleaned
+    ext = os.path.splitext(cleaned)[1].lower()
+    if ext in COMMON_EXTENSIONS:
+        return cleaned
+    return None
+
+
 def _clean_path(raw: Any) -> str | None:
     """Normalize a path string, decoding file:// URIs and stripping whitespace."""
     if not isinstance(raw, str) or not raw.strip():
@@ -247,13 +272,11 @@ def parse_aider_chat_history(content_or_path: str | Path) -> list[dict[str, Any]
                     "content": f"Applied edit to {search_replace_file}",
                 })
             current_lines.append(raw_line)
-            continue
-
         # Check for file path mentions preceding edits
         if not in_search_replace:
-            words = line.strip().split()
-            if len(words) == 1 and ("/" in words[0] or "." in words[0]) and not words[0].startswith("#"):
-                search_replace_file = words[0]
+            fp = is_likely_file_path(line)
+            if fp:
+                search_replace_file = fp
 
         # Check for shell run
         m_shell = SHELL_COMMAND_LINE.match(line)

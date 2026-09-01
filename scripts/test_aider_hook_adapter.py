@@ -165,6 +165,15 @@ class TestMatcherAndToolHelpers(unittest.TestCase):
         self.assertIsNone(adapter._clean_path(""))
         self.assertIsNone(adapter._clean_path(123))
 
+    def test_is_likely_file_path(self):
+        self.assertEqual(adapter.is_likely_file_path("path/to/file.py"), "path/to/file.py")
+        self.assertEqual(adapter.is_likely_file_path("SKILL.md"), "SKILL.md")
+        self.assertEqual(adapter.is_likely_file_path("`scripts/check-links.py`"), "scripts/check-links.py")
+        self.assertIsNone(adapter.is_likely_file_path("Done."))
+        self.assertIsNone(adapter.is_likely_file_path("OK!"))
+        self.assertIsNone(adapter.is_likely_file_path("Here are the changes:"))
+        self.assertIsNone(adapter.is_likely_file_path("https://example.com/file.py"))
+
 
 class TestEventAdaptationAndExecution(unittest.TestCase):
     """Test executing hooks and translating results."""

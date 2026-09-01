@@ -11,6 +11,13 @@ import tempfile
 import time
 
 POLL_SECONDS = 120
+# How much of a CLI's own output an error entry keeps. The entry reaches the
+# next prompt through inject-pr-monitor-status.py, so it is bounded; the
+# TAIL is kept because a CLI prints its diagnosis last. 300 characters hold
+# a refused-flag message (about 60) or the last two or three instance blocks
+# of `glab auth status --all` (about 100 each), which is the diagnosis and
+# not the whole listing.
+ERROR_TAIL = 300
 # The file and the "kind" marker keep their pre-GitLab names on purpose. A
 # daemon started before the GitLab support landed keeps writing this path
 # every poll, ensure() reads the pid from it, and scripts/install-pr-monitor.py
@@ -147,9 +154,11 @@ def glab_hosts():
     """(hosts, cut_short): hosts glab is logged in to, and None or text saying the list was cut short.
 
     An error when the status lists no logged-in host, carrying glab's exit
-    status and its own message, since the two causes differ: no login at
-    all, or an invocation glab refused (a glab older than v1.79.0 has no
-    `--all`, an unreadable config). `--all` covers every
+    status and its own message. The message is what names the cause -- no
+    login at all, or an invocation glab refused (a glab older than v1.79.0
+    has no `--all`, an unreadable config) -- since glab exits 1 for either,
+    and also for a working instance listed beside a failed one, which is
+    why the status is never consulted when parsing. `--all` covers every
     authenticated instance. Without it glab checks only the instance implied
     by the cwd's git remote or GITLAB_HOST when that is not gitlab.com -- and
     this daemon inherits the cwd of whichever session spawned it, so the
@@ -178,7 +187,7 @@ def glab_hosts():
     if not hosts:
         raise OSError(
             f"glab auth status --all listed no authenticated host "
-            f"(exit {exit_status}): {output.strip()[-300:]}")
+            f"(exit {exit_status}): {output.strip()[-ERROR_TAIL:]}")
     return hosts, cut_short
 
 
@@ -233,7 +242,7 @@ def poll_once(state):
         except subprocess.CalledProcessError as error:
             # The exit status alone names no cause; the CLI's stderr does
             # (`invalid hostname`, an auth failure), so it rides along.
-            stderr = (error.stderr or "").strip()
+            stderr = (error.stderr or "").strip()[-ERROR_TAIL:]
             errors[name] = f"{error}: {stderr}" if stderr else str(error)
         except caught as error:
             errors[name] = str(error)

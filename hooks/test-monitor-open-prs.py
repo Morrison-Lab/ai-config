@@ -15,6 +15,14 @@ assert subject.POLL_SECONDS == 120
 assert subject.STATE_PATH.endswith("all-open-prs.json")
 assert "all_open_prs" in subject.poll_once.__code__.co_consts
 assert any(isinstance(c, (str, tuple, list)) and "--author" in c for c in subject.open_prs.__code__.co_consts)
+# The command must run the absolutely-resolved GH_PATH; the literal "gh"
+# reappearing in open_prs would be a revert of the #1953 fix. CPython folds
+# a list display into a tuple inside co_consts, so nested consts are
+# searched too -- a top-level-only check passes on the reverted code.
+assert not any(
+    value == "gh"
+    for const in subject.open_prs.__code__.co_consts
+    for value in (const if isinstance(const, (tuple, list)) else (const,)))
 assert any(isinstance(c, (str, tuple, list)) and "created_by_me" in c for c in subject.host_merge_requests.__code__.co_consts)
 assert "--hostname" in subject.host_merge_requests.__code__.co_consts
 assert "--paginate" in subject.host_merge_requests.__code__.co_consts
@@ -73,7 +81,7 @@ with tempfile.TemporaryDirectory() as d:
             "if sys.argv[1:3] == ['auth', 'status']:\n"
             f"    text = open({status_file!r}, encoding='utf-8').read()\n"
             "    sys.stderr.write(text)\n"
-            "    sys.exit(1 if text.startswith('Error:') else 0)\n"
+            "    sys.exit(1 if ('Error:' in text or 'failed' in text) else 0)\n"
             "host = sys.argv[sys.argv.index('--hostname') + 1]\n"
             "if ':' in host:\n"
             "    sys.stderr.write('invalid hostname' + chr(10))\n"
@@ -91,6 +99,10 @@ with tempfile.TemporaryDirectory() as d:
         subject.GLAB_PATH = stub if os.name != "nt" else None
         subject.STATE_PATH = os.path.join(d, "state.json")
         if subject.GLAB_PATH is not None:
+            # Real glab exits 1 when ANY instance fails, even beside a working
+            # one (status.go, v1.79.0 onward), so a mixed status is exit 1 and
+            # still lists the working hosts -- the exit status is not read
+            # when parsing, only carried into the no-host error.
             assert subject.glab_hosts() == (["gitlab.com", "gitlab.example.com:8443"], None)
             assert subject.host_merge_requests("gitlab.com") == [{"iid": 1}, {"iid": 2}, {"iid": 3}]
             state = subject.poll_once({})
@@ -122,7 +134,7 @@ with tempfile.TemporaryDirectory() as d:
                 subject.glab_hosts()
                 raise AssertionError("no authenticated hosts should raise")
             except OSError as error:
-                assert "listed no authenticated host (exit 0)" in str(error), error
+                assert "listed no authenticated host (exit 1)" in str(error), error
                 assert "API call failed: 401" in str(error), error
             state = subject.poll_once({})
             assert state["data"] == {}
@@ -265,7 +277,7 @@ with tempfile.TemporaryDirectory() as d:
         # fingerprint covers the error text beside the data, so a changed
         # error text under this constant empty data still surfaces.
         def no_hosts():
-            raise OSError("glab auth status --all listed no authenticated host (exit 0): ")
+            raise OSError("glab auth status --all listed no authenticated host (exit 1): ")
 
         subject.glab_hosts = no_hosts
         state = subject.poll_once(state)

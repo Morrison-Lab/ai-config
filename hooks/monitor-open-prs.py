@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Continuously poll open GitHub PRs and GitLab merge requests authored by the user."""
+import functools
 import json
 import os
 import re
@@ -14,7 +15,8 @@ POLL_SECONDS = 120
 # daemon started before the GitLab support landed keeps writing this path
 # every poll, ensure() reads the pid from it, and scripts/install-pr-monitor.py
 # stops the pid recorded in it -- renaming it would leave that daemon running
-# beside a second one, with both files surfaced on every prompt. Nothing reads
+# beside a second one, with both files surfaced whenever either changes.
+# Nothing reads
 # "kind". The file holds GitLab merge requests too; see poll_once().
 STATE_PATH = os.path.join(tempfile.gettempdir(), "claude-pr-monitors", "all-open-prs.json")
 IS_WINDOWS = os.name == "nt"
@@ -104,9 +106,13 @@ def open_prs():
 
 # One `glab auth status` block per instance: a host line, then indented
 # status lines, of which a successful login reads `Logged in to <host> as`.
-# The host may carry a port. The backreference ties the status line to the
-# host line above it, so a failed instance listed between two working ones
-# is not credited with its neighbour's login.
+# The backreference ties the status line to the host line above it, so a
+# failed instance listed between two working ones is not credited with its
+# neighbour's login. A host may carry a port: `glab auth login` accepts one,
+# so it can appear here, while `glab api --hostname` refuses any host with a
+# ':' (gitlab-org/cli internal/glinstance/host.go, HostnameValidator). It is
+# matched anyway, so that refusal lands in state["error"] under the host's
+# own key rather than the host silently going unpolled.
 GLAB_LOGGED_IN_RE = re.compile(
     r"^([A-Za-z0-9.-]+(?::[0-9]+)?)\n\s+.*Logged in to \1 as ",
     re.MULTILINE)
@@ -136,58 +142,96 @@ def json_documents(text):
         documents.append(document)
 
 
-def open_merge_requests():
-    # `--all` covers every authenticated instance. Without it glab checks
-    # only the instance implied by the cwd's git remote or GITLAB_HOST when
-    # that is not gitlab.com -- and this daemon inherits the cwd of whichever
-    # session spawned it, so the polled host set would depend on where the
-    # session happened to start.
-    result = subprocess.run(
-        [GLAB_PATH, "auth", "status", "--all"],
-        capture_output=True, text=True, timeout=30)
-    hosts = authenticated_hosts(result.stdout + result.stderr)
+def glab_hosts():
+    """Every GitLab host glab is logged in to; an error when there is none.
+
+    `--all` covers every authenticated instance. Without it glab checks only
+    the instance implied by the cwd's git remote or GITLAB_HOST when that is
+    not gitlab.com -- and this daemon inherits the cwd of whichever session
+    spawned it, so the polled host set would depend on where the session
+    happened to start.
+    """
+    try:
+        result = subprocess.run(
+            [GLAB_PATH, "auth", "status", "--all"],
+            capture_output=True, text=True, timeout=POLL_SECONDS)
+        output = (result.stdout or "") + (result.stderr or "")
+    except subprocess.TimeoutExpired as error:
+        # glab gives each instance its own 30 s, so one unreachable instance
+        # can exhaust the budget after the reachable ones already answered;
+        # the partial output names those, and they are polled rather than
+        # lost with the timeout.
+        output = _captured_text(error.stdout) + _captured_text(error.stderr)
+        if not authenticated_hosts(output):
+            raise
+    hosts = authenticated_hosts(output)
     if not hosts:
         raise OSError("glab has no authenticated hosts")
+    return hosts
+
+
+def _captured_text(captured):
+    if captured is None:
+        return ""
+    return captured.decode(errors="replace") if isinstance(captured, bytes) else captured
+
+
+def host_merge_requests(host):
+    """Every open merge request the user authored on one GitLab host."""
+    response = subprocess.run(
+        [
+            GLAB_PATH, "api", "--hostname", host, "--paginate",
+            "merge_requests?scope=created_by_me&state=opened&per_page=100"
+        ],
+        capture_output=True, text=True, timeout=60, check=True)
     merge_requests = []
-    for host in hosts:
-        response = subprocess.run(
-            [
-                GLAB_PATH, "api", "--hostname", host, "--paginate",
-                "merge_requests?scope=created_by_me&state=opened&per_page=100"
-            ],
-            capture_output=True, text=True, timeout=60, check=True)
-        for page in json_documents(response.stdout):
-            merge_requests.extend(page)
+    for page in json_documents(response.stdout):
+        # A page is a JSON array of merge requests. glab exits non-zero on
+        # an API error, so an error object should never reach this point,
+        # and extending with one would silently store its key strings as
+        # merge requests.
+        if not isinstance(page, list):
+            raise ValueError(
+                f"expected a JSON array page from glab api, got {type(page).__name__}")
+        merge_requests.extend(page)
     return merge_requests
-
-
-def available_sources():
-    """The sources this host can query, keyed by their state["data"] entry.
-
-    A source whose CLI is missing is left out rather than reported as an
-    empty list: an absent key means "not checked", an empty list means
-    "checked, none open", and the state file must not blur the two.
-    """
-    sources = {}
-    if GH_PATH is not None:
-        sources["github_prs"] = open_prs
-    if GLAB_PATH is not None:
-        sources["gitlab_merge_requests"] = open_merge_requests
-    return sources
 
 
 def poll_once(state):
     state.update({"kind": "all_open_prs", "pid": os.getpid(), "checked_at": time.time()})
     # Every source that answered lands under "data", every one that failed
-    # under "error" (a JSON object keyed by source), so one CLI failing does
-    # not hide the other's results; "data" is {} when every source failed.
+    # under "error" (a JSON object keyed by source), so one failing does not
+    # hide another's results; "data" is {} when every source failed. Each
+    # GitLab host is its own source ("gitlab_merge_requests/<host>"), so a
+    # host that is down, or one glab api refuses, costs only its own entry.
+    # A source whose CLI is missing is left out rather than reported as an
+    # empty list: an absent key means "not checked", an empty list means
+    # "checked, none open", and the state file must not blur the two.
     data = {}
     errors = {}
-    for name, query in available_sources().items():
+    caught = (OSError, ValueError, subprocess.SubprocessError)
+
+    def run(name, query):
         try:
             data[name] = query()
-        except (OSError, ValueError, subprocess.SubprocessError) as error:
+        except caught as error:
             errors[name] = str(error)
+
+    if GH_PATH is None and GLAB_PATH is None:
+        # require_cli() refuses to start the daemon in this state; a poll
+        # reaching here anyway must not write a "checked, none open" file.
+        raise OSError("cannot resolve 'gh' or 'glab' on PATH; nothing to poll")
+    if GH_PATH is not None:
+        run("github_prs", open_prs)
+    if GLAB_PATH is not None:
+        try:
+            hosts = glab_hosts()
+        except caught as error:
+            errors["gitlab_merge_requests"] = str(error)
+        else:
+            for host in hosts:
+                run(f"gitlab_merge_requests/{host}",
+                    functools.partial(host_merge_requests, host))
 
     state["data"] = data
     if not errors:

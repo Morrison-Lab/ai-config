@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Regression test for monitor-open-prs.py."""
 import importlib.util
+import json
 import sys
 
 spec = importlib.util.spec_from_file_location("subject", sys.argv[1])
@@ -14,16 +15,17 @@ assert subject.POLL_SECONDS == 120
 assert subject.STATE_PATH.endswith("all-open-prs.json")
 assert "all_open_prs" in subject.poll_once.__code__.co_consts
 assert any(isinstance(c, (str, tuple, list)) and "--author" in c for c in subject.open_prs.__code__.co_consts)
-assert any(isinstance(c, (str, tuple, list)) and "created_by_me" in c for c in subject.open_merge_requests.__code__.co_consts)
-assert "--hostname" in subject.open_merge_requests.__code__.co_consts
-assert "--paginate" in subject.open_merge_requests.__code__.co_consts
-assert "--all" in subject.open_merge_requests.__code__.co_consts
+assert any(isinstance(c, (str, tuple, list)) and "created_by_me" in c for c in subject.host_merge_requests.__code__.co_consts)
+assert "--hostname" in subject.host_merge_requests.__code__.co_consts
+assert "--paginate" in subject.host_merge_requests.__code__.co_consts
+assert "--all" in subject.glab_hosts.__code__.co_consts
 
 # authenticated_hosts reads real `glab auth status --all` shape: a host line,
 # then indented status lines. A failed instance between two working ones is
-# not credited with a neighbour's login, a host may carry a port, and no
-# login at all is an empty list (which open_merge_requests turns into an
-# error rather than a silent zero).
+# not credited with a neighbour's login, a host may carry a port (glab api
+# then refuses it, and that lands under the host's own error key below), and
+# no login at all is an empty list, which glab_hosts turns into an error
+# rather than a silent zero.
 GLAB_STATUS = (
     "gitlab.com\n"
     "  \u2713 Logged in to gitlab.com as ezra (keyring)\n"
@@ -45,10 +47,11 @@ assert subject.json_documents("[1, 2]") == [[1, 2]]
 assert subject.json_documents("[1, 2]\n[3]\n") == [[1, 2], [3]]
 assert subject.json_documents("") == []
 
-# open_merge_requests end to end against a stub glab: the hosts come from
-# `auth status --all`, every host is queried with --paginate, and the pages
-# are concatenated. The stub records its argv so the flags are asserted
-# rather than assumed.
+# glab_hosts, host_merge_requests, and poll_once end to end against a stub
+# glab: the hosts come from `auth status --all`, every host is queried with
+# --paginate, pages are concatenated, and a host glab api refuses (the
+# port-carrying one, as the real glab does) costs only its own entry. The
+# stub records its argv so the flags are asserted rather than assumed.
 import os
 import stat
 import tempfile
@@ -67,41 +70,80 @@ with tempfile.TemporaryDirectory() as d:
             f"    sys.stderr.write(open({status_file!r}, encoding='utf-8').read())\n"
             "    sys.exit(0)\n"
             "host = sys.argv[sys.argv.index('--hostname') + 1]\n"
+            "if ':' in host:\n"
+            "    sys.stderr.write('invalid hostname' + chr(10))\n"
+            "    sys.exit(1)\n"
             "if host == 'gitlab.com':\n"
             "    sys.stdout.write('[{\"iid\": 1}, {\"iid\": 2}]\\n[{\"iid\": 3}]\\n')\n"
+            "elif host == 'object.example.org':\n"
+            "    sys.stdout.write('{\"message\": \"401 Unauthorized\"}')\n"
             "else:\n"
-            "    sys.stdout.write('[{\"iid\": 8443}]')\n")
+            "    sys.stdout.write('[]')\n")
     os.chmod(stub, os.stat(stub).st_mode | stat.S_IEXEC)
-    saved_glab = subject.GLAB_PATH
+    saved = (subject.GH_PATH, subject.GLAB_PATH, subject.STATE_PATH)
     try:
+        subject.GH_PATH = None
         subject.GLAB_PATH = stub if os.name != "nt" else None
+        subject.STATE_PATH = os.path.join(d, "state.json")
         if subject.GLAB_PATH is not None:
-            assert subject.open_merge_requests() == [
-                {"iid": 1}, {"iid": 2}, {"iid": 3}, {"iid": 8443}]
+            assert subject.glab_hosts() == ["gitlab.com", "gitlab.example.com:8443"]
+            assert subject.host_merge_requests("gitlab.com") == [{"iid": 1}, {"iid": 2}, {"iid": 3}]
+            state = subject.poll_once({})
+            assert state["data"] == {"gitlab_merge_requests/gitlab.com": [{"iid": 1}, {"iid": 2}, {"iid": 3}]}, state
+            errors = json.loads(state["error"])
+            assert list(errors) == ["gitlab_merge_requests/gitlab.example.com:8443"], errors
+            assert "returned non-zero exit status 1" in errors["gitlab_merge_requests/gitlab.example.com:8443"]
             with open(argv_log, encoding="utf-8") as stream:
                 calls = stream.read().splitlines()
             assert calls[0] == "auth status --all", calls
             assert calls[1].startswith("api --hostname gitlab.com --paginate "), calls
-            assert calls[2].startswith("api --hostname gitlab.example.com:8443 --paginate "), calls
-            assert len(calls) == 3, calls
+            # glab_hosts ran once more for poll_once, then one api call per host.
+            assert calls[2] == "auth status --all", calls
+            assert calls[3].startswith("api --hostname gitlab.com --paginate "), calls
+            assert calls[4].startswith("api --hostname gitlab.example.com:8443 --paginate "), calls
+            assert len(calls) == 5, calls
+            # A page that is not a JSON array is an error, never stored as
+            # merge requests (an error object would flatten to its keys).
+            try:
+                subject.host_merge_requests("object.example.org")
+                raise AssertionError("a non-array page should raise")
+            except ValueError as error:
+                assert "expected a JSON array page" in str(error)
             # No authenticated host is an error, never a silent empty list.
             with open(status_file, "w", encoding="utf-8") as stream:
                 stream.write("gitlab.com\n  x gitlab.com: API call failed: 401\n")
             try:
-                subject.open_merge_requests()
+                subject.glab_hosts()
                 raise AssertionError("no authenticated hosts should raise")
             except OSError as error:
                 assert "no authenticated hosts" in str(error)
+            state = subject.poll_once({})
+            assert state["data"] == {}
+            assert json.loads(state["error"]) == {"gitlab_merge_requests": "glab has no authenticated hosts"}
     finally:
-        subject.GLAB_PATH = saved_glab
-# The command must run the absolutely-resolved GH_PATH; the literal "gh"
-# reappearing in open_prs would be a revert of the #1953 fix. CPython folds
-# a list display into a tuple inside co_consts, so nested consts are
-# searched too -- a top-level-only check passes on the reverted code.
-assert not any(
-    value == "gh"
-    for const in subject.open_prs.__code__.co_consts
-    for value in (const if isinstance(const, (tuple, list)) else (const,)))
+        subject.GH_PATH, subject.GLAB_PATH, subject.STATE_PATH = saved
+
+# glab_hosts keeps the hosts that answered when `auth status --all` times
+# out on a later instance: the partial output is parsed, not discarded.
+real_run = subject.subprocess.run
+try:
+    def timing_out(*args, **kwargs):
+        raise subject.subprocess.TimeoutExpired(args[0], kwargs.get("timeout"), output="", stderr=GLAB_STATUS)
+    subject.subprocess.run = timing_out
+    saved_glab = subject.GLAB_PATH
+    subject.GLAB_PATH = subject.GLAB_PATH or "glab"
+    assert subject.glab_hosts() == ["gitlab.com", "gitlab.example.com:8443"]
+    def timing_out_empty(*args, **kwargs):
+        raise subject.subprocess.TimeoutExpired(args[0], kwargs.get("timeout"), output="", stderr="")
+    subject.subprocess.run = timing_out_empty
+    try:
+        subject.glab_hosts()
+        raise AssertionError("a timeout with no host answered should raise")
+    except subject.subprocess.TimeoutExpired:
+        pass
+finally:
+    subject.subprocess.run = real_run
+    subject.GLAB_PATH = saved_glab
 
 # Verify read_state / write_state roundtrip preserves reported fingerprint
 import tempfile, os
@@ -145,7 +187,8 @@ finally:
 with tempfile.TemporaryDirectory() as d:
     orig_path = subject.STATE_PATH
     real_open_prs = subject.open_prs
-    real_open_merge_requests = subject.open_merge_requests
+    real_glab_hosts = subject.glab_hosts
+    real_host_merge_requests = subject.host_merge_requests
 
     def failing():
         raise OSError("[Errno 2] No such file or directory: 'gh'")
@@ -153,7 +196,10 @@ with tempfile.TemporaryDirectory() as d:
     def working():
         return [{"number": 7}]
 
-    def working_gitlab():
+    def one_host():
+        return ["gitlab.com"]
+
+    def working_gitlab(host):
         return [{"iid": 8}]
 
     # poll_once queries only the sources whose CLI resolves, so both paths
@@ -164,10 +210,11 @@ with tempfile.TemporaryDirectory() as d:
         subject.GLAB_PATH = subject.GLAB_PATH or "glab"
         subject.STATE_PATH = os.path.join(d, "streak.json")
         subject.open_prs = failing
-        subject.open_merge_requests = working_gitlab
+        subject.glab_hosts = one_host
+        subject.host_merge_requests = working_gitlab
         state = subject.poll_once({})
         assert "github_prs" not in state["data"]
-        assert state["data"]["gitlab_merge_requests"] == [{"iid": 8}]
+        assert state["data"]["gitlab_merge_requests/gitlab.com"] == [{"iid": 8}]
         assert "github_prs" in state["error"]
         assert state["error_streak"] == 1
         state = subject.poll_once(state)
@@ -190,24 +237,43 @@ with tempfile.TemporaryDirectory() as d:
         # error naming every failed source. inject-pr-monitor-status.py's
         # fingerprint covers the error text beside the data, so a changed
         # error text under this constant empty data still surfaces.
-        def failing_gitlab():
+        def no_hosts():
             raise OSError("glab has no authenticated hosts")
 
-        subject.open_prs = failing_differently
-        subject.open_merge_requests = failing_gitlab
+        subject.glab_hosts = no_hosts
         state = subject.poll_once(state)
         assert state["data"] == {}
         assert "github_prs" in state["error"] and "gitlab_merge_requests" in state["error"]
         assert state["error_streak"] == 1
 
+        # One GitLab host failing costs only its own entry: the other
+        # host's merge requests are kept and the error names the host.
+        def two_hosts():
+            return ["gitlab.com", "down.example.org"]
+
+        def one_down(host):
+            if host == "down.example.org":
+                raise OSError("connection refused")
+            return [{"iid": 8}]
+
         subject.open_prs = working
-        subject.open_merge_requests = working_gitlab
+        subject.glab_hosts = two_hosts
+        subject.host_merge_requests = one_down
+        state = subject.poll_once(state)
+        assert state["data"] == {
+            "github_prs": [{"number": 7}],
+            "gitlab_merge_requests/gitlab.com": [{"iid": 8}]
+        }, state
+        assert json.loads(state["error"]) == {"gitlab_merge_requests/down.example.org": "connection refused"}
+
+        subject.glab_hosts = one_host
+        subject.host_merge_requests = working_gitlab
         state = subject.poll_once(state)
         assert "error" not in state
         assert state["error_streak"] == 0
         assert state["data"] == {
             "github_prs": [{"number": 7}],
-            "gitlab_merge_requests": [{"iid": 8}]
+            "gitlab_merge_requests/gitlab.com": [{"iid": 8}]
         }
 
         # A source whose CLI is missing is not checked, and its key stays
@@ -217,13 +283,21 @@ with tempfile.TemporaryDirectory() as d:
         try:
             subject.GH_PATH = None
             state = subject.poll_once(state)
-            assert state["data"] == {"gitlab_merge_requests": [{"iid": 8}]}
+            assert state["data"] == {"gitlab_merge_requests/gitlab.com": [{"iid": 8}]}
             assert "error" not in state
+            # Neither CLI is a refusal, never a "checked, none open" file.
+            subject.GLAB_PATH = None
+            try:
+                subject.poll_once(state)
+                raise AssertionError("no CLI at all should raise")
+            except OSError as error:
+                assert "nothing to poll" in str(error)
         finally:
             subject.GH_PATH = saved_gh
     finally:
         subject.open_prs = real_open_prs
-        subject.open_merge_requests = real_open_merge_requests
+        subject.glab_hosts = real_glab_hosts
+        subject.host_merge_requests = real_host_merge_requests
         subject.GH_PATH, subject.GLAB_PATH = saved_paths
         subject.STATE_PATH = orig_path
 

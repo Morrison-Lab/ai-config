@@ -36,7 +36,9 @@ def fingerprint(state):
     # and must still surface.  A healthy state hashes its data alone, so an
     # already-reported healthy monitor keeps its fingerprint across this
     # change; an already-reported ERRORING per-PR watcher (error, no data)
-    # does not, and re-surfaces once on the first prompt after upgrade.
+    # does not, and re-surfaces once on the first prompt after upgrade (a
+    # pre-fix daemon in the same shape with its persistent flag set can
+    # re-surface twice: the change pops the flag, then the streak fires).
     if "error" not in state:
         observed = state.get("data")
     else:

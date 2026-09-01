@@ -30,24 +30,12 @@ mutates a PR stays serial.
    State the scope rules when you report, so the user can
    correct:
    - **Only the user's own PRs are in scope.**
-     Resolve the invoking user first --- `gh api user --jq .login` locally,
-     `mcp__github__get_me` in a remote session --- and add any aliases
-     `memories/reviewing-prs.md` lists for that person, so a lab member
-     running this corpus from a vendored checkout filters on their own
-     identity rather than the corpus owner's.
-     Keep a PR only when its `author.login` is one of those logins or the
-     repository's own workflow bot (`github-actions[bot]` via the API,
-     `app/github-actions` in `gh pr list` output), one of those logins is
-     among its `assignees`, or the user named the PR in the request;
-     drop every other PR before doing anything else, and name the dropped
-     ones in the report so the user can assign or name any they want driven.
+     Resolve the invoking user first --- `gh api user --jq .login` locally, `mcp__github__get_me` in a remote session --- and add any aliases `memories/reviewing-prs.md` lists for that person, so a lab member running this corpus from a vendored checkout filters on their own identity rather than the corpus owner's.
+     Keep a PR only when its `author.login` is one of those logins or the repository's own workflow bot (app slug `github-actions`, which the REST API and the MCP tools return as `github-actions[bot]`, GraphQL and `scripts/pr-sweep.py` as `github-actions`, and `gh pr list --json author` as `app/github-actions`), one of those logins is among its `assignees`, or the user named the PR in the request;
+     drop every other PR before doing anything else, and name the dropped ones in the report so the user can assign or name any they want driven.
      "Every open PR" below means every PR that survives this filter.
-     A PR by another lab member, or by any other bot (Dependabot, a
-     Copilot agent), is not driven, reviewed, or edited, however clean it
-     looks
-     (see `memories/reviewing-prs.md`, "Only work PRs I opened or am assigned
-     to"; measured on `UCD-SERG/serodynamics` 2026-09-01, where the sweep
-     drove four other authors' PRs before the correction arrived).
+     A PR by another lab member, or by any other bot (Dependabot, a Copilot agent), is not driven, reviewed, or edited, however clean it looks (see `memories/reviewing-prs.md`, "Only work PRs I opened, am assigned to, or a workflow opened";
+     measured on `UCD-SERG/serodynamics` 2026-09-01, where the sweep drove four other authors' PRs before the correction arrived).
    - **Include drafts** (`isDraft: true`) unless another agent is actively driving one.
      A draft is the corpus's own in-flight claim signal ---
      [`pr-on-claim`](../../shared/workflow/pr-on-claim.md) opens one from an empty `start:` scaffold commit before any code exists ---

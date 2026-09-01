@@ -15,12 +15,14 @@ from fences import strip_code_spans, strip_fences, strip_math  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 
-# Matches [text](target) but not image links ![alt](target)
-LINK = re.compile(r"(?<!!)\[([^\]]*)\]\(([^)]+)\)")
+# Reference link definition (CommonMark 4.7): [label]: destination "optional title"
 REF_DEF = re.compile(
     r"^[ \t]{0,3}\[(?!\^)(?P<label>[^\]]+)\]:[ \t]*(?P<target>\S.*)$",
     re.MULTILINE,
 )
+
+# Inline, full reference, collapsed reference, or shortcut reference links
+LINK_PATTERN = re.compile(r"(?<!!)\[([^\]]*)\](?:\(([^)]+)\)|\[([^\]]*)\])?")
 
 SCAN_GLOBS = [
     "skills/**/*.md",
@@ -43,7 +45,7 @@ checked = 0
 
 
 def is_external(target: str) -> bool:
-    if target.startswith(SKIP_PREFIXES) or "://" in target:
+    if any(target.startswith(p) for p in SKIP_PREFIXES) or "://" in target:
         return True
     if URI_RE.match(target):
         return True
@@ -52,13 +54,13 @@ def is_external(target: str) -> bool:
     return False
 
 
-def parse_link_target(raw: str) -> str:
-    """Extract destination path/URL from a raw link target or reference definition.
+def normalize_label(label: str) -> str:
+    """Normalize a Markdown reference link label per CommonMark."""
+    return re.sub(r"\s+", " ", label.strip()).casefold()
 
-    Handles angle-bracket enclosed destinations (`<path/to/file>`) and drops
-    trailing optional title attributes enclosed in quotes or parentheses
-    (e.g. `"title"`, `'title'`, `(title)`).
-    """
+
+def parse_link_target(raw: str) -> str:
+    """Extract destination path/URL from a raw link target or reference definition."""
     target = raw.strip()
     if not target:
         return ""
@@ -78,14 +80,22 @@ def parse_link_target(raw: str) -> str:
     return parts[0] if parts else ""
 
 
-def resolve_target(base_dir: Path, target: str) -> Path | None:
-    """Resolve a relative markdown target to an existing file.
+def extract_reference_definitions(text: str) -> tuple[dict[str, str], str]:
+    """Extract link reference definitions and return definitions dict and remaining text."""
+    defs: dict[str, str] = {}
+    for match in REF_DEF.finditer(text):
+        label = normalize_label(match.group("label"))
+        raw_target = match.group("target")
+        parsed = parse_link_target(raw_target)
+        if label and label not in defs and parsed:
+            defs[label] = parsed
+    # Remove definition lines so they aren't parsed as shortcut links in prose
+    text_without_defs = REF_DEF.sub("", text)
+    return defs, text_without_defs
 
-    Supports:
-    - Direct file paths (with optional anchor/query fragments)
-    - Extensionless markdown paths (path/to/doc -> path/to/doc.md)
-    - Directory paths resolving to index.md or README.md
-    """
+
+def resolve_target(base_dir: Path, target: str) -> Path | None:
+    """Resolve a relative markdown target to an existing file."""
     path_part = re.split(r"[#?]", target, maxsplit=1)[0]
     if not path_part:
         return None
@@ -102,44 +112,68 @@ def resolve_target(base_dir: Path, target: str) -> Path | None:
     return None
 
 
-def check_file(md: Path, root: Path = ROOT) -> None:
+def check_target(target: str, md: Path, root: Path = ROOT) -> None:
     global checked
+    if not target or is_external(target):
+        return
+    if "<" in target or ">" in target:
+        return  # angle-bracket placeholder, e.g. <owner>/<repo>
+    path_part = re.split(r"[#?]", target, maxsplit=1)[0]
+    if not path_part:  # pure in-page anchor
+        return
+    has_fragment = len(path_part) < len(target)
+    is_bare = "/" not in path_part and "." not in path_part
+    resolved = resolve_target(md.parent, target)
+    if resolved is not None:
+        checked += 1
+    elif is_bare and not has_fragment:
+        return  # bare-word placeholder in an example, e.g. (url)
+    else:
+        checked += 1
+        try:
+            rel = md.relative_to(root)
+        except ValueError:
+            rel = md
+        broken.append(f"{rel} -> {target}")
+
+
+def check_file(md: Path, root: Path = ROOT) -> None:
     text = md.read_text(encoding="utf-8")
-    # Strip code regions and math blocks first so code examples and LaTeX math
-    # aren't mistaken for real links, while preserving prose and link targets.
     text = strip_fences(text)
     text = strip_code_spans(text)
     text = strip_math(text)
 
-    raw_targets: list[str] = []
-    for match in LINK.finditer(text):
-        raw_targets.append(match.group(2))
-    for match in REF_DEF.finditer(text):
-        raw_targets.append(match.group("target"))
+    defs, text_body = extract_reference_definitions(text)
+    referenced_labels: set[str] = set()
 
-    for raw in raw_targets:
-        target = parse_link_target(raw)
-        if not target or is_external(target):
-            continue
-        if "<" in target or ">" in target:
-            continue  # angle-bracket placeholder, e.g. <owner>/<repo>
-        path_part = re.split(r"[#?]", target, maxsplit=1)[0]
-        if not path_part:  # pure in-page anchor
-            continue
-        has_fragment = len(path_part) < len(target)
-        is_bare = "/" not in path_part and "." not in path_part
-        resolved = resolve_target(md.parent, target)
-        if resolved is not None:
-            checked += 1
-        elif is_bare and not has_fragment:
-            continue  # bare-word placeholder in an example, e.g. (url)
+    for match in LINK_PATTERN.finditer(text_body):
+        first_bracket = match.group(1)
+        inline_url = match.group(2)
+        ref_label = match.group(3)
+
+        if inline_url is not None:
+            # Inline link: [text](url)
+            parsed = parse_link_target(inline_url)
+            if parsed:
+                check_target(parsed, md, root=root)
+        elif ref_label is not None:
+            # Full reference link [text][label] or collapsed reference link [label][]
+            label = ref_label if ref_label != "" else first_bracket
+            norm = normalize_label(label)
+            if norm in defs:
+                referenced_labels.add(norm)
+                check_target(defs[norm], md, root=root)
         else:
-            checked += 1
-            try:
-                rel = md.relative_to(root)
-            except ValueError:
-                rel = md
-            broken.append(f"{rel} -> {target}")
+            # Shortcut reference link: [label]
+            norm = normalize_label(first_bracket)
+            if norm in defs:
+                referenced_labels.add(norm)
+                check_target(defs[norm], md, root=root)
+
+    # Also validate any unused link reference definitions pointing to relative paths
+    for norm, dest in defs.items():
+        if norm not in referenced_labels:
+            check_target(dest, md, root=root)
 
 
 def main() -> None:

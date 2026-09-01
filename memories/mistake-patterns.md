@@ -175,22 +175,41 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
 - **Fix**: Verify every path, test suite name, and CI workflow against the target repository's tree before committing.
   Use absolute GitHub URLs for any cross-repository references to `ai-config` files.
 
-## Pattern 12: Arming Auto-Merge While Review Findings Are Still Open
+## Pattern 12: Arming Auto-Merge While Review Findings Are Still Open or at an Unreviewed Head After Sync
 - **Mistake**: Running `gh pr merge --auto` (or any deferred/auto merge) on a PR that still has open review findings or no verdict at head.
   Treating the arming as harmless because CI is red ignores that the robot fires later,
   the moment checks go green,
   with no re-check of review state.
-- **Example**: 2026-08-26 on `ai-config#2226`:
-  armed `--squash --auto` while round-1 findings were open and the reviewer was quota-skipping.
-  Hours later a push turned `validate` green,
-  auto-merge fired at 04:30Z,
-  and it merged over an explicit Needs-more-work verdict ---
-  requiring revert (#2268) plus reland-with-fixes (#2269).
+  A second route to the same failure is arming `--auto` immediately after a sync-only push
+  (e.g. merging `origin/main` in when a direct merge was refused due to an out-of-date branch):
+  reasoning about `--auto` as *scheduling a merge already verified* ignores that the sync-only push created a new HEAD commit ref
+  that silently invalidates the prior clean verdict.
+  The sync is content-free (no code change by the author),
+  which is why it does not feel like a new head needing a new review verdict,
+  but auto-merge fires the instant CI finishes,
+  before any reviewer can evaluate the new head.
+- **Example**:
+  - 2026-08-26 on `ai-config#2226`:
+    armed `--squash --auto` while round-1 findings were open and the reviewer was quota-skipping.
+    Hours later a push turned `validate` green,
+    auto-merge fired at 04:30Z,
+    and it merged over an explicit Needs-more-work verdict ---
+    requiring revert (#2268) plus reland-with-fixes (#2269).
+  - 2026-08-28 on `ai-config#2556` (Issue #2558):
+    verified fully clean at `2c1ae45d` (checker exit 0, verdict `Ready for merge` at that exact SHA, zero unresolved threads).
+    A direct merge was refused because `main` had moved (`the head branch is not up to date with the base branch`).
+    Merged `origin/main` in and pushed `54874be0`,
+    then armed `--auto` reasoning that the merge was already verified.
+    A clean review verdict for `54874be0` landed at 22:18:44Z and auto-merge fired at 22:20:29Z;
+    had auto-merge fired before the review posted,
+    it would have merged an unreviewed head.
 - **Canonical Rule**: [`fully-clean.md`](../shared/workflow/fully-clean.md).
-  See also [`check-before-pushing.md`](../shared/workflow/check-before-pushing.md):
+  See also [`check-before-pushing.md`](../shared/workflow/check-before-pushing.md)
+  and [`sync-with-main.md`](../shared/workflow/sync-with-main.md):
   the remote can act between your commands,
   and an armed automation is exactly such an action you scheduled against yourself.
 - **Fix**: Never arm `gh pr merge --auto` on a PR whose merge gate includes a posted review verdict, which is every PR here.
+  A sync-only push invalidates a clean verdict just as thoroughly as a code push.
   Auto-merge fires server-side the moment CI passes,
   so a review landing seconds later cannot block it,
   and no reactive disable can win that race.
@@ -198,7 +217,9 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
   it gates native approvals, not verdicts posted as comments.
   Merge synchronously instead,
   only after `scripts/check-pr-fully-clean.py <N>` exits clean ---
-  CI green and the all-clear verdict both verified at the shipping head.
+  CI green and the all-clear verdict both verified at the new shipping head.
+  Accept that a moving base may require repeating the sync and re-verification cycle,
+  rather than arming an automation that cannot re-check review state.
   If something is found already armed, disable it at once ---
   `gh pr merge <N> --repo <r> --disable-auto`,
   verified with `gh pr view <N> --repo <r> --json autoMergeRequest` ---

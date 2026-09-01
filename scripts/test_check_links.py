@@ -11,6 +11,7 @@ Verifies that:
 5. Links inside fenced code blocks and inline code spans are ignored.
 6. Angle bracket placeholders (<owner>/<repo>) and in-page anchors are ignored.
 7. Display math ($$...$$) and inline math ($...$) with LaTeX brackets are not mistaken for links.
+8. Link reference definitions ([label]: target "title") validate correctly.
 """
 from __future__ import annotations
 
@@ -58,45 +59,45 @@ class TestIsExternal(unittest.TestCase):
 
 class TestExtractTarget(unittest.TestCase):
     def test_plain_target(self):
-        self.assertEqual(check_links.extract_target("path/to/file.md"), "path/to/file.md")
+        self.assertEqual(check_links.parse_link_target("path/to/file.md"), "path/to/file.md")
 
     def test_target_with_title(self):
         self.assertEqual(
-            check_links.extract_target('path/to/file.md "Document Title"'),
+            check_links.parse_link_target('path/to/file.md "Document Title"'),
             "path/to/file.md",
         )
 
     def test_angle_bracket_target(self):
         self.assertEqual(
-            check_links.extract_target("<path/to/file.md>"),
+            check_links.parse_link_target("<path/to/file.md>"),
             "path/to/file.md",
         )
 
     def test_angle_bracket_target_with_title(self):
         self.assertEqual(
-            check_links.extract_target('<path/to/file.md> "Document Title"'),
+            check_links.parse_link_target('<path/to/file.md> "Document Title"'),
             "path/to/file.md",
         )
 
     def test_angle_bracket_url(self):
         self.assertEqual(
-            check_links.extract_target("<https://example.com/path>"),
+            check_links.parse_link_target("<https://example.com/path>"),
             "https://example.com/path",
         )
         self.assertEqual(
-            check_links.extract_target('<https://example.com/path> "Web Link"'),
+            check_links.parse_link_target('<https://example.com/path> "Web Link"'),
             "https://example.com/path",
         )
 
     def test_angle_bracket_email(self):
         self.assertEqual(
-            check_links.extract_target("<user@domain.tld>"),
+            check_links.parse_link_target("<user@domain.tld>"),
             "user@domain.tld",
         )
 
     def test_angle_bracket_placeholder(self):
         self.assertEqual(
-            check_links.extract_target("<owner>/<repo>"),
+            check_links.parse_link_target("<owner>/<repo>"),
             "<owner>/<repo>",
         )
 
@@ -116,12 +117,13 @@ class TestCheckFile(unittest.TestCase):
                 "[link1](target.md)\n"
                 "[link2](<target.md>)\n"
                 '[link3](<target.md> "Title")\n'
-                "[link4](target.md#section)\n",
+                "[link4](target.md#section)\n"
+                '[ref-1]: target.md "Target Title"\n',
                 encoding="utf-8",
             )
             check_links.check_file(index, root=td)
             self.assertEqual(check_links.broken, [])
-            self.assertEqual(check_links.checked, 4)
+            self.assertEqual(check_links.checked, 5)
 
     def test_broken_relative_links(self):
         with tempfile.TemporaryDirectory() as tmpdir:

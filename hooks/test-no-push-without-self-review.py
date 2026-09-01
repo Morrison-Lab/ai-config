@@ -242,13 +242,13 @@ CASES = [
      "within one body the last verdict wins"),
     (PUSH, [agent_call()], True, "a dispatch with no returned verdict does not authorize"),
     (PUSH, reviewed(is_error=True), True, "an errored reviewer result states no verdict"),
-    (PUSH, reviewed(agent_name="general-purpose"), True,
-     "another subagent's clean verdict is not the reviewer's"),
+    (PUSH, reviewed(agent_name="general-purpose", prompt="Implement the feature"), True,
+     "another subagent with a non-review prompt is not the reviewer"),
     (PUSH, reviewed(agent_name="write me an adversarial critique"), True,
      "a prompt-like string in subagent_type does not match the reviewer"),
     (PUSH, reviewed(agent_name="general-purpose",
-                    prompt="Do an adversarial review of this diff"), True,
-     "an adversarial-sounding PROMPT to another subagent is not the reviewer"),
+                    prompt="Do an adversarial review of this diff"), False,
+     "a fallback subagent with an adversarial review prompt is accepted"),
     (PUSH, [poison_denial()], True,
      "the guard's own denial in the transcript does not authorize a retry"),
     (PUSH, poison_file_read(), True,
@@ -1373,6 +1373,87 @@ def cd_tracking_cases() -> tuple[int, int]:
     return failures, ran
 
 
+def fallback_cases() -> tuple[int, int]:
+    """Test auto-mode / fallback review mechanisms when no dedicated persona is registered."""
+    failures = 0
+    ran = 0
+
+    def check(label, ok, detail=""):
+        nonlocal failures, ran
+        ran += 1
+        if ok:
+            print(f"PASS: {label}")
+        else:
+            print(f"FAIL: {label}{' - ' + detail if detail else ''}")
+            failures += 1
+
+    # 1. Fallback subagent (e.g. general-purpose) with adversarial review prompt
+    events = [
+        agent_call("general-purpose", call_id="c1", prompt="Please conduct an adversarial review of this diff"),
+        agent_result("c1", body("Ready for merge", HEAD)),
+    ]
+    rc, out = run_hook(PUSH, events)
+    blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+    check("fallback subagent with adversarial review prompt allows push", rc == 0 and not blocked)
+
+    # 2. Fallback subagent with blocking verdict
+    events_blocking = [
+        agent_call("general-purpose", call_id="c2", prompt="Please conduct an adversarial review of this diff"),
+        agent_result("c2", body("Needs more work", HEAD)),
+    ]
+    rc, out = run_hook(PUSH, events_blocking)
+    blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+    check("fallback subagent with blocking verdict blocks push", rc == 0 and blocked)
+
+    # 3. TaskOutput delivering review report
+    task_events = [
+        {"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "id": "t1", "name": "TaskOutput", "input": {"task_id": "task_123"}}
+        ]}},
+        {"type": "user", "message": {"content": [
+            {"type": "tool_result", "tool_use_id": "t1", "content": body("Ready for merge", HEAD)}
+        ]}},
+    ]
+    rc, out = run_hook(PUSH, task_events)
+    blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+    check("TaskOutput tool result with clean review allows push", rc == 0 and not blocked)
+
+    # 4. CLI pre-push-review.py run via Bash tool
+    cli_events = [
+        {"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "id": "b1", "name": "Bash", "input": {"command": "python3 scripts/pre-push-review.py"}}
+        ]}},
+        {"type": "user", "message": {"content": [
+            {"type": "tool_result", "tool_use_id": "b1", "content": body("Ready for merge", HEAD)}
+        ]}},
+    ]
+    rc, out = run_hook(PUSH, cli_events)
+    blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+    check("pre-push-review.py run in Bash tool result allows push", rc == 0 and not blocked)
+
+    # 5. On-disk report file (.git/adversarial-review-report.txt)
+    report_file = os.path.join(REPO, ".git", "adversarial-review-report.txt")
+    with open(report_file, "w") as f:
+        f.write(body("Ready for merge", HEAD))
+    try:
+        # Run with no transcript events
+        rc, out = run_hook(PUSH, [])
+        blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+        check("on-disk report file in .git/ allows push when no transcript verdict", rc == 0 and not blocked)
+
+        # Run with on-disk report for outdated commit
+        with open(report_file, "w") as f:
+            f.write(body("Ready for merge", PREV))
+        rc, out = run_hook(PUSH, [])
+        blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+        check("on-disk report file for older commit blocks push", rc == 0 and blocked)
+    finally:
+        if os.path.exists(report_file):
+            os.remove(report_file)
+
+    return failures, ran
+
+
 def main():
     failed = 0
     extra = 0
@@ -1402,7 +1483,8 @@ def main():
         for fn in (raw_cases, orphan_cases, config_cases,
                    valueless_bool_cases, budget_cases,
                    fixture_branch_cases, windows_path_cases,
-                   structured_payload_cases, cd_tracking_cases):
+                   structured_payload_cases, cd_tracking_cases,
+                   fallback_cases):
             f, r = fn()
             failed += f
             extra += r

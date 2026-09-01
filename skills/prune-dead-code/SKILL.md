@@ -79,7 +79,7 @@ Identify files no longer connected to the build, test, or execution pipeline:
 
 Detect stale memories and documentation orphans:
 
-1. Check `memories/` for files not linked from `memories/README.md` or referenced in any active rules/skills.
+1. Run `python3 scripts/check-stale-records.py` to identify unreferenced memory entries and documentation files not linked from `memories/README.md` or other catalog files.
 2. Check for documentation referencing deleted CLI commands, removed options, or obsolete architecture.
 3. Run `python3 scripts/check-links.py` (or repo link checker) to ensure no broken relative links exist.
 

@@ -184,6 +184,38 @@ class TestCheckFile(unittest.TestCase):
             self.assertEqual(mod.checked, 0)
             self.assertEqual(len(mod.broken), 0)
 
+    def test_markdown_footnotes_produce_no_false_positives(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            td = Path(tmpdir)
+            target = td / "target.md"
+            target.write_text("# Target", encoding="utf-8")
+
+            doc = td / "doc.md"
+            doc.write_text(
+                "Here is a claim[^1] with another note[^named-footnote].\n\n"
+                "[^1]: Footnote content without links.\n"
+                "[^named-footnote]: Footnote referencing valid [target](target.md).\n",
+                encoding="utf-8",
+            )
+
+            check_file(doc, root=td)
+            self.assertEqual(len(mod.broken), 0)
+            self.assertEqual(mod.checked, 1)
+
+    def test_broken_link_inside_footnote_definition_flagged(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            td = Path(tmpdir)
+            doc = td / "doc.md"
+            doc.write_text(
+                "Here is text with a footnote[^note].\n\n"
+                "[^note]: Footnote referencing broken [missing](missing.md).\n",
+                encoding="utf-8",
+            )
+
+            check_file(doc, root=td)
+            self.assertEqual(len(mod.broken), 1)
+            self.assertIn("missing.md", mod.broken[0])
+
 
 if __name__ == "__main__":
     unittest.main()

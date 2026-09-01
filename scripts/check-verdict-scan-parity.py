@@ -451,7 +451,7 @@ def build_corpus(
         # so a contiguous head shares one leading fragment throughout and is a
         # biased sample -- LEAD is the outermost of seven itertools.product
         # axes, so a contiguous prefix holds LEAD[0] fixed for the first
-        # 241,920 of 1,693,440 (or 60,480 of 241,920 on the fast tier) bodies.
+        # 430,080 of 3,440,640 (or 60,480 of 241,920 on the fast tier) bodies.
         # A strided sample spreads across the product space and preserves
         # discrimination (e.g. 125 divergences at --limit 500 against 15 for a prefix).
         # Index by a fractional step rather than a slice stride. An integer

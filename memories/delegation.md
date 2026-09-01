@@ -388,7 +388,8 @@ The canonical trade-off analysis, context-budget rationale, and Do/Don't directi
   Use `/subtask` to fork the active conversation interactively into a subagent with full history.
 - **Antigravity:**
   Pass `TypeName: "self"` to `invoke_subagent` to inherit the parent agent's tools, system prompt, and model configuration (with `Workspace: "inherit"` to share the underlying working directory).
-  Subagents start with a clean conversation context; supply conversation history by passing the path to `transcript.jsonl` under `<appDataDir>/brain/<conversation-id>/.system_generated/logs/` in the prompt.
+  Subagents start with a clean conversation context;
+  supply conversation history by passing the path to `transcript.jsonl` under `<appDataDir>/brain/<conversation-id>/.system_generated/logs/` in the prompt.
 - **Gemini CLI, OpenAI Codex, and headless CLIs without runtime forking:**
   Subagents start with a clean context window by default (e.g. `@subagent_name` in Gemini CLI);
   provide the path to the on-disk conversation log or a focused milestone summary in the prompt brief.

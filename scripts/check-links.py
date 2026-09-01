@@ -19,7 +19,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 from fences import strip_code_spans, strip_fences, strip_math  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
-LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
+
+# Matches [text](target) but not image links ![alt](target)
+LINK = re.compile(r"(?<!!)\[([^\]]*)\]\(([^)]+)\)")
+REF_DEF = re.compile(
+    r"^[ \t]{0,3}\[(?!\^)(?P<label>[^\]]+)\]:[ \t]*(?P<target>\S.*)$",
+    re.MULTILINE,
+)
+
+# External schemes and pure in-page anchors
+EXTERNAL_PREFIXES = ("http://", "https://", "mailto:", "tel:", "#", "ftp://")
+
 SCAN_GLOBS = [
     "skills/**/*.md",
     "codex-skills/**/*.md",
@@ -30,23 +40,48 @@ SCAN_GLOBS = [
     "shared/**/*.md",
     "*.md",
 ]
-SKIP_PREFIXES = ("http://", "https://", "mailto:", "tel:", "#")
 
 broken: list[str] = []
 checked = 0
 
 
 def is_external(target: str) -> bool:
-    return target.startswith(SKIP_PREFIXES) or "://" in target
+    return any(target.startswith(p) for p in EXTERNAL_PREFIXES) or "://" in target
+
+
+def parse_link_target(raw: str) -> str:
+    """Extract destination path/URL from a raw link target or reference definition.
+
+    Handles angle-bracket enclosed destinations (`<path/to/file>`) and drops
+    trailing optional title attributes enclosed in quotes or parentheses
+    (e.g. `"title"`, `'title'`, `(title)`).
+    """
+    target = raw.strip()
+    if not target:
+        return ""
+    if target.startswith("<"):
+        end = target.find(">")
+        if end != -1:
+            destination = target[1:end].strip()
+            rest = target[end + 1:].strip()
+            if rest and not (
+                (rest.startswith('"') and rest.endswith('"'))
+                or (rest.startswith("'") and rest.endswith("'"))
+                or (rest.startswith("(") and rest.endswith(")"))
+            ):
+                return target
+            return destination
+    parts = target.split(None, 1)
+    return parts[0] if parts else ""
 
 
 def resolve_target(base_dir: Path, target: str) -> Path | None:
-    """Resolve a relative markdown link target to an existing file or directory.
+    """Resolve a relative markdown target to an existing file.
 
     Supports:
-    - Direct relative paths (e.g. `foo.md`, `images/diagram.png`, `sub/`)
-    - Extensionless markdown targets (e.g. `doc` -> `doc.md`)
-    - Directory targets with index.md or README.md (e.g. `doc` -> `doc/index.md`)
+    - Direct file paths (with optional anchor/query fragments)
+    - Extensionless markdown paths (path/to/doc -> path/to/doc.md)
+    - Directory paths resolving to index.md or README.md
     """
     path_part = re.split(r"[#?]", target, maxsplit=1)[0]
     if not path_part:
@@ -72,12 +107,15 @@ def check_file(md: Path) -> None:
     text = strip_fences(text)
     text = strip_code_spans(text)
     text = strip_math(text)
+
+    raw_targets: list[str] = []
     for match in LINK.finditer(text):
-        target = match.group(1).strip()
-        if target.startswith("<") and target.endswith(">"):
-            target = target[1:-1].strip()
-        # drop a trailing `"title"` if present
-        target = target.split(" ", 1)[0]
+        raw_targets.append(match.group(2))
+    for match in REF_DEF.finditer(text):
+        raw_targets.append(match.group("target"))
+
+    for raw in raw_targets:
+        target = parse_link_target(raw)
         if not target or is_external(target):
             continue
         if "<" in target or ">" in target:

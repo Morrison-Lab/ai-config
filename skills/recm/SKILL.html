@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="description" content="Select Claude model for task.">
+<meta name="description" content="Recommend harness, provider, model, and engine for a repo or task.">
 
 <title>skill – ai-config</title>
 <style>
@@ -311,22 +311,29 @@ ul.task-list li input[type="checkbox"] {
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#select-model-choose-the-right-claude-model" id="toc-select-model-choose-the-right-claude-model" class="nav-link active" data-scroll-target="#select-model-choose-the-right-claude-model">select-model — Choose the right Claude model</a>
+  <li><a href="#recm-recommend-harness-provider-model-and-engine" id="toc-recm-recommend-harness-provider-model-and-engine" class="nav-link active" data-scroll-target="#recm-recommend-harness-provider-model-and-engine">recm — Recommend Harness, Provider, Model, and Engine</a>
   <ul class="collapse">
-  <li><a href="#procedure" id="toc-procedure" class="nav-link" data-scroll-target="#procedure">Procedure</a>
+  <li><a href="#when-this-fires" id="toc-when-this-fires" class="nav-link" data-scroll-target="#when-this-fires">When this fires</a></li>
+  <li><a href="#the-5-dimensions-of-recommendation" id="toc-the-5-dimensions-of-recommendation" class="nav-link" data-scroll-target="#the-5-dimensions-of-recommendation">The 5 Dimensions of Recommendation</a>
   <ul class="collapse">
-  <li><a href="#model-tiers-at-a-glance" id="toc-model-tiers-at-a-glance" class="nav-link" data-scroll-target="#model-tiers-at-a-glance">Model tiers at a glance</a></li>
-  <li><a href="#orchestrator-worker-delegation-pattern" id="toc-orchestrator-worker-delegation-pattern" class="nav-link" data-scroll-target="#orchestrator-worker-delegation-pattern">Orchestrator-Worker Delegation Pattern</a></li>
-  <li><a href="#decision-tree-pick-your-model" id="toc-decision-tree-pick-your-model" class="nav-link" data-scroll-target="#decision-tree-pick-your-model">Decision tree: Pick your model</a></li>
-  <li><a href="#task-model-mapping" id="toc-task-model-mapping" class="nav-link" data-scroll-target="#task-model-mapping">Task → Model mapping</a></li>
-  <li><a href="#model-selection-factors" id="toc-model-selection-factors" class="nav-link" data-scroll-target="#model-selection-factors">Model selection factors</a></li>
-  <li><a href="#executable-mode-auto-recommend-and-config-update" id="toc-executable-mode-auto-recommend-and-config-update" class="nav-link" data-scroll-target="#executable-mode-auto-recommend-and-config-update">Executable mode (auto-recommend and config update)</a></li>
+  <li><a href="#dimension-1-harness-cli-selection" id="toc-dimension-1-harness-cli-selection" class="nav-link" data-scroll-target="#dimension-1-harness-cli-selection">Dimension 1: Harness &amp; CLI Selection</a></li>
+  <li><a href="#dimension-2-provider-tier-budget-ladder" id="toc-dimension-2-provider-tier-budget-ladder" class="nav-link" data-scroll-target="#dimension-2-provider-tier-budget-ladder">Dimension 2: Provider Tier &amp; Budget Ladder</a></li>
+  <li><a href="#dimension-3-model-capability-task-complexity" id="toc-dimension-3-model-capability-task-complexity" class="nav-link" data-scroll-target="#dimension-3-model-capability-task-complexity">Dimension 3: Model Capability &amp; Task Complexity</a></li>
+  <li><a href="#dimension-4-review-engine-selection" id="toc-dimension-4-review-engine-selection" class="nav-link" data-scroll-target="#dimension-4-review-engine-selection">Dimension 4: Review Engine Selection</a></li>
+  <li><a href="#dimension-5-governing-policy-constraints-overrides" id="toc-dimension-5-governing-policy-constraints-overrides" class="nav-link" data-scroll-target="#dimension-5-governing-policy-constraints-overrides">Dimension 5: Governing Policy Constraints &amp; Overrides</a></li>
   </ul></li>
-  <li><a href="#how-to-use" id="toc-how-to-use" class="nav-link" data-scroll-target="#how-to-use">How to use</a></li>
-  <li><a href="#faq" id="toc-faq" class="nav-link" data-scroll-target="#faq">FAQ</a></li>
+  <li><a href="#step-by-step-decision-procedure" id="toc-step-by-step-decision-procedure" class="nav-link" data-scroll-target="#step-by-step-decision-procedure">Step-by-Step Decision Procedure</a>
+  <ul class="collapse">
+  <li><a href="#step-1-check-data-sensitivity-repository-boundaries" id="toc-step-1-check-data-sensitivity-repository-boundaries" class="nav-link" data-scroll-target="#step-1-check-data-sensitivity-repository-boundaries">Step 1: Check Data Sensitivity &amp; Repository Boundaries</a></li>
+  <li><a href="#step-2-check-deterministic-testability-task-shape" id="toc-step-2-check-deterministic-testability-task-shape" class="nav-link" data-scroll-target="#step-2-check-deterministic-testability-task-shape">Step 2: Check Deterministic Testability &amp; Task Shape</a></li>
+  <li><a href="#step-3-check-quota-metered-windows" id="toc-step-3-check-quota-metered-windows" class="nav-link" data-scroll-target="#step-3-check-quota-metered-windows">Step 3: Check Quota &amp; Metered Windows</a></li>
+  <li><a href="#step-4-select-adversarial-review-engine" id="toc-step-4-select-adversarial-review-engine" class="nav-link" data-scroll-target="#step-4-select-adversarial-review-engine">Step 4: Select Adversarial Review Engine</a></li>
+  </ul></li>
+  <li><a href="#quick-reference-matrix" id="toc-quick-reference-matrix" class="nav-link" data-scroll-target="#quick-reference-matrix">Quick Reference Matrix</a></li>
+  <li><a href="#relationship-to-other-skills" id="toc-relationship-to-other-skills" class="nav-link" data-scroll-target="#relationship-to-other-skills">Relationship to Other Skills</a></li>
   </ul></li>
   </ul>
-<div class="toc-actions"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/select-model/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/select-model/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
+<div class="toc-actions"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/recm/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/recm/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
     </div>
 <!-- main -->
 <main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"></header>
@@ -335,42 +342,44 @@ ul.task-list li input[type="checkbox"] {
 
 
 
-<section id="select-model-choose-the-right-claude-model" class="level1">
-<h1>select-model — Choose the right Claude model</h1>
-<p>Determine which Claude model (Fable 5, Haiku 4.5, Sonnet 4.6, or Opus 4.8) is best for your task. Runs in <strong>procedural mode</strong> (decision tree reference) or <strong>executable mode</strong> (analyze a task and recommend a model with optional config update).</p>
-<section id="procedure" class="level2">
-<h2 class="anchored" data-anchor-id="procedure">Procedure</h2>
-<section id="model-tiers-at-a-glance" class="level3">
-<h3 class="anchored" data-anchor-id="model-tiers-at-a-glance">Model tiers at a glance</h3>
-<p><strong>Fable 5 / Opus 4.8</strong> (Tier 1: Conductor &amp; Deep Reasoning) - Highest reasoning depth, strategic planning, adversarial review - Handles ambiguous requirements, complex architectural refactors, multi-step dependencies - Best for: Orchestrator session conductor, adversarial self-review, subtle debugging, security analysis - Strategy: Use for high-leverage judgment, planning, and final auditing</p>
-<p><strong>Sonnet 4.6 / 5</strong> (Tier 2: High-Velocity Execution) - Balanced: strong coding capability, fast execution, cost-effective - Handles task execution, test generation, refactoring, boilerplate - Best for: Subagent worker execution, feature implementation from clear specs, documentation - Strategy: Delegate bounded implementation sub-tasks to maximize speed and token efficiency</p>
-<p><strong>Haiku 4.5</strong> (Tier 3: Fast Verification &amp; Scans) - Speed + lightweight focused reasoning - Best for: Simple queries, single-file regex/syntax checks, triage, shallow unit tests - Limitations: Not suited for cross-file architecture or deep review</p>
-</section>
-<section id="orchestrator-worker-delegation-pattern" class="level3">
-<h3 class="anchored" data-anchor-id="orchestrator-worker-delegation-pattern">Orchestrator-Worker Delegation Pattern</h3>
-<p>When orchestrating complex or multi-step work: 1. <strong>Conductor (Tier 1):</strong> Breaks down the objective into modular, bounded sub-tasks with strict checklists and unambiguous acceptance criteria. 2. <strong>Workers (Tier 2/3):</strong> Subagents execute bounded tasks with tight stop conditions (preventing open-ended token burns or side quests). 3. <strong>Verification (Tier 1):</strong> Conductor audits worker diffs and runs adversarial review before committing.</p>
-</section>
-<section id="decision-tree-pick-your-model" class="level3">
-<h3 class="anchored" data-anchor-id="decision-tree-pick-your-model">Decision tree: Pick your model</h3>
-<ol type="1">
-<li><strong>Is the task trivial or a fast scan?</strong> (single query, shallow check)
+<section id="recm-recommend-harness-provider-model-and-engine" class="level1">
+<h1>recm — Recommend Harness, Provider, Model, and Engine</h1>
+<p>Determine the optimal execution environment (harness CLI or IDE), billing provider tier, model capability, and review engine for a repository, issue, or task. Aliases: <a href="../../skills/rech/SKILL.html"><code>rech</code></a> (recommend harness), <a href="../../skills/rechme/SKILL.html"><code>rechme</code></a> (recommend harness/model/engine).</p>
+<p>This skill synthesizes task shape, token budget, tool requirements, deterministic testability, and data sensitivity into an actionable recommendation.</p>
+<section id="when-this-fires" class="level2">
+<h2 class="anchored" data-anchor-id="when-this-fires">When this fires</h2>
 <ul>
-<li>YES → <strong>Haiku 4.5</strong> (save cost)</li>
-<li>NO → Continue</li>
-</ul></li>
-<li><strong>Is the task bounded implementation from a clear spec?</strong> (writing code, generating tests, refactoring)
-<ul>
-<li>YES → <strong>Sonnet 4.6 / 5</strong> (high-velocity executor)</li>
-<li>NO → Continue</li>
-</ul></li>
-<li><strong>Does the task require high-level orchestration, deep design, or adversarial review?</strong> (architectural decisions, subtle bugs, security audit, orchestrator loop)
-<ul>
-<li>YES → <strong>Fable 5 / Opus 4.8</strong> (most capable)</li>
-</ul></li>
-</ol>
+<li>“recommend a harness”, “recommend a model”, “recommend an engine”, “recm”, “rech”, “rechme”.</li>
+<li>When sizing a new repository, major feature, or complex issue to determine the most cost-effective and capable execution stack.</li>
+<li>Proactively before kicking off heavy tasks to decide between inline execution, subagent fan-out, sidecar CLI delegation, or multi-engine review.</li>
+</ul>
 </section>
-<section id="task-model-mapping" class="level3">
-<h3 class="anchored" data-anchor-id="task-model-mapping">Task → Model mapping</h3>
+<section id="the-5-dimensions-of-recommendation" class="level2">
+<h2 class="anchored" data-anchor-id="the-5-dimensions-of-recommendation">The 5 Dimensions of Recommendation</h2>
+<p>Selecting the right stack requires evaluating five distinct axes:</p>
+<pre><code>                      ┌────────────────────────────────────────┐
+                      │             TASK / ISSUE               │
+                      └───────────────────┬────────────────────┘
+                                          │
+        ┌───────────────────┬─────────────┴───────┬────────────────────┐
+        ▼                   ▼                     ▼                    ▼
+ 1. Harness / CLI     2. Provider Tier     3. Model Tier        4. Review Engine
+(Claude Code, agy,    (Free Hosted,        (Tier 1 Conductor,   (Sonnet 4.6, adv,
+ Codex, OpenCode,     Subscription Window,  Tier 2 Worker,       Cross-family
+ Cursor, adv)         Prepaid, Claude)      Tier 3 Scan)         subagent)
+        ▲                   ▲                     ▲                    ▲
+        └───────────────────┴─────────────┬───────┴────────────────────┘
+                                          │
+                      ┌───────────────────┴────────────────────┐
+                      │    5. Governing Policy Guards          │
+                      │  - Ban on local/on-device inference    │
+                      │  - No LLM algorithmic thinking         │
+                      │  - Data sensitivity overrides          │
+                      └────────────────────────────────────────┘</code></pre>
+<hr>
+<section id="dimension-1-harness-cli-selection" class="level3">
+<h3 class="anchored" data-anchor-id="dimension-1-harness-cli-selection">Dimension 1: Harness &amp; CLI Selection</h3>
+<p>Choose the primary interactive harness or non-interactive sidecar CLI based on repo integration and workflow needs:</p>
 <table class="caption-top table">
 <colgroup>
 <col style="width: 25%">
@@ -380,101 +389,291 @@ ul.task-list li input[type="checkbox"] {
 </colgroup>
 <thead>
 <tr class="header">
-<th>Task Category</th>
-<th>Complexity</th>
-<th>Recommended Tier</th>
-<th>Rationale</th>
+<th>Harness / CLI</th>
+<th>Primary Role</th>
+<th>Ideal Workload</th>
+<th>Key Invocation &amp; Nuance</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td>Simple query / scan</td>
-<td>⭐</td>
-<td>Tier 3 (Haiku 4.5)</td>
-<td>Minimal reasoning; speed matters</td>
+<td><strong>Claude Code</strong></td>
+<td>Primary Orchestrator &amp; Conductor</td>
+<td>Multi-turn reasoning, project context closure, git workflows, subagent management</td>
+<td>Interactive terminal CLI; manages workflows and tool execution.</td>
 </tr>
 <tr class="even">
-<td>Code snippet / boilerplate</td>
-<td>⭐</td>
-<td>Tier 2 (Sonnet 4.6)</td>
-<td>Fast and accurate generation</td>
+<td><strong>Antigravity / Gemini CLI (<code>agy</code>)</strong></td>
+<td>DeepMind Ecosystem Harness &amp; Sidecar</td>
+<td>Antigravity plugins/skills discovery (<code>plugins/ai-config</code>), interactive UI, headless sidecar</td>
+<td>Headless: <code>agy --print "&lt;prompt&gt;"</code>. <strong>Note</strong>: API route retired; CLI available. Keep prompt immediately after <code>--print</code>.</td>
 </tr>
 <tr class="odd">
-<td>Bug fix (clear pattern)</td>
-<td>⭐</td>
-<td>Tier 2 (Sonnet 4.6)</td>
-<td>Clear problem, straightforward fix</td>
+<td><strong>Codex CLI (<code>codex</code>)</strong></td>
+<td>Mechanical Sidecar Executor</td>
+<td>Heavy parallelizable read/draft/verify, bounded implementation from clear specs</td>
+<td><code>codex exec -C &lt;repo&gt; -s read-only --skip-git-repo-check - &lt; prompt.txt</code>. Sunk ChatGPT plan (~5h window).</td>
 </tr>
 <tr class="even">
-<td>Refactor (bounded)</td>
-<td>⭐⭐</td>
-<td>Tier 2 (Sonnet 4.6)</td>
-<td>Follows established architecture</td>
+<td><strong>OpenCode CLI (<code>opencode</code>)</strong></td>
+<td>Zero-Cost &amp; Multi-Provider Sidecar</td>
+<td>Mechanical edits with deterministic test suites, OpenRouter stealth previews</td>
+<td><code>opencode run -m &lt;id&gt;</code>. Free hosted tier (<code>opencode/*</code>) &amp; Zen, or <code>$10/mo</code> Go window.</td>
 </tr>
 <tr class="odd">
-<td>Subagent execution</td>
-<td>⭐⭐</td>
-<td>Tier 2 (Sonnet 4.6)</td>
-<td>High throughput, token efficient</td>
+<td><strong>Cursor / VS Code</strong></td>
+<td>Interactive Editor &amp; Visual IDE</td>
+<td>Interactive human editing, real-time typing autocomplete, visual diff navigation</td>
+<td>IDE harness; probe CLI automation before relying on headless runs.</td>
 </tr>
 <tr class="even">
-<td>Multi-file architecture</td>
-<td>⭐⭐⭐</td>
-<td>Tier 1 (Fable 5 / Opus 4.8)</td>
-<td>Needs high reasoning; conductor tier</td>
-</tr>
-<tr class="odd">
-<td>Subtle bug hunt</td>
-<td>⭐⭐⭐</td>
-<td>Tier 1 (Fable 5 / Opus 4.8)</td>
-<td>Deep lateral reasoning required</td>
-</tr>
-<tr class="even">
-<td>Adversarial review</td>
-<td>⭐⭐⭐</td>
-<td>Tier 1 (Fable 5 / Opus 4.8)</td>
-<td>Strict verification against subtle issues</td>
-</tr>
-<tr class="odd">
-<td>Orchestration &amp; planning</td>
-<td>⭐⭐⭐</td>
-<td>Tier 1 (Fable 5 / Opus 4.8)</td>
-<td>Decomposes task DAGs with stop criteria</td>
+<td><strong><code>adv</code> / <code>pre-push-review.py</code></strong></td>
+<td>Multi-Engine Review Harness</td>
+<td>Adversarial self-review across diverse model families prior to pushing code</td>
+<td>Dedicated review dispatch runner (<code>adv</code> skill).</td>
 </tr>
 </tbody>
 </table>
+<hr>
 </section>
-<section id="model-selection-factors" class="level3">
-<h3 class="anchored" data-anchor-id="model-selection-factors">Model selection factors</h3>
+<section id="dimension-2-provider-tier-budget-ladder" class="level3">
+<h3 class="anchored" data-anchor-id="dimension-2-provider-tier-budget-ladder">Dimension 2: Provider Tier &amp; Budget Ladder</h3>
+<p>Apply the standing quota optimization rule: <strong>spend CLI-reachable free tiers and subscription windows before consuming orchestrator/Claude budget.</strong></p>
+<ol type="1">
+<li><strong>Tier A: Hosted Free (<code>opencode/*</code> hosted-free &amp; Zen)</strong>
 <ul>
-<li><strong>Reasoning depth:</strong> Tier 3 &lt; Tier 2 &lt; Tier 1</li>
-<li><strong>Code generation:</strong> Tier 2 provides optimal throughput/cost balance; Tier 1 handles architectural nuance</li>
-<li><strong>Code review:</strong> Tier 1 recommended for adversarial passes</li>
-<li><strong>Token efficiency:</strong> Use Tier 1 for judgment and Tier 2/3 for generation</li>
+<li><em>Cost</em>: $0, no usage window to exhaust.</li>
+<li><em>Best For</em>: Well-specified, mechanical edits and boilerplate where a deterministic test suite verifies correctness.</li>
+<li><em>Rule</em>: Goes ahead of metered subscription windows when capability and tooling suffice.</li>
+</ul></li>
+<li><strong>Tier B: Metered Subscription Windows (<code>codex</code>, <code>agy</code> CLI, <code>opencode-go/*</code>)</strong>
+<ul>
+<li><em>Cost</em>: Sunk cost within the current usage window (e.g.&nbsp;Codex ~5h window, OpenCode Go $10/mo window).</li>
+<li><em>Best For</em>: Heavy read fan-outs, multi-file auditing, drafting N artifacts, bounded implementation briefs.</li>
+<li><em>Rule</em>: Exhaust current subscription window before falling back to Claude tokens.</li>
+</ul></li>
+<li><strong>Tier C: Prepaid Credit Balance (<code>openrouter/*</code>)</strong>
+<ul>
+<li><em>Cost</em>: Pay-per-token draw on prepaid balance.</li>
+<li><em>Best For</em>: Frontier stealth previews and capable models when free and windowed tiers are exhausted.</li>
+</ul></li>
+<li><strong>Tier D: Orchestrator Claude Tiers (Haiku 4.5, Sonnet 4.6, Opus 4.8 / Fable 5)</strong>
+<ul>
+<li><em>Cost</em>: Direct API / session token quota.</li>
+<li><em>Best For</em>: Conductor orchestration, complex judgment, ambiguous design, adversarial review.</li>
+<li><em>Rule</em>: Conserve orchestrator budget by delegating bounded sub-tasks to Tiers A–B.</li>
+</ul></li>
+</ol>
+<hr>
+</section>
+<section id="dimension-3-model-capability-task-complexity" class="level3">
+<h3 class="anchored" data-anchor-id="dimension-3-model-capability-task-complexity">Dimension 3: Model Capability &amp; Task Complexity</h3>
+<p>Match model intelligence to the intrinsic reasoning depth required:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Model Tier</th>
+<th>Representative Models</th>
+<th>Reasoning Depth</th>
+<th>Best For</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Tier 1: Conductor &amp; Deep Reasoning</strong></td>
+<td>Claude Opus 4.8, Claude Fable 5</td>
+<td>Highest</td>
+<td>Orchestrator conductor, architectural design, subtle debugging, security audits, ambiguous spec decomposition.</td>
+</tr>
+<tr class="even">
+<td><strong>Tier 2: High-Velocity Execution &amp; Review</strong></td>
+<td>Claude Sonnet 4.6, GPT-5 / Codex</td>
+<td>Strong &amp; Fast</td>
+<td>Subagent worker implementation, bounded refactoring, test suite generation, adversarial code review.</td>
+</tr>
+<tr class="odd">
+<td><strong>Tier 3: Fast Scans &amp; Lightweight Verification</strong></td>
+<td>Claude Haiku 4.5, Nemotron Free</td>
+<td>Fast &amp; Focused</td>
+<td>Shallow triage, single-file regex/syntax checks, simple queries, boilerplate with mechanical verification.</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+<section id="dimension-4-review-engine-selection" class="level3">
+<h3 class="anchored" data-anchor-id="dimension-4-review-engine-selection">Dimension 4: Review Engine Selection</h3>
+<p>Adversarial self-review is governed by <strong>independence-first</strong>, not cost-first:</p>
+<ul>
+<li><strong>Primary Review Engine</strong>: Claude Sonnet 4.6 (or Opus 4.8 for critical security/architectural changes).</li>
+<li><strong>Cross-Family Verification</strong>: Codex or <code>agy</code> CLI pointing at Claude-generated diffs to eliminate shared blind spots.</li>
+<li><strong>Local Multi-Engine Review</strong>: Dispatch via <a href="../../skills/adv/SKILL.html"><code>adv</code></a> (<code>pre-push-review.py</code>).</li>
+</ul>
+<hr>
+</section>
+<section id="dimension-5-governing-policy-constraints-overrides" class="level3">
+<h3 class="anchored" data-anchor-id="dimension-5-governing-policy-constraints-overrides">Dimension 5: Governing Policy Constraints &amp; Overrides</h3>
+<p>Always enforce these strict repository principles:</p>
+<ol type="1">
+<li><strong>Local Inference Prohibited</strong>:
+<ul>
+<li><strong>Never</strong> run Ollama, LM Studio, llama.cpp, or on-device local models.</li>
+<li>Local inference can crash the user’s computer.</li>
+<li>“Local” strictly means <em>reachable through this computer’s CLI</em> (hosted/cloud models), not running on local hardware.</li>
+</ul></li>
+<li><strong>No LLM Algorithmic Thinking</strong>:
+<ul>
+<li><strong>Never</strong> rely on LLM probabilistic reasoning for counting, sorting, arithmetic, regex verification, math derivations, or AST linting.</li>
+<li>Always use validated deterministic software (e.g.&nbsp;Python scripts, <code>grep -c</code>, <code>wc -l</code>, SymPy, R, formal linters).</li>
+</ul></li>
+<li><strong>Data Sensitivity Overrides Cost</strong>:
+<ul>
+<li>Hosted CLIs (<code>codex</code>, <code>agy</code>, <code>opencode</code>) send payloads off-machine.</li>
+<li>When handling confidential, restricted, or unapproved data, keep work in the local orchestrator session using deterministic tools (a data trigger overrides cost ladder exceptions).</li>
+</ul></li>
+</ol>
+<hr>
+</section>
+</section>
+<section id="step-by-step-decision-procedure" class="level2">
+<h2 class="anchored" data-anchor-id="step-by-step-decision-procedure">Step-by-Step Decision Procedure</h2>
+<p>When evaluating a repository, issue, or task, follow these steps:</p>
+<section id="step-1-check-data-sensitivity-repository-boundaries" class="level3">
+<h3 class="anchored" data-anchor-id="step-1-check-data-sensitivity-repository-boundaries">Step 1: Check Data Sensitivity &amp; Repository Boundaries</h3>
+<ul>
+<li>Does the repository or task touch restricted, private, or sensitive data?
+<ul>
+<li><strong>YES</strong> → Keep work in the local orchestrator session; do not dispatch off-machine to third-party hosted CLIs unless explicitly approved. Use deterministic tools.</li>
+<li><strong>NO</strong> → Proceed to Step 2.</li>
+</ul></li>
 </ul>
 </section>
-<section id="executable-mode-auto-recommend-and-config-update" class="level3">
-<h3 class="anchored" data-anchor-id="executable-mode-auto-recommend-and-config-update">Executable mode (auto-recommend and config update)</h3>
-<p>Instead of consulting the decision tree manually, invoke the skill with a task description. The script will analyze complexity, check your current settings, recommend the right model, and optionally suggest a config update:</p>
-<pre><code>/select-model --task "I need to refactor a critical payment module with security implications"</code></pre>
-<p>The script outputs a recommendation and optionally suggests updating <code>~/.claude/settings.json</code> to use the recommended model for future sessions.</p>
-</section>
-</section>
-<section id="how-to-use" class="level2">
-<h2 class="anchored" data-anchor-id="how-to-use">How to use</h2>
+<section id="step-2-check-deterministic-testability-task-shape" class="level3">
+<h3 class="anchored" data-anchor-id="step-2-check-deterministic-testability-task-shape">Step 2: Check Deterministic Testability &amp; Task Shape</h3>
 <ul>
-<li><strong>Procedural mode (manual decision tree):</strong> Read this procedure, follow the decision tree or task mapping, choose your model.</li>
-<li><strong>Executable mode (auto-recommend):</strong> Invoke <code>/select-model --task "&lt;task description&gt;"</code> and the script provides a personalized recommendation and config suggestion.</li>
-<li><strong>Chained from assess-model-fit:</strong> If <code>/assess-model-fit</code> recommends escalation, it auto-invokes <code>select-model</code> with your task details.</li>
-<li><strong>Holistic stack recommendation (<a href="../../skills/recm/SKILL.html">recm</a>):</strong> Use <code>recm</code> when deciding across harnesses (Claude Code, agy, Codex, OpenCode), provider tiers, and review engines rather than only Claude model tiers.</li>
+<li>Is the task an algorithmic or deterministic calculation (counting lines, sorting, regex validation, math)?
+<ul>
+<li><strong>YES</strong> → Write and run a deterministic script (Python/Bash/R); do not delegate to an LLM.</li>
+</ul></li>
+<li>Is the task a heavy, parallelizable read / audit / draft of multiple files?
+<ul>
+<li><strong>YES</strong> → Route to sidecar CLI (<code>codex</code> or <code>opencode</code> free) via <a href="../../skills/delegate-to-codex/SKILL.html"><code>delegate-to-codex</code></a> or <a href="../../skills/delegate-to-opencode/SKILL.html"><code>delegate-to-opencode</code></a>.</li>
+</ul></li>
+<li>Is the task a bounded implementation from a clear spec with an automated test suite?
+<ul>
+<li><strong>YES</strong> → Route to <code>opencode</code> free hosted tier or <code>codex</code> window.</li>
+</ul></li>
+<li>Does the task require ambiguous requirements resolution, deep architecture, or orchestration?
+<ul>
+<li><strong>YES</strong> → Use Tier 1 / Tier 2 in Claude Code (Orchestrator).</li>
+</ul></li>
 </ul>
 </section>
-<section id="faq" class="level2">
-<h2 class="anchored" data-anchor-id="faq">FAQ</h2>
-<p><strong>Q: I’m using Haiku 4.5 but it keeps failing. What now?</strong> A: Escalate to Sonnet (Tier 2) or Fable/Opus (Tier 1). Use this skill to confirm the better tier for your task.</p>
-<p><strong>Q: Opus is expensive. Can I use Sonnet or Fable 5 instead?</strong> A: Yes. If your task doesn’t need deep architectural design, use Sonnet for execution. For orchestration or review, Fable 5 or Opus provides the needed reasoning depth.</p>
-<p><strong>Q: Should I always use the highest model?</strong> A: No—higher models are costlier. Match the model to task complexity. Use Haiku 4.5 for simple work, Sonnet for execution, and Fable 5 or Opus for orchestration and adversarial review.</p>
-<p><strong>Q: Can I pick a model manually without using this skill?</strong> A: Yes. This skill is advisory. You can always override and choose your own model.</p>
+<section id="step-3-check-quota-metered-windows" class="level3">
+<h3 class="anchored" data-anchor-id="step-3-check-quota-metered-windows">Step 3: Check Quota &amp; Metered Windows</h3>
+<ul>
+<li>Is <code>opencode</code> hosted-free tier suitable and verified? → Use <code>opencode</code> free.</li>
+<li>Is the <code>codex</code> ChatGPT plan window (~5h) available? → Delegate via <code>codex exec</code>.</li>
+<li>Is the <code>agy</code> CLI window available? → Delegate via <code>agy --print</code>.</li>
+<li>Are subscription windows exhausted? → Fall back to Claude Code (Haiku for scans, Sonnet for subagents, Opus for conductor).</li>
+</ul>
+</section>
+<section id="step-4-select-adversarial-review-engine" class="level3">
+<h3 class="anchored" data-anchor-id="step-4-select-adversarial-review-engine">Step 4: Select Adversarial Review Engine</h3>
+<ul>
+<li>Use <a href="../../skills/adv/SKILL.html"><code>adv</code></a> / Sonnet 4.6 subagent for pre-push review against <code>git diff origin/&lt;default-branch&gt;...HEAD</code>.</li>
+</ul>
+<hr>
+</section>
+</section>
+<section id="quick-reference-matrix" class="level2">
+<h2 class="anchored" data-anchor-id="quick-reference-matrix">Quick Reference Matrix</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Scenario / Task Type</th>
+<th>Recommended Harness</th>
+<th>Provider Tier</th>
+<th>Recommended Model</th>
+<th>Review Engine</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Orchestrator Conductor / Complex Architecture</strong></td>
+<td>Claude Code</td>
+<td>Direct Claude</td>
+<td>Opus 4.8 / Fable 5</td>
+<td>Sonnet 4.6 Subagent</td>
+</tr>
+<tr class="even">
+<td><strong>Bounded Code Implementation (with test suite)</strong></td>
+<td>Codex CLI / Claude Code</td>
+<td>ChatGPT Window / OpenCode Free</td>
+<td>Codex / Sonnet 4.6</td>
+<td><code>adv</code> / Sonnet 4.6</td>
+</tr>
+<tr class="odd">
+<td><strong>Heavy Fan-out File Audit / Backlog Scoping</strong></td>
+<td>Codex CLI / OpenCode</td>
+<td>Free Hosted / ChatGPT Window</td>
+<td>Nemotron Free / Codex</td>
+<td>Orchestrator Conductor</td>
+</tr>
+<tr class="even">
+<td><strong>Mechanical Refactor / Boilerplate Generation</strong></td>
+<td>OpenCode CLI</td>
+<td>Free Hosted Tier</td>
+<td>OpenCode Free</td>
+<td>Test Suite + Sonnet</td>
+</tr>
+<tr class="odd">
+<td><strong>Fast Syntax / Link / Triage Scans</strong></td>
+<td>Claude Code</td>
+<td>Direct Claude</td>
+<td>Haiku 4.5</td>
+<td>Deterministic Lint</td>
+</tr>
+<tr class="even">
+<td><strong>Restricted / Sensitive Data Analysis</strong></td>
+<td>Claude Code</td>
+<td>Local Session Only</td>
+<td>Approved Model</td>
+<td>Deterministic Scripts</td>
+</tr>
+<tr class="odd">
+<td><strong>Antigravity Plugin / Extension Integration</strong></td>
+<td>Antigravity / Gemini CLI</td>
+<td>DeepMind Ecosystem</td>
+<td>Gemini Pro</td>
+<td>Sonnet 4.6</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+<section id="relationship-to-other-skills" class="level2">
+<h2 class="anchored" data-anchor-id="relationship-to-other-skills">Relationship to Other Skills</h2>
+<ul>
+<li><strong><a href="../../skills/select-model/SKILL.html"><code>select-model</code></a></strong>: Focuses narrowly on choosing among Claude model tiers (Fable, Haiku, Sonnet, Opus).</li>
+<li><strong><a href="../../skills/assess-model-fit/SKILL.html"><code>assess-model-fit</code></a></strong>: Assesses whether the active model tier is struggling and warrants escalation.</li>
+<li><strong><a href="../../skills/delegate-to-codex/SKILL.html"><code>delegate-to-codex</code></a> (<code>dtc</code>)</strong>: Operationalizes background dispatch, schema enforcement, and fallback mechanics for Codex.</li>
+<li><strong><a href="../../skills/delegate-to-opencode/SKILL.html"><code>delegate-to-opencode</code></a> (<code>dto</code>)</strong>: Operationalizes dispatch to OpenCode free, Go, and OpenRouter tiers.</li>
+<li><strong><a href="../../skills/adv/SKILL.html"><code>adv</code></a></strong>: Operationalizes multi-engine adversarial code review prior to pushing.</li>
+</ul>
 
 
 </section>
@@ -904,7 +1103,7 @@ ul.task-list li input[type="checkbox"] {
     </div>   
     <div class="nav-footer-center">
 <p>Built with <a href="https://quarto.org/">Quarto</a></p>
-<div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/select-model/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/select-model/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></div>
+<div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/recm/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/recm/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></div>
     <div class="nav-footer-right">
       &nbsp;
     </div>

@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="description" content="Select Claude model for task.">
+<meta name="description" content="→ recm.">
 
 <title>skill – ai-config</title>
 <style>
@@ -311,22 +311,9 @@ ul.task-list li input[type="checkbox"] {
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#select-model-choose-the-right-claude-model" id="toc-select-model-choose-the-right-claude-model" class="nav-link active" data-scroll-target="#select-model-choose-the-right-claude-model">select-model — Choose the right Claude model</a>
-  <ul class="collapse">
-  <li><a href="#procedure" id="toc-procedure" class="nav-link" data-scroll-target="#procedure">Procedure</a>
-  <ul class="collapse">
-  <li><a href="#model-tiers-at-a-glance" id="toc-model-tiers-at-a-glance" class="nav-link" data-scroll-target="#model-tiers-at-a-glance">Model tiers at a glance</a></li>
-  <li><a href="#orchestrator-worker-delegation-pattern" id="toc-orchestrator-worker-delegation-pattern" class="nav-link" data-scroll-target="#orchestrator-worker-delegation-pattern">Orchestrator-Worker Delegation Pattern</a></li>
-  <li><a href="#decision-tree-pick-your-model" id="toc-decision-tree-pick-your-model" class="nav-link" data-scroll-target="#decision-tree-pick-your-model">Decision tree: Pick your model</a></li>
-  <li><a href="#task-model-mapping" id="toc-task-model-mapping" class="nav-link" data-scroll-target="#task-model-mapping">Task → Model mapping</a></li>
-  <li><a href="#model-selection-factors" id="toc-model-selection-factors" class="nav-link" data-scroll-target="#model-selection-factors">Model selection factors</a></li>
-  <li><a href="#executable-mode-auto-recommend-and-config-update" id="toc-executable-mode-auto-recommend-and-config-update" class="nav-link" data-scroll-target="#executable-mode-auto-recommend-and-config-update">Executable mode (auto-recommend and config update)</a></li>
-  </ul></li>
-  <li><a href="#how-to-use" id="toc-how-to-use" class="nav-link" data-scroll-target="#how-to-use">How to use</a></li>
-  <li><a href="#faq" id="toc-faq" class="nav-link" data-scroll-target="#faq">FAQ</a></li>
-  </ul></li>
+  <li><a href="#rech-alias-for-recm" id="toc-rech-alias-for-recm" class="nav-link active" data-scroll-target="#rech-alias-for-recm">rech (alias for <code>recm</code>)</a></li>
   </ul>
-<div class="toc-actions"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/select-model/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/select-model/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
+<div class="toc-actions"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/rech/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/rech/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
     </div>
 <!-- main -->
 <main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"></header>
@@ -335,149 +322,12 @@ ul.task-list li input[type="checkbox"] {
 
 
 
-<section id="select-model-choose-the-right-claude-model" class="level1">
-<h1>select-model — Choose the right Claude model</h1>
-<p>Determine which Claude model (Fable 5, Haiku 4.5, Sonnet 4.6, or Opus 4.8) is best for your task. Runs in <strong>procedural mode</strong> (decision tree reference) or <strong>executable mode</strong> (analyze a task and recommend a model with optional config update).</p>
-<section id="procedure" class="level2">
-<h2 class="anchored" data-anchor-id="procedure">Procedure</h2>
-<section id="model-tiers-at-a-glance" class="level3">
-<h3 class="anchored" data-anchor-id="model-tiers-at-a-glance">Model tiers at a glance</h3>
-<p><strong>Fable 5 / Opus 4.8</strong> (Tier 1: Conductor &amp; Deep Reasoning) - Highest reasoning depth, strategic planning, adversarial review - Handles ambiguous requirements, complex architectural refactors, multi-step dependencies - Best for: Orchestrator session conductor, adversarial self-review, subtle debugging, security analysis - Strategy: Use for high-leverage judgment, planning, and final auditing</p>
-<p><strong>Sonnet 4.6 / 5</strong> (Tier 2: High-Velocity Execution) - Balanced: strong coding capability, fast execution, cost-effective - Handles task execution, test generation, refactoring, boilerplate - Best for: Subagent worker execution, feature implementation from clear specs, documentation - Strategy: Delegate bounded implementation sub-tasks to maximize speed and token efficiency</p>
-<p><strong>Haiku 4.5</strong> (Tier 3: Fast Verification &amp; Scans) - Speed + lightweight focused reasoning - Best for: Simple queries, single-file regex/syntax checks, triage, shallow unit tests - Limitations: Not suited for cross-file architecture or deep review</p>
-</section>
-<section id="orchestrator-worker-delegation-pattern" class="level3">
-<h3 class="anchored" data-anchor-id="orchestrator-worker-delegation-pattern">Orchestrator-Worker Delegation Pattern</h3>
-<p>When orchestrating complex or multi-step work: 1. <strong>Conductor (Tier 1):</strong> Breaks down the objective into modular, bounded sub-tasks with strict checklists and unambiguous acceptance criteria. 2. <strong>Workers (Tier 2/3):</strong> Subagents execute bounded tasks with tight stop conditions (preventing open-ended token burns or side quests). 3. <strong>Verification (Tier 1):</strong> Conductor audits worker diffs and runs adversarial review before committing.</p>
-</section>
-<section id="decision-tree-pick-your-model" class="level3">
-<h3 class="anchored" data-anchor-id="decision-tree-pick-your-model">Decision tree: Pick your model</h3>
-<ol type="1">
-<li><strong>Is the task trivial or a fast scan?</strong> (single query, shallow check)
-<ul>
-<li>YES → <strong>Haiku 4.5</strong> (save cost)</li>
-<li>NO → Continue</li>
-</ul></li>
-<li><strong>Is the task bounded implementation from a clear spec?</strong> (writing code, generating tests, refactoring)
-<ul>
-<li>YES → <strong>Sonnet 4.6 / 5</strong> (high-velocity executor)</li>
-<li>NO → Continue</li>
-</ul></li>
-<li><strong>Does the task require high-level orchestration, deep design, or adversarial review?</strong> (architectural decisions, subtle bugs, security audit, orchestrator loop)
-<ul>
-<li>YES → <strong>Fable 5 / Opus 4.8</strong> (most capable)</li>
-</ul></li>
-</ol>
-</section>
-<section id="task-model-mapping" class="level3">
-<h3 class="anchored" data-anchor-id="task-model-mapping">Task → Model mapping</h3>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 25%">
-<col style="width: 25%">
-<col style="width: 25%">
-<col style="width: 25%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Task Category</th>
-<th>Complexity</th>
-<th>Recommended Tier</th>
-<th>Rationale</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>Simple query / scan</td>
-<td>⭐</td>
-<td>Tier 3 (Haiku 4.5)</td>
-<td>Minimal reasoning; speed matters</td>
-</tr>
-<tr class="even">
-<td>Code snippet / boilerplate</td>
-<td>⭐</td>
-<td>Tier 2 (Sonnet 4.6)</td>
-<td>Fast and accurate generation</td>
-</tr>
-<tr class="odd">
-<td>Bug fix (clear pattern)</td>
-<td>⭐</td>
-<td>Tier 2 (Sonnet 4.6)</td>
-<td>Clear problem, straightforward fix</td>
-</tr>
-<tr class="even">
-<td>Refactor (bounded)</td>
-<td>⭐⭐</td>
-<td>Tier 2 (Sonnet 4.6)</td>
-<td>Follows established architecture</td>
-</tr>
-<tr class="odd">
-<td>Subagent execution</td>
-<td>⭐⭐</td>
-<td>Tier 2 (Sonnet 4.6)</td>
-<td>High throughput, token efficient</td>
-</tr>
-<tr class="even">
-<td>Multi-file architecture</td>
-<td>⭐⭐⭐</td>
-<td>Tier 1 (Fable 5 / Opus 4.8)</td>
-<td>Needs high reasoning; conductor tier</td>
-</tr>
-<tr class="odd">
-<td>Subtle bug hunt</td>
-<td>⭐⭐⭐</td>
-<td>Tier 1 (Fable 5 / Opus 4.8)</td>
-<td>Deep lateral reasoning required</td>
-</tr>
-<tr class="even">
-<td>Adversarial review</td>
-<td>⭐⭐⭐</td>
-<td>Tier 1 (Fable 5 / Opus 4.8)</td>
-<td>Strict verification against subtle issues</td>
-</tr>
-<tr class="odd">
-<td>Orchestration &amp; planning</td>
-<td>⭐⭐⭐</td>
-<td>Tier 1 (Fable 5 / Opus 4.8)</td>
-<td>Decomposes task DAGs with stop criteria</td>
-</tr>
-</tbody>
-</table>
-</section>
-<section id="model-selection-factors" class="level3">
-<h3 class="anchored" data-anchor-id="model-selection-factors">Model selection factors</h3>
-<ul>
-<li><strong>Reasoning depth:</strong> Tier 3 &lt; Tier 2 &lt; Tier 1</li>
-<li><strong>Code generation:</strong> Tier 2 provides optimal throughput/cost balance; Tier 1 handles architectural nuance</li>
-<li><strong>Code review:</strong> Tier 1 recommended for adversarial passes</li>
-<li><strong>Token efficiency:</strong> Use Tier 1 for judgment and Tier 2/3 for generation</li>
-</ul>
-</section>
-<section id="executable-mode-auto-recommend-and-config-update" class="level3">
-<h3 class="anchored" data-anchor-id="executable-mode-auto-recommend-and-config-update">Executable mode (auto-recommend and config update)</h3>
-<p>Instead of consulting the decision tree manually, invoke the skill with a task description. The script will analyze complexity, check your current settings, recommend the right model, and optionally suggest a config update:</p>
-<pre><code>/select-model --task "I need to refactor a critical payment module with security implications"</code></pre>
-<p>The script outputs a recommendation and optionally suggests updating <code>~/.claude/settings.json</code> to use the recommended model for future sessions.</p>
-</section>
-</section>
-<section id="how-to-use" class="level2">
-<h2 class="anchored" data-anchor-id="how-to-use">How to use</h2>
-<ul>
-<li><strong>Procedural mode (manual decision tree):</strong> Read this procedure, follow the decision tree or task mapping, choose your model.</li>
-<li><strong>Executable mode (auto-recommend):</strong> Invoke <code>/select-model --task "&lt;task description&gt;"</code> and the script provides a personalized recommendation and config suggestion.</li>
-<li><strong>Chained from assess-model-fit:</strong> If <code>/assess-model-fit</code> recommends escalation, it auto-invokes <code>select-model</code> with your task details.</li>
-<li><strong>Holistic stack recommendation (<a href="../../skills/recm/SKILL.html">recm</a>):</strong> Use <code>recm</code> when deciding across harnesses (Claude Code, agy, Codex, OpenCode), provider tiers, and review engines rather than only Claude model tiers.</li>
-</ul>
-</section>
-<section id="faq" class="level2">
-<h2 class="anchored" data-anchor-id="faq">FAQ</h2>
-<p><strong>Q: I’m using Haiku 4.5 but it keeps failing. What now?</strong> A: Escalate to Sonnet (Tier 2) or Fable/Opus (Tier 1). Use this skill to confirm the better tier for your task.</p>
-<p><strong>Q: Opus is expensive. Can I use Sonnet or Fable 5 instead?</strong> A: Yes. If your task doesn’t need deep architectural design, use Sonnet for execution. For orchestration or review, Fable 5 or Opus provides the needed reasoning depth.</p>
-<p><strong>Q: Should I always use the highest model?</strong> A: No—higher models are costlier. Match the model to task complexity. Use Haiku 4.5 for simple work, Sonnet for execution, and Fable 5 or Opus for orchestration and adversarial review.</p>
-<p><strong>Q: Can I pick a model manually without using this skill?</strong> A: Yes. This skill is advisory. You can always override and choose your own model.</p>
+<section id="rech-alias-for-recm" class="level1">
+<h1>rech (alias for <code>recm</code>)</h1>
+<p>This is a short alias for recommending harnesses, providers, models, and engines. Read and follow the canonical skill:</p>
+<p>→ <strong><a href="../../skills/recm/SKILL.html">recm</a></strong></p>
 
 
-</section>
 </section>
 
 <a onclick="window.scrollTo(0, 0); return false;" role="button" id="quarto-back-to-top"><i class="bi bi-arrow-up"></i> Back to top</a></main> <!-- /main -->
@@ -904,7 +754,7 @@ ul.task-list li input[type="checkbox"] {
     </div>   
     <div class="nav-footer-center">
 <p>Built with <a href="https://quarto.org/">Quarto</a></p>
-<div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/select-model/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/select-model/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></div>
+<div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/rech/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/rech/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></div>
     <div class="nav-footer-right">
       &nbsp;
     </div>

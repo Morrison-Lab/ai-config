@@ -160,6 +160,35 @@ def main() -> int:
         code, out, err = run_script("--diff", "--base", "HEAD", cwd=repo)
         check("untracked file with em-dash is detected in diff mode", code == 1)
         check("...and names untracked.py", "untracked.py:1:" in err)
+        (repo / "untracked.py").unlink()
+
+        # 5g. Diff with '\ No newline at end of file' reports correct line number
+        (repo / "nonewline.py").write_text("a = 1\nb = 2\nc = 'no newline'", encoding="utf-8")
+        subprocess.run(["git", "add", "nonewline.py"], cwd=repo, check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "add nonewline.py"], cwd=repo, check=True)
+        (repo / "nonewline.py").write_text(f"a = 1\nb = 2\nc = 'no newline'\nd = '{EM_DASH}'", encoding="utf-8")
+        code, out, err = run_script("--diff", "--base", "HEAD", cwd=repo)
+        check("no newline file reports correct violation line 4", "nonewline.py:4:" in err)
+        check("...and exits 1", code == 1)
+        subprocess.run(["git", "checkout", "-q", "--", "nonewline.py"], cwd=repo, check=True)
+
+        # 5h. Moving base (main advanced) uses merge-base and does not scan changes on main
+        subprocess.run(["git", "checkout", "-q", "-b", "feature"], cwd=repo, check=True)
+        (repo / "feature.py").write_text("feat = 1\n", encoding="utf-8")
+        subprocess.run(["git", "add", "feature.py"], cwd=repo, check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "feature commit"], cwd=repo, check=True)
+
+        # Advance main with changes on a different file
+        subprocess.run(["git", "checkout", "-q", "main"], cwd=repo, check=True)
+        (repo / "main_only.py").write_text("main_val = 100\n", encoding="utf-8")
+        subprocess.run(["git", "add", "main_only.py"], cwd=repo, check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "advance main"], cwd=repo, check=True)
+
+        # Switch back to feature and diff against main -- should only scan feature.py (1 file, 1 line), NOT main_only.py
+        subprocess.run(["git", "checkout", "-q", "feature"], cwd=repo, check=True)
+        code, out, err = run_script("--diff", "--base", "main", cwd=repo)
+        check("merge-base prevents main branch changes from polluting diff", code == 0)
+        check("...and only scans feature branch added lines", "Checked 1 file(s), 1 added line(s)" in out)
 
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0

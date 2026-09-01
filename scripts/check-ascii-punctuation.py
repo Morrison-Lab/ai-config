@@ -7,7 +7,7 @@ U+2018, U+2019), or the multiplication sign (U+00D7).
 
 This checker operates in two modes:
 1. Whole-tree / file mode (default): Scans whole files matching specified
-   extensions (.py, .R, .qmd by default).
+   extensions (.py, .R by default).
 2. Diff / working-tree mode (--diff): Scans added lines against a base ref
    (including unstaged working tree edits, staged index changes, branch commits,
    and untracked files).
@@ -210,6 +210,10 @@ def parse_diff_added_lines(diff_text: str) -> Dict[str, List[Tuple[int, str]]]:
         elif line.startswith("+") and not line.startswith("+++") and current_file:
             added_lines[current_file].append((current_line_no, line[1:]))
             current_line_no += 1
+        elif line.startswith("\\"):
+            # Git marker lines, e.g. "\ No newline at end of file".
+            # Do NOT increment current_line_no for these marker lines.
+            continue
         elif not line.startswith("-") and current_file:
             current_line_no += 1
 
@@ -240,15 +244,30 @@ def get_untracked_files(repo_root: Path, extensions: Set[str]) -> List[Path]:
     return untracked
 
 
+def resolve_merge_base(repo_root: Path, base_ref: str) -> str:
+    """Resolve merge-base between base_ref and HEAD to avoid moving-base false positives."""
+    proc = subprocess.run(
+        ["git", "merge-base", base_ref, "HEAD"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode == 0:
+        mb = proc.stdout.strip()
+        if mb:
+            return mb
+    return base_ref
+
+
 def scan_diff(
     repo_root: Path,
     base_ref: str,
     extensions: Set[str],
 ) -> ScanResult:
-    """Scan added lines between base_ref and current working tree (committed + staged + dirty + untracked)."""
-    # git diff -U0 <base> diffs base directly against working tree (staged + unstaged + commits)
+    """Scan added lines between merge-base(base_ref, HEAD) and current working tree."""
+    diff_base = resolve_merge_base(repo_root, base_ref)
     diff_proc = subprocess.run(
-        ["git", "diff", "--unified=0", base_ref],
+        ["git", "diff", "--unified=0", diff_base],
         cwd=repo_root,
         capture_output=True,
         text=True,

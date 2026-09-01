@@ -89,7 +89,7 @@ project-type-specific; sections 4-6 apply to every project.
   is documented somewhere a new user would find it (README, `.env.example`,
   a setup script) — not just referenced in code:
   ```bash
-  rg -n 'Sys\.getenv\(|os\.environ|os\.getenv\(' .
+  rg -n 'Sys\.getenv\(|os\.environ|os\.getenv\(|\$[A-Z_]{2,}' .
   ```
 - **Undocumented prerequisites.** Does the repo state what has to be
   installed *before* the package manager runs — a system library, a
@@ -97,7 +97,7 @@ project-type-specific; sections 4-6 apply to every project.
   Grep for `system(`, `subprocess`, `shell_exec`, or backticked shell
   calls and confirm each invoked binary is named as a prerequisite:
   ```bash
-  rg -n 'system\(|subprocess|shell_exec' .
+  rg -n 'system\(|subprocess|shell_exec|`[^`]+`' .
   ```
 
 ### 4. Output traceability (all project types)

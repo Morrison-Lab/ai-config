@@ -258,6 +258,32 @@ documented pattern (see `vignette("creating_linters", package = "lintr")`).
 Needs `lintr (>= 3.1.2)` for the `linter_level` argument. (Landed as
 `lms::function_length_linter()` in UCD-SERG/lab-manual#381.)
 
+## lintr's `commented_code_linter` truncates at the SECOND `#`, so `# text #NNN` can flag as commented-out code
+
+`commented_code_linter` strips a comment's leading `#` and tries to
+`parse()` what remains, flagging the line when parsing succeeds (the
+premise being that valid R syntax left in a comment is probably disabled
+code).
+R's own comment rule stops at the *first* unescaped `#` it meets, so a
+comment carrying a second `#` --- an inline issue reference like `#629` ---
+is truncated there when the linter re-parses it: `# Before #629 the ...`
+strips to `Before`, which is a bare symbol and therefore valid R, so the
+whole comment gets flagged as commented-out code.
+
+Any comment whose text *before* an inline `#NNN` reference reduces to a
+single valid R symbol trips this --- a lone identifier, a lone number, a
+short assignment-shaped fragment.
+
+- **Do:** reword so the fragment before the issue number is not a bare,
+  parseable symbol on its own (add a verb, a preposition, anything that
+  fails to `parse()`), or move the issue reference elsewhere in the
+  sentence.
+- **Don't:** treat a `commented_code_linter` hit on a comment containing an
+  issue reference as a false positive to suppress --- reword it instead,
+  since the same truncation will re-trigger on the next reviewer's re-run.
+
+(`UCD-SERG/serocalculator#668`, 2026-09-01.)
+
 ## air (R formatter) vs lintr's `indentation_linter` — keep `indent-width` aligned
 
 - `air`'s `air.toml` `[format]` table has a configurable `indent-width`
@@ -278,6 +304,18 @@ Needs `lintr (>= 3.1.2)` for the `linter_level` argument. (Landed as
   (Only the *first* mis-indented line of a block is reported; de-indent the
   whole signature block, not just the flagged line, or the next line flags on
   the next run.) (UCD-SERG/serocalculator#503, 2026-07.)
+- **Recurred on UCD-SERG/serocalculator#672, 2026-09-01, from the lab's own
+  4-space continuation indent rather than from leftover styler output**: a
+  PR touching one R file whose function signatures already used that indent
+  turned `lint-changed-files` (whole-file `lintr::lint_package()` scope) red
+  on lines the PR never wrote, while `lint / lint-changed-lines` (the
+  diff-scoped job) stayed green, because it only lints lines the diff
+  actually touched.
+  The two jobs disagreeing on the same PR is not a contradiction to resolve
+  --- it is the intended difference in scope --- but only the line-scoped
+  job asks a question the PR's author can actually answer (should *this*
+  diff fix it); the whole-file job asks about pre-existing content the PR is
+  not responsible for.
 - **A `lint-changed-files`-style workflow that calls `gh::gh()` (or any
   GitHub API) to list the PR's changed files can flake with `403 API rate
   limit exceeded for <IP>` when it runs *unauthenticated*.** The R `gh`
@@ -931,6 +969,64 @@ branch differs.
 - **Don't:** compare a full run against a filtered one, or a `devtools::test()`
   run against a bare `Rscript` one --- per the `NOT_CRAN` trap above those two
   do not even execute the same tests.
+
+## `pkgload::load_all()` cannot serve a PSOCK cluster, and a mutation test that never ran can look identical to one that did
+
+`parallel::parLapplyLB()` (and any `%dopar%` backend that spins up a PSOCK
+cluster) starts worker processes that `require()` the **installed** package
+by name --- they have no access to the calling session's `load_all()`
+environment, since that environment exists only in the parent process.
+A test that reaches a PSOCK cluster therefore errors under
+`devtools::load_all()` / `pkgload::load_all()` with something like
+`object 'my_internal_fn' not found`, and passes cleanly once the package is
+actually installed (`R CMD INSTALL`, or `devtools::install()`).
+serocalculator's own source carries a comment noting this gets out of sync
+in development, which is the tell that the package's authors already knew.
+
+**This turns a mutation test that should fail into one that never runs at
+all, and the two look the same from the summary line.**
+The standard regression-test check --- revert the fix, re-run the test,
+confirm it now fails --- assumes the test executes under both states.
+Under `load_all()`, reverting a fix to a function a PSOCK worker calls does
+not make the guard test fail; it makes the whole file **error** before
+reaching any assertion, because the workers cannot find the function at
+all, fixed or broken.
+`testthat`'s summary line can then read `FAILED: 0` in both the before and
+after runs, which reads as "the fix changed nothing" when the true story is
+"this test never executed either time".
+
+- **Do:** install the package for real (`R CMD INSTALL .` or
+  `devtools::install()`) before running or mutation-testing any test that
+  spins up a parallel cluster.
+- **Do:** treat identical before/after counts from a mutation test as
+  uninformative rather than reassuring, and check for `ERROR`/`SKIP` on the
+  specific test before trusting a `FAILED: 0` either way.
+- **Don't:** trust a green (or an unchanged) `testthat` summary for a
+  cluster-using test run under `load_all()`.
+
+**A related, separate platform trap: `doParallel::registerDoParallel(cores = 1)`
+does not mean "run serially in the calling process" on every OS.**
+On Unix it registers a multicore backend, and `%dopar%` with a multicore
+backend still runs in the calling process (it forks rather than spawning a
+cluster), so any RNG or global-state mutation inside the loop leaks back to
+the caller even at `cores = 1`.
+On Windows the same call builds a one-worker PSOCK cluster instead, which
+runs in a separate process, so the identical mutation does **not** leak
+there.
+A test written to guard against the Unix-side leak passes vacuously on
+Windows, for a reason that has nothing to do with the fix being tested ---
+check which backend a test's own `num_cores`/`cores` argument resolves to
+on the platform running it, rather than assuming the guarded code path was
+exercised.
+
+(`UCD-SERG/serocalculator#668`, 2026-09-01: a snapshot-change prediction was
+derived from which `RNGseq_seed()` branch each call would take, without
+checking what `num_cores` those calls actually ran under in CI.
+They used the multi-core default and forked, so the leak the PR fixed never
+reached them, and the prediction --- sound reasoning applied to an
+unchecked population --- did not hold.
+See [`metacognitive-monitoring`](../shared/workflow/metacognitive-monitoring.md)'s
+"A sound measurement does not license the claim standing next to it".)
 
 ## `{cli}` glue-interpolates every message string, and the two brace forms fail differently
 

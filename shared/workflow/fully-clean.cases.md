@@ -1143,7 +1143,10 @@ The second wake named the live head, and still arrived inside that window.
 
 What the wake's body says about its own scope is not reproduced here, because it lives only in that session's transcript and no later reader can check it.
 What is checkable is the pair of fields above: the event's `head_sha`, and a check-runs read on the PR's actual head.
-Compare the first, then run the second.)
+Compare the first, then run the second.
+The success-direction framing, the exclusions the event body itself declares, and later occurrences across two further repositories are in
+[`memories/github-mcp-tools.md`](../../memories/github-mcp-tools.md),
+"A `check_suite.completed` event can name a superseded head".)
 
 ## A poller exited on an empty check list
 
@@ -1367,3 +1370,37 @@ However, pushing created a new HEAD commit ref that silently invalidated the pri
 Auto-merge fires server-side as soon as CI passes, with no check of whether a review verdict has posted for the new HEAD.
 A clean verdict for `54874be0` posted at 22:18:44Z and auto-merge fired at 22:20:29Z.
 Had the auto-merge beaten the review, it would have merged a head no reviewer had seen.)
+
+## The review JSON's `commit_sha` named the synthetic merge commit
+
+(`Morrison-Lab/ai-config#2907` and `UCD-SERG/serodynamics#298`, 2026-09-01,
+one session, two triggers.
+On #2907, auto-reviewed on push, the review's JSON block said
+`commit_sha: da51b7b1...` while its `Reviewed commit:` trailer said
+`ce350638...`, and `ce350638` was the branch tip.
+The JSON's SHA was resolved rather than assumed:
+
+```bash
+git fetch origin da51b7b141726693d4b2c5919108fc35867d9f32
+git log -1 --format='%P%n%s' da51b7b141726693d4b2c5919108fc35867d9f32
+#=> 10d438f43729722411448ee1cb09b4423c8f3cbb ce350638245ff07dbb1cd350010fa52ec4a89d55
+#=> Merge ce350638245ff07dbb1cd350010fa52ec4a89d55 into 10d438f43729722411448ee1cb09b4423c8f3cbb
+```
+
+Two parents, the second being the tip: the synthetic merge commit at
+`refs/pull/2907/merge`, which `actions/checkout` produces by default on a
+`pull_request` event.
+So the verdict genuinely covered `ce350638`, and a script comparing the JSON
+field against `head.sha` would have called it stale.
+
+On #298, dispatched by a `/review` comment through `workflow_dispatch`,
+which checks out the PR head explicitly, the JSON and the trailer agreed on
+`6b101d8a`.
+The difference tracks the trigger, not the repository.
+
+The PR recording this, `Morrison-Lab/ai-config#2911`, reproduced the shape
+on itself and added one datum: its review's JSON gave only a seven-character
+`a1081f5`, which `git fetch origin a1081f5` could not resolve, while the
+trailer's `4059bf08` was the tip.
+Whether `a1081f5` was the merge ref is therefore unconfirmed, and is recorded
+as such; the trailer settled it either way.)

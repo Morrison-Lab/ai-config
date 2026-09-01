@@ -13,13 +13,14 @@ Run a short, structured clarifying-question loop with the user **before** any co
 1.  **State the request as you understand it**, one or two sentences, and name the specific thing you’re unsure about — don’t ask a generic “any requirements?” question.
 2.  **Ask 2-4 targeted clarifying questions per round**, focused on the decision that most changes the shape of the work, not everything at once. Use `AskUserQuestion` for genuine either/or choices; plain questions for open-ended ones.
 3.  **Repeat** for as many rounds as it takes to reach a shape you could restate as an unambiguous “done” criterion — usually 1-3 rounds. Stop asking once further questions would be bikeshedding rather than resolving a real fork in the approach.
-4.  **Write the plan file.** Once the approach is agreed, write it to `plans/<slug>.md` in the target repo (create the directory if it doesn’t exist yet), covering: the problem/context, the chosen approach (not every alternative considered), the specific files/areas it touches, and how “done” will be verified. Keep it scannable — a few paragraphs plus a short list of concrete steps, not an exhaustive spec.
+4.  **Research existing solutions & write the plan file.** Before committing to building custom components, research existing libraries, tools, or lab implementations (DRW check via [`prefer-upstream`](../../skills/prefer-upstream/SKILL.llms.md)). Once the approach is agreed, write it to `plans/<slug>.md` in the target repo (create the directory if it doesn’t exist yet), covering: the problem/context, the chosen approach (not every alternative considered), the specific files/areas it touches, and how “done” will be verified. Keep it scannable — a few paragraphs plus a short list of concrete steps, not an exhaustive spec.
 5.  **Hand off to `st`** (or `gi` if an issue already exists): the plan file becomes the input `st` restates into an issue body, instead of writing the issue from scratch. Reference the plan file’s path in the issue.
 
 ## Relationship to other skills
 
 - **`st`** — `st` is for work whose shape is already settled; it restates the task in 1-2 sentences and jumps straight to filing an issue. This skill runs *before* that: when the shape isn’t settled yet, resolve it here first, then hand the resulting plan file to `st` to turn into an issue.
 - **`gi`** — if an issue already exists but its scope is unclear or disputed, use this skill to resolve the ambiguity before implementing, then resume `gi`’s normal flow.
+- **`prefer-upstream`** — search existing packages and tools during the planning phase to avoid planning custom code where solutions already exist.
 - **`split-concerns`** — if brainstorming reveals the request is really several independent concerns, split them into separate plan files/issues rather than one combined plan.
 
 ## Anti-patterns

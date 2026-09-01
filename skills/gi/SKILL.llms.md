@@ -102,9 +102,9 @@ gh api --paginate repos/<owner>/<repo>/issues/<N>/timeline \
 
 If an open PR already exists for the issue: - **Don’t open a competing PR.** The issue is already being worked. - Skip it and grab the next unblocked issue instead. - Or, if the existing PR is stalled/abandoned and you’re taking it over, check it out (use the existing PR branch), claim the PR, and ARDI it rather than starting fresh.
 
-### 5. Check history and peers
+### 5. Check history, peers, and research DRW
 
-Before implementing, invoke the `check-history` skill to review merged MRs/PRs that touched the same area so you don’t undo past progress. If the issue is a new feature or architectural change, also consider running `scout-peers` to see how other comparable projects solved it, ensuring we don’t reinvent the wheel. (Do NOT run `opposition-research` / `oppo` here; `oppo` mines community demand to decide *what* to build and feeds the issue tracker, while `scout-peers` checks *how* others built it once you’ve already grabbed an issue).
+Before implementing, invoke the `check-history` skill to review merged MRs/PRs that touched the same area so you don’t undo past progress. Perform a research step to check whether the functionality or helper already exists (DRW) in our own repos or upstream ecosystems before writing custom code, following [`prefer-upstream`](../../skills/prefer-upstream/SKILL.llms.md) and [`dont-reinvent-wheel`](../../shared/principles/dont-reinvent-wheel.md). If the issue is a new feature or architectural change, also consider running `scout-peers` to see how other comparable projects solved it, ensuring we don’t reinvent the wheel. (Do NOT run `opposition-research` / `oppo` here; `oppo` mines community demand to decide *what* to build and feeds the issue tracker, while `scout-peers` checks *how* others built it once you’ve already grabbed an issue).
 
 ### 6. Claim the issue
 
@@ -153,6 +153,7 @@ Keep it a draft: a draft doesn’t trigger the `@claude` review bot, so no revie
 ### 9. Implement
 
 - Read the issue description carefully — understand “done” criteria
+- Research before writing code: verify that no standard library, upstream package, or lab repo helper already provides what you are about to write (DRW). If custom implementation is needed, record the search and why existing options were unfit
 - Make the changes (code, tests, docs as needed)
 - Run the repo’s standard checks (lint, test, build) before committing Prefer the same commands CI runs. If the repo has both subpackage tests and a root-level lint step, run both
 - Commit with a message referencing the issue: `fix: handle auth timeout on slow networks (closes #12)`
@@ -201,6 +202,7 @@ If during implementation you discover the issue is blocked (missing dependency, 
 ## Relationship to other skills
 
 - **`check-history`** — invoked in step 5 to avoid undoing past work
+- **`prefer-upstream`** — search existing packages, standard libraries, and lab repos before writing custom code to avoid reinventing the wheel
 - **`scout-peers`** — suggested in step 5 to check how peers solved a problem so you don’t reinvent the wheel (distinct from `oppo`, which finds *what* to build)
 - **`ardi`** — invoked in step 11 to drive the MR/PR to clean
 - **`claim-pr`** — the issue claim in step 6 follows the same pattern
@@ -214,6 +216,7 @@ If during implementation you discover the issue is blocked (missing dependency, 
 
 - ❌ Grabbing an issue already assigned to someone else
 - ❌ Starting implementation without checking history
+- ❌ Hand-rolling custom code without researching existing packaged or shared solutions first (violating DRW)
 - ❌ Opening an MR without running the repo’s standard checks first
 - ❌ Picking a huge issue that can’t be completed in one session without discussing scope with the user first
 - ❌ Implementing without understanding “done” criteria from the issue

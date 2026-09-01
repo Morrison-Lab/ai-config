@@ -67,9 +67,10 @@ glab issue create --title "<concise title>" --description "<what & why>
   _Posted by Claude Code (AI agent) --- not written by a human._"   # COMMENT_ISSUE
   ```
 
-### 4. Check history
+### 4. Check history and research DRW
 
-Invoke `check-history` before implementing — review merged/closed MRs that touched the same area so you don’t undo past progress.
+- Invoke `check-history` before implementing — review merged/closed MRs that touched the same area so you don’t undo past progress.
+- Perform a research step to check whether the functionality or helper already exists (Don’t Reinvent the Wheel / DRW): search our own repos (`Morrison-Lab/gha`, lab packages, ai-config) and trustworthy upstream ecosystems (standard libraries, r-lib / tidyverse, PyPI, npm) via [`prefer-upstream`](../../skills/prefer-upstream/SKILL.llms.md) and [`dont-reinvent-wheel`](../../shared/principles/dont-reinvent-wheel.md) before hand-rolling custom code.
 
 ### 5. Branch → open draft PR → implement → ready → ARDI
 
@@ -90,7 +91,7 @@ git checkout -b <type>/<slug> origin/main   # CREATE_BRANCH — fix/ feat/ docs/
   WIP — opened up front to claim the issue; implementing now."   # CREATE_PR
   ```
 
-- Implement (code, tests, docs), run the repo’s standard checks, and push the implementation onto the PR, committing with a message referencing the issue (`fix: … (closes #N)`).
+- Implement (code, tests, docs), researching existing libraries/functions before hand-rolling custom code, run the repo’s standard checks, and push the implementation onto the PR, committing with a message referencing the issue (`fix: … (closes #N)`).
 
 - **Mark the PR ready for review** (`gh pr ready <N>` — `MARK_PR_READY`) and request `the repository owner` as reviewer (`request-pr-review`).
 
@@ -104,6 +105,7 @@ Linked issue + PR, ARDI round count, and any deferred follow-up issues.
 
 - **`brainstorm`** — when the task’s shape isn’t settled yet (multiple reasonable interpretations, a real design tradeoff, “done” can’t yet be stated in one sentence), run `brainstorm` first to resolve that through a Socratic Q&A loop and a plan file, then hand the result to this skill’s “restate the task and ‘done’ criteria” step instead of starting from scratch.
 - **`gi`** — once the issue exists, the implement → PR → ARDI tail is the same; `st` is “`gi`, but you write the issue first.”
+- **`prefer-upstream`** — search existing packages and tools before writing custom code to prevent reinventing the wheel.
 - **`defer-issue`** — same issue-creation mechanics, for sub-tasks that emerge.
 - **`check-history`**, **`claim-pr`**, **`pr-on-claim`**, **`request-pr-review`**, **`ardi`**, **`split-concerns`** — invoked along the way (`pr-on-claim` is the “open the draft PR before implementing” step).
 - **`post-merge`** — closes the lifecycle that `st` opens, once the PR lands.
@@ -114,6 +116,7 @@ Linked issue + PR, ARDI round count, and any deferred follow-up issues.
 - ❌ Filing a duplicate without searching open **and** closed issues first.
 - ❌ A vague issue with no “done” criteria.
 - ❌ Re-doing already-closed work without flagging it to the user.
+- ❌ Hand-rolling custom code without researching existing libraries/packages first (violating DRW).
 - ❌ Cramming multiple independent concerns into one issue/PR.
 
 Back to top

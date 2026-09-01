@@ -355,7 +355,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#triage-label-and-prioritize" id="toc-triage-label-and-prioritize" class="nav-link" data-scroll-target="#triage-label-and-prioritize">2. Triage, label, and prioritize</a></li>
   <li><a href="#select-top-issue-automatically" id="toc-select-top-issue-automatically" class="nav-link" data-scroll-target="#select-top-issue-automatically">3. Select top issue automatically</a></li>
   <li><a href="#check-the-issue-isnt-already-in-flight" id="toc-check-the-issue-isnt-already-in-flight" class="nav-link" data-scroll-target="#check-the-issue-isnt-already-in-flight">4. Check the issue isn’t already in-flight</a></li>
-  <li><a href="#check-history-and-peers" id="toc-check-history-and-peers" class="nav-link" data-scroll-target="#check-history-and-peers">5. Check history and peers</a></li>
+  <li><a href="#check-history-peers-and-research-drw" id="toc-check-history-peers-and-research-drw" class="nav-link" data-scroll-target="#check-history-peers-and-research-drw">5. Check history, peers, and research DRW</a></li>
   <li><a href="#claim-the-issue" id="toc-claim-the-issue" class="nav-link" data-scroll-target="#claim-the-issue">6. Claim the issue</a></li>
   <li><a href="#create-a-branch" id="toc-create-a-branch" class="nav-link" data-scroll-target="#create-a-branch">7. Create a branch</a></li>
   <li><a href="#open-the-pr-now-draft-from-an-empty-commit" id="toc-open-the-pr-now-draft-from-an-empty-commit" class="nav-link" data-scroll-target="#open-the-pr-now-draft-from-an-empty-commit">8. Open the PR now — draft, from an empty commit</a></li>
@@ -499,9 +499,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">--jq</span> <span class="st">'.[] | select(.event == "cross-referenced") | .source.issue | select(.pull_request != null) | select(.state == "open") | "#\(.number) \(.title)"'</span> <span class="kw">|</span> <span class="fu">cat</span>   <span class="co"># ISSUE_LINKED_PRS</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>If an open PR already exists for the issue: - <strong>Don’t open a competing PR.</strong> The issue is already being worked. - Skip it and grab the next unblocked issue instead. - Or, if the existing PR is stalled/abandoned and you’re taking it over, check it out (use the existing PR branch), claim the PR, and ARDI it rather than starting fresh.</p>
 </section>
-<section id="check-history-and-peers" class="level3">
-<h3 class="anchored" data-anchor-id="check-history-and-peers">5. Check history and peers</h3>
-<p>Before implementing, invoke the <code>check-history</code> skill to review merged MRs/PRs that touched the same area so you don’t undo past progress. If the issue is a new feature or architectural change, also consider running <code>scout-peers</code> to see how other comparable projects solved it, ensuring we don’t reinvent the wheel. (Do NOT run <code>opposition-research</code> / <code>oppo</code> here; <code>oppo</code> mines community demand to decide <em>what</em> to build and feeds the issue tracker, while <code>scout-peers</code> checks <em>how</em> others built it once you’ve already grabbed an issue).</p>
+<section id="check-history-peers-and-research-drw" class="level3">
+<h3 class="anchored" data-anchor-id="check-history-peers-and-research-drw">5. Check history, peers, and research DRW</h3>
+<p>Before implementing, invoke the <code>check-history</code> skill to review merged MRs/PRs that touched the same area so you don’t undo past progress. Perform a research step to check whether the functionality or helper already exists (DRW) in our own repos or upstream ecosystems before writing custom code, following <a href="../../skills/prefer-upstream/SKILL.html"><code>prefer-upstream</code></a> and <a href="../../shared/principles/dont-reinvent-wheel.md"><code>dont-reinvent-wheel</code></a>. If the issue is a new feature or architectural change, also consider running <code>scout-peers</code> to see how other comparable projects solved it, ensuring we don’t reinvent the wheel. (Do NOT run <code>opposition-research</code> / <code>oppo</code> here; <code>oppo</code> mines community demand to decide <em>what</em> to build and feeds the issue tracker, while <code>scout-peers</code> checks <em>how</em> others built it once you’ve already grabbed an issue).</p>
 </section>
 <section id="claim-the-issue" class="level3">
 <h3 class="anchored" data-anchor-id="claim-the-issue">6. Claim the issue</h3>
@@ -542,6 +542,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h3 class="anchored" data-anchor-id="implement">9. Implement</h3>
 <ul>
 <li>Read the issue description carefully — understand “done” criteria</li>
+<li>Research before writing code: verify that no standard library, upstream package, or lab repo helper already provides what you are about to write (DRW). If custom implementation is needed, record the search and why existing options were unfit</li>
 <li>Make the changes (code, tests, docs as needed)</li>
 <li>Run the repo’s standard checks (lint, test, build) before committing Prefer the same commands CI runs. If the repo has both subpackage tests and a root-level lint step, run both</li>
 <li>Commit with a message referencing the issue: <code>fix: handle auth timeout on slow networks (closes #12)</code></li>
@@ -590,6 +591,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h2 class="anchored" data-anchor-id="relationship-to-other-skills">Relationship to other skills</h2>
 <ul>
 <li><strong><code>check-history</code></strong> — invoked in step 5 to avoid undoing past work</li>
+<li><strong><code>prefer-upstream</code></strong> — search existing packages, standard libraries, and lab repos before writing custom code to avoid reinventing the wheel</li>
 <li><strong><code>scout-peers</code></strong> — suggested in step 5 to check how peers solved a problem so you don’t reinvent the wheel (distinct from <code>oppo</code>, which finds <em>what</em> to build)</li>
 <li><strong><code>ardi</code></strong> — invoked in step 11 to drive the MR/PR to clean</li>
 <li><strong><code>claim-pr</code></strong> — the issue claim in step 6 follows the same pattern</li>
@@ -605,6 +607,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <ul>
 <li>❌ Grabbing an issue already assigned to someone else</li>
 <li>❌ Starting implementation without checking history</li>
+<li>❌ Hand-rolling custom code without researching existing packaged or shared solutions first (violating DRW)</li>
 <li>❌ Opening an MR without running the repo’s standard checks first</li>
 <li>❌ Picking a huge issue that can’t be completed in one session without discussing scope with the user first</li>
 <li>❌ Implementing without understanding “done” criteria from the issue</li>

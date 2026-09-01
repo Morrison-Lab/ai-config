@@ -394,7 +394,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>For each iteration:</p>
 <section id="a.-invoke-gi-grab-issue" class="level4">
 <h4 class="anchored" data-anchor-id="a.-invoke-gi-grab-issue">a. Invoke <code>gi</code> (Grab Issue)</h4>
-<p>Run the full GI procedure: 1. List open issues, triage, label, and prioritize candidate issues 2. Select the highest-priority issue automatically from the triage signals, state which one and why, and proceed without pausing for confirmation 3. Check history 4. Claim the issue 5. Create a branch 6. Open the draft PR up front, from an empty commit, before implementing — see <a href="../../shared/workflow/pr-on-claim.md"><code>pr-on-claim</code></a> 7. Implement 8. Push and mark the PR ready for review 9. ARDI to clean</p>
+<p>Run the full GI procedure: 1. List open issues, triage, label, and prioritize candidate issues 2. Select the highest-priority issue automatically from the triage signals, state which one and why, and proceed without pausing for confirmation 3. Check history and research existing solutions (DRW check via <a href="../../skills/prefer-upstream/SKILL.html"><code>prefer-upstream</code></a>) 4. Claim the issue 5. Create a branch 6. Open the draft PR up front, from an empty commit, before implementing — see <a href="../../shared/workflow/pr-on-claim.md"><code>pr-on-claim</code></a> 7. Implement (researching libraries/functions before hand-rolling custom code) 8. Push and mark the PR ready for review 9. ARDI to clean</p>
 </section>
 <section id="b.-record-the-result" class="level4">
 <h4 class="anchored" data-anchor-id="b.-record-the-result">b. Record the result</h4>
@@ -452,7 +452,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="delegate-sidecar-work-when-helpful" class="level2">
 <h2 class="anchored" data-anchor-id="delegate-sidecar-work-when-helpful">Delegate sidecar work when helpful</h2>
-<p>Within an iteration, hand independent sidecar work off to a subagent via the <code>Agent</code> tool instead of doing it inline — a history/precedent investigation, a verification pass on the implementation, research into how a similar issue was solved elsewhere. Keep the critical path (claim, draft PR, implement, ARDI) on the main thread so the loop keeps moving; this is a single sidecar call within one iteration, not a way to run whole issues concurrently — for that, see <a href="../../skills/gip/SKILL.html"><code>gip</code></a>.</p>
+<p>Within an iteration, hand independent sidecar work off to a subagent via the <code>Agent</code> tool instead of doing it inline — a history/precedent investigation, a DRW research check for existing upstream packages or lab implementations, a verification pass on the implementation, research into how a similar issue was solved elsewhere. Keep the critical path (claim, draft PR, implement, ARDI) on the main thread so the loop keeps moving; this is a single sidecar call within one iteration, not a way to run whole issues concurrently — for that, see <a href="../../skills/gip/SKILL.html"><code>gip</code></a>.</p>
 <p>When the sidecar task is judgment-heavy (a tricky bug hunt, an architecturally significant call, an adversarial review pass before the implementation goes out for real review), give the subagent a stronger model via the <code>Agent</code> tool’s <code>model</code> parameter (e.g.&nbsp;<code>model: 'opus'</code>) instead of leaving it at the session default. Symmetrically, override to a cheaper/faster tier (<code>model: 'fable'</code> or <code>'haiku'</code>) for mechanical, bounded sidecar work — a lookup, a formatting check, a repeated verification — rather than defaulting to the session’s own tier; see <a href="../../skills/select-model/SKILL.html"><code>select-model</code></a>’s decision tree for both directions. When the sidecar task is a heavy fan-out read/draft/verify pass and a separately-billed provider is available (e.g.&nbsp;the <code>codex</code> CLI), prefer spending that budget first and keep Claude/Agent-tool quota in reserve — see <a href="../../skills/delegate-to-codex/SKILL.html"><code>delegate-to-codex</code></a>.</p>
 </section>
 <section id="stacking-rules" class="level2">
@@ -492,6 +492,7 @@ Depends on: #&lt;N&gt;</code></pre></li>
 <ul>
 <li><strong><code>gip</code></strong> — the <strong>parallel</strong> counterpart: when a batch of issues is provably independent (no stacking dependency, no file overlap), <code>gip</code> lifts that subset out and works it concurrently in worktree-isolated subagents instead of serially. This loop stays serial for everything <code>gip</code> can’t prove independent.</li>
 <li><strong><code>gi</code></strong> — the inner loop; each iteration is a full GI invocation</li>
+<li><strong><code>prefer-upstream</code></strong> — search existing packages, standard libraries, and lab repos before writing custom code to avoid reinventing the wheel</li>
 <li><strong><code>pr-on-claim</code></strong> — each iteration opens its draft PR up front (step 6) so the in-flight issue is visible before implementing</li>
 <li><strong><code>ardi</code></strong> — drives each MR/PR to clean review within GI</li>
 <li><strong><code>check-history</code></strong> — invoked per-issue to avoid undoing past work</li>
@@ -524,6 +525,7 @@ Depends on: #&lt;N&gt;</code></pre></li>
 <ul>
 <li>❌ Stacking more than 3–4 MRs deep without asking (merge conflicts compound)</li>
 <li>❌ Grabbing issues assigned to someone else</li>
+<li>❌ Hand-rolling custom code without researching existing packaged or shared solutions first (violating DRW)</li>
 <li>❌ Continuing after a blocked issue without telling the user</li>
 <li>❌ Forgetting to note stack dependencies in MR descriptions</li>
 <li>❌ Basing on main when the previous MR hasn’t merged yet and the next issue would edit the same passages it changes — that almost always conflicts; run <code>stack-prs</code>’s decision gate (same file but different regions usually merges cleanly from main and doesn’t need the stack)</li>

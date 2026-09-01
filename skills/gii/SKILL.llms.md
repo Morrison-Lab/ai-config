@@ -20,7 +20,7 @@ For each iteration:
 
 #### a. Invoke `gi` (Grab Issue)
 
-Run the full GI procedure: 1. List open issues, triage, label, and prioritize candidate issues 2. Select the highest-priority issue automatically from the triage signals, state which one and why, and proceed without pausing for confirmation 3. Check history 4. Claim the issue 5. Create a branch 6. Open the draft PR up front, from an empty commit, before implementing — see [`pr-on-claim`](../../shared/workflow/pr-on-claim.md) 7. Implement 8. Push and mark the PR ready for review 9. ARDI to clean
+Run the full GI procedure: 1. List open issues, triage, label, and prioritize candidate issues 2. Select the highest-priority issue automatically from the triage signals, state which one and why, and proceed without pausing for confirmation 3. Check history and research existing solutions (DRW check via [`prefer-upstream`](../../skills/prefer-upstream/SKILL.llms.md)) 4. Claim the issue 5. Create a branch 6. Open the draft PR up front, from an empty commit, before implementing — see [`pr-on-claim`](../../shared/workflow/pr-on-claim.md) 7. Implement (researching libraries/functions before hand-rolling custom code) 8. Push and mark the PR ready for review 9. ARDI to clean
 
 #### b. Record the result
 
@@ -62,7 +62,7 @@ Go back to step (a) with the next issue.
 
 ## Delegate sidecar work when helpful
 
-Within an iteration, hand independent sidecar work off to a subagent via the `Agent` tool instead of doing it inline — a history/precedent investigation, a verification pass on the implementation, research into how a similar issue was solved elsewhere. Keep the critical path (claim, draft PR, implement, ARDI) on the main thread so the loop keeps moving; this is a single sidecar call within one iteration, not a way to run whole issues concurrently — for that, see [`gip`](../../skills/gip/SKILL.llms.md).
+Within an iteration, hand independent sidecar work off to a subagent via the `Agent` tool instead of doing it inline — a history/precedent investigation, a DRW research check for existing upstream packages or lab implementations, a verification pass on the implementation, research into how a similar issue was solved elsewhere. Keep the critical path (claim, draft PR, implement, ARDI) on the main thread so the loop keeps moving; this is a single sidecar call within one iteration, not a way to run whole issues concurrently — for that, see [`gip`](../../skills/gip/SKILL.llms.md).
 
 When the sidecar task is judgment-heavy (a tricky bug hunt, an architecturally significant call, an adversarial review pass before the implementation goes out for real review), give the subagent a stronger model via the `Agent` tool’s `model` parameter (e.g. `model: 'opus'`) instead of leaving it at the session default. Symmetrically, override to a cheaper/faster tier (`model: 'fable'` or `'haiku'`) for mechanical, bounded sidecar work — a lookup, a formatting check, a repeated verification — rather than defaulting to the session’s own tier; see [`select-model`](../../skills/select-model/SKILL.llms.md)’s decision tree for both directions. When the sidecar task is a heavy fan-out read/draft/verify pass and a separately-billed provider is available (e.g. the `codex` CLI), prefer spending that budget first and keep Claude/Agent-tool quota in reserve — see [`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.llms.md).
 
@@ -109,6 +109,7 @@ When the loop ends, print a summary:
 
 - **`gip`** — the **parallel** counterpart: when a batch of issues is provably independent (no stacking dependency, no file overlap), `gip` lifts that subset out and works it concurrently in worktree-isolated subagents instead of serially. This loop stays serial for everything `gip` can’t prove independent.
 - **`gi`** — the inner loop; each iteration is a full GI invocation
+- **`prefer-upstream`** — search existing packages, standard libraries, and lab repos before writing custom code to avoid reinventing the wheel
 - **`pr-on-claim`** — each iteration opens its draft PR up front (step 6) so the in-flight issue is visible before implementing
 - **`ardi`** — drives each MR/PR to clean review within GI
 - **`check-history`** — invoked per-issue to avoid undoing past work
@@ -141,6 +142,7 @@ Some web/remote sessions carry harness instructions naming a single assigned bra
 
 - ❌ Stacking more than 3–4 MRs deep without asking (merge conflicts compound)
 - ❌ Grabbing issues assigned to someone else
+- ❌ Hand-rolling custom code without researching existing packaged or shared solutions first (violating DRW)
 - ❌ Continuing after a blocked issue without telling the user
 - ❌ Forgetting to note stack dependencies in MR descriptions
 - ❌ Basing on main when the previous MR hasn’t merged yet and the next issue would edit the same passages it changes — that almost always conflicts; run `stack-prs`’s decision gate (same file but different regions usually merges cleanly from main and doesn’t need the stack)

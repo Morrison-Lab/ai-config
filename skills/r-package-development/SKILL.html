@@ -391,6 +391,7 @@ air format .</code></pre>
 <section id="coding" class="level2">
 <h2 class="anchored" data-anchor-id="coding">Coding</h2>
 <ul>
+<li>Before writing custom helper functions or hand-rolling utilities, research existing functions in base R, tidyverse/r-lib, ropensci, or existing dependencies per <a href="../../shared/coding/prefer-packaged-functions.md"><code>prefer-packaged-functions</code></a> and <a href="../../skills/prefer-upstream/SKILL.html"><code>prefer-upstream</code></a>.</li>
 <li>Always run <code>air format .</code> after generating code.</li>
 <li>Use the base pipe operator (<code>|&gt;</code>) not the magrittr pipe (<code>%&gt;%</code>).</li>
 <li>Use <code>\() ...</code> for single-line anonymous functions. For all other cases, use <code>function() {...}</code>.</li>
@@ -434,6 +435,7 @@ air format .</code></pre>
 <h2 class="anchored" data-anchor-id="relationship-to-other-skills">Relationship to other skills</h2>
 <p>This skill is a day-to-day dev-loop reference (load, test, document, format) with this author’s own conventions. It does not replace, and does not cover:</p>
 <ul>
+<li><a href="../../shared/coding/prefer-packaged-functions.md"><code>prefer-packaged-functions</code></a> and <a href="../../skills/prefer-upstream/SKILL.html"><code>prefer-upstream</code></a> — researching existing functions and package solutions before hand-rolling custom code.</li>
 <li><a href="../../skills/r-pkg-check/SKILL.html"><code>r-pkg-check</code></a> — running and triaging <code>devtools::check()</code> output.</li>
 <li><a href="../../skills/r-pkg-cran-checklist/SKILL.html"><code>r-pkg-cran-checklist</code></a> — the CRAN release mechanics (win-builder, revdep checks, <code>devtools::release()</code>).</li>
 <li><a href="../../skills/cran-extrachecks/SKILL.html"><code>cran-extrachecks</code></a> — the ad-hoc/stylistic CRAN checklist (Title case, <code>@return</code> tags, URL hygiene) that <code>devtools::check()</code> doesn’t catch on its own.</li>

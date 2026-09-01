@@ -37,6 +37,7 @@ Simon P. Couch (@simonpcouch)
 
 ## Coding
 
+- Before writing custom helper functions or hand-rolling utilities, research existing functions in base R, tidyverse/r-lib, ropensci, or existing dependencies per [`prefer-packaged-functions`](../../shared/coding/prefer-packaged-functions.md) and [`prefer-upstream`](../../skills/prefer-upstream/SKILL.llms.md).
 - Always run `air format .` after generating code.
 - Use the base pipe operator (`|>`) not the magrittr pipe (`%>%`).
 - Use `\() ...` for single-line anonymous functions. For all other cases, use `function() {...}`.
@@ -75,6 +76,7 @@ This is the tidyverse-style default. When the package already has an established
 
 This skill is a day-to-day dev-loop reference (load, test, document, format) with this author’s own conventions. It does not replace, and does not cover:
 
+- [`prefer-packaged-functions`](../../shared/coding/prefer-packaged-functions.md) and [`prefer-upstream`](../../skills/prefer-upstream/SKILL.llms.md) — researching existing functions and package solutions before hand-rolling custom code.
 - [`r-pkg-check`](../../skills/r-pkg-check/SKILL.llms.md) — running and triaging `devtools::check()` output.
 - [`r-pkg-cran-checklist`](../../skills/r-pkg-cran-checklist/SKILL.llms.md) — the CRAN release mechanics (win-builder, revdep checks, `devtools::release()`).
 - [`cran-extrachecks`](../../skills/cran-extrachecks/SKILL.llms.md) — the ad-hoc/stylistic CRAN checklist (Title case, `@return` tags, URL hygiene) that `devtools::check()` doesn’t catch on its own.

@@ -355,7 +355,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#restate-the-task-and-done-criteria" id="toc-restate-the-task-and-done-criteria" class="nav-link" data-scroll-target="#restate-the-task-and-done-criteria">1. Restate the task and “done” criteria</a></li>
   <li><a href="#search-for-an-existing-issue" id="toc-search-for-an-existing-issue" class="nav-link" data-scroll-target="#search-for-an-existing-issue">2. Search for an existing issue</a></li>
   <li><a href="#file-the-issue-if-none-exists" id="toc-file-the-issue-if-none-exists" class="nav-link" data-scroll-target="#file-the-issue-if-none-exists">3. File the issue (if none exists)</a></li>
-  <li><a href="#check-history" id="toc-check-history" class="nav-link" data-scroll-target="#check-history">4. Check history</a></li>
+  <li><a href="#check-history-and-research-drw" id="toc-check-history-and-research-drw" class="nav-link" data-scroll-target="#check-history-and-research-drw">4. Check history and research DRW</a></li>
   <li><a href="#branch-open-draft-pr-implement-ready-ardi" id="toc-branch-open-draft-pr-implement-ready-ardi" class="nav-link" data-scroll-target="#branch-open-draft-pr-implement-ready-ardi">5. Branch → open draft PR → implement → ready → ARDI</a></li>
   <li><a href="#report" id="toc-report" class="nav-link" data-scroll-target="#report">6. Report</a></li>
   </ul></li>
@@ -434,9 +434,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="st">_Posted by Claude Code (AI agent) --- not written by a human._"</span>   <span class="co"># COMMENT_ISSUE</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div></li>
 </ul>
 </section>
-<section id="check-history" class="level3">
-<h3 class="anchored" data-anchor-id="check-history">4. Check history</h3>
-<p>Invoke <code>check-history</code> before implementing — review merged/closed MRs that touched the same area so you don’t undo past progress.</p>
+<section id="check-history-and-research-drw" class="level3">
+<h3 class="anchored" data-anchor-id="check-history-and-research-drw">4. Check history and research DRW</h3>
+<ul>
+<li>Invoke <code>check-history</code> before implementing — review merged/closed MRs that touched the same area so you don’t undo past progress.</li>
+<li>Perform a research step to check whether the functionality or helper already exists (Don’t Reinvent the Wheel / DRW): search our own repos (<code>Morrison-Lab/gha</code>, lab packages, ai-config) and trustworthy upstream ecosystems (standard libraries, r-lib / tidyverse, PyPI, npm) via <a href="../../skills/prefer-upstream/SKILL.html"><code>prefer-upstream</code></a> and <a href="../../shared/principles/dont-reinvent-wheel.md"><code>dont-reinvent-wheel</code></a> before hand-rolling custom code.</li>
+</ul>
 </section>
 <section id="branch-open-draft-pr-implement-ready-ardi" class="level3">
 <h3 class="anchored" data-anchor-id="branch-open-draft-pr-implement-ready-ardi">5. Branch → open draft PR → implement → ready → ARDI</h3>
@@ -450,7 +453,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> pr create <span class="at">--draft</span> <span class="at">--title</span> <span class="st">"&lt;title&gt;"</span> <span class="at">--body</span> <span class="st">"Closes #&lt;N&gt;</span></span>
 <span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="st">WIP — opened up front to claim the issue; implementing now."</span>   <span class="co"># CREATE_PR</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div></li>
-<li><p>Implement (code, tests, docs), run the repo’s standard checks, and push the implementation onto the PR, committing with a message referencing the issue (<code>fix: … (closes #N)</code>).</p></li>
+<li><p>Implement (code, tests, docs), researching existing libraries/functions before hand-rolling custom code, run the repo’s standard checks, and push the implementation onto the PR, committing with a message referencing the issue (<code>fix: … (closes #N)</code>).</p></li>
 <li><p><strong>Mark the PR ready for review</strong> (<code>gh pr ready &lt;N&gt;</code> — <code>MARK_PR_READY</code>) and request <code>the repository owner</code> as reviewer (<code>request-pr-review</code>).</p></li>
 <li><p><strong>ARDI</strong> the PR to a clean verdict (<code>ardi</code>). Don’t merge unless asked.</p></li>
 </ul>
@@ -465,6 +468,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <ul>
 <li><strong><code>brainstorm</code></strong> — when the task’s shape isn’t settled yet (multiple reasonable interpretations, a real design tradeoff, “done” can’t yet be stated in one sentence), run <code>brainstorm</code> first to resolve that through a Socratic Q&amp;A loop and a plan file, then hand the result to this skill’s “restate the task and ‘done’ criteria” step instead of starting from scratch.</li>
 <li><strong><code>gi</code></strong> — once the issue exists, the implement → PR → ARDI tail is the same; <code>st</code> is “<code>gi</code>, but you write the issue first.”</li>
+<li><strong><code>prefer-upstream</code></strong> — search existing packages and tools before writing custom code to prevent reinventing the wheel.</li>
 <li><strong><code>defer-issue</code></strong> — same issue-creation mechanics, for sub-tasks that emerge.</li>
 <li><strong><code>check-history</code></strong>, <strong><code>claim-pr</code></strong>, <strong><code>pr-on-claim</code></strong>, <strong><code>request-pr-review</code></strong>, <strong><code>ardi</code></strong>, <strong><code>split-concerns</code></strong> — invoked along the way (<code>pr-on-claim</code> is the “open the draft PR before implementing” step).</li>
 <li><strong><code>post-merge</code></strong> — closes the lifecycle that <code>st</code> opens, once the PR lands.</li>
@@ -477,6 +481,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li>❌ Filing a duplicate without searching open <strong>and</strong> closed issues first.</li>
 <li>❌ A vague issue with no “done” criteria.</li>
 <li>❌ Re-doing already-closed work without flagging it to the user.</li>
+<li>❌ Hand-rolling custom code without researching existing libraries/packages first (violating DRW).</li>
 <li>❌ Cramming multiple independent concerns into one issue/PR.</li>
 </ul>
 

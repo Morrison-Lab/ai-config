@@ -345,7 +345,7 @@ ul.task-list li input[type="checkbox"] {
 <li><strong>State the request as you understand it</strong>, one or two sentences, and name the specific thing you’re unsure about — don’t ask a generic “any requirements?” question.</li>
 <li><strong>Ask 2-4 targeted clarifying questions per round</strong>, focused on the decision that most changes the shape of the work, not everything at once. Use <code>AskUserQuestion</code> for genuine either/or choices; plain questions for open-ended ones.</li>
 <li><strong>Repeat</strong> for as many rounds as it takes to reach a shape you could restate as an unambiguous “done” criterion — usually 1-3 rounds. Stop asking once further questions would be bikeshedding rather than resolving a real fork in the approach.</li>
-<li><strong>Write the plan file.</strong> Once the approach is agreed, write it to <code>plans/&lt;slug&gt;.md</code> in the target repo (create the directory if it doesn’t exist yet), covering: the problem/context, the chosen approach (not every alternative considered), the specific files/areas it touches, and how “done” will be verified. Keep it scannable — a few paragraphs plus a short list of concrete steps, not an exhaustive spec.</li>
+<li><strong>Research existing solutions &amp; write the plan file.</strong> Before committing to building custom components, research existing libraries, tools, or lab implementations (DRW check via <a href="../../skills/prefer-upstream/SKILL.html"><code>prefer-upstream</code></a>). Once the approach is agreed, write it to <code>plans/&lt;slug&gt;.md</code> in the target repo (create the directory if it doesn’t exist yet), covering: the problem/context, the chosen approach (not every alternative considered), the specific files/areas it touches, and how “done” will be verified. Keep it scannable — a few paragraphs plus a short list of concrete steps, not an exhaustive spec.</li>
 <li><strong>Hand off to <code>st</code></strong> (or <code>gi</code> if an issue already exists): the plan file becomes the input <code>st</code> restates into an issue body, instead of writing the issue from scratch. Reference the plan file’s path in the issue.</li>
 </ol>
 </section>
@@ -354,6 +354,7 @@ ul.task-list li input[type="checkbox"] {
 <ul>
 <li><strong><code>st</code></strong> — <code>st</code> is for work whose shape is already settled; it restates the task in 1-2 sentences and jumps straight to filing an issue. This skill runs <em>before</em> that: when the shape isn’t settled yet, resolve it here first, then hand the resulting plan file to <code>st</code> to turn into an issue.</li>
 <li><strong><code>gi</code></strong> — if an issue already exists but its scope is unclear or disputed, use this skill to resolve the ambiguity before implementing, then resume <code>gi</code>’s normal flow.</li>
+<li><strong><code>prefer-upstream</code></strong> — search existing packages and tools during the planning phase to avoid planning custom code where solutions already exist.</li>
 <li><strong><code>split-concerns</code></strong> — if brainstorming reveals the request is really several independent concerns, split them into separate plan files/issues rather than one combined plan.</li>
 </ul>
 </section>

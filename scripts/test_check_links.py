@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests for scripts/check-links.py (ai-config#2547).
+"""Tests for scripts/check-links.py (ai-config#2842).
 
 Verifies that:
 1. parse_link_target properly extracts paths and drops title attributes across

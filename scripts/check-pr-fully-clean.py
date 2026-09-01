@@ -48,6 +48,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 from fences import (  # noqa: E402
     CODE_SPAN_RE,
     find_fence_spans,
+    strip_code,
     strip_code_spans,
     strip_fences,
 )
@@ -348,7 +349,7 @@ def _reviewer_identity(body: str, author: str = "") -> str:
     The first line, not the first paragraph: semantic line breaks often put
     the header and the next sentence in one paragraph, and a quote of
     ``**Claude finished**`` on line 2 must not inherit Claude's identity.
-    Cited finding vocabulary is blanked first so a code span still does not
+    Code spans and cited finding vocabulary are blanked first so a code span does not
     match.
 
     Residual: a shared-login review whose first or last non-empty line has no known
@@ -363,8 +364,7 @@ def _reviewer_identity(body: str, author: str = "") -> str:
     exclusive = EXCLUSIVE_BOT_IDENTITY.get(login.lower())
     if exclusive:
         return exclusive
-    scan = "\n".join(strip_code_spans(ln) for ln in (body or "").splitlines())
-    scan = strip_cited_finding_vocab(scan)
+    scan = strip_cited_finding_vocab(strip_code_spans(body or ""))
     lines = [ln.strip() for ln in scan.splitlines() if ln.strip()]
     first_line = lines[0] if lines else ""
     last_line = lines[-1] if lines else ""
@@ -2330,9 +2330,7 @@ def _is_structured_review_body(body: str) -> bool:
     #1798's false-CLEAN direction closed while #2402's supersession path
     opens.
     """
-    no_fences = strip_fences(body, swallow_unclosed=True)
-    scan = "\n".join(strip_code_spans(ln) for ln in no_fences.splitlines())
-    scan = strip_cited_finding_vocab(scan)
+    scan = strip_cited_finding_vocab(strip_code(body, swallow_unclosed=True))
     if not _REVIEW_STRUCTURE_HEADING.search(scan):
         return False
     return bool(re.search(

@@ -395,6 +395,22 @@ Operationalized by:
 [`challenge-unnecessary-complexity`](../workflow/challenge-unnecessary-complexity.md),
 and [`fail-fast`](fail-fast.md).
 
+## Get under the hood --- inspect source code and raw output
+
+When trying to understand what a process is doing,
+diagnose an unexpected failure,
+or determine the behavior of a tool, library, or harness,
+find and inspect the actual source code,
+raw logs,
+job traces,
+and live execution paths rather than treating the component as an opaque black box.
+
+Full statement: [`get-under-the-hood`](get-under-the-hood.md).
+Operationalized by:
+[`run-ums-proactively`](../workflow/run-ums-proactively.md),
+the diagnostic requirements in `AGENTS.md`,
+and `hooks/` and log-inspection mechanisms.
+
 ## The 3Rs lens — reduce, reuse, recycle
 
 The environmental mnemonic maps cleanly onto the catalog, and makes a
@@ -500,6 +516,12 @@ for the entire catalog: it mandates empirical verification over deference to aut
 extending challenge-the-assignment (which focuses on task briefs) to all factual claims,
 recommendations, and assumptions, while leaning on deterministic-tools and
 algorithmatize-checks as the instruments of independent verification.
+
+Get-under-the-hood provides the diagnostic counterpart to deterministic-tools
+and fail-fast: where fail-fast ensures failure is loud and deterministic-tools
+ensures mechanisms are inspectable, get-under-the-hood demands that investigators
+actually open and read those inspectable mechanics and un-truncated logs rather than
+attempting black-box speculation from surface symptoms or summary error codes.
 
 The remaining principles serve the goals directly: least astonishment
 and self-documenting code serve readability the way modularity serves

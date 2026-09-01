@@ -1252,6 +1252,12 @@ Always investigate assertions independently via deterministic queries, source in
 
 [`shared/principles/dont-take-my-word-for-it.md`](shared/principles/dont-take-my-word-for-it.md)
 
+## Get under the hood --- inspect source code and raw output
+
+When trying to understand what a process is doing, diagnose an unexpected failure, or determine the behavior of a tool, library, or harness, find and inspect the actual source code, raw logs, job output, and live execution paths rather than treating the component as an opaque black box.
+
+[`shared/principles/get-under-the-hood.md`](shared/principles/get-under-the-hood.md)
+
 ## Coding: KISS is the umbrella principle
 
 Apply KISS to code and prose: use the simplest construct that does the job,

@@ -189,14 +189,24 @@ Detaching the commit SHA leaves those verdicts pointing to an unreachable histor
 Once a commit is pushed, add a new commit instead of amending.
 The extra commit is squashed cleanly at PR merge, so history tidiness is preserved without breaking the review audit trail.
 
+## Once pushed, actively monitor CI and review to completion
+
+Pushing a commit to a PR/MR branch is the start of the round, not the end of the turn.
+Do not abandon monitoring after pushing or assume automated pipelines and reviewer runs will complete without active polling.
+Immediately maintain an active polling loop or scheduled wake mechanism.
+Actively query current-head CI/pipeline status (`gh pr checks` / `glab ci list` or `glab mr pipeline`) and review verdicts (`gh pr view` / `glab mr view`) until that round reaches a terminal state.
+Re-arm the poll while work remains.
+
 - **Do:** take a fresh `git ls-remote` reading immediately before every push, including on a branch you created and believe you alone are driving.
 - **Do:** push with `--force-with-lease --force-if-includes` whenever a force is genuinely wanted, and state a reason whenever you reach for `ALLOW_FORCE_PUSH=1`.
 - **Do:** add a new commit rather than amending once a commit has been pushed to the remote.
+- **Do:** immediately start or re-arm active CI and review polling after pushing to a PR/MR, driving the round until it reaches a terminal state.
 - **Do:** reconcile a divergence by fetching and reading it, and treat an object you cannot resolve locally as the stronger signal rather than the weaker.
 - **Don't:** treat an earlier fetch, sync, or green CI run as the check --- each was a reading of a moment that has passed.
 - **Don't:** read "I opened this branch and its PR" as evidence you are its only driver.
   That belief is what the check exists to test.
 - **Don't:** run `git commit --amend` on a commit that has already been pushed and reviewed, orphaning the SHA cited in review verdicts.
+- **Don't:** abandon monitoring after pushing, or assume automated pipelines and reviewer runs will complete without active polling.
 - **Don't:** reach for bare `git push --force`, and don't read `--force-with-lease` alone as safe --- a background fetch defeats it silently.
 - **Don't:** pair `--force` *with* the lease and expect protection.
   Git's documentation for `-f, --force` says the flag "disables that check, the other safety checks in PUSH RULES below, and the checks in `--force-with-lease`" --- so the two together are a plain force push.

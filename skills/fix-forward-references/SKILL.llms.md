@@ -13,13 +13,31 @@ The full detection heuristic, confirmation checklist, and fix menu live in [`sha
 ## Procedure
 
 1.  **Identify the target.** A file, a PR/MR diff, or pasted prose.
-2.  **Grep for candidates** using the heuristic in [`forward-references.md`](../../shared/writing/forward-references.md#the-detection-heuristic) — start with the bare directional word (below, later, following, subsequently, further down, next, afterward); use the narrower reference-cue-paired pattern as a higher-confidence secondary filter when the primary grep returns too many idiom hits.
+
+2.  **Grep for candidates** using the heuristic in [`forward-references.md`](../../shared/writing/forward-references.md#the-detection-heuristic) — start with the bare directional word (below, later, following, subsequently, further down, next, afterward); use the narrower reference-cue-paired pattern as a higher-confidence secondary filter when the primary grep returns too many idiom hits:
+
+    ``` bash
+    # Primary grep: directional words
+    rg -niE '\b(below|later|following|subsequently|further down|next|afterward)\b' <file>
+
+    # Narrower secondary filter: cue paired with directional word
+    rg -niE '(@[a-z0-9_-]+|section|figure|table|chapter)[^.]{0,60}\b(below|later|following|subsequently|further down|next|afterward)\b' <file>
+    rg -niE '\b(below|later|following|subsequently|further down|next|afterward)\b[^.]{0,60}(@[a-z0-9_-]+|section|figure|table|chapter)' <file>
+
+    # Numbered procedural pointers (e.g. in sequential steps)
+    rg -niE '\b(per|see|as in|described in|from) (step|item|point) [0-9]+' <file>
+    ```
+
 3.  **Confirm each hit.** Read the sentence: is it a genuine reference (not an idiom like “below average”), and does the target really come after the mention (not already earlier, just mis-worded)? Drop anything that fails either check.
+
 4.  **Fix each confirmed forward reference**, in order of preference:
+
     - **Reorder** — move the referenced section/paragraph/div/figure/table earlier so it precedes the mention. Update the directional word (“below” → “above”) or drop it once a working crossref link carries the point.
     - **Reword** — only when reordering would break the document’s narrative logic. Replace the vague pointer with a precise, working link/crossref instead of leaving a bare “below”.
     - **Leave it** when the mention is a deliberate roadmap/overview preview (see the fragment’s “roadmap exception”) — not every forward-pointing sentence is a defect.
+
 5.  **Re-scan** the touched section after editing to confirm no new forward reference was introduced by the reordering itself (e.g., a paragraph that used to follow the moved content and referenced it backward now needs the opposite fix).
+
 6.  **Report.** For each finding: the phrase, its location, whether it was fixed by reordering or rewording (or left, with why), and the diff.
 
 ## Relationship to other skills

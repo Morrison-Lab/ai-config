@@ -49,7 +49,12 @@ For each factual claim that has a “current” value (a version, a status, a de
 2.  Compare. Flag when the claim’s value **differs from current** and the claim doesn’t already hedge it (e.g. “as of 2023,” or “in v2,” makes an old value correct, not stale).
 3.  Distinguish **evergreen** claims (a fact that doesn’t change, a historical statement correctly framed as historical) from **stale** ones (an unhedged “current” claim that’s since moved) — don’t flag the former.
 
-Grep starting points for likely staleness carriers: version-looking tokens (`\bv?\d+\.\d+(\.\d+)?\b`), date-anchored phrases (“currently”, “as of”, “the latest”, “now supports”), and deprecation language (“deprecated”, “no longer”, “legacy”).
+Grep starting points for likely staleness carriers: version-looking tokens (`\bv?\d+\.\d+(\.\d+)?\b`), date-anchored phrases (“currently”, “as of”, “the latest”, “now supports”), and deprecation language (“deprecated”, “no longer”, “legacy”):
+
+``` bash
+# Grep for likely staleness carriers: versions, dates, temporal and deprecation phrases
+rg -niE '\bv?\d+\.\d+(\.\d+)?\b|\b(currently|as of|the latest|now supports|deprecated|no longer|legacy)\b' <target>
+```
 
 ### B. Irrelevant information
 

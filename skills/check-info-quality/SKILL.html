@@ -27,6 +27,41 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
 </style>
 
 
@@ -387,7 +422,9 @@ ul.task-list li input[type="checkbox"] {
 <li>Compare. Flag when the claim’s value <strong>differs from current</strong> and the claim doesn’t already hedge it (e.g.&nbsp;“as of 2023,” or “in v2,” makes an old value correct, not stale).</li>
 <li>Distinguish <strong>evergreen</strong> claims (a fact that doesn’t change, a historical statement correctly framed as historical) from <strong>stale</strong> ones (an unhedged “current” claim that’s since moved) — don’t flag the former.</li>
 </ol>
-<p>Grep starting points for likely staleness carriers: version-looking tokens (<code>\bv?\d+\.\d+(\.\d+)?\b</code>), date-anchored phrases (“currently”, “as of”, “the latest”, “now supports”), and deprecation language (“deprecated”, “no longer”, “legacy”).</p>
+<p>Grep starting points for likely staleness carriers: version-looking tokens (<code>\bv?\d+\.\d+(\.\d+)?\b</code>), date-anchored phrases (“currently”, “as of”, “the latest”, “now supports”), and deprecation language (“deprecated”, “no longer”, “legacy”):</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Grep for likely staleness carriers: versions, dates, temporal and deprecation phrases</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="ex">rg</span> <span class="at">-niE</span> <span class="st">'\bv?\d+\.\d+(\.\d+)?\b|\b(currently|as of|the latest|now supports|deprecated|no longer|legacy)\b'</span> <span class="op">&lt;</span>target<span class="op">&gt;</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
 <section id="b.-irrelevant-information" class="level3">
 <h3 class="anchored" data-anchor-id="b.-irrelevant-information">B. Irrelevant information</h3>

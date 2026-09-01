@@ -78,30 +78,6 @@ HEREDOC_OPEN = re.compile(
 )
 
 
-def strip_heredocs(command: str) -> str:
-    """Omit heredoc body lines and closing delimiters from a multi-line shell command."""
-    lines = command.splitlines(keepends=True)
-    out_lines: list[str] = []
-    active_delimiter: str | None = None
-    strip_tabs = False
-
-    for line in lines:
-        if active_delimiter is not None:
-            check_line = line.lstrip("\t") if strip_tabs else line
-            if check_line.rstrip("\r\n") == active_delimiter:
-                active_delimiter = None
-            continue
-
-        out_lines.append(line)
-        matches = list(HEREDOC_OPEN.finditer(line))
-        if matches:
-            last_match = matches[-1]
-            strip_tabs = bool(last_match.group(1))
-            delim = next(g for g in last_match.groups()[1:] if g is not None)
-            active_delimiter = delim
-
-    return "".join(out_lines)
-
 
 def split_command(command: str) -> list[str]:
     """Split a shell command into executable segments, respecting quotes and subshells."""

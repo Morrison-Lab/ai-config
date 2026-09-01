@@ -45,7 +45,7 @@ python3 "$REVIEW_SCRIPT" --engine codex
 
 1.  Computes the local outgoing diff against `origin/main` (or PR base).
 2.  Dispatches the review to the selected alternate model/engine using plan/read-only mode to independently conduct both a detailed implementation defect audit and a holistic change assessment.
-3.  Parses and validates the structured review findings (requiring explicit evaluation of both passes).
+3.  Parses and validates the structured review findings.
 4.  Exits with a nonzero code on blocking findings (unless `--allow-findings` is specified).
 
 ## Related

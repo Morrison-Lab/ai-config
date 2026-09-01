@@ -379,8 +379,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <ol type="1">
 <li>Computes the local outgoing diff against <code>origin/main</code> (or the detected PR base / explicit base branch).</li>
 <li>Injects universal repository standards (<code>AGENTS.md</code>).</li>
-<li>Dispatches to the selected engine or auto-fallback chain in plan/read-only mode (<code>claude</code> -&gt; <code>cursor</code> -&gt; <code>codex</code> -&gt; <code>opencode</code> -&gt; <code>agy</code>), or alternates round-robin across available models, conducting both a detailed implementation defect audit and a holistic change assessment.</li>
-<li>Strictly parses and validates structured findings (Summary Verdict, Holistic Assessment, Critical Findings, Observations, Verification Steps, and Reviewed-Commit SHA), requiring explicit evaluation of both review passes.</li>
+<li>Dispatches to the selected engine or auto-fallback chain in plan/read-only mode (<code>claude</code> -&gt; <code>cursor</code> -&gt; <code>codex</code> -&gt; <code>opencode</code> -&gt; <code>agy</code>), or alternates round-robin across available models, instructing both a detailed implementation defect audit and a holistic change assessment.</li>
+<li>Strictly parses and validates structured findings (Summary Verdict, Critical Findings, Observations, Verification Steps, and Reviewed-Commit SHA).</li>
 <li>Exits nonzero on blocking <code>Needs work</code> findings (unless <code>--allow-findings</code> is specified) and optionally posts verified review notes directly to the GitHub PR.</li>
 </ol>
 </section>

@@ -1,12 +1,13 @@
 Don't reinvent the wheel (DRW).
-Before implementing a new function or feature, check that it hasn't
-already been done — either in one of our own repos, or in a trustworthy
+Before writing custom code or implementing a new function or feature,
+always perform a research step to verify that it hasn't
+already been done --- either in one of our own repos, or in a trustworthy
 external source we could depend on instead.
 Prefer reusing, depending on, forking, or contributing to an existing
 implementation over building a new one from scratch.
 
-This is both a development principle (run the check before writing) and
-a review principle (flag hand-rolled equivalents in a diff — see "In
+This is both a development principle (run the research check before writing) and
+a review principle (flag hand-rolled equivalents in a diff --- see "In
 review" below).
 
 ## Where to look
@@ -143,13 +144,13 @@ Both this section and the close-the-loop paragraph above wait for an event --- a
 
 ## Prefer forking or contributing over re-building
 
-When an existing external source is close but not exact — it does most
-of the job but is missing the piece we need — prefer extending it over
+When an existing external source is close but not exact --- it does most
+of the job but is missing the piece we need --- prefer extending it over
 re-building the functionality from scratch:
 
 - **Contribute upstream** when the missing piece is general-purpose:
   a PR adding it, or an issue with a reprex, per
-  [`upstream-issues`](../workflow/upstream-issues.md) — read the
+  [`upstream-issues`](../workflow/upstream-issues.md) --- read the
   upstream repo's contribution policy first, and never post to an
   external repo autonomously.
 - **Fork** when we need the change now, or the change is too
@@ -256,7 +257,7 @@ wrong for the need, or the dependency is far heavier than the job
 (a heavy package for a one-liner).
 When you do build custom, note in the PR (or a code comment) that you
 checked and nothing fit, so the next reader doesn't re-run the search
-— and so the reviewer's DRW check below has its answer up front.
+--- and so the reviewer's DRW check below has its answer up front.
 
 ## A constraint your own change authored is not evidence against an upstream
 
@@ -423,5 +424,5 @@ code) already provides is a review finding, the same weight as any
 other standing review check: name the existing implementation, and
 propose depending on, forking, or contributing to it instead.
 Accept the custom version when one of the escape hatches above
-genuinely applies — and ask for the "checked, nothing fit" note when
+genuinely applies --- and ask for the "checked, nothing fit" note when
 it's missing.

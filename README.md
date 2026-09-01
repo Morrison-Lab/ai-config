@@ -4,8 +4,7 @@ Portable AI agent config --- skills, memories, and commands
 synced across machines via git.
 Works with Claude Code, Codex, [Gemini CLI](https://github.com/google-gemini/gemini-cli), [Cursor](https://cursor.com), VS Code Copilot, and any agent that reads markdown instruction files.
 
-Claude Code and Cursor install this repo's skills natively as a plugin (see each harness's section below);
-Codex has no plugin mechanism yet ([#2352](https://github.com/Morrison-Lab/ai-config/issues/2352)).
+Claude Code, Codex, and Cursor install this repo's skills natively as plugins (see each harness's section below);
 `bootstrap.sh` handles what a plugin install can't: Gemini CLI / Antigravity config and per-machine dotfiles.
 
 ## Setup on a new machine
@@ -76,7 +75,8 @@ strict `name`/`description` frontmatter. Each wrapper tells Codex to read the
 matching canonical skill from `skills/<name>/SKILL.md` and adapt Claude-only
 metadata or tools to the current Codex session.
 
-`bootstrap.sh` no longer places those wrappers on disk for Codex (see its header comment) --- Codex has no marketplace-plugin mechanism analogous to Claude Code's or Cursor's, so until a replacement lands ([#2352](https://github.com/Morrison-Lab/ai-config/issues/2352)), reach `codex-skills/` by symlinking or copying it into `${CODEX_HOME:-$HOME/.codex}/skills` by hand.
+Codex can load this repository as a plugin through [`.codex-plugin/plugin.json`](.codex-plugin/plugin.json), which also registers the canonical hook catalog through [`.codex/hooks.json`](.codex/hooks.json). The first session opening a new or changed hook must review and trust it in Codex's hook browser before it runs.
+For a user-global install, register the plugin with Codex and keep `${CODEX_HOME:-$HOME/.codex}/skills` out of the source checkout; the generated wrappers remain available in the plugin's `codex-skills/` tree.
 After adding or editing a canonical skill, regenerate the wrappers:
 
 ```sh
@@ -616,6 +616,8 @@ activated.")
 
 - `skills/` --- reusable workflow skills (Claude Code and Cursor via plugin install, and Gemini/Antigravity via the `skills.json` registration `bootstrap.sh` writes against the checkout's own `skills/` path)
 - `codex-skills/` --- generated Codex wrappers (no install path yet --- [#2352](https://github.com/Morrison-Lab/ai-config/issues/2352))
+- `.codex-plugin/` --- Codex plugin manifest, including the hook catalog registration
+- `.codex/` --- Codex project hook registration that dispatches the canonical catalog
 - `cursor-rules/` --- user-global Cursor rules (shipped by the Cursor plugin's `rules` field, `~/.cursor/rules/`)
 - `.cursor/rules/` --- project Cursor rules for this repo as a workspace
 - `.cursor/hooks.json` --- Cursor-native project hooks (Cloud agents load these)

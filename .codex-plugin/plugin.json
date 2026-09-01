@@ -1,0 +1,13 @@
+{
+  "name": "ai-config",
+  "version": "1.0.0",
+  "description": "Morrison-Lab AI agent skills, rules, commands, and lifecycle hooks for Codex.",
+  "author": {
+    "name": "d-morrison"
+  },
+  "homepage": "https://github.com/Morrison-Lab/ai-config",
+  "repository": "https://github.com/Morrison-Lab/ai-config",
+  "keywords": ["skills", "pr-workflow", "review", "hooks", "r-packages"],
+  "skills": "codex-skills",
+  "hooks": "./hooks/hooks.json"
+}

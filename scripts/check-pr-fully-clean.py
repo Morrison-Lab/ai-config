@@ -364,10 +364,9 @@ def _reviewer_identity(body: str, author: str = "") -> str:
     exclusive = EXCLUSIVE_BOT_IDENTITY.get(login.lower())
     if exclusive:
         return exclusive
-    scan = strip_cited_finding_vocab(strip_code_spans(body or ""))
-    lines = [ln.strip() for ln in scan.splitlines() if ln.strip()]
-    first_line = lines[0] if lines else ""
-    last_line = lines[-1] if lines else ""
+    lines = [ln.strip() for ln in (body or "").splitlines() if ln.strip()]
+    first_line = strip_cited_finding_vocab(strip_code_spans(lines[0])) if lines else ""
+    last_line = strip_cited_finding_vocab(strip_code_spans(lines[-1])) if lines else ""
     agent = _detect_review_agent(first_line) or _detect_review_agent(last_line)
     if agent:
         return agent
@@ -2324,17 +2323,37 @@ def _is_structured_review_body(body: str) -> bool:
     Requires both a report heading (Summary / Findings / Verdict families)
     and a Reviewed-Commit fingerprint line, tested over the CITED-VOCAB
     STRIPPED body so a casual comment quoting a prior report inside a
-    fence cannot smuggle the structure in (#1202's convention). The two
+    fence or code span cannot smuggle the structure in (#1202/#2525). The two
     together are what a pre-push-review or adversarial-self-review report
     always carries and conversational prose does not, which is what keeps
     #1798's false-CLEAN direction closed while #2402's supersession path
     opens.
     """
-    scan = strip_cited_finding_vocab(strip_code(body, swallow_unclosed=True))
-    if not _REVIEW_STRUCTURE_HEADING.search(scan):
+    if not body:
         return False
-    return bool(re.search(
-        r"(?im)^\*{0,2}Reviewed[- ]Commit\*{0,2}[ \t]*:", scan))
+    fenced_lines, _, _ = find_fence_spans(body, swallow_unclosed=True)
+    span_intervals = [m.span() for m in CODE_SPAN_RE.finditer(body)]
+
+    def _in_fence_or_span(match_start: int) -> bool:
+        line_idx = body[:match_start].count("\n")
+        if line_idx in fenced_lines:
+            return True
+        for b, e in span_intervals:
+            if b <= match_start < e:
+                return True
+        return False
+
+    scan = strip_cited_finding_vocab(body)
+    has_heading = any(
+        not _in_fence_or_span(m.start())
+        for m in _REVIEW_STRUCTURE_HEADING.finditer(scan)
+    )
+    if not has_heading:
+        return False
+    return any(
+        not _in_fence_or_span(m.start())
+        for m in re.finditer(r"(?im)^\*{0,2}Reviewed[- ]Commit\*{0,2}[ \t]*:", scan)
+    )
 
 
 def _commit_activity(pr) -> Dict[str, str]:

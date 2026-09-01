@@ -52,6 +52,17 @@ def main() -> int:
     check("no change is NOT a widening",
           not parity.is_widening(("clean", False), ("clean", False)))
 
+    # count_generated_prose arithmetic matches actual Cartesian space size
+    fast_total = parity.count_generated_prose(False)
+    ex_total = parity.count_generated_prose(True)
+    check("count_generated_prose matches fast tier size", fast_total == 241920)
+    check("count_generated_prose matches exhaustive tier size", ex_total == 3440640)
+
+    # Strided generation with --limit returns exactly limit count in O(limit)
+    strided_50 = list(parity.generated_bodies(False, limit=50))
+    check("generated_bodies with limit returns exact limit count", len(strided_50) == 50)
+    check("generated_bodies with limit yields strings", all(isinstance(b, str) for b in strided_50))
+
     # Comparing a revision against ITSELF must find nothing, and must still
     # report a live negative control -- a zero from a blind detector and a zero
     # from a genuinely unchanged candidate look identical without it.
@@ -69,6 +80,8 @@ def main() -> int:
     check("self-comparison reports no widening", "WIDENED" in out and (
         "WIDENED  (base rejected, candidate accepts) : 0" in out))
     check("self-comparison still discriminates", "DISCRIMINATES" in out)
+    check("self-comparison reports strided sample mode in output",
+          "strided sample -- NOT a parity proof" in out)
     check("self-comparison exits 0", result.returncode == 0)
 
     # widening_is_on_axis is the function that produces the "0 off axis"

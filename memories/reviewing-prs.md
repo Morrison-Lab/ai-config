@@ -72,7 +72,9 @@ A PR opened by another lab member, or by any other bot, is not mine to drive unl
 
 The user stated the **Do** side, in two steps: first the author/assignee test, then (same day) that workflow-opened PRs such as a submodule bump are fine.
 The **Don't** side is inferred from the near-miss that prompted it, and is what makes the rule checkable.
+The named-in-request arm came from neither directive: it is carried over from `ardia`'s former "unless told to" bullet, which this rule replaced.
 The narrowing of "workflow-opened" to the `github-actions[bot]` login is also inferred: the example given was a `bump-submodule.yml` PR, and Dependabot and Copilot PRs post under their own logins and were not named.
+That login match covers a workflow that opens its PR with `GITHUB_TOKEN`; `gha`'s `open-sync-pr` prefers `WORKFLOW_TOKEN` when the repo sets one, and a PR it opens then posts under the PAT holder's own login, so it is in scope only through the author arm when that PAT is mine.
 
 - **Do:** before touching any PR, resolve who you are running as, read the PR's `author.login` and `assignees`, and proceed only when the author is you (or an alias below) or a repository workflow, you are among the assignees, or the user named the PR in the request.
   Match the app slug `github-actions` in whichever form the source returns it: the REST API and the MCP tools suffix it (`github-actions[bot]`), GraphQL and `scripts/pr-sweep.py` return it bare (`github-actions`), and `gh pr list --json author` prefixes it (`app/github-actions`, with `is_bot: true`).
@@ -92,8 +94,8 @@ The session then stood down from all five, and the user reversed that for the wo
 So the population error was the four human-authored PRs, and the over-correction was the fifth.
 Every individual action was a correct ARDI step.
 The error was the population, decided by reading "every open PR" in the skill rather than by asking whose PRs they were.
-Each of those threads got one disclosure comment naming the commits, so the authors can keep or revert them.
+Each of those threads got one disclosure comment naming the commits (or, on #310, the dispatched review), so the authors can keep or revert them.
 
-An issue on a repo I own is different from a PR on it: filing, triaging, and
-commenting on issues is fine, and an issue someone else's open PR already
-fixes is left to that PR (not grabbed, and that PR not driven either).
+An issue on a repo I own is different from a PR on it:
+filing, triaging, and commenting on issues is fine,
+and an issue someone else's open PR already fixes is left to that PR (not grabbed, and that PR not driven either).

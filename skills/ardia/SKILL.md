@@ -29,7 +29,7 @@ mutates a PR stays serial.
    in the JSON — `glab mr list` alone does not expose these fields.
    State the scope rules when you report, so the user can
    correct:
-   - **Only the user's own PRs are in scope.**
+   - **Only PRs the user opened, is assigned to, or named, or a repository workflow opened, are in scope.**
      Resolve the invoking user first --- `gh api user --jq .login` locally, `mcp__github__get_me` in a remote session --- and add any aliases `memories/reviewing-prs.md` lists for that person, so a lab member running this corpus from a vendored checkout filters on their own identity rather than the corpus owner's.
      Keep a PR only when its `author.login` is one of those logins or the repository's own workflow bot (the app slug `github-actions`, in whichever form the source returns it;
      `memories/reviewing-prs.md` lists the forms),

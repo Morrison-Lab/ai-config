@@ -1549,7 +1549,7 @@ def fallback_cases() -> tuple[int, int]:
     blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
     check("TaskOutput tool result with clean review allows push", rc == 0 and not blocked)
 
-    # 4. CLI pre-push-review.py run via Bash tool
+    # 4. Negative: Bash commands cannot authorize push via tool_result
     cli_events = [
         {"type": "assistant", "message": {"content": [
             {"type": "tool_use", "id": "b1", "name": "Bash", "input": {"command": "python3 scripts/pre-push-review.py"}}
@@ -1560,7 +1560,7 @@ def fallback_cases() -> tuple[int, int]:
     ]
     rc, out = run_hook(PUSH, cli_events)
     blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
-    check("pre-push-review.py run in Bash tool result allows push", rc == 0 and not blocked)
+    check("Bash tool result cannot authorize push", rc == 0 and blocked)
 
     # 5. Negative: On-disk report file without transcript is rejected (no unauthenticated forge)
     report_file = os.path.join(REPO, ".git", "adversarial-review-report.txt")
@@ -1597,19 +1597,6 @@ def fallback_cases() -> tuple[int, int]:
     rc, out = run_hook(PUSH, errored_task)
     blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
     check("errored TaskOutput does not authorize push", rc == 0 and blocked)
-
-    # 8. Negative: Non-review bash command mentioning 'adv' in arguments is rejected
-    non_review_bash = [
-        {"type": "assistant", "message": {"content": [
-            {"type": "tool_use", "id": "b_non", "name": "Bash", "input": {"command": "git checkout -b adv-fix"}}
-        ]}},
-        {"type": "user", "message": {"content": [
-            {"type": "tool_result", "tool_use_id": "b_non", "content": body("Ready for merge", HEAD)}
-        ]}},
-    ]
-    rc, out = run_hook(PUSH, non_review_bash)
-    blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
-    check("non-review bash command mentioning adv in arguments is rejected", rc == 0 and blocked)
 
     return failures, ran
 

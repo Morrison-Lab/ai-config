@@ -1351,10 +1351,6 @@ def parse_report(text: str) -> tuple[str | None, str | None]:
     return verdict, (sha.group(1).lower() if sha else None)
 
 
-CLI_REVIEW_CMD_RE = re.compile(
-    r"""(?:^|[;&`(\n]|\$\()\s*(?:(?:!|\{|time|nohup|sudo|then|else|do|if|elif|while|until|exec|builtin|env(?:\s+-[^\s]+)*(?:\s+\w+=\S+)*)\s+)*(?:python[0-9.]*\s+)?(?:[\w./-]*/)?pre-push-review(?:\.py)?(?:\s+|$|[;&|])""",
-    re.I | re.MULTILINE,
-)
 
 
 def _is_reviewer_record(record: dict) -> bool:
@@ -1464,14 +1460,6 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                             if (task_id and task_id in reviewer_task_ids) or not reviewer_task_ids:
                                 if isinstance(call_id, str) and call_id:
                                     reviewer_call_ids.add(call_id)
-
-                    elif tool_name in CLI_REVIEW_TOOLS:
-                        cmd = str(inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or inp.get("script") or "")
-                        clean_cmd = re.sub(r"(?m)(?:^|\s+)#.*$", "", cmd)
-                        if CLI_REVIEW_CMD_RE.search(clean_cmd):
-                            saw_reviewer_call = True
-                            if isinstance(call_id, str) and call_id:
-                                reviewer_call_ids.add(call_id)
                     elif tool_name == "send_message" and record_is_reviewer:
                         msg_text = str(inp.get("Message") or inp.get("message") or "")
                         if msg_text:

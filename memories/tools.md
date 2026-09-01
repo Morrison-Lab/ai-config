@@ -608,20 +608,6 @@ expects it from.
 Prefix the source with `./` so a slash precedes the colon, or use a `cp`
 loop when the file list is small enough not to need rsync.
 
-## Markdown linting (markdownlint, lint-qmd)
-
-- **Table rows must stay on one line (MD055/MD056).**
-  Wrapping a cell across lines breaks the `|` alignment and trips both rules.
-  Rewrite the cell concisely on a single line rather than word-wrapping it.
-  Prefer a short, complete description over hitting a length target.
-- **Don't tag a non-shell CLI block `bash`/`sh` (MD040).**
-  MD040 wants a language on every fence, which invites tagging anything command-shaped as `bash`.
-  Claude slash commands (`/ums`, `/plugin`, `/also`) and other application-level directives are not shell-executable, so `bash` implies a reader can run them and they fail when someone tries.
-  Tag those `text` instead.
-
-(Recovered 2026-07-30 from `a739c69`, an orphaned commit on `ums/ardi-review-link-handling`: it landed about 30 minutes after its own PR [#650](https://github.com/Morrison-Lab/ai-config/pull/650) merged, so it never reached `main` and sat unnoticed for a week.
-Both rules were first learned on [#645](https://github.com/Morrison-Lab/ai-config/pull/645).)
-
 ## The Bash tool runs zsh here, and zsh does not word-split unquoted expansions
 
 Kin to the two path gotchas above --- it produces a confident wrong answer

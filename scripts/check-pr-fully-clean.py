@@ -2622,7 +2622,11 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         help="Score a payload gathered by the agent instead of shelling out to "
              "`gh`. Use this in remote/web sessions, where the CLI does not "
              "exist (ai-config#2441). shared/workflow/fully-clean.md lists the "
-             "payload keys and the MCP calls that fill them.",
+             "payload keys and the MCP calls that fill them. When a remote "
+             "session's GraphQL surface is pinned to a fixed operation set "
+             "but plain REST is reachable (ai-config#2908), build FILE with "
+             "`python3 scripts/build-pr-payload.py OWNER/REPO N FILE` instead "
+             "of hand-transcribing MCP tool output.",
     )
     parser.add_argument(
         "-R", "--repo", default="", metavar="OWNER/REPO",

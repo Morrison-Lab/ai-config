@@ -386,11 +386,12 @@ The canonical trade-off analysis, context-budget rationale, and Do/Don't directi
   Do not confuse this with skill frontmatter `context: fork` (which runs a skill in isolated context *without* conversation history, as in `skill-audit` and `find-overlap`).
 - **Claude Code interactive sessions:**
   Use `/subtask` to fork the active conversation interactively into a subagent with full history.
-- **Antigravity / Gemini CLI:**
+- **Antigravity:**
   Pass `TypeName: "self"` to `invoke_subagent` with `Workspace: "inherit"` to create a subagent that inherits the parent agent's configuration and context,
   or provide the transcript log path from `transcript.jsonl` under `<appDataDir>/brain/<conversation-id>/.system_generated/logs`.
-- **OpenAI Codex / headless CLIs without runtime forking:**
-  Provide the path to the on-disk conversation log or a focused milestone summary in the prompt brief.
+- **Gemini CLI, OpenAI Codex, and headless CLIs without runtime forking:**
+  Subagents start with a clean context window by default (e.g. `@subagent_name` in Gemini CLI);
+  provide the path to the on-disk conversation log or a focused milestone summary in the prompt brief.
 
 - **Do:** use conversation-inheriting dispatch (`subagent_type: "fork"`, `/subtask`, or `self`) for reflective UMS sweeps and emergent CAI workflows per [`use-subagents`](../shared/workflow/use-subagents.md).
 - **Do:** clearly distinguish the `Agent` tool's conversation-inheriting `subagent_type: "fork"` from skill frontmatter `context: fork` (which isolates and omits conversation history).

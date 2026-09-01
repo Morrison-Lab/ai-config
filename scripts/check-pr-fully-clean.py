@@ -1759,8 +1759,8 @@ FINDING_HEADING_PATTERNS = {
 # cover qualifiers attached to an already-marked phrase, which is a far smaller
 # job than parsing arbitrary prose.
 BARE_CLEAN_MARKED = re.compile(
-    r"(?:^|\n)[ \t]*(?:[#>*_+-]+[ \t]*)*"
-    r"(?:verdict[ \t]*[:.\-]*[ \t]*)?(?:[#>*_]+[ \t]*)*$",
+    r"(?:^|\n)[ \t]*[#>*_+\t -]*"
+    r"(?:verdict[ \t]*[:.\-]*[ \t]*)?[#>*_\t -]*$",
     re.IGNORECASE,
 )
 CLEAN_NEGATION_PREFIX = re.compile(

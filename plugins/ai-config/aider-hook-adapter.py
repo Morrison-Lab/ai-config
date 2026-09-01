@@ -567,6 +567,7 @@ def adapt_aider_event(
         turns = []
 
     # Generate JSONL transcript
+    is_temp_transcript = (transcript_out is None)
     jsonl_path = generate_jsonl_transcript(turns, transcript_out)
 
     # Build standard payload
@@ -580,17 +581,24 @@ def adapt_aider_event(
     if tool_input is not None:
         payload["tool_input"] = tool_input
 
-    # Execute hooks
-    result = execute_hooks_for_event(
-        event=event,
-        payload=payload,
-        cwd=effective_cwd,
-        repo_root=effective_root,
-        tool_name=tool_name,
-        hooks_manifest=hooks_manifest,
-    )
-    result["transcript_path"] = str(jsonl_path)
-    return result
+    try:
+        # Execute hooks
+        result = execute_hooks_for_event(
+            event=event,
+            payload=payload,
+            cwd=effective_cwd,
+            repo_root=effective_root,
+            tool_name=tool_name,
+            hooks_manifest=hooks_manifest,
+        )
+        result["transcript_path"] = str(jsonl_path)
+        return result
+    finally:
+        if is_temp_transcript and jsonl_path.exists():
+            try:
+                jsonl_path.unlink()
+            except OSError:
+                pass
 
 
 def main() -> int:

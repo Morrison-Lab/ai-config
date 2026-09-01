@@ -137,6 +137,15 @@ class TestTranscriptGeneration(unittest.TestCase):
             self.assertEqual(parsed_records[1]["type"], "assistant")
             self.assertEqual(parsed_records[1]["tool_calls"][0]["name"], "Bash")
 
+    def test_temp_transcript_cleaned_up_after_event(self):
+        res = adapter.adapt_aider_event(
+            event="Stop",
+            history_path_or_content="#### hello\n\nworld",
+            hooks_manifest={"Stop": []},
+        )
+        temp_path = Path(res["transcript_path"])
+        self.assertFalse(temp_path.exists())
+
 
 class TestMatcherAndToolHelpers(unittest.TestCase):
     """Test tool matching and path normalization helpers."""
@@ -182,15 +191,18 @@ I will now refactor the code.
                 ]
             }
 
+            out_transcript = Path(tmpdir) / "custom_transcript.jsonl"
             with patch.object(adapter, "load_hooks_manifest", return_value=mock_manifest):
                 res = adapter.adapt_aider_event(
                     event="Stop",
                     history_path_or_content=hist_file,
                     cwd=tmpdir,
+                    transcript_out=out_transcript,
                 )
                 self.assertEqual(res["decision"], "allow")
                 self.assertIn("transcript_path", res)
-                self.assertTrue(os.path.isfile(res["transcript_path"]))
+                self.assertEqual(res["transcript_path"], str(out_transcript))
+                self.assertTrue(out_transcript.is_file())
 
     def test_adapt_pre_tool_use_block(self):
         mock_manifest = {

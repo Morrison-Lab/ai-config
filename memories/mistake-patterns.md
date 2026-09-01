@@ -795,3 +795,31 @@ A clean automated review from every available provider evaluating the current HE
   Yes.
   Unit test suites must assert differential failure on base fixtures and regression coverage for non-standard link text.
 
+## Pattern 42: `pgrep -f` Self-Matching in Background Waiters and Process Status Pollers
+- **Do**: When monitoring background tasks or long-running scripts,
+  wait on an explicit sentinel done-marker file
+  (`until [ -f "$DIR/job.done" ]; do sleep 5; done`)
+  or record and poll the exact process PID (`$!`),
+  and kill processes by PID (`kill -9 "$pid"; pkill -9 -P "$pid"`).
+- **Don't**: Use unanchored command-line substring matching (`pgrep -f "<script-name>"`)
+  in polling loops, waiters, or kill invocations;
+  the executing shell or waiter loop itself contains the search pattern in its `argv`,
+  causing `pgrep` to match itself and report false "still running" statuses,
+  deadlock on dead processes,
+  or trigger self-inflicted kills (exit code 144) when running `pkill -f`.
+- **Example**: 2026-09-01 during a `serocalculator` [PR #668](https://github.com/UCD-SERG/serocalculator/pull/668) session (documented in [Issue #2915](https://github.com/Morrison-Lab/ai-config/issues/2915)):
+  A background waiter `until ! pgrep -f "install.R"; do sleep 10; done` ran indefinitely
+  because its own command line matched `install.R`,
+  causing status checks to report `STILL INSTALLING` for 40 minutes after the script finished.
+  A subsequent script waiting with `while pgrep -f "mut2.sh"; do sleep 3; done` deadlocked on the lingering waiter,
+  and a cleanup `pkill -f 'pgrep -f ...'` killed the active Bash execution mid-run.
+- **Canonical Rule**: [`memories/debugging.md`](debugging.md) (Background process waiters section)
+  and [`shared/workflow/no-empty-promises.md`](../shared/workflow/no-empty-promises.md).
+- **Fix**: Replace process table substring matching with done-file sentinels,
+  track and terminate by PID,
+  and anchor pattern matching (`pgrep -f "^bash .*<name>"`) when unavoidable.
+- **Algorithmatizable?**
+  Yes.
+  Static analysis / hooks can flag unanchored `pgrep -f` and `pkill -f` inside while/until loops in shell scripts.
+
+

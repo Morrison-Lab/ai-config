@@ -1233,3 +1233,42 @@ is the only heredoc-adjacent fix that is genuinely safe and should be kept.
 `echo $((1<<2)) && git grep -lO…` (must flag).
 
 (Morrison-Lab/wai#125, PR #137, 2026-08-29, three review rounds.)
+
+## Background process waiters: `pgrep -f` matches its own command line (self-match deadlock)
+
+`pgrep -f "<name>"` matches every process whose full command line contains `<name>`, including any shell or loop that is itself waiting on or searching for `<name>`.
+Because the pattern is a substring of the searcher's own `argv`, this causes silent failure modes with no error messages:
+
+1. **Stale "still running" readings**:
+   A waiter like `until ! pgrep -f "job.sh"; do sleep 10; done` never terminates because its own command line in the process table contains `job.sh`.
+   Subsequent status checks using `pgrep -f "job.sh"` confirm the process is still running even hours after the target script finished.
+2. **Deadlocks across scripts**:
+   A sequence guarding a step with `while pgrep -f "task.sh"; do sleep 3; done` blocks indefinitely if an earlier waiter (`until ! pgrep -f "task.sh" ...`) remains alive, even though the original `task.sh` exited.
+3. **Self-inflicted process termination**:
+   Running `pkill -f 'pgrep -f "task.sh"'` matches the executing shell itself and terminates the calling session mid-command (exit code 144) before any cleanup or follow-up runs.
+
+### Robust remedies
+
+- **Poll a done-marker file**:
+  Write a sentinel file on completion and poll for file existence rather than process inspection:
+
+  ```bash
+  # Inside the background script:
+  ... ; touch "$SP/job.done"
+
+  # Inside the waiter:
+  until [ -f "$SP/job.done" ]; do sleep 5; done
+  ```
+
+- **Kill by PID, not pattern**:
+  Store `$!` or read a recorded PID file, then target the process hierarchy explicitly:
+
+  ```bash
+  kill -9 "$pid"; pkill -9 -P "$pid"
+  ```
+
+- **Anchor `pgrep -f` when unavoidable**:
+  Anchor to the interpreter binary (`pgrep -f "^bash .*<name>"`) or exclude the current shell process to avoid self-matching.
+
+(Measured 2026-09-01 during `serocalculator#668` session, documented in ai-config#2915.)
+

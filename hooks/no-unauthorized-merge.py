@@ -904,9 +904,9 @@ def _read_payload() -> tuple[dict, bool]:
         payload = json.load(sys.stdin)
         return (payload if isinstance(payload, dict) else {}), is_dry_run
     except Exception as exc:
-        if is_dry_run:
-            print(f"no-unauthorized-merge: unreadable hook input ({exc})",
-                  file=sys.stderr)
+        print(f"no-unauthorized-merge: unreadable hook input ({exc})",
+
+              file=sys.stderr)
         return {}, is_dry_run
 
 

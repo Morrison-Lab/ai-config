@@ -69,7 +69,8 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
 - **[`gh-cli.md`](gh-cli.md)'s "A session's egress proxy can block GraphQL entirely" bullet is not `gh`-specific -- the same 403 answers a raw `curl` to `https://api.github.com/graphql` in a session with no `gh` binary at all.**
   Measured 2026-09-01, no `gh` on `PATH`: `curl -H "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/repos/Morrison-Lab/wai/pulls/173` returned `200`, while the same token against `https://api.github.com/graphql` returned the identical `403` body that bullet quotes.
   So this is not a quirk of the `gh` client, it is a property of the session's egress policy, and it confirms the mechanism in exactly the session class -- remote/web, no `gh` -- where `gh api graphql` was never available to test it with.
-  Since `gh pr view --json` depends on GraphQL fields for several of them, it is unavailable here even indirectly, not merely absent as a binary; don't assume plain REST shares its fate, since the REST call above succeeded in the same session.
+  Since `gh pr view --json` depends on GraphQL fields for several of them, it is unavailable here even indirectly, not merely absent as a binary.
+  Don't assume plain REST shares its fate, since the REST call above succeeded in the same session.
   `scripts/build-pr-payload.py` (ai-config#2908) assembles a `check-pr-fully-clean.py` `--from-json` payload from REST alone for exactly this case -- run it instead of hand-transcribing MCP tool output into the payload JSON, which is slow and error-prone:
   ```
   python3 scripts/build-pr-payload.py OWNER/REPO N out.json

@@ -467,7 +467,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> push <span class="at">-u</span> origin HEAD   <span class="co"># PUSH</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p><code>HEAD</code> rather than <code>"$BRANCH"</code>, deliberately: a shell variable reaches the pre-push guard unexpanded, so it cannot resolve which commits the push would ship and refuses. <code>-u origin HEAD</code> sets the upstream to the current branch just the same.</p>
 <p>If the push fails on a <strong>network</strong> error, retry up to 4 times with exponential backoff (2s, 4s, 8s, 16s). Do <strong>not</strong> retry — and do <strong>not</strong> force-push — if it fails because the remote rejected a non-fast-forward (that’s check #2 surfacing late: fetch, reconcile, re-run the checks).</p>
-<p>After a successful push, if the branch has no PR yet, open one (ready for review, not a draft).</p>
+<p>After a successful push, if the branch has no PR yet, open one (ready for review, not a draft). Immediately maintain an active monitoring loop or scheduled wake mechanism. Actively query current-head CI/pipeline status (<code>gh pr checks</code> / <code>glab ci list</code> or <code>glab mr view</code>) and review verdicts (<code>gh pr view</code> / <code>glab mr view</code>) until that round reaches a terminal state, re-arming the poll while work remains.</p>
 </section>
 <section id="relationship-to-other-skills" class="level2">
 <h2 class="anchored" data-anchor-id="relationship-to-other-skills">Relationship to other skills</h2>
@@ -489,6 +489,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li>❌ Pushing onto a <code>do-not-merge</code> / <code>hold</code> PR without asking (check #4)</li>
 <li>❌ Pushing while a <code>@claude</code> run is mid-session on the branch (check #5)</li>
 <li>❌ Pushing directly to <code>main</code> / the default branch (check #1)</li>
+<li>❌ Pushing and abandoning active monitoring without polling CI and review to completion</li>
 <li>❌ Reporting “pushed” when a check stopped you — say what fired and that you’re waiting on the user</li>
 </ul>
 

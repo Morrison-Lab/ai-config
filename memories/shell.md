@@ -87,5 +87,3 @@ pre-empt these when authoring shell, especially under `set -euo pipefail`:
 - **bash 3.2 (macOS default) compatibility:** indexed arrays, C-style `for ((...))`, and `${2+set}` all work;
   **associative arrays do NOT** (4.0+).
   Parse key=value records with `while IFS='=' read -r k v; do case "$k" in ...`.
-
-

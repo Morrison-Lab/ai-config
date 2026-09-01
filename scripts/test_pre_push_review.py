@@ -6,7 +6,7 @@ Tests:
 2. Review output validation (rejects empty output, missing sections, and refusal strings).
 3. Diff resolution logic against PR base branch vs main.
 4. Engine detection and automatic fallback chain (claude -> codex -> opencode -> agy).
-5. Model override parameter forwarding.
+5. Model override parameter forwarding and argument ordering (ai-config#2880).
 6. Post review failure exit codes and error handling.
 """
 

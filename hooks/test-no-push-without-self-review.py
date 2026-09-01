@@ -1379,7 +1379,7 @@ def transcript_scoping_cases() -> tuple[int, int]:
                 "content": [
                     {
                         "type": "text",
-                        "text": f"### Verdict\n\nNeeds more work.\n\nReviewed-Commit: {HEAD}\n",
+                        "text": f"### Verdict: Needs more work\n\nReviewed-Commit: {HEAD}\n",
                     }
                 ]
             },

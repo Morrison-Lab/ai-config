@@ -734,26 +734,31 @@ See ai-config#694 for the precedent.
   know a PR merged; re-check explicitly.
   **CI success is now partly covered, contrary to what this bullet used to
   say in full: a `check_suite.completed` event is delivered when no
-  third-party check suite on a head is still running or failed.** Measured
-  2026-09-01 in a Claude Code remote session on `UCD-SERG/serodynamics`,
-  where seven arrived across six PRs. Its own body states the limits, and
-  they matter: cancelled suites, suites with no runs, the GitHub App's own
-  suites and legacy commit statuses are **not** covered. So it is a prompt
-  to verify, not a green light — a PR can carry a still-running
-  `review / claude-review` (an App suite) while this event says CI is done.
+  third-party check suite on a head is still running or failed.**
+  Measured 2026-09-01 in a Claude Code remote session on
+  `UCD-SERG/serodynamics`, where seven arrived across six PRs.
+  Its own body states the limits, and they matter:
+  cancelled suites, suites with no runs, the GitHub App's own suites
+  and legacy commit statuses are **not** covered.
+  So it is a prompt to verify, not a green light --- a PR can carry a
+  still-running `review / claude-review` (an App suite)
+  while this event says CI is done.
   Read the check runs before calling anything clean.
 - **A `check_suite.completed` event can name a superseded head, and its
-  wording invites you to act on it anyway.** The event body says "If you were
-  waiting on CI, continue with the next step", which reads as an all-clear
-  for the PR rather than for one commit. Two of the seven measured above
-  named a head that a later push had already replaced (`8c6c1be` on #311
-  after `fb8c7ac`; `cb327d7` on #298 after `65fd9fc`), each arriving one to
-  five minutes after the superseding push. This is the same staleness the
-  failure-event bullet below describes, in the direction that is easier to
-  act on wrongly: a stale *failure* costs a wasted investigation, while a
-  stale *success* can license declaring a head green whose CI never ran.
-  Compare `head_sha` against the PR's live `.head.sha` before treating any
-  such event as progress.
+  wording invites you to act on it anyway.**
+  The event body says "If you were waiting on CI, continue with the next
+  step", which reads as an all-clear for the PR rather than for one commit.
+  Two of the seven measured above named a head that a later push had already
+  replaced (`8c6c1be` on #311 after `fb8c7ac`;
+  `cb327d7` on #298 after `65fd9fc`),
+  each arriving one to five minutes after the superseding push.
+  This is the same staleness the failure-event bullet below describes,
+  in the direction that is easier to act on wrongly:
+  a stale *failure* costs a wasted investigation,
+  while a stale *success* can license declaring a head green
+  whose CI never ran.
+  Compare `head_sha` against the PR's live `.head.sha`
+  before treating any such event as progress.
 - **A CI-failure webhook event's `HeadSHA` can be stale — compare it against
   the PR's actual current head before investigating.** Pushing a fix-up commit
   right after a bad one (e.g. correcting an encoding mistake seconds later)

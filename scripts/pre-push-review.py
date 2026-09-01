@@ -87,7 +87,21 @@ def resolve_diff(head_sha: str, pr_number: Optional[int] = None, explicit_base: 
 
     Always diffs the provided head_sha to include unpushed commits.
     """
-    base_ref = explicit_base
+    base_ref = ""
+    if explicit_base:
+        if explicit_base.startswith("origin/"):
+            cands = [explicit_base, explicit_base[len("origin/"): ]]
+        else:
+            cands = [f"origin/{explicit_base}", explicit_base]
+        for cand in cands:
+            r = subprocess.run(["git", "rev-parse", "--verify", cand], capture_output=True, text=True)
+            if r.returncode == 0:
+                base_ref = cand
+                break
+        if not base_ref:
+            log_error(f"Could not resolve explicit base reference '{explicit_base}'.")
+            sys.exit(1)
+
     if not base_ref and pr_number:
         pr_base = get_pr_base_branch(pr_number)
         if pr_base:
@@ -99,7 +113,20 @@ def resolve_diff(head_sha: str, pr_number: Optional[int] = None, explicit_base: 
                     break
 
     if not base_ref:
-        for cand in ["origin/main", "origin/master", "main", "master"]:
+        candidates = []
+        # Check origin HEAD symbolic ref (e.g. origin/main)
+        r_origin_head = subprocess.run(
+            ["git", "symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
+            capture_output=True,
+            text=True,
+        )
+        if r_origin_head.returncode == 0:
+            sym_ref = r_origin_head.stdout.strip()
+            if sym_ref:
+                candidates.append(sym_ref)
+
+        candidates.extend(["origin/main", "origin/master", "main", "master"])
+        for cand in candidates:
             r = subprocess.run(["git", "rev-parse", "--verify", cand], capture_output=True, text=True)
             if r.returncode == 0:
                 base_ref = cand

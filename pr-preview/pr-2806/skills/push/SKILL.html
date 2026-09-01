@@ -482,7 +482,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="proactive-hook-compliance" class="level2">
 <h2 class="anchored" data-anchor-id="proactive-hook-compliance">Proactive hook compliance</h2>
-<p>Active hooks guard push operations (see <a href="../../memories/hooks.md"><code>memories/hooks.md</code></a>): - <strong><code>no-push-without-self-review.py</code></strong>: Blocks <code>git push</code> unless an adversarial self-review subagent produced a clean verdict for the exact commit being pushed (<code>Reviewed-Commit: &lt;HEAD_SHA&gt;</code>). Dispatch the reviewer in the foreground and resolve all findings before pushing. Use <code>ALLOW_UNREVIEWED_PUSH=1</code> only for the empty <code>pr-on-claim</code> commit or documented exceptions. - <strong><code>no-clobbering-push.py</code></strong>: Denies bare <code>git push -f</code>/<code>--force</code> and warns if remote tip has diverged. Always run <code>git ls-remote --heads origin &lt;branch&gt;</code> immediately before pushing, and use <code>--force-with-lease --force-if-includes</code>. - <strong><code>no-unshipped-commit.py</code></strong>: Stop guard that blocks turn completion when unpushed commits remain on the branch.</p>
+<ul>
+<li><strong><code>no-push-without-self-review.py</code></strong>: Blocks <code>git push</code> unless an adversarial self-review subagent produced a clean verdict for the exact commit being pushed (<code>Reviewed-Commit: &lt;HEAD_SHA&gt;</code>). Dispatch the reviewer in the foreground and resolve all findings before pushing. Use <code>ALLOW_UNREVIEWED_PUSH=1</code> only for the empty <code>pr-on-claim</code> commit or documented exceptions.</li>
+<li><strong><code>no-clobbering-push.py</code></strong>: Denies bare <code>git push -f</code>/<code>--force</code> and warns if remote tip has diverged. Always run <code>git ls-remote --heads origin &lt;branch&gt;</code> immediately before pushing, and use <code>--force-with-lease --force-if-includes</code>.</li>
+<li><strong><code>no-unshipped-commit.py</code></strong>: Stop guard that blocks turn completion when unpushed commits remain on the branch.</li>
+</ul>
 </section>
 <section id="anti-patterns" class="level2">
 <h2 class="anchored" data-anchor-id="anti-patterns">Anti-patterns</h2>

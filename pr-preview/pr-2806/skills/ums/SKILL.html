@@ -544,7 +544,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="proactive-hook-compliance" class="level2">
 <h2 class="anchored" data-anchor-id="proactive-hook-compliance">Proactive hook compliance</h2>
-<p>Active hooks reinforce continuous learning and error prevention (see <a href="../../memories/hooks.md"><code>memories/hooks.md</code></a>): - <strong><code>remind-ums-after-error.py</code></strong>: Prompt-injection hook that fires when an admitted mistake has no subsequent memory or skill modification. Satisfy it by executing <code>ums</code> immediately upon acknowledging an error. - <strong><code>remind-ums-on-scrutiny.py</code></strong>: Injects a reminder when a review was read or a questioned claim was corrected without a recorded UMS pass. - <strong><code>remind-learn-from-review.py</code></strong>: Reminds when an accepted reviewer finding has no accompanying learning or guard recorded. - <strong><code>no-mistake-without-a-hook.py</code></strong>: Stop guard and reminder that blocks after an admitted, mechanizable mistake until a hook (<code>hooks/&lt;name&gt;.py</code>), test (<code>hooks/test-&lt;name&gt;.py</code>), and manifest binding (<code>hooks/hooks.json</code>) are authored.</p>
+<ul>
+<li><strong><code>remind-ums-after-error.py</code></strong>: Prompt-injection hook that fires when an admitted mistake has no subsequent memory or skill modification. Satisfy it by executing <code>ums</code> immediately upon acknowledging an error.</li>
+<li><strong><code>remind-ums-on-scrutiny.py</code></strong>: Injects a reminder when a review was read or a questioned claim was corrected without a recorded UMS pass.</li>
+<li><strong><code>remind-learn-from-review.py</code></strong>: Reminds when an accepted reviewer finding has no accompanying learning or guard recorded.</li>
+<li><strong><code>no-mistake-without-a-hook.py</code></strong>: Stop guard and reminder that blocks after an admitted, mechanizable mistake until a hook (<code>hooks/&lt;name&gt;.py</code>), test (<code>hooks/test-&lt;name&gt;.py</code>), and manifest binding (<code>hooks/hooks.json</code>) are authored.</li>
+</ul>
 
 
 </section>

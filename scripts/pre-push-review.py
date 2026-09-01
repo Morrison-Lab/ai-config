@@ -464,11 +464,10 @@ def _parse_persona_verdict(report: str, expected_commit_sha: str = "") -> Tuple[
                 f"Fingerprint SHA mismatch: found {reviewed_commit!r}, expected {expected_commit_sha!r}."
             )
 
-    contradiction = _structured_contradiction(report, expected_commit_sha=expected_commit_sha)
-    if contradiction:
-        return False, False, contradiction
-
     if verdict == "clean":
+        contradiction = _structured_contradiction(report, expected_commit_sha=expected_commit_sha)
+        if contradiction:
+            return False, False, contradiction
         return True, True, "Clean (persona contract)"
     return True, False, "Needs work (persona contract)"
 

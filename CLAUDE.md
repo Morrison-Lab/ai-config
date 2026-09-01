@@ -289,6 +289,15 @@ The review caught it, and it is the same class of unmeasured claim.)
 - **Do:** run the clock command again immediately before typing a time into a forge comment, exactly as before a chat recap or a file edit.
 - **Don't:** infer a clock time from the number of tool calls or actions taken since the last real reading.
 
+Two hooks are this rule's mechanism, one per surface.
+`hooks/no-unmeasured-clock-claim.py` reads the reply at `Stop`.
+`hooks/flag-unmeasured-timestamp.py` reads a comment body at `PreToolUse`,
+on the `gh` comment commands and the `mcp__github__` comment tools.
+Each warns, never blocks, when the text states a Pacific clock time
+and no clock read appears in the transcript since the turn began,
+naming the stamp and the command to run before restating it
+(ai-config#2903, filed on the same day the rule above was written and broken again).
+
 ## State the actual time when reporting a scheduled check-in
 
 When telling the user I've scheduled a wakeup or check-in (`ScheduleWakeup`, or an equivalent poll-later mechanism), state the clock time it fires at, not just the relative delay or a bare "I scheduled a check-in."

@@ -25,6 +25,8 @@ Actively review recent session context and update all relevant memory files and 
 - Debugging insights
 - Codebase conventions discovered
 
+*(When delegating UMS to a subagent, prefer **conversation-inheriting dispatch** (Agent `subagent_type: "fork"` or `/subtask` in Claude Code, or providing the transcript log path in clean-slate harnesses) so the subagent surveys conversation history directly without manual serialization; see [`use-subagents`](../../shared/workflow/use-subagents.md).)*
+
 **Categorize each learning.** For each item, decide:
 
 - Is it a **skill update**? (workflow step missing, procedure unclear)

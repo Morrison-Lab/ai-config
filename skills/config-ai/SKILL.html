@@ -455,6 +455,7 @@ ul.task-list li input[type="checkbox"] {
 <li><strong><code>claude-agent-workflow</code></strong>, <strong><code>claude-review-workflow</code></strong>, <strong><code>agy-review-workflow</code></strong> – own the bot-CI-tuning row; all document the load-bearing patterns in their respective workflows (<code>claude.yml</code>, <code>claude-code-review.yml</code>, <code>antigravity-review.yml</code>) this skill doesn’t repeat.</li>
 <li><strong><code>upstream-issues</code></strong> (<code>shared/workflow/upstream-issues.md</code>) – the general escalation pattern (PR → issue on target → issue on own repo, ask for transfer) this skill’s Step 3 specializes for the <code>ai-config</code>/<code>gha</code> case, where the “external” repos are the user’s own but may still be out of the current session’s scope.</li>
 <li><strong><code>issue-first</code></strong> (<code>shared/workflow/issue-first.md</code>) / <strong><code>st</code></strong> – the issue-before-PR discipline Step 3’s normal push-access path still follows once a form is chosen.</li>
+<li><strong><code>use-subagents</code></strong> (<code>shared/workflow/use-subagents.md</code>) – governs when to use conversation-inheriting dispatch for an emergent workflow vs dispatching a clean subagent for an explicit capability request.</li>
 </ul>
 </section>
 <section id="anti-patterns" class="level2">

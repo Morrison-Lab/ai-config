@@ -735,4 +735,13 @@ A clean automated review from every available provider evaluating the current HE
   Yes.
   Check file footprints during orchestration and gate multi-subagent dispatch when targets share the same file footprint.
 
+## Pattern 39: Leaving PR Review Questions or Feedback Unanswered on the Forge Thread
+- **Do**: Whenever a user or reviewer links, cites, or asks about a PR review comment, question, or finding, synthesize and post the formal reply/resolution directly to the PR thread on GitHub in that very same turn.
+- **Don't**: Analyze the review question or execute downstream tasks locally/in chat without posting the written answer or resolution directly to the forge PR review thread.
+- **Example**: 2026-09-01 session (Antigravity, working `ucdavis/matt.contracts` [PR #98](https://github.com/ucdavis/matt.contracts/pull/98)): user linked review `https://github.com/ucdavis/matt.contracts/pull/98#pullrequestreview-5075093750` ("how much of this content can we externalize to hac.sap and load from there?").
+  The agent analyzed the architectural boundaries internally and proceeded to work on multi-format rendering in `hac.sap#9`, but failed to post the written architectural breakdown reply to the PR thread on GitHub until prompted "why didn't you do that hours ago?".
+- **Canonical Rule**: `AGENTS.md` ("Status and diagnostic requests do not make issues report-only", "Deliver completed implementation work"), and `skills/ard/SKILL.md` (Address, rebut, or defer review items).
+- **Fix**: When given a PR review reference or question, immediately post the direct response comment to the PR thread on the forge before or alongside related code updates.
+
+
 

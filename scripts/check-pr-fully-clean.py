@@ -1411,6 +1411,206 @@ def _is_resolved_blocking_mention(
 # disable the ai-config#2370 exemption.
 _FINDINGS_HEADING_PATTERN = r"#+\s*(Actionable\s+|Detailed\s+)?Findings"
 
+_EXEMPT_FINDINGS_HEADING_NON_BLOCKING = re.compile(
+    r"(?i)^[ \t]*#{1,6}[ \t]*.*?"
+    r"(?:"
+    r"\bfindings\b.*?\bnon[- ]blocking\b"
+    r"|"
+    r"\bnon[- ]blocking\s+(?:actionable\s+|detailed\s+)?findings\b"
+    r")"
+)
+_EXEMPT_FINDINGS_HEADING_RESOLVED = re.compile(
+    r"(?i)^[ \t]*#{1,6}[ \t]*.*?"
+    r"(?:"
+    r"\b(?:resolved|addressed)\s+(?:actionable\s+|detailed\s+)?findings\b"
+    r"|"
+    r"\bfindings\b.*?(?:[\(\[\{:\-\u2013\u2014\s]|\b(?:from|prior|previous|earlier|rounds?|now|all|already|previously))\s*"
+    r"(?:from\s+(?:prior|previous|earlier)\s+rounds?\s*[\-\u2013\u2014:]?\s*)?"
+    r"(?:now\s+|all\s+|already\s+|previously\s+)?"
+    r"(?:resolved|addressed)\b"
+    r")"
+)
+_FINDINGS_HEADING_NOT_EXEMPT = re.compile(
+    r"(?i)\b(?:"
+    r"unresolved|unaddressed|unfixed"
+    r"|partially\s+(?:resolved|addressed|fixed|closed|cleared)"
+    r"|partly\s+(?:resolved|addressed|fixed|closed|cleared)"
+    r"|not\s+(?:fully\s+|completely\s+|entirely\s+|quite\s+|yet\s+)?(?:resolved|addressed|fixed|closed|cleared)"
+    r"|never\s+(?:resolved|addressed|fixed|closed|cleared)"
+    r"|hardly\s+(?:resolved|addressed|fixed|closed|cleared)"
+    r"|scarcely\s+(?:resolved|addressed|fixed|closed|cleared)"
+    r"|without\s+(?:a\s+)?fix"
+    r"|yet\s+to\s+be\s+(?:resolved|addressed|fixed)"
+    r"|to\s+be\s+(?:resolved|addressed|fixed)"
+    r"|still\s+(?:unresolved|open|unaddressed|broken)"
+    r")\b"
+    r"|(?<!non-)(?<!non\s)\bblocking\b"
+)
+_LINE_RESOLUTION_WORDS = re.compile(
+    r"(?i)\b(?:"
+    r"(?:is|are|was|were|have|has)\s+(?:now\s+|also\s+|already\s+|since\s+|been\s+)*"
+    r"(?:fixed|resolved|addressed|closed|removed|corrected|cleared)"
+    r"(?:\s+(?:in|by|via)\s+(?:commit\s+[a-f0-9]+|[a-f0-9]{7,40}|PR\s+#?\d+|#\d+|this\s+round(?:['\u2019]s)?\s+(?:diff|push|commit|changes?|fixes?)))?"
+    r"|no\s+longer\s+applies"
+    r"|(?:now|already|previously|all)\s+(?:fixed|resolved|addressed|cleared|closed)"
+    r"|(?:item|items|feedback|issues?|findings?|bugs?|everything|both|all)\s+(?:now\s+|also\s+|already\s+|since\s+)?(?:fixed|resolved|addressed|closed|cleared)"
+    r"|(?:fixed|resolved|addressed|cleared|closed)\s+(?:(?:this|it|that|the\s+(?:bug|issue|finding|defect|crash|problem|leak))\s+)?(?:in|by|via)\s+(?:commit\s+[a-f0-9]+|[a-f0-9]{7,40}|PR\s+#?\d+|#\d+|this\s+round(?:['\u2019]s)?\s+(?:diff|push|commit|changes?|fixes?))"
+    r")\b"
+    r"|^[ \t]*(?:[-*+]|\d+[.)])?[ \t]*(?:\*\*)?\[?(?:resolved|fixed|addressed|closed|cleared)\b\]?"
+)
+_LINE_UNRESOLVED_WORDS = re.compile(
+    r"(?i)\b(?:"
+    r"unresolved|unaddressed|partially\s+(?:resolved|addressed|fixed)"
+    r"|still\s+(?:unresolved|broken|present|failing|reproducible|open|leaks?|crashes?|fails?|in\s+main|remains)"
+    r"|not\s+(?:resolved|addressed|fixed|closed|cleared|fully|completely|yet)"
+    r"|(?:is|are|was|were|currently)\s+being\s+(?:fixed|resolved|addressed|closed|corrected|cleared)"
+    r"|(?:must|needs?\s+to|should|ought\s+to|has\s+to|remains?\s+to|will|would|could|might|may|supposed\s+to|yet\s+to)\s+(?:have\s+been\s+|be\s+)?(?:fixed|resolved|addressed|closed|corrected|cleared)"
+    r"|(?:fixed|resolved|addressed)\s+only\s+(?:in|for|on|partially)"
+    r"|only\s+(?:fixed|resolved|addressed)\s+(?:in|for|on|partially)"
+    r"|(?:later\s+|was\s+|since\s+)?reverted"
+    r"|(?:in|for|via)\s+(?:a\s+)?(?:follow-?up|later|future|next|subsequent|separate)\s+(?:pr|commit|branch|release|issue|round)"
+    r"|remains?\b|is\s+back\b|comes\s+back\b|persists?\b"
+    r"|without\s+(?:a\s+)?fix\b"
+    r")\b"
+    r"|(?<!non-)(?<!non\s)\bblocking\b"
+)
+_PREFIX_DISQUALIFY_RE = re.compile(
+    r"(?i)\b(?:"
+    r"should|would|could|might|may|must|ought\s+to|needs?\s+to|supposed\s+to|yet\s+to"
+    r"|claims?|claiming|claimed|says?|saying|said|believes?|believed|thinks?|thought"
+    r"|assumes?|assumed|purports?|purported|alleges?|alleged|supposedly|allegedly"
+    r"|apparently|seemingly|presumably|unconfirmed|unverified|reportedly"
+    r"|if|unless|whether|had|though|although"
+    r"|seems?(?:\s+to(?:\s+have(?:\s+been)?)?)?|looks?\s+(?:like|to\s+be)"
+    r"|hopes?|hoping|hoped|hopefully"
+    r"|in\s+theory|theoretically|hypothetically|ostensibly|tentatively"
+    r"|maybe|perhaps|possibly|probably|likely|unclear|unsure|suspects?"
+    r"|appears?(?:\s+to(?:\s+be)?)?"
+    r"|in\s+(?:my|our|your|their|his|her)\s+(?:opinion|view|judgment|judgement|assessment|estimation|belief|impression|experience)"
+    r"|to\s+(?:my|our|your|their|his|her)\s+(?:knowledge|understanding|recollection|mind)"
+    r"|as\s+far\s+as\s+(?:i|we|you|they|he|she)\s+(?:know|understand|recall|remember|can\s+tell)"
+    r"|according\s+to"
+    r"|from\s+(?:my|our|what\s+i|what\s+we)"
+    r")\b"
+)
+_PREFIX_NON_RESOLUTION_SUBJECT = re.compile(
+    r"(?i)\b(?:fix|fixes|patch|patches|pr|pull\s+request|branch|workaround|revert)\b"
+)
+_AFFIRMATIVE_RESOLUTION_SUFFIX = re.compile(
+    r"^(?:"
+    r"\s*(?:in|by|via)\s+(?:commit\s+[a-f0-9]+|[a-f0-9]{7,40}|PR\s+#?\d+|#\d+|this\s+round(?:['\u2019]s)?\s+(?:diff|push|commit|changes?|fixes?))"
+    r")?"
+    r"(?:"
+    r"\s*(?:and|,?\s*and)\s+(?:confirmed\s+|now\s+)?(?:passing|clean|verified|resolved|tested|closed|cleared)"
+    r")?"
+    r"(?:"
+    r"\s*,?\s*with\s+no\s+new\s+(?:issues?|findings?)(?:\s+(?:introduced|found|added|identified))?"
+    r")?"
+    r"[.,!?:;\s\)\"'\`]*$",
+    re.IGNORECASE,
+)
+
+# A line that reads as a finding ITEM. Severity/class tags and Location
+# markers are the explicit forms; a bare list item in any CommonMark form
+# (`-`, `*`, `+`, `1.`, `1)`) vetoes too, because an untagged finding
+# ("1. `foo()` crashes on empty input") is still a finding, and swallowing
+# it is the dangerous direction.
+_SECTION_FINDING_ITEM = re.compile(
+    r"(?im)"
+    r"^[ \t]*(?:\*\*)?\[?"
+    r"(?:Defect|Factual\s+Error|Edge\s+Case|Convention|Nit|Non-blocking|"
+    r"Suggestion|Note|Question|Warning|Blocking|Critical|Major|Minor|P[0-4])\b\]?"
+    r"|^[ \t]*(?:\d+[.)]|[-*+])\s+\S"
+    r"|\*\*Location:\*\*"
+    r"|^[ \t]*>\s*\S"
+    r"|^[ \t]*\*\*(?!\s*$)"
+)
+_ITEM_NON_BLOCKING_TAG = re.compile(
+    r"(?i)^[ \t]*(?:[-*+]|\d+[.)])?[ \t]*(?:\*\*)?\[?"
+    r"(?:Nit|Non-blocking|Suggestion|Note|Question|Minor|Optional|Low)\b\]?"
+    r"|^[ \t]*(?:[-*+]|\d+[.)])[ \t]*(?:Nit|Suggestion|Note|Question|Optional|Minor|Low)(?::|\b)"
+)
+
+
+def _item_is_resolved(line: str) -> bool:
+    if _LINE_UNRESOLVED_WORDS.search(line):
+        return False
+    res_match = _LINE_RESOLUTION_WORDS.search(line)
+    if not res_match:
+        return False
+    before_res = line[:res_match.start()]
+    if _NEGATOR_RE.search(before_res):
+        return False
+    if _PREFIX_DISQUALIFY_RE.search(before_res):
+        return False
+    matched_verb = res_match.group(0).lower()
+    if any(w in matched_verb for w in ("removed", "closed")):
+        if _PREFIX_NON_RESOLUTION_SUBJECT.search(before_res):
+            return False
+    after_res = line[res_match.end():]
+    if not _AFFIRMATIVE_RESOLUTION_SUFFIX.match(after_res):
+        return False
+    return True
+
+
+def _section_has_unresolved_blocking_items(
+    section: str, is_non_blocking_heading: bool = False
+) -> bool:
+    """True when the section contains unresolved severity-tagged, untagged, or blocking items."""
+    for line in section.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if _LINE_UNRESOLVED_WORDS.search(line):
+            return True
+        if _SECTION_FINDING_ITEM.search(line):
+            if _item_is_resolved(line):
+                continue
+            if is_non_blocking_heading and _ITEM_NON_BLOCKING_TAG.search(line):
+                continue
+            return True
+    return False
+
+
+def _is_exempt_findings_heading(
+    scan_body: str, match_start: int, match_end: int
+) -> bool:
+    """True when a Findings heading indicates non-blocking or resolved findings,
+    AND the section body underneath it contains no unresolved severity-tagged, untagged, or blocking items.
+
+    Exempts headings like '### Findings (non-blocking)', '### Findings (resolved)',
+    '### Findings from prior rounds --- now resolved', '### Findings (addressed)', etc.
+    Does not exempt headings with unaddressed/unresolved or blocking signals, or
+    sections containing unresolved blocking/severity-tagged/untagged items.
+    """
+    line_start = scan_body.rfind("\n", 0, match_start) + 1
+    line_end = scan_body.find("\n", match_end)
+    if line_end == -1:
+        line_end = len(scan_body)
+    heading_line = scan_body[line_start:line_end]
+
+    if not re.match(r"^[ \t]*#{1,6}\s", heading_line):
+        return False
+
+    if _FINDINGS_HEADING_NOT_EXEMPT.search(heading_line):
+        return False
+    is_non_blocking = bool(_EXEMPT_FINDINGS_HEADING_NON_BLOCKING.search(heading_line))
+    is_resolved = bool(_EXEMPT_FINDINGS_HEADING_RESOLVED.search(heading_line))
+    if not (is_non_blocking or is_resolved):
+        return False
+
+    section_start = line_end + 1
+    next_heading = re.search(r"(?m)^#{1,6}\s", scan_body[section_start:])
+    section = (
+        scan_body[section_start:section_start + next_heading.start()]
+        if next_heading
+        else scan_body[section_start:]
+    )
+    if _section_has_unresolved_blocking_items(section, is_non_blocking_heading=is_non_blocking):
+        return False
+
+    return True
+
 VERDICT_NOT_CLEAN_PATTERNS = [
     # Intervening words allowed, because the adjacent forms are not the only
     # ones a reviewer writes. Found by running this classifier over the real
@@ -1559,8 +1759,8 @@ FINDING_HEADING_PATTERNS = {
 # cover qualifiers attached to an already-marked phrase, which is a far smaller
 # job than parsing arbitrary prose.
 BARE_CLEAN_MARKED = re.compile(
-    r"(?:^|\n)[ \t]*(?:[#>*_+-]+[ \t]*)*"
-    r"(?:verdict[ \t]*[:.\-]*[ \t]*)?(?:[#>*_]+[ \t]*)*$",
+    r"(?:^|\n)[ \t]*[#>*_+\t -]*"
+    r"(?:verdict[ \t]*[:.\-]*[ \t]*)?[#>*_\t -]*$",
     re.IGNORECASE,
 )
 CLEAN_NEGATION_PREFIX = re.compile(
@@ -1686,10 +1886,11 @@ def classify_verdict(body: str, state: str = "") -> str:
             if NOT_CLEAN_NEGATION_PREFIX.search(prefix):
                 if not _is_negated_resolution(scan, match):
                     continue
-            if pat == _BARE_REJECTION and _is_resolved_blocking_mention(
-                scan, match, cited
-            ):
-                continue
+            if pat == _BARE_REJECTION:
+                if _is_resolved_blocking_mention(scan, match, cited):
+                    continue
+                if _is_exempt_findings_heading(scan, match.start(), match.end()):
+                    continue
             if pat == r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b":
                 suffix = scan[match.end():match.end() + 60]
                 if NOT_CLEAN_NEGATION_SUFFIX.search(suffix):
@@ -1746,21 +1947,7 @@ def classify_verdict(body: str, state: str = "") -> str:
     return ""
 
 
-# A line that reads as a finding ITEM. Severity/class tags and Location
-# markers are the explicit forms; a bare list item in any CommonMark form
-# (`-`, `*`, `+`, `1.`, `1)`) vetoes too, because an untagged finding
-# ("1. `foo()` crashes on empty input") is still a finding, and swallowing
-# it is the dangerous direction.
-_SECTION_FINDING_ITEM = re.compile(
-    r"(?im)"
-    r"^[ \t]*(?:\*\*)?\[?"
-    r"(?:Defect|Factual\s+Error|Edge\s+Case|Convention|Nit|Non-blocking|"
-    r"Suggestion|Note|Question|Warning|Blocking|Critical|Major|Minor|P[0-4])\b\]?"
-    r"|^[ \t]*(?:\d+[.)]|[-*+])\s+\S"
-    r"|\*\*Location:\*\*"
-    r"|^[ \t]*>\s*\S"
-    r"|^[ \t]*\*\*(?!\s*$)"
-)
+
 
 
 _FINDINGS_TRAILER_SUFFIX = re.compile(
@@ -1876,10 +2063,11 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
             if NOT_CLEAN_NEGATION_PREFIX.search(prefix):
                 if not _is_negated_resolution(scan_body, match):
                     continue
-            if pat == _BARE_REJECTION and _is_resolved_blocking_mention(
-                scan_body, match, cited
-            ):
-                continue
+            if pat == _BARE_REJECTION:
+                if _is_resolved_blocking_mention(scan_body, match, cited):
+                    continue
+                if _is_exempt_findings_heading(scan_body, match.start(), match.end()):
+                    continue
             if pat == _FINDINGS_HEADING_PATTERN:
                 # The section-resolution check REPLACES the 60-char suffix
                 # shortcut for this heading: the shortcut read "No new
@@ -1888,9 +2076,13 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
                 # #2370's review of this very fix). The replacement keeps
                 # the shortcut's first-line trigger and adds the item veto
                 # over the rest of the section.
+                if _is_exempt_findings_heading(scan_body, match.start(), match.end()):
+                    continue
                 if _findings_section_resolves_empty(scan_body, match.end()):
                     continue
             elif pat in FINDING_HEADING_PATTERNS:
+                if _is_exempt_findings_heading(scan_body, match.start(), match.end()):
+                    continue
                 suffix = scan_body[match.end():match.end() + 60]
                 if NOT_CLEAN_NEGATION_SUFFIX.search(suffix):
                     continue

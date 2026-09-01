@@ -249,6 +249,8 @@ late: fetch, reconcile, re-run the checks).
 
 After a successful push, if the branch has no PR yet, open one (ready for
 review, not a draft).
+Immediately maintain an active monitoring loop or scheduled wake mechanism.
+Actively query current-head CI/pipeline status (`gh pr checks` / `glab ci list` or `glab mr view`) and review verdicts (`gh pr view` / `glab mr view`) until that round reaches a terminal state, re-arming the poll while work remains.
 
 ## Relationship to other skills
 
@@ -263,6 +265,17 @@ review, not a draft).
 - **[`check-before-pushing`](../../shared/workflow/check-before-pushing.md)** --- the standing rule these checks implement, and the home of the immediacy argument and the `--force-if-includes` mechanism.
   `hooks/no-clobbering-push.py` is its instrument, and it runs on the `git push` itself rather than waiting to be invoked --- so it covers the bare push in the middle of an ARDI round that never reaches this skill.
 
+## Proactive hook compliance
+
+- **`no-push-without-self-review.py`**: Blocks `git push` unless an adversarial self-review subagent
+  produced a clean verdict for the exact commit being pushed (`Reviewed-Commit: <HEAD_SHA>`).
+  Dispatch the reviewer in the foreground and resolve all findings before pushing.
+  Use `ALLOW_UNREVIEWED_PUSH=1` only for the empty `pr-on-claim` commit or documented exceptions.
+- **`no-clobbering-push.py`**: Denies bare `git push -f`/`--force` and warns if remote tip has diverged.
+  Always run `git ls-remote --heads origin <branch>` immediately before pushing,
+  and use `--force-with-lease --force-if-includes`.
+- **`no-unshipped-commit.py`**: Stop guard that blocks turn completion when unpushed commits remain on the branch.
+
 ## Anti-patterns
 
 - ❌ Force-pushing over commits another session added (check #2)
@@ -272,5 +285,6 @@ review, not a draft).
 - ❌ Pushing onto a `do-not-merge` / `hold` PR without asking (check #4)
 - ❌ Pushing while a `@claude` run is mid-session on the branch (check #5)
 - ❌ Pushing directly to `main` / the default branch (check #1)
+- ❌ Pushing and abandoning active monitoring without polling CI and review to completion
 - ❌ Reporting "pushed" when a check stopped you — say what fired and that you're
   waiting on the user

@@ -5,6 +5,16 @@ Worked-example case records for the rules in
 auto-loaded `CLAUDE.md` context.
 Each heading names the rule the record supports.
 
+## "Prefer the typed tool over the shell, once one exists"
+
+(2026-08-29: establishing context at session start, an agent ran `which gh glab`
+bundled into its initial bash call before using `mcp__github__*` for every
+subsequent operation.
+Because GitHub MCP tools were registered, the rule preferred MCP regardless of
+whether `gh` was present on `PATH`.
+The probe tested a fact whose outcome could not change the next action,
+encoding a CLI-first check that inverted the rule's default.)
+
 ## "When a rule names a mechanism this session does not have"
 
 (2026-07-29: an entire session ran `gh pr checks` polling loops because

@@ -1353,6 +1353,62 @@ def structured_payload_cases() -> tuple[int, int]:
     return failures, ran
 
 
+def transcript_scoping_cases() -> tuple[int, int]:
+    """Test transcript parsing scoping and isolation of reviewer records."""
+    spec = importlib.util.spec_from_file_location("hook", HOOK)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = ran = 0
+
+    def check(label, actual, expected=True):
+        nonlocal failures, ran
+        ran += 1
+        if actual == expected:
+            print(f"PASS: {label}")
+        else:
+            print(f"FAIL: {label} (expected {expected!r}, got {actual!r})")
+            failures += 1
+
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False) as tf:
+        tf_path = tf.name
+        # 1. Attributed reviewer with blocking verdict
+        rec1 = {
+            "type": "assistant",
+            "attributionAgent": "adversarial-reviewer",
+            "message": {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"### Verdict\n\nNeeds more work.\n\nReviewed-Commit: {HEAD}\n",
+                    }
+                ]
+            },
+        }
+        # 2. Subsequent unattributed main-session assistant prose claiming clean
+        rec2 = {
+            "type": "assistant",
+            "message": {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"### Verdict: Ready for merge\n\nReviewed-Commit: {HEAD}\n",
+                    }
+                ]
+            },
+        }
+        tf.write(json.dumps(rec1) + "\n" + json.dumps(rec2) + "\n")
+
+    try:
+        v, s, saw = mod.read_latest_review(tf_path)
+        check("transcript_scoping: unattributed main-session prose cannot overwrite reviewer blocking verdict",
+              (v, s, saw) == ("needs_work", HEAD.lower(), True))
+    finally:
+        if os.path.exists(tf_path):
+            os.remove(tf_path)
+
+    return failures, ran
+
+
 def cd_tracking_cases() -> tuple[int, int]:
     """Test cd parsing, options, relative path chaining, and subshell scoping."""
     spec = importlib.util.spec_from_file_location("hook", HOOK)
@@ -1477,7 +1533,8 @@ def main():
         for fn in (raw_cases, orphan_cases, config_cases,
                    valueless_bool_cases, budget_cases,
                    fixture_branch_cases, windows_path_cases,
-                   structured_payload_cases, cd_tracking_cases):
+                   structured_payload_cases, transcript_scoping_cases,
+                   cd_tracking_cases):
             f, r = fn()
             failed += f
             extra += r

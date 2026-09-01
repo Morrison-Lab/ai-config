@@ -47,7 +47,10 @@ CLEAN_REPORT = (
     "### Summary of Changes\nOne commit.\n\n"
     "### Findings\nNo actionable findings identified.\n\n"
     "### Verdict: Ready for merge\n\n"
-    f"Reviewed-Commit: {SHA}\n"
+      f"Reviewed-Commit: {SHA}\n\n"
+      '<!-- review-data: {"schema_version": "1.1", "verdict": "CLEAN", "findings": [], '
+      '"detailed_assessment": "No detailed findings after tracing changed paths and failure modes.", '
+      '"holistic_assessment": "No whole-change concerns after checking requirements and integration."} -->\n'
 )
 
 NEEDS_WORK_REPORT = CLEAN_REPORT.replace(

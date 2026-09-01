@@ -43,7 +43,8 @@ Always wait for fresh reviews and CI on the new head, re-verify with `check-pr-f
 
 **After merging main, re-check version parity.** In R packages with a
 `version-check` CI job, the branch's `DESCRIPTION` `Version:` must *exceed*
-main's. A conflict-free merge can silently put them at parity --- main advanced
+main's.
+A conflict-free merge can silently put them at parity --- main advanced
 (e.g. another PR merged between when you last bumped and now). After every merge
 of main, compare versions:
 

@@ -286,8 +286,63 @@ _TRAILING_AFTER_FINGERPRINT = re.compile(
 )
 
 
-def _structured_contradiction(report: str) -> Optional[str]:
-    """Reason string when the report's structured payload blocks, else ``None``.
+def verify_working_state(repo_dir: str = ".", expected_commit_sha: str = "") -> Tuple[bool, str]:
+    """Verify that the repository working tree is clean and matches the expected commit.
+
+    Returns:
+        (is_valid, reason): True and success message if working tree is clean and matches
+        expected_commit_sha (if provided), or False and error message on dirty state or mismatch.
+    """
+    res_git = subprocess.run(
+        ["git", "rev-parse", "--show-toplevel"],
+        cwd=repo_dir,
+        capture_output=True,
+        text=True,
+    )
+    if res_git.returncode != 0:
+        return False, f"Not inside a git repository: {repo_dir}"
+
+    # Check for uncommitted tracked changes (staged or unstaged)
+    status_res = subprocess.run(
+        ["git", "status", "--porcelain", "-uno"],
+        cwd=repo_dir,
+        capture_output=True,
+        text=True,
+    )
+    if status_res.returncode != 0:
+        return False, f"Failed to check git status in {repo_dir}: {status_res.stderr.strip()}"
+
+    dirty_lines = [line for line in status_res.stdout.splitlines() if line.strip()]
+    if dirty_lines:
+        return False, (
+            "Working repository state is dirty (uncommitted changes detected). "
+            "Commit or stash changes before running pre-push review so the reviewed state matches the exact commit ref."
+        )
+
+    # Check HEAD commit
+    head_res = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo_dir,
+        capture_output=True,
+        text=True,
+    )
+    if head_res.returncode != 0:
+        return False, f"Failed to resolve HEAD in {repo_dir}: {head_res.stderr.strip()}"
+
+    current_head = head_res.stdout.strip().lower()
+
+    if expected_commit_sha:
+        exp = expected_commit_sha.strip().lower()
+        if current_head != exp and not (len(exp) >= 7 and current_head.startswith(exp)) and not (len(current_head) >= 7 and exp.startswith(current_head)):
+            return False, (
+                f"Working repository HEAD ({current_head[:8]}) does not match expected commit ref ({exp[:8]})."
+            )
+
+    return True, f"Working repository state is clean and at commit {current_head[:8]}."
+
+
+def _structured_contradiction(report: str, expected_commit_sha: str = "") -> Optional[str]:
+    """Reason string when the report's structured payload blocks or contradicts, else ``None``.
 
     ``build_review_prompt`` asks the reviewer to append a machine-readable
     ``<!-- review-data: {...} -->`` payload, and both verdict parsers below
@@ -306,6 +361,19 @@ def _structured_contradiction(report: str) -> Optional[str]:
     ``classify_verdict``'s ordering on the PR side.
     """
     structured = extract_structured_review(report)
+    if not structured:
+        return None
+
+    if expected_commit_sha:
+        payload_sha = str(structured.get("commit_sha") or "").strip().lower()
+        if payload_sha:
+            exp_sha = expected_commit_sha.strip().lower()
+            if payload_sha != exp_sha and not (len(payload_sha) >= 7 and exp_sha.startswith(payload_sha)) and not (len(exp_sha) >= 7 and payload_sha.startswith(exp_sha)):
+                return (
+                    f"Contradictory output: structured review-data commit_sha '{structured.get('commit_sha')}' "
+                    f"does not match expected reviewed commit '{expected_commit_sha[:8]}'."
+                )
+
     if not payload_is_blocking(structured):
         return None
     findings = payload_findings(structured)
@@ -396,13 +464,14 @@ def _parse_persona_verdict(report: str, expected_commit_sha: str = "") -> Tuple[
             return False, False, (
                 f"Missing required 'Reviewed-Commit: {expected_commit_sha[:8]}' fingerprint after the verdict."
             )
-        if reviewed_commit != expected_commit_sha.lower():
+        exp = expected_commit_sha.lower()
+        if reviewed_commit.lower() != exp and not (len(reviewed_commit) >= 7 and exp.startswith(reviewed_commit.lower())) and not (len(exp) >= 7 and reviewed_commit.lower().startswith(exp)):
             return False, False, (
                 f"Fingerprint SHA mismatch: found {reviewed_commit!r}, expected {expected_commit_sha!r}."
             )
 
     if verdict == "clean":
-        contradiction = _structured_contradiction(report)
+        contradiction = _structured_contradiction(report, expected_commit_sha=expected_commit_sha)
         if contradiction:
             return False, False, contradiction
         return True, True, "Clean (persona contract)"
@@ -479,7 +548,8 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
             return False, False, f"Missing required 'Reviewed-Commit: {expected_commit_sha[:8]}' fingerprint."
         exp_sha = expected_commit_sha.lower()
         for found_sha_raw in all_shas:
-            if found_sha_raw.lower() != exp_sha:
+            found_lower = found_sha_raw.lower()
+            if found_lower != exp_sha and not (len(found_lower) >= 7 and exp_sha.startswith(found_lower)) and not (len(exp_sha) >= 7 and found_lower.startswith(exp_sha)):
                 return False, False, f"Fingerprint SHA mismatch: found {found_sha_raw!r}, expected {expected_commit_sha!r}."
 
         # Also ensure the final fingerprint is anchored at the end of the report (allowing optional trailing status/disclosure footer)
@@ -615,7 +685,7 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
             return False, False, f"Contradictory output: clean verdict but report contains blocking phrase '{blocker_match.group(0)}'."
 
     if is_clean:
-        contradiction = _structured_contradiction(report)
+        contradiction = _structured_contradiction(report, expected_commit_sha=expected_commit_sha)
         if contradiction:
             return False, False, contradiction
 
@@ -1137,7 +1207,6 @@ def build_review_prompt(diff: str, ref_name: str, guidelines: str, head_sha: str
     prompt_parts = [
         "You are an ADVERSARIAL AI CODE REVIEWER conducting an independent, rigorous code audit.",
         f"Context: {branch_name} (diff against {ref_name})",
-        f"Reviewed-Commit: {head_sha}",
         "Review Standards & Expectations:",
         "1. Conduct two independent, rigorous review passes:",
         "   (a) Detailed implementation defect audit: actively search for regressions, edge-case failures, schema mismatches, syntax errors, omitted instances, and breaking contract changes.",
@@ -1145,7 +1214,8 @@ def build_review_prompt(diff: str, ref_name: str, guidelines: str, head_sha: str
         "2. Review outputs MUST explicitly report both passes, even when one has no findings.",
         "3. Do NOT rubber-stamp. Scrutinize whether any other files or callers suffer from identical bugs.",
         "4. Review the code strictly on what the diff and codebase state, not on assumptions.",
-        "5. Structure your response strictly with:",
+        "5. Evaluate repository-derived values strictly against the reviewed commit and diff. Do NOT use adjacent checkouts, stale build artifacts, or unverified external states.",
+        "6. Structure your response strictly with:",
         "   - ### Summary Verdict",
         "     Verdict: Ready for merge (or Verdict: Needs work with concise reason)",
         "   - ### Holistic Assessment",
@@ -1206,6 +1276,13 @@ def main():
         help="Base git reference to diff against (defaults to PR base or origin/main)",
     )
     parser.add_argument(
+        "--head",
+        "--commit",
+        dest="head",
+        default="",
+        help="Commit ref or SHA to review (defaults to HEAD)",
+    )
+    parser.add_argument(
         "--engine",
         choices=[
             "auto", "alternate", "round-robin", "claude", "cursor", "codex", "dtc",
@@ -1246,11 +1323,26 @@ def main():
     os.chdir(git_root)
     pr_num = args.pr or get_current_pr()
 
-    initial_head = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
+    if args.head:
+        res_h = subprocess.run(
+            ["git", "rev-parse", "--verify", f"{args.head}^{{commit}}"],
+            capture_output=True,
+            text=True,
+        )
+        if res_h.returncode != 0:
+            log_error(f"Could not resolve commit ref '{args.head}': {res_h.stderr.strip()}")
+            sys.exit(1)
+        initial_head = res_h.stdout.strip()
+    else:
+        initial_head = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        is_clean_state, state_msg = verify_working_state(git_root, expected_commit_sha=initial_head)
+        if not is_clean_state:
+            log_error(state_msg)
+            sys.exit(1)
 
     diff, base_sha, base_ref, ref_name = resolve_diff(initial_head, pr_number=pr_num, explicit_base=args.base)
 
@@ -1275,15 +1367,20 @@ def main():
         finally:
             os.chdir(original_cwd)
 
-    current_head = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-
-    if current_head != initial_head:
-        log_error(f"HEAD moved during review (from {initial_head[:8]} to {current_head[:8]}). Verdict is bound to the old commit and cannot be posted/accepted.")
-        sys.exit(1)
+    if not args.head:
+        is_clean_state_post, state_msg_post = verify_working_state(git_root, expected_commit_sha=initial_head)
+        if not is_clean_state_post:
+            log_error(f"Working repository state changed during review: {state_msg_post}")
+            sys.exit(1)
+    else:
+        current_head = subprocess.run(
+            ["git", "rev-parse", args.head],
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        if current_head != initial_head and not (len(initial_head) >= 7 and current_head.startswith(initial_head)):
+            log_error(f"Target ref {args.head} moved during review (from {initial_head[:8]} to {current_head[:8]}). Verdict is bound to the old commit and cannot be posted/accepted.")
+            sys.exit(1)
 
     if not report:
         log_error("Adversarial review failed to produce a valid report across all attempted engines.")

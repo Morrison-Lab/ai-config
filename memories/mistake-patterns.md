@@ -692,7 +692,7 @@ A clean automated review from every available provider evaluating the current HE
   Partially per-domain (e.g. static analyzers checking that CI jobs admitting `$CI_COMMIT_TAG` do not rely exclusively on `CI_COMMIT_BRANCH` in their scripts).
   General case requires behavioural fixture tests.
 
-## Pattern 36: Discrepancy Between Synthesis Count and Underlying Source Inventory
+## Pattern 37: Discrepancy Between Synthesis Count and Underlying Source Inventory
 - **Do**: Distinguish between the total number of referenced items/files in a source catalog and the count of synthesized/distilled items in your derived document or taxonomy.
   Ensure summaries, index entries, and cross-references match the exact count in the file they describe.
 - **Don't**: Cite the source catalog's full size (e.g., "29 patterns") as the count of items in a derived taxonomy that only enumerates a subset (e.g., 20 core patterns).

@@ -39,7 +39,6 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
-import itertools
 import json
 import re
 import subprocess

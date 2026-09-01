@@ -736,6 +736,14 @@ def main() -> int:
         "marker falls back to the login",
         checker._reviewer_identity(unmarked_ga, "github-actions") == "github-actions",
     )
+    quoted_claude_multi_backtick = (
+        "A quote of ``**Claude finished**`` on the first line.\n\n"
+        "### Verdict\n\n**Ready for merge**"
+    )
+    check(
+        "_reviewer_identity: multi-backtick quoted agent marker falls back to login (#2525)",
+        checker._reviewer_identity(quoted_claude_multi_backtick, "github-actions") == "github-actions",
+    )
     items_unmarked_after_claude = [
         items_cross_reviewer[0],
         (
@@ -4694,6 +4702,12 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     check("_unresolved_finding_pattern: clean structured review has no findings", checker._unresolved_finding_pattern(struct_clean) is None)
     check("_is_structured_review_body: structured review is recognized as structured body", checker._is_structured_review_body(struct_clean))
     check("_is_structured_review_body: casual mention of JSON without heading/fingerprint is NOT structured body", not checker._is_structured_review_body("Here is the JSON format:\n<!-- review-data: {\"verdict\":\"CLEAN\"} -->"))
+    check(
+        "_is_structured_review_body: multi-backtick span quoting report headings is NOT structured body (#2525)",
+        not checker._is_structured_review_body(
+            "Discussion of format:\n``\n## Verdict\nReviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\n``\nCasual prose."
+        ),
+    )
 
     # Conflicting representations: prose says Needs work with findings, but JSON says CLEAN
     conflicting_body = """

@@ -45,7 +45,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
-from fences import CODE_SPAN_RE, find_fence_spans  # noqa: E402
+from fences import CODE_SPAN_RE, find_fence_spans, strip_code_spans  # noqa: E402
 from payload_fetcher import PayloadError, PayloadFetcher  # noqa: E402
 from review_payload import (  # noqa: E402
     extract_structured_review,
@@ -358,7 +358,7 @@ def _reviewer_identity(body: str, author: str = "") -> str:
     exclusive = EXCLUSIVE_BOT_IDENTITY.get(login.lower())
     if exclusive:
         return exclusive
-    scan = strip_cited_finding_vocab(body or "")
+    scan = strip_cited_finding_vocab(strip_code_spans(body or ""))
     lines = [ln.strip() for ln in scan.splitlines() if ln.strip()]
     first_line = lines[0] if lines else ""
     last_line = lines[-1] if lines else ""
@@ -2324,7 +2324,7 @@ def _is_structured_review_body(body: str) -> bool:
     #1798's false-CLEAN direction closed while #2402's supersession path
     opens.
     """
-    scan = strip_cited_finding_vocab(body)
+    scan = strip_cited_finding_vocab(strip_code_spans(body))
     if not _REVIEW_STRUCTURE_HEADING.search(scan):
         return False
     return bool(re.search(

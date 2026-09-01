@@ -16,13 +16,16 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
-from fences import strip_fences  # noqa: E402
+from fences import strip_code_spans, strip_fences  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
-# Strip code regions first so link-shaped examples inside fences / backticks
-# (regexes, `[text](url)` snippets) aren't mistaken for real links.
-INLINE = re.compile(r"`[^`]*`")
+FOOTNOTE_DEF = re.compile(r"^[ ]{0,3}\[\^([^\]\s]+)\]:[ \t]*(.*)$", re.MULTILINE)
+FOOTNOTE_REF = re.compile(r"\[\^([^\]\s]+)\](?!:)")
+REF_LINK_DEF = re.compile(
+    r"^[ ]{0,3}\[(?!\^)([^\]]+)\]:[ \t]*<?([^\s>]+)>?(?:[ \t]+.*)?$",
+    re.MULTILINE,
+)
 SCAN_GLOBS = [
     "skills/**/*.md",
     "codex-skills/**/*.md",
@@ -43,30 +46,55 @@ def is_external(target: str) -> bool:
     return target.startswith(SKIP_PREFIXES) or "://" in target
 
 
-def check_file(md: Path) -> None:
+def _rel_path(path: Path, root: Path) -> str:
+    try:
+        return str(path.relative_to(root))
+    except ValueError:
+        return str(path)
+
+
+def check_target(target: str, md: Path, root: Path = ROOT) -> None:
+    global checked
+    # drop a trailing `"title"` if present
+    target = target.split(" ", 1)[0].strip()
+    if target.startswith("<") and target.endswith(">"):
+        target = target[1:-1].strip()
+    if not target or is_external(target):
+        return
+    if "<" in target or ">" in target:
+        return  # angle-bracket placeholder, e.g. <owner>/<repo>
+    path_part = re.split(r"[#?]", target, maxsplit=1)[0]
+    if not path_part:  # pure in-page anchor
+        return
+    if "/" not in path_part and "." not in path_part:
+        return  # bare-word placeholder in an example, e.g. (url)
+    checked += 1
+    resolved = (md.parent / path_part).resolve()
+    if not resolved.exists():
+        broken.append(f"{_rel_path(md, root)} -> {target}")
+
+
+def check_file(md: Path, root: Path = ROOT) -> None:
     global checked
     text = md.read_text(encoding="utf-8")
     text = strip_fences(text)
-    text = INLINE.sub("", text)
-    for match in LINK.finditer(text):
-        target = match.group(1).strip()
-        if target.startswith("<") and target.endswith(">"):
-            target = target[1:-1].strip()
-        # drop a trailing `"title"` if present
-        target = target.split(" ", 1)[0]
-        if not target or is_external(target):
-            continue
-        if "<" in target or ">" in target:
-            continue  # angle-bracket placeholder, e.g. <owner>/<repo>
-        path_part = re.split(r"[#?]", target, maxsplit=1)[0]
-        if not path_part:  # pure in-page anchor
-            continue
-        if "/" not in path_part and "." not in path_part:
-            continue  # bare-word placeholder in an example, e.g. (url)
+    text = strip_code_spans(text)
+
+    # Footnote definitions and references (ai-config#2538)
+    footnote_defs = {m.group(1).strip() for m in FOOTNOTE_DEF.finditer(text)}
+    for match in FOOTNOTE_REF.finditer(text):
+        ref = match.group(1).strip()
         checked += 1
-        resolved = (md.parent / path_part).resolve()
-        if not resolved.exists():
-            broken.append(f"{md.relative_to(ROOT)} -> {target}")
+        if ref not in footnote_defs:
+            broken.append(f"{_rel_path(md, root)} -> [^{ref}]")
+
+    # Inline links [text](target)
+    for match in LINK.finditer(text):
+        check_target(match.group(1).strip(), md, root=root)
+
+    # Reference link definitions [label]: target
+    for match in REF_LINK_DEF.finditer(text):
+        check_target(match.group(2).strip(), md, root=root)
 
 
 def main() -> None:

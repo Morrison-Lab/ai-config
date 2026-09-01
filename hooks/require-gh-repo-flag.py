@@ -281,6 +281,39 @@ def mask_comments_and_arithmetic(command: str) -> str:
             i += 1
             continue
 
+        if not in_sq:
+            if command.startswith("$((", i):
+                start = i
+                i += 3
+                depth = 2
+                sub_sq = False
+                sub_dq = False
+                sub_escaped = False
+                while i < n and depth > 0:
+                    c = command[i]
+                    if sub_escaped:
+                        sub_escaped = False
+                        i += 1
+                        continue
+                    if c == "\\":
+                        sub_escaped = True
+                        i += 1
+                        continue
+                    if c == "'" and not sub_dq:
+                        sub_sq = not sub_sq
+                    elif c == '"' and not sub_sq:
+                        sub_dq = not sub_dq
+                    elif not sub_sq and not sub_dq:
+                        if c == "(":
+                            depth += 1
+                        elif c == ")":
+                            depth -= 1
+                    i += 1
+                span = command[start:i]
+                for ch_span in span:
+                    out.append("\n" if ch_span == "\n" else " ")
+                continue
+
         if not in_sq and not in_dq:
             if ch == "#" and (i == 0 or command[i - 1] in " \t\r\n;|&()<>"):
                 # Mask comment until next newline or EOF
@@ -289,10 +322,9 @@ def mask_comments_and_arithmetic(command: str) -> str:
                     i += 1
                 continue
 
-            if command.startswith("$((", i) or command.startswith("((", i):
-                is_subst = command.startswith("$((", i)
+            if command.startswith("((", i):
                 start = i
-                i += 3 if is_subst else 2
+                i += 2
                 depth = 2
                 sub_sq = False
                 sub_dq = False

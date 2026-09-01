@@ -407,9 +407,8 @@ and live execution paths rather than treating the component as an opaque black b
 
 Full statement: [`get-under-the-hood`](get-under-the-hood.md).
 Operationalized by:
-[`run-ums-proactively`](../workflow/run-ums-proactively.md),
-the diagnostic requirements in `AGENTS.md`,
-and `hooks/` and log-inspection mechanisms.
+the diagnostic requirements in `AGENTS.md`
+and log-inspection mechanisms.
 
 ## The 3Rs lens — reduce, reuse, recycle
 

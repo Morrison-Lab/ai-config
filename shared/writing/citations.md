@@ -687,8 +687,12 @@ for one they can't, only checking the field directly against its target catches 
 A LaTeX document only prints entries reached by `\cite` (transitively, following any `\input`/`\include`), so an unused `.bib` entry can carry an arbitrary DOI with no reader ever seeing it render.
 Auditing it spends effort on a defect nobody can encounter, and skipping this scoping step risks reporting false urgency on an entry the document never surfaces.
 
-The mechanical half --- given a `.bib`, resolve each cited DOI and diff the returned title and first author against the entry --- is a deterministic check with an exact verdict, the shape [`algorithmatize-checks`](../workflow/algorithmatize-checks.md) says should not stay a prose instruction;
-it is not yet built here.
+The mechanical half --- given a `.bib`, resolve each cited DOI and diff the
+returned title and first author against the entry --- is a deterministic check
+with an exact verdict, the shape
+[`algorithmatize-checks`](../workflow/algorithmatize-checks.md) says should not
+stay a prose instruction;
+[`scripts/check_doi_bib.py`](../../scripts/check_doi_bib.py) implements it.
 
 - **Do:** verify a cited DOI resolves to a work whose title and authors match the citation, not just that it resolves.
 - **Do:** confirm which fields your document's actual citation style renders before trusting a compiled-PDF read to catch a wrong DOI.

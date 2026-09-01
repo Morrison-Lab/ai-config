@@ -458,7 +458,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-fable-subagent.py\"",
             "timeout": 10,
             "script": "no-fable-subagent.py",
-            "why": "Denies an Agent/Task dispatch that names no `model` (the worker would silently inherit the session's model -- on a Fable session, a Fable subagent) or that names Fable without ALLOW_FABLE_SUBAGENT=1. User directive 2026-09-01: never spawn a subagent on Fable without explicit, specific permission (ai-config#2929; memory rule in #2924). Denies rather than warns because a warning fires as the forbidden worker starts, and a wrong deny costs one re-issued call with `model` set. Never emits permissionDecision: allow."
+            "why": "Denies an Agent/Task dispatch that names Fable without ALLOW_FABLE_SUBAGENT=1, or that names no `model` while the session's transcript (`transcript_path`, last assistant entry's `message.model`) shows the session is on Fable, since the worker would inherit it. An omitted `model` on a non-Fable or unknown session (the Antigravity adapter passes no `model` and often no transcript) only warns via additionalContext, per when-to-orchestrate.md's omit-by-default guidance. User directive 2026-09-01: never spawn a subagent on Fable without explicit, specific permission (ai-config#2929; memory rule in #2924). Denies the Fable cases rather than warns because a warning fires as the forbidden worker starts, and a wrong deny costs one re-issued call with `model` set. Never emits permissionDecision: allow."
           }
         ]
       },
@@ -470,7 +470,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-fable-subagent.py\"",
             "timeout": 10,
             "script": "no-fable-subagent.py",
-            "why": "Denies an Agent/Task dispatch that names no `model` (the worker would silently inherit the session's model -- on a Fable session, a Fable subagent) or that names Fable without ALLOW_FABLE_SUBAGENT=1. User directive 2026-09-01: never spawn a subagent on Fable without explicit, specific permission (ai-config#2929; memory rule in #2924). Denies rather than warns because a warning fires as the forbidden worker starts, and a wrong deny costs one re-issued call with `model` set. Never emits permissionDecision: allow."
+            "why": "Denies an Agent/Task dispatch that names Fable without ALLOW_FABLE_SUBAGENT=1, or that names no `model` while the session's transcript (`transcript_path`, last assistant entry's `message.model`) shows the session is on Fable, since the worker would inherit it. An omitted `model` on a non-Fable or unknown session (the Antigravity adapter passes no `model` and often no transcript) only warns via additionalContext, per when-to-orchestrate.md's omit-by-default guidance. User directive 2026-09-01: never spawn a subagent on Fable without explicit, specific permission (ai-config#2929; memory rule in #2924). Denies the Fable cases rather than warns because a warning fires as the forbidden worker starts, and a wrong deny costs one re-issued call with `model` set. Never emits permissionDecision: allow."
           }
         ]
       },

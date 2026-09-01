@@ -23,7 +23,7 @@ Detect the forge (GitHub `gh` / GitLab `glab`) from `git remote get-url origin`.
 
 **Confirm which repo first when several are in reach.** GIA (like `ardia` and `gii`) clears *one* repo’s queue, but a session may start in a directory holding several repos (e.g. a web session scoped to multiple repos). If the working dir isn’t itself a single repo, or more than one repo is in scope, ask which repo’s queue to clear before surveying — don’t assume the first one found.
 
-**Confirm whose PRs are in scope, too.** Both phases act only on PRs the invoking user opened, is assigned to, or named in the request; `ardia`’s step 1 resolves that user, applies the filter, and reports what it dropped. A PR another lab member or a bot opened stays theirs, and an issue such a PR already fixes is left to it rather than grabbed.
+**Confirm whose PRs are in scope, too.** Both phases act only on PRs the invoking user opened, is assigned to, or named in the request, plus PRs the repository’s own workflows opened (`github-actions[bot]`); `ardia`’s step 1 resolves that user, applies the filter, and reports what it dropped. A PR another lab member or any other bot opened stays theirs, and an issue such a PR already fixes is left to it rather than grabbed.
 
 ### Phase 1 — ARDIA (existing open PRs/MRs)
 
@@ -94,6 +94,6 @@ Within either phase, a single PR’s own round can still delegate lightweight si
 - ❌ Running Phase 2 unbounded — keep GII’s wave boundary.
 - ❌ Starting the next wave on your own once the current one is fully finished — stop and ask, with a recommendation, per “Stopping conditions”.
 - ❌ Grabbing an issue a pending Phase-1 PR already closes.
-- ❌ Driving, reviewing, or editing a PR the user neither opened nor is assigned to — “every open PR” means every one of the user’s.
+- ❌ Driving, reviewing, or editing a PR the user neither opened nor is assigned to, unless a repository workflow opened it — “every open PR” means every one of the user’s.
 
 Back to top

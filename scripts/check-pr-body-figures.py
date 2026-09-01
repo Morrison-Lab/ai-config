@@ -309,6 +309,7 @@ def get_link_counts(repo_root: Path) -> Optional[Tuple[int, int]]:
         total_links = 0
         seen_files = set()
 
+        angle_dest = re.compile(r"^<([^>\r\n]+)>(?:\s+.*)?$", re.DOTALL)
         for g in scan_globs:
             for md in repo_root.glob(g):
                 if not md.is_file() or md in seen_files:
@@ -320,9 +321,12 @@ def get_link_counts(repo_root: Path) -> Optional[Tuple[int, int]]:
                 files_checked += 1
                 for m in link_re.finditer(text):
                     tgt = m.group(1).strip()
-                    if tgt.startswith("<") and tgt.endswith(">"):
-                        tgt = tgt[1:-1].strip()
-                    tgt = tgt.split(" ", 1)[0]
+                    angle_match = angle_dest.match(tgt)
+                    if angle_match:
+                        tgt = angle_match.group(1).strip()
+                    else:
+                        parts = tgt.split(None, 1)
+                        tgt = parts[0] if parts else ""
                     if not tgt or tgt.startswith(skip_prefixes) or "://" in tgt:
                         continue
                     if "<" in tgt or ">" in tgt:

@@ -20,6 +20,7 @@ from fences import strip_fences  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
+ANGLE_DEST = re.compile(r"^<([^>\r\n]+)>(?:\s+.*)?$", re.DOTALL)
 # Strip code regions first so link-shaped examples inside fences / backticks
 # (regexes, `[text](url)` snippets) aren't mistaken for real links.
 INLINE = re.compile(r"`[^`]*`")
@@ -43,17 +44,25 @@ def is_external(target: str) -> bool:
     return target.startswith(SKIP_PREFIXES) or "://" in target
 
 
-def check_file(md: Path) -> None:
+def extract_target(raw: str) -> str:
+    """Extract destination path from raw link target, handling angle brackets and titles."""
+    raw = raw.strip()
+    angle_match = ANGLE_DEST.match(raw)
+    if angle_match:
+        return angle_match.group(1).strip()
+    parts = raw.split(None, 1)
+    return parts[0] if parts else ""
+
+
+def check_file(md: Path, root: Path | None = None) -> None:
     global checked
+    if root is None:
+        root = ROOT
     text = md.read_text(encoding="utf-8")
     text = strip_fences(text)
     text = INLINE.sub("", text)
     for match in LINK.finditer(text):
-        target = match.group(1).strip()
-        if target.startswith("<") and target.endswith(">"):
-            target = target[1:-1].strip()
-        # drop a trailing `"title"` if present
-        target = target.split(" ", 1)[0]
+        target = extract_target(match.group(1))
         if not target or is_external(target):
             continue
         if "<" in target or ">" in target:
@@ -66,7 +75,7 @@ def check_file(md: Path) -> None:
         checked += 1
         resolved = (md.parent / path_part).resolve()
         if not resolved.exists():
-            broken.append(f"{md.relative_to(ROOT)} -> {target}")
+            broken.append(f"{md.relative_to(root)} -> {target}")
 
 
 def main() -> None:

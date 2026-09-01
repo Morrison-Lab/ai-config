@@ -1,6 +1,6 @@
 # adv (Adversarial Review)
 
-Runs a local adversarial AI code review on outgoing branch commits using an alternate model/engine available on this machine.
+Runs a detailed and holistic local adversarial AI code review on outgoing branch commits using an alternate model/engine available on this machine (evaluating architecture, conventions, safety, tests, and diff impacts rather than perfunctory surface checks).
 
 ## When this fires
 
@@ -44,7 +44,7 @@ python3 "$REVIEW_SCRIPT" --engine codex
 ## How it works
 
 1.  Computes the local outgoing diff against `origin/main` (or PR base).
-2.  Dispatches the review to the selected alternate model/engine using plan/read-only mode.
+2.  Dispatches the review to the selected alternate model/engine using plan/read-only mode to independently conduct both a detailed implementation defect audit and a holistic change assessment.
 3.  Parses and validates the structured review findings.
 4.  Exits with a nonzero code on blocking findings (unless `--allow-findings` is specified).
 

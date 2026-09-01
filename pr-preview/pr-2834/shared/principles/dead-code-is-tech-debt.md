@@ -67,7 +67,7 @@ Eliminate dead code systematically using a four-stage process:
    Use static analysis linters and search tools rather than memory:
    - Python: `vulture`, `ruff` / `flake8` (`F401` unused imports, `F841` unused variables), `coverage.py`.
    - JavaScript / TypeScript: `knip`, `ts-prune`, `depcheck`, `eslint` (`no-unused-vars`).
-   - R: `lintr` (`unused_import_linter`), `covr`, `pkgload::check()`.
+   - R: `lintr` (`unused_import_linter`), `covr`, `devtools::check()`.
    - Manifest audits: check `hooks/hooks.json`, `plugins/`, and `skills/` for unregistered scripts or missing wrapper bindings.
 2. **Verify live reachability and API boundaries.**
    Before deleting an apparently uncalled symbol:

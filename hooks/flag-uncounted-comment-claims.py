@@ -1250,18 +1250,48 @@ NOTE = (
 )
 
 
-def main() -> int:
+def _read_payload() -> tuple[dict, bool]:
+    """Parse payload from sys.argv (--dry-run / --simulate) or sys.stdin."""
+    args = sys.argv[1:]
+    is_dry_run = "--dry-run" in args or "--simulate" in args
+    if is_dry_run:
+        positional = [a for a in args if not a.startswith("-")]
+        if positional:
+            raw_cmd = positional[0].strip()
+            if raw_cmd.startswith("{") and raw_cmd.endswith("}"):
+                try:
+                    return json.loads(raw_cmd), True
+                except Exception:
+                    pass
+            return {"tool_name": "Bash", "tool_input": {"command": raw_cmd}}, True
+
     try:
         payload = json.load(sys.stdin)
-    except Exception:
+        return (payload if isinstance(payload, dict) else {}), is_dry_run
+    except Exception as exc:
+        print(f"flag-uncounted-comment-claims: unreadable hook input ({exc})",
+
+              file=sys.stderr)
+        return {}, is_dry_run
+
+
+def main() -> int:
+    payload, is_dry_run = _read_payload()
+    if not payload:
         return 0
     if not isinstance(payload, dict) or payload.get("tool_name") not in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
+        if is_dry_run:
+            print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
         return 0
     tool_input = payload.get("tool_input")
     if not isinstance(tool_input, dict):
+        if is_dry_run:
+            print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
         return 0
     command = tool_input.get("command") or tool_input.get("CommandLine") or tool_input.get("cmd") or tool_input.get("script")
     if not isinstance(command, str) or not command.strip():
+        if is_dry_run:
+            print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
         return 0
 
     cwd = payload.get("cwd") or os.getcwd()
@@ -1272,19 +1302,20 @@ def main() -> int:
         if not undischarged:
             return 0
 
-        key = hashlib.sha256(
-            (tpath + "|" + command + "|"
-             + "|".join(q for _, q in undischarged)).encode()
-        ).hexdigest()[:16]
-        sentinel = os.path.join(
-            tempfile.gettempdir(), f".claude-comment-cardinality-{key}"
-        )
-        if os.path.exists(sentinel):
-            return 0
-        try:
-            open(sentinel, "w").close()
-        except Exception:
-            pass
+        if not is_dry_run:
+            key = hashlib.sha256(
+                (tpath + "|" + command + "|"
+                 + "|".join(q for _, q in undischarged)).encode()
+            ).hexdigest()[:16]
+            sentinel = os.path.join(
+                tempfile.gettempdir(), f".claude-comment-cardinality-{key}"
+            )
+            if os.path.exists(sentinel):
+                return 0
+            try:
+                open(sentinel, "w").close()
+            except Exception:
+                pass
 
         listed = "\n".join(
             f'  - [{k}] "{q}"' for k, q in undischarged[:3]

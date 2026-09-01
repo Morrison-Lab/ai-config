@@ -196,6 +196,20 @@ gh pr comment <N> --body "Review posted --- unclaiming.
 _Posted by Claude Code (AI agent) --- not written by a human._"      # COMMENT_PR
 ```
 
+## Proactive hook compliance
+
+- **`require-gh-repo-flag.py`**: Always supply `-R <owner>/<repo>` on mutating `gh` calls
+  (`gh pr comment -R ...`, `gh issue comment -R ...`).
+- **`require-agent-disclosure.py`**: Every claim, update, or unclaim comment
+  must include the disclosure trailer `_Posted by <Agent Name> (AI agent) --- not written by a human._`
+  on its own line after a blank line.
+  Never use the robot emoji.
+- **`warn-pr-create-without-dupe-check.py` & `warn-dupe-check-chained-to-create.py`**: When opening an immediate PR
+  under [`pr-on-claim`](../../shared/workflow/pr-on-claim.md), search for existing PRs
+  (`gh pr list --state all --search "<keywords>"`) in a separate tool call before creating the PR.
+- **`flag-uncounted-comment-claims.py`**: When referencing file lists or counts in comments,
+  ensure deriving commands (`grep -c`, `wc -l`) ran in the session.
+
 ## Notes
 
 - If the user explicitly says to contribute to a specific existing PR, keep

@@ -491,6 +491,57 @@
         "hooks": [
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-fable-subagent.py\"",
+            "timeout": 10,
+            "script": "no-fable-subagent.py",
+            "why": "Denies an Agent launch that names Fable, or that omits `model` in a session whose own model is Fable (the inherit path is how the violation happens), unless FABLE_SUBAGENT_OK=1 records the user's explicit grant for that launch; warns on a Workflow launch in a Fable session, whose agent() calls it cannot inspect. User directive 2026-09-01, ai-config#2927: 8 of 10 launches in one session inherited Fable and the account hit its usage limit.",
+            "_note_blocks": [
+              "Emits `permissionDecision: deny` only for the two Fable cases above;",
+              "every other Agent launch is untouched, and an unreadable transcript",
+              "adds a note rather than a denial, so a missing file never stops work.",
+              "Never emits `allow`."
+            ]
+          }
+        ]
+      },
+      {
+        "matcher": "Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-fable-subagent.py\"",
+            "timeout": 10,
+            "script": "no-fable-subagent.py",
+            "why": "Denies an Agent launch that names Fable, or that omits `model` in a session whose own model is Fable (the inherit path is how the violation happens), unless FABLE_SUBAGENT_OK=1 records the user's explicit grant for that launch; warns on a Workflow launch in a Fable session, whose agent() calls it cannot inspect. User directive 2026-09-01, ai-config#2927: 8 of 10 launches in one session inherited Fable and the account hit its usage limit.",
+            "_note_blocks": [
+              "Emits `permissionDecision: deny` only for the two Fable cases above;",
+              "every other Agent launch is untouched, and an unreadable transcript",
+              "adds a note rather than a denial, so a missing file never stops work.",
+              "Never emits `allow`."
+            ]
+          }
+        ]
+      },
+      {
+        "matcher": "Workflow",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-fable-subagent.py\"",
+            "timeout": 10,
+            "script": "no-fable-subagent.py",
+            "why": "Warns on a Workflow launch in a Fable session: its agent() calls inherit the session model unless each sets `model`, and the hook cannot inspect the script, so it names the risk and leaves the decision visible (ai-config#2927).",
+            "_note_warns_never_blocks": [
+              "On the Workflow matcher this script only ever adds context; the deny path is reachable from the Agent matcher alone."
+            ]
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/remind-brief-premises.py\"",
             "timeout": 10,
             "script": "remind-brief-premises.py",

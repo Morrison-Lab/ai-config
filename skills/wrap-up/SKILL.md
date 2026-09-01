@@ -37,7 +37,7 @@ your model's tool via [`tool-mappings.md`](../../tool-mappings.md) instead of
 the `gh` command shown if this session doesn't have `gh`:
 
 ```bash
-gh pr list --state open --json number,title,headRefName,author,mergeable,mergeStateStatus,comments \
+gh pr list --state open --json number,title,headRefName,author,assignees,mergeable,mergeStateStatus,comments \
   --jq '.[] | "#\(.number) [\(.author.login)] \(.title) [\(.mergeable)]"'   # LIST_PRS
 gh issue list --state open --json number,title --jq '.[] | "#\(.number) \(.title)"'   # LIST_ISSUES
 git status --short                         # uncommitted work?
@@ -51,7 +51,7 @@ git log --oneline -5 origin/main           # what actually landed on main
   by the user, and vice-versa.
 - If the session touched **other repos** (e.g. an upstream dependency),
   check those too — `gh pr list --repo <owner>/<repo> --state open
-  --json number,title,headRefName,author,mergeable,mergeStateStatus,comments`
+  --json number,title,headRefName,author,assignees,mergeable,mergeStateStatus,comments`
   (`LIST_PRS`).
 - **Merge conflict sweep.** Before closing out, check every open PR's
   `mergeable` field.

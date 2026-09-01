@@ -76,7 +76,7 @@ The named-in-request arm came from neither directive: it is carried over from `a
 The narrowing of "workflow-opened" to the `github-actions[bot]` login is also inferred: the example given was a `bump-submodule.yml` PR, and Dependabot and Copilot PRs post under their own logins and were not named.
 That login match covers a workflow that opens its PR with `GITHUB_TOKEN`;
 `gha`'s reusable sync workflows (`bump-submodule.yml`, `bump-dev-version.yml`, `sync-shared-fragments.yml`, `sync-upstream.yml`) hand `open-sync-pr` `${{ secrets.WORKFLOW_TOKEN || github.token }}`, so when the repo sets that secret the PR posts under that token's identity: the PAT holder's own login, or an App's `<slug>[bot]`.
-Such a PR is then in scope through the author arm when the PAT is mine, and out of scope under an App token or another member's PAT unless assigned or named.
+The workflow arm is therefore an author test on the `github-actions` app, not a provenance test: such a PR is in scope through the author arm when the PAT is mine, and needs an assignment or naming under an App token or another member's PAT, however it was opened.
 
 - **Do:** before touching any PR, resolve who you are running as, read the PR's `author.login` and `assignees`, and proceed only when the author is you (or an alias below) or a repository workflow, you are among the assignees, or the user named the PR in the request.
   Match the app slug `github-actions` in whichever form the source returns it: the REST API and the MCP tools suffix it (`github-actions[bot]`), GraphQL and `scripts/pr-sweep.py` return it bare (`github-actions`), and `gh pr list --json author` prefixes it (`app/github-actions`, with `is_bot: true`).

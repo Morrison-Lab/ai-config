@@ -26,8 +26,15 @@ this skill exists to pin the meaning.)
 
 1. **Map the stack.**
    List open PRs and their base branches
-   (`gh pr list --json number,headRefName,baseRefName`,
+   (`gh pr list --json number,headRefName,baseRefName,author,assignees`,
    or `mcp__github__list_pull_requests` in remote sessions).
+   Filter that list by `memories/reviewing-prs.md`'s scope test first, as
+   `ardia` step 1 does (opened by or assigned to the invoking user, named
+   in the request, or opened by a repository workflow), and report the PRs
+   dropped: every later step pushes to the branch, which that memory
+   forbids on any other PR.
+   A stacked PR whose base PR is out of scope is synced against that base
+   as it stands; the base itself is left to its author.
    A PR based on `main` is unstacked;
    a PR based on another PR's head branch is stacked on it.
    Order the work from the base outward:

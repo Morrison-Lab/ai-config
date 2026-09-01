@@ -264,7 +264,7 @@ Scan right after the merge is confirmed:
 
 ```bash
 gh pr list --state open \
-  --json number,title,headRefName,mergeable,mergeStateStatus,comments   # LIST_PRS
+  --json number,title,headRefName,author,assignees,mergeable,mergeStateStatus,comments   # LIST_PRS
 ```
 
 Filter that list by `memories/reviewing-prs.md`'s scope test first, as

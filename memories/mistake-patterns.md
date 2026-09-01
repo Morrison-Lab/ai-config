@@ -719,3 +719,20 @@ A clean automated review from every available provider evaluating the current HE
   A linter can extract claims of the form `N <nouns>` in docstrings/index entries
   and compare them against header or bullet counts in target files.
 
+## Pattern 38: Atomized Write Fan-Out on Shared Subsystems / Files
+- **Do**: Group cohesive syntax edge cases, parser rules, or multi-case features for the same file or subsystem into unified design specifications and consolidated pull requests.
+- **Don't**: Fan out 20+ parallel micro-issues and micro-PRs targeting isolated syntax permutations in the same source file, which generates massive CI thrashing, review quota exhaustion, merge conflict cascades, and duplicate authoring overhead before ultimately requiring a holistic rewrite.
+- **Example**: 2026-09-01 on `Morrison-Lab/ai-config` (Issues #2509, #2513–#2538):
+  Decomposing CommonMark link parsing in `scripts/check-links.py` into 26 separate micro-PRs (#2849–#2874) caused severe review quota exhaustion, merge collisions, and wasted authoring turns.
+  The entire problem was ultimately solved by 3 holistic PRs ([#2836](https://github.com/Morrison-Lab/ai-config/pull/2836), [#2839](https://github.com/Morrison-Lab/ai-config/pull/2839), [#2843](https://github.com/Morrison-Lab/ai-config/pull/2843)),
+  rendering all 26 micro-PRs redundant and superseded.
+- **Canonical Rule**: [`when-to-orchestrate.md`](../shared/workflow/when-to-orchestrate.md),
+  [`use-subagents.md`](../shared/workflow/use-subagents.md),
+  and [`restructure-for-efficiency.md`](../shared/workflow/restructure-for-efficiency.md).
+- **Fix**: Perform survey/discovery to identify the root architectural requirement (e.g. "Full CommonMark link parser compatibility") rather than decomposing into per-syntax permutation micro-tasks.
+  Use read-only subagents for discovery, and execute write tasks with consolidated, holistic feature branches.
+- **Algorithmatizable?**
+  Yes.
+  Check file footprints during orchestration and gate multi-subagent dispatch when targets share the same file footprint.
+
+

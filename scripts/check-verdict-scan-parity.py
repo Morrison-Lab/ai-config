@@ -202,36 +202,88 @@ def payload_bodies():
                    f"{placement.format(p=payload)}\n")
 
 
-def generated_bodies(exhaustive=False):
-    seen = set()
+TEMPLATES = (
+    "## Verdict: Ready for merge\n\n{core}\n",
+    "## Verdict: Ready for merge\n\nReviewed-Commit: abc1234\n\n{core}\n",
+    "Verdict: Ready for merge\n\n{core}\n\n### Findings\n\nNone.\n",
+    "## Verdict: Ready for merge\n\n## Findings\n\nNone.\n{core}\n",
+    "## Verdict: Ready for merge\n\nSee {a}\n{b} here.\n",
+)
 
-    if exhaustive:
-        leads, vocabs, negs = LEAD, VOCAB, NEGATION
-    else:
-        # Fast default tier: include the baseline, the negation guards, quote placement,
-        # and complex finding shapes, while dropping redundant variations.
-        leads = [LEAD[0], LEAD[1], LEAD[2], LEAD[6]]
-        vocabs = [VOCAB[0], VOCAB[4], VOCAB[5]]
-        negs = [NEGATION[0], NEGATION[2], NEGATION[5]]
 
-    for lead, d1, f1, v, d2, f2, neg in itertools.product(
-        leads, DELIMS, FILLER + FILLER_EXTRA, vocabs, DELIMS, FILLER, negs
-    ):
-        core = f"{lead}{d1}{f1} {v} {d2}{f2}{neg}"
-        for template in (
-            "## Verdict: Ready for merge\n\n{core}\n",
-            "## Verdict: Ready for merge\n\nReviewed-Commit: abc1234\n\n{core}\n",
-            "Verdict: Ready for merge\n\n{core}\n\n### Findings\n\nNone.\n",
-            "## Verdict: Ready for merge\n\n## Findings\n\nNone.\n{core}\n",
-            "## Verdict: Ready for merge\n\nSee {a}\n{b} here.\n",
-        ):
-            body = (
-                template.format(a=f"{lead}{d1}{f1}", b=f"{v} {d2}{f2}{neg}")
-                if "{a}" in template else template.format(core=core)
-            )
-            if body not in seen:
-                seen.add(body)
-                yield body
+def count_generated_prose(exhaustive: bool = False) -> int:
+    """Return the total number of generated prose combinations without materializing."""
+    leads = LEAD if exhaustive else [LEAD[0], LEAD[1], LEAD[2], LEAD[6]]
+    vocabs = VOCAB if exhaustive else [VOCAB[0], VOCAB[4], VOCAB[5]]
+    negs = NEGATION if exhaustive else [NEGATION[0], NEGATION[2], NEGATION[5]]
+    return (
+        len(leads)
+        * len(DELIMS)
+        * len(FILLER + FILLER_EXTRA)
+        * len(vocabs)
+        * len(DELIMS)
+        * len(FILLER)
+        * len(negs)
+        * len(TEMPLATES)
+    )
+
+
+def generated_body_by_index(idx: int, exhaustive: bool = False) -> str:
+    """Generate a single prose body by Cartesian product index in O(1) time."""
+    leads = LEAD if exhaustive else [LEAD[0], LEAD[1], LEAD[2], LEAD[6]]
+    vocabs = VOCAB if exhaustive else [VOCAB[0], VOCAB[4], VOCAB[5]]
+    negs = NEGATION if exhaustive else [NEGATION[0], NEGATION[2], NEGATION[5]]
+    fillers1 = FILLER + FILLER_EXTRA
+    fillers2 = FILLER
+    delims = DELIMS
+
+    K = idx
+    t_idx = K % len(TEMPLATES)
+    K //= len(TEMPLATES)
+    neg_idx = K % len(negs)
+    K //= len(negs)
+    f2_idx = K % len(fillers2)
+    K //= len(fillers2)
+    d2_idx = K % len(delims)
+    K //= len(delims)
+    v_idx = K % len(vocabs)
+    K //= len(vocabs)
+    f1_idx = K % len(fillers1)
+    K //= len(fillers1)
+    d1_idx = K % len(delims)
+    K //= len(delims)
+    lead_idx = K % len(leads)
+
+    lead = leads[lead_idx]
+    d1 = delims[d1_idx]
+    f1 = fillers1[f1_idx]
+    v = vocabs[v_idx]
+    d2 = delims[d2_idx]
+    f2 = fillers2[f2_idx]
+    neg = negs[neg_idx]
+    template = TEMPLATES[t_idx]
+
+    core = f"{lead}{d1}{f1} {v} {d2}{f2}{neg}"
+    if "{a}" in template:
+        return template.format(a=f"{lead}{d1}{f1}", b=f"{v} {d2}{f2}{neg}")
+    return template.format(core=core)
+
+
+def generated_bodies(exhaustive: bool = False, limit: int = 0):
+    """Yield generated prose bodies.
+
+    If limit is non-zero and less than total, yields a strided sample without
+    materializing the entire corpus.
+    """
+    total = count_generated_prose(exhaustive)
+    if limit and limit < total:
+        step = total / limit
+        for i in range(limit):
+            yield generated_body_by_index(int(i * step), exhaustive)
+        return
+
+    for i in range(total):
+        yield generated_body_by_index(i, exhaustive)
 
 
 def classify(module, body):
@@ -393,20 +445,19 @@ def build_corpus(
 
     if generator_arms is None:
         # Default generator arms: prose combinatorics and structured payloads
-        prose = list(generated_bodies(getattr(args, "exhaustive", False)))
+        exhaustive = getattr(args, "exhaustive", False)
         limit = getattr(args, "limit", 0)
-        if limit and limit < len(prose):
-            # Strided, not a prefix. The generator varies its last fragment fastest,
-            # so a contiguous head shares one leading fragment throughout and is a
-            # biased sample -- measured: the first 8,000 bodies contain no shape the
-            # negative control can even detect, so a capped run reported itself
-            # blind. A stride spreads the sample across the product space.
-            # Index by a fractional step rather than a slice stride. An integer
-            # stride collapses to 1 for any limit above half the corpus, which
-            # silently degenerates to exactly the contiguous prefix the comment
-            # above says was measured to leave the negative control blind.
-            step = len(prose) / limit
-            prose = [prose[int(i * step)] for i in range(limit)]
+        # Strided, not a prefix. The generator varies its last fragment fastest,
+        # so a contiguous head shares one leading fragment throughout and is a
+        # biased sample -- LEAD is the outermost of seven itertools.product
+        # axes, so a contiguous prefix holds LEAD[0] fixed for the first
+        # 241,920 of 1,693,440 (or 60,480 of 241,920 on the fast tier) bodies.
+        # A strided sample spreads across the product space and preserves
+        # discrimination (e.g. 125 divergences at --limit 500 against 15 for a prefix).
+        # Index by a fractional step rather than a slice stride. An integer
+        # stride collapses to 1 for any limit above half the corpus, which
+        # silently degenerates to exactly the contiguous prefix.
+        prose = list(generated_bodies(exhaustive, limit=limit))
         arm_counts["prose"] = len(prose)
         corpus.extend([("generated", b) for b in prose])
 
@@ -508,6 +559,13 @@ def main(argv=None):
     new.strip_cited_finding_vocab_with_mask = real_strip
 
     print(f"base revision      : {args.base_rev}")
+    total_prose = count_generated_prose(getattr(args, "exhaustive", False))
+    limit = getattr(args, "limit", 0)
+    if limit and limit < total_prose:
+        print(f"generated corpus   : {arm_counts.get('prose', 0)} of {total_prose} "
+              "(strided sample -- NOT a parity proof)")
+    else:
+        print(f"generated corpus   : {arm_counts.get('prose', 0)} (full sweep)")
     print(f"bodies examined    : {len(corpus)} "
           f"({sum(1 for o, _ in corpus if o == 'real')} real, "
           f"{sum(1 for o, _ in corpus if o == 'generated')} generated)")

@@ -749,8 +749,9 @@ See ai-config#694 for the precedent.
   The event body says "If you were waiting on CI, continue with the next
   step", which reads as an all-clear for the PR rather than for one commit.
   Three of the nine measured above named a head that a later push had
-  already replaced: `8c6c1be` on #311 after `fb8c7ac`,
-  then `cb327d7` and `65fd9fc` on #298 after `65fd9fc` and `e76c564`.
+  already replaced, written here as superseded-head -> replacement:
+  on #311, `8c6c1be` -> `fb8c7ac`;
+  on #298, `cb327d7` -> `65fd9fc`, and then `65fd9fc` -> `e76c564`.
   Each arrived one to five minutes after the superseding push,
   and every one of the three was on a PR that had just been pushed to ---
   the old head's suite simply finishes after the new head exists.

@@ -405,8 +405,26 @@ def mask_comments_and_arithmetic(command: str) -> str:
             m = re.match(r"^(?:let|declare\s+-[a-zA-Z]*i[a-zA-Z]*|local\s+-[a-zA-Z]*i[a-zA-Z]*|typeset\s+-[a-zA-Z]*i[a-zA-Z]*)\b", command[i:])
             if m:
                 start = i
-                # Mask through end of statement (;, \n, &&, ||, |, ), `, or EOF)
-                while i < n and command[i] not in ";\n|&)`":
+                sub_sq = False
+                sub_dq = False
+                sub_escaped = False
+                while i < n:
+                    sc = command[i]
+                    if sub_escaped:
+                        sub_escaped = False
+                        i += 1
+                        continue
+                    if sc == "\\":
+                        sub_escaped = True
+                        i += 1
+                        continue
+                    if sc == "'" and not sub_dq:
+                        sub_sq = not sub_sq
+                    elif sc == '"' and not sub_sq:
+                        sub_dq = not sub_dq
+                    elif not sub_sq and not sub_dq:
+                        if sc in ";\n|&)`":
+                            break
                     i += 1
                 span = command[start:i]
                 for sc in span:

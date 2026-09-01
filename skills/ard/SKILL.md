@@ -379,6 +379,9 @@ Active hooks guard review interactions and round responses (see [`memories/hooks
   always fetch that URL via `WebFetch` or `WebSearch` before posting a rebuttal.
 - **`flag-uncounted-comment-claims.py`**: When stating file counts or listing identifiers in forge comments,
   run and cite deriving commands (`grep -c`, `wc -l`) in the session.
+- **`flag-unmeasured-timestamp.py`**: A round summary or reply that carries a clock time
+  needs a fresh `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"` in the same turn.
+  Never infer the time from how many tool calls have run since the last reading.
 - **`no-handrolled-verdict-parse.py`**: Always run `python3 scripts/check-pr-fully-clean.py <pr>`
   to verify review and CI cleanliness.
   Do not grep comments for ad-hoc verdict keywords.

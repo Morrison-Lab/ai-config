@@ -292,7 +292,8 @@ The review caught it, and it is the same class of unmeasured claim.)
 Two hooks are this rule's mechanism, one per surface.
 `hooks/no-unmeasured-clock-claim.py` reads the reply at `Stop`.
 `hooks/flag-unmeasured-timestamp.py` reads a comment body at `PreToolUse`,
-on the `gh` comment commands and the `mcp__github__` comment tools.
+on the `gh` comment and review commands
+and on the `mcp__github__` comment tools that `hooks/require-agent-disclosure.py` covers.
 Each warns, never blocks, when the text states a Pacific clock time
 and no clock read appears in the transcript since the turn began,
 naming the stamp and the command to run before restating it

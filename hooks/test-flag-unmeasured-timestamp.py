@@ -110,6 +110,49 @@ CASES = [
      bash(f'gh issue comment 96 --body "{CLAIM}"'), True,
      "no transcript at all: nothing measured, so the stamp warns"),
 
+    # --- the stamp shape is the Stop sibling's RX_CLAIM, not a narrower one --
+    ([PROMPT],
+     mcp("mcp__github__add_issue_comment",
+         "Claiming -- 1:05 PM PT.\n\n" + MARKER), True,
+     "an AM/PM stamp (1:05 PM PT) warns; a local HH:MM-only pattern let it through"),
+    ([PROMPT],
+     mcp("mcp__github__add_issue_comment",
+         "Claiming -- 3:15 pt.\n\n" + MARKER), True,
+     "a lower-case marker (3:15 pt) warns, as RX_CLAIM is case-insensitive"),
+
+    # --- gh pr review posts a body too ----------------------------------------
+    ([PROMPT],
+     bash('gh pr review 5 -R d-morrison/wai --comment --body "Looked at 12:15 PT, fine."'),
+     True, "a gh pr review --body stamp warns, the same as the MCP review tool"),
+    ([PROMPT],
+     {"tool_name": "mcp__github__pull_request_review_write",
+      "tool_input": {"method": "create", "pullNumber": 5,
+                     "body": "Looked at 12:15 PT, fine."}}, True,
+     "the same review body through mcp__github__pull_request_review_write warns"),
+    ([PROMPT],
+     bash('gh pr review 5 -R d-morrison/wai --approve -b "LGTM as of 12:15 PT."'),
+     True, "gh pr review's -b shorthand is read too"),
+    ([PROMPT],
+     bash('gh pr review 5 -R d-morrison/wai --approve'), False,
+     "a gh pr review with no body flag posts no prose and is silent"),
+    ([PROMPT],
+     bash('echo "do not run gh pr review 5 --body \\"12:15 PT\\" yet"'), False,
+     "prose that merely mentions gh pr review is not a review"),
+
+    # --- the Stop sibling's context exemptions apply here too -----------------
+    ([PROMPT],
+     mcp("mcp__github__add_issue_comment",
+         "I'll check back at 08:22 PT (~4 min).\n\n" + MARKER), False,
+     "CLAUDE.md's own scheduled check-in sentence is exempt, as at Stop"),
+    ([PROMPT],
+     mcp("mcp__github__add_issue_comment",
+         "PR #81 merged at 14:51 PT per the merge timestamp.\n\n" + MARKER), False,
+     "a past action's time (merged at ...) is exempt, as at Stop"),
+    ([PROMPT],
+     mcp("mcp__github__add_issue_comment",
+         "Run finished 21:51 UTC (14:51 PT).\n\n" + MARKER), False,
+     "a UTC-to-local conversion is exempt, as at Stop"),
+
     # --- measured, so correct -------------------------------------------------
     ([PROMPT, DATE],
      bash(f'gh issue comment 96 -R d-morrison/wai --body "{CLAIM}"'), False,
@@ -226,6 +269,57 @@ def check_output_shape():
     return 0 if ok else 1
 
 
+def check_seconds_stamp():
+    """A stamp with seconds is named whole, in both branches of the check.
+
+    The narrower local pattern captured "12:47:30 PDT" as "47:30 PDT", which
+    `_claim_minutes` could not parse, so the injected-reading branch skipped
+    it silently.
+    """
+    body = "Claiming -- 12:47:30 PDT.\n\n" + MARKER
+    ok = True
+    for events, label in (([PROMPT], "no reading"),
+                          ([PROMPT, attach_clock("12:02:00")], "45 min ahead of the reading")):
+        out = run(events, mcp("mcp__github__add_issue_comment", body))
+        ctx = (out.get("hookSpecificOutput") or {}).get("additionalContext") or ""
+        msg = out.get("systemMessage") or ""
+        this = fired(out) and "12:47:30 PDT" in ctx and "12:47:30 PDT" in msg
+        ok = ok and this
+        print(f"{'ok  ' if this else 'FAIL'}  a seconds-bearing stamp warns and is "
+              f"named whole ({label})")
+    return 0 if ok else 1
+
+
+def check_unreadable_body():
+    """A post whose body cannot be read gets the cannot-read note, not silence.
+
+    A `--body-file` written by a heredoc in the same Bash call does not exist
+    when this hook runs, and `--body-file -` is stdin; both used to fail open
+    and silent. A clock read in the turn still discharges, since any stamp
+    the body carries would be.
+    """
+    heredoc = ("cat <<'EOF' > body-never-written-2903.md\n"
+               "Claiming -- 12:47 PT.\n\n" + MARKER + "\nEOF\n"
+               "gh pr comment 96 -R d-morrison/wai --body-file body-never-written-2903.md")
+    ok = True
+    for events, command, want, label in (
+            ([PROMPT], heredoc, True,
+             "a --body-file written by a heredoc in the same call is unreadable and warns"),
+            ([PROMPT], "gh pr comment 96 -R d-morrison/wai --body-file -", True,
+             "--body-file - (stdin) is unreadable and warns"),
+            ([PROMPT, DATE], heredoc, False,
+             "a date call in this turn discharges an unreadable body too")):
+        out = run(events, bash(command))
+        got = fired(out)
+        ctx = (out.get("hookSpecificOutput") or {}).get("additionalContext") or ""
+        msg = out.get("systemMessage") or ""
+        this = got == want and (not want or ("cannot read" in ctx and "cannot be read" in msg
+                                             and "12:47" not in ctx))
+        ok = ok and this
+        print(f"{'ok  ' if this else 'FAIL'}  fire={got!s:5} want={want!s:5}  {label}")
+    return 0 if ok else 1
+
+
 def check_body_file():
     """A `--body-file` body is read off disk, per the corpus's own convention."""
     fd, path = tempfile.mkstemp(suffix=".md")
@@ -283,6 +377,8 @@ def check_malformed_stdin():
 def main():
     failures = 0
     failures += check_output_shape()
+    failures += check_seconds_stamp()
+    failures += check_unreadable_body()
     failures += check_body_file()
     failures += check_dry_run()
     failures += check_sentinel()

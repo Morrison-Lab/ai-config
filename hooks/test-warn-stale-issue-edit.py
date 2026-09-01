@@ -722,6 +722,27 @@ check(
     subject.strip_heredocs("cat <<EOF > out.txt\nline1\nline2"),
     "cat  > out.txt\n",
 )
+check(
+    "strip_heredocs preserves trailing content on terminator line",
+    subject.strip_heredocs("cat <<EOF > out.txt\nbody line\nEOF; echo done\ngit fetch"),
+    "cat  > out.txt\n; echo done\ngit fetch",
+)
+check(
+    "command_views_issue sees issue view chained onto terminator line",
+    subject.command_views_issue(
+        "cat <<EOF > out.txt\nbody line\nEOF; gh issue view 2282\ngit fetch",
+        issue,
+        stems["view_cli"],
+    ),
+    True,
+)
+check(
+    "strip_heredocs handles chained heredocs across terminator lines",
+    subject.strip_heredocs(
+        "cat <<EOF1 > a\nbody1\nEOF1; cat <<EOF2 > b\nbody2\nEOF2; echo done\ngit fetch"
+    ),
+    "cat  > a\n; cat  > b\n; echo done\ngit fetch",
+)
 
 # Performance test for unterminated openers (ai-config#2536)
 # Benchmarks both single large command (800 openers) and 20-command 1.9MB scenario

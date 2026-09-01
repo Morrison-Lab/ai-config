@@ -225,13 +225,30 @@ def strip_heredocs(command):
                 nl = "\n" if line.endswith("\n") else ""
                 out.append(prefix + rem + nl)
                 active_tag = m.group(1)
-                term_pattern = re.compile(rf"^[ \t]*{re.escape(active_tag)}\b")
+                term_pattern = re.compile(
+                    rf"^[ \t]*{re.escape(active_tag)}\b([^\n]*)"
+                )
             else:
                 out.append(line)
         else:
-            if term_pattern.match(line):
+            term_m = term_pattern.match(line)
+            if term_m:
                 active_tag = None
                 term_pattern = None
+                trailing = term_m.group(1)
+                nl = "\n" if line.endswith("\n") else ""
+                if trailing:
+                    m_next = RX_HEREDOC_OPENER.search(trailing)
+                    if m_next:
+                        prefix_next = trailing[:m_next.start()]
+                        rem_next = m_next.group(2)
+                        out.append(prefix_next + rem_next + nl)
+                        active_tag = m_next.group(1)
+                        term_pattern = re.compile(
+                            rf"^[ \t]*{re.escape(active_tag)}\b([^\n]*)"
+                        )
+                    else:
+                        out.append(trailing + nl)
     return "".join(out)
 
 

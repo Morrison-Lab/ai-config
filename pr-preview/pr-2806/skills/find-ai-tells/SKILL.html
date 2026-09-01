@@ -389,9 +389,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <ol type="1">
 <li><strong>Identify the target.</strong> A path, a PR/MR (<code>gh pr diff N</code> / <code>glab mr diff N</code>), pasted text, or — for the self-check — my own draft before I send it.</li>
 <li><strong>First pass, grep the cheap lexical/typographic tells</strong> (catalog below has a ready-to-run command). This finds the mechanical ones fast and cheaply.</li>
-<li><strong>Second pass, read for the rhetorical and structural tells</strong> that grep can’t see — antithesis, triads, both-sidesing, hollow conclusions, uniform rhythm.</li>
+<li><strong>Second pass, read for the rhetorical and structural tells</strong> that grep can’t see — copula avoidance, participle commentary, antithesis, triads, both-sidesing, hollow conclusions, uniform rhythm.</li>
+<li><strong>Apply the deletion test</strong> — remove the rhetorical framing and check if any concrete fact remains (a specific name, date, measurement, trade-off, or actionable decision). If nothing remains, the passage has zero information content.</li>
 <li><strong>Report</strong> <em>(external targets only — skip for the self-check)</em>. A table — <em>tell · location (<code>file:line</code> or quoted snippet) · why it reads as AI · suggested revision</em> — followed by a one-line <strong>density verdict</strong>: is this an isolated word or a pervasive pattern? Don’t cry wolf on a single innocent em-dash.</li>
-<li><strong>Offer to apply</strong> <em>(external targets)</em> / <strong>just fix it silently</strong> <em>(self-check)</em>. For an external target, on request rewrite in place with <code>Edit</code>, preserving the author’s meaning and voice. When scanning my own draft, skip the report (step 4) and simply cut the tells before presenting.</li>
+<li><strong>Offer to apply</strong> <em>(external targets)</em> / <strong>just fix it silently</strong> <em>(self-check)</em>. For an external target, on request rewrite in place with <code>Edit</code>, preserving the author’s meaning and voice. When scanning my own draft, skip the report (step 5) and simply cut the tells before presenting.</li>
 </ol>
 </section>
 <section id="the-catalog" class="level2">
@@ -406,13 +407,15 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li><strong>Stock frames:</strong> “in today’s fast-paced world”, “in the realm of”, “at the heart of”, “when it comes to”, “more than just”, “stands as a testament to”, “plays a crucial/pivotal role”.</li>
 </ul>
 <p>Quick first-pass grep (case-insensitive, prints <code>file:line</code>). Define the pattern once, then run it through whichever tool is on hand:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="va">tells</span><span class="op">=</span><span class="st">'delve|leverage|utilize|seamless(ly)?|robust|holistic|nuanced|multifaceted|intricate|tapestry|testament|realm|landscape|beacon|plethora|myriad|pivotal|crucial|paramount|underscore|foster|harness|embark|unlock|elevate|game-?changer|cutting-edge|state-of-the-art|ever-evolving|treasure trove|fast-paced|in the realm of|at the heart of|more than just|shed light|dive in(to)?|deep dive'</span></span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="va">tells</span><span class="op">=</span><span class="st">'delve|leverage|utilize|seamless(ly)?|robust|holistic|nuanced|multifaceted|intricate|tapestry|testament|realm|landscape|beacon|plethora|myriad|pivotal|crucial|paramount|underscore|foster|harness|embark|unlock|elevate|game-?changer|cutting-edge|state-of-the-art|ever-evolving|treasure trove|fast-paced|in the realm of|at the heart of|more than just|shed light|dive in(to)?|deep dive|serves as|stands as'</span></span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="ex">rg</span> <span class="at">-niE</span> <span class="st">"\b(</span><span class="va">$tells</span><span class="st">)\b"</span> <span class="op">&lt;</span>target<span class="op">&gt;</span>          <span class="co"># ripgrep</span></span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">grep</span> <span class="at">-rniE</span> <span class="st">"\b(</span><span class="va">$tells</span><span class="st">)\b"</span> <span class="op">&lt;</span>target<span class="op">&gt;</span>       <span class="co"># no ripgrep — same pattern, via grep</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
 <section id="b.-rhetorical-tells-sentence-level-reflexes" class="level3">
 <h3 class="anchored" data-anchor-id="b.-rhetorical-tells-sentence-level-reflexes">B. Rhetorical tells (sentence-level reflexes)</h3>
 <ul>
+<li><strong>Copula avoidance (dodging “is” and “are”)</strong> — refusing plain statements of fact in favor of dressed-up constructions (“serves as a”, “stands as a”, “acts as a”, “marks a”). Replace with “is” or “are”.</li>
+<li><strong>Trailing “-ing” participle commentary</strong> — tacking a participial phrase onto the end of a factual clause to simulate analysis (“…thereby highlighting the importance of X”, “…ensuring seamless alignment”, “…paving the way for”). Cut the participle clause or split into a concrete second sentence.</li>
 <li><strong>The negation-reversal antithesis</strong> — the single biggest tell: “It’s not just X, it’s Y” / “It isn’t about X; it’s about Y” / “This isn’t merely X — it’s Z”. Grep: <code>rg -niE "(it'?s|this is) not (just|only|merely|about)"</code>.</li>
 <li><strong>Rule of three, mechanically</strong> — triadic lists everywhere (“fast, reliable, and scalable”; “discover, explore, and master”). One triad is rhetoric; a triad in every sentence is a tell.</li>
 <li><strong>Sweeping range frames</strong> — “from X to Y”, “whether you’re X or Y”.</li>
@@ -426,6 +429,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="c.-structural-typographic-tells" class="level3">
 <h3 class="anchored" data-anchor-id="c.-structural-typographic-tells">C. Structural &amp; typographic tells</h3>
 <ul>
+<li><strong>Forced tables and forced structure</strong> — tabulating content that is not multidimensional data, or bulleting narrative paragraphs to mimic analytical rigor.</li>
+<li><strong>Lead construction (title as an object)</strong> — opening a document by defining its own title as a noun in the world (“X is a comprehensive guide that outlines…”).</li>
 <li><strong>Em-dash overuse</strong> — multiple <code>—</code> per paragraph used as a default connector. (Em-dashes are correct; the tell is <em>frequency</em>, not presence.) Grep: <code>rg -n '—' &lt;target&gt;</code> and judge density.</li>
 <li><strong>Bold-leading bullets</strong> — every list item shaped <code>**Term:** explanation</code>, applied mechanically rather than where emphasis helps.</li>
 <li><strong>Emoji section headers / bullets</strong> — ✅ 🚀 🎯 🔑 decorating headings or list items in otherwise plain prose.</li>
@@ -455,6 +460,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="relationship-to-other-skills" class="level2">
 <h2 class="anchored" data-anchor-id="relationship-to-other-skills">Relationship to other skills</h2>
 <ul>
+<li><strong><a href="../../memories/ai-writing-patterns.md"><code>memories/ai-writing-patterns.md</code></a></strong> — the underlying research catalog (20 core empirical patterns synthesized from community research, statistical detection metrics including burstiness and TTR, and multi-tier anti-slop architectures).</li>
 <li><strong><code>simplify</code> / <code>tidy</code></strong> — the code-side analogues (cut dead code / cruft); this skill is the prose-side analogue (cut filler / reflexes).</li>
 <li><strong><code>grade-work</code></strong> — when reviewing a deliverable, fold an AI-tells pass into the quality check.</li>
 <li><strong><code>memorize</code> / <code>ums</code></strong> — if a new recurring tell surfaces, add it here and note it; keep the catalog living.</li>

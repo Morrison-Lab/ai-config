@@ -22,6 +22,7 @@ The same recognition applies one level down: if the emerging pattern is really a
 
     ``` bash
     grep -ril "<keywords>" skills/*/SKILL.md
+    gh pr list --state all --search "<keywords>" --json number,title,state,url   # SEARCH_PRS
     ```
 
     (see [`check-open-prs-before-duplicating`](../../shared/workflow/check-open-prs-before-duplicating.md) for the PR check). If something already owns this concern, suggest extending it — or, if a PR is already building it, redirect to that PR — instead of proposing a new skill.

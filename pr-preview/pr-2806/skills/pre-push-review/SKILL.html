@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="description" content="Run local adversarial AI code review on desktop subscription quota.">
+<meta name="description" content="Run local adversarial AI code review.">
 
 <title>skill – ai-config</title>
 <style>
@@ -365,7 +365,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <section id="pre-push-review" class="level1">
 <h1>pre-push-review</h1>
-<p>Runs an automated, single-pass adversarial AI code review on outgoing branch commits, drawing on desktop <strong>Claude Pro/Team</strong>, <strong>ChatGPT</strong>, <strong>OpenCode</strong>, or <strong>Google AI Ultra</strong> subscription quota.</p>
+<p>Runs an automated, detailed, and holistic adversarial AI code review on outgoing branch commits, drawing on desktop <strong>Claude Pro/Team</strong>, <strong>ChatGPT</strong>, <strong>OpenCode</strong>, or <strong>Google AI Ultra</strong> subscription quota (evaluating implementation defects, architecture, conventions, safety, tests, and diff impacts rather than perfunctory surface checks).</p>
 <section id="when-this-fires" class="level2">
 <h2 class="anchored" data-anchor-id="when-this-fires">When this fires</h2>
 <ul>
@@ -379,7 +379,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <ol type="1">
 <li>Computes the local outgoing diff against <code>origin/main</code> (or the detected PR base / explicit base branch).</li>
 <li>Injects universal repository standards (<code>AGENTS.md</code>).</li>
-<li>Dispatches to the selected engine or auto-fallback chain in plan/read-only mode (<code>claude</code> -&gt; <code>cursor</code> -&gt; <code>codex</code> -&gt; <code>opencode</code> -&gt; <code>agy</code>), or alternates round-robin across available models.</li>
+<li>Dispatches to the selected engine or auto-fallback chain in plan/read-only mode (<code>claude</code> -&gt; <code>cursor</code> -&gt; <code>codex</code> -&gt; <code>opencode</code> -&gt; <code>agy</code>), or alternates round-robin across available models, instructing both a detailed implementation defect audit and a holistic change assessment.</li>
 <li>Strictly parses and validates structured findings (Summary Verdict, Critical Findings, Observations, Verification Steps, and Reviewed-Commit SHA).</li>
 <li>Exits nonzero on blocking <code>Needs work</code> findings (unless <code>--allow-findings</code> is specified) and optionally posts verified review notes directly to the GitHub PR.</li>
 </ol>

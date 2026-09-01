@@ -22,9 +22,32 @@ gh issue list --state open --limit 20 --json number,title,labels,assignees,creat
 glab issue list --per-page=20 2>&1 | cat
 ```
 
-### 2. Triage / prioritize
+### 2. Triage, label, and prioritize
 
-Scan the issue list and rank by priority. Use these signals (in order):
+While surveying open issues to select the top candidate, inspect candidate issues and apply triage labels to any that are unlabeled or undertriaged.
+
+**Apply triage labels:**
+
+1.  **Check repo taxonomy:** Use existing labels on the repository (check `gh label list` / `glab label list` if unsure) rather than inventing new ones.
+2.  **Classify each candidate:**
+    - **Type:** `bug`, `enhancement`, `documentation`, `maintenance` / `refactor` / `chore` (match repo conventions).
+    - **Priority:** `high-priority`, `low-priority`, `P0` / `P1` / `P2` if the repo uses explicit priority labels.
+    - **Status:** `blocked`, `duplicate`, `invalid`, `wontfix` if applicable.
+3.  **Add labels to inspected issues:**
+
+``` bash
+# GitHub
+gh issue edit <N> --add-label "<label1>,<label2>"   # LABEL_ISSUE
+
+# GitLab
+glab issue update <N> --label "<label1>,<label2>"
+```
+
+`gh issue edit --add-label` is additive and preserves existing labels.
+
+**Rank by priority:**
+
+Scan the triaged issues and rank by priority. Use these signals (in order):
 
 | Signal | Weight |
 |----|----|
@@ -37,10 +60,6 @@ Scan the issue list and rank by priority. Use these signals (in order):
 | Already assigned to someone else | **Skip** |
 | Issue comment says “Working on this” (and the claim is live — under 2 h old) | **Skip** |
 | Open PR already exists for the issue | **Skip** |
-
-**Re-triage if helpful:** If labels are stale, missing, or inconsistent, briefly suggest re-labeling to the user before proceeding. Don’t unilaterally relabel without asking — but do flag it:
-
-> “Issues \#4 and \#7 both look high-priority but neither is labeled. Want me to label them before picking one, or just grab \#4 (older, looks like a bug)?”
 
 ### 3. Select top issue automatically
 
@@ -83,9 +102,9 @@ gh api --paginate repos/<owner>/<repo>/issues/<N>/timeline \
 
 If an open PR already exists for the issue: - **Don’t open a competing PR.** The issue is already being worked. - Skip it and grab the next unblocked issue instead. - Or, if the existing PR is stalled/abandoned and you’re taking it over, check it out (use the existing PR branch), claim the PR, and ARDI it rather than starting fresh.
 
-### 5. Check history and peers
+### 5. Check history, peers, and research DRW
 
-Before implementing, invoke the `check-history` skill to review merged MRs/PRs that touched the same area so you don’t undo past progress. If the issue is a new feature or architectural change, also consider running `scout-peers` to see how other comparable projects solved it, ensuring we don’t reinvent the wheel. (Do NOT run `opposition-research` / `oppo` here; `oppo` mines community demand to decide *what* to build and feeds the issue tracker, while `scout-peers` checks *how* others built it once you’ve already grabbed an issue).
+Before implementing, invoke the `check-history` skill to review merged MRs/PRs that touched the same area so you don’t undo past progress. Perform a research step to check whether the functionality or helper already exists (DRW) in our own repos or upstream ecosystems before writing custom code, following [`prefer-upstream`](../../skills/prefer-upstream/SKILL.llms.md) and [`dont-reinvent-wheel`](../../shared/principles/dont-reinvent-wheel.md). If the issue is a new feature or architectural change, also consider running `scout-peers` to see how other comparable projects solved it, ensuring we don’t reinvent the wheel. (Do NOT run `opposition-research` / `oppo` here; `oppo` mines community demand to decide *what* to build and feeds the issue tracker, while `scout-peers` checks *how* others built it once you’ve already grabbed an issue).
 
 ### 6. Claim the issue
 
@@ -134,6 +153,7 @@ Keep it a draft: a draft doesn’t trigger the `@claude` review bot, so no revie
 ### 9. Implement
 
 - Read the issue description carefully — understand “done” criteria
+- Research before writing code: verify that no standard library, upstream package, or lab repo helper already provides what you are about to write (DRW). If custom implementation is needed, record the search and why existing options were unfit
 - Make the changes (code, tests, docs as needed)
 - Run the repo’s standard checks (lint, test, build) before committing Prefer the same commands CI runs. If the repo has both subpackage tests and a root-level lint step, run both
 - Commit with a message referencing the issue: `fix: handle auth timeout on slow networks (closes #12)`
@@ -182,6 +202,7 @@ If during implementation you discover the issue is blocked (missing dependency, 
 ## Relationship to other skills
 
 - **`check-history`** — invoked in step 5 to avoid undoing past work
+- **`prefer-upstream`** — search existing packages, standard libraries, and lab repos before writing custom code to avoid reinventing the wheel
 - **`scout-peers`** — suggested in step 5 to check how peers solved a problem so you don’t reinvent the wheel (distinct from `oppo`, which finds *what* to build)
 - **`ardi`** — invoked in step 11 to drive the MR/PR to clean
 - **`claim-pr`** — the issue claim in step 6 follows the same pattern
@@ -195,9 +216,11 @@ If during implementation you discover the issue is blocked (missing dependency, 
 
 - ❌ Grabbing an issue already assigned to someone else
 - ❌ Starting implementation without checking history
+- ❌ Hand-rolling custom code without researching existing packaged or shared solutions first (violating DRW)
 - ❌ Opening an MR without running the repo’s standard checks first
 - ❌ Picking a huge issue that can’t be completed in one session without discussing scope with the user first
 - ❌ Implementing without understanding “done” criteria from the issue
+- ❌ Skipping triage labeling on candidate issues — apply classification labels to candidate issues inspected during triage so the backlog stays organized
 - ❌ Opening the PR only after implementing — open a draft PR up front (step 8) so the work is visible and a parallel session doesn’t grab the same issue
 - ❌ Forgetting `Closes #N` in the MR/PR description
 - ❌ Merging without re-checking that a concurrent session’s PR hasn’t already closed the issue (resolve a surprise merge conflict by reading the diff, not blindly)

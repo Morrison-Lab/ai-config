@@ -60,7 +60,7 @@ In every session --- at session start, and again periodically during long sessio
    a `git pull` in `~/.claude/plugins/marketplaces/<marketplace>` updates the clone and changes nothing the harness executes,
    and overwriting the cache copy directly is denied by the auto-mode permission classifier (reasonably --- an agent rewriting its own active guard).
    A merged hook fix reaches a plugin-consumer session only when the plugin pin in `~/.claude/plugins/installed_plugins.json` advances to a snapshot that contains it ---
-   a session restart alone does not advance it (measured 2026-09-01: a fresh session still ran `a3e0fdb` with a `79def2e` snapshot sitting unpinned beside it),
+   a session restart alone does not advance it (measured 2026-09-01, recorded on [#2899](https://github.com/Morrison-Lab/ai-config/issues/2899): a session restarted 35 minutes after the marketplace pull still ran `a3e0fdb`, and a later app update added a `79def2e` snapshot to the cache without moving any scope's pin off `a3e0fdb`),
    so reporting "pulled the fix" or "restarted" reports a hook as updated that is still running stale.
    Advance the pin through the plugin CLI (`claude plugin marketplace update <marketplace>`, then `claude plugin install <plugin>@<marketplace>`, per [`use-plugins.md`](use-plugins.md)) --- the documented path, not yet measured against this incident --- then verify the pinned copy in `installed_plugins.json` rather than assuming it moved.
    (Measured 2026-09-01: the cache hook at rev `a3e0fdb` predated ai-config#2820's fallback while the marketplace clone had pulled past it;

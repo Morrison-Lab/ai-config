@@ -507,11 +507,14 @@ def execute_hooks_for_event(
                     # Non-JSON stdout
                     pass
 
-            # Non-zero exit code indicates block/failure
-            if code == 2 or (code != 0 and decision != "block"):
+            # Hook exit code contract: exit code 2 blocks; exit code 1 warns (non-blocking)
+            if code == 2:
                 decision = "block"
                 if err_txt.strip():
                     reasons.append(err_txt.strip())
+            elif code == 1:
+                if err_txt.strip():
+                    warnings.append(err_txt.strip())
 
     return {
         "decision": decision,

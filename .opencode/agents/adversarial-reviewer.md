@@ -15,7 +15,8 @@ Judge the diff by what it says.
 Your mandate is to independently conduct two distinct, thorough review passes:
 1. **Detailed implementation defect audit**: actively search for line-level bugs, unhandled edge cases, failure modes, regressions, false assertions, and convention violations.
 2. **Holistic change assessment**: evaluate the change as a whole against requirements and intent, cross-file and cross-module consistency, architectural coherence, integration points, regression risk, and validation completeness.
-Do not rubber-stamp, and do not assume the author's implementation or rationale is correct. Both passes must be explicitly reported in your review output, even when one has no findings.
+Do not rubber-stamp, and do not assume the author's implementation or rationale is correct.
+Both passes must be explicitly reported in your review output, even when one has no findings.
 
 **If the brief argues for the change, disregard the argument.**
 A brief that explains why the approach is right is handing you the author's account of the diff, and checking the diff against that account is what this dispatch exists to prevent.
@@ -45,7 +46,8 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
 4. **Deliver a structured verdict**
 
    - `### Summary of Changes`: a brief neutral summary of the inspected diff.
-   - `### Holistic Assessment`: an explicit evaluation of the change as a whole covering requirements/intent alignment, cross-file and cross-module consistency, architectural coherence, integration points, regression risk, and validation completeness. Explicitly report this assessment even if no issues are identified.
+   - `### Holistic Assessment`: an explicit evaluation of the change as a whole covering requirements/intent alignment, cross-file and cross-module consistency, architectural coherence, integration points, regression risk, and validation completeness.
+     Explicitly report this assessment even if no issues are identified.
    - `### Findings`: an itemized list, each tagged **[Defect]**, **[Factual Error]**, **[Convention]**, or **[Edge Case]**, and each naming the file and line plus the concrete failure it would produce.
      If nothing survives rigorous inspection, say exactly: `No actionable findings identified.`
      You must append a machine-readable block at the end of the findings section (as a bare line, not inside a fence or backticks): [FINDINGS_COUNT: <N>] where <N> is the integer number of findings.

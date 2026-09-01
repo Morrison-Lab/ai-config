@@ -1121,7 +1121,8 @@ class TestPrePushReview(unittest.TestCase):
         cursor_cmd = mock_subproc.call_args[0][0]
         self.assertIn("--trust", cursor_cmd)
         self.assertIn("--print", cursor_cmd)
-        print_idx = cursor_cmd.index("--print"); self.assertEqual(cursor_cmd[print_idx + 1], "prompt")
+        print_idx = cursor_cmd.index("--print")
+        self.assertEqual(cursor_cmd[print_idx + 1], "-")
 
         # Test Antigravity runner
         mock_which.return_value = "/opt/homebrew/bin/agy"
@@ -1265,9 +1266,9 @@ class TestPrePushReview(unittest.TestCase):
         called_args = mock_run.call_args[0][0]
         self.assertEqual(called_args[0], "/usr/local/bin/agy")
         self.assertIn("--print", called_args)
-        # Check that the prompt immediately follows --print
+        # Check that '-' immediately follows --print
         print_idx = called_args.index("--print")
-        self.assertEqual(called_args[print_idx + 1], "my_prompt")
+        self.assertEqual(called_args[print_idx + 1], "-")
 
 
     @patch.object(reviewer, "_clean_sandbox_configs")

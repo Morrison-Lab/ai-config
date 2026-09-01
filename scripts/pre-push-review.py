@@ -714,15 +714,14 @@ def run_antigravity_review(prompt: str, model: str = "", expected_commit_sha: st
         print("Notice: Prompt size exceeds ARG_MAX safe limit for Antigravity, skipping...", file=sys.stderr)
         return None
 
-    cmd = [agy_path, "--print"]
+    cmd = [agy_path, "--print", "-"]
     if model:
         cmd.extend(["--model", model])
-    cmd.append(prompt)
 
     label_suffix = f" (model: {model})" if model else ""
     print(f"Running local adversarial review via Google Antigravity (plan mode){label_suffix}...")
     try:
-        res = subprocess.run(_prepare_subprocess_cmd(cmd), capture_output=True, text=True, timeout=360)
+        res = subprocess.run(_prepare_subprocess_cmd(cmd), input=prompt, capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
         print("Notice: Antigravity review timed out after 360s.", file=sys.stderr)
         return None
@@ -776,15 +775,14 @@ def run_cursor_review(prompt: str, model: str = "", expected_commit_sha: str = "
         print("Notice: Prompt size exceeds ARG_MAX safe limit for Cursor, skipping...", file=sys.stderr)
         return None
 
-    cmd = [cursor_path, "--mode", "plan", "--trust"]
+    cmd = [cursor_path, "--mode", "plan", "--trust", "--print", "-"]
     if model:
         cmd.extend(["--model", model])
-    cmd.extend(["--print", prompt])
 
     label_suffix = f" (model: {model})" if model else ""
     print(f"Running local adversarial review via Cursor Agent (plan mode){label_suffix}...")
     try:
-        res = subprocess.run(_prepare_subprocess_cmd(cmd), capture_output=True, text=True, timeout=360)
+        res = subprocess.run(_prepare_subprocess_cmd(cmd), input=prompt, capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
         print("Notice: Cursor review timed out after 360s.", file=sys.stderr)
         return None

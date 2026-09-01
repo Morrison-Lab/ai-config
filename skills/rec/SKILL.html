@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="description" content="Run local adversarial AI code review.">
+<meta name="description" content="Provide recommendations for choices.">
 
 <title>skill – ai-config</title>
 <style>
@@ -346,15 +346,27 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#pre-push-review" id="toc-pre-push-review" class="nav-link active" data-scroll-target="#pre-push-review">pre-push-review</a>
+  <li><a href="#rec-provide-recommendations-for-choices-and-questions" id="toc-rec-provide-recommendations-for-choices-and-questions" class="nav-link active" data-scroll-target="#rec-provide-recommendations-for-choices-and-questions">rec — provide recommendations for choices and questions</a>
   <ul class="collapse">
   <li><a href="#when-this-fires" id="toc-when-this-fires" class="nav-link" data-scroll-target="#when-this-fires">When this fires</a></li>
-  <li><a href="#how-it-works" id="toc-how-it-works" class="nav-link" data-scroll-target="#how-it-works">How it works</a></li>
-  <li><a href="#usage" id="toc-usage" class="nav-link" data-scroll-target="#usage">Usage</a></li>
-  <li><a href="#relationship-to-other-skills-guards" id="toc-relationship-to-other-skills-guards" class="nav-link" data-scroll-target="#relationship-to-other-skills-guards">Relationship to other skills &amp; guards</a></li>
+  <li><a href="#core-rules" id="toc-core-rules" class="nav-link" data-scroll-target="#core-rules">Core Rules</a>
+  <ul class="collapse">
+  <li><a href="#always-include-a-concrete-recommendation" id="toc-always-include-a-concrete-recommendation" class="nav-link" data-scroll-target="#always-include-a-concrete-recommendation">1. Always include a concrete recommendation</a></li>
+  <li><a href="#interactive-tools-format-put-recommendation-first" id="toc-interactive-tools-format-put-recommendation-first" class="nav-link" data-scroll-target="#interactive-tools-format-put-recommendation-first">2. Interactive tools format: put recommendation first</a></li>
+  <li><a href="#visual-tagging-in-chat-output" id="toc-visual-tagging-in-chat-output" class="nav-link" data-scroll-target="#visual-tagging-in-chat-output">3. Visual tagging in chat output</a></li>
+  <li><a href="#do-not-offer-authorized-work-as-an-optional-choice" id="toc-do-not-offer-authorized-work-as-an-optional-choice" class="nav-link" data-scroll-target="#do-not-offer-authorized-work-as-an-optional-choice">4. Do not offer authorized work as an optional choice</a></li>
+  </ul></li>
+  <li><a href="#procedure" id="toc-procedure" class="nav-link" data-scroll-target="#procedure">Procedure</a>
+  <ul class="collapse">
+  <li><a href="#step-1-identify-the-choice-or-question" id="toc-step-1-identify-the-choice-or-question" class="nav-link" data-scroll-target="#step-1-identify-the-choice-or-question">Step 1 — Identify the choice or question</a></li>
+  <li><a href="#step-2-evaluate-trade-offs" id="toc-step-2-evaluate-trade-offs" class="nav-link" data-scroll-target="#step-2-evaluate-trade-offs">Step 2 — Evaluate trade-offs</a></li>
+  <li><a href="#step-3-present-the-recommendation" id="toc-step-3-present-the-recommendation" class="nav-link" data-scroll-target="#step-3-present-the-recommendation">Step 3 — Present the recommendation</a></li>
+  </ul></li>
+  <li><a href="#relationship-to-other-skills-and-rules" id="toc-relationship-to-other-skills-and-rules" class="nav-link" data-scroll-target="#relationship-to-other-skills-and-rules">Relationship to other skills and rules</a></li>
+  <li><a href="#anti-patterns" id="toc-anti-patterns" class="nav-link" data-scroll-target="#anti-patterns">Anti-patterns</a></li>
   </ul></li>
   </ul>
-<div class="toc-actions"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/pre-push-review/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/pre-push-review/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
+<div class="toc-actions"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/rec/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/rec/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
     </div>
 <!-- main -->
 <main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"></header>
@@ -363,70 +375,88 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 
 
-<section id="pre-push-review" class="level1">
-<h1>pre-push-review</h1>
-<p>Runs an automated, detailed, and holistic adversarial AI code review on outgoing branch commits, drawing on desktop <strong>Claude Pro/Team</strong>, <strong>ChatGPT</strong>, <strong>OpenCode</strong>, or <strong>Google AI Ultra</strong> subscription quota (evaluating implementation defects, architecture, conventions, safety, tests, and diff impacts rather than perfunctory surface checks).</p>
+<section id="rec-provide-recommendations-for-choices-and-questions" class="level1">
+<h1>rec — provide recommendations for choices and questions</h1>
+<p>Whenever posing a choice or asking a question to the user, always provide a clear, specific, and grounded recommendation. Never present an unweighted list of options or ask “what should I do?” without declaring your own recommended path.</p>
+<p>This skill is invoked proactively before presenting decisions or questions, or reactively when the user invokes <code>/rec</code>, <code>/recommend</code>, or asks what the agent recommends after an unweighted question was asked.</p>
 <section id="when-this-fires" class="level2">
 <h2 class="anchored" data-anchor-id="when-this-fires">When this fires</h2>
 <ul>
-<li>“review this before I push”, “pre-push review”, “check my diff locally”, “run local review”, <code>/pre-push-review</code></li>
-<li>“alternate between models”, “run adversarial review with codex/claude/cursor”</li>
-<li>Before running <code>/push</code> or <code>git push</code> on complex feature branches when you want a second opinion without consuming cloud CI API credits or Claude Code token quotas.</li>
+<li><strong>Proactively</strong>: whenever presenting options for a genuine decision, asking a clarifying or architectural question, or using interactive question modals (<code>AskUserQuestion</code> / <code>ask_user_question</code>).</li>
+<li><strong>Reactively</strong>:
+<ul>
+<li>Explicit invocation: <code>/rec</code>, <code>/recommend</code>, “recommend”, “rec”.</li>
+<li>The user asks “what do you recommend?”, “what’s your recommendation?”, “which one should we pick?”, or “give me a recommendation”.</li>
+<li>The agent previously asked a question without a recommendation and needs to supply one now.</li>
+</ul></li>
 </ul>
 </section>
-<section id="how-it-works" class="level2">
-<h2 class="anchored" data-anchor-id="how-it-works">How it works</h2>
-<ol type="1">
-<li>Computes the local outgoing diff against <code>origin/main</code> (or the detected PR base / explicit base branch).</li>
-<li>Injects universal repository standards (<code>AGENTS.md</code>).</li>
-<li>Dispatches to the selected engine or auto-fallback chain in plan/read-only mode (<code>claude</code> -&gt; <code>cursor</code> -&gt; <code>codex</code> -&gt; <code>opencode</code> -&gt; <code>agy</code>), or alternates round-robin across available models, instructing both a detailed implementation defect audit and a holistic change assessment.</li>
-<li>Strictly parses and validates structured findings (Summary Verdict, Critical Findings, Observations, Verification Steps, and Reviewed-Commit SHA).</li>
-<li>Exits nonzero on blocking <code>Needs work</code> findings (unless <code>--allow-findings</code> is specified) and optionally posts verified review notes directly to the GitHub PR.</li>
-</ol>
+<section id="core-rules" class="level2">
+<h2 class="anchored" data-anchor-id="core-rules">Core Rules</h2>
+<section id="always-include-a-concrete-recommendation" class="level3">
+<h3 class="anchored" data-anchor-id="always-include-a-concrete-recommendation">1. Always include a concrete recommendation</h3>
+<p>Never leave a decision or question open-ended without a recommended option. State the specific recommendation clearly (e.g., “Recommendation: Proceed with Option A because…”).</p>
 </section>
-<section id="usage" class="level2">
-<h2 class="anchored" data-anchor-id="usage">Usage</h2>
-<p><strong>Note:</strong> Until this skill is merged to <code>main</code>, you must set <code>PRE_PUSH_REVIEW_LOCAL_DEV=1</code> in your environment to use the local branch copy.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># By default, use the trusted installed review script to prevent executing untrusted branch code.</span></span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="co"># To override with a local checkout during development, set PRE_PUSH_REVIEW_LOCAL_DEV=1</span></span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="va">GIT_ROOT</span><span class="op">=</span><span class="va">$(</span><span class="fu">git</span> rev-parse <span class="at">--show-toplevel</span> <span class="dv">2</span><span class="op">&gt;</span>/dev/null<span class="va">)</span></span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="bu">[</span> <span class="ot">-n</span> <span class="st">"</span><span class="va">$PRE_PUSH_REVIEW_LOCAL_DEV</span><span class="st">"</span> <span class="bu">]</span> <span class="kw">&amp;&amp;</span> <span class="bu">[</span> <span class="ot">-n</span> <span class="st">"</span><span class="va">$GIT_ROOT</span><span class="st">"</span> <span class="bu">]</span> <span class="kw">&amp;&amp;</span> <span class="bu">[</span> <span class="ot">-f</span> <span class="st">"</span><span class="va">$GIT_ROOT</span><span class="st">/scripts/pre-push-review.py"</span> <span class="bu">]</span><span class="kw">;</span> <span class="cf">then</span></span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>  <span class="va">REVIEW_SCRIPT</span><span class="op">=</span><span class="st">"</span><span class="va">$GIT_ROOT</span><span class="st">/scripts/pre-push-review.py"</span></span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="cf">else</span></span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>  <span class="va">TRUSTED_DIR</span><span class="op">=</span><span class="va">$(</span><span class="ex">python3</span> <span class="at">-c</span> <span class="st">"import os, sys; candidates = ['~/.claude/skills/pre-push-review', '~/.gemini/skills/pre-push-review', '~/.cursor/skills/pre-push-review', '~/.codex/skills/pre-push-review', '~/.gemini/config/plugins/ai-config/skills/pre-push-review']; p = next((os.path.realpath(os.path.expanduser(f)) for f in candidates if os.path.exists(os.path.expanduser(f))), None); sys.exit('Error: Trusted pre-push-review skill not found') if not p else print(os.path.abspath(os.path.join(p, '..', '..')))"</span><span class="va">)</span></span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>  <span class="va">TMP_WORKTREE</span><span class="op">=</span><span class="va">$(</span><span class="fu">mktemp</span> <span class="at">-d</span><span class="va">)</span></span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>  <span class="bu">trap</span> <span class="st">'rm -rf "$TMP_WORKTREE"'</span> EXIT</span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">git</span> <span class="at">-C</span> <span class="st">"</span><span class="va">$TRUSTED_DIR</span><span class="st">"</span> archive origin/main <span class="kw">|</span> <span class="fu">tar</span> <span class="at">-x</span> <span class="at">-C</span> <span class="st">"</span><span class="va">$TMP_WORKTREE</span><span class="st">"</span> <span class="dv">2</span><span class="op">&gt;</span>/dev/null <span class="kw">||</span> <span class="kw">{</span> <span class="bu">echo</span> <span class="st">"Error: Failed to extract trusted origin/main review script. Set PRE_PUSH_REVIEW_LOCAL_DEV=1 to use local branch."</span><span class="kw">;</span> <span class="bu">exit</span> 1<span class="kw">;</span> <span class="kw">}</span></span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>  <span class="va">REVIEW_SCRIPT</span><span class="op">=</span><span class="st">"</span><span class="va">$TMP_WORKTREE</span><span class="st">/scripts/pre-push-review.py"</span></span>
-<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="cf">fi</span></span>
-<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="co"># Auto-detect local AI CLI (priority: claude -&gt; cursor -&gt; codex -&gt; opencode -&gt; agy)</span></span>
-<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> <span class="st">"</span><span class="va">$REVIEW_SCRIPT</span><span class="st">"</span></span>
-<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a><span class="co"># Alternate among available models/engines across successive runs</span></span>
-<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="bu">[</span> <span class="ot">-n</span> <span class="st">"</span><span class="va">$AGENT_NAME</span><span class="st">"</span> <span class="bu">]</span><span class="kw">;</span> <span class="cf">then</span></span>
-<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>  <span class="ex">python3</span> <span class="st">"</span><span class="va">$REVIEW_SCRIPT</span><span class="st">"</span> <span class="at">--engine</span> alternate <span class="at">--exclude-engine</span> <span class="st">"</span><span class="va">$AGENT_NAME</span><span class="st">"</span></span>
-<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a><span class="cf">else</span></span>
-<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>  <span class="ex">python3</span> <span class="st">"</span><span class="va">$REVIEW_SCRIPT</span><span class="st">"</span> <span class="at">--engine</span> alternate</span>
-<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a><span class="cf">fi</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Review via Claude model through Antigravity CLI:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> <span class="st">"</span><span class="va">$REVIEW_SCRIPT</span><span class="st">"</span> <span class="at">--engine</span> agy-claude</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Explicitly choose AI engine (‘claude’, ‘cursor’, ‘codex’, ‘opencode’, or ‘antigravity’):</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> <span class="st">"</span><span class="va">$REVIEW_SCRIPT</span><span class="st">"</span> <span class="at">--engine</span> codex</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Pass custom model override:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> <span class="st">"</span><span class="va">$REVIEW_SCRIPT</span><span class="st">"</span> <span class="at">--engine</span> codex <span class="at">--model</span> gpt-5.6-sol</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Post the review report directly to the current GitHub PR:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> <span class="st">"</span><span class="va">$REVIEW_SCRIPT</span><span class="st">"</span> <span class="at">--post</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Save output to a markdown file:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> <span class="st">"</span><span class="va">$REVIEW_SCRIPT</span><span class="st">"</span> <span class="at">-o</span> review.md</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<section id="interactive-tools-format-put-recommendation-first" class="level3">
+<h3 class="anchored" data-anchor-id="interactive-tools-format-put-recommendation-first">2. Interactive tools format: put recommendation first</h3>
+<p>When using interactive question tools (<code>AskUserQuestion</code> or <code>ask_user_question</code>): - Place the recommended option <strong>first</strong> in the options array. - Prefix the label with <code>(Recommended)</code> (e.g., <code>(Recommended) Option A: ...</code>).</p>
 </section>
-<section id="relationship-to-other-skills-guards" class="level2">
-<h2 class="anchored" data-anchor-id="relationship-to-other-skills-guards">Relationship to other skills &amp; guards</h2>
+<section id="visual-tagging-in-chat-output" class="level3">
+<h3 class="anchored" data-anchor-id="visual-tagging-in-chat-output">3. Visual tagging in chat output</h3>
+<p>In conversational responses, format recommendations using the standard category box:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>🧭 **RECOMMENDATION:** <span class="dt">&lt;</span><span class="kw">action</span><span class="dt">&gt;</span>. <span class="dt">&lt;</span><span class="kw">concise</span><span class="ot"> rationale</span><span class="dt">&gt;</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Lead with the specific action, followed by the trade-off rationale.</p>
+</section>
+<section id="do-not-offer-authorized-work-as-an-optional-choice" class="level3">
+<h3 class="anchored" data-anchor-id="do-not-offer-authorized-work-as-an-optional-choice">4. Do not offer authorized work as an optional choice</h3>
+<p>Distinguish genuine decisions from authorized or standard workflow steps: - If an action is already in scope or required by standing rules (e.g., running tests, fixing lints, ARDI loops, drafting issues), perform the work and report in the past tense rather than asking “Let me know if you want me to do X”. - Reserve recommendations for genuine forks in design, architecture, scope trade-offs, or external intent.</p>
+</section>
+</section>
+<section id="procedure" class="level2">
+<h2 class="anchored" data-anchor-id="procedure">Procedure</h2>
+<section id="step-1-identify-the-choice-or-question" class="level3">
+<h3 class="anchored" data-anchor-id="step-1-identify-the-choice-or-question">Step 1 — Identify the choice or question</h3>
 <ul>
-<li><strong><code>push</code> / pre-push guard</strong>: Standalone multi-vendor adversarial review tool that can be run on-demand across all harnesses. Within Claude Code sessions, pre-push enforcement hooks require clean foreground <code>adversarial-reviewer</code> subagent audits.</li>
-<li><strong><code>delegate-to-codex</code></strong>: General offloading of heavy analysis tasks to Codex CLI.</li>
-<li><strong><code>ardi</code></strong>: PR-level review iteration in GitHub Actions.</li>
+<li><strong>Proactive</strong>: State the decision point, the context that makes it necessary, and the distinct feasible options.</li>
+<li><strong>Reactive</strong> (<code>/rec</code> / <code>/recommend</code>): Scan back through recent conversation turns to locate the latest question or unresolved decision point, restating the options if context is needed.</li>
+</ul>
+</section>
+<section id="step-2-evaluate-trade-offs" class="level3">
+<h3 class="anchored" data-anchor-id="step-2-evaluate-trade-offs">Step 2 — Evaluate trade-offs</h3>
+<p>Weigh the alternatives across: - <strong>Simplicity and minimal blast radius</strong>: least complex change that solves the issue. - <strong>Project conventions</strong>: alignment with existing codebase patterns and rules. - <strong>Safety and reversibility</strong>: lower operational and maintenance risk. - <strong>Token and execution efficiency</strong>: avoiding unnecessary overhead.</p>
+<p>Select the single strongest path as the recommendation.</p>
+</section>
+<section id="step-3-present-the-recommendation" class="level3">
+<h3 class="anchored" data-anchor-id="step-3-present-the-recommendation">Step 3 — Present the recommendation</h3>
+<p>Present the question or decision with its structured recommendation:</p>
+<ul>
+<li><strong>For interactive GUI modals</strong> (<code>AskUserQuestion</code> or <code>ask_user_question</code>): List the recommended choice as option 1 with the <code>(Recommended)</code> prefix.</li>
+<li><strong>For inline chat questions</strong>: State the context, outline the trade-offs, and attach the boxed recommendation:</li>
+</ul>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>❓ **QUESTION:** <span class="dt">&lt;</span><span class="kw">clear</span><span class="ot"> question</span><span class="dt">&gt;</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Option A**: <span class="dt">&lt;</span><span class="kw">summary</span><span class="ot"> of option A and trade-offs</span><span class="dt">&gt;</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Option B**: <span class="dt">&lt;</span><span class="kw">summary</span><span class="ot"> of option B and trade-offs</span><span class="dt">&gt;</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>🧭 **RECOMMENDATION:** Proceed with Option A because <span class="dt">&lt;</span><span class="kw">rationale</span><span class="dt">&gt;</span>.</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+</section>
+<section id="relationship-to-other-skills-and-rules" class="level2">
+<h2 class="anchored" data-anchor-id="relationship-to-other-skills-and-rules">Relationship to other skills and rules</h2>
+<ul>
+<li><strong><code>AGENTS.md</code> (“Always give recommendations with questions”)</strong>: Universal baseline rule requiring recommendations on all questions.</li>
+<li><strong><a href="../../skills/prompt-me/SKILL.html"><code>prompt-me</code></a> / <a href="../../skills/pm/SKILL.html"><code>pm</code></a></strong>: Surfaces pending questions; pair with <code>rec</code> if a surfaced question lacked a recommendation.</li>
+<li><strong><a href="../../skills/pending-decisions/SKILL.html"><code>pending-decisions</code></a> / <a href="../../skills/pd/SKILL.html"><code>pd</code></a></strong>: Presents tracker-level decisions sequentially, with recommendations.</li>
+<li><strong><a href="../../skills/brainstorm/SKILL.html"><code>brainstorm</code></a></strong>: Interactive Socratic planning loop before implementation; uses <code>rec</code> principles to guide trade-offs.</li>
+</ul>
+</section>
+<section id="anti-patterns" class="level2">
+<h2 class="anchored" data-anchor-id="anti-patterns">Anti-patterns</h2>
+<ul>
+<li>❌ Asking “Which option do you prefer?” or “Should I do A or B?” without declaring a recommendation.</li>
+<li>❌ Using “Let me know if…” to pose authorized work as a choice instead of performing it.</li>
+<li>❌ Providing an ambiguous or fence-sitting recommendation (“Either A or B is fine”).</li>
+<li>❌ Placing the recommended option anywhere other than first in interactive choice lists.</li>
 </ul>
 
 
@@ -857,7 +887,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     </div>   
     <div class="nav-footer-center">
 <p>Built with <a href="https://quarto.org/">Quarto</a></p>
-<div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/pre-push-review/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/pre-push-review/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></div>
+<div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/rec/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/rec/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></div>
     <div class="nav-footer-right">
       &nbsp;
     </div>

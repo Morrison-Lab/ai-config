@@ -30,8 +30,16 @@ REF_DEF = re.compile(
 # External schemes and pure in-page anchors
 EXTERNAL_PREFIXES = ("http://", "https://", "mailto:", "tel:", "#", "ftp://")
 
-# Patterns to scan
-SCAN_GLOBS = ("*.md", "skills/**/*.md", "shared/**/*.md", "memories/**/*.md")
+SCAN_GLOBS = [
+    "skills/**/*.md",
+    "codex-skills/**/*.md",
+    "commands/**/*.md",
+    "docs/**/*.md",
+    "memories/**/*.md",
+    "references/**/*.md",
+    "shared/**/*.md",
+    "*.md",
+]
 
 broken: list[str] = []
 checked = 0

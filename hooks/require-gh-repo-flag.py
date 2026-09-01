@@ -270,8 +270,8 @@ def split_command(command: str) -> list[str]:
     return segments
 
 
-def mask_arithmetic(command: str) -> str:
-    """Mask $(( ... )) and (( ... )) arithmetic expansions with balanced parentheses."""
+def mask_comments_and_arithmetic(command: str) -> str:
+    """Mask comments and $(( ... )) / (( ... )) arithmetic expansions with spaces/newlines."""
     out = []
     i = 0
     n = len(command)
@@ -306,6 +306,13 @@ def mask_arithmetic(command: str) -> str:
             continue
 
         if not in_sq and not in_dq:
+            if ch == "#" and (i == 0 or command[i - 1] in " \t;|&(\n"):
+                # Mask comment until next newline or EOF
+                while i < n and command[i] != "\n":
+                    out.append(" ")
+                    i += 1
+                continue
+
             if command.startswith("$((", i) or command.startswith("((", i):
                 is_subst = command.startswith("$((", i)
                 start = i
@@ -349,33 +356,11 @@ def mask_arithmetic(command: str) -> str:
     return "".join(out)
 
 
-def strip_unquoted_trailing_comment(line: str) -> str:
-    """Strip trailing # comment if outside single/double quotes."""
-    in_sq = False
-    in_dq = False
-    escaped = False
-    for i, c in enumerate(line):
-        if escaped:
-            escaped = False
-            continue
-        if c == "\\":
-            escaped = True
-            continue
-        if c == "'" and not in_dq:
-            in_sq = not in_sq
-        elif c == '"' and not in_sq:
-            in_dq = not in_dq
-        elif c == "#" and not in_sq and not in_dq:
-            if i == 0 or line[i - 1] in " \t;|&":
-                return line[:i]
-    return line
-
-
 def strip_heredocs(command: str) -> str:
     """Drop heredoc body lines and delimiters so interior text is not scanned as commands."""
-    # Mask arithmetic expansions across the whole command before parsing openers,
+    # Mask arithmetic expansions and comments across the whole command before parsing openers,
     # preserving line breaks so line counts stay synchronized.
-    command_for_openers = mask_arithmetic(command)
+    command_for_openers = mask_comments_and_arithmetic(command)
     lines_orig = command.split("\n")
     lines_masked = command_for_openers.split("\n")
 
@@ -400,9 +385,8 @@ def strip_heredocs(command: str) -> str:
             continue
 
         out.append(orig_line)
-        line_to_scan = strip_unquoted_trailing_comment(masked_line)
-        for m in HEREDOC_OPEN.finditer(line_to_scan):
-            rest = line_to_scan[m.end():]
+        for m in HEREDOC_OPEN.finditer(masked_line):
+            rest = masked_line[m.end():]
             if re.match(r"^\s*\)\)", rest):
                 continue
             strip_flag = m.group(1)

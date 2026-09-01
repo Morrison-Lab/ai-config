@@ -26,6 +26,12 @@ FENCE_LINE = re.compile(
 CODE_SPAN_RE = re.compile(
     r"(?<!`)(`+)(?!`)(?:[^\n\r]|\r?\n(?![ \t]*\r?\n))*?(?<!`)\1(?!`)"
 )
+DISPLAY_MATH_RE = re.compile(
+    r"(?<!\\)\$\$.*?(?<!\\)\$\$", re.DOTALL
+)
+INLINE_MATH_RE = re.compile(
+    r"(?<![\\$\w])\$(?!\s)(?:\\.|[^\$\n\r])+?(?<![\s\\\$])\$(?![0-9\w])"
+)
 
 
 def find_fence_spans(
@@ -124,6 +130,24 @@ def strip_code(
         text, swallow_unclosed=swallow_unclosed, replacement=fence_replacement
     )
     return strip_code_spans(stripped, replacement=span_replacement)
+
+
+def strip_display_math(text: str, replacement: str = " ") -> str:
+    """Strip display math blocks ($$...$$) from markdown text."""
+    return DISPLAY_MATH_RE.sub(replacement, text)
+
+
+def strip_inline_math(text: str, replacement: str = " ") -> str:
+    """Strip inline math spans ($...$), bounded by blank lines and unescaped delimiters."""
+    return INLINE_MATH_RE.sub(replacement, text)
+
+
+def strip_math(text: str, replacement: str = " ") -> str:
+    """Strip display math blocks and inline math spans."""
+    return strip_inline_math(
+        strip_display_math(text, replacement=replacement),
+        replacement=replacement,
+    )
 
 
 def count_unbalanced_fences(text: str) -> int:

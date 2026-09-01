@@ -86,6 +86,10 @@ committed pass.
    - Debugging insights
    - Codebase conventions discovered
 
+   *(When delegating UMS to a subagent, prefer **session forking**
+   so the subagent can survey the full conversation history directly without manual serialization from the parent orchestrator ---
+   see [`use-subagents`](../../shared/workflow/use-subagents.md).)*
+
 2. **Categorize each learning.** For each item, decide:
    - Is it a **skill update**? (workflow step missing, procedure unclear)
    - Is it a **memory note**? (tool quirk, preference, debugging insight)

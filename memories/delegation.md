@@ -371,3 +371,48 @@ skill's step 2 ("Prepare the prompt").
   deterministic way to check the result ---
   this success was confirmed by four independent test suites,
   not by inspecting the diff.
+
+## Session forking vs. clean-context subagent dispatch for UMS and CAI
+
+When dispatching UMS (`update-memories-and-skills`) or CAI (`config-ai`) as subagents,
+harnesses support either **session forking** (inheriting the full conversation transcript and tool history)
+or **clean-context dispatch** (starting a fresh conversation with a standalone prompt brief).
+Where a harness lacks native runtime session-forking flags,
+point the subagent at the session's on-disk transcript log or provide a focused milestone summary.
+
+### The UMS forking trade-off
+
+- **Forking avoids manual serialization.**
+  A reflective UMS sweep requires reviewing the entire session for mistakes, corrections, quirks, and preferences.
+  Serializing that context into a subagent brief consumes orchestrator tokens and risks omitting subtle turns.
+  A forked session inherits the full transcript, allowing the subagent to autonomously survey the trajectory.
+- **Forking offloads context consumption.**
+  The mechanical operations of UMS --- grepping `memories/`, reading 1200-line memory files, running `validate-skills.py`,
+  and handling git operations in a worktree --- accumulate thousands of tokens.
+  In a forked subagent, these tokens do not pollute the parent conductor's active context window.
+- **Guarding against role bleed.**
+  A forked subagent inherits the parent's goals and system prompt.
+  To prevent the worker from resuming the parent's coding task, the brief must explicitly bound its role:
+  "Your task is strictly UMS.
+  Do not continue the parent implementation.
+  Survey the transcript above, persist learnings to memories/skills via a dedicated worktree, validate, push PR, and report back."
+- **When NOT to fork for UMS:**
+  When the parent session is already near context exhaustion (>80-90% of model window), forking copies an oversized prompt prefix that can cause immediate context truncation or degradation in the subagent.
+  In that regime, brief a clean subagent with the explicit learnings or log them via `record-learnings` in place.
+
+### The CAI forking trade-off
+
+- **Emergent workflows benefit from forking.**
+  When CAI is triggered to capture an ad-hoc procedure just executed ("make a skill for what we did"),
+  forking gives the router/builder the exact commands and tool sequences used without manual replay.
+- **Explicit capability requests want clean dispatch.**
+  When a request is stated declaratively ("add a hook for X"),
+  a clean subagent avoids prompt bloat and runs faster and cheaper.
+
+- **Do:** fork the session for reflective UMS passes and emergent CAI workflows so the subagent has the full transcript.
+- **Do:** explicitly scope the forked subagent's prompt to UMS or CAI to prevent it from continuing the parent's task.
+- **Do:** use a clean subagent when the parent session is near context limits or when the brief is already fully specified.
+- **Don't:** serialize an entire session's history into a manual brief when session forking is available.
+- **Don't:** fork a session for a trivial, already-isolated 1-line memory note when inline capture or a clean brief suffices.
+
+

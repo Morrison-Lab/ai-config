@@ -47,6 +47,7 @@ codex plugin add <plugin>@<new-name> --json
 ```
 
 Read `marketplaceName` from the add result instead of guessing the renamed selector, then verify both `codex plugin list` and `codex plugin marketplace list`.
+
 This sequence preserves the source repository while replacing only its stale local registration.
 
 (2026-08-08: `Morrison-Lab/ai-config` changed its manifest marketplace name from `the repository owner` to `Morrison-Lab`;

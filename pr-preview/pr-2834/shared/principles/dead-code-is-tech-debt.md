@@ -103,7 +103,8 @@ This principle complements rather than contradicts [`prefer-optionality-over-rem
 - **Do:** remove associated tests, documentation, and manifest registrations when removing dead symbols.
 - **Do:** use deterministic static analysis tools to verify zero callers before deletion.
 - **Don't:** comment out code blocks "in case we need them later" --- git history preserves them.
-- **Don't:** keep obsolete functions or orphaned configs as harmless clutter; they actively degrade agent context and developer focus.
+- **Don't:** keep obsolete functions or orphaned configs as harmless clutter;
+  they actively degrade agent context and developer focus.
 - **Don't:** leave deprecated symbols without a formal deprecation schedule and warning mechanism.
 
 ## In review

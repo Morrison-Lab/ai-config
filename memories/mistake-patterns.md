@@ -761,7 +761,8 @@ A clean automated review from every available provider evaluating the current HE
   Because the review verifier only scanned for `github-actions`, `claude[bot]`, `jules`, and `cursor`
   and did not recognize Copilot's `### 🟢 Approval recommended` / `### 🟡 Changes recommended` headers,
   the ARDI checker reported clean and permitted merging over the unaddressed comment.
-- **Canonical Rule**: [`fully-clean.md`](../shared/workflow/fully-clean.md) (Criterion 2, `EXCLUSIVE_BOT_IDENTITY`).
+- **Canonical Rule**: [`fully-clean.md`](../shared/workflow/fully-clean.md) (Criterion 2, automated review identity)
+  and [`scripts/check-pr-fully-clean.py`](../scripts/check-pr-fully-clean.py) (`EXCLUSIVE_BOT_IDENTITY`).
 - **Fix**: Register `copilot-pull-request-reviewer` in review bot rosters,
   add Copilot's `Approval recommended` / `Changes recommended` verdict patterns,
   and address the missing Windows platform documentation in `Morrison-Lab/wai` PR [#169](https://github.com/Morrison-Lab/wai/pull/169)

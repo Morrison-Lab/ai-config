@@ -981,7 +981,7 @@ class TestPrePushReview(unittest.TestCase):
         # Verify it created the agent in the correct directory
         import os
         expected_dir = os.path.expanduser("~/.config/opencode/agents")
-        mock_tf.assert_any_call(mode="w", suffix=".md", dir=expected_dir, delete=False)
+        mock_tf.assert_any_call(mode="w", suffix=".md", dir=expected_dir, delete=False, encoding="utf-8")
         self.assertIn("--file", oc_cmd)
         self.assertNotIn("prompt", oc_cmd)
         self.assertIn("-m", oc_cmd)
@@ -1109,8 +1109,9 @@ class TestPrePushReview(unittest.TestCase):
         self.assertEqual(called_args[print_idx + 1], "my_prompt")
 
 
+    @patch.object(reviewer, "_clean_sandbox_configs")
     @patch("subprocess.run")
-    def test_sandbox_isolation_removes_agent_configs(self, mock_run):
+    def test_sandbox_isolation_removes_agent_configs(self, mock_run, mock_clean):
         import subprocess
         mock_result = subprocess.CompletedProcess(args=[], returncode=0, stdout="true\n")
         mock_run.return_value = mock_result
@@ -1122,18 +1123,79 @@ class TestPrePushReview(unittest.TestCase):
                     except SystemExit:
                         pass
 
-        rm_call = None
-        for call in mock_run.call_args_list:
-            args = call[0][0]
-            if args and args[0] == "rm" and "-rf" in args:
-                rm_call = args
-                break
+        mock_clean.assert_called_once()
+        cleaned_dir = mock_clean.call_args[0][0]
+        self.assertIsInstance(cleaned_dir, Path)
 
-        self.assertIsNotNone(rm_call, "Sandbox cleanup rm -rf was not called")
-        self.assertIn(".cursor", rm_call)
-        self.assertIn(".agents", rm_call)
-        self.assertIn("opencode.json", rm_call)
-        self.assertIn(".mcp.json", rm_call)
+    def test_clean_sandbox_configs_removes_all_targets(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            # Create directories to remove
+            (td_path / ".claude").mkdir()
+            (td_path / ".cursor").mkdir()
+            (td_path / ".agents").mkdir()
+            # Create files to remove
+            (td_path / "AGENTS.md").write_text("rules", encoding="utf-8")
+            (td_path / "CLAUDE.md").write_text("claude", encoding="utf-8")
+            (td_path / "opencode.json").write_text("{}", encoding="utf-8")
+            (td_path / ".mcp.json").write_text("{}", encoding="utf-8")
+            # Create file that should NOT be removed
+            keep_file = td_path / "solution.py"
+            keep_file.write_text("print(1)", encoding="utf-8")
+
+            reviewer._clean_sandbox_configs(td_path)
+
+            self.assertFalse((td_path / ".claude").exists())
+            self.assertFalse((td_path / ".cursor").exists())
+            self.assertFalse((td_path / ".agents").exists())
+            self.assertFalse((td_path / "AGENTS.md").exists())
+            self.assertFalse((td_path / "CLAUDE.md").exists())
+            self.assertFalse((td_path / "opencode.json").exists())
+            self.assertFalse((td_path / ".mcp.json").exists())
+            self.assertTrue(keep_file.exists())
+
+    def test_resolve_engine_executable_posix_and_windows(self):
+        # 1. System PATH hit
+        with patch("shutil.which", return_value="/usr/local/bin/claude"):
+            self.assertEqual(reviewer.resolve_engine_executable("claude"), "/usr/local/bin/claude")
+
+        # 2. POSIX fallback ~/.local/bin
+        def fake_which(cmd):
+            return None
+
+        with patch("shutil.which", side_effect=fake_which):
+            with patch("os.path.isfile") as mock_isfile, patch("os.access", return_value=True):
+                mock_isfile.side_effect = lambda p: ".local" in str(p) and "claude" in str(p)
+                res = reviewer.resolve_engine_executable("claude")
+                self.assertIsNotNone(res)
+                self.assertIn(".local", str(res))
+
+        # 3. Windows %APPDATA%/npm fallback
+        with patch("os.name", "nt"), patch("sys.platform", "win32"):
+            with patch.dict(os.environ, {"APPDATA": "C:\\Users\\test\\AppData\\Roaming"}, clear=False):
+                with patch("shutil.which", side_effect=fake_which):
+                    with patch("os.path.isfile") as mock_isfile:
+                        mock_isfile.side_effect = lambda p: "npm" in str(p) and "claude.cmd" in str(p).lower()
+                        res = reviewer.resolve_engine_executable("claude")
+                        self.assertIsNotNone(res)
+                        self.assertIn("npm", str(res))
+
+    def test_prepare_subprocess_cmd_cross_platform(self):
+        # POSIX: command list passes through unmodified
+        with patch("os.name", "posix"), patch("sys.platform", "darwin"):
+            cmd = ["/usr/bin/claude", "--print", "test"]
+            self.assertEqual(reviewer._prepare_subprocess_cmd(cmd), cmd)
+
+        # Windows: .cmd / .bat gets wrapped with COMSPEC / cmd.exe /c
+        with patch("os.name", "nt"), patch("sys.platform", "win32"), patch.dict(os.environ, {"COMSPEC": "C:\\Windows\\system32\\cmd.exe"}, clear=False):
+            cmd_bat = ["C:\\npm\\claude.cmd", "-p", "-"]
+            wrapped = reviewer._prepare_subprocess_cmd(cmd_bat)
+            self.assertEqual(wrapped, ["C:\\Windows\\system32\\cmd.exe", "/c", "C:\\npm\\claude.cmd", "-p", "-"])
+
+            # Non-bat .exe on Windows is not wrapped
+            cmd_exe = ["C:\\bin\\codex.exe", "exec"]
+            self.assertEqual(reviewer._prepare_subprocess_cmd(cmd_exe), cmd_exe)
 
 
     @patch.object(reviewer, "run_cursor_review")

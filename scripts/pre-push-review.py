@@ -600,11 +600,89 @@ def validate_review_output(report: Optional[str], expected_commit_sha: str = "")
     return is_valid
 
 
-def run_antigravity_review(prompt: str, model: str = "", expected_commit_sha: str = "") -> Optional[str]:
-    agy_path = shutil.which("agy") or os.path.expanduser("~/.local/bin/agy")
-    if not os.path.isfile(agy_path) and not shutil.which("agy"):
-        return None
+def resolve_engine_executable(name: str) -> Optional[str]:
+    """Resolve executable path for AI engine across POSIX and Windows environments.
 
+    Checks:
+    1. System PATH via shutil.which (respecting PATHEXT on Windows).
+    2. User local bin (~/.local/bin, ~/bin, ~/.cargo/bin).
+    3. Windows-specific user and program directories (%APPDATA%/npm, %LOCALAPPDATA%/Programs).
+    """
+    found = shutil.which(name)
+    if found:
+        return found
+
+    home = os.path.expanduser("~")
+    candidate_dirs: List[str] = [
+        os.path.join(home, ".local", "bin"),
+        os.path.join(home, "bin"),
+        os.path.join(home, ".cargo", "bin"),
+    ]
+
+    is_windows = os.name == "nt" or sys.platform == "win32"
+    if is_windows:
+        appdata = os.environ.get("APPDATA")
+        if appdata:
+            candidate_dirs.append(os.path.join(appdata, "npm"))
+        localappdata = os.environ.get("LOCALAPPDATA")
+        if localappdata:
+            candidate_dirs.append(os.path.join(localappdata, "Programs", name))
+            candidate_dirs.append(os.path.join(localappdata, "Programs"))
+        candidate_dirs.extend([
+            os.path.join(home, "AppData", "Roaming", "npm"),
+            os.path.join(home, "AppData", "Local", "Programs", name),
+        ])
+
+    extensions = [""]
+    if is_windows:
+        pathext = os.environ.get("PATHEXT", ".COM;.EXE;.BAT;.CMD;.VBS;.JS;.WSF;.WSH")
+        ext_list = [ext.lower() for ext in pathext.split(";") if ext]
+        extensions = ext_list + [""]
+
+    for d in candidate_dirs:
+        for ext in extensions:
+            cand_str = os.path.join(d, f"{name}{ext}" if ext else name)
+            which_cand = shutil.which(cand_str)
+            if which_cand:
+                return which_cand
+            if os.path.isfile(cand_str) and (is_windows or os.access(cand_str, os.X_OK)):
+                return cand_str
+
+    return None
+
+
+def _prepare_subprocess_cmd(cmd: List[str]) -> List[str]:
+    """Wrap Windows batch/cmd scripts to execute reliably without shell injection vulnerabilities."""
+    if (os.name == "nt" or sys.platform == "win32") and cmd:
+        exe = cmd[0]
+        if exe.lower().endswith((".cmd", ".bat")):
+            comspec = os.environ.get("COMSPEC", "cmd.exe")
+            return [comspec, "/c"] + cmd
+    return cmd
+
+
+def _clean_sandbox_configs(sandbox_dir: Path):
+    """Remove branch-controlled agent configs to enforce sandbox isolation portably across platforms."""
+    configs_to_remove = [
+        ".claude", ".claude.json", ".cursor", ".gemini", ".codex",
+        "AGENTS.md", "CLAUDE.md", "GEMINI.md", ".github/copilot-instructions.md",
+        ".vscode", "cursor.json", ".aider.conf.yml", ".agents", "opencode.json", ".mcp.json"
+    ]
+    for rel_path in configs_to_remove:
+        target = sandbox_dir / rel_path
+        try:
+            if target.is_dir() and not target.is_symlink():
+                shutil.rmtree(target, ignore_errors=True)
+            elif target.exists() or target.is_symlink():
+                target.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+
+def run_antigravity_review(prompt: str, model: str = "", expected_commit_sha: str = "") -> Optional[str]:
+    agy_path = resolve_engine_executable("agy")
+    if not agy_path:
+        return None
 
     if len(prompt.encode("utf-8")) > 800000:
         print("Notice: Prompt size exceeds ARG_MAX safe limit for Antigravity, skipping...", file=sys.stderr)
@@ -617,7 +695,7 @@ def run_antigravity_review(prompt: str, model: str = "", expected_commit_sha: st
     label_suffix = f" (model: {model})" if model else ""
     print(f"Running local adversarial review via Google Antigravity (plan mode){label_suffix}...")
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=360)
+        res = subprocess.run(_prepare_subprocess_cmd(cmd), capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
         print("Notice: Antigravity review timed out after 360s.", file=sys.stderr)
         return None
@@ -634,8 +712,8 @@ def run_antigravity_review(prompt: str, model: str = "", expected_commit_sha: st
 
 
 def run_claude_review(prompt: str, model: str = "", expected_commit_sha: str = "") -> Optional[str]:
-    claude_path = shutil.which("claude") or os.path.expanduser("~/.local/bin/claude")
-    if not os.path.isfile(claude_path) and not shutil.which("claude"):
+    claude_path = resolve_engine_executable("claude")
+    if not claude_path:
         return None
 
     cmd = [claude_path, "--permission-mode", "plan", "--safe-mode", "--strict-mcp-config", "-p", "-"]
@@ -645,7 +723,7 @@ def run_claude_review(prompt: str, model: str = "", expected_commit_sha: str = "
     label_suffix = f" (model: {model})" if model else ""
     print(f"Running local adversarial review via Claude CLI (plan mode){label_suffix}...")
     try:
-        res = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=600)
+        res = subprocess.run(_prepare_subprocess_cmd(cmd), input=prompt, capture_output=True, text=True, timeout=600)
     except subprocess.TimeoutExpired:
         print("Notice: Claude review timed out after 600s.", file=sys.stderr)
         return None
@@ -662,10 +740,9 @@ def run_claude_review(prompt: str, model: str = "", expected_commit_sha: str = "
 
 
 def run_cursor_review(prompt: str, model: str = "", expected_commit_sha: str = "") -> Optional[str]:
-    cursor_path = shutil.which("agent") or os.path.expanduser("~/.local/bin/agent")
-    if not os.path.isfile(cursor_path) and not shutil.which("agent"):
+    cursor_path = resolve_engine_executable("agent")
+    if not cursor_path:
         return None
-
 
     if len(prompt.encode("utf-8")) > 800000:
         print("Notice: Prompt size exceeds ARG_MAX safe limit for Cursor, skipping...", file=sys.stderr)
@@ -678,7 +755,7 @@ def run_cursor_review(prompt: str, model: str = "", expected_commit_sha: str = "
     label_suffix = f" (model: {model})" if model else ""
     print(f"Running local adversarial review via Cursor Agent (plan mode){label_suffix}...")
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=360)
+        res = subprocess.run(_prepare_subprocess_cmd(cmd), capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
         print("Notice: Cursor review timed out after 360s.", file=sys.stderr)
         return None
@@ -695,8 +772,8 @@ def run_cursor_review(prompt: str, model: str = "", expected_commit_sha: str = "
 
 
 def run_codex_review(prompt: str, model: str = "", expected_commit_sha: str = "") -> Optional[str]:
-    codex_path = shutil.which("codex") or os.path.expanduser("~/.local/bin/codex")
-    if not os.path.isfile(codex_path) and not shutil.which("codex"):
+    codex_path = resolve_engine_executable("codex")
+    if not codex_path:
         return None
 
     label_suffix = f" (model: {model})" if model else " (ChatGPT quota)"
@@ -706,7 +783,7 @@ def run_codex_review(prompt: str, model: str = "", expected_commit_sha: str = ""
         cmd.extend(["-m", model])
 
     try:
-        res = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=360)
+        res = subprocess.run(_prepare_subprocess_cmd(cmd), input=prompt, capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
         print("Notice: Codex review timed out after 360s.", file=sys.stderr)
         return None
@@ -723,8 +800,8 @@ def run_codex_review(prompt: str, model: str = "", expected_commit_sha: str = ""
 
 
 def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str = "") -> Optional[str]:
-    opencode_path = shutil.which("opencode") or os.path.expanduser("~/.local/bin/opencode")
-    if not os.path.isfile(opencode_path) and not shutil.which("opencode"):
+    opencode_path = resolve_engine_executable("opencode")
+    if not opencode_path:
         return None
 
     label_suffix = f" (model: {model})" if model else ""
@@ -733,12 +810,12 @@ def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str =
     prompt_file = None
     agent_file = None
     try:
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tf:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False, encoding="utf-8") as tf:
             tf.write(prompt)
             prompt_file = tf.name
         agent_dir = os.path.expanduser("~/.config/opencode/agents")
         os.makedirs(agent_dir, exist_ok=True)
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", dir=agent_dir, delete=False) as af:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", dir=agent_dir, delete=False, encoding="utf-8") as af:
             af.write("---\n")
             af.write("description: Adversarial Code Reviewer\n")
             af.write("mode: subagent\n")
@@ -757,7 +834,7 @@ def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str =
         if model:
             cmd.extend(["-m", model])
 
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=360)
+        res = subprocess.run(_prepare_subprocess_cmd(cmd), capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
         print("Notice: OpenCode review timed out after 360s.", file=sys.stderr)
         return None
@@ -787,15 +864,15 @@ def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str =
 def detect_available_engines() -> List[str]:
     """Return available local engines in preferred fallback priority: claude -> cursor -> codex -> opencode -> agy."""
     engines = []
-    if shutil.which("claude") or os.path.isfile(os.path.expanduser("~/.local/bin/claude")):
+    if resolve_engine_executable("claude"):
         engines.append("claude")
-    if shutil.which("agent") or os.path.isfile(os.path.expanduser("~/.local/bin/agent")):
+    if resolve_engine_executable("agent"):
         engines.append("cursor")
-    if shutil.which("codex") or os.path.isfile(os.path.expanduser("~/.local/bin/codex")):
+    if resolve_engine_executable("codex"):
         engines.append("codex")
-    if shutil.which("opencode") or os.path.isfile(os.path.expanduser("~/.local/bin/opencode")):
+    if resolve_engine_executable("opencode"):
         engines.append("opencode")
-    if shutil.which("agy") or os.path.isfile(os.path.expanduser("~/.local/bin/agy")):
+    if resolve_engine_executable("agy"):
         engines.append("antigravity")
     return engines
 
@@ -1164,7 +1241,7 @@ def main():
             os.chdir(temp_dir)
             subprocess.run(["git", "checkout", initial_head], check=True, capture_output=True)
             # Remove branch-controlled agent configs to enforce sandbox isolation
-            subprocess.run(["rm", "-rf", ".claude", ".claude.json", ".cursor", ".gemini", ".codex", "AGENTS.md", "CLAUDE.md", "GEMINI.md", ".github/copilot-instructions.md", ".vscode", "cursor.json", ".aider.conf.yml", ".agents", "opencode.json", ".mcp.json"], check=False)
+            _clean_sandbox_configs(Path(temp_dir))
             report, engine_label = execute_review(args.engine, full_prompt, model=args.model, expected_commit_sha=initial_head, exclude_engine=args.exclude_engine)
         finally:
             os.chdir(original_cwd)

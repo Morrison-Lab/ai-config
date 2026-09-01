@@ -38,9 +38,38 @@ gh issue list --state open --limit 20 --json number,title,labels,assignees,creat
 glab issue list --per-page=20 2>&1 | cat
 ```
 
-### 2. Triage / prioritize
+### 2. Triage, label, and prioritize
 
-Scan the issue list and rank by priority. Use these signals (in order):
+While surveying open issues to select the top candidate, inspect candidate
+issues and apply triage labels to any that are unlabeled or undertriaged.
+
+**Apply triage labels:**
+
+1. **Check repo taxonomy:** Use existing labels on the repository (check
+   `gh label list` / `glab label list` if unsure) rather than inventing new
+   ones.
+2. **Classify each candidate:**
+   - **Type:** `bug`, `enhancement`, `documentation`, `maintenance` / `refactor` /
+     `chore` (match repo conventions).
+   - **Priority:** `high-priority`, `low-priority`, `P0` / `P1` / `P2` if the repo
+     uses explicit priority labels.
+   - **Status:** `blocked`, `duplicate`, `invalid`, `wontfix` if applicable.
+3. **Add labels to inspected issues:**
+
+```bash
+# GitHub
+gh issue edit <N> --add-label "<label1>,<label2>"   # LABEL_ISSUE
+
+# GitLab
+glab issue update <N> --label "<label1>,<label2>"
+```
+
+`gh issue edit --add-label` is additive and preserves existing labels.
+
+**Rank by priority:**
+
+Scan the triaged issues and rank by priority.
+Use these signals (in order):
 
 | Signal | Weight |
 |--------|--------|
@@ -53,13 +82,6 @@ Scan the issue list and rank by priority. Use these signals (in order):
 | Already assigned to someone else | **Skip** |
 | Issue comment says "Working on this" (and the claim is live --- under 2 h old) | **Skip** |
 | Open PR already exists for the issue | **Skip** |
-
-**Re-triage if helpful:** If labels are stale, missing, or inconsistent, briefly
-suggest re-labeling to the user before proceeding. Don't unilaterally relabel
-without asking — but do flag it:
-
-> "Issues #4 and #7 both look high-priority but neither is labeled. Want me to
-> label them before picking one, or just grab #4 (older, looks like a bug)?"
 
 ### 3. Select top issue automatically
 
@@ -310,6 +332,8 @@ dependency, needs design decision, upstream bug):
 - ❌ Picking a huge issue that can't be completed in one session without
   discussing scope with the user first
 - ❌ Implementing without understanding "done" criteria from the issue
+- ❌ Skipping triage labeling on candidate issues — apply classification labels
+  to candidate issues inspected during triage so the backlog stays organized
 - ❌ Opening the PR only after implementing — open a draft PR up front (step 8)
   so the work is visible and a parallel session doesn't grab the same issue
 - ❌ Forgetting `Closes #N` in the MR/PR description

@@ -20,6 +20,10 @@ from fences import strip_fences  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
+REF_DEF = re.compile(
+    r"^[ \t]{0,3}\[[^\]\r\n]+\]:[ \t]*(?:\r?\n[ \t]*)?(?:<([^>\r\n]+)>|(\S+))",
+    re.MULTILINE,
+)
 # Strip code regions first so link-shaped examples inside fences / backticks
 # (regexes, `[text](url)` snippets) aren't mistaken for real links.
 INLINE = re.compile(r"`[^`]*`")
@@ -43,41 +47,60 @@ def is_external(target: str) -> bool:
     return target.startswith(SKIP_PREFIXES) or "://" in target
 
 
-def check_file(md: Path) -> None:
+def _check_target(target: str, md: Path, root: Path = ROOT) -> None:
     global checked
+    target = target.strip()
+    if target.startswith("<") and target.endswith(">"):
+        target = target[1:-1].strip()
+    # drop a trailing `"title"` if present
+    target = target.split(" ", 1)[0]
+    if not target or is_external(target):
+        return
+    if "<" in target or ">" in target:
+        return  # angle-bracket placeholder, e.g. <owner>/<repo>
+    path_part = re.split(r"[#?]", target, maxsplit=1)[0]
+    if not path_part:  # pure in-page anchor
+        return
+    if "/" not in path_part and "." not in path_part:
+        return  # bare-word placeholder in an example, e.g. (url)
+    checked += 1
+    resolved = (md.parent / path_part).resolve()
+    if not resolved.exists():
+        try:
+            rel = md.relative_to(root)
+        except ValueError:
+            rel = md
+        broken.append(f"{rel} -> {target}")
+
+
+def check_file(md: Path, root: Path = ROOT) -> None:
     text = md.read_text(encoding="utf-8")
     text = strip_fences(text)
     text = INLINE.sub("", text)
     for match in LINK.finditer(text):
-        target = match.group(1).strip()
-        if target.startswith("<") and target.endswith(">"):
-            target = target[1:-1].strip()
-        # drop a trailing `"title"` if present
-        target = target.split(" ", 1)[0]
-        if not target or is_external(target):
-            continue
-        if "<" in target or ">" in target:
-            continue  # angle-bracket placeholder, e.g. <owner>/<repo>
-        path_part = re.split(r"[#?]", target, maxsplit=1)[0]
-        if not path_part:  # pure in-page anchor
-            continue
-        if "/" not in path_part and "." not in path_part:
-            continue  # bare-word placeholder in an example, e.g. (url)
-        checked += 1
-        resolved = (md.parent / path_part).resolve()
-        if not resolved.exists():
-            broken.append(f"{md.relative_to(ROOT)} -> {target}")
+        _check_target(match.group(1), md, root=root)
+    for match in REF_DEF.finditer(text):
+        target = match.group(1) or match.group(2)
+        if target:
+            _check_target(target, md, root=root)
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    root = ROOT
+    if argv is None:
+        argv = sys.argv[1:]
+    if "--root" in argv:
+        idx = argv.index("--root")
+        if idx + 1 < len(argv):
+            root = Path(argv[idx + 1]).resolve()
     seen: set[Path] = set()
     for glob in SCAN_GLOBS:
-        for md in ROOT.glob(glob):
+        for md in root.glob(glob):
             if md.is_file() and md not in seen:
                 seen.add(md)
-                check_file(md)
+                check_file(md, root=root)
     print(f"Checked {checked} relative links across {len(seen)} markdown files.")
     if broken:
         print(f"\n✗ {len(broken)} broken link(s):")

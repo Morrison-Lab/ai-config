@@ -22,7 +22,7 @@ mutates a PR stays serial.
 1. **List the open PRs/MRs and decide which are in scope.**
    ```bash
    gh pr list --state open --limit 100 \
-     --json number,title,headRefName,baseRefName,isDraft,author,reviewDecision   # LIST_PRS
+     --json number,title,headRefName,baseRefName,isDraft,author,assignees,reviewDecision   # LIST_PRS
    ```
    On GitLab, use `glab api "projects/:id/merge_requests?state=opened&per_page=100"`
    and look for `source_branch` (≡ `headRefName`) and `target_branch` (≡ `baseRefName`)
@@ -30,11 +30,15 @@ mutates a PR stays serial.
    State the scope rules when you report, so the user can
    correct:
    - **Only the user's own PRs are in scope.**
-     Keep a PR only when `author.login` is the user (`d-morrison` or
-     `dem-extra1`) or the user is among its `assignees`;
-     drop every other PR from the list before doing anything else, and name
-     the dropped ones in the report so the user can reassign any they want
-     driven.
+     Resolve the invoking user first --- `gh api user --jq .login` locally,
+     `mcp__github__get_me` in a remote session --- and add any aliases
+     `memories/reviewing-prs.md` lists for that person, so a lab member
+     running this corpus from a vendored checkout filters on their own
+     identity rather than the corpus owner's.
+     Keep a PR only when its `author.login` is one of those logins, one of
+     them is among its `assignees`, or the user named the PR in the request;
+     drop every other PR before doing anything else, and name the dropped
+     ones in the report so the user can assign or name any they want driven.
      "Every open PR" below means every PR that survives this filter.
      A PR by another lab member or by a bot is not driven, reviewed, or
      edited, however clean it looks
@@ -60,9 +64,6 @@ mutates a PR stays serial.
        mark it ready for review --- a clean verdict is unreachable while it stays draft.
      Name each draft's disposition, and the signal that decided it, in the scope report,
      so the user can veto before the loop touches it.
-   - **Only iterate PRs the user owns / is responsible for** by default. In a
-     shared repo, don't start review loops (which push commits) on other
-     people's PRs unless told to. If unsure who owns what, ask first.
    - **A green PR with no review check run is parked, not finished.**
      On a repo whose review workflow is `workflow_dispatch`-only, nothing
      fires on push, so a PR nobody ever reviewed presents exactly like one

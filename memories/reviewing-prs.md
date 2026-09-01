@@ -75,9 +75,18 @@ sweep skill words its scope.
 The user stated the **Do** side; the **Don't** side is inferred from the
 near-miss that prompted it, and is what makes the rule checkable.
 
-- **Do:** before touching any PR, read `author.login` and `assignees` and
-  proceed only when the author is `d-morrison` / `dem-extra1` or the
-  assignees include `d-morrison`.
+- **Do:** before touching any PR, resolve who you are running as, read the
+  PR's `author.login` and `assignees`, and proceed only when the author is
+  you (or an alias below), you are among the assignees, or the user named
+  the PR in the request.
+- **Do:** treat `d-morrison` and `dem-extra1` as one person --- this
+  corpus's owner --- when either is the invoking user.
+  They are written as literals here on purpose: `preferences.md`'s
+  "Never hardcode usernames" rule exempts values that must resolve to a
+  real account, and an `author.login` match is exactly that.
+  A skill must still resolve the invoking user dynamically and only *add*
+  these aliases, so another lab member running the vendored corpus filters
+  on their own identity, not on these two.
 - **Do:** on a sweep (`ardia`, `gia`, `ardiaei`, `gmd`), filter the PR list by
   that test first, and say in the report which PRs were excluded and why.
 - **Don't:** push commits to, rewrite the title or body of, dispatch a paid

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests for scripts/check-links.py (ai-config#2537).
+"""Tests for scripts/check-links.py (ai-config#2842).
 
 Verifies that:
 1. External URI schemes, email addresses, and in-page anchors are recognized and skipped.

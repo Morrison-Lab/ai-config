@@ -127,10 +127,8 @@ RX_PULL_URL = re.compile(
     re.I,
 )
 
-RX_HEREDOC = re.compile(
-    r"<<-?\s*['\"]?([A-Za-z_][A-Za-z0-9_]*)['\"]?([^\n]*)\n"
-    r".*?\n[ \t]*\1\b",
-    re.DOTALL,
+RX_HEREDOC_OPENER = re.compile(
+    r"<<-?\s*['\"]?([A-Za-z_][A-Za-z0-9_]*)['\"]?([^\n]*)"
 )
 
 # Command-position opener. Narrower than a full shell parser: omits `(` / `{`
@@ -208,14 +206,50 @@ def strip_heredocs(command):
     stripped twice. The hook runs on every Write/Edit/NotebookEdit
     (ai-config#2390), so halving the work is worth a cache.
 
-    An early exit from `evaluate`'s loop once `view_after` and `fetch_after`
-    are both set would be the larger win and is NOT safe: that same loop
-    collects `view_results`, and `closed_after` reads the result of the LAST
-    after-view, which arrives in a later entry than the tool_use that set the
-    flag. Breaking would drop it and lose the closed-issue case.
-    ai-config#2536 carries the remaining bound, on RX_HEREDOC itself.
+    Bounded against unterminated openers (ai-config#2536): processes lines in
+    a single linear forward pass in O(length) time without re-scanning or
+    backtracking.
     """
-    return RX_HEREDOC.sub(lambda m: m.group(2), command)
+    if not isinstance(command, str) or "<<" not in command:
+        return command
+    lines = command.splitlines(keepends=True)
+    out = []
+    active_tag = None
+    term_pattern = None
+    for line in lines:
+        if active_tag is None:
+            m = RX_HEREDOC_OPENER.search(line)
+            if m:
+                prefix = line[:m.start()]
+                rem = m.group(2)
+                nl = "\n" if line.endswith("\n") else ""
+                out.append(prefix + rem + nl)
+                active_tag = m.group(1)
+                term_pattern = re.compile(
+                    rf"^[ \t]*{re.escape(active_tag)}\b([^\n]*)"
+                )
+            else:
+                out.append(line)
+        else:
+            term_m = term_pattern.match(line)
+            if term_m:
+                active_tag = None
+                term_pattern = None
+                trailing = term_m.group(1)
+                nl = "\n" if line.endswith("\n") else ""
+                if trailing:
+                    m_next = RX_HEREDOC_OPENER.search(trailing)
+                    if m_next:
+                        prefix_next = trailing[:m_next.start()]
+                        rem_next = m_next.group(2)
+                        out.append(prefix_next + rem_next + nl)
+                        active_tag = m_next.group(1)
+                        term_pattern = re.compile(
+                            rf"^[ \t]*{re.escape(active_tag)}\b([^\n]*)"
+                        )
+                    else:
+                        out.append(trailing + nl)
+    return "".join(out)
 
 
 def _mapping_block(text, op_id):

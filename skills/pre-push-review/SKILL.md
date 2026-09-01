@@ -9,8 +9,9 @@ allowed-tools:
 
 # pre-push-review
 
-Runs an automated, single-pass adversarial AI code review on outgoing branch commits,
-drawing on desktop **Claude Pro/Team**, **ChatGPT**, **OpenCode**, or **Google AI Ultra** subscription quota.
+Runs an automated, detailed, and holistic adversarial AI code review on outgoing branch commits,
+drawing on desktop **Claude Pro/Team**, **ChatGPT**, **OpenCode**, or **Google AI Ultra** subscription quota
+(evaluating implementation defects, architecture, conventions, safety, tests, and diff impacts rather than perfunctory surface checks).
 
 ## When this fires
 
@@ -22,7 +23,7 @@ drawing on desktop **Claude Pro/Team**, **ChatGPT**, **OpenCode**, or **Google A
 
 1. Computes the local outgoing diff against `origin/main` (or the detected PR base / explicit base branch).
 2. Injects universal repository standards (`AGENTS.md`).
-3. Dispatches to the selected engine or auto-fallback chain in plan/read-only mode (`claude` -> `cursor` -> `codex` -> `opencode` -> `agy`), or alternates round-robin across available models.
+3. Dispatches to the selected engine or auto-fallback chain in plan/read-only mode (`claude` -> `cursor` -> `codex` -> `opencode` -> `agy`), or alternates round-robin across available models, instructing both a detailed implementation defect audit and a holistic change assessment.
 4. Strictly parses and validates structured findings (Summary Verdict, Critical Findings, Observations, Verification Steps, and Reviewed-Commit SHA).
 5. Exits nonzero on blocking `Needs work` findings (unless `--allow-findings` is specified) and optionally posts verified review notes directly to the GitHub PR.
 

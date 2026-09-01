@@ -119,6 +119,34 @@ def create(tid, result=URL, err=False):
             res(tid, result, err)]
 
 
+# One push/no-push corpus for `_argv_push`, the sole authority both this
+# hook and no-push-without-self-review.py consult (ai-config#1935, #1920).
+PUSH_CORPUS = [
+    ("git push origin main", True),
+    ("git -C /tmp/wt push origin HEAD", True),
+    ("git push -o -n origin feature", True),
+    ("git push --receive-pack -d origin feature", True),
+    ("git push --push-option=-n origin x", True),
+    ("git push -on origin x", True),
+    ("git push -o ci.skip origin main", True),
+    ("git push -- origin -n", True),
+    # git reads the exclusions last-wins (measured on git 2.43.0: each of
+    # these moves the remote ref), so a later --no- form restores the push.
+    ("git push -n --no-dry-run origin main", True),
+    ("git push --dry-run --no-dry-run origin main", True),
+    ("git push --delete --no-delete origin main", True),
+    ("git push -d --no-delete origin main", True),
+    ("git push --no-dry-run -n origin main", False),
+    # After an ambiguous abbreviation git refuses the command outright, so
+    # the classification is immaterial; pinned so a change is deliberate.
+    ("git push --rec -n origin main", False),
+    ("git push --dry-run origin HEAD", False),
+    ("git push origin --delete old", False),
+    ("git push -qn origin x", False),
+    ("git push --dry origin x", False),
+    ("git push --del origin x", False),
+    ("gh pr comment 1 --body 'git push'", False),
+]
 CASES = []
 
 
@@ -1091,6 +1119,35 @@ case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
                     bash("git push origin --delete old-branch", tid="p"),
                     res("p", ""), say("Deleted a stale branch.")], False,
      "`git push --delete` removes a ref rather than advancing one")
+# The exclusion walks option VALUES (ai-config#1935): `-n` as the value of
+# `-o` is a push-option, not a dry run, and `-d` after `--receive-pack` is
+# that option's value -- both re-head the branch and re-arm. A clustered
+# `-qn` is a dry run; `-on` is `-o` with the value `n`; `--dry` is git's
+# accepted abbreviation of `--dry-run`.
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash("git push -o -n origin feature", tid="p"),
+                    res("p", ""), say("Pushed with a push-option.")], True,
+     "`-n` as the value of `-o` is not --dry-run: the push re-arms")
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash("git push --receive-pack -d origin feature", tid="p"),
+                    res("p", ""), say("Pushed via a custom receive-pack.")], True,
+     "`-d` as the value of --receive-pack is not --delete: the push re-arms")
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash("git push -qn origin feature", tid="p"),
+                    res("p", ""), say("Quiet dry run.")], False,
+     "a clustered `-qn` is a dry run and does not re-arm")
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash("git push -on origin feature", tid="p"),
+                    res("p", ""), say("Pushed with push-option n.")], True,
+     "`-on` is `-o` with the value `n`, a real push that re-arms")
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash("git push --dry origin feature", tid="p"),
+                    res("p", ""), say("Dry run, abbreviated.")], False,
+     "`--dry` is git's abbreviation of --dry-run and does not re-arm")
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash("git push -n --no-dry-run origin feature", tid="p"),
+                    res("p", ""), say("Pushed; the later --no-dry-run wins.")], True,
+     "a later --no-dry-run restores the push (git reads last-wins), so it re-arms")
 case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
                     bash("git -C /tmp/wt push origin HEAD", tid="p"),
                     res("p", ""), say("Pushed from a worktree.")], True,
@@ -1385,6 +1442,15 @@ def obligations_of(events):
 
 def main():
     passes = failures = 0
+    hookmod = load_hook()
+    for cmd, want in PUSH_CORPUS:
+        got = hookmod._argv_push(cmd.split())
+        if got is want:
+            passes += 1
+            print(f"PASS: _argv_push({cmd!r}) is {want}")
+        else:
+            failures += 1
+            print(f"FAIL: _argv_push({cmd!r}) is {got}, want {want}")
     for events, expected, label in CASES:
         if expected == "ordering":
             obs = obligations_of(events)

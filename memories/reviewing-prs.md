@@ -64,3 +64,42 @@ A later request to iterate is a driving request.
 "Watch and ARDI every PR you touch" applies when you are driving the
 branch, not when you were asked only to read it.
 See also [`shared/workflow/ardi.md`](../shared/workflow/ardi.md).
+## Only work PRs I opened or am assigned to
+
+Work only on pull requests opened by me (`d-morrison` or `dem-extra1`) or
+assigned to me.
+A PR opened by another lab member, or by a bot, is not mine to drive unless it
+is assigned to me --- however clean, stale, or easy it looks, and however a
+sweep skill words its scope.
+
+The user stated the **Do** side; the **Don't** side is inferred from the
+near-miss that prompted it, and is what makes the rule checkable.
+
+- **Do:** before touching any PR, read `author.login` and `assignees` and
+  proceed only when the author is `d-morrison` / `dem-extra1` or the
+  assignees include `d-morrison`.
+- **Do:** on a sweep (`ardia`, `gia`, `ardiaei`, `gmd`), filter the PR list by
+  that test first, and say in the report which PRs were excluded and why.
+- **Don't:** push commits to, rewrite the title or body of, dispatch a paid
+  review on, or resolve threads on a PR that fails the test.
+- **Don't:** read a skill's "drive every open PR" as a scope grant that
+  overrides this --- "every" means every PR that is mine.
+- **Don't:** treat a bot-opened PR (a submodule bump, a Dependabot PR) as
+  mine by default; it needs the assignment like any other.
+
+The near-miss looks like diligence from the inside, which is why it needs
+the explicit Don'ts.
+On `UCD-SERG/serodynamics`, 2026-09-01, a `gia` sweep pushed commits
+to #284, #292, #298 and #311 and dispatched a review on #310 --- four
+authored by other lab members, one by `github-actions[bot]`, none assigned
+to me --- and drove all of them to a clean verdict before the correction
+arrived.
+Every individual action was a correct ARDI step.
+The error was the population, decided by reading "every open PR" in the
+skill rather than by asking whose PRs they were.
+Each of those threads got one disclosure comment naming the commits, so the
+authors can keep or revert them.
+
+An issue on a repo I own is different from a PR on it: filing, triaging, and
+commenting on issues is fine, and an issue someone else's open PR already
+fixes is left to that PR (not grabbed, and that PR not driven either).

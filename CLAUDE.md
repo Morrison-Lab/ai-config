@@ -277,6 +277,15 @@ If the suffix isn't PDT/PST, fall back to plain `date` when the machine's system
 Otherwise use PowerShell: `[System.TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTime]::UtcNow, 'Pacific Standard Time')`.
 Note the output format differs from the bash command — it's a raw `DateTime` with no timezone-abbreviation field, so format it yourself if you need the `PDT`/`PST` suffix or a compact form.
 
+**The same drift also hits a clock time typed into a forge comment --- an issue or PR comment, a claim comment especially, since `claim-pr` puts a time in every one.**
+A claim comment, a "working on this" status update, or a session-notebook heading is a dated claim exactly like the file edit above, so it needs the same fresh reading, not a reuse of whatever the last real reading said.
+The near-miss is inferring the current time from how much work has happened since that last reading --- counting elapsed tool calls, or a rough sense of "it's been a while" --- rather than running the clock command again.
+That inference feels safe because the earlier reading really was measured, but the clock keeps moving while a tool-call count does not track it, so the two drift apart the same way an unrefreshed chat timestamp does, and the drift compounds across several comments posted in sequence from the same stale reading.
+(Measured 2026-09-01: one real reading at 12:02 PDT was followed by claim comments on wai#81, wai#96, and wai#95 stamped "12:15 PT", "12:40 PT", and "12:58 PT" and by notebook headings "12:25", "12:55", "13:20", all extrapolated from elapsed tool calls; the next real reading, taken when a PR head commit's timestamp was needed, came back 12:21 PDT --- up to an hour behind the invented stamps.)
+
+- **Do:** run the clock command again immediately before typing a time into a forge comment, exactly as before a chat recap or a file edit.
+- **Don't:** infer a clock time from the number of tool calls or actions taken since the last real reading.
+
 ## State the actual time when reporting a scheduled check-in
 
 When telling the user I've scheduled a wakeup or check-in (`ScheduleWakeup`, or an equivalent poll-later mechanism), state the clock time it fires at, not just the relative delay or a bare "I scheduled a check-in."

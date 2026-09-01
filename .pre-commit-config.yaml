@@ -31,6 +31,18 @@ repos:
         language: python
         pass_filenames: false
         always_run: true
+      - id: check-ascii-punctuation
+        name: check ASCII punctuation in source (.py, .R)
+        entry: python scripts/check-ascii-punctuation.py
+        language: python
+        pass_filenames: false
+        always_run: true
+      - id: test-check-ascii-punctuation
+        name: check-ascii-punctuation tests
+        entry: python scripts/test_check_ascii_punctuation.py
+        language: python
+        pass_filenames: false
+        always_run: true
       - id: check-jules-review-workflow
         name: check Jules mention-dispatch wrap
         entry: python scripts/check-jules-review-workflow.py

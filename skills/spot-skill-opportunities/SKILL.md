@@ -47,6 +47,7 @@ a **dedicated, read-only fan-out worker** a heavy skill's per-item step needs
    in-flight branch, or an **open PR** before proposing a new one:
    ```bash
    grep -ril "<keywords>" skills/*/SKILL.md
+   gh pr list --state all --search "<keywords>" --json number,title,state,url   # SEARCH_PRS
    ```
    (see
    [`check-open-prs-before-duplicating`](../../shared/workflow/check-open-prs-before-duplicating.md)

@@ -692,6 +692,21 @@ A clean automated review from every available provider evaluating the current HE
   Partially per-domain (e.g. static analyzers checking that CI jobs admitting `$CI_COMMIT_TAG` do not rely exclusively on `CI_COMMIT_BRANCH` in their scripts).
   General case requires behavioural fixture tests.
 
+## Pattern 36: Approximating Shell Constructs via Regex Without Disambiguating Context-Dependent Operators
+- **Do**: When approximating shell grammar (such as heredocs, redirection, or variable expansions) in security-relevant hooks, identify and mask syntactic contexts where the operator has a completely different meaning (e.g., `<<` inside arithmetic expressions `$(( x << n ))` or `(( x << n ))` is bitwise left-shift, not a heredoc opener), parse balanced parentheses rather than naive regexes, and preserve unclosed constructs rather than dropping downstream commands.
+- **Don't**: Assume an operator character sequence (like `<<`) uniquely identifies a redirection across all shell contexts, or that non-matching delimiter lines will safely fail closed;
+  treating an operator as a heredoc opener causes subsequent command lines to be silently swallowed until an impossible delimiter matches, creating silent false negatives on gated commands.
+- **Example**: 2026-08-31 on `Morrison-Lab/ai-config` PR [#2817](https://github.com/Morrison-Lab/ai-config/pull/2817) (Issue #2588):
+  `strip_heredocs` matched `<<` as a heredoc opener without checking for arithmetic expansion `$(( ... ))` or `(( ... ))`.
+  In a multi-line script starting with `timeout=$(( base_timeout << retry_count ))`, the left-shift was misparsed as opening a heredoc with delimiter `retry_count`, silently swallowing subsequent lines including ungated `gh` commands.
+  Caught in review by Claude review bot on PR #2817.
+- **Canonical Rule**: [`fail-fast.md`](../shared/principles/fail-fast.md).
+- **Fix**: Mask arithmetic expansions with balanced parenthesis tracking (`mask_arithmetic`), fail-safe unclosed heredocs by restoring buffered lines, and verify delimiter termination syntax before entering heredoc-stripping state;
+  add regression test cases specifically covering arithmetic expressions preceding gated commands.
+- **Algorithmatizable?**
+  Yes;
+  unit test suites for shell-parsing hooks must include fixtures combining arithmetic expansions, subshells, pipelines, and heredocs.
+
 ## Pattern 37: Discrepancy Between Synthesis Count and Underlying Source Inventory
 - **Do**: Distinguish between the total number of referenced items/files in a source catalog and the count of synthesized/distilled items in your derived document or taxonomy.
   Ensure summaries, index entries, and cross-references match the exact count in the file they describe.

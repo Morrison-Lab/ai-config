@@ -2,13 +2,13 @@
 """Dispatch the canonical ai-config hook catalog through Codex hooks.
 
 Codex and Claude use compatible lifecycle names and JSON payloads, but Codex
-discovers project hooks from ``.codex/hooks.json`` and plugin hooks from a
-Codex plugin manifest.  This dispatcher keeps one source of truth in
-``hooks/hooks.json`` while translating only the small matcher and output
-differences that matter to Codex.  If Codex does not provide a transcript path
-for Stop, only the prompt/tool fields present in that payload and the final
-assistant message can be reconstructed; transcript-dependent checks are then
-necessarily best-effort.
+loads this adapter through the explicit ``hooks`` override in the plugin
+manifest, which points to ``plugins/ai-config/codex-hooks.json``.  This keeps
+one source of truth in ``hooks/hooks.json`` while translating only the small
+matcher and output differences that matter to Codex.  If Codex does not
+provide a transcript path for Stop, only the prompt/tool fields present in
+that payload and the final assistant message can be reconstructed;
+transcript-dependent checks are then necessarily best-effort.
 """
 from __future__ import annotations
 

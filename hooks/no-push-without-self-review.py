@@ -127,7 +127,18 @@ ADVERSARIAL_AGENT_NAME = re.compile(
     r"\A\s*(?:[\w.-]+[:/])?adversarial[-_ ]?reviewer\s*\Z", re.I
 )
 
-AGENT_TOOLS = {"agent", "task", "invoke_subagent"}
+# When no dedicated `adversarial-reviewer` persona is registered in the
+# environment (e.g. built-in subagents or automated sessions), allow
+# fallback subagents whose prompt requests adversarial review.
+FALLBACK_AGENT_NAME = re.compile(
+    r"\A\s*(?:[\w.-]+[:/])?(?:general[-_ ]?purpose|general|reviewer|code[-_ ]?reviewer|research|self)\s*\Z", re.I
+)
+
+REVIEW_PROMPT_RE = re.compile(
+    r"\b(?:adversarial[-_ ]?(?:self[-_ ]?)?review|pre[-_ ]?push[-_ ]?review|self[-_ ]?review)\b", re.I
+)
+
+AGENT_TOOLS = {"agent", "task", "invoke_subagent", "taskoutput", "task_output", "manage_task"}
 
 OVERRIDE_ENV = re.compile(r"\AALLOW_UNREVIEWED_PUSH=1\Z")
 
@@ -1339,6 +1350,8 @@ def parse_report(text: str) -> tuple[str | None, str | None]:
     return verdict, (sha.group(1).lower() if sha else None)
 
 
+
+
 def _is_reviewer_record(record: dict) -> bool:
     """True if this transcript record is attributed to the adversarial reviewer."""
     candidates: list[str] = []
@@ -1375,6 +1388,7 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
     clean final review verdict.
     """
     reviewer_call_ids: set[str] = set()
+    reviewer_task_ids: set[str] = set()
     saw_reviewer_call = False
     verdict: str | None = None
     reviewed_commit: str | None = None
@@ -1390,6 +1404,12 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                 continue
             if not isinstance(record, dict):
                 continue
+
+            is_assistant = (
+                record.get("source") == "MODEL"
+                or record.get("type") == "assistant"
+                or (isinstance(record.get("message"), dict) and record["message"].get("role") == "assistant")
+            )
 
             record_is_reviewer = _is_reviewer_record(record)
             if record_is_reviewer:
@@ -1407,8 +1427,10 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
 
                 if b_type == "tool_use":
                     tool_name = (b.get("name") or "").lower()
+                    call_id = b.get("id")
+                    inp = b.get("input") or {}
+
                     if tool_name in AGENT_TOOLS:
-                        inp = b.get("input") or {}
                         sub_types = []
                         for k in ("subagent_type", "subagentType", "agent_type", "TypeName", "name", "Role"):
                             if inp.get(k):
@@ -1419,13 +1441,26 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                                     for k in ("TypeName", "Role", "name"):
                                         if sa.get(k):
                                             sub_types.append(str(sa.get(k)))
-                        if any(ADVERSARIAL_AGENT_NAME.match(st) for st in sub_types):
+
+                        prompt = str(inp.get("prompt") or inp.get("Prompt") or inp.get("instruction") or inp.get("description") or "")
+
+                        is_adversarial = any(ADVERSARIAL_AGENT_NAME.match(st) for st in sub_types)
+                        is_fallback = bool(
+                            sub_types
+                            and any(FALLBACK_AGENT_NAME.match(st) for st in sub_types)
+                            and REVIEW_PROMPT_RE.search(prompt)
+                        )
+
+                        if is_adversarial or is_fallback:
                             saw_reviewer_call = True
-                            call_id = b.get("id")
                             if isinstance(call_id, str) and call_id:
                                 reviewer_call_ids.add(call_id)
+                        elif tool_name in ("taskoutput", "task_output", "manage_task"):
+                            task_id = str(inp.get("task_id") or inp.get("TaskId") or inp.get("id") or "")
+                            if task_id and task_id in reviewer_task_ids:
+                                if isinstance(call_id, str) and call_id:
+                                    reviewer_call_ids.add(call_id)
                     elif tool_name == "send_message" and record_is_reviewer:
-                        inp = b.get("input") or {}
                         msg_text = str(inp.get("Message") or inp.get("message") or "")
                         if msg_text:
                             found, sha = parse_report(msg_text)
@@ -1433,13 +1468,45 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                                 verdict, reviewed_commit = found, sha
 
                 elif b_type == "tool_result":
-                    if b.get("tool_use_id") not in reviewer_call_ids:
-                        continue
-                    if b.get("is_error"):
-                        continue
-                    found, sha = parse_report(_result_text(b))
-                    if found:
-                        verdict, reviewed_commit = found, sha
+                    call_id = b.get("tool_use_id")
+                    if call_id in reviewer_call_ids:
+                        # Check if this result launched a background task with an ID
+                        res_text = _result_text(b)
+                        try:
+                            res_data = json.loads(res_text)
+                            if isinstance(res_data, dict):
+                                tid = res_data.get("task_id") or res_data.get("conversationId") or res_data.get("id")
+                                if tid:
+                                    reviewer_task_ids.add(str(tid))
+                        except Exception:
+                            tid_match = re.search(r"\b(?:task[-_ ]?id|conversationId)[:=]\s*[`\"']?([\w-]+)", res_text, re.I)
+                            if tid_match:
+                                reviewer_task_ids.add(tid_match.group(1))
+
+                        if not b.get("is_error"):
+                            found, sha = parse_report(res_text)
+                            if found:
+                                saw_reviewer_call = True
+                                verdict, reviewed_commit = found, sha
+
+                # Genuine task notifications from tracked background reviewer dispatches
+                origin = record.get("origin")
+                is_task_notification = (
+                    isinstance(origin, dict)
+                    and origin.get("kind") in ("task-notification", "task_notification")
+                )
+                if is_task_notification and not is_assistant and not b.get("is_error"):
+                    origin_task_id = str(origin.get("taskId") or origin.get("task_id") or "")
+                    sender_id = str(record.get("sender") or "")
+                    if (
+                        (origin_task_id and origin_task_id in reviewer_task_ids)
+                        or (sender_id and sender_id in reviewer_task_ids)
+                    ):
+                        text = str(b.get("text") or b.get("content") or "")
+                        found, sha = parse_report(text)
+                        if found:
+                            saw_reviewer_call = True
+                            verdict, reviewed_commit = found, sha
 
     return verdict, reviewed_commit, saw_reviewer_call
 
@@ -1447,13 +1514,18 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
 def verify_review(transcript_path: str, directory: str | None,
                   argv: list[str], env: list[str]) -> tuple[bool, str]:
     """(is_clean, reason) -- is there a clean verdict for what this push ships?"""
-    if not transcript_path or not os.path.exists(transcript_path):
-        return False, "No transcript available to verify the adversarial self-review."
+    saw_reviewer_call = False
+    verdict: str | None = None
+    reviewed_commit: str | None = None
 
-    try:
-        verdict, reviewed_commit, saw_reviewer_call = read_latest_review(transcript_path)
-    except Exception as e:
-        return False, f"Failed reading transcript: {e}"
+    if transcript_path and os.path.exists(transcript_path):
+        try:
+            verdict, reviewed_commit, saw_reviewer_call = read_latest_review(transcript_path)
+        except Exception as e:
+            return False, f"Failed reading transcript: {e}"
+
+    if not transcript_path and not saw_reviewer_call:
+        return False, "No transcript available to verify the adversarial self-review."
 
     if not saw_reviewer_call:
         return False, (
@@ -1517,15 +1589,17 @@ def verify_review(transcript_path: str, directory: str | None,
 DENY_TAIL = (
     "\n\nStanding rule: every self-review is an adversarial review by a separate "
     "subagent. Dispatch `adversarial-reviewer` in the foreground against your "
-    "committed diff, address or rebut every finding, and let its report state the "
-    "commit it read.\n\n"
-    "Only that subagent's own result counts -- this message does not, and neither "
-    "does reading a file that quotes a verdict.\n\n"
+    "committed diff (or dispatch a fallback reviewer subagent such as `general-purpose` "
+    "or `self` with an adversarial review prompt when the persona is unregistered), "
+    "address or rebut every finding, and let its report state the commit it read.\n\n"
+    "Only that reviewer's own result or report counts -- this message does not, "
+    "and neither does reading a file that quotes a verdict.\n\n"
     "Override by prefixing the push itself with `ALLOW_UNREVIEWED_PUSH=1` when no "
     "verdict can exist for the guard to check: an initial empty PR branch (per "
-    "pr-on-claim), a review delivered by a separate CLI rather than a subagent, a "
-    "session where the reviewer agent is unregistered or loaded from a stale "
-    "definition, or an emergency. Say in your reply that you used it and why."
+    "pr-on-claim), an auto-mode session where no subagent tool exists, "
+    "or an emergency. In auto mode, if the permission classifier denies the env "
+    "prefix, request a Bash permission rule. "
+    "Say in your reply that you used the override and why."
 )
 
 

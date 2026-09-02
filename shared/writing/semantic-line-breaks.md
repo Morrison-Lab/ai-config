@@ -212,8 +212,9 @@ lesson, until review consolidated it here instead.
   After #2085, `--write` splits what `classify_line` flags.
   It still is not the diff-scoped CI job.
 
-**Until [ai-config#1730](https://github.com/Morrison-Lab/ai-config/issues/1730) gated the job, a green check run named for this gate might not have run it, and both runs
-carried the same name.**
+**Until [ai-config#1730](https://github.com/Morrison-Lab/ai-config/issues/1730) gated the job,
+a green check run named for this gate might not have run it,
+and both runs carried the same name.**
 The reformatter trap above is about the wrong *tool*.
 This is about the right tool reporting success without measuring anything, and
 it is harder to catch because there is nothing to notice: the check run is
@@ -234,7 +235,10 @@ reading "the check is green", answered a question it was never asked.
 
 The `new-line-breaks` job in `.github/workflows/validate.yml` now carries
 `if: github.event_name == 'pull_request'`, so the push-triggered run reports
-`skipped` rather than `success` and a green run of that name is one that ran.
+`skipped` rather than `success`.
+That closes the missing-base push case only: a `pull_request` run can still
+skip with the action's warning when the diff cannot be computed, so a green
+run is one that ran only once its log shows lines were examined.
 The rule below still applies to any other workflow of this shape, and to any
 repository whose copy of the job predates that guard.
 

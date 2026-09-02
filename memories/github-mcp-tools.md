@@ -333,6 +333,33 @@ See ai-config#694 for the precedent.
   (`ucdavis/rampp#111`, 2026-07-24/25: three refusals across two heads while
   `claude-review` reviewed both normally, and Copilot itself had worked on
   the same PR two days earlier.)
+- **Copilot's per-push review is not guaranteed, and a missing one is
+  silent.**
+  Measured on `Morrison-Lab/ai-config#2913`, 2026-09-01: three consecutive
+  pushes (`988b545`, `3b32086`, `ab89045`) produced no
+  `copilot-pull-request-reviewer` check run on the new head for several
+  minutes, while `request_copilot_review` started one within about fifteen
+  seconds each time and the review posted five to six minutes later.
+  `get_check_runs` is the tell: a Copilot review that is coming shows that
+  check run within a minute of the push, so an absent run is a request to
+  re-issue, not a review to wait for.
+  - **Do:** after every push, confirm the check run exists on the new head,
+    and call `request_copilot_review` when it does not.
+  - **Don't:** arm a check-in that waits on a round that never started.
+- **A Copilot review reporting `Comments generated: 0 new` can still carry
+  findings.**
+  They sit under `Suppressed comments` in the review body that `get_reviews`
+  returns (state `COMMENTED`, header `Needs a closer look`) and nowhere in
+  `get_review_comments`, so a `success` check run plus zero open threads is
+  not a clean round.
+  Rounds thirty-five and thirty-six on `#2913` each carried two such findings.
+  The same shape from the `gh` side is `fully-clean.cases.md`'s
+  collapsed-block case (`#1029`).
+  - **Do:** read the newest review body with `get_reviews` every round,
+    paging past the first page (`perPage` 5, highest page number) on a long
+    thread.
+  - **Don't:** call a round clean from `get_review_comments` and the check
+    run alone.
 - **A branch ruleset can block Copilot from pushing a fix while leaving my
   own push to the same branch unaffected.**
   When Copilot reports it prepared a change but could not apply it ---

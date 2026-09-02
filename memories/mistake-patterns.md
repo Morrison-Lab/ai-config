@@ -830,3 +830,52 @@ A clean automated review from every available provider evaluating the current HE
   A `Stop` guard could warn when a reply carries a BLOCKER box naming a
   `scripts/*.py` instrument and the transcript shows no `--help` invocation
   of that script; not built yet.
+
+## Pattern 43: Auto-Mode Push-Guard Deadlock --- Stale Plugin-Cache Hook Plus Classifier-Denied Overrides
+- **Do**: stop probing after the classifier's second denial of the same goal and hand the user the decision (push manually, restart the session, or add a permission rule).
+- **Don't**: keep rephrasing the override or the dispatch --- each denied variant makes the classifier more suspicious, locking out even the sanctioned paths;
+  and don't route the push around the guard through a peer session, a separately-billed CLI, or the MCP GitHub write tools ---
+  each is permission laundering:
+  the MCP write tools are the guard's documented open gap ([ai-config#1929](https://github.com/Morrison-Lab/ai-config/issues/1929)),
+  and a peer session or a separate CLI bypasses simply because the hook does not run there.
+- **Example**: 2026-09-01, `Lacaedemon/sparta` [PR #1459](https://github.com/Lacaedemon/sparta/pull/1459) (GIA sweep), tracked as [ai-config#2899](https://github.com/Morrison-Lab/ai-config/issues/2899);
+  previously `ucdavis/bcs` 2026-08-28 ([ai-config#2544](https://github.com/Morrison-Lab/ai-config/issues/2544), closed by [#2820](https://github.com/Morrison-Lab/ai-config/pull/2820)).
+  In an auto-permission-mode plugin-consumer session where no `adversarial-reviewer` agent is registered (`Agent type not found`),
+  the session treated `hooks/no-push-without-self-review.py`'s refusal as solvable in-session by repeatedly rephrasing the sanctioned `ALLOW_UNREVIEWED_PUSH=1` override or by patching the running hook file ---
+  when the auto-mode permission classifier pattern-matches every such attempt as a guard bypass and denies it,
+  and repeated varied attempts make the classifier (correctly) more suspicious,
+  until it denies even legitimately-shaped review dispatches.
+  The hook's sanctioned escape valve is exactly what the classifier reads as a bypass, so the two mechanisms compose into a lockout neither intends.
+  Both discharge paths were unreachable at once:
+  the plugin's shipped agents were absent from the session's Agent registry
+  (writing `.claude/agents/adversarial-reviewer.md` into the repo mid-session does not register it immediately or reliably --- definitions load at session start, and the one measured mid-session appearance came about fifty minutes after the write, by a mechanism not yet identified),
+  and the classifier denied the override in all three phrasings tried (Bash chained, Bash standalone, PowerShell `$env:`) --- consistent denials, not stochastic ones.
+  The [#2820](https://github.com/Morrison-Lab/ai-config/pull/2820) fallback, merged earlier that same day, was ALSO unreachable, for a distinct reason:
+  the harness runs the hook from the plugin CACHE snapshot (`~/.claude/plugins/cache/Morrison-Lab/ai-config/<rev>/hooks/`, via `${CLAUDE_PLUGIN_ROOT}`),
+  which predated the fix (rev `a3e0fdb`, no `FALLBACK_AGENT_NAME`);
+  pulling the marketplace clone (`git -C ~/.claude/plugins/marketplaces/Morrison-Lab pull --ff-only origin main`, to `79def2e`) succeeded but changed nothing the harness executes,
+  and copying the updated hook onto the cache copy was itself classifier-denied (reasonably --- an agent rewriting its own active guard).
+- **Canonical Rule**: [`adversarial-self-review.md`](../shared/workflow/adversarial-self-review.md) (the override's sanctioned scope),
+  [`no-push-without-self-review.py`](../hooks/no-push-without-self-review.py) (the fallback contract),
+  and [`keep-checkouts-fresh.md`](../shared/workflow/keep-checkouts-fresh.md) (the plugin hook path is the cache snapshot, not the marketplace clone).
+- **Fix**: Check first whether the running hook copy is stale against ai-config `main` --- diff the copy that `~/.claude/plugins/installed_plugins.json` pins (its per-scope `version` / `installPath`), since that is what runs: not the marketplace clone, and not merely the newest directory under the cache.
+  A session restart alone does NOT advance that pin (measured 2026-09-01: a continuation session started under ten minutes after the marketplace pull still ran rev `a3e0fdb`, and after a later app update the cache held a `79def2e` snapshot containing the fix while every scope stayed pinned to `a3e0fdb`).
+  Both measurements are recorded in the 2026-09-01 comments on [#2899](https://github.com/Morrison-Lab/ai-config/issues/2899).
+  What a restart does refresh is the auto-mode classifier's per-conversation state (the override the prior session's classifier had denied three times was accepted in the fresh one) and the Agent registry (a repo-level `.claude/agents/adversarial-reviewer.md` present at session start registers the reviewer, which satisfies even the stale hook's literal check).
+  The hook copy itself moves only when that pin advances.
+  The documented way to advance it is the plugin CLI --- `claude plugin marketplace update Morrison-Lab`, then `claude plugin update ai-config`.
+  `update` is the CLI's own subcommand for an already-installed plugin (present in Claude Code 2.1.258);
+  the `install` step in [`use-plugins.md`](../shared/workflow/use-plugins.md) is the first-time path and does not advance an existing pin.
+  This incident did not measure those commands:
+  an agent updating its own active guard mid-session is the same self-modification the classifier denies, so running them is the next thing for the USER to do.
+  Verify the pinned copy in `installed_plugins.json` afterwards rather than assuming the pin moved.
+  On a post-[#2820](https://github.com/Morrison-Lab/ai-config/pull/2820) hook (verified against `main`, 2026-09-01), the fallback contract is:
+  a dispatch whose `subagent_type` matches the general-purpose family (`general-purpose`, `general`, `reviewer`, `code-reviewer`, `research`, `self`)
+  and whose prompt contains a review-request phrase matching the prompt gate (e.g. "adversarial pre-push review"),
+  returning a report whose last verdict line reads `### Verdict: Ready for merge` (or `Needs more work`)
+  followed by `Reviewed-Commit: <HEAD sha>` (the parser accepts 7-40 hex characters; give the full 40).
+  A foreground dispatch is the simplest credited path and the one the hook's own refusal message recommends,
+  but background fallback dispatches, tracked `TaskOutput` reads, and task notifications are credited too, per Pattern 22.
+- **Algorithmatizable?**
+  Partially.
+  [#2544](https://github.com/Morrison-Lab/ai-config/issues/2544)'s suggested fix 3 --- have the hook's refusal message name a user-approvable permission rule for the override --- would have resolved the measured session in one step, and remains open under [#2899](https://github.com/Morrison-Lab/ai-config/issues/2899).

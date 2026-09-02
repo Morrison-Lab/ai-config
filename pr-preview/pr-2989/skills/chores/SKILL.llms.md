@@ -122,12 +122,12 @@ For a Renovate PR, tick the rebase checkbox in the PR body (or its Dependency Da
 Record `headRefOid` before reading the CI and conflict state, and require the live head to equal it immediately before the merge command, since Dependabot can rebase or regenerate the branch between the two reads and a regenerated head that already contains the base would pass a currency check with CI never read for it. Then run the base-currency check from [`fully-clean`](../../shared/workflow/fully-clean.md)’s stale-base rule (the Do bullets beginning “for a direct merge”), since a green head can still break the base when the base gained a check after the head’s CI ran. When it is stale, the bot-bump recovery is to update the branch, wait for the new head SHA, rerun the CI and conflict checks this skill gates on against that SHA (review stays skipped on bot PRs), and recheck currency and that the head is still that SHA immediately before merging. `gh pr update-branch "$N" --repo "$REPO"` merges the base in. `@dependabot rebase` rewrites the head onto it and also clears a conflict. Then merge directly. Dependabot deletes its own branch on merge.
 
 ``` bash
-gh pr merge "$N" --repo "$REPO" --squash   # MERGE_PR
+gh pr merge "$N" --repo "$REPO" --squash --match-head-commit "$PINNED"   # MERGE_PR; $PINNED is the headRefOid recorded above
 ```
 
 Pick a merge method the repo actually allows — `--squash` errors when squash merges are disabled; swap in `--merge` or `--rebase` to match the repo’s settings.
 
-If checks are still running and you want it to land once they pass, and only where the repository requires an up-to-date branch before merging or a correctly configured merge queue tests the merge (a deferred merge runs after the base-currency check, so elsewhere the check is stale by the time it fires):
+If checks are still running and you want it to land once they pass, and only where the repository requires an up-to-date branch before merging or a correctly configured merge queue tests the merge, and every check this skill gates on is required or aggregated behind a required check (both settings block on required checks alone, and a deferred merge runs after the base-currency check, so elsewhere the check is stale by the time it fires):
 
 ``` bash
 gh pr merge "$N" --repo "$REPO" --squash --auto   # MERGE_PR — needs auto-merge enabled; swap --squash for --merge/--rebase if squash is disabled

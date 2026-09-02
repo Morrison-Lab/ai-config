@@ -570,7 +570,7 @@
   Review verification tools and mistake patterns (Pattern 40) require recognizing `copilot-pull-request-reviewer`
   and its clean/not-clean verdict patterns so Copilot reviews are tracked as part of the automated review gate.
 
-  **Now that Copilot is live again, the 201-then-empty `requested_reviewers` signature above still holds, and the fix is to poll `reviews`, not `reviewRequests`.**
+  **On the 2026-09-01 (Pacific) sample, with Copilot reviewing again, the 201-then-empty `requested_reviewers` signature above still held, and the fix is to poll `reviews`, not `reviewRequests`.**
   On the PRs below, `gh api repos/<owner>/<repo>/pulls/<N>/requested_reviewers -X POST -f 'reviewers[]=copilot-pull-request-reviewer[bot]'` returned HTTP 201 each time.
   The section above records 422 and refusal as other outcomes.
   `gh pr view --json reviewRequests` stayed empty each time.

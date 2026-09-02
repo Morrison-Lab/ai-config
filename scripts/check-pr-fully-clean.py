@@ -1163,27 +1163,86 @@ _BARE_REJECTION = (
 # tense-checked ("is/are/was/were ... fixed", "has/have been fixed", "no
 # longer applies") so a live directive like "must be fixed before merge"
 # never reads as already resolved.
-RESOLVED_BLOCKING_SUFFIX = re.compile(
-    r"^(?:(?!\b(?:and|but|while|although|however)\b)"
-    r"(?:\([^()\n]{0,120}\)|[^,:;.!?()])){0,120}\b(?:"
-    r"(?:is|are|was|were)\s+(?:(?:now|since|already|also|fully|completely|satisfactorily|properly|cleanly|successfully)\s+)?"
-    r"(?:fixed|resolved|addressed|closed|removed|corrected)"
-    r"|ha(?:s|ve)\s+(?:(?:since|already|also)\s+)?been\s+(?:(?:now|fully|completely|satisfactorily|properly|cleanly|successfully)\s+)?"
-    r"(?:fixed|resolved|addressed|closed|removed|corrected)"
-    r"|no\s+longer\s+applies"
-    r")\b"
-    r"(?:\s+(?:by|in|via|with|through|as|per|on)\b"
-    r"(?:(?!\b(?:and|but|while|although|however|yet|though|"
+# The method phrase after a resolution verb ("fixed by re-running the
+# suite", "resolved via a rebase") and after the verified continuation
+# below ("fixed and verified by executing the script"). One definition, so
+# the forbidden-token lookahead that keeps "fixed by disabling the test"
+# not-clean guards both sites identically (ai-config#2957).
+# The tokens that keep a "fixed by ..." method phrase from vouching for a
+# suppressed check or a still-open finding. Applied per character of the
+# phrase AND per character inside a parenthesized aside: the aside used to
+# be consumed atomically, so "(but a critical bug remains)" after the
+# method was never inspected (round-2 adversarial review of #2958).
+_RESOLUTION_FORBIDDEN_LOOKAHEAD = (
+    r"(?!\b(?:and|but|while|although|however|yet|though|"
     r"not|never|neither|nor|no|none|nothing|without|"
     r"hardly|barely|scarcely|zero|"
     r"partially?|incomplete(?:ly)?|ignor(?:e|ed|ing|es)?|omit(?:s|ted|ting)?|skip(?:s|ped|ping)?|"
     r"except|unresolved|unfixed|unaddressed|open|reproduce[s]?|broken|failing|fails?|"
     r"(?:suppress|disabl|mut|weaken|bypass|silenc|remov|delet|revert)(?:e|ed|ing)?\s+(?:(?:the|an?|all|these|those|that|our|any)\s+)?(?:[a-z0-9_-]+\s+)?(?:tests?|checks?|assertions?|warnings?|linters?|guards?|lints?|detectors?|errors?)|"
     r"comment(?:ed|ing)?\s+out\s+(?:(?:the|an?|all|these|those|that|our|any)\s+)?(?:[a-z0-9_-]+\s+)?(?:tests?|checks?|assertions?|warnings?|linters?|guards?|lints?|detectors?|errors?))\b)"
-    r"(?:\([^()\n]{0,120}\)|[^;:,.!?()]|\.(?!\s|$))){1,180})?"
-    r"(?:"
+)
+
+_RESOLUTION_METHOD_PHRASE = (
+    r"(?:\s+(?:by|in|via|with|through|as|per|on|against)\b"
+    r"(?:" + _RESOLUTION_FORBIDDEN_LOOKAHEAD
+    + r"(?:\((?:" + _RESOLUTION_FORBIDDEN_LOOKAHEAD + r"[^()\n]){0,120}\)"
+    r"|[^;:,.!?()]|\.(?!\s|$))){1,180})?"
+)
+
+# "are fixed and verified by <method>" is how a reviewer says the fix was
+# checked rather than merely made. The method phrase reuses the guarded
+# body above, so the continuation admits no more than the bare form does.
+_RESOLUTION_VERIFIED_CONTINUATION = (
+    r"\s+and\s+(?:re-?)?(?:verified|confirmed|validated|checked)\b"
+    + _RESOLUTION_METHOD_PHRASE
+)
+
+# A `;`-joined clause after a resolved mention. Admitted by WHITELIST: the
+# clause must be one of a few enumerated shapes that carry no finding by
+# construction -- a "no new issues" statement, or the reviewer's habitual
+# note that the round's only commit is a small documentation correction.
+# A blacklist of finding vocabulary was tried first and failed open on the
+# adversarial review of ai-config#2958 ("; a critical error in the login
+# flow" read as clean), which is the dangerous direction by this file's
+# policy: a bounded word list can never enumerate every way to name an
+# open finding, while a whitelist admits only what it names.
+_BENIGN_TRAILING_CLAUSE = re.compile(
+    r"^\s*(?:"
+    r"(?:I\s+found\s+|there\s+(?:are|were)\s+|with\s+)?no\s+new\s+(?:issues?|findings?)"
+    r"(?:\s+(?:introduced|found|added|identified))?"
+    r"(?:\s+in\s+(?:this|the)\s+(?:round|review|pass|diff))?"
+    r"|nothing\s+else\s+to\s+report"
+    r"|the\s+(?:one|only|single|sole)\s+new\s+commit"
+    r"(?:\s+since\s+(?:the\s+)?(?:last|previous|prior)\s+round)?"
+    r"\s+is\s+an?\s+(?:(?:small|minor|trivial|cosmetic|accurate|correct|harmless|simple),?\s+){0,3}"
+    r"(?:documentation|doc|docs|comment|wording|typo|formatting|whitespace)"
+    r"\s+(?:correction|fix|change|update|tweak)s?"
+    r")\s*[.!?]?\s*$",
+    re.IGNORECASE,
+)
+
+RESOLVED_BLOCKING_SUFFIX = re.compile(
+    # The lead-in between the blocking mention and the resolution verb gets
+    # the same forbidden-token guard as the method phrase, inside parens
+    # too: "crash which remains open is resolved" and "crash (still open)
+    # is resolved" both read as resolved before it (ai-config#2958). The
+    # shared lookahead also carries the conjunction stop (and, but, while,
+    # although, however) the lead-in used to assert on its own.
+    r"^(?:" + _RESOLUTION_FORBIDDEN_LOOKAHEAD
+    + r"(?:\((?:" + _RESOLUTION_FORBIDDEN_LOOKAHEAD + r"[^()\n]){0,120}\)"
+    r"|[^,:;.!?()])){0,120}\b(?:"
+    r"(?:is|are|was|were)\s+(?:(?:now|since|already|also|fully|completely|satisfactorily|properly|cleanly|successfully)\s+)?"
+    r"(?:fixed|resolved|addressed|closed|removed|corrected)"
+    r"|ha(?:s|ve)\s+(?:(?:since|already|also)\s+)?been\s+(?:(?:now|fully|completely|satisfactorily|properly|cleanly|successfully)\s+)?"
+    r"(?:fixed|resolved|addressed|closed|removed|corrected)"
+    r"|no\s+longer\s+applies"
+    r")\b"
+    + _RESOLUTION_METHOD_PHRASE
+    + r"(?:"
     r"\s+and\s+(?:confirmed\s+)?passing"
-    r"|,?\s+and\s+(?:(?![.!?])[\s\S]){1,180}\b"
+    + "|" + _RESOLUTION_VERIFIED_CONTINUATION
+    + r"|,?\s+and\s+(?:(?![.!?])[\s\S]){1,180}\b"
     r"(?:is|are|was|were)\s+(?:also\s+)?"
     r"(?:fixed|resolved|addressed|closed|removed|corrected)"
     r"|,?\s+with\s+no\s+new\s+(?:issues?|findings?)"
@@ -1335,9 +1394,21 @@ def _has_resolution_suffix(scan: str, match: re.Match) -> bool:
     if paragraph is None:
         return False
     following = paragraph.group(0)[sentence.end():]
+    if AFFIRMATIVE_RESOLUTION_FOLLOWUP.fullmatch(following) is None:
+        return False
+    text = sentence.group(0)
+    if RESOLVED_BLOCKING_SUFFIX.fullmatch(text) is not None:
+        return True
+    # A `;`-joined clause is inside the sentence, so it defeats the `$`
+    # anchor even when it carries nothing. Retry on the head alone and
+    # require the tail to be one of the whitelisted benign shapes
+    # (ai-config#2957).
+    head, sep, tail = text.partition(";")
+    if not sep:
+        return False
     return (
-        RESOLVED_BLOCKING_SUFFIX.fullmatch(sentence.group(0)) is not None
-        and AFFIRMATIVE_RESOLUTION_FOLLOWUP.fullmatch(following) is not None
+        RESOLVED_BLOCKING_SUFFIX.fullmatch(head) is not None
+        and _BENIGN_TRAILING_CLAUSE.fullmatch(tail) is not None
     )
 
 

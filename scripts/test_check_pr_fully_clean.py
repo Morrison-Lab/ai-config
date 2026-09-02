@@ -1852,6 +1852,90 @@ def main() -> int:
               "### Verdict\n**Ready for merge.** The previously blocking "
               "line-break failure is fixed and confirmed passing.\n", "")
           == "clean")
+    # ai-config#2957: "fixed and verified by <method>" is a fourth
+    # continuation, and a `;` clause after it is admitted only when benign.
+    # The clean case is the wai#187 round-4 verdict line verbatim.
+    _wai187_verdict = (
+        "### Verdict\n\n**Ready for merge** \u2014 both previously blocking "
+        "issues are fixed and verified by actually executing the spellcheck "
+        "script against the current checkout (clean exit, \"No spelling "
+        "errors found\"); the one new commit since the last round is a "
+        "small, accurate documentation correction.\n"
+    )
+    check("'fixed and verified by <method>; <benign clause>' reads as clean (#2957)",
+          checker.classify_verdict(_wai187_verdict, "") == "clean")
+    check("'fixed and verified by <method>' with no ';' clause reads as clean",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The previously blocking "
+              "failure is fixed and verified by re-running the suite.\n", "")
+          == "clean")
+    check("'fixed and verified by disabling the failing test' stays not-clean",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The previously blocking "
+              "failure is fixed and verified by disabling the failing test.\n", "")
+          == "not-clean")
+    check("a ';' clause that leaves a finding open stays not-clean",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The previously blocking "
+              "crash is fixed and verified by running the suite; the second "
+              "finding remains open.\n", "")
+          == "not-clean")
+    check("a ';' clause outside the whitelist stays not-clean (fails safe)",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The previously blocking "
+              "crash is fixed and verified by running the suite; nothing else "
+              "was checked.\n", "")
+          == "not-clean")
+    # The adversarial review of #2958 showed a blacklist failing open on
+    # ordinary finding vocabulary; the whitelist must refuse these.
+    for _clause in (
+        "a critical error in the login flow",
+        "a serious concern about the auth flow",
+        "a security vulnerability in login",
+        "a data race was spotted separately",
+        "still worth a look",
+    ):
+        check(f"a ';' clause naming an open finding stays not-clean: {_clause!r}",
+              checker.classify_verdict(
+                  "### Verdict\n**Ready for merge.** The previously blocking "
+                  "crash is fixed and verified by running the suite; "
+                  + _clause + ".\n", "")
+              == "not-clean")
+    # Round-2 adversarial review of #2958: a parenthesized aside inside the
+    # method phrase was consumed whole, so a forbidden word inside it was
+    # never seen. Both the bare "by" site and the verified continuation.
+    check("a finding inside parens after 'verified by' stays not-clean",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The previously blocking "
+              "crash is fixed and verified by running the suite (but a "
+              "critical bug remains).\n", "")
+          == "not-clean")
+    check("a finding inside parens after 'fixed by' stays not-clean",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The previously blocking "
+              "crash is fixed by a rebase (the test still fails).\n", "")
+          == "not-clean")
+    check("a harmless parenthesized aside after the method still reads as clean",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The previously blocking "
+              "crash is fixed and verified by running the suite (clean exit).\n", "")
+          == "clean")
+    check("an open-finding clause between the mention and the verb stays not-clean",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The previously blocking "
+              "crash which remains open is resolved.\n", "")
+          == "not-clean")
+    check("an open-finding aside between the mention and the verb stays not-clean",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The previously blocking "
+              "crash (still open) is resolved.\n", "")
+          == "not-clean")
+    check("a whitelisted 'no new issues introduced' ';' clause reads as clean",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The previously blocking "
+              "crash is fixed and verified by running the suite; no new "
+              "issues introduced.\n", "")
+          == "clean")
     check("a resolved prior verdict blocking issue is not an active finding",
           checker.classify_verdict(
               "### Verdict\n**Ready for merge.** The prior verdict's blocking "

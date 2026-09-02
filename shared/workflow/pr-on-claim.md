@@ -181,13 +181,17 @@ See [`pr-on-claim.cases.md`](pr-on-claim.cases.md),
 So the per-issue order becomes: claim → cut a worktree and branch → **open the draft PR now** →
 implement → mark ready-for-review → ARDI.
 
-**Working several issues in one session? Verify you actually switched branches
-before writing the second issue's code.** The `git checkout -b <type>/<slug>
-origin/main` you ran for issue 1 doesn't carry over to issue 2 --- you have to
-run it again with a new branch name for each new issue. Forgetting leaves the
-working tree on issue 1's branch, so issue 2's edits land in the same
-commit/PR as issue 1's --- silently, since nothing errors (there's no reused
-branch name here to trigger `git checkout -b`'s own "already exists" error).
+**Working several issues in one session? Verify you are actually in the second
+issue's worktree, on its branch, before writing its code.** The worktree cut
+for issue 1 does not carry over to issue 2 --- cut a new one for each issue,
+and `cd` into it, since `git worktree add` leaves the shell where it was
+([`memories/git-worktrees.md`](../../memories/git-worktrees.md)).
+On the no-worktree fallback path the same slip is forgetting to run
+`git checkout -b <type>/<slug> origin/main` again with a new branch name.
+Either way the working tree stays on issue 1's branch, so issue 2's edits land
+in the same commit/PR as issue 1's --- silently, since nothing errors (there is
+no reused branch name here to trigger `git checkout -b`'s own "already exists"
+error).
 
 **The open-PR check fails silently in the one situation it exists for, and a hook now carries it.**
 

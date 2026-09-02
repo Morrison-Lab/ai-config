@@ -539,3 +539,19 @@ whether through irreconcilably contradictory requirements,
 self-contradictory oscillation,
 or endless non-contradictory goalpost-moving ---
 halt the review process and escalate to the user for a tie-breaking decision.
+
+## A relayed not-clean round is a standing verdict under your login, so close it with a clean one on the new head
+
+The findings a subagent review returns are worth posting to the PR, and the natural form is one comment: "the review returned Needs more work with N findings;
+all N are addressed in <sha>".
+That comment is posted under the account's own login, and `scripts/check-pr-fully-clean.py` reads it as that login's latest verdict.
+"All addressed" does not clear it, because the instrument keys on the verdict phrase and on the reviewer, and a later all-clear from a *different* reviewer never supersedes a standing not-clean (ai-config#2274).
+So the PR reads not-clean under `mwc` however many CLEAN bot rounds follow, until the same login posts a clean verdict on the current head.
+
+The fix is cheap and it is the honest one anyway: once the findings are addressed, run the adversarial reviewer again on the new head and post its verdict, with a `### Verdict` line and the reviewed commit, under the same login.
+That is the same-reviewer clean the rule asks for, and it is a real re-review rather than an edit to the old comment.
+
+- **Do:** post a fresh adversarial verdict on the head that carries the fixes, in the same voice and login as the round that found them.
+- **Don't:** rely on "all findings addressed in <sha>" inside the not-clean comment, or on later bot verdicts, to clear a not-clean you relayed.
+
+(Measured 2026-09-01 on UCD-SERG/serocalculator#668: the relayed round on `065adf0` read as `d-morrison=not-clean` two CLEAN bot verdicts later, and a fresh Sonnet adversarial review of `2aa82df`, posted with its verdict, was what flipped the instrument to exit 0.)

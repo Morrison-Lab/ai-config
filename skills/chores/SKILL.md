@@ -223,7 +223,8 @@ Do not arm `gh pr merge --auto` and do not hand the merge to `@dependabot squash
 Auto-merge stays enabled across later pushes and fires on required checks alone, so the classified head can be replaced and different content merge without this skill's scope and bump-risk checks rerunning.
 Wait for the checks and merge synchronously with the pin instead.
 
-`@dependabot ...` comment commands do nothing on **Renovate** PRs; merge those with the same pinned `gh pr merge`, not with the merge checkbox in Renovate's Dependency Dashboard, which hands the merge to Renovate without the pin.
+`@dependabot ...` comment commands do nothing on **Renovate** PRs.
+Merge those with the same pinned `gh pr merge`, not with the merge checkbox in Renovate's Dependency Dashboard, which hands the merge to Renovate without the pin.
 
 Batch the safe ones — merge them all in one pass, then report.
 

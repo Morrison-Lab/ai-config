@@ -571,14 +571,16 @@
   and its clean/not-clean verdict patterns so Copilot reviews are tracked as part of the automated review gate.
 
   **Now that Copilot is live again, the 201-then-empty `requested_reviewers` signature above still holds, and the fix is to poll `reviews`, not `reviewRequests`.**
-  `gh api repos/<owner>/<repo>/pulls/<N>/requested_reviewers -X POST -f 'reviewers[]=copilot-pull-request-reviewer[bot]'` returns HTTP 201, and `gh pr view --json reviewRequests` stays empty --- yet the Copilot review lands within about a minute and is visible under `gh pr view --json reviews` with author login `Copilot`.
-  Filter with a case-insensitive test (`test("copilot"; "i")`) rather than `startswith("copilot")`, since the landed review's login is capitalised (`Copilot`) and a plain `startswith` check misses it.
+  `gh api repos/<owner>/<repo>/pulls/<N>/requested_reviewers -X POST -f 'reviewers[]=copilot-pull-request-reviewer[bot]'` returns HTTP 201, and `gh pr view --json reviewRequests` stays empty --- yet the Copilot review lands within about a minute and is visible under `gh pr view --json reviews` with author login `copilot-pull-request-reviewer`, which `startswith("copilot")` matches.
+  The inline comments of that review (`gh api repos/<owner>/<repo>/pulls/<N>/comments`) carry `user.login` `Copilot` instead, so a query over comments needs a case-insensitive test (`test("copilot"; "i")`) while a query over reviews does not.
+  A re-request after a push produces a fresh review on the new head.
+  Count reviews per `commit.oid` to tell a new round from the old one.
   Measured 2026-09-01 on [#2975](https://github.com/Morrison-Lab/ai-config/pull/2975) through [#2979](https://github.com/Morrison-Lab/ai-config/pull/2979) and [#2983](https://github.com/Morrison-Lab/ai-config/pull/2983).
 
-  - **Do:** poll `reviews` (count and login) for the landed review rather than `reviewRequests`.
-  - **Do:** filter the login case-insensitively (`test("copilot"; "i")`).
+  - **Do:** poll `reviews` (count, login, and `commit.oid`) for the landed review rather than `reviewRequests`.
+  - **Do:** match the inline-comment author case-insensitively, since it is `Copilot` there and `copilot-pull-request-reviewer` on the review.
   - **Don't:** read an empty `reviewRequests` as a failed request --- it is the expected transient state.
-  - **Don't:** filter with `startswith("copilot")`, which misses the capitalised `Copilot` login.
+  - **Don't:** read a review on an older `commit.oid` as the verdict on the head you just pushed.
 
   **Re-measured 2026-08-06 with a wider denominator:** across `Morrison-Lab/ai-config`'s last 60 merged PRs, every Copilot review object carries a refusal body and **zero** are substantive (query in [`shared/workflow/pr-on-claim.md`](../shared/workflow/pr-on-claim.md), which also explains why the object count drifts between runs while the zero does not).
   Say *refusals* rather than *quota refusals* when reporting a count like this, because the body alone does not name a cause: the 2026-08-06 Actions incident listed "Copilot code review" among its affected components, so a refusal inside that window has two candidate explanations.

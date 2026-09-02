@@ -260,6 +260,10 @@ NON_OPERATION_TOKENS = {
     "OPENROUTER_API_KEY",
     "PROJECT_ID",
     "PR_NUMBER",
+    # env vars: the chores skill's scope inputs (aliases of the invoking user,
+    # PR numbers named in the request), per memories/reviewing-prs.md
+    "PR_SCOPE_ALIASES",
+    "PR_SCOPE_REQUESTED",
     "REBASE_HEAD",
     "REVERT_HEAD",
     "R_LIBS_USER",

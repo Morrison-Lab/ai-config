@@ -145,8 +145,6 @@ check("rest is everything after the subcommand",
 # ------------------------------------------------------------- env_value
 
 check("plain assignment", shellcmd.env_value(["FOO=1"], "FOO"), "1")
-check("export-prefixed token",
-      shellcmd.env_value(["export FOO=1"], "FOO"), "1")
 check("absent name", shellcmd.env_value(["BAR=1"], "FOO"), None)
 check("empty value is not None",
       shellcmd.env_value(["FOO="], "FOO"), "")
@@ -154,11 +152,22 @@ check("the last assignment wins",
       shellcmd.env_value(["FOO=1", "FOO=2"], "FOO"), "2")
 check("a name that merely contains the key does not match",
       shellcmd.env_value(["MYFOO=1"], "FOO"), None)
-# `export FOO=1` reaches shlex as two tokens, and `strip_env` must consume both
-# so the following word is still the program.
-check("export split across two tokens",
+# `export FOO=1` reaches shlex as TWO tokens -- never one -- so `strip_env`
+# must consume both, and `env_value` must never need to strip an `export `
+# prefix from a token. Both halves are asserted, because a mutation removing
+# the (unreachable) prefix handling from `ENV_ASSIGNMENT` left the suite green.
+check("export split across two tokens leaves git as the program",
       shellcmd.strip_env(["export", "FOO=1", "git", "push"])[1],
       ["git", "push"])
+check("export split across two tokens still records the assignment",
+      shellcmd.env_value(shellcmd.strip_env(
+          ["export", "FOO=1", "git", "push"])[0], "FOO"), "1")
+check("an export-prefixed assignment survives a real shlex round trip",
+      shellcmd.env_value(shellcmd.strip_env(
+          (shellcmd.simple_commands("export FOO=1 git push") or [[]])[0])[0],
+          "FOO"), "1")
+check("export with no assignment after it is not consumed as one",
+      shellcmd.strip_env(["export", "PATH"])[1], ["export", "PATH"])
 
 if failures:
     print("FAILED:")

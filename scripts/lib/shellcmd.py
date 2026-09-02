@@ -39,7 +39,12 @@ import shlex
 # outside the match -- see `_heredoc_free`.
 RX_HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1.*?\n[ \t]*\2\b", re.S)
 
-ENV_ASSIGNMENT = re.compile(r"\A(?:export\s+)?[A-Za-z_][A-Za-z0-9_]*=")
+# No `export` alternative here on purpose. `shlex` splits `export FOO=1` into
+# TWO tokens, so an `export`-prefixed assignment never reaches this pattern as
+# one word -- `strip_env` handles the two-token form instead. A
+# `(?:export\s+)?` group here was unreachable, and a mutation removing it left
+# the suite green, which is how it was found.
+ENV_ASSIGNMENT = re.compile(r"\A[A-Za-z_][A-Za-z0-9_]*=")
 
 # Wrappers that RUN the command following them, so `git` is not argv[0] even
 # though a git command is exactly what executes. Taken from
@@ -181,15 +186,18 @@ def strip_env(argv):
 def env_value(env_tokens, name):
     """The value assigned to `name` by `env_tokens`, or `None`.
 
-    Tolerates an `export ` prefix on the token, which is how
-    `hooks/no-unauthorized-merge.py` anchors `ALLOW_MERGE`. A caller reading an
-    override must match that precedent or its documented escape valve will not
-    work for someone following it.
+    The LAST assignment wins, as the shell does. Tokens arrive already
+    `export`-free: `strip_env` consumes the `export` word separately, because
+    `shlex` splits `export FOO=1` into two tokens and never into one.
+
+    The `export` spelling still has to WORK, since
+    `hooks/no-unauthorized-merge.py`'s `ALLOW_MERGE` anchor accepts it and an
+    escape valve that rejects its own precedent's spelling is not an escape
+    valve. `strip_env` is where that support lives.
     """
     value = None
     for tok in env_tokens:
-        bare = tok[len("export "):].lstrip() if tok.startswith("export ") else tok
-        key, sep, val = bare.partition("=")
+        key, sep, val = tok.partition("=")
         if sep and key == name:
             value = val
     return value

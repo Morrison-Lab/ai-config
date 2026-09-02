@@ -405,6 +405,64 @@ def _prefix_match(m):
 _mutate("prefix matching fires on git commit-tree",
         _prefix_match, "git commit-tree $T -m x; git push", True)
 
+# M3b -- the SAME defect at the clause that actually discriminates. `evaluate`
+#        filters on `sub not in ("commit", "push")` before it branches, so a
+#        mutation of the later `sub == "commit"` alone is masked by that
+#        filter and leaves the suite green -- `fail-fast.md`'s "a guard whose
+#        condition ANDs several clauses masks its own mutation test", observed
+#        here rather than reasoned about. This patches the filter instead.
+def _prefix_filter(m):
+    real = m.git_subcommand
+
+    def loose(argv):
+        parsed = real(argv)
+        if parsed is None:
+            return None
+        sub, rest, env = parsed
+        # A prefix-matching classifier, as a `git\s+commit\b` regex would be.
+        if sub.startswith("commit"):
+            return "commit", rest, env
+        if sub.startswith("push"):
+            return "push", rest, env
+        return parsed
+    m.git_subcommand = loose
+
+
+_mutate("prefix matching at the discriminating clause fires on commit-graph",
+        _prefix_filter, "git commit-graph write && git push", True)
+
+# M7 -- drop `strip_env`'s two-token `export` handling, which is the reachable
+#       half of the escape valve's export spelling. The unreachable half (an
+#       `export ` prefix inside a single token) was removed rather than
+#       mutated: shlex never produces one, and a mutation of it left the suite
+#       green, which is how the dead code was found.
+def _no_export(m):
+    import shellcmd as sc
+    real = sc.strip_env
+
+    def strip(argv):
+        if argv and argv[0] == "export":
+            return [], list(argv)  # `export` treated as an ordinary program
+        return real(argv)
+    m.strip_env = strip
+    m.env_value = sc.env_value
+
+    real_eval = m.evaluate
+
+    def evaluate(command):
+        cmds = m.simple_commands(command) or []
+        for argv in cmds:
+            env, rest = strip(argv)
+            if not rest and m.env_value(env, m.OVERRIDE) == "1":
+                return None
+        return real_eval(command)
+    m.evaluate = evaluate
+
+
+_mutate("dropping export handling denies a call the escape valve should clear",
+        _no_export,
+        "export ALLOW_COMMIT_AND_PUSH=1 && git commit -m x && git push", True)
+
 # M4 -- widen the override to any mention. Must start CLEARING a deny it should
 #       not, so the expectation is False against a real-module baseline of True.
 def _loose_override(m):

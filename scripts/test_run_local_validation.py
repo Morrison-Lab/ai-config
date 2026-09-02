@@ -145,6 +145,16 @@ def test_other_workflow_files():
               "NOT RUN  [workflow] review.yml" in text and "plus 2 other workflow file(s)" in text)
         check("--skip never marks an other-workflow notice SKIP",
               "SKIP     [workflow]" not in text)
+        # Run mode builds its tally separately from --list, so pin it too.
+        out = io.StringIO()
+        with redirect_stdout(out), redirect_stderr(io.StringIO()):
+            rc = rlv.main(["--workflow", str(wf), "--only", "Passing", "--root", tmp])
+        text = out.getvalue()
+        check("run-mode tally counts the other files apart from the derived steps",
+              rc == 0 and "plus 2 other workflow file(s) listed as NOT RUN" in text
+              and "1 step(s) derived from" in text)
+        check("run-mode not-run report names the other files",
+              "not run: review.yml (other workflow file, not derived (on: pull_request, workflow_dispatch))" in text)
 
 
 def test_derive_steps():

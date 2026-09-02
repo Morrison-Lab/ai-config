@@ -48,7 +48,8 @@ A PR is in scope when **either** of these holds:
 Human-authored feature PRs are **out of scope** --- those go through `ardia` /
 `gia` (review-to-clean), not this skill --- and so is a chore-titled or
 `dependencies`-labelled PR whose author is another lab member or another bot,
-unless the invoking user is assigned to it.
+unless the invoking user is assigned to it or explicitly asked this run to
+work on it.
 
 ## Procedure
 

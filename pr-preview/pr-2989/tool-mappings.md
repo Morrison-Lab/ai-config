@@ -61,6 +61,7 @@ operation to the equivalent GitHub MCP tool so any model can run a skill.
 | `EDIT_PR` | Edit a pull request (reviewers, labels, base, etc.). | `gh pr edit "<N>"` | `mcp__github__update_pull_request` |
 | `MERGE_PR` | Merge a pull request. | `gh pr merge "<N>"` | `mcp__github__merge_pull_request` |
 | `MARK_PR_READY` | Flip a draft pull request to ready for review. | `gh pr ready "<N>"` | `mcp__github__update_pull_request (draft=false)` |
+| `UPDATE_PR_BRANCH` | Merge the base branch into a pull request's head branch. | `gh pr update-branch "<N>"` | `mcp__github__update_pull_request_branch` |
 | `REOPEN_PR` | Reopen a closed pull request. | `gh pr reopen "<N>"` | `mcp__github__update_pull_request (state=open)` |
 | `COMMENT_PR` | Post a top-level comment on a pull request. **The body ends with the agent-disclosure marker** --- see [`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md). | `gh pr comment "<N>" --body "..."` | `mcp__github__add_issue_comment` |
 | `REPLY_REVIEW_COMMENT` | Reply to an inline pull-request review comment. The path carries the PR number; the id-only route (`PATCH .../pulls/comments/<id>`) EDITS that comment instead. **The body ends with the agent-disclosure marker** --- see [`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md). | `gh api -X POST "repos/<owner>/<repo>/pulls/<N>/comments/<id>/replies" -F "body=@<file>"` | `mcp__github__add_reply_to_pull_request_comment` |

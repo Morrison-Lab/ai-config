@@ -335,27 +335,42 @@ See ai-config#694 for the precedent.
   the same PR two days earlier.)
 - **Copilot's per-push review is not guaranteed, and a missing one is
   silent.**
-  Measured on [Morrison-Lab/ai-config#2913](https://github.com/Morrison-Lab/ai-config/pull/2913), 2026-09-01
-  (times UTC, commits from `git log --format=%cI`, reviews from
-  `get_reviews`).
-  `28c20e5` (committed 03:17:52) got an auto-started
-  `copilot-pull-request-reviewer` check run at 03:18:28.
-  `988b545` (03:24:10) had no run at 03:30 and `3b32086` (03:36:59) none
-  at 03:38.
-  `request_copilot_review` at about 03:31 and 03:39 started a run within
-  seconds each time, and those reviews posted at 03:35:41 and 03:44:37.
-  `ab89045` (03:47:53) was re-requested at about 03:48 without waiting and
-  its review posted at 03:53:50, so it says nothing about whether an
-  auto-run would have come.
-  `get_check_runs` is the tell.
-  Where a run did start on its own or on request, it appeared within about
-  a minute, so one minute is the operational heuristic rather than a
+  Measured on [Morrison-Lab/ai-config#2913](https://github.com/Morrison-Lab/ai-config/pull/2913)
+  on 2026-09-01 PT, which is 2026-09-02 on the UTC clock every time below
+  uses.
+  Every source is public and re-runnable: commit times from
+  `git log --format=%cI` on `refs/pull/2913/head`; check runs from
+  `GET repos/Morrison-Lab/ai-config/commits/<sha>/check-runs` filtered to
+  `name == "copilot-pull-request-reviewer"`; request times from the
+  `review_requested` events whose `requested_reviewer.login` is `Copilot`
+  on `GET repos/Morrison-Lab/ai-config/issues/2913/timeline`; review times
+  from `get_reviews`.
+  `28c20e5`: committed 03:17:52, requested 03:18:15, run `100111746156`
+  started 03:18:28, review 03:23:02.
+  `988b545`: committed 03:24:10, no run at 03:30, requested 03:31:08, run
+  `100114154380` started 03:31:22, review 03:35:41.
+  `3b32086`: committed 03:36:59, no run at 03:38, requested 03:39:03, run
+  `100115600016` started 03:39:16, review 03:44:37.
+  `ab89045`: committed 03:47:53, requested 03:48:09 without waiting, run
+  `100117262861` started 03:48:21, review 03:53:50.
+  Every run followed a request by twelve to sixteen seconds.
+  None of the four pushes started a run on its own in the time it was
+  given, and the two that waited went seven and two minutes without one.
+  `get_check_runs` is the tell for the current head, and the per-SHA
+  endpoint above for an earlier one.
+  A requested run appeared within seconds and the measured absences were
+  minutes long, so one minute is the operational heuristic rather than a
   guarantee: an absent run after that is grounds to re-issue, at the cost
   of a duplicate request when check creation was merely delayed, which is
   cheap next to a check-in that waits on a round that never started.
-  - **Do:** after every push, confirm the check run exists on the new head,
-    and call `request_copilot_review` when it is still absent after about a
-    minute.
+  - **Do:** after every push, confirm a `copilot-pull-request-reviewer`
+    check run exists on the new head within about a minute.
+    Where one exists, the repo's ruleset or an earlier request started it,
+    and `pr-on-claim.md`'s rule against re-posting on an auto-requesting
+    repo holds.
+    Call `request_copilot_review` only when none has appeared, the case that
+    rule's premise (the retry changes nothing) does not cover: on the two
+    heads above that waited, the request is what started the run.
   - **Don't:** arm a check-in that waits on a round that never started.
 - **A Copilot review reporting `Comments generated: 0 new` can still carry
   findings.**

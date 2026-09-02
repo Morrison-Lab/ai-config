@@ -107,7 +107,8 @@ See [`pr-on-claim.cases.md`](pr-on-claim.cases.md),
 - **Do:** check for a `copilot_code_review` rule before concluding that a vanished pending request means a blocked one.
 - **Don't:** read an empty pending list as evidence the request was blocked, nor as evidence a review is on its way.
 - **Don't:** treat a negative ruleset result as establishing that the request failed --- ai-config returns exactly that while the request still reaches Copilot.
-- **Don't:** re-POST on a repo whose ruleset auto-requests --- the retry changes nothing and the empty read repeats.
+- **Don't:** re-POST on a repo whose ruleset auto-requests while a `copilot-pull-request-reviewer` check run exists on the head --- the retry changes nothing and the empty read repeats.
+  A head with no such run about a minute after the push is the other case, measured per push in [`memories/github-mcp-tools.md`](../../memories/github-mcp-tools.md), and there the request is what starts the run.
 
 See [`pr-on-claim.cases.md`](pr-on-claim.cases.md),
 "Three surfaces fail to discriminate a vanished pending request".

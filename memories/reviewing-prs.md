@@ -172,8 +172,10 @@ broadening-fix section.
 
 A "reapply the test before each write" sentence has two populations to
 enumerate, and recalling either one misses members: the write actions per
-step (grep the skill for `close`, `comment`, `merge`, `push`) and the
-predicate's mutable inputs (read them off the filter itself: `chores`
+step (read every mutating command or API call off the procedure itself,
+`gh pr close`, `comment`, `merge`, `edit`, `ready`, `review`, a thread
+resolution, a push, an API mutation, rather than a fixed verb list) and
+the predicate's mutable inputs (read them off the filter itself: `chores`
 reads title and labels, not only author and assignees).
 
 - **Do:** find every restatement of the rule the finding touched by
@@ -182,8 +184,9 @@ reads title and labels, not only author and assignees).
   ([`grep-is-not-coverage`](../shared/workflow/grep-is-not-coverage.md)):
   the phrase grep, a grep for the mechanism's stable terms (the input
   names, the arm names, the write verbs), and a topic-and-filename pass
-  over the skills, fragments, and memories that list, push to, comment on,
-  review, or merge PRs.
+  over every skill, fragment, and memory that lists PRs or mutates PR
+  state (push, comment, review, resolve a thread, edit title, body, or
+  metadata, mark ready, close, merge).
   Read each candidate against the widened rule, fix the ones that carry
   the gap, and say in the ARD reply which candidates were inspected and
   which changed, never that the grep enumerated the concept.

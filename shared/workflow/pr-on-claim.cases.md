@@ -18,6 +18,26 @@ The request was written `gh api -X POST .../requested_reviewers -f 'reviewers[]=
 The hook still fired at Stop, correctly, because `tail` owned the exit status.
 Re-running the POST bare discharged it and produced a second, identical refusal at `07:53:03Z`.)
 
+## The blocking message prescribes a non-dischargeable shape
+
+(Morrison-Lab/ai-config#3010, 2026-09-02, and the third occurrence of the chained-request mistake after rpt#181 and ai-config#1139 above.
+Nine successive turns.
+Eight `requested_reviewers` POSTs, every one returning 200;
+three Copilot reviews genuinely landed, at `15:51:54Z`, `16:43:37Z`, and `16:47:16Z`;
+and the hook fired after every turn.
+Each of those turns chained the block message's own verify command after the POST, which is what left the request non-last.
+The tenth turn ran the POST as the sole command in its call and the loop ended.
+
+The first two occurrences were a session composing the wrong shape on its own.
+This one is the corpus supplying it: the rule was already written down twice, in `pr-on-claim.md` and in `pr-on-claim.rationale.md`, and the message a blocked session actually reads contradicted both.
+That is why the fix is to the message rather than to another sentence of prose.
+
+Two smaller findings from the same nine turns.
+The message's verification query counts Copilot reviews on the PR rather than on the head, and returned 1 over a review that predated a force-push.
+And `requested_reviewers` came back empty immediately after all eight successful POSTs, so the 201-then-empty signature in [`memories/gh-cli.md`](../../memories/gh-cli.md) held at eight for eight --- here with reviews arriving anyway, which is the half that record previously lacked.
+
+Tracked as [ai-config#3017](https://github.com/Morrison-Lab/ai-config/issues/3017).)
+
 ## The blocked-request test's false positive on auto-requesting repos
 
 (Morrison-Lab/ai-config#1077, 2026-08-03: two explicit requests each returned `["Copilot"]` and each left `reviewRequests` empty within a minute, and both were reported as a possible blocked/silent reviewer.

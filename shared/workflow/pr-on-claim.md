@@ -87,6 +87,36 @@ See [`pr-on-claim.cases.md`](pr-on-claim.cases.md),
 - **Do:** narrow the response with a flag on the POST itself rather than a downstream pipe.
 - **Don't:** pipe the POST anywhere, including to `tail`, `head`, or `jq` --- the hook cannot tell a formatting pipe from a chained verification, because the shell does not either.
 
+**Third occurrence, 2026-09-02, and the new fact is that the hook's own blocking message prescribes the shape its discharge rule rejects.**
+
+The two rules above tell you to run the POST alone.
+The message you actually read at Stop tells you to request the review and, in the same breath, to verify it --- a `requested_reviewers` POST followed by a `gh pr view --json reviews` count, given together under one instruction.
+Read as one Bash call, which is the natural reading, the POST is no longer last, so `request_ident()` reports it as non-last and the obligation stays live.
+The hook re-fires, the message repeats verbatim, and following it again reproduces the same shape.
+
+Note what makes this one hard to diagnose from inside the turn.
+The request genuinely succeeds every time and reviews genuinely arrive, so every signal available to the session says the obligation is met.
+Nothing distinguishes *the request failed* from *the request was not last*, and the message names only the first.
+The message already states the rule correctly --- for `gh pr edit --add-label`, whose exemption branch says a chained-ahead command shares one exit status and so cannot be attributed.
+The same constraint binds the request and was nowhere stated for it.
+
+- **Do:** run the request as the sole command in its call, and verify in a separate call, whatever the blocking message's own example does.
+- **Do:** read a verbatim-repeating block message as a candidate defect in the message, once the blocked action's own output says it succeeded.
+- **Don't:** infer from a successful POST and an arriving review that the obligation discharged --- neither is what the hook measures.
+
+Tracked as [ai-config#3017](https://github.com/Morrison-Lab/ai-config/issues/3017), whose fix states the constraint in the request's own instruction.
+Third occurrence rather than a new lesson, so it meets [`deterministic-tools`](../principles/deterministic-tools.md)'s bar for building something --- and the something is the message, since the rule was already written down twice and the message is what a session actually reads.
+
+See [`pr-on-claim.cases.md`](pr-on-claim.cases.md), "The blocking message prescribes a non-dischargeable shape".
+
+**That message's verification query counts reviews on the PR, not reviews of the current head.**
+
+`[.reviews[] | select(.author.login | startswith("copilot"))] | length` returns every Copilot review the PR ever received, including one submitted against a diff that no longer exists.
+On ai-config#3010 it returned 1 while the only review on record predated a force-push, so it read as satisfied over a diff nothing had reviewed --- the same head-scoping gap [`fully-clean`](fully-clean.md) closes by requiring `reviews[].commit.oid` in its payload.
+
+- **Do:** compare each review's `submittedAt` against the last push, or match `commit.oid` against the head, before reading a non-zero count as an answer.
+- **Don't:** treat a count of reviews on the PR as a count of reviews of the diff you just pushed.
+
 **A PreToolUse block for this was considered and rejected -- the Stop hook stays the only guard.**
 
 - **Do:** treat the Stop hook's post-hoc catch as sufficient for this specific mistake, and re-run the POST alone when it fires.

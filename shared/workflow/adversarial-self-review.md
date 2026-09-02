@@ -276,6 +276,40 @@ An instrument with no such result is a finding on its own terms, per [`verify-th
 Five adversarial rounds each found real defects against a fully green suite, and three of the five found them in the verification tooling rather than in the change: a parity metric that could not fail, a negative control patching a function that had moved off the execution path, and an assertion comparing a function against itself.
 The last of those had let a previously-rejected design pass 299 tests.)
 
+## Prose *about* an instrument is reviewed against the instrument, not against the prose
+
+The section above says a diff's verification artifacts are the least-guarded part of it.
+Its mirror is a diff carrying no code at all: documentation describing how an instrument behaves.
+That reads as the safest change available --- nothing executes, no suite can break, and the round feels like a copy-edit --- which is exactly why the claims in it go unexecuted.
+
+The defect has one shape, and it produces sentences that are fluent, specific, and false: **stating what code plausibly does instead of running it.**
+A consumer is described as reading one field when it falls back to another;
+a format is called unparseable when the parser accepts it;
+a value is called rejected when nothing validates it;
+a set of accepted forms is given as two when the code accepts three.
+None of those reads as a guess afterwards, because each is a claim about a file sitting in the same repository, and knowing roughly what that file does feels like having read it.
+
+[`fact-check-prose`](../writing/fact-check-prose.md) already covers the narrower case of a fenced block composed from convention rather than captured from a run.
+This is the same substitution one level out, over behaviour rather than output, and its remedy is the same: run the consumer against the exact input the sentence describes, and quote what came back.
+Where the claim is about which branch fires, read the branch.
+A negative claim --- *this form does not parse*, *nothing accepts this* --- is the one to execute rather than reason about, since it is the shape that cannot be confirmed by reading and is the shape a reviewer will refute.
+
+- **Do:** run each consumer named in the prose against the input the prose describes, before writing the sentence about it.
+- **Do:** treat a negative claim about a parser, guard, or matcher as owing an execution, not an argument.
+- **Do:** keep dispatching rounds while findings land, and expect a docs-only change about instruments to take more of them than the code change it describes, not fewer.
+- **Don't:** read "no code changed" as "nothing here can be wrong" --- the claims changed, and they have no suite.
+- **Don't:** describe a fallback, a precedence rule, or an accepted-form list from the shape of the code;
+  enumerate it from the code.
+
+(Measured 2026-09-02 on [ai-config#3010](https://github.com/Morrison-Lab/ai-config/pull/3010), a docs-only 43-line change to this file.
+Thirteen adversarial rounds: 7, 8, 4, 3, 3, 3, 1, 1, 0, then 4, 1, 0 after the scope reopened.
+Nine of the findings across those rounds were the one shape above.
+The refuted claims, each disproved by reading or running the named consumer: that the three payload consumers read the payload and nothing else, when they fall back to prose;
+that a bolded verdict phrase does not parse, when it does;
+that demoting a disclosure marker changes `_reviewer_identity()`, when the Claude Code footer is deliberately excluded from `REVIEW_AGENT_MARKERS`;
+that a non-conforming payload is rejected, when nothing validates it;
+and that the pre-push guard accepts two verdict phrasings, when it accepts three.)
+
 ## Require detailed and holistic review passes
 
 Reviewers must independently assess both detailed, evidence-backed implementation defects and the whole change:

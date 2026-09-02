@@ -543,6 +543,15 @@
   The short version: `Morrison-Lab/ai-config` reproduces the identical 201-then-empty signature while carrying no `copilot_code_review` rule at either scope, so an empty pending list is evidence neither that the request was blocked nor that a review is coming.
   Only the posted review **body** settles which of those happened.
 
+  **The "nor that a review is coming" half is now measured, not just argued.**
+  Eight successive POSTs on `Morrison-Lab/ai-config#3010` (2026-09-02) each returned 200 and each left `requested_reviewers` empty on the immediate read, and three Copilot reviews landed on that PR anyway.
+  The four-POST bcs record below supplies the other direction --- empty list, zero reviews --- so the same empty read has now been observed with reviews arriving and with none arriving, on different repos.
+  That is what makes the list uninformative rather than merely unreliable.
+
+  - **Do:** poll the review bodies on the head when you need to know whether a reviewer engaged.
+  - **Don't:** re-POST because the pending list came back empty;
+    that read carries no information in either direction.
+
   **Both outcomes were genuinely observed on the same repo the same day, so do not flatten this into "it returns 201".**
   One session ran the POST once and got `422`;
   another ran it three times, across all three login spellings, and got `201` every time.

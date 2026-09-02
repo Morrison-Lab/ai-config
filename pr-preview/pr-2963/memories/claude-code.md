@@ -104,8 +104,8 @@
   `${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/<this-skill> rev-parse --show-toplevel 2>/dev/null || pwd)}`,
   which uses `$CLAUDE_PLUGIN_ROOT` under native plugin installs and falls back to
   the per-skill symlink `git -C ~/.claude/skills/<this-skill> rev-parse --show-toplevel`
-  under legacy symlink setups, never the bare-parent `git -C ~/.claude/skills rev-parse --show-toplevel`. `bootstrap.sh`
-  may symlink skills
+  under legacy symlink setups, never the bare-parent `git -C ~/.claude/skills rev-parse --show-toplevel`.
+  `bootstrap.sh` may symlink skills
   *per-child* into a real `~/.claude/skills` directory, so the parent isn't a
   symlink into the repo and `git -C` there fails with "not a git repository".
   The `@claude` reviewer enforces the plugin/per-skill form on new skills;

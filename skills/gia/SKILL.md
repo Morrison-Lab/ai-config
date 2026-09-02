@@ -117,6 +117,7 @@ stacks on it.
   A wave is "completely finished" only once every item in it has reached a terminal state;
   a PR still in CI/review is not a finished wave, and the check-in loop that drives it to green continues uninterrupted.
   This is a deliberate exception to the standing "don't stop to ask" grant the rest of this skill runs under: the wave boundary is the one place GIA hands the decision back, because a fresh wave is new, open-ended commitment (5 more issues, 5 more PRs, 5 more review rounds) rather than work already implied by the current wave.
+  A UMS pass, and the PR it opens, is work the current wave implies rather than a new wave --- run it at the boundary, per [`gii`](../gii/SKILL.md)'s "A UMS pass is not a new wave" paragraph.
 - If a PR or issue is blocked or ambiguous, **bypass** it — surface it and move
   on to the next item rather than halting the sweep. Stop only when every
   remaining item depends on that blocked one, so no independent work is left

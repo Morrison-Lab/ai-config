@@ -78,10 +78,13 @@ With both unset the filter keeps only the resolved login's own PRs, the
 assigned ones, and the bots', which is the fail-closed default.
 
 ```bash
+set -eo pipefail   # a failed command, or a failed gh pr list in the pipeline below, stops here
 ME=$(gh api user --jq .login 2>/dev/null) || ME=""   # WHO_AM_I
 if [ -z "$ME" ]; then
   # Fail closed, and say so: with no identity the author and assignee arms
-  # stay unevaluated, so only bot-authored and explicitly requested PRs pass.
+  # stay unevaluated (aliases included), so only bot-authored and explicitly
+  # requested PRs pass.
+  PR_SCOPE_ALIASES=""
   echo "::warning::identity lookup failed; author/assignee arms unevaluated (report this)" >&2
 fi
 # e.g. PR_SCOPE_ALIASES=other-login      # from memories/reviewing-prs.md
@@ -90,7 +93,6 @@ IDS=$(jq -cn --arg me "$ME" --arg al "${PR_SCOPE_ALIASES:-}" \
   '[$me] + ($al | split(",") | map(select(length > 0))) | map(select(length > 0)) | unique')
 REQ=$(jq -cn --arg r "${PR_SCOPE_REQUESTED:-}" \
   '$r | split(",") | map(select(length > 0) | tonumber)')
-set -o pipefail   # a failed gh pr list must not read as "no chores"
 gh pr list --repo "$REPO" --state open --limit 200 \
   --json number,title,author,assignees,labels,mergeable \
   | jq -r --argjson ids "$IDS" --argjson req "$REQ" '.[] | select(

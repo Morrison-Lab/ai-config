@@ -909,3 +909,23 @@ A clean automated review from every available provider evaluating the current HE
 - **Algorithmatizable?**
   Yes.
   Static analysis / hooks can flag unanchored `pgrep -f` and `pkill -f` inside while/until loops in shell scripts.
+
+## Pattern 34: Merging a PR That Adds a CI Check Alongside PRs That Add Content, Then Not Watching Main's First Run
+- **Do**: When a PR adds or widens a CI check and other open PRs add content the check will scan, run the new check on a local union of `main` plus the check branch immediately before merging it, and watch the first run on `main` after the merge as if it were the PR's own CI.
+  Treat that first run as the only run that has ever seen the union.
+- **Don't**: Read "every PR was green on its own branch" as evidence `main` will be green.
+  Each branch was checked against its own content; the check branch never held the content branches' prose, and the content branches never held the check.
+- **Example**: 2026-09-02, `Morrison-Lab/wai`: [#187](https://github.com/Morrison-Lab/wai/pull/187) added a chapter-wide spellcheck step;
+  [#190](https://github.com/Morrison-Lab/wai/pull/190) and a peer session's [#192](https://github.com/Morrison-Lab/wai/pull/192) added prose in the same hour.
+  All three were green on their branches.
+  The first Spellcheck run on `main` after #187 merged ([run 33580505258](https://github.com/Morrison-Lab/wai/actions/runs/33580505258)) failed on six words, five from #192 and one from #190, and stayed red until [#199](https://github.com/Morrison-Lab/wai/pull/199).
+  Two of the six were a second gap the same run exposed: the wordlist already listed `GSM8K` and `MiniF2F`, and hunspell splits a token at a digit, so the entries had never matched.
+  The red run was noticed only because a post-wave sweep listed the workflow's runs on `main`; nothing in the PR-driving loop looks at `main` after a merge.
+- **Canonical Rule**: [`sync-with-main.md`](../shared/workflow/sync-with-main.md) keeps a branch current with `main` before its own CI runs;
+  this pattern is the mirror, where the branch is current and it is `main` that has never been checked with the union.
+  [`post-merge`](../skills/post-merge/SKILL.md) verifies the merge landed and does not read `main`'s CI.
+- **Fix**: Before merging a check-adding PR, run the check locally on `main` merged with the branch, or list the open PRs whose files the check scans and re-run the check against each merged in turn.
+  After merging, list the workflow's runs on `main` (`gh run list --workflow <file> --branch main --limit 1`, or the Actions API) and hold the wrap-up until that run is green.
+- **Algorithmatizable?**
+  Yes for the after-merge half: a post-merge step that lists the affected workflow's latest run on `main` and refuses a clean wrap-up while it is red or in progress.
+  The before-merge half is a bounded loop over open PRs that `scripts/pr-overlap.py` already enumerates.

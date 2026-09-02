@@ -339,7 +339,7 @@ I don't care if they run on this computer or in the cloud."
 
 The rule, its guard (`hooks/no-fable-subagent.py`), and the
 `FABLE_SUBAGENT_OK=1` grant mechanism live in `CLAUDE.md`'s section of the
-same name ([#2927](https://github.com/Morrison-Lab/ai-config/issues/2927));
+same rule ([#2927](https://github.com/Morrison-Lab/ai-config/issues/2927));
 read them there rather than here.
 This entry adds the one inferred step the rule does not spell out,
 and keeps the case records behind it.

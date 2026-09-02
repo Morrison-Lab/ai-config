@@ -342,23 +342,31 @@ current branch):
 
 ```bash
 git branch --merged origin/main --format='%(refname:short)' \
-  | grep -vxE 'main|master'
+  | grep -vxF -e main -e master -e "$(git branch --show-current)"
 # --format gives plain names. Plain `git branch` prefixes the current branch
 # with `*` and a branch checked out in a linked worktree with `+`, so a
 # column-anchored grep on the plain listing mangled such a name into
 # `+ feature/foo` and the delete below failed on it (ai-config#1882; the
-# clean-worktrees skill's step 3c records the same hazard). `grep -vx`
-# matches whole lines, so only the literal `main`/`master` are excluded, so a
-# branch like `maintain-docs` or `feature-main-menu` is NOT silently filtered
-# out. The current branch and any worktree-checked-out branch still appear;
-# `git branch -d` refuses both, which is the safety net below.
+# clean-worktrees skill's step 3c records the same hazard). With no `*` to
+# filter, the current branch is excluded by name instead. `grep -vxF`
+# matches whole lines literally, so only `main`, `master`, and the current
+# branch are excluded, and a branch like `maintain-docs` or
+# `feature-main-menu` is NOT silently filtered out. A branch checked out in
+# a linked worktree still appears; `git branch -d` refuses it, and the note
+# below says how to read that refusal.
 # Compare against origin/main (just fetched), NOT local `main` — your local main
 # may be behind, which would hide branches that are actually merged.
 git branch -d <branch>          # -d refuses if NOT actually merged — a safety net
 ```
 
-`-d` (never `-D`) is deliberate: if git refuses, the branch has unmerged
-commits — treat it as **stale**, not dead (see b).
+`-d` (never `-D`) is deliberate, and its refusal has two readings.
+`error: the branch 'X' is not fully merged` means unmerged commits, so treat the
+branch as **stale**, not dead (see b).
+`error: cannot delete branch 'X' used by worktree at ...` means the branch is
+checked out in a linked worktree, so leave it alone, give it the status
+`checked out in a worktree` in the step 4 plan table, and count it under
+"Skipped" in the step 9 report; `clean-worktrees` is the skill that retires
+the worktree first.
 
 #### b. Upstream gone but the PR merged → delete
 

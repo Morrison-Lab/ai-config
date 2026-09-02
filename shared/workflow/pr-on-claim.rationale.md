@@ -107,8 +107,8 @@ pending reviewer, which the API can (unreliably) answer with either `201` or
 `422` --- don't spend a call resolving which; either response is consistent
 with the ruleset already having asked.
 Where you can't tell whether the repo has such a ruleset, request explicitly
-anyway --- a redundant request costs nothing, while skipping it on a repo
-without automatic review leaves Copilot unrequested.
+anyway --- a redundant request spends one call, the accepted risk, while
+skipping it on a repo without automatic review leaves Copilot unrequested.
 
 Run that request immediately after `gh pr create` for a non-draft PR, or immediately after `gh pr ready` for a draft PR, before writing any status report.
 Verify the request landed: the POST response should include the requested reviewer, then a fresh read should show either a pending review request or a new review/check from that reviewer on the current head.

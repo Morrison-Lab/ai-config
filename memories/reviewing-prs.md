@@ -120,6 +120,84 @@ An issue on a repo I own is different from a PR on it:
 filing, triaging, and commenting on issues is fine,
 and an issue someone else's open PR already fixes is left to that PR (not grabbed, and that PR not driven either).
 
+## Inspect every restatement of a rule in one pass
+
+When a reviewer's finding adds an arm, a veto, or a recheck to one
+restatement of a rule, the same gap may be open at any other restatement,
+and the reviewer finds those one round at a time.
+[Morrison-Lab/ai-config#2913](https://github.com/Morrison-Lab/ai-config/pull/2913) (2026-09-01) spent Copilot rounds thirty-two
+through thirty-five landing one exclusion veto and one pre-write recheck
+site by site (files per commit from `git show --stat`): `chores` plus the
+`scripts/validate-skills.py` allowlist entry for its new input
+(`28c20e5`), `chores` again for the recheck's step range (`988b545`),
+then `AGENTS.md`, `ardia`, `post-merge`, and this file (`3b32086`), then
+`memories/github.md` and `chores` a third time for the recheck's inputs
+(`ab89045`).
+A corpus grep for the rule's vocabulary after round thirty-two, with each
+hit read against the widened rule, reaches most of those sites.
+Measured 2026-09-01 against the `28c20e5` tree:
+
+```bash
+git grep -n -i -e "not a request" -e "reapply the" -e "before each write" \
+  -e "before the mutations" -e "explicitly authorized" 28c20e5 -- '*.md'
+```
+
+returns `AGENTS.md:571`, `memories/reviewing-prs.md:94`,
+`skills/ardia/SKILL.md:45` and `:47`, `skills/chores/SKILL.md:46` and
+`:132-133`, `memories/github.md:73`, and `skills/post-merge/SKILL.md:285`,
+plus three unrelated hits (`hooks.md`, `report-mistakes-proactively.md`,
+`math-derivation-steps.md`) that reading against the rule discards.
+That is every file rounds thirty-three through thirty-five changed.
+The `post-merge` hit at line 285 is the scanner's own filter, where the
+phrase sits on one line.
+The scanner brief a few paragraphs above it restates the same rule with
+the phrase wrapped across a line break, `explicitly` ending line 231 and
+`authorized` starting line 232
+(`git show 28c20e5:skills/post-merge/SKILL.md | sed -n 231,232p`), so the
+grep reaches that file through the filter and not through the brief.
+A wrapped phrase needs a second pattern or a read of the surrounding
+section, which is one more reason the sweep inspects each hit's file
+rather than only the matching line.
+Round thirty-six was a different gap (a live-claim check in
+`check-history`, distinct from scope), so it is not an instance of this
+lesson and a restatement sweep would not have caught it.
+
+A sweep inspects; it does not rewrite.
+Some restatements are already correct, and some are deliberately narrower
+(`ardia`'s recheck reads author and assignees only, because its predicate
+has no title or label arm), so each hit is read against the new scope and
+changed only when it carries the gap, per
+[`address-every-comment`](../shared/workflow/address-every-comment.md)'s
+broadening-fix section.
+
+A "reapply the test before each write" sentence has two populations to
+enumerate, and recalling either one misses members: the write actions per
+step (read every mutating command or API call off the procedure itself,
+`gh pr close`, `comment`, `merge`, `edit`, `ready`, `review`, a thread
+resolution, a push, an API mutation, rather than a fixed verb list) and
+the predicate's mutable inputs (read them off the filter itself: `chores`
+reads title and labels, not only author and assignees).
+
+- **Do:** find every restatement of the rule the finding touched by
+  three routes, since a phrase grep matches strings and a restatement can
+  use other words
+  ([`grep-is-not-coverage`](../shared/workflow/grep-is-not-coverage.md)):
+  the phrase grep, a grep for the mechanism's stable terms (the input
+  names, the arm names, the write verbs), and a topic-and-filename pass
+  over every repository surface that lists PRs or mutates PR state: the
+  root manuals (`AGENTS.md`, `CLAUDE.md`), skills, fragments, memories,
+  hooks, and scripts (push, comment, review, resolve a thread, edit title,
+  body, or metadata, mark ready, close, merge).
+  Read each candidate against the widened rule, fix the ones that carry
+  the gap, and say in the ARD reply which candidates were inspected and
+  which changed, never that the grep enumerated the concept.
+- **Do:** derive both populations for a before-each-write sentence from
+  the file, and name them in it.
+- **Don't:** fix the one site the finding quoted and wait for the next
+  round to name the next one.
+- **Don't:** rewrite a restatement that is correct or deliberately
+  narrower just because the grep returned it.
+
 ## Search the issue thread before rebutting "no source exists"
 
 A reviewer asked for a permalink to the post a chapter summarized.

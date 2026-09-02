@@ -64,8 +64,10 @@ command, keyed by a content hash of the command, the number of times it has
 been denied in this transcript, and the transcript path: a reminder repeated
 every turn is noise, and noise is what gets a guard ignored, but each fresh
 denial is new information and gets its own one-time reminder. At most one
-reminder is printed per prompt, the newest unreminded one, so several denied
-commands surface over several prompts rather than all at once.
+reminder is printed per prompt, the OLDEST unreminded one, so several denied
+commands surface over several prompts rather than all at once -- oldest
+because the original command is the one the evidence is about, and the newest
+is whatever the session most recently reworded it into.
 
 The number in that key is the RUNNING TOTAL, which only ever grows. The number
 that decides the ADVICE is the current STRETCH, which resets -- so the two are
@@ -140,6 +142,23 @@ What it does warn off is variation, which is Pattern 43's actual mechanism:
 "each denied variant makes the classifier more suspicious", its three denials
 being three different phrasings of one override. A byte-identical re-run
 presents no new variant, so that mechanism does not reach it.
+
+That warning cannot hang off either count, and getting this wrong is easy:
+rephrasing produces a NEW command, so each variant carries a stretch of 1 and
+a total of 1, and a warning attached to a second denial never fires in the one
+shape Pattern 43 measured. It keys on the number of distinct commands the
+classifier has denied instead, which is the only trace rephrasing leaves. That
+number cannot tell three phrasings of one goal from three unrelated commands,
+so the text says "if they are rephrasings of one goal" rather than asserting
+it.
+
+On the second denial itself the hook states the tension and stops. Pattern
+43's Do bullet says to stop probing after the second denial of the same goal
+and hand the user the decision; #2994 measured the third attempt succeeding.
+Both are in this corpus, neither has been retired, and a guard is the wrong
+place to settle it -- so the message puts both to the user, which is what
+Pattern 43's Do bullet asks for anyway. Reconciling the two texts is tracked
+as ai-config#3008.
 
 TWO LIMITATIONS, STATED RATHER THAN HIDDEN
 ------------------------------------------
@@ -276,6 +295,13 @@ def read_transcript(path):
         # A subagent's denial is not this session's to retry, and its
         # transcript is a separate file anyway. Same guard, and same reasoning,
         # as remind-ums-after-error.py's.
+        # `null`, `[]` and `5` are valid JSON lines with no `.get`. Without
+        # this guard one of them raises, `main`'s blanket except swallows it,
+        # and the whole scan is lost -- silently, for the rest of the session.
+        # Same defect class as the stdin guard in `main`, on the surface that
+        # carries thousands of lines instead of one.
+        if not isinstance(rec, dict):
+            continue
         if rec.get("isSidechain"):
             continue
         blocks = (rec.get("message") or {}).get("content") or rec.get("content")
@@ -304,13 +330,21 @@ def read_transcript(path):
 
 
 def unretried(path):
-    """Return [(label, key, stretch, total)] per denial with no re-attempt.
+    """Return (candidates, shapes) for the denials with no re-attempt.
 
-    Newest first, so the caller reports the freshest one it has not already
-    reported. `stretch` is the run of denials since the classifier last let
-    the command through, which is what the advice turns on; `total` is every
-    denial of it in this transcript, which is what the message reports and
-    what the sentinel keys on, because it never goes back down.
+    Each candidate is (label, key, stretch, total). `stretch` is the run of
+    denials since the classifier last let the command through, which is what
+    the advice turns on; `total` is every denial of it in this transcript,
+    which is what the message reports and what the sentinel keys on, because
+    it never goes back down. `shapes` is how many DISTINCT commands the
+    classifier has denied at all, which is the only visible trace of a
+    session rephrasing one goal.
+
+    OLDEST first, which matters more than it looks. The newest denial is by
+    construction the most-varied last-ditch attempt, and the oldest is the
+    original command -- the one #2994 measured succeeding. Reporting newest
+    first replays that incident by naming the settings edit before the push,
+    and citing "with no settings change" as the reason to re-run it.
     """
     attempts, denied, ran, labels = read_transcript(path)
     out = []
@@ -321,17 +355,21 @@ def unretried(path):
         floor = max(ran.get(key) or [-1])
         out.append((labels.get(key, ""), key,
                     sum(1 for j in hits if j > floor), len(hits), last))
-    out.sort(key=lambda row: row[4], reverse=True)
-    return [row[:4] for row in out if row[0]]
+    out.sort(key=lambda row: row[4])
+    return [row[:4] for row in out if row[0]], len(denied)
 
 
-def message(label, stretch, total):
+def message(label, stretch, total, shapes=1):
     """The reminder text.
 
     `stretch` decides the advice, `total` is what gets reported. Quoting the
     stretch under session-total wording ("denied once so far") would tell the
     session to under-report the exact number this hook exists to make
-    accurate.
+    accurate. `shapes` decides whether the variation warning is included: it
+    keys on distinct denied COMMANDS rather than on either count, because
+    rephrasing produces a new command with a stretch of 1 every time, so a
+    warning attached to a repeat count can never reach the shape Pattern 43
+    actually measured.
     """
     shown = label if len(label) <= 160 else label[:157] + "..."
     run = "once" if stretch == 1 else f"{stretch} times"
@@ -355,22 +393,34 @@ def message(label, stretch, total):
             "closed.\n"
         )
     else:
-        # Deliberately NOT "stop re-running it". #2994's measured success WAS
-        # the third attempt after two denials, so an identical re-run here is
-        # the move the evidence supports. Pattern 43's mechanism is variation,
-        # and it is variation this warns off.
+        # Deliberately NOT a verdict either way. The corpus is in genuine
+        # tension here: Pattern 43's Do bullet says stop probing after the
+        # second denial of the same goal and hand the user the decision,
+        # while #2994 measured the third attempt of the same command
+        # succeeding. This hook is not the place to settle that, so it states
+        # both and gives the decision to the person the Do bullet names.
         act = (
-            "You have already re-run it. One more identical re-run is still "
-            "within what the evidence supports -- #2994's success came on the "
-            "third attempt, after two denials. What is NOT supported is "
-            "rephrasing it into new shapes: mistake-patterns Pattern 43 "
-            "records each denied variant making the classifier more "
-            "suspicious, until it denied even the sanctioned paths. If you "
-            "stop here, hand the user the decision rather than declaring the "
-            "path closed.\n"
+            "You have already re-run it, and the corpus pulls both ways from "
+            "here. mistake-patterns Pattern 43 says to stop probing after "
+            "the classifier's second denial of the same goal and hand the "
+            "user the decision (push manually, restart the session, add a "
+            "permission rule); #2994 measured a byte-identical command "
+            "succeeding on its third attempt, after two denials. Put both to "
+            "the user and let them choose, rather than settling it by "
+            "declaring the path closed.\n"
+        )
+    warn = ""
+    if shapes > 1:
+        warn = (
+            f"The classifier has denied {shapes} distinct commands in this "
+            "session. If they are rephrasings of one goal, stop generating "
+            "new shapes: Pattern 43 records each denied variant making the "
+            "classifier more suspicious, until it denied even the sanctioned "
+            "paths. An identical re-run is not a new variant; a reworded one "
+            "is.\n"
         )
     return (
-        head + act +
+        head + act + warn +
         "Either way, report what was measured, not a prediction: "
         f"\"denied {session} so far\", never \"cannot\" or \"is not "
         "self-serviceable\". Concluding the path is closed also destroys the "
@@ -397,7 +447,7 @@ def main() -> int:
         return 0
 
     try:
-        candidates = unretried(path)
+        candidates, shapes = unretried(path)
     except Exception:
         return 0
 
@@ -421,7 +471,7 @@ def main() -> int:
             open(sentinel, "w").close()
         except Exception:
             pass
-        print(message(label, stretch, total))
+        print(message(label, stretch, total, shapes))
         return 0
 
     return 0

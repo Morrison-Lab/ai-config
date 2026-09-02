@@ -154,6 +154,15 @@ REMIND = [
     ([use("t1"), denial("t1"),
       txt("The push path is closed; handing this to you.")],
      "prose after the denial does not discharge it"),
+    # A well-formed JSON line that is not an object has no `.get`. It must
+    # cost that ONE line, not the whole scan: the enclosing except would
+    # swallow the error and silence the hook for the rest of the session.
+    ([use("t1"), denial("t1"), None],
+     "a null record does not silence the rest of the transcript"),
+    ([use("t1"), denial("t1"), []],
+     "a list record does not silence the rest of the transcript"),
+    ([5, use("t1"), denial("t1")],
+     "a bare number record before the denial is skipped"),
     # The stretch resets on an allowed run, so this is a FIRST denial of the
     # current stretch. The wording block below pins that it advises a retry.
     ([use("t1"), denial("t1"), use("t2"), result("t2", "ok"),
@@ -422,6 +431,17 @@ try:
     both = write_transcript([
         use("t1", "git push origin alpha"), denial("t1"),
         use("t2", "git push origin beta"), denial("t2")])
+    # Pattern 43's measured shape: one goal in three phrasings, each denied
+    # once. Every variant carries a stretch and total of 1, so a warning
+    # attached to either count fires zero times here -- which is the shape
+    # that produced the rule.
+    variants = write_transcript([
+        use("t1", "ALLOW_UNREVIEWED_PUSH=1 git push -u origin HEAD"),
+        denial("t1"),
+        use("t2", "export ALLOW_UNREVIEWED_PUSH=1 && git push -u origin HEAD"),
+        denial("t2"),
+        use("t3", "env ALLOW_UNREVIEWED_PUSH=1 git push -u origin HEAD"),
+        denial("t3")])
     # Denied, ran successfully, denied again: one denial in the current
     # stretch, so the retry advice is right and "2 times" would be wrong.
     reset = write_transcript([
@@ -469,8 +489,9 @@ try:
         out_reset = invoke(reset, sdir)
         out_noreset = [(invoke(t, sdir), d) for t, d in noreset]
         out_failed = invoke(failed_run, sdir)
+        out_variants = invoke(variants, sdir)
     finally:
-        for p in (one, two, both, reset, failed_run,
+        for p in (one, two, both, reset, failed_run, variants,
                   *[t for t, _ in noreset]):
             os.unlink(p)
     content += [
@@ -483,21 +504,16 @@ try:
         # second-denial message whose only imperative was "hand the user the
         # decision" would stop the session one attempt short of the thing
         # that worked -- the incident, reproduced by following the hook.
-        ("One more identical re-run is still within what the evidence "
-         "supports" in out_two,
-         "two denials: an identical re-run is still supported"),
-        # Pattern 43's mechanism is VARIATION, so it is variation this warns
-        # off, not the byte-identical re-run.
-        ("rephrasing it into new shapes" in out_two,
-         "two denials: warns against rephrasing, not against re-running"),
-        ("Pattern 43 records" in out_two,
-         "two denials: cites Pattern 43 as recording, not as measuring"),
         ("denied 2 times so far" in out_two,
          "two denials: reports the count, not 'cannot'"),
-        ("git push origin beta" in out_both[0],
-         "concurrent denials: the newest is reported first"),
-        ("git push origin alpha" in out_both[1],
-         "concurrent denials: the older one is not lost behind it"),
+        # Oldest first. The original command is the one the evidence is
+        # about; the newest is whatever the session most recently reworded it
+        # into. Reporting newest first replays #2994 by naming the settings
+        # edit before the push it was a workaround for.
+        ("git push origin alpha" in out_both[0],
+         "concurrent denials: the oldest is reported first"),
+        ("git push origin beta" in out_both[1],
+         "concurrent denials: the newer one is not lost behind it"),
         # The stretch drives the advice and the TOTAL is what gets
         # reported. Quoting the stretch under "so far" wording would tell the
         # session to report one denial where the transcript records two.
@@ -511,10 +527,28 @@ try:
          "an allowed run restores the retry advice"),
         ("denied a tool call once in a row" in out_failed,
          "a run the classifier allowed resets it even if it failed"),
+        ("denied 3 distinct commands" in out_variants,
+         "three phrasings of one goal reach the variation warning"),
+        ("stop generating new shapes" in out_variants,
+         "the variation warning says what to stop doing"),
+        ("if they are rephrasings of one goal" in out_variants.lower(),
+         "and hedges, because it cannot tell variants from unrelated work"),
+        ("stop generating new shapes" not in out_one,
+         "a single denied command gets no variation warning"),
+        # Pattern 43's Do bullet and #2994's measurement pull opposite ways
+        # here. A guard is the wrong place to settle that, so the message
+        # states both and hands the decision over -- which is what the Do
+        # bullet asks for.
+        ("Pattern 43 says to stop probing" in out_two,
+         "two denials: states Pattern 43's rule"),
+        ("succeeding on its third attempt" in out_two,
+         "two denials: states #2994's measurement beside it"),
+        ("let them choose" in out_two,
+         "two denials: hands the decision to the user"),
     ]
     content += [("denied 2 times so far" in out, desc)
                 for out, desc in out_noreset]
-    content += [("One more identical re-run" in out,
+    content += [("Pattern 43 says to stop probing" in out,
                  desc.replace("does not reset the stretch",
                               "leaves the stretch at 2")
                      .replace("still does not reset it",

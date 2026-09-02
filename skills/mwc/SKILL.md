@@ -48,6 +48,13 @@ without asking confirmation before every merge.
   [`fully-clean`](../../shared/workflow/fully-clean.md) for the payload keys.
   A later all-clear from a different reviewer does not supersede a standing
   not-clean; only a later clean from the same reviewer does.
+  After the instrument passes, run the base-currency check that
+  [`fully-clean`](../../shared/workflow/fully-clean.md) states in its stale-base rule
+  (the Do bullet beginning "before merging, fetch the PR's configured base")
+  before the merge command; until
+  [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) wires it
+  into the instrument it is a manual step, and a stale merge-base means
+  `gh pr update-branch` and a full re-run of the gate on the new head.
 - **Session Duration**: The grant expires automatically when the session ends
   or when explicitly revoked via `/mwc revoke` or `disable-mwc`.
 

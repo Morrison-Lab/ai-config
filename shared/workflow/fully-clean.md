@@ -1195,7 +1195,8 @@ A clean-gate check the queue cannot block on is a check the queue does not run a
 - **Do:** when the merge-base is not that tip and the merge is direct, `gh pr update-branch <N> -R <owner>/<repo>`, then rerun the whole clean gate on the new head, review included, before merging.
   The update is a new head, so a clean verdict on the old one no longer counts, per [`sync-with-main`](sync-with-main.md).
 - **Do:** under a merge queue whose required checks cover the whole clean gate on `merge_group`, rely on those checks rather than a manual update.
-- **Don't:** skip the manual update under a queue while any clean-gate check is non-required or `pull_request`-only, since the queue neither runs nor blocks on it.
+- **Don't:** skip the manual update under a queue while any clean-gate check is non-required, since such a check can run on `merge_group` and still not block the merge.
+- **Don't:** skip it while any clean-gate check is `pull_request`-only either: a non-required one never runs on the queue branch, and a required one holds the queue until it times out waiting for a result that never arrives.
 - **Don't:** read a head-only FULLY CLEAN verdict as a merge-safe verdict when the base has advanced.
 - **Don't:** substitute a path diff of `.github/workflows/` for the update.
   It cannot see a check that arrived through a script or a reusable workflow.

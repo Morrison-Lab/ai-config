@@ -574,7 +574,7 @@
   On the PRs below, `gh api repos/<owner>/<repo>/pulls/<N>/requested_reviewers -X POST -f 'reviewers[]=copilot-pull-request-reviewer[bot]'` returned HTTP 201 each time.
   The section above records 422 and refusal as other outcomes.
   `gh pr view --json reviewRequests` stayed empty each time.
-  On those same requests the review then landed (a few minutes later on #2976), visible under `gh pr view --json reviews` with author login `copilot-pull-request-reviewer`, which `startswith("copilot")` matches.
+  On those same requests the review then landed (a few minutes later on [#2976](https://github.com/Morrison-Lab/ai-config/pull/2976)), visible under `gh pr view --json reviews` with author login `copilot-pull-request-reviewer`, which `startswith("copilot")` matches.
   That is an observation of those PRs, not a guarantee: the empty request list stays inconclusive (see the 201-then-empty section above), and the posted review is the only evidence of arrival.
   The inline comments of that review (`gh api repos/<owner>/<repo>/pulls/<N>/comments`) carry `user.login` `Copilot` instead, so a query over comments needs a case-insensitive test (`test("copilot"; "i")`) while a query over reviews does not.
   On those PRs a re-request after a push was followed by a fresh review on the new head.

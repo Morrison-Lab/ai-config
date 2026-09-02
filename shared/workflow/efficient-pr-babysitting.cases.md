@@ -38,8 +38,9 @@ invoked to withhold one.)
 
 (Morrison-Lab/ai-config#1115, 2026-08-04: a 23-line CLAUDE.md addition earned **Ready for merge** on round one, with one optional cross-link the reviewer noted but declined to raise.
 Acting on it drew a second clean verdict plus a fresh declined note -- a forward-pointing phrase the added cross-link introduced -- and acting on that drew a third: three review rounds for a change mergeable after the first.
-Copilot's check went green with `get_reviews` empty on every head, including #1118's stable single-push head.
-That silence carried no verdict and its cause is unresolved, so it was not something the pushes caused -- an earlier version of this entry wrongly called it self-inflicted, and a later one wrongly called it Copilot's no-findings behavior.)
+Copilot's check went green with `get_reviews` empty on every head, including [#1118](https://github.com/Morrison-Lab/ai-config/pull/1118)'s stable single-push head.
+That silence carried no verdict, and its cause is unresolved.
+The single-push head shows the trickled pushes were not necessary for it, and nothing measured says whether they contributed -- an earlier version of this entry wrongly called it self-inflicted, and a later one wrongly called it Copilot's no-findings behavior.)
 
 ## "A caveat reporting that the reviewer could not check is not a declined note"
 

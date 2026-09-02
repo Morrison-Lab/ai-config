@@ -86,8 +86,10 @@ In repository settings under **Rulesets** -> **Rules** -> **Require merge queue*
 
 Workflows containing required status checks must listen for the `merge_group` event in addition to `pull_request` and `push`.
 Without `merge_group`, GitHub Actions will not run checks on speculative queue branches, causing queued PRs to hang indefinitely until timeout.
-The queue blocks only on required checks, so a clean-gate check that is not required, or is `pull_request`-only, neither runs on the speculative branch nor holds the merge.
-Before the queue replaces the manual update, every check in the clean gate has to be required (or aggregated behind a required one) and has to execute on `merge_group`, per [`fully-clean`](fully-clean.md)'s merge-gate section.
+The queue blocks only on required checks.
+A workflow runs on the speculative branch only when its own `on:` block lists `merge_group`, and the two settings are independent.
+So a non-required check that lists `merge_group` runs there and cannot block the merge, a non-required `pull_request`-only check neither runs nor blocks, and a required `pull_request`-only check is the hang above.
+Before the queue replaces the manual update, every check in the clean gate has to be required (or aggregated behind a required one) and has to execute on `merge_group`, per the stale-base rule in [`fully-clean`](fully-clean.md) (the passage tracked as [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982)).
 
 ```yaml
 name: CI

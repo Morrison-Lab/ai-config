@@ -135,7 +135,7 @@ ai-config#2969 (ai-config#694 pattern) to keep both files well under the
   So a rebuttal has to show the helper is about two lines and closely
   related to the functions beside it; anything larger goes in its own
   module.
-  The helpers from #2976 landed inline before this was checked and are
+  The helpers from [#2976](https://github.com/Morrison-Lab/ai-config/pull/2976) landed inline before this was checked and are
   tracked in
   [#2990](https://github.com/Morrison-Lab/ai-config/issues/2990).
   - **Do:** rebut only by the rule's own carve-out (a two-liner grouped

@@ -1185,16 +1185,16 @@ every clean-gate check executes for `merge_group`, job and step conditions inclu
 and every clean-gate check is a required status check on the base, or is aggregated behind one that is.
 A clean-gate check the queue cannot block on is a check the queue does not run as a gate.
 Neither condition is readable from `gh pr checks`, which reports state and not requiredness ([`gh-cli`](../../memories/gh-cli.md) records the rulesets query that does).
-Until [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) supplies an instrument, verify both by hand before relying on the queue: the required checks from `gh api "repos/<owner>/<repo>/rules/branches/<base>"`, and each clean-gate workflow's `on:` block and job and step `if:` conditions for `merge_group`.
+Until [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) supplies an instrument, verify both by hand before relying on the queue: the required checks from `gh api --paginate "repos/<owner>/<repo>/rules/branches/<base-encoded>"` (encode the base name as one path segment, `jq -rn --arg b "<base>" '$b|@uri'`, since `release/1.x` would otherwise split into two, and paginate, since the first page can omit rules), and each clean-gate workflow's `on:` block and job and step `if:` conditions for `merge_group`.
 Without that verification the exception is unavailable: take the direct path, or stop.
 
 The rule splits by merge mode: a direct merge from a session with `git` and `gh`, a direct merge from a remote session without `git`, and a merge queue.
-It is GitHub-specific as written (`headRefOid`, `gh`, the compare endpoint, the update-branch and merge pins), so a GitLab merge has no equivalent gate until [#3021](https://github.com/Morrison-Lab/ai-config/issues/3021) supplies one, and the entry points below inherit that scope.
+It is GitHub-specific as written (`headRefOid`, `gh`, the compare endpoint, the update-branch and merge pins), so a GitLab merge has no equivalent gate until [#3021](https://github.com/Morrison-Lab/ai-config/issues/3021) supplies one, and `merge-it`, `mwc`, and `chores` inherit that scope.
 It binds every direct-merge path, including the dependency-bump merges in [`chores`](../../skills/chores/SKILL.md), not only `mwc` and `merge-it`.
 For a bot bump, the gate to rerun after an update is CI plus conflict state, which is what those PRs are gated on, since `@claude` review is skipped on them by design.
 `chores` states that form.
 A deferred merge (`gh pr merge --auto`, or a `@dependabot` merge command) stays out of every direct-merge path.
-Auto-merge stays enabled across a later push by anyone with write access (GitHub disables it only for a push from someone without write permission, or a base switch) and fires on required checks alone, so a pin on the enabling request protects nothing after it, and the sync-push rule further down already forbids arming it after a new head.
+Auto-merge stays enabled across a later push by anyone with write access (GitHub disables it only for a push from someone without write permission, or a base switch) and fires on required checks alone, so a pin on the enabling request protects nothing after it, and the sync-only-push rule in this fragment already forbids arming it after a new head.
 Merge synchronously, right after the check, with the merge command pinned.
 
 - **Do:** for a direct merge from a session with `git` and `gh`, record `headRefOid` and `baseRefName` before the clean gate runs, so the gate's verdict is tied to one head and one target.
@@ -1210,12 +1210,12 @@ Merge synchronously, right after the check, with the merge command pinned.
   Each result is assigned inside the `&&` chain so an unresolved branch or a failed command fails the check rather than comparing two empty strings as equal.
   Reading `FETCH_HEAD` after each fetch uses the tip the fetch just returned and writes no remote-tracking ref, so it holds in a single-branch clone (where a bare `git fetch origin` leaves `origin/<branch>` stale) and under `fetch.prune=true` (where an explicit `branch:refs/remotes/origin/branch` refspec was measured to delete the ref and fail `rev-parse` on its first run).
   The base comes from the PR, not from the repository's default branch: a stacked or release PR targets another branch, and [`merge-it`](../../skills/merge-it/SKILL.md) already warns not to assume `main` for those.
-- **Do:** for a direct merge from a remote session without `git`, re-read the PR's `headRefOid` and `baseRefName` and require both to equal the recorded pins, then read the compare endpoint instead of `git merge-base`, `gh api "repos/<owner>/<repo>/compare/<base>...<head-sha>"`, and require `behind_by` of 0.
+- **Do:** for a direct merge from a remote session without `git`, re-read the PR's `headRefOid` and `baseRefName` and require both to equal the recorded pins, then read the compare endpoint instead of `git merge-base`, `gh api "repos/<owner>/<repo>/compare/<base-encoded>...<head-sha>"`, with the base name encoded as one path segment (`jq -rn --arg b "<base>" '$b|@uri'`, so `release/1.x` does not split the path), and require `behind_by` of 0.
   The pin comparison is the same one the local path makes, since `expectedHeadSha` on the merge protects the head and nothing protects the target branch.
   Measured 2026-09-02 (Pacific) on [#2989](https://github.com/Morrison-Lab/ai-config/pull/2989): `behind_by` was 0 and `merge_base_commit.sha` was the base tip, the same answer the `git merge-base` form gives.
   Where no raw API call is available either, as in an MCP-only session whose tools expose neither endpoint, the gate cannot run, so do not merge from that session until [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) supplies the tool.
   That is the fail-closed direction, per [`fail-fast`](../principles/fail-fast.md).
-- **Do:** when the merge-base is not that tip and the merge is direct, update the branch pinned to the recorded head (the `expected_head_sha` call below, or `update_pull_request_branch` with `expectedHeadSha` remotely), then rerun the whole clean gate on the new head, review included, before merging.
+- **Do:** when the merge-base is not that tip and the merge is direct, update the branch pinned to the recorded head (the `expected_head_sha` update call, or `update_pull_request_branch` with `expectedHeadSha` remotely), then rerun the whole clean gate on the new head, review included, before merging.
   The update is a new head, so a clean verdict on the old one no longer counts, per [`sync-with-main`](sync-with-main.md).
   The update is asynchronous: the REST endpoint answers `202 Accepted` while the merge is still in progress, and the MCP tool reports that answer as success, so a gate rerun started at once can read the old head.
   Pin the update itself to the head that failed the currency check.
@@ -1223,7 +1223,7 @@ Merge synchronously, right after the check, with the merge command pinned.
   Remotely it is `expectedHeadSha` on the MCP `update_pull_request_branch` tool.
   A `422` whose message names an expected-head mismatch means the head already moved.
   Match on the substring `expected head sha`, since the live text carries a curly apostrophe and a trailing period that this ASCII rendering cannot show.
-  That is the another-writer signal below, so it routes to the ownership rule instead of merging the base into someone else's push.
+  That is the another-writer signal, so it routes to the ownership rule (settle who owns the branch per [`claim-pr`](claim-pr.md)) instead of merging the base into someone else's push.
   The endpoint uses `422` for other validation failures too, so any other message is a failed update: stop and read it rather than treating it as a moved head.
   Measured 2026-09-02 (Pacific) on [#2989](https://github.com/Morrison-Lab/ai-config/pull/2989): a deliberately wrong `expected_head_sha` returned `422` with a message reading "expected head sha didn't match current head ref." (curly apostrophe in the live text) and changed nothing.
   Then poll `headRefOid` until it changes, with a deadline (five minutes is generous for a merge commit GitHub has accepted), and treat expiry as a failed update to stop on and report, since a `202` can be returned without a new head ever appearing.

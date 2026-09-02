@@ -186,7 +186,7 @@ CONFIG_LIKE_INDETERMINATE_FLAGS = (
 # (ai-config#1920) -- an earlier revision of this file wrote one as a "fallback"
 # and it did diverge, on all three of those points. So there is no fallback
 # parser: if the sibling cannot be loaded this guard never grades pushes with
-# a worse one. It applies only the narrow degraded-mode heuristic further down
+# a worse one. It applies only the narrow degraded-mode heuristic in main()
 # to decide whether to report the broken installation and deny a command
 # whose text looks like a push (ai-config#2981).
 

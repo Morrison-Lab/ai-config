@@ -241,10 +241,12 @@ resolve any conflict yourself (you have the context on your own change), then
 continue." This is faster and higher-context than a scanning subagent
 guessing at the resolution from outside: the branch's own owning agent
 already knows why its code looks the way it does.
-Those branches are this session's own work, opened under the invoking user's
-login, so they pass `memories/reviewing-prs.md`'s scope test by construction;
-a branch claimed by an agent that is not yours goes through the filtered scan
-in step 1 like any other PR.
+Those branches are usually this session's own work, but re-check each one
+against `memories/reviewing-prs.md`'s scope test before sending the
+instruction: an assignment can change, and a delegated agent may be driving
+an assigned or requested PR that another author opened.
+A branch that fails the test, or that is claimed by an agent that is not
+yours, goes through the filtered scan in step 1 like any other PR.
 
 **This depends on the coordinator finding out about a merge in the first
 place --- so brief every delegated agent, up front, to report back the
@@ -988,5 +990,6 @@ When this post-merge wrap-up completes the session's work **and no PR this sessi
 - ❌ Treating the whole cascade-scan hit list as work caused by this merge, without
   intersecting it against the merge's own deleted and renamed paths (step 1.5's own step 2) --- on
   an old backlog that claims other people's stale PRs for no reason.
-- ❌ Pushing a resolution to a branch you don't own when a comment would do ---
-  sharpest on a release branch, where a push can disrupt an out-of-band process.
+- ❌ Pushing to, or commenting on, a PR that fails the scope test --- it gets a
+  report to the user --- or pushing to a release branch carrying an out-of-band
+  process even when it passes, where a report is the safe form.

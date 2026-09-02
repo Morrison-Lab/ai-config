@@ -239,12 +239,13 @@ change and nothing else, then push and flag what you did in a PR comment.
 See [`sync-with-main.cases.md`](sync-with-main.cases.md), "Check other open
 PRs after merging an extraction".
 
-**That "push to their branch" is scoped by standing, not only by cause.**
+**That "push to their branch" is scoped by the scope test, not only by cause.**
 gha#201/#202 were CI workflow files in a repo the author drove, where a push
 saves the sibling's author a round and risks nothing they were relying on.
-The same push onto a branch you do not own --- a colleague's active work, and
-most sharply a release branch carrying an out-of-band process --- can disrupt
-something a comment would not.
+The same push onto a PR that fails the scope test --- a colleague's active
+work you were neither assigned nor asked to drive --- and, whatever the test
+says, onto a release branch carrying an out-of-band process, can disrupt
+something a report would not.
 There, report the extraction, the deletion, or the rename
 and where the content went to the user,
 who can assign or name the PR if they want it acted on,

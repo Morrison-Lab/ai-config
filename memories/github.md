@@ -65,8 +65,14 @@ Moved to [`gh-cli.md`](gh-cli.md).
 
 When starting a GII loop, do a cleanup pass before diving into ARDI:
 
-1. **List all open PRs** with `mcp__github__list_pull_requests`. Look for
-   stale bot-opened PRs that target the same issues as the queue.
+1. **List all open PRs** with `mcp__github__list_pull_requests` (fields
+   `number,title,user,assignees`).
+   Filter the list by `reviewing-prs.md`'s scope test first (opened by or
+   assigned to the invoking user, explicitly requested, or authored by the
+   GitHub Actions app); steps 2-4 act only on PRs that pass it, and an
+   out-of-scope PR is reported to the user rather than closed, commented on,
+   or merged into.
+   Look for stale bot-opened PRs that target the same issues as the queue.
 2. **Close empty PRs** — bot-opened branches with no commits (e.g. a `@claude`
    task run that posted a comment but never pushed code). Check `get_commits`
    on each PR before closing.

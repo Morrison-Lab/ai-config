@@ -595,8 +595,8 @@ _CURLY_QUOTE_SPAN = re.compile("\u201c[^\u201d\\n]*\u201d")
 _MAX_MASKED_LINE = 4096
 
 
-def _citation_mask(text: str) -> bytearray:
-    """Mark every offset lying inside a closed code span of 2+ backticks.
+def _citation_mask(text: str, min_backticks: int = 2) -> bytearray:
+    """Mark every offset lying inside a closed code span of min_backticks+ backticks.
 
     The INTERSECTION of a per-line scan and a whole-body scan, which is
     strictly safer than either alone because each over-reaches where the other
@@ -631,7 +631,7 @@ def _citation_mask(text: str) -> bytearray:
             oversized.append((offset, offset + len(line)))
         else:
             for match in CODE_SPAN_RE.finditer(line):
-                if len(match.group(1)) >= 2:
+                if len(match.group(1)) >= min_backticks:
                     begin, finish = match.span()
                     per_line[offset + begin:offset + finish] = (
                         b"\x01" * (finish - begin)
@@ -650,7 +650,7 @@ def _citation_mask(text: str) -> bytearray:
 
     whole = bytearray(len(text))
     for match in CODE_SPAN_RE.finditer(scannable):
-        if len(match.group(1)) >= 2:
+        if len(match.group(1)) >= min_backticks:
             begin, finish = match.span()
             whole[begin:finish] = b"\x01" * (finish - begin)
 
@@ -2332,16 +2332,25 @@ def _is_structured_review_body(body: str) -> bool:
     if not body:
         return False
     fenced_lines, _, _ = find_fence_spans(body, swallow_unclosed=True)
-    span_intervals = [m.span() for m in CODE_SPAN_RE.finditer(body)]
+    mask = bytearray(len(body))
+    offset = 0
+    for line in body.split("\n"):
+        for m in re.finditer(r"(?<!`)(`+)(?!`)[^\n\r`]+?(?<!`)\1(?!`)", line):
+            b, e = m.span()
+            mask[offset + b : offset + e] = b"\x01" * (e - b)
+        offset += len(line) + 1
+    for m in re.finditer(
+        r"(?<!`)(`{2,})(?!`)(?:[^\n\r]|\r?\n(?![ \t]*\r?\n))*?(?<!`)\1(?!`)",
+        body,
+    ):
+        b, e = m.span()
+        mask[b:e] = b"\x01" * (e - b)
 
     def _in_fence_or_span(match_start: int) -> bool:
         line_idx = body[:match_start].count("\n")
         if line_idx in fenced_lines:
             return True
-        for b, e in span_intervals:
-            if b <= match_start < e:
-                return True
-        return False
+        return bool(mask[match_start])
 
     scan = strip_cited_finding_vocab(body)
     has_heading = any(

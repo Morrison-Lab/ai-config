@@ -127,14 +127,31 @@ restatement of a rule, the same gap may be open at any other restatement,
 and the reviewer finds those one round at a time.
 `Morrison-Lab/ai-config#2913` (2026-09-01) spent Copilot rounds thirty-two
 through thirty-five landing one exclusion veto and one pre-write recheck
-site by site (files per commit from `git show --stat`): `chores`
+site by site (files per commit from `git show --stat`): `chores` plus the
+`scripts/validate-skills.py` allowlist entry for its new input
 (`28c20e5`), `chores` again for the recheck's step range (`988b545`),
 then `AGENTS.md`, `ardia`, `post-merge`, and this file (`3b32086`), then
 `memories/github.md` and `chores` a third time for the recheck's inputs
 (`ab89045`).
 A corpus grep for the rule's vocabulary after round thirty-two, with each
-hit read against the widened rule, would have folded the next three rounds
-into one push.
+hit read against the widened rule, reaches most of those sites.
+Measured 2026-09-01 against the `28c20e5` tree:
+
+```bash
+git grep -n -i -e "not a request" -e "reapply the" -e "before each write" \
+  -e "before the mutations" -e "explicitly authorized" 28c20e5 -- '*.md'
+```
+
+returns `AGENTS.md:571`, `memories/reviewing-prs.md:94`,
+`skills/ardia/SKILL.md:45` and `:47`, `skills/chores/SKILL.md:46` and
+`:132-133`, `memories/github.md:73`, and `skills/post-merge/SKILL.md:285`,
+plus three unrelated hits (`hooks.md`, `report-mistakes-proactively.md`,
+`math-derivation-steps.md`) that reading against the rule discards.
+That is every file rounds thirty-three through thirty-five changed.
+The one restatement it lands beside rather than on is `post-merge`'s
+scanner brief, whose "explicitly authorized" is wrapped across a line
+break, so a single-line grep needs a second pattern or a read of the
+surrounding section for a wrapped phrase.
 Round thirty-six was a different gap (a live-claim check in
 `check-history`, distinct from scope), so it is not an instance of this
 lesson and a restatement sweep would not have caught it.

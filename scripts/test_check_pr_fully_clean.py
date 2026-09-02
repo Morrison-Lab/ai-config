@@ -1901,6 +1901,35 @@ def main() -> int:
                   "crash is fixed and verified by running the suite; "
                   + _clause + ".\n", "")
               == "not-clean")
+    # Round-2 adversarial review of #2958: a parenthesized aside inside the
+    # method phrase was consumed whole, so a forbidden word inside it was
+    # never seen. Both the bare "by" site and the verified continuation.
+    check("a finding inside parens after 'verified by' stays not-clean",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The previously blocking "
+              "crash is fixed and verified by running the suite (but a "
+              "critical bug remains).\n", "")
+          == "not-clean")
+    check("a finding inside parens after 'fixed by' stays not-clean",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The previously blocking "
+              "crash is fixed by a rebase (the test still fails).\n", "")
+          == "not-clean")
+    check("a harmless parenthesized aside after the method still reads as clean",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The previously blocking "
+              "crash is fixed and verified by running the suite (clean exit).\n", "")
+          == "clean")
+    check("an open-finding clause between the mention and the verb stays not-clean",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The previously blocking "
+              "crash which remains open is resolved.\n", "")
+          == "not-clean")
+    check("an open-finding aside between the mention and the verb stays not-clean",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The previously blocking "
+              "crash (still open) is resolved.\n", "")
+          == "not-clean")
     check("a whitelisted 'no new issues introduced' ';' clause reads as clean",
           checker.classify_verdict(
               "### Verdict\n**Ready for merge.** The previously blocking "

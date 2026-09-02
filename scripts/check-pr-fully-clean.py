@@ -1168,16 +1168,26 @@ _BARE_REJECTION = (
 # below ("fixed and verified by executing the script"). One definition, so
 # the forbidden-token lookahead that keeps "fixed by disabling the test"
 # not-clean guards both sites identically (ai-config#2957).
-_RESOLUTION_METHOD_PHRASE = (
-    r"(?:\s+(?:by|in|via|with|through|as|per|on|against)\b"
-    r"(?:(?!\b(?:and|but|while|although|however|yet|though|"
+# The tokens that keep a "fixed by ..." method phrase from vouching for a
+# suppressed check or a still-open finding. Applied per character of the
+# phrase AND per character inside a parenthesized aside: the aside used to
+# be consumed atomically, so "(but a critical bug remains)" after the
+# method was never inspected (round-2 adversarial review of #2958).
+_RESOLUTION_FORBIDDEN_LOOKAHEAD = (
+    r"(?!\b(?:and|but|while|although|however|yet|though|"
     r"not|never|neither|nor|no|none|nothing|without|"
     r"hardly|barely|scarcely|zero|"
     r"partially?|incomplete(?:ly)?|ignor(?:e|ed|ing|es)?|omit(?:s|ted|ting)?|skip(?:s|ped|ping)?|"
     r"except|unresolved|unfixed|unaddressed|open|reproduce[s]?|broken|failing|fails?|"
     r"(?:suppress|disabl|mut|weaken|bypass|silenc|remov|delet|revert)(?:e|ed|ing)?\s+(?:(?:the|an?|all|these|those|that|our|any)\s+)?(?:[a-z0-9_-]+\s+)?(?:tests?|checks?|assertions?|warnings?|linters?|guards?|lints?|detectors?|errors?)|"
     r"comment(?:ed|ing)?\s+out\s+(?:(?:the|an?|all|these|those|that|our|any)\s+)?(?:[a-z0-9_-]+\s+)?(?:tests?|checks?|assertions?|warnings?|linters?|guards?|lints?|detectors?|errors?))\b)"
-    r"(?:\([^()\n]{0,120}\)|[^;:,.!?()]|\.(?!\s|$))){1,180})?"
+)
+
+_RESOLUTION_METHOD_PHRASE = (
+    r"(?:\s+(?:by|in|via|with|through|as|per|on|against)\b"
+    r"(?:" + _RESOLUTION_FORBIDDEN_LOOKAHEAD
+    + r"(?:\((?:" + _RESOLUTION_FORBIDDEN_LOOKAHEAD + r"[^()\n]){0,120}\)"
+    r"|[^;:,.!?()]|\.(?!\s|$))){1,180})?"
 )
 
 # "are fixed and verified by <method>" is how a reviewer says the fix was
@@ -1213,8 +1223,14 @@ _BENIGN_TRAILING_CLAUSE = re.compile(
 )
 
 RESOLVED_BLOCKING_SUFFIX = re.compile(
+    # The lead-in between the blocking mention and the resolution verb gets
+    # the same forbidden-token guard as the method phrase, inside parens
+    # too: "crash which remains open is resolved" and "crash (still open)
+    # is resolved" both read as resolved before it (ai-config#2958).
     r"^(?:(?!\b(?:and|but|while|although|however)\b)"
-    r"(?:\([^()\n]{0,120}\)|[^,:;.!?()])){0,120}\b(?:"
+    + _RESOLUTION_FORBIDDEN_LOOKAHEAD
+    + r"(?:\((?:" + _RESOLUTION_FORBIDDEN_LOOKAHEAD + r"[^()\n]){0,120}\)"
+    r"|[^,:;.!?()])){0,120}\b(?:"
     r"(?:is|are|was|were)\s+(?:(?:now|since|already|also|fully|completely|satisfactorily|properly|cleanly|successfully)\s+)?"
     r"(?:fixed|resolved|addressed|closed|removed|corrected)"
     r"|ha(?:s|ve)\s+(?:(?:since|already|also)\s+)?been\s+(?:(?:now|fully|completely|satisfactorily|properly|cleanly|successfully)\s+)?"

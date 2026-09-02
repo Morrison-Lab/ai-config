@@ -267,6 +267,46 @@ Note what the toolchain question actually turns on: a `pdf:` anywhere in that sw
 (Measured 2026-08-24 on `d-morrison/macros`, whose `_quarto.yml` declares `format: html` only while `demo-shortcode.qmd` and `demo-include-in-header.qmd` each declare their own `pdf:` and `revealjs:` blocks --- demonstrating the macros reaching the LaTeX preamble being the entire point of those two pages.
 Caught in self-review on [macros#83](https://github.com/d-morrison/macros/pull/83) before the TinyTeX removal merged.)
 
+## The project `format:` block reaches every document that declares no `format:` of its own
+
+The section above is about which **formats** a project renders, and says the project block understates that set.
+This is the other axis: which **documents** a given entry in that block reaches.
+The answer is all of them --- the block is the *default* for any document whose own front matter declares no `format:` --- so adding a format there to give **one** document slides silently gives it to every page in the site.
+
+The two are not opposite directions of one claim, and reading them as such is what makes this surprising: the block behaves exactly as documented, and it is the author's intent that was narrower than the edit.
+
+The failure is the filename collision already recorded twice in this corpus, reached from the project side with no document edited at all.
+Both formats claim `<stem>.html`, and the render dies rather than rendering something wrong.
+The "Verify a redirect on a site build" bullet above carries the remedy (an explicit `output-file:` on the second format), and [`debugging.md`](debugging.md)'s "Reproduce heavy-tool project bugs minimally" carries a two-file, R-free reproducer for the same `safeMoveSync`/`renderProject` collision --- reach for that before rendering a real project twice.
+
+Two things this adds to those.
+
+**The blast radius is the whole site, and the error names one page.**
+Measured on Quarto 1.9.36 / macOS, a `revealjs:` block added under the top-level `format:` key of a website project:
+
+```
+ERROR: NotFound ... rename 'docs/design-decisions.html' -> '_site/docs/design-decisions.html'
+```
+
+The output directory was left missing `index.html`, `styles.css`, `search.json`, and `site_libs/`.
+The page named is whichever collision the render reached first, not the page the format was added for --- and that mismatch is itself the tell that the scope is project-wide rather than per-document.
+
+**A green CI check is not evidence the block is scoped correctly.**
+Quarto 1.10.18 on a Linux runner accepted the identical config that 1.9.36 on macOS refused.
+Both the version and the platform differ between those two observations, so neither is attributable on this evidence;
+what is established is only that a passing remote render does not reproduce a local one.
+The deployed preview is still worth reading, per the `pr-preview/pr-<N>/` recipe the bullet above cites --- it is the check, not the forge, that was blind here.
+
+- **Do:** put a single document's extra format in that document's own front matter, with an explicit `output-file:`.
+- **Do:** render the project locally before trusting CI on a `_quarto.yml` `format:` change.
+- **Do:** grep the error's source path against the document you actually edited;
+  a different path means the entry is reaching documents you did not intend.
+- **Don't:** add a format to the top-level `format:` key for one document's benefit.
+- **Don't:** treat the page named in a `rename ... NotFound` as the page at fault.
+
+(Measured 2026-09-01 while reviewing a pull request on `ucdavis/hac.sap`, a Quarto website project: a `revealjs:` block added under the top-level `format:` key made `index.qmd` and `docs/design-decisions.md` each render to revealjs as well, colliding with their own HTML outputs.
+Tracked as [ai-config#2984](https://github.com/Morrison-Lab/ai-config/issues/2984).)
+
 ## quarto-actions/setup with tinytex — two shared-runner failure signatures (win, 2026-07)
 
 - **`ERROR: Unable to determine latest release for rstudio/tinytex-releases / 403 - Forbidden`**

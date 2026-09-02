@@ -90,7 +90,8 @@ Match the two-word invariant `hold off`, or either retired wording `paws off` / 
 
 ``` bash
 # GitHub — list open PRs and scan for any whose title or branch references this issue:
-gh pr list --state open --json number,title,headRefName | cat   # LIST_PRS
+gh pr list --state open --json number,title,headRefName,author,assignees \
+  --jq '.[] | "#\(.number) \(.title) [\(.headRefName); \(.author.login); assignees: \([.assignees[].login] | join(","))]"'   # LIST_PRS
 # Authoritative — the issue's cross-referenced open PRs via the REST timeline API.
 # (gh issue view --json has no timelineItems field; in the timeline, source.type is
 #  always "issue", so a PR is one whose source.issue.pull_request is non-null. The

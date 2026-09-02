@@ -176,9 +176,17 @@ step (grep the skill for `close`, `comment`, `merge`, `push`) and the
 predicate's mutable inputs (read them off the filter itself: `chores`
 reads title and labels, not only author and assignees).
 
-- **Do:** grep every restatement of the rule the finding touched, read
-  each hit against the widened rule, fix the ones that carry the gap, and
-  say in the ARD reply which sites were inspected and which changed.
+- **Do:** find every restatement of the rule the finding touched by
+  three routes, since a phrase grep matches strings and a restatement can
+  use other words
+  ([`grep-is-not-coverage`](../shared/workflow/grep-is-not-coverage.md)):
+  the phrase grep, a grep for the mechanism's stable terms (the input
+  names, the arm names, the write verbs), and a topic-and-filename pass
+  over the skills, fragments, and memories that list, push to, comment on,
+  review, or merge PRs.
+  Read each candidate against the widened rule, fix the ones that carry
+  the gap, and say in the ARD reply which candidates were inspected and
+  which changed, never that the grep enumerated the concept.
 - **Do:** derive both populations for a before-each-write sentence from
   the file, and name them in it.
 - **Don't:** fix the one site the finding quoted and wait for the next

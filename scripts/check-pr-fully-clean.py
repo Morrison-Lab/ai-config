@@ -48,9 +48,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 from fences import (  # noqa: E402
     CODE_SPAN_RE,
     find_fence_spans,
-    strip_code,
     strip_code_spans,
-    strip_fences,
 )
 from payload_fetcher import PayloadError, PayloadFetcher  # noqa: E402
 from review_payload import (  # noqa: E402
@@ -2315,13 +2313,46 @@ def check_latest_verdict(
 _REVIEW_STRUCTURE_HEADING = re.compile(
     r"(?im)^#{1,6}\s*(?:(?:Review\s+)?Summary|(?:Critical\s+|Actionable\s+)?Findings|Verdict)\b"
 )
+_MULTI_BACKTICK_SPAN_RE = re.compile(
+    r"(?<!`)(`{2,})(?!`)(?:[^\n\r]|\r?\n(?![ \t]*\r?\n))*?(?<!`)\1(?!`)"
+)
 
 
 def _blank_fences_and_spans(body: str) -> str:
     """Blank fenced code blocks and code spans to spaces, preserving length."""
     fenced_lines, _, _ = find_fence_spans(body, swallow_unclosed=True)
     mask = _citation_mask(body, min_backticks=1)
+
     lines = body.split("\n")
+    unfenced_lines = [
+        "" if idx in fenced_lines else line for idx, line in enumerate(lines)
+    ]
+    unfenced_body = "\n".join(unfenced_lines)
+
+    line_offsets = []
+    curr = 0
+    for line in lines:
+        line_offsets.append(curr)
+        curr += len(line) + 1
+
+    unfenced_line_offsets = []
+    curr_unf = 0
+    for unf_line in unfenced_lines:
+        unfenced_line_offsets.append(curr_unf)
+        curr_unf += len(unf_line) + 1
+
+    for m in _MULTI_BACKTICK_SPAN_RE.finditer(unfenced_body):
+        b_unf, e_unf = m.span()
+        start_line = unfenced_body[:b_unf].count("\n")
+        start_col = b_unf - unfenced_line_offsets[start_line]
+        end_line = unfenced_body[:e_unf].count("\n")
+        end_col = e_unf - unfenced_line_offsets[end_line]
+
+        if not any(l in fenced_lines for l in range(start_line, end_line + 1)):
+            b_orig = line_offsets[start_line] + start_col
+            e_orig = line_offsets[end_line] + end_col
+            mask[b_orig:e_orig] = b"\x01" * (e_orig - b_orig)
+
     out = []
     line_offset = 0
     for idx, line in enumerate(lines):

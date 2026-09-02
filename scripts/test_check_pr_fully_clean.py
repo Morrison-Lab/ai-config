@@ -4715,6 +4715,18 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         ),
     )
     check(
+        "_is_structured_review_body: multi-line double-backtick span quoting report headings is NOT structured body (#2525)",
+        not checker._is_structured_review_body(
+            "Ready for merge -- this all looks good to me, thanks!\n\n"
+            "For reference, our report template looks like this:\n\n"
+            "`` \n"
+            "### Verdict\n"
+            "All clear\n"
+            "Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\n"
+            "``\n"
+        ),
+    )
+    check(
         "_is_structured_review_body: stray unclosed backtick in prose does NOT hide genuine headings (#2525)",
         checker._is_structured_review_body(
             "Here is some commentary with a stray ` backtick.\nMore prose.\n\n## Verdict\n\nReviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\nClean"
@@ -4735,7 +4747,7 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     check(
         "_is_structured_review_body: stray unclosed double-backtick without blank line does NOT hide genuine headings (#2525)",
         checker._is_structured_review_body(
-            "Commentary with stray `` double backtick on line 1\n### Verdict\nClean\nReviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\nClosing `` on line 4"
+            "Commentary with stray `` double backtick on line 1\n### Verdict\nClean\nReviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\nMore prose"
         ),
     )
     check(

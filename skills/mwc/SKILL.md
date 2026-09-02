@@ -259,7 +259,7 @@ When the user gives an MWC grant (e.g. `/mwc` or "merge when confident"):
 
 1. **Run the enabling step first, and confirm it took.**
    `skills/session-lock/scripts/ai-session.sh enable-mwc --id "<session id>"`
-   (or `~/.claude/skills/session-lock/scripts/ai-session.sh enable-mwc --id "<session id>"`)
+   (or `"${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/skills/session-lock/scripts/ai-session.sh}"` / `~/.claude/skills/session-lock/scripts/ai-session.sh`)
    sets the session merge-permission flag `no-unauthorized-merge.py` reads.
    This step is what makes the grant real: without the `.mwc` marker it creates,
    `no-unauthorized-merge.py` cannot see the grant and correctly keeps blocking.

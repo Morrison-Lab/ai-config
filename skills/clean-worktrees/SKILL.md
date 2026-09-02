@@ -205,7 +205,9 @@ which is why the narrowing matters.)
 ```bash
 # Plain `list` (NOT `--all`) — it prunes stale records and shows only LIVE
 # sessions, so a worktree whose session already died won't be flagged Active.
-~/.claude/skills/session-lock/scripts/ai-session.sh list 2>/dev/null \
+("${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/skills/session-lock/scripts/ai-session.sh}" list 2>/dev/null \
+  || ~/.claude/skills/session-lock/scripts/ai-session.sh list 2>/dev/null \
+  || skills/session-lock/scripts/ai-session.sh list 2>/dev/null) \
   | grep -F "<path>"        # a live record on this worktree → ACTIVE, skip
 ```
 

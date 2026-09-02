@@ -852,6 +852,7 @@ Stop watching only when the PR merges or closes, or I tell you to back off.
 Do not start ARDI, do not push fixes, and do not merge.
 Leave the findings and stop unless asked to iterate.
 A later request to iterate is a driving request.
+The review you post still carries both representations, per `AGENTS.md`'s own review-only rule.
 
 (UCD-SERG/shigella#31, 2026-08-25.)
 

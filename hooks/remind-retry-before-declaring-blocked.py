@@ -488,8 +488,8 @@ def message(label, stretch, total, shapes=1):
     if shapes > 1:
         warn = (
             f"{shapes} distinct commands are standing denied by the "
-            "classifier right now, with no re-attempt. If they are "
-            "rephrasings of one goal, stop generating "
+            "classifier, none of them re-attempted since its last denial. "
+            "If they are rephrasings of one goal, stop generating "
             "new shapes: Pattern 43 records each denied variant making the "
             "classifier more suspicious, until it denied even the sanctioned "
             "paths. An identical re-run is not a new variant; a reworded one "

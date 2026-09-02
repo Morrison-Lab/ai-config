@@ -4726,6 +4726,12 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
             "```\nthis is a seventy character fenced block that takes up some space in body\n```\nSome prose with ``two backtick span`` here.\n\n### Verdict\nClean\n\nReviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\n"
         ),
     )
+    check(
+        "_is_structured_review_body: multi-line double-backtick span with prose on delimiter lines is NOT structured body (#2525)",
+        not checker._is_structured_review_body(
+            "Ready for merge ... template for reference: ``\n### Verdict\nAll clear\nReviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\n`` (that's usually what it looks like)"
+        ),
+    )
 
     # Conflicting representations: prose says Needs work with findings, but JSON says CLEAN
     conflicting_body = """

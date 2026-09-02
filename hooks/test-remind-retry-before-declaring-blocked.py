@@ -612,7 +612,7 @@ try:
          "a record with no uuid is still counted"),
         ("stop generating new shapes" not in out_discharged,
          "a command the classifier later allowed is not a live variant"),
-        ("denied 3 distinct commands" in out_variants,
+        ("3 distinct commands are standing denied" in out_variants,
          "three phrasings of one goal reach the variation warning"),
         ("stop generating new shapes" in out_variants,
          "the variation warning says what to stop doing"),

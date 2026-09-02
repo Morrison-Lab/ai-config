@@ -165,11 +165,13 @@ presents no new variant, so that mechanism does not reach it.
 That warning cannot hang off either count, and getting this wrong is easy:
 rephrasing produces a NEW command, so each variant carries a stretch of 1 and
 a total of 1, and a warning attached to a second denial never fires in the one
-shape Pattern 43 measured. It keys on the number of distinct commands the
-classifier has denied instead, which is the only trace rephrasing leaves. That
-number cannot tell three phrasings of one goal from three unrelated commands,
-so the text says "if they are rephrasings of one goal" rather than asserting
-it.
+shape Pattern 43 measured. It keys instead on how many distinct commands are
+standing denied with no re-attempt -- the candidate count, which is the only
+trace rephrasing leaves. A command the classifier later allowed drops out of
+that count, because an allowed run is a re-attempt: an escalation that has
+relented is not one to warn about. The number still cannot tell three
+phrasings of one goal from three unrelated commands, so the text says "if they
+are rephrasings of one goal" rather than asserting it.
 
 On the second denial itself the hook states the tension and stops. Pattern
 43's Do bullet says to stop probing after the second denial of the same goal
@@ -485,8 +487,9 @@ def message(label, stretch, total, shapes=1):
     warn = ""
     if shapes > 1:
         warn = (
-            f"The classifier has denied {shapes} distinct commands in this "
-            "session. If they are rephrasings of one goal, stop generating "
+            f"{shapes} distinct commands are standing denied by the "
+            "classifier right now, with no re-attempt. If they are "
+            "rephrasings of one goal, stop generating "
             "new shapes: Pattern 43 records each denied variant making the "
             "classifier more suspicious, until it denied even the sanctioned "
             "paths. An identical re-run is not a new variant; a reworded one "

@@ -227,7 +227,9 @@ finding's disposition.)
 subagent** rather than running the scan-and-resolve loop in the main thread
 --- it's exactly the kind of investigation-plus-fix work the coordinator
 should hand off (see `memories/preferences.md`'s coordinator-mode bullet).
-Brief the subagent with the merged PR's number/branch and the steps below;
+Brief the subagent with the merged PR's number/branch, the resolved invoking
+user and their aliases, the exact list of PR numbers the request explicitly
+authorized (possibly empty), and the steps below;
 have it report back which PRs it found conflicting, what it did about each,
 and any it skipped (already claimed, conflict it couldn't understand). Do the
 scan inline only for a solo (non-orchestrated) session.
@@ -248,6 +250,10 @@ an assigned or requested PR that another author opened.
 A branch that fails the test, or that is claimed by an agent that is not
 yours, is handled like any other open PR: the scope filter decides, and an
 out-of-scope one is reported to the user and left untouched.
+When the re-check finds one of this session's own agents on a branch that
+now fails the test, tell that agent to stop before reporting the PR;
+withholding the merge-main message alone leaves it free to keep polling and
+pushing.
 
 **This depends on the coordinator finding out about a merge in the first
 place --- so brief every delegated agent, up front, to report back the
@@ -275,8 +281,9 @@ gh pr list --state open \
 ```
 
 Filter that list by `memories/reviewing-prs.md`'s scope test first, as
-`ardia` step 1 does (opened by or assigned to the invoking user, named in the
-request, or authored by the GitHub Actions app (`github-actions`)), and report the PRs dropped.
+`ardia` step 1 does (opened by or assigned to the invoking user, on the
+explicitly authorized list from the brief, or authored by the GitHub Actions
+app (`github-actions`)), and report the PRs dropped.
 A conflict on an out-of-scope PR is reported to the user and the PR left
 untouched (no comment, no push); a claim comment does not bring it into scope.
 

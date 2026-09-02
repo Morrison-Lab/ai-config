@@ -30,7 +30,7 @@ mutates a PR stays serial.
    in the JSON — `glab mr list` alone does not expose these fields.
    State the scope rules when you report, so the user can
    correct:
-   - **Only PRs the user opened, is assigned to, or asked for by name, or the Actions app authored, are in scope.**
+   - **Only PRs opened by the user, assigned to the user, explicitly requested by name, or authored by the Actions app are in scope.**
      Resolve the invoking user first
      --- `gh api user --jq .login` locally, `mcp__github__get_me` in a remote session, `glab api user | jq -r .username` on GitLab, where the fields are `author.username` and `assignees[].username` ---
      and add any aliases `memories/reviewing-prs.md` lists for that person,

@@ -558,7 +558,7 @@ This grants no merge authority: the strict merge policy below still applies.
   (`gh issue reopen <issue-number>`) per
   [`revert-merge.md`](shared/workflow/revert-merge.md).
 
-## Only work PRs the user opened, is assigned to, asked for, or the Actions app authored
+## Only work PRs opened by the user, assigned to the user, explicitly requested by the user, or authored by the Actions app
 
 Before pushing to, editing, commenting on, reviewing, resolving threads on,
 dispatching a paid review of, or merging any PR, resolve the invoking user

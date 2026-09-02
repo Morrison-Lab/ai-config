@@ -90,6 +90,7 @@ operation to the equivalent GitHub MCP tool so any model can run a skill.
 | `FETCH` | Fetch refs from the remote. | `git fetch origin "<branch>"` | (use git; no GitHub MCP equivalent) |
 | `MERGE_BRANCH` | Merge a branch into the current one. | `git merge "origin/<branch>"` | (use git; no GitHub MCP equivalent) |
 | `CREATE_BRANCH` | Create a new branch (e.g. off the default branch). | `git switch -c "<branch>" "origin/<base>"` | `mcp__github__create_branch` |
+| `CREATE_WORKTREE` | Create a dedicated worktree on a new branch off the default branch, so parallel sessions never share a checkout (AGENTS.md "Worktree isolation"). | `git worktree add "../<repo>-<slug>" -b "<branch>" "origin/<base>"` | (use git; no GitHub MCP equivalent) |
 | `DELETE_REF` | Delete a remote branch or tag ref. | `git push origin --delete "<branch>" (or git push origin ":refs/tags/<tag>")` | (no GitHub MCP tool; use gh api -X DELETE "repos/<owner>/<repo>/git/refs/heads/<branch>") |
 | `READ_FILE` | Read a file's contents from the repo. | `gh api "repos/<owner>/<repo>/contents/<path>"` | `mcp__github__get_file_contents` |
 | `LIST_COMMITS` | List a branch's commits (pass the branch or ref as sha, e.g. sha=gh-pages to see which build a Pages branch currently serves). | `git log "<branch>" (or gh api "repos/<owner>/<repo>/commits" -f "sha=<branch>")` | `mcp__github__list_commits` |

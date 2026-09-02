@@ -231,6 +231,10 @@ operations:
     description: Create a new branch (e.g. off the default branch).
     cli: git switch -c "<branch>" "origin/<base>"
     github_mcp: mcp__github__create_branch
+  - id: CREATE_WORKTREE
+    description: Create a dedicated worktree on a new branch off the default branch, so parallel sessions never share a checkout (AGENTS.md "Worktree isolation").
+    cli: git worktree add "../<repo>-<slug>" -b "<branch>" "origin/<base>"
+    github_mcp: (use git; no GitHub MCP equivalent)
   - id: DELETE_REF
     description: Delete a remote branch or tag ref.
     cli: git push origin --delete "<branch>" (or git push origin ":refs/tags/<tag>")

@@ -273,7 +273,8 @@ The section above is about which **formats** a project renders, and says the pro
 This is the other axis: which **documents** a given entry in that block reaches.
 The answer is all of them --- the block is the *default* for any document whose own front matter declares no `format:` --- so adding a format there to give **one** document slides silently gives it to every page in the site.
 
-The two axes are not opposite directions of one claim, and reading them as such is what makes the document scope surprising: the block behaves exactly as documented, and it is the author's intent that was narrower than the edit.
+Both axes fall out of the single rule that section states --- per-document front matter *overrides* the project block rather than adding to it --- so the block understates the format set and overstates the document set at the same time.
+What is surprising is the scope rather than the behaviour: the block does exactly what it is documented to do, and the edit was wider than the intent behind it.
 
 The failure is the filename collision already recorded twice in this corpus, reached from the project side with no document edited at all.
 Both formats claim `<stem>.html`, and the render dies rather than rendering something wrong.
@@ -291,23 +292,29 @@ ERROR: NotFound ... rename 'docs/design-decisions.html' -> '_site/docs/design-de
 
 The output directory was left missing `index.html`, `styles.css`, `search.json`, and `site_libs/`.
 The page named is not the page the format was added for, and that mismatch is itself the tell that the scope is project-wide rather than per-document.
-Don't read the named page as the first one rendered either.
-An independent reproduction on the same Quarto and OS named the page rendered *last*, so the naming does not track render order;
-which stage picks the reported path was not established, and the usable fact is only that the name identifies neither the edited document nor the first one rendered.
+Don't read the named page as the first one rendered either, or as the last.
+The name tracks the *colliding* document --- the one inheriting both formats --- and nothing about render position.
+Measured on Quarto 1.9.36 / macOS in a three-page project where `index.qmd` alone declares no `format:` of its own: the render reports `[1/3] docs/design-decisions.md`, `[2/3] index.qmd`, `[3/3] aaa.qmd`, and the error names `index.html`, which is neither first nor last.
+Which stage picks the reported path was not established, and is not needed: the name identifies the document that collided, which is the one to go and fix.
 
-**A green CI check is not evidence the block is scoped correctly.**
-Quarto 1.10.18 on a Linux runner accepted the identical config that 1.9.36 on macOS refused.
-Both the version and the platform differ between those two observations, so neither is attributable on this evidence;
-what is established is only that a passing remote render does not reproduce a local one.
+**A green CI check here was not weak evidence that the block was fine --- it was no evidence either way.**
+The `build` check passed on the commit carrying that top-level block, and the reason is that it never rendered revealjs at all.
+`Morrison-Lab/gha`'s `preview.yml@v2` derives its format list from PR labels, and with none of them set it falls to a legacy branch that renders exactly one: `quarto render . --to html --output-dir _site`.
+A single-format render cannot produce a two-format filename collision, so the check could not have failed for this reason whatever the config said.
+So read a green render check by asking which formats it rendered, not by asking which platform or Quarto version it ran on.
+The "Verify a redirect on a site build, not on a single-file render" bullet above says the same thing about a local single-file render.
+A `--to`-driven CI render is that blind spot wearing a remote runner.
 Nobody read the deployed preview here, so whether it would have shown the partial site is untested;
 the `pr-preview/pr-<N>/` recipe the bullet above cites is the cheap way to find out before concluding a green check means anything.
 
 - **Do:** put a single document's extra format in that document's own front matter, with an explicit `output-file:`.
 - **Do:** render the project locally before trusting CI on a `_quarto.yml` `format:` change.
+- **Do:** read a green render check by asking which formats it rendered, and treat a single-format run as silent on any collision between formats.
 - **Do:** compare the error's source path against the document the format was added for;
   a different path means the entry is reaching documents you did not intend.
 - **Don't:** add a format to the top-level `format:` key for one document's benefit.
-- **Don't:** treat the page named in a `rename ... NotFound` as the page at fault.
+- **Don't:** read the page named in a `rename ... NotFound` as the one whose front matter you edited.
+  It names a document that inherited the format, not the one you meant to give it to.
 
 (Measured 2026-09-01 while reviewing a pull request on `ucdavis/hac.sap`, a Quarto website project: a `revealjs:` block added under the top-level `format:` key made `index.qmd` and `docs/design-decisions.md` each render to revealjs as well, colliding with their own HTML outputs.
 Tracked as [ai-config#2984](https://github.com/Morrison-Lab/ai-config/issues/2984).)

@@ -410,7 +410,7 @@ for _base, _want in (("origin/main", "silent"), ("hc2-gitlab/main", "WARN")):
 # fallback set exists for -- would otherwise see a spurious local failure.
 _forkless = tempfile.mkdtemp()
 try:
-    subprocess.run(["git", "init", "-q", _forkless], check=True,
+    subprocess.run(["git", "init", "-q", "-b", "main", _forkless], check=True,
                    capture_output=True)
     subprocess.run(["git", "-C", _forkless, "remote", "add", "origin",
                     "https://example.invalid/r.git"], check=True,
@@ -438,7 +438,7 @@ finally:
 _scratch = tempfile.mkdtemp()
 _home = tempfile.mkdtemp()
 try:
-    subprocess.run(["git", "init", "-q", _scratch], check=True,
+    subprocess.run(["git", "init", "-q", "-b", "main", _scratch], check=True,
                    capture_output=True)
     subprocess.run(["git", "-C", _scratch, "remote", "add", "hc2-gitlab",
                     "https://example.invalid/r.git"], check=True,
@@ -487,7 +487,7 @@ try:
     # resolve. Both the option-scanning pattern and the `-C` capture used to
     # stop at the first space, and both degraded silently.
     _spaced = os.path.join(_scratch, "a dir with spaces")
-    subprocess.run(["git", "init", "-q", _spaced], check=True,
+    subprocess.run(["git", "init", "-q", "-b", "main", _spaced], check=True,
                    capture_output=True)
     _proc = subprocess.run(
         [sys.executable, HOOK],

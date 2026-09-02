@@ -122,6 +122,7 @@ doc_span_blank = "stray ` backtick\n\nreal prose\n\nclosing ` backtick"
 stripped_span_blank = strip_code_spans(doc_span_blank)
 check("code span stopped by blank line", "real prose" in stripped_span_blank)
 
+
 # 9. Display math stripping ($$...$$)
 doc_display_math = """prose before
 $$

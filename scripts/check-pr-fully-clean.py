@@ -45,7 +45,11 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
-from fences import CODE_SPAN_RE, find_fence_spans  # noqa: E402
+from fences import (  # noqa: E402
+    CODE_SPAN_RE,
+    find_fence_spans,
+    strip_code_spans,
+)
 from payload_fetcher import PayloadError, PayloadFetcher  # noqa: E402
 from review_payload import (  # noqa: E402
     extract_structured_review,
@@ -343,7 +347,7 @@ def _reviewer_identity(body: str, author: str = "") -> str:
     The first line, not the first paragraph: semantic line breaks often put
     the header and the next sentence in one paragraph, and a quote of
     ``**Claude finished**`` on line 2 must not inherit Claude's identity.
-    Cited finding vocabulary is blanked first so a code span still does not
+    Code spans and cited finding vocabulary are blanked first so a code span does not
     match.
 
     Residual: a shared-login review whose first or last non-empty line has no known
@@ -358,10 +362,9 @@ def _reviewer_identity(body: str, author: str = "") -> str:
     exclusive = EXCLUSIVE_BOT_IDENTITY.get(login.lower())
     if exclusive:
         return exclusive
-    scan = strip_cited_finding_vocab(body or "")
-    lines = [ln.strip() for ln in scan.splitlines() if ln.strip()]
-    first_line = lines[0] if lines else ""
-    last_line = lines[-1] if lines else ""
+    lines = [ln.strip() for ln in (body or "").splitlines() if ln.strip()]
+    first_line = strip_cited_finding_vocab(strip_code_spans(lines[0])) if lines else ""
+    last_line = strip_cited_finding_vocab(strip_code_spans(lines[-1])) if lines else ""
     agent = _detect_review_agent(first_line) or _detect_review_agent(last_line)
     if agent:
         return agent
@@ -590,8 +593,8 @@ _CURLY_QUOTE_SPAN = re.compile("\u201c[^\u201d\\n]*\u201d")
 _MAX_MASKED_LINE = 4096
 
 
-def _citation_mask(text: str) -> bytearray:
-    """Mark every offset lying inside a closed code span of 2+ backticks.
+def _citation_mask(text: str, min_backticks: int = 2) -> bytearray:
+    """Mark every offset lying inside a closed code span of min_backticks+ backticks.
 
     The INTERSECTION of a per-line scan and a whole-body scan, which is
     strictly safer than either alone because each over-reaches where the other
@@ -626,7 +629,7 @@ def _citation_mask(text: str) -> bytearray:
             oversized.append((offset, offset + len(line)))
         else:
             for match in CODE_SPAN_RE.finditer(line):
-                if len(match.group(1)) >= 2:
+                if len(match.group(1)) >= min_backticks:
                     begin, finish = match.span()
                     per_line[offset + begin:offset + finish] = (
                         b"\x01" * (finish - begin)
@@ -645,7 +648,7 @@ def _citation_mask(text: str) -> bytearray:
 
     whole = bytearray(len(text))
     for match in CODE_SPAN_RE.finditer(scannable):
-        if len(match.group(1)) >= 2:
+        if len(match.group(1)) >= min_backticks:
             begin, finish = match.span()
             whole[begin:finish] = b"\x01" * (finish - begin)
 
@@ -2381,6 +2384,72 @@ def check_latest_verdict(
 _REVIEW_STRUCTURE_HEADING = re.compile(
     r"(?im)^#{1,6}\s*(?:(?:Review\s+)?Summary|(?:Critical\s+|Actionable\s+)?Findings|Verdict)\b"
 )
+_MULTI_BACKTICK_SPAN_RE = re.compile(
+    r"(?<!`)(`{2,})(?!`)(?:[^\n\r]|\r?\n(?![ \t]*\r?\n))*?(?<!`)\1(?!`)"
+)
+
+
+def _blank_fences_and_spans(body: str) -> str:
+    """Blank fenced code blocks and code spans to spaces, preserving length."""
+    fenced_lines, _, _ = find_fence_spans(body, swallow_unclosed=True)
+
+    lines = body.split("\n")
+    mask = bytearray(len(body))
+    line_offset = 0
+    unclaimed_lines = []
+
+    for idx, line in enumerate(lines):
+        if idx in fenced_lines:
+            unclaimed_lines.append("")
+        else:
+            line_span_mask = bytearray(len(line))
+            for m in CODE_SPAN_RE.finditer(line):
+                b, e = m.span()
+                line_span_mask[b:e] = b"\x01" * (e - b)
+                mask[line_offset + b : line_offset + e] = b"\x01" * (e - b)
+            unclaimed_lines.append(
+                "".join(" " if m else c for c, m in zip(line, line_span_mask))
+            )
+        line_offset += len(line) + 1
+
+    unclaimed_body = "\n".join(unclaimed_lines)
+
+    line_offsets = []
+    curr = 0
+    for line in lines:
+        line_offsets.append(curr)
+        curr += len(line) + 1
+
+    unclaimed_line_offsets = []
+    curr_un = 0
+    for un_line in unclaimed_lines:
+        unclaimed_line_offsets.append(curr_un)
+        curr_un += len(un_line) + 1
+
+    for m in _MULTI_BACKTICK_SPAN_RE.finditer(unclaimed_body):
+        b_un, e_un = m.span()
+        start_line = bisect.bisect_right(unclaimed_line_offsets, b_un) - 1
+        start_col = b_un - unclaimed_line_offsets[start_line]
+        end_line = (
+            bisect.bisect_right(unclaimed_line_offsets, max(0, e_un - 1)) - 1
+        )
+        end_col = e_un - unclaimed_line_offsets[end_line]
+
+        if not any(l in fenced_lines for l in range(start_line, end_line + 1)):
+            b_orig = line_offsets[start_line] + start_col
+            e_orig = line_offsets[end_line] + end_col
+            mask[b_orig:e_orig] = b"\x01" * (e_orig - b_orig)
+
+    out = []
+    line_offset = 0
+    for idx, line in enumerate(lines):
+        if idx in fenced_lines:
+            out.append(" " * len(line))
+        else:
+            line_mask = mask[line_offset : line_offset + len(line)]
+            out.append("".join(" " if m else c for c, m in zip(line, line_mask)))
+        line_offset += len(line) + 1
+    return "\n".join(out)
 
 
 def _is_structured_review_body(body: str) -> bool:
@@ -2389,13 +2458,16 @@ def _is_structured_review_body(body: str) -> bool:
     Requires both a report heading (Summary / Findings / Verdict families)
     and a Reviewed-Commit fingerprint line, tested over the CITED-VOCAB
     STRIPPED body so a casual comment quoting a prior report inside a
-    fence cannot smuggle the structure in (#1202's convention). The two
+    fence or code span cannot smuggle the structure in (#1202/#2525). The two
     together are what a pre-push-review or adversarial-self-review report
     always carries and conversational prose does not, which is what keeps
     #1798's false-CLEAN direction closed while #2402's supersession path
     opens.
     """
-    scan = strip_cited_finding_vocab(body)
+    if not body:
+        return False
+    blanked = _blank_fences_and_spans(body)
+    scan = strip_cited_finding_vocab(blanked)
     if not _REVIEW_STRUCTURE_HEADING.search(scan):
         return False
     return bool(re.search(

@@ -736,6 +736,14 @@ def main() -> int:
         "marker falls back to the login",
         checker._reviewer_identity(unmarked_ga, "github-actions") == "github-actions",
     )
+    quoted_claude_multi_backtick = (
+        "A quote of ``**Claude finished**`` on the first line.\n\n"
+        "### Verdict\n\n**Ready for merge**"
+    )
+    check(
+        "_reviewer_identity: multi-backtick quoted agent marker falls back to login (#2525)",
+        checker._reviewer_identity(quoted_claude_multi_backtick, "github-actions") == "github-actions",
+    )
     items_unmarked_after_claude = [
         items_cross_reviewer[0],
         (
@@ -4827,6 +4835,66 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     check("_unresolved_finding_pattern: clean structured review has no findings", checker._unresolved_finding_pattern(struct_clean) is None)
     check("_is_structured_review_body: structured review is recognized as structured body", checker._is_structured_review_body(struct_clean))
     check("_is_structured_review_body: casual mention of JSON without heading/fingerprint is NOT structured body", not checker._is_structured_review_body("Here is the JSON format:\n<!-- review-data: {\"verdict\":\"CLEAN\"} -->"))
+    check(
+        "_is_structured_review_body: single-line double-backtick span quoting report headings is NOT structured body (#2525)",
+        not checker._is_structured_review_body(
+            "Discussion of format:\n``## Verdict``\n``Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b``\nCasual prose."
+        ),
+    )
+    check(
+        "_is_structured_review_body: standard fenced block quoting report headings is NOT structured body (#2525)",
+        not checker._is_structured_review_body(
+            "Discussion of format:\n```\n## Verdict\nReviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\n```\nCasual prose."
+        ),
+    )
+    check(
+        "_is_structured_review_body: multi-line double-backtick span quoting report headings is NOT structured body (#2525)",
+        not checker._is_structured_review_body(
+            "Ready for merge -- this all looks good to me, thanks!\n\n"
+            "For reference, our report template looks like this:\n\n"
+            "`` \n"
+            "### Verdict\n"
+            "All clear\n"
+            "Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\n"
+            "``\n"
+        ),
+    )
+    check(
+        "_is_structured_review_body: stray unclosed backtick in prose does NOT hide genuine headings (#2525)",
+        checker._is_structured_review_body(
+            "Here is some commentary with a stray ` backtick.\nMore prose.\n\n## Verdict\n\nReviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\nClean"
+        ),
+    )
+    check(
+        "_is_structured_review_body: stray unclosed backtick without blank line does NOT hide genuine headings (#2525)",
+        checker._is_structured_review_body(
+            "Commentary with stray ` single backtick on line 1\n### Verdict\nClean\nReviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\nClosing ` on line 4"
+        ),
+    )
+    check(
+        "_is_structured_review_body: stray unclosed double-backtick in prose does NOT hide genuine headings (#2525)",
+        checker._is_structured_review_body(
+            "Here is some commentary with a stray `` double backtick.\nMore prose.\n\n## Verdict\n\nReviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\nClean"
+        ),
+    )
+    check(
+        "_is_structured_review_body: stray unclosed double-backtick without blank line does NOT hide genuine headings (#2525)",
+        checker._is_structured_review_body(
+            "Commentary with stray `` double backtick on line 1\n### Verdict\nClean\nReviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\nMore prose"
+        ),
+    )
+    check(
+        "_is_structured_review_body: stray unclosed double-backtick across fence does NOT hide genuine headings (#2525)",
+        checker._is_structured_review_body(
+            "Commentary with stray `` double backtick on line 1\n```python\ndef foo(): pass\n```\n### Verdict\nClean\nReviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\nClosing `` on line 6"
+        ),
+    )
+    check(
+        "_is_structured_review_body: fenced block preceding heading does NOT shift containment offsets (#2525)",
+        checker._is_structured_review_body(
+            "```\nthis is a seventy character fenced block that takes up some space in body\n```\nSome prose with ``two backtick span`` here.\n\n### Verdict\nClean\n\nReviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\n"
+        ),
+    )
 
     # Conflicting representations: prose says Needs work with findings, but JSON says CLEAN
     conflicting_body = """
@@ -5248,6 +5316,16 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     check(
         "_unresolved_finding_pattern on many small fenced blocks scales linearly (< 1s)",
         _uf_res is None and _uf_secs < 1.0,
+    )
+
+    _double_backtick_unit = "Some text with unclosed `` delimiter\n"
+    _double_backtick_body = _double_backtick_unit * 3000
+    _db_secs, _ = best_of_three(
+        checker._blank_fences_and_spans, _double_backtick_body
+    )
+    check(
+        "_blank_fences_and_spans on max-length body of double backticks scales linearly (< 1s)",
+        _db_secs < 1.0,
     )
 
     print(f"\n{passes} passed, {failures} failed")

@@ -268,6 +268,37 @@ The reconciliation was correct (its rationale for preferring the wider scan hold
 - **Don't:** assume a live claim comment stops a bot (or a second session) from pushing to the branch it names --- this is the same collision `check-before-pushing.md`'s "Ownership is what suppresses the check" section already lists, observed again with a claim already standing.
 - **Don't:** treat a local reconciliation commit as shipped just because it exists and is correct --- check the PR's actual merged head (`gh pr view <N> --json mergeCommit,mergedAt`) before crediting it with anything, since a merge that completes first ships the branch as it stood, not your unpushed fix-up on top of it.
 
+**Fourth occurrence, 2026-09-01 --- when the second driver has already pushed
+over your live claim, the cheap resolution is to stop driving and merge-gate,
+not to race.**
+During a `gia` sweep of this repo, the sweep posted claim
+comments on [#2913](https://github.com/Morrison-Lab/ai-config/pull/2913) and
+[#2924](https://github.com/Morrison-Lab/ai-config/pull/2924), pushed one round
+to each, and within the hour another Claude Code session pushed its own round
+to both branches (`97101c6` and `5c00562`) with the claims still standing.
+Neither push collided, because both sessions ran `git ls-remote` first, so
+nothing was lost; what remained was two drivers on one branch, each about to
+address the next review round.
+The sweep posted one comment per PR saying it would push no more and would
+merge under the standing grant once the head was fully clean for twenty
+minutes (the peer rule in [`mwc`](../../skills/mwc/SKILL.md)), then scored
+the heads at each check-in.
+The other session drove both to clean and merged
+[#2924](https://github.com/Morrison-Lab/ai-config/pull/2924) itself,
+and [#2913](https://github.com/Morrison-Lab/ai-config/pull/2913) stayed with that session.
+The alternative, both sessions fixing the same round's findings, is the
+`#2668` collision above with a different ending only by luck.
+
+- **Do:** once a second driver has pushed to a branch you claimed, post one
+  comment standing down from pushes and switch to merge-gating that PR.
+- **Do:** keep scoring the head with `check-pr-fully-clean.py` so the merge
+  still happens on your clock when the peer stops short of it.
+- **Don't:** re-assert the claim and keep pushing --- the claim did not stop
+  the first push and will not stop the next one.
+- **Don't:** read the peer's push as a reason to abandon the PR entirely;
+  the standing grant still covers merging it once it is fully clean and the
+  peer has gone quiet for twenty minutes.
+
 **Handing off mid-task to another agent, on user request ("finish what you're
 doing, then relinquish holds; I'll put another agent on them"):** don't just
 stop --- leave the next agent a clean starting point. On each claimed PR/issue:

@@ -549,15 +549,17 @@
   [`pr-on-claim.cases.md`](../shared/workflow/pr-on-claim.cases.md)'s "The blocking message prescribes a non-dischargeable shape" carries the derived figures;
   read them there rather than restating them here, since #3010 is open and any copy drifts.
 
-  So the empty read is confirmed **uninformative in the reviews-arriving direction** and not yet in the other.
-  The `ucdavis/bcs` #648/#649/#650 record further down this file is the zero-review candidate, and it is confounded: [`challenge-the-assignment.cases.md`](../shared/workflow/challenge-the-assignment.cases.md) records `_argv_close`'s docstring in `hooks/no-unreviewed-pr.py` documenting HTTP 200 on this endpoint as what GitHub returns for an already merged or closed PR, adding nobody by design, and that confound was confirmed to apply to some of those four calls without being shown to explain all of them.
-  Until that is settled the honest statement stays *unreliable*, not *uninformative*.
+  So this instance does not upgrade the claim.
+  What is measured on #3010 is that reviews arrived;
+  that they arrived *over an empty pending read* rests entirely on the session's own report, from the one session whose self-counting is known to have been wrong.
+  The `ucdavis/bcs` #648/#649/#650 record further down this file is the zero-review candidate for the other direction, and it is confounded too: [`challenge-the-assignment.cases.md`](../shared/workflow/challenge-the-assignment.cases.md) records `_argv_close`'s docstring in `hooks/no-unreviewed-pr.py` documenting HTTP 200 on this endpoint as what GitHub returns for an already merged or closed PR, adding nobody by design, and that confound was confirmed to apply to some of those four calls without being shown to explain all of them.
+  Both candidate directions are therefore unconfirmed, and the honest statement stays *unreliable*, not *uninformative*.
 
   - **Do:** poll the review bodies on the head when you need to know whether a reviewer engaged.
-  - **Do:** derive a POST count from `review_requested` timeline events rather than from a narration of the turns.
-  - **Don't:** re-POST because the pending list came back empty;
-    an empty read has now been seen with reviews arriving, so it is not evidence the request failed.
-  - **Don't:** cite the bcs zero-review direction as settling the converse --- its status-code confound is open.
+  - **Do:** read `review_requested` timeline events as a lower bound on requests that actually **added** a reviewer, never as a POST count --- a POST re-requesting an already-pending reviewer adds nobody and emits nothing, and no endpoint recovers the POST count itself.
+  - **Don't:** treat an empty pending read as evidence the request failed, nor as evidence a review is coming;
+    that was already the rule and neither new data point changes it.
+  - **Don't:** cite either direction as settled --- the bcs status-code confound is open, and the #3010 empty reads are unverifiable after the fact.
 
   **Both outcomes were genuinely observed on the same repo the same day, so do not flatten this into "it returns 201".**
   One session ran the POST once and got `422`;

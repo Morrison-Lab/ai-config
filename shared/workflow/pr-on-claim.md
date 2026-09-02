@@ -107,7 +107,8 @@ Nothing distinguishes *the request failed* from *the request was not last*, and 
 - **Do:** read a verbatim-repeating block message as a candidate gap in the message, once the blocked action's own output says it succeeded.
 - **Don't:** infer from a successful POST and an arriving review that the obligation discharged --- neither is what the hook measures.
 
-Tracked as [ai-config#3017](https://github.com/Morrison-Lab/ai-config/issues/3017), whose fix states the constraint in the request's own instruction.
+Tracked as [ai-config#3017](https://github.com/Morrison-Lab/ai-config/issues/3017), whose suggested fix states the constraint in the request's own instruction;
+that issue was still open when this was written, so the message on `main` is unchanged.
 Third occurrence rather than a new lesson, so it meets [`deterministic-tools`](../principles/deterministic-tools.md)'s bar for building something --- and the something is the message, since the rule was already written down twice and the message is what a blocked session actually reads.
 
 See [`pr-on-claim.cases.md`](pr-on-claim.cases.md), "The blocking message prescribes a non-dischargeable shape".

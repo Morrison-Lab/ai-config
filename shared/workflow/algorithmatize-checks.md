@@ -820,7 +820,8 @@ Its dual is a test whose needle is a string the artifact under test **already** 
 The assertion then passes on that pre-existing occurrence, so it passes against the *unfixed* artifact as readily as against the fixed one.
 The control that should have turned it red does not, and the test discriminates nothing.
 
-It bites hardest on a guard whose message is written in the same vocabulary as its own rule, since the phrase that best describes the new behaviour is the phrase an adjacent branch already prints.
+It bites hardest on a guard written throughout in the vocabulary of its own rule, since the phrase that best describes the new behaviour is the phrase the file already uses to explain the old one --- in a docstring, an inline comment, or a message an adjacent branch prints.
+A grep sees all three, so it does not matter that only the last is ever printed.
 `no-placeholder-reply.py`'s whole-message anchoring, in [`CLAUDE.md`](../../CLAUDE.md), is the shipped form of the same precaution applied to a matcher rather than to a test.
 
 - **Do:** grep the artifact for the needle **before** writing the assertion, and pick one that returns zero hits on the unfixed file.
@@ -830,7 +831,7 @@ It bites hardest on a guard whose message is written in the same vocabulary as i
 - **Don't:** choose a needle by quoting the fix's own explanation --- that wording is the likeliest to already appear in a neighbouring branch or docstring.
 
 (Measured 2026-09-02 while adding a hook test for [ai-config#3017](https://github.com/Morrison-Lab/ai-config/issues/3017).
-The needle was the phrase `chained AHEAD`, and `git show origin/main:hooks/no-unreviewed-pr.py | grep -c 'chained AHEAD'` returns 6 --- five docstrings plus the label-exemption message the fix never touches.
+The needle was the phrase `chained AHEAD`, and `git show origin/main:hooks/no-unreviewed-pr.py | grep -n 'chained AHEAD'` returns 6 hits the fix never touches: three docstrings (lines 356, 418, 672), two inline comments (1522, 1550), and the label-exemption message (1917).
 So the assertion passed against the unfixed script, and the pre-fix control that was supposed to fail did not.)
 
 **A tenth outcome: the property under test is enforced at more than

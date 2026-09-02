@@ -33,11 +33,11 @@ That gap is itself the lesson the record is about: a session in this loop cannot
 
 The first two occurrences were a session composing the wrong shape on its own.
 This one had the rule written down twice already, in `pr-on-claim.md` and in `pr-on-claim.rationale.md`, while the message a blocked session actually reads stated it for `gh pr edit --add-label` and not for the request.
-That is why the fix is to the message rather than to another sentence of prose.
+That is why #3017 proposes fixing the message rather than adding another sentence of prose.
 
 One smaller finding from the same turns: the message's verification query counts Copilot reviews on the PR rather than on the head, and returned 1 over a review that predated a force-push.
 
-Tracked as [ai-config#3017](https://github.com/Morrison-Lab/ai-config/issues/3017).
+Tracked as [ai-config#3017](https://github.com/Morrison-Lab/ai-config/issues/3017), open at the time of writing.
 The PR was open when this was written, so its review and event counts drift;
 the figures above are what the endpoints returned on 2026-09-02.)
 

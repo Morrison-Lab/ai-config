@@ -1184,6 +1184,9 @@ So two conditions hold before the manual update is skipped:
 every clean-gate check executes for `merge_group`, job and step conditions included,
 and every clean-gate check is a required status check on the base, or is aggregated behind one that is.
 A clean-gate check the queue cannot block on is a check the queue does not run as a gate.
+Neither condition is readable from `gh pr checks`, which reports state and not requiredness ([`gh-cli`](../../memories/gh-cli.md) records the rulesets query that does).
+Until [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) supplies an instrument, verify both by hand before relying on the queue: the required checks from `gh api "repos/<owner>/<repo>/rules/branches/<base>"`, and each clean-gate workflow's `on:` block and job and step `if:` conditions for `merge_group`.
+Without that verification the exception is unavailable: take the direct path, or stop.
 
 The rule splits by merge mode: a direct merge from a session with `git` and `gh`, a direct merge from a remote session without `git`, and a merge queue.
 It is GitHub-specific as written (`headRefOid`, `gh`, the compare endpoint, the update-branch and merge pins), so a GitLab merge has no equivalent gate until [#3021](https://github.com/Morrison-Lab/ai-config/issues/3021) supplies one, and the entry points below inherit that scope.

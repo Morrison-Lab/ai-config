@@ -66,32 +66,35 @@ def stubs(tz_answer, plain_answer, powershell_body):
     It answers `plain_answer` otherwise, which is the second rung,
     and the real UTC shape for `date -u`.
     The `powershell` stub runs `powershell_body` only for a
-    `-NoProfile -Command <conversion program>` call naming the Pacific zone,
-    and exits 1 for anything else.
+    `-NoProfile -Command <program>` call, exits 1 for anything else, and
+    records the program beside itself for the whole-text comparison.
     Keying on TZ is what lets a case pin one rung:
     a stub that ignored TZ would pass the first-rung case identically
     if the hook skipped straight to the second."""
     d = tempfile.mkdtemp()
     date_stub = os.path.join(d, "date")
     with open(date_stub, "w") as fh:
+        # The stub answers only for the two format strings the hook actually
+        # passes, so dropping or mangling "$FMT" fails here rather than
+        # returning the preformatted fixture regardless.
         fh.write("#!/bin/sh\n"
-                 "if [ \"$1\" = -u ]; then printf '2026-01-01T00:00:00Z\\n'; exit 0; fi\n"
+                 "if [ \"$1\" = -u ]; then\n"
+                 "  [ \"$2\" = '+%%Y-%%m-%%dT%%H:%%M:%%SZ' ] || exit 1\n"
+                 "  printf '2026-01-01T00:00:00Z\\n'; exit 0\n"
+                 "fi\n"
+                 "[ \"$1\" = '+%%Y-%%m-%%d %%H:%%M:%%S %%Z' ] || exit 1\n"
                  "if [ \"${TZ:-}\" = America/Los_Angeles ]; then printf '%s\\n'; else printf '%s\\n'; fi\n"
                  % (tz_answer, plain_answer))
     ps_stub = os.path.join(d, "powershell")
     with open(ps_stub, "w") as fh:
-        # Answer only when invoked the way the hook's third rung invokes it,
-        # so a hook that drops or mangles the conversion program fails here
-        # rather than passing on any call that merely reaches `powershell`.
+        # Answer only for the hook's invocation shape, and record the program
+        # so the third-rung case can compare it whole against the expected
+        # text (see EXPECTED_PS_PROGRAM); a fragment match let a rewired
+        # argument through.
         fh.write("#!/bin/sh\n"
                  "[ \"$1\" = -NoProfile ] || exit 1\n"
                  "[ \"$2\" = -Command ] || exit 1\n"
-                 # Whole call shapes, not bare method names, so a renamed or
-                 # truncated call (ConvertTimeFromUtcBROKEN, a dropped
-                 # argument list) no longer matches. Without a PowerShell on
-                 # this host the program cannot be executed, so this is the
-                 # strongest check available here.
-                 "case \"$3\" in *\"FindSystemTimeZoneById('Pacific Standard Time')\"*\"::ConvertTimeFromUtc([DateTime]::UtcNow, \"*\".IsDaylightSavingTime(\"*\"'PDT'\"*\"'PST'\"*) ;; *) exit 1 ;; esac\n"
+                 "printf '%s' \"$3\" > \"$(dirname \"$0\")/ps-program\"\n"
                  + powershell_body + "\n")
     for f in (date_stub, ps_stub):
         os.chmod(f, os.stat(f).st_mode | stat.S_IXUSR)
@@ -101,6 +104,16 @@ def stubs(tz_answer, plain_answer, powershell_body):
 def with_stubs(d):
     return dict(os.environ, PATH=d + os.pathsep + os.environ.get("PATH", ""))
 
+
+# The hook's third-rung program, whitespace-normalised. A change to the hook's
+# conversion is a change to this constant, which is the point: the stub cannot
+# run PowerShell, so equality with the known-good program is the check.
+EXPECTED_PS_PROGRAM = " ".join("""
+        $tz = [System.TimeZoneInfo]::FindSystemTimeZoneById('Pacific Standard Time')
+        $t  = [System.TimeZoneInfo]::ConvertTimeFromUtc([DateTime]::UtcNow, $tz)
+        $z  = if ($tz.IsDaylightSavingTime($t)) { 'PDT' } else { 'PST' }
+        '{0:yyyy-MM-dd HH:mm:ss} {1}' -f $t, $z
+""".split())
 
 PDT = "2026-01-01 00:00:00 PDT"
 GMT = "2026-01-01 00:00:00 GMT"
@@ -119,10 +132,15 @@ check("prints the Pacific reading the system zone supplied", bool(LOCAL.search(o
 check("never labels the GMT reading as local", "GMT" not in out)
 
 print("\nthird rung (both date rungs answer GMT, PowerShell answers PDT):")
-rc, out = run(with_stubs(stubs(GMT, GMT, "printf '%s\\n'" % PDT)))
+d = stubs(GMT, GMT, "printf '%s\\n'" % PDT)
+rc, out = run(with_stubs(d))
 check("exit 0", rc == 0)
 check("prints the Pacific reading PowerShell supplied", bool(LOCAL.search(out)))
 check("never labels the GMT reading as local", "GMT" not in out)
+with open(os.path.join(d, "ps-program")) as fh:
+    program = " ".join(fh.read().split())
+check("hands PowerShell the complete conversion program, compared whole",
+      program == EXPECTED_PS_PROGRAM)
 
 print("\nnegative control (both date rungs answer GMT, PowerShell fails):")
 rc, out = run(with_stubs(stubs(GMT, GMT, "exit 1")))
@@ -131,6 +149,6 @@ check("prints the UTC-only fallback line", bool(FALLBACK.search(out)))
 check("prints the do-NOT-state warning", WARN in out)
 check("never labels the GMT reading as local", "local:" not in out and "GMT" not in out)
 
-total = 14
+total = 15
 print(f"\n{total - wrong}/{total} correct" + ("" if wrong == 0 else f"  ({wrong} WRONG)"))
 sys.exit(1 if wrong else 0)

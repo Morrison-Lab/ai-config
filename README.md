@@ -492,10 +492,10 @@ Each suite has a 900-second deadline
 (override with `HOOK_TEST_SUITE_TIMEOUT`);
 a hung suite reports FAIL rather than stalling the sweep.
 The runner gates `validate` and pre-commit.
-One hook is untested today
-(`inject-local-time.sh`), carried in an explicit
-`KNOWN_UNTESTED` allowlist and tracked in
-[#1080](https://github.com/Morrison-Lab/ai-config/issues/1080).
+Every hook ships a test since
+[#1080](https://github.com/Morrison-Lab/ai-config/issues/1080) closed;
+the `KNOWN_UNTESTED` allowlist stays, empty, so a new hook without a test
+fails the runner rather than being noted.
 
 That runner compares hooks against their *tests*.
 `scripts/check-hook-catalog.py` compares them against their *bindings*:

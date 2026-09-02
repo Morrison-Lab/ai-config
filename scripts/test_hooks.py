@@ -208,10 +208,6 @@ def run_one_suite(test_path, subject, timeout):
     return 1
 
 
-def rel_test_for(test_path):
-    return os.path.relpath(test_path, ROOT)
-
-
 def run_suites(timeout=None):
     """Run each hooks/test-*.py against its subject. Returns failure count."""
     if timeout is None:
@@ -227,7 +223,7 @@ def run_suites(timeout=None):
         if len(present) > 1:
             # Two subjects for one suite is ambiguous; picking one silently
             # would test the wrong file with no signal (fail-fast).
-            print(f"FAIL: {rel_test_for(test_path)} has two subjects: "
+            print(f"FAIL: {os.path.relpath(test_path, ROOT)} has two subjects: "
                   + ", ".join(os.path.relpath(c, ROOT) for c in present))
             failures += 1
             continue

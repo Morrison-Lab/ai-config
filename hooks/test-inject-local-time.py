@@ -86,7 +86,12 @@ def stubs(tz_answer, plain_answer, powershell_body):
         fh.write("#!/bin/sh\n"
                  "[ \"$1\" = -NoProfile ] || exit 1\n"
                  "[ \"$2\" = -Command ] || exit 1\n"
-                 "case \"$3\" in *\"Pacific Standard Time\"*ConvertTimeFromUtc*IsDaylightSavingTime*) ;; *) exit 1 ;; esac\n"
+                 # Whole call shapes, not bare method names, so a renamed or
+                 # truncated call (ConvertTimeFromUtcBROKEN, a dropped
+                 # argument list) no longer matches. Without a PowerShell on
+                 # this host the program cannot be executed, so this is the
+                 # strongest check available here.
+                 "case \"$3\" in *\"FindSystemTimeZoneById('Pacific Standard Time')\"*\"::ConvertTimeFromUtc([DateTime]::UtcNow, \"*\".IsDaylightSavingTime(\"*\"'PDT'\"*\"'PST'\"*) ;; *) exit 1 ;; esac\n"
                  + powershell_body + "\n")
     for f in (date_stub, ps_stub):
         os.chmod(f, os.stat(f).st_mode | stat.S_IXUSR)

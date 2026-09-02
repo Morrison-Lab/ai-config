@@ -218,7 +218,7 @@ Resolve it from a remote-tracking ref after fetching that remote, and state the 
 - **Do:** resolve `<base>` from a fetched remote-tracking ref, and state the merge-base SHA and the diff's counts alongside it.
 - **Don't:** hand over the case for the change.
   If it is not persuasive from the diff alone, that is the finding.
-- **Don't:** name a bare local branch as `<base>` --- one behind its remote widens the diff so the reviewer works on already-merged code, and one that has diverged in commits the head branch also carries narrows it so part of the change is never reviewed.
+- **Don't:** name a bare local branch as `<base>` --- one behind its remote widens the diff so the reviewer works on already-merged code, and one carrying local commits the remote lacks (ahead, or diverged) that the head branch also carries narrows it so part of the change is never reviewed.
 - **Don't:** read a clean verdict as covering the whole change when the base was local;
   the narrowing direction produces exactly that.
 

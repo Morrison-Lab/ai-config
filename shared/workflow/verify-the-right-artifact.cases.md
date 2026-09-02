@@ -231,7 +231,7 @@ The contamination was not confined to whole extra files, which is the more insid
 `DESCRIPTION` and `.Rbuildignore` are both among the 14 the pull request really changes, and the wide diff mixed already-merged hunks into them --- a `foodwebr`-to-`covr` swap in `Suggests`, and a template-name cleanup --- so the spurious content sat inside files the reviewer had every reason to be reading.
 
 The base was *behind*, so the diff grew.
-A base that has diverged from its remote fails the other way, narrowing the diff and hiding part of the change behind a clean verdict;
+A base carrying local commits the remote lacks --- ahead of it, or diverged from it --- fails the other way, narrowing the diff and hiding part of the change behind a clean verdict;
 that direction was not what happened here.
 
 **The detection was accidental, which is the part worth recording.**

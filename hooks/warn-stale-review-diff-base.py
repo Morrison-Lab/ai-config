@@ -85,7 +85,7 @@ RX_RANGE = re.compile(
 # Only these subcommands take a range whose base is a review scope. `git
 # rebase`, `git merge`, and friends are excluded on purpose.
 _GIT_RANGE_CMD = (
-    r"git\b(?:\s+-[-A-Za-z0-9]+(?:[= ](?:'[^']*'|\"[^\"]*\"|\S+))?)*\s+"
+    r"git\b(?:\s+-[-A-Za-z0-9]+(?:[= ](?:'[^']*'|\"[^\"]*\"|\S+))?){0,12}\s+"
     r"(diff|log|shortlog|merge-base|rev-list|range-diff)\b"
 )
 
@@ -315,14 +315,21 @@ def normalize_base(token):
     return token.strip(".")
 
 
-def is_remote_tracking(token, remotes):
-    """True when `token` names a remote-tracking ref of this repository."""
+def remote_tracking_branch(token, remotes):
+    """The branch part of a remote-tracking ref, or None.
+
+    `origin/main` -> `main`; `refs/remotes/origin/main` -> `main`; a local
+    branch, a tag or a SHA -> None.
+    """
     token = normalize_base(token)
     if not token:
-        return False
+        return None
     if token.startswith("refs/remotes/"):
-        return True
-    return "/" in token and token.split("/", 1)[0] in remotes
+        rest = token[len("refs/remotes/"):]
+        return rest.split("/", 1)[1] if "/" in rest else None
+    if "/" in token and token.split("/", 1)[0] in remotes:
+        return token.split("/", 1)[1]
+    return None
 
 
 def is_local_branch_base(token, remotes):
@@ -432,11 +439,16 @@ def stale_bases(text, remotes, pattern, quote_aware=False):
                     continue
                 if not is_local_branch_base(base, remotes):
                     continue
-                # `<local>..<remote>` measures the local ref's staleness --- the
+                # `main..origin/main` measures THAT branch's staleness --- the
                 # idiom `post-merge` prescribes --- rather than claiming a
-                # review scope. The local ref is the subject there, so naming a
-                # remote-tracking base would defeat the measurement.
-                if is_remote_tracking(head, remotes):
+                # review scope, so naming a remote-tracking base would defeat
+                # the measurement. The exemption has to be this narrow: it is
+                # only safe when the head names the SAME branch as the base.
+                # `main...origin/feature` is an ordinary review diff, and its
+                # remote-tracking head says nothing about the base's freshness
+                # --- exempting it would blind the hook to this incident's own
+                # shape, one fetch removed.
+                if remote_tracking_branch(head, remotes) == normalize_base(base):
                     continue
                 base = normalize_base(base)
                 if base not in found:

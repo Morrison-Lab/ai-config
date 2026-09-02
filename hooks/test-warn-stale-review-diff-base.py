@@ -19,6 +19,7 @@ import json
 import os
 import shutil
 import subprocess
+import time
 import sys
 import tempfile
 
@@ -85,6 +86,13 @@ def run(command, tool_name="Bash", tool_input=None):
 
 
 WARN_CASES = [
+    ("git diff main...origin/feature",
+     "an ordinary review diff whose HEAD is remote-tracking: the head says "
+     "NOTHING about the base's freshness, and exempting it would blind the "
+     "hook to the measured incident's own shape one fetch removed"),
+    ("git diff main...origin/pr-98",
+     "the measured incident verbatim, had pr-98 been fetched as a "
+     "remote-tracking ref instead of a local branch"),
     ("git diff -C main...HEAD",
      "`-C` is find-copies and never takes a SEPARATE argument in `git diff` "
      "or `git log`, so listing it in VALUE_OPTIONS ate the real range "
@@ -139,6 +147,9 @@ WARN_CASES = [
 ]
 
 SILENT_CASES = [
+    ("git diff main...origin/main",
+     "same branch on both sides is a staleness measurement, not a review "
+     "scope -- the ONLY shape the head exemption may cover"),
     ("git rev-list --count main..origin/main",
      "`<local>..<remote>` measures the local ref's staleness -- the idiom "
      "`post-merge` prescribes -- so the local ref is the measurement SUBJECT, "
@@ -258,6 +269,19 @@ for prompt, desc, want in ((BRIEF_WARN[0], BRIEF_WARN[1], "WARN"),
     total += 1
     wrong += verdict != want
     print(f"{verdict:<7} {desc}")
+
+# The command-position pattern once admitted 2^N parses over N option tokens
+# when the overall match failed: n=34 took 8.4s against a 10s timeout. Bounded
+# repetition makes it flat. A wall-clock assertion is crude, but the failure it
+# guards is a wall-clock one.
+_t0 = time.time()
+run("git " + "-a " * 40 + "nope main...HEAD")
+_elapsed = time.time() - _t0
+total += 1
+_ok = _elapsed < 5.0
+wrong += not _ok
+print(f"{'ok' if _ok else 'FAIL':<7} many option tokens before an unlisted "
+      f"subcommand stay fast ({_elapsed:.2f}s)")
 
 print("\n--- fail-open and environment")
 # A type-confused `cwd` reaches `os.path.join` inside `main()` and is the

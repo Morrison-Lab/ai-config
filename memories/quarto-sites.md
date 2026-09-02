@@ -298,22 +298,26 @@ Measured on Quarto 1.9.36 / macOS in a three-page project where `index.qmd` alon
 Which stage picks the reported path was not established, and is not needed: the name identifies the document that collided, which is the one to go and fix.
 
 **A green CI check here was not weak evidence that the block was fine --- it was no evidence either way.**
-The `build` check passed on the commits carrying that top-level block, and the render step's own environment dump says why: `FORMATS` empty, `RENDER_PROFILE` empty, `TINYTEX: false`, and `HAS_LABEL_PDF`, `HAS_LABEL_DOCX`, `HAS_LABEL_REVEALJS` all false.
+Two runs on `ucdavis/hac.sap#9` carried that top-level block: run `33432191485` (job `99619966191`) at `8c40c4db`, and run `33567826907` (job `100054940478`) at `e6d9e8a`.
+Both `build` checks passed, and both render steps dump the same inputs: `FORMATS` empty, `RENDER_PROFILE` empty, `TINYTEX: false`, and `HAS_LABEL_PDF`, `HAS_LABEL_DOCX`, `HAS_LABEL_REVEALJS` all false.
 Read `TINYTEX` as part of that input rather than the labels alone: the action's pdf branch fires on `TINYTEX = true` **or** `HAS_LABEL_PDF = true`, so a false label does not exclude pdf by itself.
-On that input `Morrison-Lab/gha`'s `preview@v2` takes its no-formats branch, builds `FORMAT_LIST=("html")`, and issues one command: `quarto render . --to html --output-dir _site`.
-A single-format project render renders each document once, so no two formats can contend for `<stem>.html`, and the collision was impossible in that run by construction.
+On those inputs `Morrison-Lab/gha`'s `preview@v2` takes its no-formats branch, builds `FORMAT_LIST=("html")`, and issues one command: `quarto render . --to html --output-dir _site`.
+A single-format project render renders each document once, so no two formats can contend for `<stem>.html`, and the collision was impossible in either run by construction.
+The runner never echoes the resolved command line, so that last step is a derivation over the script text and the `env:` block it does print, rather than an observation of the command itself.
 
-**The log reads like a multi-format render, and that is the trap.**
-It carries `Output created: _site/sap-template-revealjs.html` and `_site/sap-template.docx` next to `_site/index.html`, which looks like the project block's revealjs rendering cleanly.
+**The later run's log reads like a multi-format render, and that is the trap.**
+Run `33567826907` carries `Output created: _site/sap-template-revealjs.html` and `_site/sap-template.docx` next to `_site/index.html`, which looks like the project block's revealjs rendering cleanly.
 Those two come from the project's `post-render: Rscript scripts/post-render.R`, which runs `quarto render sap-template.qmd --to revealjs` and the same to `docx`: two single-document renders of the one document whose front matter declares its own `format:` block, with an explicit `output-file:`.
-By this section's own rule that is precisely the document the project block does *not* reach, so those outputs are evidence about per-document front matter and say nothing about the project block.
+The log's ordering settles that without needing any prior belief about the project render, since both lines fall after `Running script 'Rscript'` and before the project render's own `Output created: _site/index.html`.
+By this section's own rule `sap-template.qmd` is precisely the document the project block does *not* reach, so those outputs are evidence about per-document front matter and say nothing about the project block.
+The earlier run carries no such lines, because `scripts/post-render.R` did not exist at `8c40c4db`.
 
 The reflex explanation is the version, and it is wrong: CI ran Quarto 1.10.18 on Linux against a local 1.9.36 on macOS, but installing 1.10.18 on macOS collides identically, so the version explains nothing.
 The difference that mattered was the render command, sitting in the same log as the environment dump.
 Reach for the command a check actually ran before reaching for its platform or its version.
 [`metacognitive-monitoring.md`](../shared/workflow/metacognitive-monitoring.md) states the general form: a claim about cause owes an alternative you can name and reject.
 Reading the deployed preview would not have rescued this either, which is worth knowing before reaching for the `pr-preview/pr-<N>/` recipe the bullet above cites.
-That run wrote a complete html-only site, so the preview had nothing partial to show;
+Run `33567826907` wrote every page the project declares, so the preview had nothing partial to show;
 a preview can only expose what the render command it came from actually built.
 
 - **Do:** put a single document's extra format in that document's own front matter, with an explicit `output-file:`.
@@ -322,6 +326,8 @@ a preview can only expose what the render command it came from actually built.
 - **Do:** check a project's `post-render` step before reading an output in the log as the project render's work.
 - **Do:** compare the error's source path against the document the format was added for;
   a different path means the entry is reaching documents you did not intend.
+- **Don't:** read a green render check as evidence the config is right without asking which formats it rendered.
+- **Don't:** read an `Output created:` line as the project render's work before checking the project's `post-render` step.
 - **Don't:** add a format to the top-level `format:` key for one document's benefit.
 - **Don't:** read the page named in a `rename ... NotFound` as the one whose front matter you edited.
   It names a document that inherited the format, not the one you meant to give it to.

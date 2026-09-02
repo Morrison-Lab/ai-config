@@ -387,7 +387,13 @@ Worked-example case records for the rules below live in
    This is the mirror at the run level, and it is worse, because nothing about the green one looks partial: it reports the same check name, it completed, and it passed.
 
    The mechanism is a workflow that needs a base to diff against.
-   `check-new-line-breaks.yml` passes `base-ref` only when `github.event_name == 'pull_request'`, so the `push`-triggered run of the identical workflow has no base, examines zero added lines, and passes having measured nothing.
+   `check-new-line-breaks.yml` passed `base-ref` only when `github.event_name == 'pull_request'`, so the `push`-triggered run of the identical workflow had no base, examined zero added lines, and passed having measured nothing.
+   In this repository the `new-line-breaks` job in `validate.yml` is now gated with `if: github.event_name == 'pull_request'` ([ai-config#1730](https://github.com/Morrison-Lab/ai-config/issues/1730)),
+   so its push run reports `skipped` rather than `success`.
+   That closes the missing-base push case only:
+   a `pull_request` run can still skip with the same warning when the diff cannot be computed,
+   so read the job log before trusting a green run whose base could have been unreachable.
+   The rest of this subsection still governs any workflow of this shape that lacks the guard.
    Both runs attach to the same commit, so `gh pr checks` prints two rows with one name, one `pass` and one `fail`, and reading the list top-down finds whichever came first.
 
    The vacuous run is the one to discard, and the trigger event is the only field that separates them.

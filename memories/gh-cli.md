@@ -544,10 +544,19 @@
   Only the posted review **body** settles which of those happened.
 
   **The issue timeline's `review_requested` event is a fourth surface, and it is the one that does discriminate whether the request landed.**
-  `gh api "repos/<owner>/<repo>/issues/<N>/timeline" --jq '[.[] | select(.event=="review_requested") | .requested_reviewer.login] | unique'` returned `["Copilot"]` on `Morrison-Lab/ai-config#3004` immediately after a POST whose own response body already read empty.
-  Measured 2026-09-02: the POST returned **200**, not 201, with `"requested_reviewers":[]` in its own response body, and a follow-up `GET` of the same endpoint stayed empty too --- which read as a silently failed request and invited four repeated POSTs, each landing the same way.
-  The timeline carried the `review_requested` event the entire time.
-  Cross-checked against `#2979`, a PR Copilot did go on to review: the identical timeline entry is there, and that review is present.
+  Measured 2026-09-02 on [Morrison-Lab/ai-config#3004](https://github.com/Morrison-Lab/ai-config/pull/3004): the POST returned **200**, not 201, with `"requested_reviewers":[]` in its own response body, and a follow-up `GET` of the same endpoint stayed empty too --- which read as a silently failed request and invited four repeated POSTs, each landing the same way.
+  The timeline carried a `review_requested` event the entire time.
+
+  **Read that event with `--paginate` and with its timestamp kept, or the check is unsound in two ways at once.**
+  This file already requires `--paginate` on this endpoint (see the `cross-referenced` bullet above): without it `gh api` returns only the first 30 events and silently drops later ones, so a busy PR's newest request is exactly what goes missing.
+  And collapsing the logins --- `| unique` --- discards *when* each event happened, so a request from an earlier head confirms forever, which is the opposite of what the check is for.
+  Take the newest event's timestamp and compare it against the push or POST you are asking about:
+
+      gh api --paginate "repos/<owner>/<repo>/issues/<N>/timeline" \ --jq '[.[] | select(.event == "review_requested")
+                   | select((.requested_reviewer.login // "") | startswith("Copilot") or startswith("copilot"))
+                   | .created_at] | max'
+
+  Cross-checked against [#2979](https://github.com/Morrison-Lab/ai-config/pull/2979), a PR Copilot did go on to review: the same event is there, and that review is present.
   Its login differs by surface, which matters to any jq that filters on one: REST (`gh api .../pulls/<N>/reviews`) returns `copilot-pull-request-reviewer[bot]`, while GraphQL (`gh pr view <N> --json reviews`) returns `copilot-pull-request-reviewer` with the suffix stripped.
   Match on a prefix rather than on equality, or a filter written against one surface silently returns nothing on the other.
   This settles a narrower question than the paragraph above leaves open --- "was the request accepted" rather than "will Copilot post a review" --- so read it beside that paragraph's conclusion rather than in place of it: the timeline event is the evidence a request landed, and the posted review body is still what a verdict requires.

@@ -1068,12 +1068,12 @@ this entry is the general one.)
 
 - **Do:** ask which mechanism produced a cited artifact before asking whether the artifact is real, for evidence offered against your own claim exactly as hard as for evidence supporting it.
 - **Do:** re-run the check you would run on your own claim before retracting it on someone else's evidence, not after.
-- **Don't:** let "this refutes what I said" stand in for "this shows what I said is what happened" --- the first is a role the evidence is asked to play, the second is what the evidence actually shows.
+- **Don't:** let "this refutes what I said" stand in for "this shows that what I said is not what happened" --- the first is a role the evidence is asked to play, the second is what the evidence would actually have to show.
 - **Don't:** read acceptance of a peer's finding as exempt from this section's test on the grounds that agreeing is not asserting.
 
 Those four rules belong to this case alone, in the same way the three above it do;
 the section's standing Do/Don't list is the one that follows this paragraph.
-[`A correction inherits its instrument`](#a-correction-inherits-its-instrument-so-a-second-reading-is-not-a-check) below reaches the same place from the other direction, governing the retraction itself rather than the evidence offered for it.
+[`A correction inherits its instrument`](#a-correction-inherits-its-instrument-so-a-second-reading-is-not-a-check) above reaches the same place from the other direction, governing the retraction itself rather than the evidence offered for it.
 
 - **Do:** write what the measurement establishes and what you are claiming as
   two separate sentences, and confirm the second does not reach past the first.

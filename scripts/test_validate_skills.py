@@ -118,6 +118,19 @@ def run_listing_budget(tmpdir: Path, entries: list[tuple[str, str]]):
         vs.warnings.clear()
 
 
+
+def run_skills_check(tmpdir: Path):
+    """Point validate-skills.py at a fake repo root and run check_skills."""
+    original_root = vs.ROOT
+    vs.ROOT = tmpdir
+    vs.errors.clear()
+    vs.warnings.clear()
+    try:
+        vs.check_skills()
+        return list(vs.errors), list(vs.warnings)
+    finally:
+        vs.ROOT = original_root
+
 def main() -> int:
     with tempfile.TemporaryDirectory() as raw:
         tmp = Path(raw)
@@ -303,6 +316,40 @@ def main() -> int:
             "description one char over the limit errors",
             len(errs) == 1 and "over the marketplace" in errs[0],
         )
+
+    # --- skills-directory plugin exemption (ai-config#2004) ---
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+        plugin = tmp / "skills" / "hooks-only"
+        (plugin / ".claude-plugin").mkdir(parents=True)
+        manifest = plugin / ".claude-plugin" / "plugin.json"
+        manifest.write_text(
+            json.dumps({"name": "hooks-only", "description": "d"}),
+            encoding="utf-8",
+        )
+        errors, _ = run_skills_check(tmp)
+        check("skills-dir plugin without SKILL.md is not an error", errors == [])
+
+        manifest.write_text(
+            json.dumps({"name": "other", "description": "d"}), encoding="utf-8"
+        )
+        errors, _ = run_skills_check(tmp)
+        check(
+            "skills-dir plugin whose name != directory is an error",
+            any("!= directory" in e for e in errors),
+        )
+
+        manifest.write_text(
+            json.dumps({"name": "hooks-only", "description": "d"}),
+            encoding="utf-8",
+        )
+        (tmp / "skills" / "bare").mkdir()
+        errors, _ = run_skills_check(tmp)
+        check(
+            "skill dir with neither SKILL.md nor manifest is still an error",
+            any("no SKILL.md" in e for e in errors),
+        )
+
 
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0

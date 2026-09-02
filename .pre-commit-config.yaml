@@ -92,6 +92,18 @@ repos:
         language: python
         pass_filenames: false
         always_run: true
+      - id: gen-hooks-plugin-check
+        name: hooks-only skills-dir plugin in sync with hooks/hooks.json
+        entry: python scripts/gen-hooks-plugin.py --check
+        language: python
+        pass_filenames: false
+        always_run: true
+      - id: gen-hooks-plugin-tests
+        name: gen-hooks-plugin tests
+        entry: python scripts/test_gen_hooks_plugin.py
+        language: python
+        pass_filenames: false
+        always_run: true
       - id: hook-catalog
         name: hook catalog (README table vs hooks/hooks.json)
         entry: python scripts/check-hook-catalog.py

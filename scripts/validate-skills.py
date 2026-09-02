@@ -7,7 +7,9 @@ jeremylongshore/claude-code-plugins-plus-skills (`validate-skills-schema.py`).
 No source was copied; see CREDITS.md.
 
 Checks:
-  * every skills/<name>/ has a SKILL.md with parseable YAML frontmatter
+  * every skills/<name>/ has a SKILL.md with parseable YAML frontmatter,
+    except a skills-directory plugin (a .claude-plugin/plugin.json and no
+    SKILL.md), whose manifest must name its directory
   * frontmatter has non-empty `name` and `description`
   * `name` matches the directory name
   * `user-invocable` (if present) is a bool
@@ -101,6 +103,33 @@ def parse_frontmatter(text: str, where: str):
         errors.append(f"{where}: frontmatter is not a mapping")
         return None
     return data
+
+
+def is_skills_dir_plugin(child: Path) -> bool:
+    """A `skills/<name>/` with a plugin manifest and no SKILL.md is a plugin.
+
+    Claude Code loads such a folder in place as `<name>@skills-dir` (with its
+    own hooks, agents, and skills) rather than as one skill, so it carries no
+    SKILL.md of its own. `skills/ai-config-hooks/` is the one in this repo
+    (ai-config#2004).
+    """
+    return ((child / ".claude-plugin" / "plugin.json").is_file()
+            and not (child / "SKILL.md").exists())
+
+
+def check_skills_dir_plugin(plugin_dir: Path) -> None:
+    manifest = plugin_dir / ".claude-plugin" / "plugin.json"
+    rel = manifest.relative_to(ROOT)
+    try:
+        data = json.loads(manifest.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        errors.append(f"{rel}: invalid JSON ({exc})")
+        return
+    if data.get("name") != plugin_dir.name:
+        errors.append(f"{rel}: name {data.get('name')!r} != directory "
+                      f"{plugin_dir.name!r}")
+    if not data.get("description"):
+        errors.append(f"{rel}: empty description")
 
 
 def check_skill(skill_dir: Path) -> None:
@@ -221,11 +250,17 @@ def check_skills() -> None:
         warnings.append("no skills/ directory")
         return
     count = 0
+    plugins = 0
     for child in sorted(skills_dir.iterdir()):
-        if child.is_dir() and not child.name.startswith("."):
-            count += 1
-            check_skill(child)
-    print(f"  checked {count} skills")
+        if not child.is_dir() or child.name.startswith("."):
+            continue
+        if is_skills_dir_plugin(child):
+            plugins += 1
+            check_skills_dir_plugin(child)
+            continue
+        count += 1
+        check_skill(child)
+    print(f"  checked {count} skills, {plugins} skills-directory plugins")
     check_listing_budget(sorted(skills_dir.glob("*/SKILL.md")), "skills/")
 
 

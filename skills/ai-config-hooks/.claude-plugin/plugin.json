@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "ai-config-hooks",
+  "description": "Hooks-only skills-directory plugin: registers hooks/hooks.json in sessions that open the ai-config checkout itself, where the marketplace plugin is not installed (ai-config#2004).",
+  "author": {
+    "name": "d-morrison"
+  }
+}

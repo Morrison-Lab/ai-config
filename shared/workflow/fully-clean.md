@@ -1171,7 +1171,9 @@ so for a direct merge the rule is the one [`sync-with-main`](sync-with-main.md) 
 Under a merge queue the queue's speculative merge test covers this, and [`merge-queue`](merge-queue.md) forbids the manual update loop.
 There the `merge_group` checks are the gate.
 
-- **Do:** before merging, confirm the merge-base with the default branch is the default branch's current tip (`git merge-base origin/main <head>` equals `git rev-parse origin/main`).
+- **Do:** before merging, fetch and resolve the default branch, then confirm the merge-base with it is its current tip:
+  `git fetch origin && d=$(git symbolic-ref --short refs/remotes/origin/HEAD | cut -d/ -f2-) && [ "$(git merge-base origin/$d <head>)" = "$(git rev-parse origin/$d)" ]`.
+  A remote-tracking ref is current only after a fetch, and the default branch is not always `main`.
 - **Do:** when it is not and the merge is direct, `gh pr update-branch` and let CI re-run at the new base before merging.
 - **Do:** under a merge queue, rely on the `merge_group` checks rather than a manual update.
 - **Don't:** read a head-only FULLY CLEAN verdict as a merge-safe verdict when the base has advanced.

@@ -205,7 +205,6 @@ CASES = [
      mcp("mcp__github__add_issue_comment", "See the 12:47 entry in the log."),
      False, "a bare time with no Pacific marker is not a present-tense claim"),
 
-    # --- session notebooks and memory files (ai-config#2947) ------------------
     ([PROMPT],
      {"tool_name": "Write", "tool_input": {
          "file_path": "/Users/user/.claude/projects/proj/memory/session-2026-09-01-gia-mwc.md",
@@ -217,6 +216,11 @@ CASES = [
          "text": "Status at 17:50ish: tests green."}}, True,
      "#2947: an Edit to a memory session notebook with 17:50ish warns"),
     ([PROMPT],
+     {"tool_name": "NotebookEdit", "tool_input": {
+         "notebook_path": "/Users/user/repo/memory/session-2026-09-01.md",
+         "new_source": "Status at 17:50ish: tests green."}}, True,
+     "#2947: NotebookEdit with new_source targeting memory session notebook warns"),
+    ([PROMPT],
      {"tool_name": "write_to_file", "tool_input": {
          "TargetFile": "/Users/user/repo/memories/preferences.md",
          "CodeContent": "Verified 18:05ish PT: settings updated."}}, True,
@@ -225,6 +229,9 @@ CASES = [
      bash("cat <<'EOF' >> ~/.claude/projects/p/memory/session-2026-09-01.md\n"
           "### Wave 2 (17:50ish PDT)\nEOF"), True,
      "#2947: a Bash heredoc appending 17:50ish PDT to session notebook warns"),
+    ([PROMPT],
+     bash('LOGID=$(date +%s); echo "Status at 17:50 PDT: tests green" >> memory/session-2026-09-01.md'), True,
+     "#2947: an unrelated date call in earlier segment does not discharge notebook stamp"),
     ([PROMPT],
      bash("cat <<EOF >> ~/.claude/projects/p/memory/session-2026-09-01.md\n"
           "### Wave 2 ($(TZ=America/Los_Angeles date \"+%H:%M %Z\"))\nEOF"), False,

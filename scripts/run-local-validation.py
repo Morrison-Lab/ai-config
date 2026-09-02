@@ -19,10 +19,11 @@ What it runs, in order:
      blocks execute under `bash -e -o pipefail`, the shell GitHub uses.
   2. A local equivalent for each sibling job that only `uses:` a reusable
      workflow or composite action, where one is known (the table below):
-     the diff-scoped new-line-breaks check and markdownlint. A `uses:` job
-     with no known equivalent (lint-qmd today) is listed as NOT RUN, and so
-     is a `run:` step that reads a `${{ github.* }}` expression, so the
-     denominator shows what CI checks that this run did not.
+     the diff-scoped new-line-breaks check, whose script is vendored here. A
+     `uses:` job with no vendored equivalent (lint-markdown and lint-qmd
+     today) is listed as NOT RUN, and so is a `run:` step that reads a
+     `${{ github.* }}` expression, so the denominator shows what CI checks
+     that this run did not.
 
 Steps whose name matches --skip (default: the dependency install, which needs
 the network and is already satisfied locally) are skipped and counted.
@@ -48,7 +49,6 @@ from __future__ import annotations
 import argparse
 import os
 import re
-import shlex
 import subprocess
 import sys
 import time
@@ -72,25 +72,31 @@ def _nlb_equivalent(job: Dict[str, Any], base: str) -> Optional[Dict[str, Any]]:
     if step is None:
         return None
     with_ = step.get("with") or {}
-    globs = str(with_.get("globs") or "*.md")
-    return {
-        "command": "python3 scripts/vendor/gha-check-new-line-breaks.py",
-        "env": {"NLB_BASE_REF": base, "NLB_GLOBS": globs, "NLB_FAIL": str(with_.get("fail", "true"))},
+    env = {
+        "NLB_BASE_REF": base,
+        "NLB_GLOBS": str(with_.get("globs") or "*.md"),
+        "NLB_FAIL": str(with_.get("fail", "true")),
     }
+    # Every input the composite action takes is forwarded; the vendored script
+    # reads the same NLB_* names, so a job input this misses would make the
+    # local run diverge from CI in one direction or the other (#1940 review
+    # round 1 found paths-ignore missing: 201 generated codex-skills/*.md files
+    # CI skips were being scanned locally).
+    if with_.get("paths-ignore"):
+        env["NLB_PATHS_IGNORE"] = str(with_["paths-ignore"])
+    return {"command": "python3 scripts/vendor/gha-check-new-line-breaks.py", "env": env}
 
 
-def _markdownlint_equivalent(job: Dict[str, Any], base: str) -> Optional[Dict[str, Any]]:
-    with_ = job.get("with") or {}
-    config = str(with_.get("config-file") or ".markdownlint-cli2.jsonc")
-    return {"command": f"npx --yes markdownlint-cli2@0.23.0 --config {shlex.quote(config)}", "env": {}}
-
-
-# lint-qmd is deliberately absent: what gha's lint-qmd.yml runs has not been
-# read from its source, and a guessed equivalent would report a clean zero
-# for a check it does not reproduce. It is listed as NOT RUN instead.
+# Only a job whose exact check is vendored into this repo gets a local
+# equivalent. new-line-breaks qualifies: scripts/vendor/gha-check-new-line-breaks.py
+# is the pinned copy of the composite action's script. lint-markdown and
+# lint-qmd do not: gha's lint-markdown action runs four checks (markdownlint,
+# code-block length, list-item splices, table splits), and a local
+# `markdownlint-cli2` call reproduces one of them while reporting a clean
+# zero for the other three -- the guessed-equivalent failure this runner
+# exists to avoid. Both are listed as NOT RUN so the denominator names them.
 LOCAL_EQUIVALENTS = {
     "check-new-line-breaks": _nlb_equivalent,
-    "lint-markdown.yml": _markdownlint_equivalent,
 }
 
 
@@ -165,7 +171,10 @@ def load_workflow(path: Path) -> Dict[str, Any]:
         text = path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError) as exc:
         raise RuntimeError(f"cannot read {path}: {exc}") from exc
-    doc = yaml.safe_load(text)
+    try:
+        doc = yaml.safe_load(text)
+    except yaml.YAMLError as exc:
+        raise RuntimeError(f"cannot parse {path}: {exc}") from exc
     if not isinstance(doc, dict):
         raise RuntimeError(f"{path} did not parse to a mapping")
     return doc
@@ -186,7 +195,11 @@ def dirty_tree(root: Path) -> List[str]:
     try:
         out = subprocess.run(["git", "status", "--porcelain"], cwd=str(root),
                              capture_output=True, text=True, check=True).stdout
-    except (subprocess.CalledProcessError, FileNotFoundError):
+    except (subprocess.CalledProcessError, FileNotFoundError) as exc:
+        # Observable, never silent: the caller's dirty-tree report is skipped,
+        # and this line says so (shared/principles/fail-fast.md).
+        print(f"warning: could not read git status in {root} ({exc}); "
+              "skipping the dirty-tree check", file=sys.stderr)
         return []
     return [ln for ln in out.splitlines() if ln.strip()]
 

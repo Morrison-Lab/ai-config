@@ -65,6 +65,7 @@ jobs:
         uses: Morrison-Lab/gha/check-new-line-breaks@deadbeef
         with:
           globs: '*.md *.qmd'
+          paths-ignore: 'codex-skills/**,docs/**'
           fail: 'true'
   lint-markdown:
     uses: Morrison-Lab/gha/.github/workflows/lint-markdown.yml@v2
@@ -99,8 +100,10 @@ def test_derive_steps():
           by["new-line-breaks"].command.endswith("gha-check-new-line-breaks.py")
           and by["new-line-breaks"].env["NLB_GLOBS"] == "*.md *.qmd"
           and by["new-line-breaks"].env["NLB_BASE_REF"] == "origin/main")
-    check("lint-markdown job maps to markdownlint-cli2 with the job's config file",
-          "markdownlint-cli2" in by["lint-markdown"].command and ".markdownlint-cli2.jsonc" in by["lint-markdown"].command)
+    check("new-line-breaks forwards the job's paths-ignore input",
+          by["new-line-breaks"].env.get("NLB_PATHS_IGNORE") == "codex-skills/**,docs/**")
+    check("lint-markdown is NOT RUN: a markdownlint-only stand-in would report a clean zero for three of the action's four checks",
+          not by["lint-markdown"].runnable and "lint-markdown.yml" in by["lint-markdown"].note)
     check("a uses: job with no local equivalent is listed as not runnable",
           not by["lint-qmd"].runnable and "lint-qmd.yml" in by["lint-qmd"].note)
 
@@ -115,6 +118,12 @@ def test_missing_job_is_exit_2():
         with redirect_stderr(io.StringIO()), redirect_stdout(io.StringIO()):
             rc = rlv.main(["--workflow", str(Path(tmp) / "absent.yml"), "--root", tmp])
         check("a missing workflow exits 2", rc == 2)
+        bad = Path(tmp) / "bad.yml"
+        bad.write_text("jobs:\n  validate:\n    steps: [\n", encoding="utf-8")
+        err = io.StringIO()
+        with redirect_stderr(err), redirect_stdout(io.StringIO()):
+            rc = rlv.main(["--workflow", str(bad), "--root", tmp])
+        check("a malformed workflow exits 2 with the parse error named", rc == 2 and "cannot parse" in err.getvalue())
 
 
 def test_list_does_not_execute():
@@ -180,6 +189,13 @@ def test_require_clean_on_dirty_tree():
         with redirect_stdout(io.StringIO()), redirect_stderr(err):
             rc = rlv.main(["--workflow", str(wf), "--root", tmp, "--only", "Passing"])
         check("without --require-clean a dirty tree only warns", rc == 0 and "warning" in err.getvalue())
+    with tempfile.TemporaryDirectory() as tmp:
+        wf = _write_fixture(tmp)
+        err = io.StringIO()
+        with redirect_stdout(io.StringIO()), redirect_stderr(err):
+            rc = rlv.main(["--workflow", str(wf), "--root", tmp, "--only", "Passing"])
+        check("a root that is not a git repo is reported, not silently read as clean",
+              rc == 0 and "could not read git status" in err.getvalue())
 
 
 def test_live_workflow_derives_every_python_test_suite():

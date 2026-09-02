@@ -78,10 +78,10 @@ REQ=$(jq -cn --arg r "${PR_SCOPE_REQUESTED:-}" \
 gh pr list --repo "$REPO" --state open --limit 200 \
   --json number,title,author,assignees,labels,mergeable \
   | jq -r --argjson ids "$IDS" --argjson req "$REQ" '.[] | select(
-          (.author.login | test("^(app/)?(dependabot|renovate)(\\[bot\\])?$"))
+          (.author.login | test("^(app/(dependabot|renovate)|(dependabot|renovate)\\[bot\\])$"))
           or (
             (
-              (.author.login | test("^(app/)?github-actions(\\[bot\\])?$"))
+              (.author.login | test("^(app/github-actions|github-actions\\[bot\\]|github-actions)$"))
               or ((.author.login as $a | $ids | index($a)) != null)
               or any(.assignees[].login; . as $x | ($ids | index($x)) != null)
               or ((.number as $n | $req | index($n)) != null)

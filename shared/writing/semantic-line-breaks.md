@@ -212,14 +212,14 @@ lesson, until review consolidated it here instead.
   After #2085, `--write` splits what `classify_line` flags.
   It still is not the diff-scoped CI job.
 
-**A green check run named for this gate may never have run it, and both runs
+**Until [ai-config#1730](https://github.com/Morrison-Lab/ai-config/issues/1730) gated the job, a green check run named for this gate could have never run it, and both runs
 carry the same name.**
 The reformatter trap above is about the wrong *tool*.
 This is about the right tool reporting success without measuring anything, and
 it is harder to catch because there is nothing to notice: the check run is
 green, its name is correct, and it sits in the same list as the real one.
 
-Until ai-config#1730 was fixed, the workflow's base-ref input was
+Until [ai-config#1730](https://github.com/Morrison-Lab/ai-config/issues/1730) was fixed, the workflow's base-ref input was
 `github.event.pull_request.base.sha` on a pull request and empty otherwise,
 which made a push to `main` skip cleanly instead of scanning the whole tree.
 The consequence for a *branch* push was the part worth stating: that run had no

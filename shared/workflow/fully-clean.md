@@ -388,7 +388,8 @@ Worked-example case records for the rules below live in
 
    The mechanism is a workflow that needs a base to diff against.
    `check-new-line-breaks.yml` passed `base-ref` only when `github.event_name == 'pull_request'`, so the `push`-triggered run of the identical workflow had no base, examined zero added lines, and passed having measured nothing.
-   In this repository the `new-line-breaks` job in `validate.yml` is now gated with `if: github.event_name == 'pull_request'` (ai-config#1730), so its push run reports `skipped` and cannot pass vacuously; the rest of this subsection still governs any workflow of this shape that lacks the guard.
+   In this repository the `new-line-breaks` job in `validate.yml` is now gated with `if: github.event_name == 'pull_request'` (ai-config#1730), so its push run reports `skipped` and cannot pass vacuously.
+   The rest of this subsection still governs any workflow of this shape that lacks the guard.
    Both runs attach to the same commit, so `gh pr checks` prints two rows with one name, one `pass` and one `fail`, and reading the list top-down finds whichever came first.
 
    The vacuous run is the one to discard, and the trigger event is the only field that separates them.

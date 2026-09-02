@@ -83,7 +83,8 @@ files and can scan added lines in PRs and working trees (ai-config#2550).
 Named a `.md` path, the default whole-file mode scans nothing,
 prints `notice: No files found matching criteria.`, and exits 0,
 which reads as a pass;
-`--diff --base origin/<default-branch>` inspects every added line whatever its extension.
+`--diff --base origin/<default-branch>` inspects the added lines of `.py`, `.R`, `.qmd`, `.md`, `.sh`, `.yml`, and `.yaml` files,
+and `--extensions` widens that set.
 (Measured 2026-09-01 on ai-config#2944:
 the default mode's notice was read as clean,
 and a reflow-carried em-dash reached the external review.)

@@ -352,16 +352,16 @@ See ai-config#694 for the precedent.
   `100115600016` started 03:39:16, review 03:44:37.
   `ab89045`: committed 03:47:53, requested 03:48:09 without waiting, run
   `100117262861` started 03:48:21, review 03:53:50.
-  Every run followed a request by twelve to sixteen seconds.
-  None of the four pushes started a run on its own in the time it was
-  given, and the two that waited went seven and two minutes without one.
+  Every run followed a request by twelve to sixteen seconds, none started
+  on its own in the time it was given, and two waited seven and two minutes.
   `get_check_runs` (current head) or the per-SHA endpoint above is the tell.
-  One minute is therefore the operational heuristic rather than a
-  guarantee: an absent run after that is grounds to re-issue, and a
-  duplicate request when check creation was merely delayed is the cheap
-  side of the trade.
-  - **Do:** after every push, confirm a `copilot-pull-request-reviewer`
-    check run exists on the new head within about a minute.
+  One minute is therefore the heuristic rather than a guarantee: an absent
+  run after that is grounds to re-issue, and a duplicate request when
+  creation was merely delayed is the cheap side of the trade.
+  - **Do:** after every push to a PR that is ready for review (a draft's
+    pushes defer review, per `hooks/no-unreviewed-pr.py`), confirm a
+    `copilot-pull-request-reviewer` check run exists on the new head
+    within about a minute.
     Where one exists, `pr-on-claim.md`'s rule against re-posting on an
     auto-requesting repo holds.
     Call `request_copilot_review` only when none has appeared.

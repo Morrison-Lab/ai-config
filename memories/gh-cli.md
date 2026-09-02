@@ -555,7 +555,8 @@
   It stays untested on purpose: probing consumes the per-user quota that is usually the actual reason Copilot is absent, so the experiment damages the thing it would explain.
 
   The operational advice does not depend on resolving it.
-  Don't spend a call on this endpoint either way -- the ruleset already requests the review, and neither response tells you whether one is pending.
+  Don't spend a call on this endpoint either way while a `copilot-pull-request-reviewer` check run exists on the head -- the ruleset already requested the review, and neither response tells you whether one is pending.
+  A ready-for-review head with no such run about a minute after the push is the one case for a request, measured per push in [`memories/github-mcp-tools.md`](github-mcp-tools.md).
 
   **As of 2026-08-04, Copilot is quota-exhausted across Morrison-Lab and unavailable until September 2026, so do not request it at all until then.**
   The user stated this directly on 2026-08-04, in the words "copilot is unavailable until september" and "stop trying to get copilot reviews".

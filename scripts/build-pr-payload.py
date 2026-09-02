@@ -29,12 +29,25 @@ Field mapping mirrors shared/workflow/fully-clean.md's payload table: REST's
 `{"author": {"login": ...}}`, and reviewDecision is derived the way GitHub
 computes it -- CHANGES_REQUESTED if any reviewer's latest review requests
 changes, else APPROVED if any latest review approves, else "".
+
+The payload also carries `actions_runs`, keyed by the Actions run id of every
+check run, each with the run's workflow `path`. The checker's #2277 rule --
+a `cancelled` check run is superseded by a later `success` under the same job
+name in the SAME workflow file -- resolves that path through
+`gh api repos/{repo}/actions/runs/{id}`, which the --from-json fetcher
+answers from this key and otherwise answers with `{}`. Without it every
+cancel-in-progress leftover scored a head NOT clean in remote sessions
+(Morrison-Lab/ai-config#1697, measured on #2926 and #2917, 2026-09-01). A run
+the API no longer has (404, past retention) is skipped with a warning on
+stderr rather than aborting the build, since the omission only pushes the
+verdict toward not-clean, the safe direction.
 """
 from __future__ import annotations
 
 import argparse
 import json
 import os
+import re
 import sys
 import urllib.error
 import urllib.request
@@ -126,6 +139,43 @@ def derive_review_decision(reviews: List[Dict[str, Any]]) -> str:
     return ""
 
 
+# Same shape check-pr-fully-clean.py's _workflow_path_from_check_run applies, so
+# every id gathered here is one the checker's own lookup will ask for.
+_RUN_ID_RE = re.compile(r"/actions/runs/(\d+)/")
+
+
+def run_ids_from_check_runs(check_runs_raw: List[Dict[str, Any]]) -> List[str]:
+    """Distinct Actions run ids named by the check runs' `html_url`s, in first-seen order."""
+    seen: List[str] = []
+    for c in check_runs_raw:
+        m = _RUN_ID_RE.search(str(c.get("html_url") or ""))
+        if m and m.group(1) not in seen:
+            seen.append(m.group(1))
+    return seen
+
+
+def fetch_actions_runs(owner_repo: str, run_ids: List[str], token: str) -> Dict[str, Dict[str, Any]]:
+    """GET each Actions run once; map run id -> {"path": workflow file path}.
+
+    A 404 (a run past its retention window) is reported on stderr and skipped:
+    the checker treats a missing entry as "path unknown", which can only
+    withhold a supersession, never grant one. Any other HTTP failure still
+    raises, per fail-fast.
+    """
+    out: Dict[str, Dict[str, Any]] = {}
+    for run_id in run_ids:
+        try:
+            raw = rest_get(f"/repos/{owner_repo}/actions/runs/{run_id}", token)
+        except PayloadBuildError as exc:
+            if " failed: 404 " in str(exc):
+                print(f"warning: actions run {run_id} not found (404); "
+                      "its check runs will not be attributed to a workflow", file=sys.stderr)
+                continue
+            raise
+        out[run_id] = {"path": raw.get("path") or ""}
+    return out
+
+
 def build_payload(
     owner_repo: str,
     pr_raw: Dict[str, Any],
@@ -133,6 +183,7 @@ def build_payload(
     comments_raw: List[Dict[str, Any]],
     commits_raw: List[Dict[str, Any]],
     check_runs_raw: List[Dict[str, Any]],
+    actions_runs: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """Map REST JSON to the shape scripts/lib/payload_fetcher.py expects.
 
@@ -199,7 +250,10 @@ def build_payload(
         }
         for c in check_runs_raw
     ]
-    return {"repo": owner_repo, "pr": pr, "check_runs": check_runs}
+    payload = {"repo": owner_repo, "pr": pr, "check_runs": check_runs}
+    if actions_runs is not None:
+        payload["actions_runs"] = actions_runs
+    return payload
 
 
 def fetch_payload(owner_repo: str, pr_number: int, token: str) -> Dict[str, Any]:
@@ -211,7 +265,10 @@ def fetch_payload(owner_repo: str, pr_number: int, token: str) -> Dict[str, Any]
     check_runs_raw = rest_get(
         f"{base}/commits/{pr_raw['head']['sha']}/check-runs", token, envelope="check_runs"
     )
-    return build_payload(owner_repo, pr_raw, reviews_raw, comments_raw, commits_raw, check_runs_raw)
+    actions_runs = fetch_actions_runs(owner_repo, run_ids_from_check_runs(check_runs_raw), token)
+    return build_payload(
+        owner_repo, pr_raw, reviews_raw, comments_raw, commits_raw, check_runs_raw, actions_runs
+    )
 
 
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
@@ -253,7 +310,8 @@ def main() -> int:
         f"{args.out_file}: head {pr['headRefOid'][:7]} {pr['state']} "
         f"{pr['mergeStateStatus']} decision={pr['reviewDecision'] or '-'} "
         f"reviews={len(pr['reviews'])} comments={len(pr['comments'])} "
-        f"commits={len(pr['commits'])} checks={len(payload['check_runs'])}"
+        f"commits={len(pr['commits'])} checks={len(payload['check_runs'])} "
+        f"actions_runs={len(payload.get('actions_runs') or {})}"
     )
     return 0
 

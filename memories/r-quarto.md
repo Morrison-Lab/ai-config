@@ -1066,11 +1066,12 @@ Three consequences, in descending order of how long they stay useful:
 
 - **Do:** assert a mutation harness is live (an invocation counter, or a known-caught mutation) in every environment it runs in, not only the one it was authored against.
 - **Do:** patch the environment the tests actually resolve from, and prove which one that is with an invocation counter rather than reasoning about it.
-  Under `load_all()` that was the **attached** environment: a namespace-only patch of the same mutation left the suite at 31 pass / 0 fail with the patched function called zero times, while a patch reaching the attached environment gave 27 / 4.
+  Under `load_all()` that was the **attached** environment, on the peer session's measurement rather than one reproduced here: their invocation counter recorded the namespace-only patch called zero times, leaving the suite at 31 pass / 0 fail, while a patch reaching the attached environment gave 27 / 4.
+  Those figures come from a private repository, so treat them as the peer's evidence for the direction rather than as numbers you can re-derive.
 - **Do:** compare `ns`/`attached` locking (or membership) using an exported name, never `ls(asNamespace(pkg))[1]`.
 - **Don't:** trust a mutation-testing harness's "all mutations caught" verdict without confirming it ran the same way under `load_all()` and under an installed package.
 
-([ucdavis/hac.sap#27](https://github.com/ucdavis/hac.sap/issues/27), a mutation-testing investigation where eight exported formatters accepted a `"MUTANT"` return with the suite still reporting 31/31 passing.)
+([ucdavis/hac.sap#27](https://github.com/ucdavis/hac.sap/issues/27) --- a **private** repository, so the link resolves only with access --- a mutation-testing investigation where eight exported formatters accepted a `"MUTANT"` return with the suite still reporting 31/31 passing.)
 
 ## `{cli}` glue-interpolates every message string, and the two brace forms fail differently
 

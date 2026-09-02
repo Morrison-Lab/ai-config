@@ -360,9 +360,13 @@ See ai-config#694 for the precedent.
   Rounds thirty-five and thirty-six on `#2913` each carried two such findings.
   The same shape from the `gh` side is `fully-clean.cases.md`'s
   collapsed-block case (`#1029`).
-  - **Do:** read the newest review body with `get_reviews` every round,
-    paging past the first page (`perPage` 5, highest page number) on a long
-    thread.
+  - **Do:** read the review body with `get_reviews` every round, selecting
+    the entry whose `user.login` is `copilot-pull-request-reviewer[bot]` and
+    whose `commit_id` is the current head, and paging past the first page
+    (`perPage` 5, highest page number) on a long thread.
+    The newest entry alone can be a human review or a stale round;
+    `shared/workflow/review-verdict-pitfalls.md`'s reviewer-login table
+    carries the field and value per surface.
   - **Don't:** call a round clean from `get_review_comments` and the check
     run alone.
 - **A branch ruleset can block Copilot from pushing a fix while leaving my

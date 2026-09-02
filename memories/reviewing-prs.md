@@ -127,8 +127,11 @@ restatement of a rule, the same gap may be open at any other restatement,
 and the reviewer finds those one round at a time.
 `Morrison-Lab/ai-config#2913` (2026-09-01) spent Copilot rounds thirty-two
 through thirty-five landing one exclusion veto and one pre-write recheck
-site by site: `chores`, then `AGENTS.md`, `ardia`, and `post-merge`, then
-`memories/github.md`.
+site by site (files per commit from `git show --stat`): `chores`
+(`28c20e5`), `chores` again for the recheck's step range (`988b545`),
+then `AGENTS.md`, `ardia`, `post-merge`, and this file (`3b32086`), then
+`memories/github.md` and `chores` a third time for the recheck's inputs
+(`ab89045`).
 A corpus grep for the rule's vocabulary after round thirty-two, with each
 hit read against the widened rule, would have folded the next three rounds
 into one push.

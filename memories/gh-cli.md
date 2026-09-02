@@ -542,7 +542,47 @@
 
   That disappearance is **not** explained by the `review_on_push: true` rule above, and [`shared/workflow/pr-on-claim.md`](../shared/workflow/pr-on-claim.md)'s "blocked-request test has a false positive" section owns the argument and the deriving queries.
   The short version: `Morrison-Lab/ai-config` reproduces the identical 201-then-empty signature while carrying no `copilot_code_review` rule at either scope, so an empty pending list is evidence neither that the request was blocked nor that a review is coming.
-  Only the posted review **body** settles which of those happened.
+  Only the posted review **body** settles whether a review is actually coming.
+  The timeline event described next settles the strictly narrower question of whether the request was *accepted*, which those three surfaces also cannot answer --- so the two conclusions divide the question rather than competing for it.
+
+  **The issue timeline's `review_requested` event is a fourth surface, and it is the one that does discriminate whether the request landed.**
+  Measured 2026-09-02 on [Morrison-Lab/ai-config#3004](https://github.com/Morrison-Lab/ai-config/pull/3004).
+  The POST returned **200**, not 201, with `"requested_reviewers":[]` in its own response body.
+  A follow-up `GET` of the same endpoint stayed empty too.
+  Together those read as a silently failed request, and invited four repeated POSTs, each landing the same way.
+  The timeline carried a `review_requested` event the entire time.
+
+  **Read that event with `--paginate` and with its timestamp kept, or the check is unsound in two ways at once.**
+  This file already requires `--paginate` on this endpoint, in the `cross-referenced` bullet above.
+  Without it `gh api` returns only the first 30 events and silently drops later ones.
+  A busy PR's newest request is then exactly what goes missing.
+  Collapsing the logins --- `| unique` --- discards *when* each event happened.
+  A request from an earlier head then confirms forever, which is the opposite of what the check is for.
+  Take the newest event's timestamp and compare it against the push or POST you are asking about:
+
+  ```bash
+  set -o pipefail
+  gh api --paginate "repos/<owner>/<repo>/issues/<N>/timeline" \
+    | jq -s '[.[][] | select(.event == "review_requested")
+                    | select((.requested_reviewer.login // "") | startswith("Copilot") or startswith("copilot"))
+                    | .created_at] | max'
+  ```
+
+  Two details in that command are this file's own standing rules rather than taste, and skipping either produces a wrong answer quietly.
+  `--jq` cannot be combined with `--paginate` for an aggregate: it evaluates each page separately, so `max` returns one maximum *per page* rather than one across the run.
+  Pipe the raw pages into standalone `jq -s`, exactly as the comment-polling recipe above prescribes, and enable `pipefail` so a failed `gh api` is not masked by a successful `jq`.
+
+  Cross-checked against [#2979](https://github.com/Morrison-Lab/ai-config/pull/2979), a PR Copilot did go on to review: the same event is there, and that review is present.
+  Its login differs by surface, which matters to any jq that filters on one.
+  REST (`gh api .../pulls/<N>/reviews`) returns `copilot-pull-request-reviewer[bot]`.
+  GraphQL (`gh pr view <N> --json reviews`) returns `copilot-pull-request-reviewer`, with the suffix stripped.
+  Match on a prefix rather than on equality, or a filter written against one surface silently returns nothing on the other.
+
+  - **Do:** check the timeline's `review_requested` event before re-issuing a reviewer-request POST that read back empty.
+  - **Do:** treat the timeline event as confirmation the request landed, and the posted review body as the separate, later question of whether a review follows.
+  - **Don't:** re-POST a request because the pending-list or `reviewRequests` read came back empty --- both are already documented above as uninformative in either direction.
+  - **Don't:** read the timeline event as proof a review is coming;
+    it confirms the request, not the outcome.
 
   **Both outcomes were genuinely observed on the same repo the same day, so do not flatten this into "it returns 201".**
   One session ran the POST once and got `422`;

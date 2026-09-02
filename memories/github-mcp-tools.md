@@ -335,7 +335,8 @@ See ai-config#694 for the precedent.
   the same PR two days earlier.)
 - **Copilot's per-push review is not guaranteed, and a missing one is
   silent.**
-  Measured on `Morrison-Lab/ai-config#2913`, 2026-09-01: three consecutive
+  Measured on [Morrison-Lab/ai-config#2913](https://github.com/Morrison-Lab/ai-config/pull/2913), 2026-09-01:
+  three consecutive
   pushes (`988b545`, `3b32086`, `ab89045`) produced no
   `copilot-pull-request-reviewer` check run on the new head for several
   minutes, while `request_copilot_review` started one within about fifteen
@@ -357,9 +358,10 @@ See ai-config#694 for the precedent.
   returns (state `COMMENTED`, header `Needs a closer look`) and nowhere in
   `get_review_comments`, so a `success` check run plus zero open threads is
   not a clean round.
-  Rounds thirty-five and thirty-six on `#2913` each carried two such findings.
+  Rounds thirty-five and thirty-six on [#2913](https://github.com/Morrison-Lab/ai-config/pull/2913) each carried two
+  such findings.
   The same shape from the `gh` side is `fully-clean.cases.md`'s
-  collapsed-block case (`#1029`).
+  collapsed-block case ([#1029](https://github.com/Morrison-Lab/ai-config/pull/1029)).
   - **Do:** read the review body with `get_reviews` every round, selecting
     the entry whose `user.login` is `copilot-pull-request-reviewer[bot]` and
     whose `commit_id` is the current head, and paging past the first page

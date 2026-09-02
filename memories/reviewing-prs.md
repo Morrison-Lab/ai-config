@@ -125,7 +125,7 @@ and an issue someone else's open PR already fixes is left to that PR (not grabbe
 When a reviewer's finding adds an arm, a veto, or a recheck to one
 restatement of a rule, the same gap may be open at any other restatement,
 and the reviewer finds those one round at a time.
-`Morrison-Lab/ai-config#2913` (2026-09-01) spent Copilot rounds thirty-two
+[Morrison-Lab/ai-config#2913](https://github.com/Morrison-Lab/ai-config/pull/2913) (2026-09-01) spent Copilot rounds thirty-two
 through thirty-five landing one exclusion veto and one pre-write recheck
 site by site (files per commit from `git show --stat`): `chores` plus the
 `scripts/validate-skills.py` allowlist entry for its new input

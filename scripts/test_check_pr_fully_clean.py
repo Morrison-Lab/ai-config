@@ -4709,9 +4709,9 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         ),
     )
     check(
-        "_is_structured_review_body: multi-line double-backtick fence quoting report headings is NOT structured body (#2525)",
+        "_is_structured_review_body: standard fenced block quoting report headings is NOT structured body (#2525)",
         not checker._is_structured_review_body(
-            "Discussion of format:\n``\n## Verdict\nReviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\n``\nCasual prose."
+            "Discussion of format:\n```\n## Verdict\nReviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\n```\nCasual prose."
         ),
     )
     check(

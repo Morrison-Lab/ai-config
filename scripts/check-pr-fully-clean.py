@@ -2315,20 +2315,12 @@ def check_latest_verdict(
 _REVIEW_STRUCTURE_HEADING = re.compile(
     r"(?im)^#{1,6}\s*(?:(?:Review\s+)?Summary|(?:Critical\s+|Actionable\s+)?Findings|Verdict)\b"
 )
-_TWO_BACKTICK_FENCE_RE = re.compile(
-    r"(?m)^[ \t]{0,3}(`{2,}|~{2,})[ \t]*\n.*?\n[ \t]{0,3}\1[ \t]*$",
-    re.DOTALL,
-)
 
 
 def _blank_fences_and_spans(body: str) -> str:
     """Blank fenced code blocks and code spans to spaces, preserving length."""
     fenced_lines, _, _ = find_fence_spans(body, swallow_unclosed=True)
     mask = _citation_mask(body, min_backticks=1)
-    for m in _TWO_BACKTICK_FENCE_RE.finditer(body):
-        b, e = m.span()
-        mask[b:e] = b"\x01" * (e - b)
-
     lines = body.split("\n")
     out = []
     line_offset = 0

@@ -4,16 +4,24 @@
 The hook prints the current Pacific time for the model to quote verbatim, and
 must refuse to label a non-Pacific reading as local. Two cases:
 
-  1. On a host with a TZ database (every CI runner, every macOS/Linux dev box)
-     the output carries a real PDT/PST reading plus the verbatim-use line.
-  2. When every rung of the ladder answers in a non-Pacific zone -- simulated
-     by a `date` stub on PATH that always prints GMT and a `powershell` stub
-     that fails -- the hook prints the UTC-only fallback and the explicit
-     "do NOT state a PDT/PST time" warning, never a GMT value labelled local.
+  1. First rung: the `date` stub answers PDT only when the hook sets
+     `TZ=America/Los_Angeles`, and GMT otherwise -- the output carries the
+     Pacific reading plus the verbatim-use line.
+  2. Second rung: the stub answers GMT under the TZ override and PDT when
+     TZ is unset (a system zone that is already Pacific, the Git Bash
+     shape) -- the hook must fall past the first rung and still print a
+     Pacific reading.
+  3. Third rung: the stub answers GMT either way, and a `powershell` stub
+     answers PDT -- the hook must fall through both `date` rungs.
+  4. Negative control: GMT either way plus a `powershell` stub that fails --
+     the hook prints the UTC-only fallback and the explicit "do NOT state a
+     PDT/PST time" warning, never a GMT value labelled local.
 
-Case 2 is the negative control: without it, case 1 alone cannot tell a hook
-that checks the zone from one that merely prints whatever `date` said
-(ai-config#1918, the Git Bash GMT fallback).
+Every case runs against stubs rather than the ambient host, so the suite
+passes and fails for the same reasons on macOS, on Ubuntu CI, and on a host
+with no TZ database. Case 3 is what tells a hook that checks the zone from
+one that merely prints whatever `date` said (ai-config#1918, the Git Bash
+GMT fallback).
 """
 import os
 import re
@@ -43,35 +51,62 @@ def check(desc, cond):
     print(f"  {'ok' if cond else 'WRONG':<6} {desc}")
 
 
-print("with a TZ database:")
-rc, out = run(dict(os.environ))
-check("exit 0", rc == 0)
-check("prints a Pacific local reading and the UTC reading", bool(LOCAL.search(out)))
-check("prints the verbatim-use instruction", VERBATIM in out)
-check("does not print the fallback warning", WARN not in out)
+def stubs(tz_answer, plain_answer, powershell_body):
+    """A temp dir holding a `date` stub and a `powershell` stub for PATH.
 
-print("\nwith every rung answering GMT (negative control):")
-with tempfile.TemporaryDirectory() as stubs:
-    # A `date` that ignores TZ and the format string's zone: always GMT, the
-    # Windows Git Bash shape from ai-config#1918. `-u` must still work so the
-    # UTC line can be produced.
-    date_stub = os.path.join(stubs, "date")
+    The `date` stub answers `tz_answer` when TZ is America/Los_Angeles (the
+    hook's first rung), `plain_answer` otherwise (its second rung), and the
+    real UTC shape for `date -u`. Keying on TZ is what lets a case pin one
+    rung: a stub that ignored TZ would pass the first-rung case identically
+    if the hook skipped straight to the second."""
+    d = tempfile.mkdtemp()
+    date_stub = os.path.join(d, "date")
     with open(date_stub, "w") as fh:
         fh.write("#!/bin/sh\n"
                  "if [ \"$1\" = -u ]; then printf '2026-01-01T00:00:00Z\\n'; exit 0; fi\n"
-                 "printf '2026-01-01 00:00:00 GMT\\n'\n")
-    ps_stub = os.path.join(stubs, "powershell")
+                 "if [ \"${TZ:-}\" = America/Los_Angeles ]; then printf '%s\\n'; else printf '%s\\n'; fi\n"
+                 % (tz_answer, plain_answer))
+    ps_stub = os.path.join(d, "powershell")
     with open(ps_stub, "w") as fh:
-        fh.write("#!/bin/sh\nexit 1\n")
+        fh.write("#!/bin/sh\n" + powershell_body + "\n")
     for f in (date_stub, ps_stub):
         os.chmod(f, os.stat(f).st_mode | stat.S_IXUSR)
-    env = dict(os.environ, PATH=stubs + os.pathsep + os.environ.get("PATH", ""))
-    rc, out = run(env)
-    check("exit 0 (a failed reading is reported, not a crash)", rc == 0)
-    check("prints the UTC-only fallback line", bool(FALLBACK.search(out)))
-    check("prints the do-NOT-state warning", WARN in out)
-    check("never labels the GMT reading as local", "local:" not in out and "GMT" not in out)
+    return d
 
-total = 8
+
+def with_stubs(d):
+    return dict(os.environ, PATH=d + os.pathsep + os.environ.get("PATH", ""))
+
+
+PDT = "2026-01-01 00:00:00 PDT"
+GMT = "2026-01-01 00:00:00 GMT"
+
+print("first rung (only the TZ override answers PDT):")
+rc, out = run(with_stubs(stubs(PDT, GMT, "exit 1")))
+check("exit 0", rc == 0)
+check("prints the Pacific local reading and the UTC reading", bool(LOCAL.search(out)))
+check("prints the verbatim-use instruction", VERBATIM in out)
+check("does not print the fallback warning", WARN not in out)
+
+print("\nsecond rung (TZ override answers GMT, plain date answers PDT):")
+rc, out = run(with_stubs(stubs(GMT, PDT, "exit 1")))
+check("exit 0", rc == 0)
+check("prints the Pacific reading the system zone supplied", bool(LOCAL.search(out)))
+check("never labels the GMT reading as local", "GMT" not in out)
+
+print("\nthird rung (both date rungs answer GMT, PowerShell answers PDT):")
+rc, out = run(with_stubs(stubs(GMT, GMT, "printf '%s\\n'" % PDT)))
+check("exit 0", rc == 0)
+check("prints the Pacific reading PowerShell supplied", bool(LOCAL.search(out)))
+check("never labels the GMT reading as local", "GMT" not in out)
+
+print("\nnegative control (both date rungs answer GMT, PowerShell fails):")
+rc, out = run(with_stubs(stubs(GMT, GMT, "exit 1")))
+check("exit 0 (a failed reading is reported, not a crash)", rc == 0)
+check("prints the UTC-only fallback line", bool(FALLBACK.search(out)))
+check("prints the do-NOT-state warning", WARN in out)
+check("never labels the GMT reading as local", "local:" not in out and "GMT" not in out)
+
+total = 14
 print(f"\n{total - wrong}/{total} correct" + ("" if wrong == 0 else f"  ({wrong} WRONG)"))
 sys.exit(1 if wrong else 0)

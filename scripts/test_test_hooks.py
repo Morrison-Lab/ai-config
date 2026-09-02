@@ -297,5 +297,64 @@ check('no hooks/test-*.py spawns its hook via a bare "python3"',
       not offenders, repr(offenders))
 
 
+# --- 6. Coverage allowlist branches and the two-subject FAIL (#1080) ------
+# KNOWN_UNTESTED is empty in production, so both of check_coverage()'s
+# allowlist branches would otherwise run only when a hook regresses; inject a
+# test allowlist so they are exercised every run.
+
+with tempfile.TemporaryDirectory(prefix="hook-runner-") as tmp:
+    hooks = Path(tmp)
+    (hooks / "untested.py").write_text("pass\n", encoding="utf-8")
+    _write_pair(hooks, "ok", OK)
+    old_hooks, old_allow = th.HOOKS, th.KNOWN_UNTESTED
+    th.HOOKS = str(hooks)
+    try:
+        th.KNOWN_UNTESTED = {"untested.py"}
+        (cov, stdout, _) = _capture(th.check_coverage)
+        check("an allowlisted hook without a test is a NOTE, not a failure",
+              cov[0] == 0 and "NOTE: untested.py has no test" in stdout, repr(stdout))
+        th.KNOWN_UNTESTED = set()
+        (cov, stdout, _) = _capture(th.check_coverage)
+        check("an unlisted hook without a test fails",
+              cov[0] == 1 and "FAIL: hooks/untested.py has no test" in stdout, repr(stdout))
+        th.KNOWN_UNTESTED = {"ok.py"}
+        (cov, stdout, _) = _capture(th.check_coverage)
+        # untested.py is still unlisted here, so that failure counts too.
+        check("a stale allowlist entry that now has a test fails",
+              cov[0] == 2 and "drop it from KNOWN_UNTESTED" in stdout, repr(stdout))
+    finally:
+        th.HOOKS, th.KNOWN_UNTESTED = old_hooks, old_allow
+
+with tempfile.TemporaryDirectory(prefix="hook-runner-") as tmp:
+    hooks = Path(tmp)
+    _write_pair(hooks, "twin", OK)
+    (hooks / "twin.sh").write_text("exit 0\n", encoding="utf-8")
+    old_hooks = th.HOOKS
+    th.HOOKS = str(hooks)
+    try:
+        (counts, stdout, _) = _capture(lambda: th.run_suites(timeout=5))
+    finally:
+        th.HOOKS = old_hooks
+    check("a stem with both .py and .sh subjects is one failure",
+          counts == (1, 1), repr(counts))
+    check("the two-subject FAIL names both subjects",
+          "has two subjects" in stdout and "twin.py" in stdout and "twin.sh" in stdout, repr(stdout))
+    check("the ambiguous suite is not invoked",
+          "RUN:" not in stdout and "PASS:" not in stdout, repr(stdout))
+
+with tempfile.TemporaryDirectory(prefix="hook-runner-") as tmp:
+    hooks = Path(tmp)
+    (hooks / "test-shell.py").write_text(OK, encoding="utf-8")
+    (hooks / "shell.sh").write_text("exit 0\n", encoding="utf-8")
+    old_hooks = th.HOOKS
+    th.HOOKS = str(hooks)
+    try:
+        (counts, stdout, _) = _capture(lambda: th.run_suites(timeout=5))
+    finally:
+        th.HOOKS = old_hooks
+    check("a .sh-only subject resolves and its suite runs",
+          counts == (0, 1) and "PASS:" in stdout, repr((counts, stdout)))
+
+
 print(f"\n{passes}/{passes + failures} checks passed")
 sys.exit(1 if failures else 0)

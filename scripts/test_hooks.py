@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Run every hook's own test suite, and flag any hook that lacks one.
 
-The hooks in `hooks/` each can ship a `test-<name>.py` beside a `<name>.py`,
+The hooks in `hooks/` each can ship a `test-<name>.py` beside a `<name>.py`
+or `<name>.sh`,
 but those tests ran nowhere: `.pre-commit-config.yaml` and `validate.yml`
 invoke `scripts/test_*.py` by name and never reach into `hooks/`. So a guard
 could regress -- start blocking a message it should pass, stop catching the
@@ -11,8 +12,10 @@ the instruments that enforce the corpus's rules were themselves unverified.
 
 This runner does two things:
 
-  1. Runs each `hooks/test-*.py` against its subject `hooks/<name>.py` (the
-     convention every hook test already uses, taking the subject as argv[1]).
+  1. Runs each `hooks/test-*.py` against its subject `hooks/<name>.py` or
+     `hooks/<name>.sh` (the convention every hook test already uses, taking
+     the subject as argv[1]; a stem with both spellings is a FAIL, since
+     picking one silently would test the wrong file).
   2. Checks coverage in the OTHER direction -- enumerates every hook and
      confirms it has a test. A one-directional test->subject walk cannot see a
      hook that ships NO test at all, so "N/N suites passed" would read as full

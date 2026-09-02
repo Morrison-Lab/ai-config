@@ -1532,9 +1532,54 @@ _ITEM_NON_BLOCKING_TAG = re.compile(
 )
 
 
+# A finding item written as a resolution LOG entry: a bold past-status lead
+# ("**Previously: <what was wrong>.**") followed by the disposition. The
+# reviewer that writes these puts the explanation of the fix AFTER the
+# resolution verb ("Now fixed --- `foo.md:25` includes ..."), so the
+# end-of-line test below never matches and a fully resolved section reads as
+# open findings (ai-config#2945, measured on #2913's 2026-09-02T00:26Z
+# review). Two signals are required, not one: the lead names the line as a
+# report of a PRIOR finding, and a resolution verb after it states the
+# disposition. "closed" is deliberately absent from the verb list, since
+# "closed as not planned" is a deferral, not a resolution.
+_PRIOR_STATUS_LEAD = re.compile(
+    r"(?i)^[ \t]*(?:[-*+]|\d+[.)])?[ \t]*\*\*\s*"
+    r"(?:previously|was|prior(?:\s+round)?|earlier|before)\s*:[^*]*\*\*"
+)
+_RESOLUTION_VERB = re.compile(
+    r"(?i)\b(?:"
+    r"(?:is|are|has|have)\s+(?:now\s+|been\s+|also\s+)*(?:fully\s+|completely\s+)?"
+    r"|now\s+"
+    r")?"
+    r"(?:fixed|resolved|addressed|removed|corrected|cleared)\b"
+)
+
+
+def _prior_status_item_is_resolved(line: str) -> bool:
+    """True for "**Previously: X.** <...> fixed/resolved/addressed <explanation>".
+
+    Guards reuse the end-of-line path's: an unresolved phrase anywhere on the
+    line, or a negator or hedge between the lead and the verb, keeps the item
+    open. The caller has already applied the unresolved-words test.
+    """
+    lead = _PRIOR_STATUS_LEAD.match(line)
+    if not lead:
+        return False
+    rest = line[lead.end():]
+    verb = _RESOLUTION_VERB.search(rest)
+    if not verb:
+        return False
+    before = rest[:verb.start()]
+    if _NEGATOR_RE.search(before) or _PREFIX_DISQUALIFY_RE.search(before):
+        return False
+    return True
+
+
 def _item_is_resolved(line: str) -> bool:
     if _LINE_UNRESOLVED_WORDS.search(line):
         return False
+    if _prior_status_item_is_resolved(line):
+        return True
     res_match = _LINE_RESOLUTION_WORDS.search(line)
     if not res_match:
         return False

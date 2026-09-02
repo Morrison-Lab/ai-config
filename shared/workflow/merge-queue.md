@@ -88,7 +88,9 @@ Workflows containing required status checks must listen for the `merge_group` ev
 Without `merge_group`, GitHub Actions will not run checks on speculative queue branches, causing queued PRs to hang indefinitely until timeout.
 The queue blocks only on required checks.
 A workflow runs on the speculative branch only when its own `on:` block lists `merge_group`, and the two settings are independent.
-So a non-required check that lists `merge_group` runs there and cannot block the merge, a non-required `pull_request`-only check neither runs nor blocks, and a required `pull_request`-only check is the hang above.
+So a non-required check that lists `merge_group` runs there and cannot block the merge.
+A non-required `pull_request`-only check neither runs nor blocks.
+A required `pull_request`-only check is the hang above.
 Before the queue replaces the manual update, every check in the clean gate has to be required (or aggregated behind a required one) and has to execute on `merge_group`, per the stale-base rule in [`fully-clean`](fully-clean.md) (the passage tracked as [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982)).
 
 ```yaml
@@ -123,6 +125,6 @@ jobs:
 - **Do:** enable `merge_group` event triggers on all workflows that provide required status checks.
 - **Do:** use merge queues to automate pre-merge speculative testing when landing multiple PRs in parallel.
 - **Do:** treat base-advance staleness on queued PRs as a platform queue concern rather than an immediate need for manual branch re-syncing, when every clean-gate check is required and runs on `merge_group`.
-  Otherwise the stale-base rule in [`fully-clean`](fully-clean.md) applies, because the queue neither runs nor blocks on the checks it is missing.
+  Otherwise the stale-base rule in [`fully-clean`](fully-clean.md) applies, because the queue then either cannot block on a check that runs, or never runs a check it would block on.
 - **Don't:** run manual `gh pr update-branch` loops on simultaneously ready PRs when a merge queue is active and configured that way.
 - **Don't:** omit the `merge_group` trigger from CI workflows when enabling merge queue rulesets.

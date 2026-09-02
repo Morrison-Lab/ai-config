@@ -1070,6 +1070,7 @@ Both were caught by the `@claude` review bot, not by me --- mentally (or actuall
 
 Moved to [delegation.md](delegation.md) --- the cost-first order,
 usage-window rules, and headless dispatch mechanics live there.
+Its "agy on Windows" section carries the 2026-09-02 install-and-mechanics writeup --- kept there rather than duplicated here.
 
 ## Ephemeral-session commit tension
 

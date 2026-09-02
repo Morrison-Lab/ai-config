@@ -296,14 +296,14 @@ A negative claim --- *this form does not parse*, *nothing accepts this* --- is t
 
 - **Do:** run each consumer named in the prose against the input the prose describes, before writing the sentence about it.
 - **Do:** treat a negative claim about a parser, guard, or matcher as owing an execution, not an argument.
-- **Do:** keep dispatching rounds while findings land, and expect a docs-only change about instruments to take more of them than the code change it describes, not fewer.
+- **Do:** keep dispatching rounds while findings land, and let the count be decided by that rather than by the diff's size or its lack of code.
 - **Don't:** read "no code changed" as "nothing here can be wrong" --- the claims changed, and they have no suite.
 - **Don't:** describe a fallback, a precedence rule, or an accepted-form list from the shape of the code;
   enumerate it from the code.
 
 (Measured 2026-09-02 on [ai-config#3010](https://github.com/Morrison-Lab/ai-config/pull/3010), a documentation-only change carrying 52 insertions and 1 deletion across four files, of which 34 insertions are to this file.
 Twelve adversarial rounds are recoverable from the session: 7, 8, 4, 3, 3, 3, 1, 1, 0, then 4, 1, 0 after the scope reopened.
-Nine of those 35 findings were the one shape above, and five of the nine are recoverable, each disproved by reading or running the named consumer: that the three payload consumers read the payload and nothing else, when they fall back to prose;
+Nine of those 35 findings were the one shape above, and five of the nine are recoverable, each a claim the named consumer disproves once read or run: that the three payload consumers read the payload and nothing else, when they fall back to prose;
 that a bolded verdict phrase does not parse, when it does;
 that demoting a disclosure marker changes `_reviewer_identity()`, when the Claude Code footer is deliberately excluded from `REVIEW_AGENT_MARKERS`;
 that a non-conforming payload is rejected, when nothing validates it;
@@ -311,7 +311,8 @@ and that the pre-push guard accepts two verdict phrasings, when it accepts three
 
 ## Require detailed and holistic review passes
 
-Reviewers must independently assess both detailed, evidence-backed implementation defects and the whole change: requirements, intent, cross-file consistency, integration, regression risk, and validation.
+Reviewers must independently assess both detailed, evidence-backed implementation defects and the whole change:
+requirements, intent, cross-file consistency, integration, regression risk, and validation.
 A perfunctory scan of isolated diff hunks misses both subtle line-level bugs and systemic architectural drift.
 
 The two passes evaluate complementary failure modes:

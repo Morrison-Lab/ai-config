@@ -556,12 +556,13 @@
   Both candidate directions are therefore unconfirmed, and the honest statement stays *unreliable*, not *uninformative*.
 
   - **Do:** poll the review bodies on the head when you need to know whether a reviewer engaged.
-  - **Do:** read `review_requested` timeline events as a lower bound on requests that actually **added** a reviewer, never as a POST count --- a POST re-requesting an already-pending reviewer adds nobody and emits nothing, and no endpoint recovers the POST count itself.
+  - **Do:** read `review_requested` timeline events as a lower bound on requests that actually **added** a reviewer, never as a POST count.
+    Why a POST can add nobody is unsettled here --- the untested 422 reconciliation below is one account, a silent no-op another --- so take the bound from the events themselves and leave the mechanism open.
   - **Don't:** treat an empty pending read as evidence the request failed, nor as evidence a review is coming;
     that was already the rule and neither new data point changes it.
   - **Don't:** cite either direction as settled --- the bcs status-code confound is open, and the #3010 empty reads are unverifiable after the fact.
 
-  **Both outcomes were genuinely observed on the same repo the same day, so do not flatten this into "it returns 201".**
+  **Both response codes --- the `422` and the `201` above, not the two directions just discussed --- were genuinely observed on the same repo the same day, so do not flatten this into "it returns 201".**
   One session ran the POST once and got `422`;
   another ran it three times, across all three login spellings, and got `201` every time.
   Neither session was lying, and the first one's real mistake was not the observation but the generalisation -- it turned a single failed attempt into a stated property of the repository, wrote that into a PR body as settled fact, and steered two later rounds with it.

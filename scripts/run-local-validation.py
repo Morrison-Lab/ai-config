@@ -289,6 +289,13 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     plan = []
     for s in steps:
+        # --only and --skip select among the steps derived from the workflow.
+        # An other-workflow-file notice is not a step to run; it stays in the
+        # denominator whatever the filters say, and only --no-other-workflows
+        # drops it (#1881).
+        if s.source == "workflow":
+            plan.append((s, False))
+            continue
         if only and not only.search(s.name):
             continue
         skipped = bool(skip and skip.search(s.name))

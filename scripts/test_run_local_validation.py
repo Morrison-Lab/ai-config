@@ -137,6 +137,14 @@ def test_other_workflow_files():
               "review.yml" not in out.getvalue() and "plus" not in out.getvalue())
         check("_denominator with no other files is the plain derived count",
               rlv._denominator(5, 0, "w.yml") == "5 step(s) derived from w.yml")
+        out = io.StringIO()
+        with redirect_stdout(out):
+            rlv.main(["--workflow", str(wf), "--list", "--only", "Passing", "--skip", "review", "--root", tmp])
+        text = out.getvalue()
+        check("--only keeps the other-workflow notices in the denominator",
+              "NOT RUN  [workflow] review.yml" in text and "plus 2 other workflow file(s)" in text)
+        check("--skip never marks an other-workflow notice SKIP",
+              "SKIP     [workflow]" not in text)
 
 
 def test_derive_steps():

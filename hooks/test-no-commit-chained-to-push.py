@@ -1,0 +1,334 @@
+#!/usr/bin/env python3
+"""Tests for no-commit-chained-to-push.py.
+
+The negatives carry most of the weight. This hook DENIES, and it fires on two
+of the commonest strings in this corpus: a repo about git workflow writes
+`git commit` and `git push` inside commit messages, issue bodies, PR bodies,
+heredocs, fragments, and hook docstrings constantly. A matcher that fired on
+prose about the rule would refuse every session that discusses it, which is
+README's "a hook that misfires is worse than a missing one" in its worst form.
+
+Each negative names the shape it protects, so a later reader can tell a
+deliberate exclusion from an accident.
+
+Run:  python3 hooks/test-no-commit-chained-to-push.py
+"""
+import importlib.util
+import json
+import os
+import subprocess
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+HOOK = os.path.join(HERE, "no-commit-chained-to-push.py")
+
+# Bytecode caching is disabled for this suite. The mutation section below
+# rewrites, imports, and restores real source files, and a cached `.pyc` for
+# `scripts/lib/shellcmd.py` silently survived one such restore during
+# development -- so the suite reported a failure against source that was
+# already correct. `sys.dont_write_bytecode` removes the confound rather than
+# leaving anyone to diagnose it a second time.
+sys.dont_write_bytecode = True
+
+spec = importlib.util.spec_from_file_location("hook", HOOK)
+hook = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(hook)
+
+failures = []
+
+
+def check(label, got, want):
+    if got != want:
+        failures.append(f"{label}: got {got!r}, want {want!r}")
+
+
+def fires(command):
+    return hook.evaluate(command) is not None
+
+
+def run_hook(command, tool_name="Bash"):
+    payload = json.dumps({"tool_name": tool_name,
+                          "tool_input": {"command": command}})
+    proc = subprocess.run([sys.executable, HOOK], input=payload,
+                          capture_output=True, text=True, timeout=10)
+    return proc.stdout.strip()
+
+
+# --------------------------------------------------------------- must fire
+
+# TEST CASE #1 -- the incident verbatim (ai-config#2992, 2026-09-02): an
+# `add`, a heredoc commit, an `echo`, and the push, all in one call. Per
+# `shared/workflow/algorithmatize-checks.md`'s "test the instrument against
+# the incident that prompted it, verbatim", this reproduces the shape rather
+# than a tidier summary of it -- heredoc and interleaved `echo` included.
+INCIDENT = (
+    "git add -A && git commit -F - <<'EOF'\n"
+    "feat(hooks): add a guard\n"
+    "\n"
+    "Body text mentioning git push, because commit messages do.\n"
+    "EOF\n"
+    "echo committed; git push -u origin hook-branch"
+)
+check("the measured incident shape", fires(INCIDENT), True)
+
+check("&& chained", fires("git commit -m x && git push"), True)
+check("semicolon separated", fires("git commit -m x; git push"), True)
+check("newline separated", fires("git commit -m x\ngit push"), True)
+check("|| separated", fires("git commit -m x || git push"), True)
+check("add, commit, push", fires("git add -A && git commit -m x && git push -u origin b"), True)
+check("commit -F file then push",
+      fires("git commit -F /tmp/msg.txt && git push --force-with-lease"), True)
+check("git -C on both halves",
+      fires("git -C /repo commit -m x; git -C /repo push origin main"), True)
+check("env assignment prefixes",
+      fires("GIT_AUTHOR_NAME=x git commit -m y; GIT_TERMINAL_PROMPT=0 git push"),
+      True)
+check("subshell grouping", fires("(git commit -m x; git push)"), True)
+check("extra whitespace", fires("git   commit  -m x ;  git   push"), True)
+check("an intervening unrelated command does not mask it",
+      fires("git commit -m x; python3 scripts/check-links.py; git push"), True)
+check("commit, push, and a later second push",
+      fires("git commit -m x; git push origin a; git push origin b"), True)
+
+# The reported reason names BOTH halves, so the message is actionable.
+# `or ""` rather than a bare `in`: a mutation that makes `evaluate` return
+# None here must produce a reported FAILURE, not a TypeError that aborts the
+# suite before the remaining cases run. A crash is technically a red test and
+# is a poor one -- it hides every assertion after it.
+reason = hook.evaluate("git commit -m wip && git push -u origin feature") or ""
+check("reason names the commit", "git commit -m wip" in reason, True)
+check("reason names the push", "git push -u origin feature" in reason, True)
+
+# ----------------------------------------------------------- must NOT fire
+
+# 1. Order. Push-then-commit denies the same invocation, but nothing was
+#    created to lose: the tree is exactly as it was and the author's belief
+#    about it is correct. Only commit-then-push hides a missing commit.
+check("push before commit", fires("git push; git commit -m x"), False)
+check("push then commit then nothing",
+      fires("git push origin main && git commit -m late"), False)
+
+# 2. Either command alone -- overwhelmingly the common case.
+check("commit alone", fires("git commit -m x"), False)
+check("push alone", fires("git push -u origin b"), False)
+check("add and commit, no push", fires("git add -A && git commit -m x"), False)
+check("commit then a status read",
+      fires("git commit -m x && git status --short"), False)
+check("commit then gh pr create",
+      fires("git commit -m x && gh pr create --fill"), False)
+
+# 3. QUOTING. The whole reason the matcher runs over an argv split. A commit
+#    MESSAGE mentioning a push is the single likeliest false positive in this
+#    corpus, and it is a dequoted token inside the commit's own argv.
+check("push named inside a double-quoted commit message",
+      fires('git commit -m "split the commit from the git push"'), False)
+check("push named inside a single-quoted commit message",
+      fires("git commit -m 'do not chain git push onto this'"), False)
+check("both commands quoted in an echo",
+      fires("echo 'git commit -m x; git push'"), False)
+check("both commands quoted in a gh issue comment body",
+      fires('gh issue comment 2992 -b "The shape is git commit -m x; '
+            'git push -u origin b -- split it."'), False)
+check("a commit message quoting the push and a real commit after it",
+      fires('git commit -m "mentions git push"; git status'), False)
+
+# 4. HEREDOC BODIES are data. A body redirected into a file, or fed to a
+#    commit as its message, routinely quotes both commands -- this repo's
+#    issue and PR bodies do it constantly. `examples-are-scanned.md`.
+check("push inside a commit message heredoc",
+      fires("git commit -F - <<'EOF'\nfix: stop chaining\n\nUse git push separately.\nEOF"),
+      False)
+check("both commands inside a file-redirect heredoc",
+      fires("cat > /tmp/body.md <<'EOF'\ngit commit -m x\ngit push\nEOF\n"
+            "gh issue create --body-file /tmp/body.md"), False)
+check("unquoted heredoc tag",
+      fires("cat <<EOF > /tmp/b.md\ngit commit -m x\ngit push\nEOF"), False)
+check("<<- with a tab-indented terminator",
+      fires("cat <<-EOF > /tmp/b.md\ngit commit\ngit push\n\tEOF"), False)
+
+# 5. PLUMBING SIBLINGS. `no-unshipped-commit.py` records both of these as
+#    measured bugs of a `git\s+commit\b` scan, because a word boundary sits
+#    between `commit` and `-`. Comparing the whole subcommand token cannot
+#    make that mistake, and these pin it.
+check("git commit-tree is not git commit",
+      fires("git commit-tree $T -m x; git push"), False)
+check("git commit-graph write is not git commit",
+      fires("git commit-graph write && git push"), False)
+check("git push-anything is not git push",
+      fires("git commit -m x && git push-mirror"), False)
+
+# 6. Other command words that merely contain the subcommand names.
+check("a script named git-commit-and-push",
+      fires("./git-commit-and-push.sh"), False)
+check("a grep for both strings",
+      fires("grep -rn 'git commit' hooks/ && grep -rn 'git push' hooks/"),
+      False)
+
+# 7. THE OVERRIDE, anchored to a real env assignment on one of the matched
+#    commands rather than to a mention anywhere in the text.
+check("override clears the refusal",
+      fires("ALLOW_COMMIT_AND_PUSH=1 git commit -m x && git push"), False)
+check("override on the push half also clears it",
+      fires("git commit -m x && ALLOW_COMMIT_AND_PUSH=1 git push"), False)
+check("a MENTION of the override does not clear it",
+      fires("git commit -m 'set ALLOW_COMMIT_AND_PUSH=1 next time' && git push"),
+      True)
+check("override set to something other than 1 does not clear it",
+      fires("ALLOW_COMMIT_AND_PUSH=0 git commit -m x && git push"), True)
+
+# 8. Degenerate inputs.
+check("empty command", fires(""), False)
+check("whitespace only", fires("   \n  "), False)
+check("unrelated command", fires("git status --short"), False)
+check("bare git", fires("git; git push"), False)
+
+# --------------------------------------------------------------- end-to-end
+
+out = run_hook("git add -A && git commit -m x && git push -u origin b")
+check("end-to-end fires", bool(out), True)
+if out:
+    try:
+        payload = json.loads(out)
+        hso = payload["hookSpecificOutput"]
+        check("event name is PreToolUse", hso["hookEventName"], "PreToolUse")
+        check("decision is deny", hso["permissionDecision"], "deny")
+        text = hso.get("permissionDecisionReason") or ""
+        check("reason names the commit", "git commit -m x" in text, True)
+        check("reason names the push", "git push -u origin b" in text, True)
+        check("reason names the override", "ALLOW_COMMIT_AND_PUSH" in text, True)
+        check("reason cites the tracking issue", "#2992" in text, True)
+        check("systemMessage present", bool(payload.get("systemMessage")), True)
+    except (ValueError, KeyError) as exc:
+        failures.append(f"end-to-end output not well-formed: {exc}")
+
+check("end-to-end silent on a commit alone", run_hook("git commit -m x"), "")
+check("end-to-end silent on a push alone", run_hook("git push"), "")
+check("end-to-end silent on a quoted mention",
+      run_hook("git commit -m 'then git push'"), "")
+check("non-Bash tool ignored",
+      run_hook("git commit -m x && git push", tool_name="Read"), "")
+
+# ---------------------------------------------------------------- fail open
+
+proc = subprocess.run([sys.executable, HOOK], input="not json",
+                      capture_output=True, text=True, timeout=10)
+check("malformed input exits 0", proc.returncode, 0)
+check("malformed input prints nothing to stdout", proc.stdout.strip(), "")
+
+for literal in ("123", "null", "[1,2]", '"a string"'):
+    proc = subprocess.run([sys.executable, HOOK], input=literal,
+                          capture_output=True, text=True, timeout=10)
+    check(f"non-dict payload {literal} exits 0", proc.returncode, 0)
+    check(f"non-dict payload {literal} prints no traceback",
+          "Traceback" in proc.stderr, False)
+    check(f"non-dict payload {literal} prints nothing to stdout",
+          proc.stdout.strip(), "")
+
+for bad in ({"tool_name": "Bash", "tool_input": "oops"},
+            {"tool_name": "Bash", "tool_input": {"command": 42}},
+            {"tool_name": "Bash", "tool_input": {}},
+            {}):
+    proc = subprocess.run([sys.executable, HOOK], input=json.dumps(bad),
+                          capture_output=True, text=True, timeout=10)
+    check(f"degenerate payload {bad} exits 0", proc.returncode, 0)
+    check(f"degenerate payload {bad} prints no traceback",
+          "Traceback" in proc.stderr, False)
+    check(f"degenerate payload {bad} prints nothing to stdout",
+          proc.stdout.strip(), "")
+
+# An unparseable command (an unbalanced quote) must fail open rather than
+# refuse. `shlex` raises ValueError, `simple_commands` returns None.
+check("unparseable command fails open", fires("git commit -m \"unclosed && git push"),
+      False)
+
+# ------------------------------------------------------------- the mutation
+#
+# `shared/principles/fail-fast.md`: a guard whose condition ANDs several
+# clauses masks its own mutation test, because breaking one clause leaves the
+# others still refusing the positive cases. So each mutation below is checked
+# against the specific case it should break, not against the suite as a whole.
+#
+# This runs the real module under a patched dependency rather than editing the
+# file, so the check is reproducible in CI instead of being a claim about
+# something somebody did by hand once.
+
+def _mutate(label, patch, command, expect):
+    """Apply `patch` to a fresh copy of the module and assert `evaluate`."""
+    mspec = importlib.util.spec_from_file_location("mutant", HOOK)
+    mutant = importlib.util.module_from_spec(mspec)
+    mspec.loader.exec_module(mutant)
+    patch(mutant)
+    check(f"MUTATION {label}", mutant.evaluate(command) is not None, expect)
+
+
+# M1 -- drop the ORDER constraint (treat any commit/push pair as a hit).
+#       Must start firing on push-then-commit, which is legitimate.
+def _drop_order(m):
+    def evaluate(command):
+        cmds = m.simple_commands(command) or []
+        subs = [s for s in (m.git_subcommand(a) for a in cmds) if s]
+        names = {s[0] for s in subs}
+        return "hit" if {"commit", "push"} <= names else None
+    m.evaluate = evaluate
+
+
+_mutate("dropping the order constraint fires on push-then-commit",
+        _drop_order, "git push; git commit -m x", True)
+
+# M2 -- replace the argv split with a raw substring scan, the naive
+#       implementation this hook exists to avoid. Must start firing on a
+#       commit message that merely names a push.
+def _substring_scan(m):
+    def evaluate(command):
+        i = command.find("git commit")
+        j = command.find("git push")
+        return "hit" if 0 <= i < j else None
+    m.evaluate = evaluate
+
+
+_mutate("a raw substring scan fires on a quoted commit message",
+        _substring_scan, 'git commit -m "split the commit from the git push"',
+        True)
+
+# M3 -- compare the subcommand with `startswith` instead of `==`, which is the
+#       `git\s+commit\b` bug `no-unshipped-commit.py` measured twice.
+def _prefix_match(m):
+    real = m.git_subcommand
+
+    def loose(argv):
+        parsed = real(argv)
+        if parsed is None:
+            return None
+        sub, rest, env = parsed
+        for name in ("commit", "push"):
+            if sub.startswith(name):
+                return name, rest, env
+        return parsed
+    m.git_subcommand = loose
+
+
+_mutate("prefix matching fires on git commit-tree",
+        _prefix_match, "git commit-tree $T -m x; git push", True)
+
+# M4 -- stop honouring the override anchor (match a mention anywhere).
+def _loose_override(m):
+    real = m.evaluate
+
+    def evaluate(command):
+        if m.OVERRIDE in command:
+            return None
+        return real(command)
+    m.evaluate = evaluate
+
+
+_mutate("an unanchored override is cleared by a mere mention",
+        _loose_override,
+        "git commit -m 'set ALLOW_COMMIT_AND_PUSH=1 next time' && git push",
+        False)
+
+if failures:
+    print("FAILED:")
+    for line in failures:
+        print("  " + line)
+    sys.exit(1)
+print("all tests passed")

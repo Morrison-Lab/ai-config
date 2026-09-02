@@ -1185,7 +1185,7 @@ So two conditions hold before the manual update is skipped:
 every clean-gate check executes for `merge_group`, job and step conditions included,
 and every clean-gate check is a required status check on the base, or is aggregated behind one that is.
 A clean-gate check the queue cannot block on is a check the queue does not run as a gate.
-Neither condition is readable from `gh pr checks`, which reports state and not requiredness ([`gh-cli`](../../memories/gh-cli.md) records the rulesets query that does).
+`gh pr checks --required` (present in `gh` 2.98.0) lists the required checks among those in the current rollup, but a required check absent from that rollup, one the base gained after the head's last run, is exactly the case here, and no `gh pr checks` output says whether a check executes on `merge_group`, so the rules query and the workflow read below are what settle both ([`gh-cli`](../../memories/gh-cli.md) carries the same distinction).
 Those two conditions are the specification the queue form of this gate has to prove ([#3030](https://github.com/Morrison-Lab/ai-config/issues/3030)), and until it lands the exception is unavailable: a base that requires a merge queue stops the merge, since a required check supplied by a GitHub App cannot be verified from workflow files at all.
 The proof will read the required checks from `gh api --paginate "repos/<owner>/<repo>/rules/branches/<base-encoded>"` (encode the base name as one path segment, `jq -rn --arg b "<base>" '$b|@uri'`, since `release/1.x` would otherwise split into two, and paginate, since the first page can omit rules), and each clean-gate workflow's `on:` block and job and step `if:` conditions for `merge_group`.
 
@@ -1214,6 +1214,8 @@ Merge synchronously, right after the check, with the merge command pinned.
   The base comes from the PR, not from the repository's default branch: a stacked or release PR targets another branch, and [`merge-it`](../../skills/merge-it/SKILL.md) already warns not to assume `main` for those.
 - **Do:** for a direct merge from a remote session without `git`, re-read the PR's `headRefOid` and `baseRefName` and require both to equal the recorded pins, then read the compare endpoint instead of `git merge-base`, `gh api "repos/<owner>/<repo>/compare/<base-encoded>...<head-sha>"`, with the base name encoded as one path segment (`jq -rn --arg b "<base>" '$b|@uri'`, so `release/1.x` does not split the path), and require `behind_by` of 0.
   The pin comparison is the same one the local path makes, since `expectedHeadSha` on the merge protects the head and nothing protects the target branch.
+  When `behind_by` is 0, record `merge_base_commit.sha` as `<pinned-tip>` (it is the base tip at that moment), so the pre-merge comparison re-reads the same endpoint and requires the same value.
+  Without that record the remote path has nothing to compare.
   Measured 2026-09-02 (Pacific) on [#2989](https://github.com/Morrison-Lab/ai-config/pull/2989): `behind_by` was 0 and `merge_base_commit.sha` was the base tip, the same answer the `git merge-base` form gives.
   Where no raw API call is available either, as in an MCP-only session whose tools expose neither endpoint, the gate cannot run, so do not merge from that session until [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) supplies the tool.
   That is the fail-closed direction, per [`fail-fast`](../principles/fail-fast.md).

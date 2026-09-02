@@ -147,6 +147,7 @@ BASE=$(gh pr view "$N" --repo "$REPO" --json baseRefName -q .baseRefName)   # VI
 TITLE=$(gh pr view "$N" --repo "$REPO" --json title -q .title)   # VIEW_PR; the classification below reads this title
 ```
 
+Shell variables do not survive between tool calls, so print the three values and substitute the literals into every later command, rather than expecting `$PINNED` to expand later.
 If the head, the base name, or the title changes before the merge lands, start again from here, classification included.
 A retitle moves neither SHA and can turn a patch-looking bump into a major one.
 
@@ -199,7 +200,8 @@ Dashboard) — `@dependabot` comment commands do nothing on Renovate PRs.
 First read whether the base requires a merge queue (the rules probe in `fully-clean`'s stop bullet).
 On a base that requires a merge queue, stop and report the bump as blocked: the queue form of the gate is [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030) and is out of scope until it lands.
 Otherwise run the base-currency check from [`fully-clean`](../../shared/workflow/fully-clean.md)'s stale-base rule (the Do bullets beginning "for a direct merge"), since a green head can still break the base when the base gained a check after the head's CI ran.
-That check's one-liner prints the tested base tip; keep it as `TIP`.
+That check's one-liner prints the tested base tip.
+Record the printed literal as `TIP` the same way.
 Immediately before the merge command, require the live head to equal `$PINNED`, the live base name to equal `$BASE`, the live title to equal `$TITLE`, and the live base tip to equal `$TIP`, and restart from the currency check if the tip moved or from step 2 if anything else did.
 A regenerated head that already contains the base would otherwise pass a currency check with CI never read for it.
 When that check finds the base stale, the bot-bump recovery is to update the branch pinned to `$PINNED`,

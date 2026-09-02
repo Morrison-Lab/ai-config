@@ -85,7 +85,7 @@ fi
 # e.g. PR_SCOPE_ALIASES=other-login      # from memories/reviewing-prs.md
 # e.g. PR_SCOPE_REQUESTED=123,456       # PR numbers named in the request
 IDS=$(jq -cn --arg me "$ME" --arg al "${PR_SCOPE_ALIASES:-}" \
-  '[$me] + ($al | split(",") | map(select(length > 0))) | unique')
+  '[$me] + ($al | split(",") | map(select(length > 0))) | map(select(length > 0)) | unique')
 REQ=$(jq -cn --arg r "${PR_SCOPE_REQUESTED:-}" \
   '$r | split(",") | map(select(length > 0) | tonumber)')
 gh pr list --repo "$REPO" --state open --limit 200 \

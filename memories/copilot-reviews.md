@@ -9,12 +9,12 @@ ai-config#2969 (ai-config#694 pattern) to keep both files well under the
 1250-line gate.
 
 - **`mcp__github__request_copilot_review` is a real, separate tool** (not a
-  `pull_request_read` method) -- requests a Copilot code review on a PR,
+  `pull_request_read` method) --- requests a Copilot code review on a PR,
   equivalent to `gh api .../requested_reviewers -X POST -f
-  "reviewers[]=copilot-pull-request-reviewer[bot]"`. Verified directly
-  against `github/github-mcp-server`'s own source
+  "reviewers[]=copilot-pull-request-reviewer[bot]"`.
+  Verified directly against `github/github-mcp-server`'s own source
   (`pkg/github/copilot.go`'s `RequestCopilotReview`), registered in the
-  **default** toolset (`pkg/github/tools.go`), not behind an opt-in flag --
+  **default** toolset (`pkg/github/tools.go`), not behind an opt-in flag ---
   don't assume a tool is a hallucination just because it's absent from this
   file, which is a running collection of quirks encountered, not an
   exhaustive registry.

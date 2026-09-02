@@ -37,11 +37,16 @@ This skill is GitHub-first (`gh`). For a GitLab repo, the same shape applies via
 Set the two scope inputs first, the way `REPO` is set above. `PR_SCOPE_ALIASES` is the comma-separated list of other logins `memories/reviewing-prs.md` names as the same person as the resolved user (leave it unset when that file lists none for them), and `PR_SCOPE_REQUESTED` is the comma-separated list of PR numbers the user named in this request (leave it unset when the request named none). With both unset the filter keeps only the resolved login’s own PRs, the assigned ones, and the bots’, which is the fail-closed default.
 
 ``` bash
-ME=$(gh api user --jq .login)   # WHO_AM_I
+ME=$(gh api user --jq .login 2>/dev/null) || ME=""   # WHO_AM_I
+if [ -z "$ME" ]; then
+  # Fail closed, and say so: with no identity the author and assignee arms
+  # stay unevaluated, so only bot-authored and explicitly requested PRs pass.
+  echo "::warning::identity lookup failed; author/assignee arms unevaluated (report this)" >&2
+fi
 # e.g. PR_SCOPE_ALIASES=other-login      # from memories/reviewing-prs.md
 # e.g. PR_SCOPE_REQUESTED=123,456       # PR numbers named in the request
 IDS=$(jq -cn --arg me "$ME" --arg al "${PR_SCOPE_ALIASES:-}" \
-  '[$me] + ($al | split(",") | map(select(length > 0))) | unique')
+  '[$me] + ($al | split(",") | map(select(length > 0))) | map(select(length > 0)) | unique')
 REQ=$(jq -cn --arg r "${PR_SCOPE_REQUESTED:-}" \
   '$r | split(",") | map(select(length > 0) | tonumber)')
 gh pr list --repo "$REPO" --state open --limit 200 \

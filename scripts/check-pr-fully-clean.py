@@ -1226,9 +1226,10 @@ RESOLVED_BLOCKING_SUFFIX = re.compile(
     # The lead-in between the blocking mention and the resolution verb gets
     # the same forbidden-token guard as the method phrase, inside parens
     # too: "crash which remains open is resolved" and "crash (still open)
-    # is resolved" both read as resolved before it (ai-config#2958).
-    r"^(?:(?!\b(?:and|but|while|although|however)\b)"
-    + _RESOLUTION_FORBIDDEN_LOOKAHEAD
+    # is resolved" both read as resolved before it (ai-config#2958). The
+    # shared lookahead also carries the conjunction stop (and, but, while,
+    # although, however) the lead-in used to assert on its own.
+    r"^(?:" + _RESOLUTION_FORBIDDEN_LOOKAHEAD
     + r"(?:\((?:" + _RESOLUTION_FORBIDDEN_LOOKAHEAD + r"[^()\n]){0,120}\)"
     r"|[^,:;.!?()])){0,120}\b(?:"
     r"(?:is|are|was|were)\s+(?:(?:now|since|already|also|fully|completely|satisfactorily|properly|cleanly|successfully)\s+)?"

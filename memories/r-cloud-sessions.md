@@ -67,7 +67,7 @@ which keeps the R-toolchain and R-package material that applies anywhere.
   full HTML `quarto render` (needs knitr/DT/rmarkdown) isn't feasible locally.
   Two mitigations:
   (1) replicate just the **build-breaking check in base R**
-  (e.g. a Quarto page's `stop()`-on-missing-data guard) — base R needs no install;
+  (e.g. a Quarto page's `stop()`-on-missing-data guard) --- base R needs no install;
   (2) `quarto install tinytex` usually works
   (measured working on macros#71, and failing silently on 2026-09-01 --- see the next bullet),
   so validate the LaTeX/PDF paths locally with lualatex (`quarto render <f>.qmd --to pdf`)

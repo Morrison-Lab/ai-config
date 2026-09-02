@@ -62,14 +62,39 @@ onto, three of them denying.
         simple_commands("git commit -m ';' && git push")
         ->  [['git', 'commit', '-m'], ['git', 'push']]
 
-    A caller can therefore see a command that the shell would not run. For a
-    guard this is a FALSE POSITIVE direction, not a false negative: measured,
-    no chained push could be hidden this way, but `git commit -m x && echo '"
-    LF "' git push` splits so that `git push` -- which is really an argument
-    to `echo` -- reads as a command.
+    A caller can therefore see a command that the shell would not run:
 
-The first two fail toward silence or toward a mangled argument. The third does
-not fail open, and is stated separately for that reason. Fixing any of them
+        git commit -m x && echo '" LF "' git push
+
+    splits so that `git push` -- really an argument to `echo` -- reads as a
+    command. That is the FALSE POSITIVE direction.
+
+    IT ALSO RUNS THE OTHER WAY, and the earlier revision of this section said
+    it did not. A separator-only token landing between `git` and its
+    subcommand ORPHANS the subcommand, hiding a real command. The value of any
+    `GIT_VALUE_OPTS` global option is an arbitrary string, so:
+
+        git commit -m wip && git -C '&' push --force origin main
+        ->  [..., ['git', 'commit', '-m', 'wip'], ['git', '-C'],
+             ['push', '--force', 'origin', 'main']]
+
+    `git_subcommand(['git', '-C'])` returns `None` because `-C` consumes a
+    token that is not there, and `['push', ...]` fails the `rest[0] != "git"`
+    test. The push is gone. The same hole opens through the newline rewrite
+    this limit is named for: `git commit -m x && git -C '" LF "' push` is
+    silent too. Both were measured, and the shell really does tokenize them
+    that way -- git rejects `&` for not existing as a path, not for being
+    malformed.
+
+    Reachability is poor: it needs a path composed only of `();|&` or a bare
+    newline, so no real workflow produces one, and every sibling carrying the
+    same `_SHELL_OPS` test is equally blind. It is stated because a limits
+    section that says "this cannot hide a command from you" is the sentence a
+    later reader relies on, and that sentence was wrong.
+
+The first two fail toward silence or toward a mangled argument. The third
+fails BOTH ways -- a phantom command and a hidden one -- and is stated
+separately for that reason. Fixing any of them
 means a quote-aware pre-scan, which is a real parser and out of scope for an
 extraction; ai-config#2993 is where that belongs, alongside migrating the
 seven copies.

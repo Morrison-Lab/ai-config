@@ -80,9 +80,23 @@ check("an argument that dequotes to only a newline is eaten as a separator",
 check("an argument that dequotes to a bare semicolon likewise",
       shellcmd.simple_commands("git commit -m ';' && git push"),
       [["git", "commit", "-m"], ["git", "push"]])
-check("the direction is a false positive, not a hidden command",
+check("a separator-only argument can invent a command (false positive)",
       shellcmd.simple_commands("git commit -m x && echo '\n' git push"),
       [["git", "commit", "-m", "x"], ["echo"], ["git", "push"]])
+# ... and it runs the other way too, which an earlier revision of the docstring
+# denied. A separator-only VALUE of a `GIT_VALUE_OPTS` global option orphans
+# the subcommand, so a real push disappears. Reachability is poor (the path
+# must be composed only of `();|&` or a bare newline) and every sibling
+# carrying the same `_SHELL_OPS` test is equally blind, but the claim that it
+# "cannot hide a command" was false and is now pinned as false.
+check("a separator-only -C value orphans the subcommand (hidden command)",
+      shellcmd.simple_commands("git commit -m wip && git -C '&' push --force"),
+      [["git", "commit", "-m", "wip"], ["git", "-C"],
+       ["push", "--force"]])
+check("an orphaned subcommand is not classified as a git invocation",
+      shellcmd.git_subcommand(["git", "-C"]), None)
+check("and its remainder is not either",
+      shellcmd.git_subcommand(["push", "--force"]), None)
 check("empty input", shellcmd.simple_commands(""), [])
 
 # ------------------------------------------------------------- heredocs

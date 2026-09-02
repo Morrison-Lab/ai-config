@@ -32,6 +32,14 @@ On a session whose pushes go through Morrison-Lab/ai-config’s Cursor adapter, 
 
 The prefix has to be on the pushing command, not merely somewhere on the line: an override the guard accepted from anywhere was how a commit message quoting this very paragraph disarmed it.
 
+**Then run the CI validators locally, and read the denominator line.**
+
+``` bash
+python3 scripts/run-local-validation.py --base origin/<default-branch>
+```
+
+It derives its step list from `.github/workflows/validate.yml` (so it cannot drift from CI), runs each step in order after every edit, and reports `N passed, M failed, K skipped, J not runnable locally, of T step(s)`. A step listed as **not runnable locally** (a `uses:`-only job whose check is not vendored here, or a step reading a `${{ github.* }}` expression) is a check CI will run that this pass did not; say so when you report the push as pre-validated. `--only REGEX` runs a slice while iterating; the full run is the one that counts before the push. Any non-zero row is a red CI job waiting to happen: fix it before pushing, per [`fully-clean`](../../shared/workflow/fully-clean.md). (ai-config#1940, \#1262.)
+
 ### 1. Protected branch
 
 ``` bash

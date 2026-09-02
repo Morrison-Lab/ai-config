@@ -34,22 +34,23 @@ This skill is GitHub-first (`gh`). For a GitLab repo, the same shape applies via
 
 ### 1. List the open chore PRs
 
+Set the two scope inputs first, the way `REPO` is set above. `PR_SCOPE_ALIASES` is the comma-separated list of other logins `memories/reviewing-prs.md` names as the same person as the resolved user (leave it unset when that file lists none for them), and `PR_SCOPE_REQUESTED` is the comma-separated list of PR numbers the user named in this request (leave it unset when the request named none). With both unset the filter keeps only the resolved login’s own PRs, the assigned ones, and the bots’, which is the fail-closed default.
+
 ``` bash
 ME=$(gh api user --jq .login)   # WHO_AM_I
-# PR_SCOPE_ALIASES: comma-separated logins that are the same person as $ME,
-# taken from memories/reviewing-prs.md (empty when that file lists none for $ME).
+# e.g. PR_SCOPE_ALIASES=other-login      # from memories/reviewing-prs.md
+# e.g. PR_SCOPE_REQUESTED=123,456       # PR numbers named in the request
 IDS=$(jq -cn --arg me "$ME" --arg al "${PR_SCOPE_ALIASES:-}" \
   '[$me] + ($al | split(",") | map(select(length > 0))) | unique')
-# PR_SCOPE_REQUESTED: comma-separated PR numbers the user named in this request.
 REQ=$(jq -cn --arg r "${PR_SCOPE_REQUESTED:-}" \
   '$r | split(",") | map(select(length > 0) | tonumber)')
 gh pr list --repo "$REPO" --state open --limit 200 \
   --json number,title,author,assignees,labels,mergeable \
   | jq -r --argjson ids "$IDS" --argjson req "$REQ" '.[] | select(
-          (.author.login | test("^(app/)?(dependabot|renovate)(\\[bot\\])?$"))
+          (.author.login | test("^(app/(dependabot|renovate)|(dependabot|renovate)\\[bot\\])$"))
           or (
             (
-              (.author.login | test("^(app/)?github-actions(\\[bot\\])?$"))
+              (.author.login | test("^(app/github-actions|github-actions\\[bot\\]|github-actions)$"))
               or ((.author.login as $a | $ids | index($a)) != null)
               or any(.assignees[].login; . as $x | ($ids | index($x)) != null)
               or ((.number as $n | $req | index($n)) != null)

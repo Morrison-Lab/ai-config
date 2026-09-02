@@ -91,8 +91,8 @@ State which issue was selected and why, then proceed directly to check
 in-flight status and implementation without pausing for user confirmation.
 
 Do not describe the issue as "in progress" or say that implementation has
-started until steps 4, 6, 7, and 8 have completed: the live claim, isolated
-branch/worktree, and draft PR are the observable start of work.
+started until steps 4, 6, 6b/7, and 8 have completed: the live claim, isolated
+worktree and branch, and draft PR are the observable start of work.
 Investigation or triage alone is preparatory work, not an active implementation.
 
 ### 4. Check the issue isn't already in-flight
@@ -172,7 +172,34 @@ glab issue note <N> --message "Claude Code CLI (local session) is working on thi
 _Posted by Claude Code (AI agent) --- not written by a human._"
 ```
 
+### 6b. Cut a dedicated worktree
+
+`AGENTS.md`'s "Worktree isolation" rule applies here and this skill did not
+say so, so a session following it verbatim ran its triage and its edits in
+the shared checkout, which was sitting on another work-stream's branch
+([#2061](https://github.com/Morrison-Lab/ai-config/issues/2061)).
+Every step from here on runs inside a worktree of its own:
+
+```bash
+git fetch origin main                                              # FETCH
+git worktree add ../<repo>-<slug> -b fix/<slug> origin/main         # CREATE_WORKTREE -- or feat/<slug>, docs/<slug>
+cd ../<repo>-<slug>
+```
+
+`git worktree add` does not change directory, a worktree cannot check out a
+branch another worktree already has, and a repo script run from a worktree
+can still measure the main checkout ---
+[`memories/git-worktrees.md`](../../memories/git-worktrees.md) carries these
+and the other measured gotchas; the [`session-lock`](../session-lock/SKILL.md)
+skill wraps the same step with a collision check.
+Remove the worktree when the PR merges, per
+[`post-merge`](../post-merge/SKILL.md).
+
 ### 7. Create a branch
+
+Step 6b's `worktree add -b` already created the branch; this step is the
+fallback for a session that cannot use worktrees (a container whose harness
+pins one checkout, per [`use-existing-pr-branch`](../../shared/workflow/use-existing-pr-branch.md)):
 
 ```bash
 git fetch origin main                    # FETCH

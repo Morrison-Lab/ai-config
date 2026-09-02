@@ -381,9 +381,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li>two push to the same branch and one rejects / force-overwrites the other;</li>
 <li>two kick off the same expensive render/build/test in the same dir.</li>
 </ul>
-<p>The system is one script — <strong><code>~/.claude/skills/session-lock/scripts/ai-session.sh</code></strong> — backed by a registry of live sessions under the repo’s shared git common dir (<code>$(git rev-parse --git-common-dir)/ai-sessions/</code>). That location is machine-local (git never tracks anything under <code>.git/</code>, so it is never committed or pushed), repo-scoped, and <strong>shared across every <code>git worktree</code></strong> of the repo — so sessions in different worktrees still see each other.</p>
+<p>The system is one script — <strong><code>skills/session-lock/scripts/ai-session.sh</code></strong> (reachable via <code>${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/skills/session-lock/scripts/ai-session.sh}</code> or <code>~/.claude/skills/session-lock/scripts/ai-session.sh</code>) — backed by a registry of live sessions under the repo’s shared git common dir (<code>$(git rev-parse --git-common-dir)/ai-sessions/</code>). That location is machine-local (git never tracks anything under <code>.git/</code>, so it is never committed or pushed), repo-scoped, and <strong>shared across every <code>git worktree</code></strong> of the repo — so sessions in different worktrees still see each other.</p>
 <blockquote class="blockquote">
-<p>Throughout, <code>ai-session.sh</code> means <code>~/.claude/skills/session-lock/scripts/ai-session.sh</code> (symlinked there by <code>bootstrap.sh</code>). Use the full path, or alias it for the session.</p>
+<p>Throughout, <code>ai-session.sh</code> means <code>skills/session-lock/scripts/ai-session.sh</code> (or <code>${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/skills/session-lock/scripts/ai-session.sh}</code> / <code>~/.claude/skills/session-lock/scripts/ai-session.sh</code>). Use the full path, or alias it for the session.</p>
 </blockquote>
 <section id="when-this-fires" class="level2">
 <h2 class="anchored" data-anchor-id="when-this-fires">When this fires</h2>

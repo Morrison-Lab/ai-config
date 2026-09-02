@@ -81,10 +81,10 @@ Either way:
 
 Agent files and skills both live in the ai-config repo — never local-only. Branch + PR + ARDI, the same flow as `skill-builder`.
 
-> **In a worktree session, the same hazard applies as in `skill-builder`’s ship-it:** the repo toplevel below is the MAIN checkout, not your worktree. `~/.claude/skills` symlinks into the main `ai-config` checkout, so `git -C ~/.claude/skills/… rev-parse --show-toplevel` returns the main repo root — often on another session’s branch. Don’t `cd` there and don’t pass that path to Write/Edit. Author `.claude/agents/<name>.md` and the calling skill’s `SKILL.md` in your **worktree’s own** checkout instead, and confirm with `git branch --show-current` before committing. See `skill-builder`’s ship-it section for the full explanation.
+> **In a worktree session, the same hazard applies as in `skill-builder`’s ship-it:** the repo toplevel below is the MAIN checkout, not your worktree. The plugin install or checkout points to the main `ai-config` checkout, so `${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/agent-builder rev-parse --show-toplevel 2>/dev/null || pwd)}` returns the main repo root — often on another session’s branch. Don’t `cd` there and don’t pass that path to Write/Edit. Author `.claude/agents/<name>.md` and the calling skill’s `SKILL.md` in your **worktree’s own** checkout instead, and confirm with `git branch --show-current` before committing. See `skill-builder`’s ship-it section for the full explanation.
 
 ``` bash
-cd "$(git -C ~/.claude/skills/agent-builder rev-parse --show-toplevel)"   # ai-config root — NOTE: the MAIN checkout, NOT your worktree (see caveat above)
+cd "${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/agent-builder rev-parse --show-toplevel 2>/dev/null || pwd)}"   # ai-config root — NOTE: the MAIN checkout, NOT your worktree (see caveat above)
 git fetch origin main && git checkout -b add-<name>-agent origin/main   # FETCH, CREATE_BRANCH
 # write .claude/agents/<name>.md, and update the one calling skill's SKILL.md
 # The `validate` CI job runs these four — run all four locally before pushing,

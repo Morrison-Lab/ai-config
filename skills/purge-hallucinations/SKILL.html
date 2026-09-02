@@ -352,7 +352,7 @@ ul.task-list li input[type="checkbox"] {
 <p>Pick the narrowest target the user named, in this precedence order:</p>
 <ol type="1">
 <li><strong>Explicit target</strong> — a file, a directory, a PR diff, or pasted AI output the user pointed at. For a PR: <code>gh pr diff &lt;n&gt;</code> (local) or <code>mcp__github__pull_request_read</code> <code>method: get_diff</code> (remote/web — see <code>memories/github-mcp-tools.md</code>); audit only the references the diff <em>introduces</em>.</li>
-<li><strong>The memory/instruction corpus</strong> — the ai-config repo’s <code>memories/</code>, <code>skills/</code>, and <code>CLAUDE.md</code>. Find the repo root with <code>git -C ~/.claude/skills/purge-hallucinations rev-parse --show-toplevel</code>.</li>
+<li><strong>The memory/instruction corpus</strong> — the ai-config repo’s <code>memories/</code>, <code>skills/</code>, and <code>CLAUDE.md</code>. Find the repo root with <code>${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/purge-hallucinations rev-parse --show-toplevel 2&gt;/dev/null || pwd)}</code>.</li>
 <li><strong>The current repo’s code &amp; docs</strong> — when the user says “this repo” or names no target while inside a project.</li>
 </ol>
 <p>If the target is genuinely ambiguous, ask once; otherwise proceed with the narrowest reasonable reading and state which you chose.</p>
@@ -386,7 +386,7 @@ ul.task-list li input[type="checkbox"] {
 </tr>
 <tr class="even">
 <td>Skill name</td>
-<td><code>~/.claude/skills/&lt;name&gt;/</code>, a <code>/slash-command</code></td>
+<td><code>skills/&lt;name&gt;/</code>, <code>~/.claude/skills/&lt;name&gt;/</code>, a <code>/slash-command</code></td>
 </tr>
 <tr class="odd">
 <td>Memory cross-link</td>

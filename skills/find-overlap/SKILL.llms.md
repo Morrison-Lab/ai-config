@@ -36,7 +36,7 @@ Pick the scope the user named (default to the skills corpus when you’re in the
 For skills:
 
 ``` bash
-cd "$(git -C ~/.claude/skills/find-overlap rev-parse --show-toplevel)"
+cd "${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/find-overlap rev-parse --show-toplevel 2>/dev/null || pwd)}"
 for d in skills/*/; do n=$(basename "$d")
   # robust for inline and block-scalar (`>`, `|`, with optional `-`/`+` chomp) frontmatter:
   desc=$(python3 -c "

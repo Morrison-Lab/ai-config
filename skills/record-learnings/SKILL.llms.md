@@ -25,7 +25,7 @@ For facts specific to ONE repo (build quirks, project conventions, CI behavior),
 
 For an **external repo we don’t own**, never open a direct PR autonomously — follow [`upstream-issues`](../../shared/workflow/upstream-issues.md): check its contribution policy first, then draft and get explicit user approval before posting anything. Stage the fact in local Claude project memory (short-lived, not durable) until approved, and update that directory’s `MEMORY.md` as an index entry, same as the owned-repo staging fallback above.
 
-### Shared ai-config skills (`~/.claude/skills/`)
+### Shared ai-config skills (`skills/`)
 
 For reusable workflows that other agents should also follow: - Multi-step procedures (review loops, deployment steps) - Decision frameworks (when to defer, when to split MRs) - Tool integration patterns (forge CLI usage)
 
@@ -54,13 +54,13 @@ For standing instructions that should always be in context: - Only for the most 
     - **Repository-specific fact, a repo we own** — commit it to that repo’s own agent docs via a PR (`CLAUDE.md`, `.github/copilot-instructions.md`, or whatever it already has). If that repo has no agent-doc infrastructure yet, write to its local Claude project memory instead as short-lived staging only (update that directory’s `MEMORY.md` as an index entry), and hand off that a PR adding agent-doc infrastructure (plus migrating the staged memory there) is still needed.
     - **Repository-specific fact, an external repo we don’t own** — never open a direct PR autonomously; follow `upstream-issues` (policy check, draft, explicit user approval), staging in local project memory (update `MEMORY.md` there too) until approved.
     - **User-wide memory** — commit and push to `Morrison-Lab/ai-config` (branch + PR if none is open yet).
-6.  **If it’s a skill (or a dedicated fan-out worker)** — hand off to `spot-skill-opportunities` to judge whether the pattern is genuinely recurring (not a one-off), then to `skill-builder` to scaffold a new user-invocable workflow in `~/.claude/skills/` (symlink to the cloned repo; discover the repo path with `git -C ~/.claude/skills/record-learnings rev-parse --show-toplevel`), or to `agent-builder` to scaffold a persistent read-only subagent in `.claude/agents/` when the pattern is really a worker persona a heavy skill’s fan-out step needs.
+6.  **If it’s a skill (or a dedicated fan-out worker)** — hand off to `spot-skill-opportunities` to judge whether the pattern is genuinely recurring (not a one-off), then to `skill-builder` to scaffold a new user-invocable workflow in `skills/` (in the cloned `ai-config` repo / plugin; discover the repo path with `${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/record-learnings rev-parse --show-toplevel 2>/dev/null || pwd)}`), or to `agent-builder` to scaffold a persistent read-only subagent in `.claude/agents/` when the pattern is really a worker persona a heavy skill’s fan-out step needs.
 
 ## Sharing with other agents
 
-The `~/.claude/skills/` directory is a symlink to wherever you cloned `ai-config` (discover the path with `git -C ~/.claude/skills/record-learnings rev-parse --show-toplevel`). Any skill written there is: - Available to this agent via the skills system - Shareable with other agents by cloning/pulling the ai-config repo - Version-controlled and reviewable via PRs
+The `skills/` directory lives in your `ai-config` clone / plugin checkout (discover the path with `${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/record-learnings rev-parse --show-toplevel 2>/dev/null || pwd)}`). Any skill written there is: - Available to this agent via the skills system - Shareable with other agents by cloning/pulling the ai-config repo - Version-controlled and reviewable via PRs
 
-When creating a new skill that other agents should use: 1. Write it in `~/.claude/skills/<name>/SKILL.md` 2. Branch, commit, push, and open a PR on the ai-config repo 3. The skill becomes available locally immediately (via symlink) 4. Other agents get it after the PR merges and they pull
+When creating a new skill that other agents should use: 1. Write it in `skills/<name>/SKILL.md` 2. Branch, commit, push, and open a PR on the ai-config repo 3. The skill becomes available locally immediately (via plugin/symlink) 4. Other agents get it after the PR merges and they pull
 
 ## General guidance = update both skills AND preferences
 

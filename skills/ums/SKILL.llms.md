@@ -65,7 +65,7 @@ If the work will dispatch an expensive external action from a pinned commit (suc
 
 **If a push is rejected non-fast-forward:** fetch first and diff before assuming a real conflict – the branch may have picked up another session’s commit that needs separating out (`git revert <their-commit>`) rather than force-pushing over it. Verify the PR’s real, current content via `gh api repos/<owner>/<repo>/pulls/<N>/files` or `git ls-remote`/`git show origin/<branch>:<path>` (the GitHub-side truth), not the local checkout, which may have already moved again. (ai-config#748: a UMS commit collided with another concurrent session’s UMS commit on a shared branch name this way – both sessions’ content ended up interleaved on one branch before separating back out, resolved without data loss only because both sides fetched-before-pushing and diffed before force-acting.)
 
-**Cross-project items** (skills, cross-project memory notes): both live in the ai-config repo. Discover its path with `git -C ~/.claude/skills/ums rev-parse --show-toplevel` — point `-C` at a **skill subdir** (any one), not the `~/.claude/skills` parent. `bootstrap.sh` may symlink skills *per-child* into a real `~/.claude/skills` directory (cloud/web sessions pre-populate it), so the parent itself isn’t a symlink into the repo and `git -C` there fails with “not a git repository”; a child like `…/skills/ums` follows the symlink into the repo. (Both beat the older `dirname "$(readlink …)"`, which resolves only one symlink hop.) Never leave ANY changes (skills, memories, etc.) as local-only uncommitted edits. Run **one** of the two paths below — not both:
+**Cross-project items** (skills, cross-project memory notes): both live in the ai-config repo. Discover its path with `${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/ums rev-parse --show-toplevel 2>/dev/null || pwd)}` — point `-C` at a **skill subdir** (any one), not the `~/.claude/skills` parent. `bootstrap.sh` may symlink skills *per-child* into a real `~/.claude/skills` directory (cloud/web sessions pre-populate it), so the parent itself isn’t a symlink into the repo and `git -C` there fails with “not a git repository”; a child like `…/skills/ums` follows the symlink into the repo. (Both beat the older `dirname "$(readlink …)"`, which resolves only one symlink hop.) Never leave ANY changes (skills, memories, etc.) as local-only uncommitted edits. Run **one** of the two paths below — not both:
 
 **Stage only the files you actually edited — NEVER `git add -A`.** The working tree often holds unrelated in-flight edits (the user’s own UMS commits, another skill being drafted); `git add -A` sweeps those into your commit and onto your PR, where they bloat the review and extend the cycle. List the specific paths instead. Then **`git status` to confirm only your intended files are staged** — if something unexpected is there, the working tree had in-flight work; unstage it rather than bundling it. (Avoid `git add -p` here: it needs a terminal and hangs in non-interactive sessions.)
 
@@ -74,7 +74,7 @@ Every path below starts by resolving `$repo`, the shared checkout’s path (read
 *Already on the open PR’s branch* (e.g. mid-ARDI): reuse a worktree for it, creating one if this is the first push in the worktree-ified flow.
 
 ``` bash
-repo="$(git -C ~/.claude/skills/ums rev-parse --show-toplevel)"
+repo="${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/ums rev-parse --show-toplevel 2>/dev/null || pwd)}"
 wt="../ai-config-worktrees/<branch>"
 git -C "$repo" worktree add "$wt" "<branch>" 2>/dev/null || true   # no-op if it already exists
 cd "$wt"
@@ -88,7 +88,7 @@ git push origin HEAD                   # PUSH
 *Same-repo case* (this checkout’s `origin` IS the repo you’re targeting):
 
 ``` bash
-repo="$(git -C ~/.claude/skills/ums rev-parse --show-toplevel)"
+repo="${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/ums rev-parse --show-toplevel 2>/dev/null || pwd)}"
 git -C "$repo" fetch origin main   # FETCH
 git -C "$repo" worktree add -b "ums-<topic>" "../ai-config-worktrees/ums-<topic>" origin/main   # CREATE_BRANCH
 cd "../ai-config-worktrees/ums-<topic>"
@@ -100,7 +100,7 @@ git push -u origin HEAD   # PUSH — PR creation is handled by the post-push ver
 *Cross-fork case* (this checkout’s `origin` is your own fork, not the upstream repo you’re targeting): don’t branch from a bare `origin/main` here – the fork’s `main` can be stale relative to upstream’s default branch. Fetch the intended **upstream** repo explicitly (not just look up its default-branch name) and branch the worktree from that fetched ref:
 
 ``` bash
-repo="$(git -C ~/.claude/skills/ums rev-parse --show-toplevel)"
+repo="${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/ums rev-parse --show-toplevel 2>/dev/null || pwd)}"
 base="$(gh repo view "<upstream-owner>/<repo>" --json defaultBranchRef -q .defaultBranchRef.name)" \
   && git -C "$repo" fetch "https://github.com/<upstream-owner>/<repo>.git" "$base" \
   && git -C "$repo" worktree add -b "ums-<topic>" "../ai-config-worktrees/ums-<topic>" FETCH_HEAD

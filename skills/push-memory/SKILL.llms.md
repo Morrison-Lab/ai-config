@@ -45,7 +45,7 @@ What stays: a **general standing rule** (“always link PRs in tables”) → `C
     **Path B — local `ai-config` checkout you can safely branch in.** Resolve the repo root via this skill’s own symlink (the skill lives in `ai-config`):
 
     ``` bash
-    acfg="$(git -C ~/.claude/skills/push-memory rev-parse --show-toplevel 2>/dev/null)"
+    acfg="${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/push-memory rev-parse --show-toplevel 2>/dev/null)}"
     # Fall back to a sibling clone if that isn't a checkout here:
     [ -n "$acfg" ] || for d in ~/ai-config ~/Documents/GitHub/ai-config ../ai-config; do
       [ -d "$d/.git" ] && acfg="$(git -C "$d" rev-parse --show-toplevel)" && break

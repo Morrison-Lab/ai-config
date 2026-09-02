@@ -25,7 +25,7 @@ Not every co-mention is a gap. Aliases only redirect to their canonical and need
 ### 1. Move to the repo and inventory the skills
 
 ``` bash
-cd "$(git -C ~/.claude/skills/link-skills rev-parse --show-toplevel)"   # the ai-config repo
+cd "${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/link-skills rev-parse --show-toplevel 2>/dev/null || pwd)}"   # the ai-config repo
 ls skills/
 ```
 

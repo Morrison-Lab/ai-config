@@ -15,7 +15,7 @@ Rule out extending an existing skill *before* scaffolding anything:
 1.  **Search the whole corpus, not only `skills/`**, for something that already owns (or is adjacent to) this concern:
 
     ``` bash
-    cd "$(git -C ~/.claude/skills/skill-builder rev-parse --show-toplevel)"   # the ai-config repo
+    cd "${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/skill-builder rev-parse --show-toplevel 2>/dev/null || pwd)}"   # the ai-config repo
     ls skills/ scripts/ hooks/
     grep -ril "<keywords>" skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md
     ```
@@ -155,7 +155,7 @@ Skills and memories all live in the ai-config repo — never leave changes local
 > **In a worktree session, the repo toplevel below is the MAIN checkout, not your worktree.** `~/.claude/skills` symlinks into the main `ai-config` checkout, so `git -C ~/.claude/skills … rev-parse --show-toplevel` returns the main repo root — often on another session’s branch. Don’t `cd` there and don’t pass that path to Write/Edit: the skill files (and git commits) would land in the main checkout, clobbering another session’s working tree. Instead author the files in your **worktree’s own** `skills/<name>/` dir and run git from the worktree (it’s a full checkout of the same repo). Confirm with `git branch --show-current` before committing.
 
 ``` bash
-cd "$(git -C ~/.claude/skills/skill-builder rev-parse --show-toplevel)"   # ai-config root — NOTE: the MAIN checkout, NOT your worktree (see caveat above)
+cd "${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/skill-builder rev-parse --show-toplevel 2>/dev/null || pwd)}"   # ai-config root — NOTE: the MAIN checkout, NOT your worktree (see caveat above)
 git fetch origin main && git checkout -b add-<name>-skill origin/main   # FETCH, CREATE_BRANCH
 # write skills/<name>/SKILL.md (+ alias dir, + preferences/CLAUDE.md if it's a rule)
 python3 scripts/sync-codex-skill-wrappers.py   # regenerate codex-skills/ wrappers — REQUIRED for every new/renamed skill

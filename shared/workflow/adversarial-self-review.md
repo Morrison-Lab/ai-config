@@ -276,7 +276,7 @@ An instrument with no such result is a finding on its own terms, per [`verify-th
 Five adversarial rounds each found real defects against a fully green suite, and three of the five found them in the verification tooling rather than in the change: a parity metric that could not fail, a negative control patching a function that had moved off the execution path, and an assertion comparing a function against itself.
 The last of those had let a previously-rejected design pass 299 tests.)
 
-## A docs-only diff describing an instrument earns MORE rounds, not fewer
+## A docs-only diff describing an instrument is where a round is likeliest to be cut short
 
 The section above says a diff's verification artifacts are the least-guarded part of it.
 Its limit case is a diff carrying no code at all: documentation describing how an instrument behaves.
@@ -286,7 +286,7 @@ The defect it carries is not new here.
 [`fact-check-prose`](../writing/fact-check-prose.md)'s "Prose that distills code is a code claim, checked like code" already owns it, names the same psychology, and prescribes the same remedy;
 its "condensation of the code that builds it" section extends the rule to a written-out command, and its fenced-block section to program output.
 Read those for what the check is.
-What this section adds is the **review-side** consequence, which none of them states: how many rounds such a diff should be expected to absorb, and that a green suite and an unchanged line count are no argument for stopping.
+What this section adds is the **review-side** consequence, which none of them states: that a docs-only diff about instruments is a place this corpus's stopping rules get applied too early, and where the findings cluster when they are not.
 
 The measured shape is worth carrying because it tells a reviewer where to aim.
 The findings cluster, rather than scattering: a consumer described as reading one field when it falls back to another, a format called unparseable when the parser accepts it, a value called rejected when nothing validates it, a set of accepted forms given as two when the code accepts three.
@@ -296,7 +296,7 @@ A negative claim --- *this form does not parse*, *nothing accepts this* --- is t
 
 - **Do:** run each consumer named in the prose against the input the prose describes, before writing the sentence about it.
 - **Do:** treat a negative claim about a parser, guard, or matcher as owing an execution, not an argument.
-- **Do:** keep dispatching rounds while findings land, and let the count be decided by that rather than by the diff's size or its lack of code.
+- **Do:** let the round count be decided by whether findings are still landing --- the rule the section above already gives --- rather than by the diff's size or its lack of code.
 - **Don't:** read "no code changed" as "nothing here can be wrong" --- the claims changed, and they have no suite.
 - **Don't:** describe a fallback, a precedence rule, or an accepted-form list from the shape of the code;
   enumerate it from the code.

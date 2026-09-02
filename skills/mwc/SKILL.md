@@ -48,8 +48,9 @@ without asking confirmation before every merge.
   [`fully-clean`](../../shared/workflow/fully-clean.md) for the payload keys.
   A later all-clear from a different reviewer does not supersede a standing
   not-clean; only a later clean from the same reviewer does.
-  Record `headRefOid` before the instrument runs and require the live
-  head to equal it immediately before every direct merge, so a
+  Record `headRefOid` and `baseRefName` before the instrument runs and
+  require both live values to equal them immediately before every direct
+  merge, so a retarget at the same tip cannot pass with an old verdict and a
   concurrent push that already contains the base cannot ride a
   currency-only check past a verdict it never received.
   After the instrument passes, run the base-currency check that

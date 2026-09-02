@@ -33,8 +33,8 @@ standing yes (see `preferences.md`).
 
 - Resolve which PR is meant (the one from the current session; if ambiguous,
   ask which number).
-- Then record that PR's `headRefOid` before the readiness check below, so its result is tied to one SHA,
-  and require the live head to equal it immediately before every direct merge, on the initially current path as much as after a recovery.
+- Then record that PR's `headRefOid` and `baseRefName` before the readiness check below, so its result is tied to one head and one target,
+  and require both live values to equal them immediately before every direct merge, on the initially current path as much as after a recovery.
 - Confirm it is **fully clean** before merging (the ARDI terminal state — see
   `shared/workflow/fully-clean.md`): every CI workflow and check run — not
   just required ones — is green **and completed** (never still queued or in
@@ -75,9 +75,13 @@ standing yes (see `preferences.md`).
   skip the check and let the queue's speculative merge test the base.
   It is a manual step until [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) wires it into `check-pr-fully-clean.py`,
   and a repository that does not require an up-to-date branch merges without it otherwise.
-  When it fails on a direct merge, update the branch pinned to the recorded head, `gh api -X PUT "repos/<owner>/<repo>/pulls/<N>/update-branch" -f expected_head_sha="<pinned-sha>"` (or `update_pull_request_branch` with `expectedHeadSha` remotely),
-  treating a `422` whose message names an expected-head mismatch (match on the substring `expected head sha`, since the live text carries a curly apostrophe and a trailing period that this ASCII rendering cannot show) as the another-writer signal rather than retrying unpinned, and any other `422` as a failed update to stop on,
-  wait until `headRefOid` changes (the update answers `202 Accepted` before the merge lands),
+  When it fails on a direct merge, update the branch pinned to the recorded head.
+  Locally: `gh api -X PUT "repos/<owner>/<repo>/pulls/<N>/update-branch" -f expected_head_sha="<pinned-sha>"`.
+  Remotely: `update_pull_request_branch` with `expectedHeadSha`.
+  A `422` whose message names an expected-head mismatch is the another-writer signal, so settle ownership rather than retrying unpinned.
+  Match on the substring `expected head sha`, since the live text carries a curly apostrophe and a trailing period that this ASCII rendering cannot show.
+  Any other `422` is a failed update to stop on.
+  Then wait until `headRefOid` changes (the update answers `202 Accepted` before the merge lands),
   record that SHA,
   rerun the base-currency check on it,
   and then rerun the whole clean gate pinned to it.

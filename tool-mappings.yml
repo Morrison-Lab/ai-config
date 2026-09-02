@@ -108,9 +108,9 @@ operations:
     cli: gh pr ready "<N>"
     github_mcp: mcp__github__update_pull_request (draft=false)
   - id: UPDATE_PR_BRANCH
-    description: Merge the base branch into a pull request's head branch.
-    cli: gh pr update-branch "<N>"
-    github_mcp: mcp__github__update_pull_request_branch
+    description: Merge the base branch into a pull request's head branch, pinned to the head that was checked.
+    cli: gh api -X PUT "repos/<owner>/<repo>/pulls/<N>/update-branch" -f expected_head_sha="<sha>"
+    github_mcp: mcp__github__update_pull_request_branch (expectedHeadSha="<sha>")
   - id: REOPEN_PR
     description: Reopen a closed pull request.
     cli: gh pr reopen "<N>"

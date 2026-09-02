@@ -1186,14 +1186,17 @@ and every clean-gate check is a required status check on the base, or is aggrega
 A clean-gate check the queue cannot block on is a check the queue does not run as a gate.
 
 The rule splits by merge mode: a direct merge from a session with `git` and `gh`, a direct merge from a remote session without `git`, and a merge queue.
+It is GitHub-specific as written (`headRefOid`, `gh`, the compare endpoint, the update-branch and merge pins), so a GitLab merge has no equivalent gate until [#3021](https://github.com/Morrison-Lab/ai-config/issues/3021) supplies one, and the entry points below inherit that scope.
 It binds every direct-merge path, including the dependency-bump merges in [`chores`](../../skills/chores/SKILL.md), not only `mwc` and `merge-it`.
 For a bot bump, the gate to rerun after an update is CI plus conflict state, which is what those PRs are gated on, since `@claude` review is skipped on them by design.
 `chores` states that form.
-A deferred merge (`gh pr merge --auto`, or a `@dependabot` merge command) runs after any check made before the command, so it is safe only where the base requires an up-to-date branch or a correctly configured queue tests the merge, and in either case only when every clean-gate check is required or aggregated behind a required check, since both settings block on required checks alone.
-Elsewhere merge synchronously, right after the check.
+A deferred merge (`gh pr merge --auto`, or a `@dependabot` merge command) stays out of every direct-merge path.
+Auto-merge stays enabled across a later push by anyone with write access (GitHub disables it only for a push from someone without write permission, or a base switch) and fires on required checks alone, so a pin on the enabling request protects nothing after it, and the sync-push rule further down already forbids arming it after a new head.
+Merge synchronously, right after the check, with the merge command pinned.
 
-- **Do:** for a direct merge from a session with `git` and `gh`, record `headRefOid` before the clean gate runs, so the gate's verdict is tied to one SHA.
-  Then, before the merge command, fetch the PR's configured base, confirm the live PR head is still that SHA, and confirm the merge-base with it is that base's current tip.
+- **Do:** for a direct merge from a session with `git` and `gh`, record `headRefOid` and `baseRefName` before the clean gate runs, so the gate's verdict is tied to one head and one target.
+  Then, before the merge command, confirm the live `baseRefName` is still the recorded one, fetch that base, confirm the live PR head is still the recorded SHA, and confirm the merge-base with it is that base's current tip.
+  A retarget to another branch at the same tip during the gate would otherwise pass both the ancestry check and the head pin with a verdict produced for the old target.
   A concurrent push after the gate can already contain the base tip, so an ancestry check alone would admit a head no verdict covers.
   Until [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) wires this into `check-pr-fully-clean.py`, which [`mwc`](../../skills/mwc/SKILL.md) already runs, both [`mwc`](../../skills/mwc/SKILL.md) and [`merge-it`](../../skills/merge-it/SKILL.md) name it as a manual step after their readiness check and before the merge command:
   `url=$(gh repo view "<owner>/<repo>" --json url -q .url) && b=$(gh pr view "<N>" -R "<owner>/<repo>" --json baseRefName -q .baseRefName) && [ -n "$url" ] && [ -n "$b" ] && git fetch "$url" "$b" && tip=$(git rev-parse --verify FETCH_HEAD) && git fetch "$url" "refs/pull/<N>/head" && head=$(git rev-parse --verify FETCH_HEAD) && [ "$head" = "<pinned-sha>" ] && [ "$(git merge-base "$tip" "$head")" = "$tip" ]`,
@@ -1209,8 +1212,12 @@ Elsewhere merge synchronously, right after the check.
 - **Do:** when the merge-base is not that tip and the merge is direct, update the branch pinned to the recorded head (the `expected_head_sha` call below, or `update_pull_request_branch` with `expectedHeadSha` remotely), then rerun the whole clean gate on the new head, review included, before merging.
   The update is a new head, so a clean verdict on the old one no longer counts, per [`sync-with-main`](sync-with-main.md).
   The update is asynchronous: the REST endpoint answers `202 Accepted` while the merge is still in progress, and the MCP tool reports that answer as success, so a gate rerun started at once can read the old head.
-  Pin the update itself to the head that failed the currency check: `gh api -X PUT "repos/<owner>/<repo>/pulls/<N>/update-branch" -f expected_head_sha="<pinned-sha>"` (the `gh pr update-branch` wrapper has no flag for it in `gh` 2.98.0), or `expectedHeadSha` on the MCP `update_pull_request_branch` tool.
-  A `422` whose message names an expected-head mismatch (match on the substring `expected head sha`, since the live text carries a curly apostrophe and a trailing period that this ASCII rendering cannot show) means the head already moved, which is the another-writer signal below, so it routes to the ownership rule instead of merging the base into someone else's push.
+  Pin the update itself to the head that failed the currency check.
+  Locally that is `gh api -X PUT "repos/<owner>/<repo>/pulls/<N>/update-branch" -f expected_head_sha="<pinned-sha>"`, since the `gh pr update-branch` wrapper has no flag for it in `gh` 2.98.0.
+  Remotely it is `expectedHeadSha` on the MCP `update_pull_request_branch` tool.
+  A `422` whose message names an expected-head mismatch means the head already moved.
+  Match on the substring `expected head sha`, since the live text carries a curly apostrophe and a trailing period that this ASCII rendering cannot show.
+  That is the another-writer signal below, so it routes to the ownership rule instead of merging the base into someone else's push.
   The endpoint uses `422` for other validation failures too, so any other message is a failed update: stop and read it rather than treating it as a moved head.
   Measured 2026-09-02 (Pacific) on [#2989](https://github.com/Morrison-Lab/ai-config/pull/2989): a deliberately wrong `expected_head_sha` returned `422` with a message reading "expected head sha didn't match current head ref." (curly apostrophe in the live text) and changed nothing.
   Then poll `headRefOid` until it changes, record that SHA, rerun the base-currency check on it, and only then rerun the gate, pinned to that SHA.

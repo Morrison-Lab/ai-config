@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Run every hook's own test suite, and flag any hook that lacks one.
 
-The hooks in `hooks/` each can ship a `test-<name>.py` beside a `<name>.py`,
+The hooks in `hooks/` each can ship a `test-<name>.py` beside a `<name>.py`
+or `<name>.sh`,
 but those tests ran nowhere: `.pre-commit-config.yaml` and `validate.yml`
 invoke `scripts/test_*.py` by name and never reach into `hooks/`. So a guard
 could regress -- start blocking a message it should pass, stop catching the
@@ -11,8 +12,10 @@ the instruments that enforce the corpus's rules were themselves unverified.
 
 This runner does two things:
 
-  1. Runs each `hooks/test-*.py` against its subject `hooks/<name>.py` (the
-     convention every hook test already uses, taking the subject as argv[1]).
+  1. Runs each `hooks/test-*.py` against its subject `hooks/<name>.py` or
+     `hooks/<name>.sh` (the convention every hook test already uses, taking
+     the subject as argv[1]; a stem with both spellings is a FAIL, since
+     picking one silently would test the wrong file).
   2. Checks coverage in the OTHER direction -- enumerates every hook and
      confirms it has a test. A one-directional test->subject walk cannot see a
      hook that ships NO test at all, so "N/N suites passed" would read as full
@@ -21,7 +24,8 @@ This runner does two things:
 
 `KNOWN_UNTESTED` records the hooks that currently ship without a test as an
 explicit, reviewable debt; adding a NEW hook without a test fails this check.
-Tracked in ai-config#1080 -- write those tests, then empty the allowlist.
+ai-config#1080 wrote the last of those tests, so the allowlist is empty; it
+stays so a new untested hook is a failure, not a NOTE.
 
 A hung suite used to stall the whole sweep with no timeout and nothing on
 stdout (ai-config#2098, observed on Windows). Each suite now has a deadline;
@@ -69,10 +73,11 @@ DEFAULT_SUITE_TIMEOUT_S = 900
 # this runner targets.
 MAX_SUITE_TIMEOUT_S = 86400
 
-# Hooks that ship without a test today. An explicit, reviewable list -- not a
-# silent gap. A new hook is expected to bring its test; this list should only
-# ever shrink. See ai-config#1080.
-KNOWN_UNTESTED = {"inject-local-time.sh"}
+# Hooks that ship without a test: an explicit, reviewable allowlist rather
+# than a silent gap. Empty since ai-config#1080 wrote the last missing test;
+# the set stays so a new hook without a test fails this check, and an entry
+# added here must cite its tracking issue.
+KNOWN_UNTESTED: set = set()
 
 
 def suite_timeout_s():
@@ -210,13 +215,24 @@ def run_suites(timeout=None):
     failures = 0
     tests = sorted(glob.glob(os.path.join(HOOKS, "test-*.py")))
     for test_path in tests:
-        subject = os.path.join(HOOKS, os.path.basename(test_path)[len("test-"):])
-        rel_test = os.path.relpath(test_path, ROOT)
-        rel_subj = os.path.relpath(subject, ROOT)
-        if not os.path.isfile(subject):
-            print(f"FAIL: {rel_test} has no subject at {rel_subj}")
+        # A subject may be a .py or a .sh hook (inject-local-time.sh, #1080);
+        # try the test's own extension first, then the shell spelling.
+        stem = os.path.basename(test_path)[len("test-"):-len(".py")]
+        candidates = [os.path.join(HOOKS, stem + ext) for ext in (".py", ".sh")]
+        present = [c for c in candidates if os.path.isfile(c)]
+        if len(present) > 1:
+            # Two subjects for one suite is ambiguous; picking one silently
+            # would test the wrong file with no signal (fail-fast).
+            print(f"FAIL: {os.path.relpath(test_path, ROOT)} has two subjects: "
+                  + ", ".join(os.path.relpath(c, ROOT) for c in present))
             failures += 1
             continue
+        if not present:
+            print(f"FAIL: {os.path.relpath(test_path, ROOT)} has no subject at "
+                  + " or ".join(os.path.relpath(c, ROOT) for c in candidates))
+            failures += 1
+            continue
+        subject = present[0]
         failures += run_one_suite(test_path, subject, timeout)
     return failures, len(tests)
 
@@ -232,7 +248,7 @@ def check_coverage():
         if has_test:
             tested += 1
         elif name in KNOWN_UNTESTED:
-            print(f"NOTE: {name} has no test (known debt, ai-config#1080)")
+            print(f"NOTE: {name} has no test (known debt; track it in an issue)")
         else:
             print(f"FAIL: hooks/{name} has no test ({test_for(name)}); "
                   "add one or add it to KNOWN_UNTESTED with a tracking issue")
@@ -242,6 +258,11 @@ def check_coverage():
     for name in sorted(KNOWN_UNTESTED):
         if os.path.isfile(os.path.join(HOOKS, test_for(name))):
             print(f"FAIL: {name} now has a test; drop it from KNOWN_UNTESTED")
+            failures += 1
+        elif name not in subs:
+            # A deleted or renamed hook left behind in the allowlist would
+            # otherwise pass both loops while inflating the known-debt count.
+            print(f"FAIL: {name} is in KNOWN_UNTESTED but is not a hook in hooks/; drop it")
             failures += 1
     return failures, tested, len(subs)
 

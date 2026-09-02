@@ -257,7 +257,7 @@ def test_only_and_skip_filters():
 def test_require_clean_on_dirty_tree():
     with tempfile.TemporaryDirectory() as tmp:
         wf = _write_fixture(tmp)
-        subprocess.run(["git", "init", "-q"], cwd=tmp, check=True)
+        subprocess.run(["git", "init", "-q", "-b", "main"], cwd=tmp, check=True)
         (Path(tmp) / "dirty.txt").write_text("x")
         err = io.StringIO()
         with redirect_stdout(io.StringIO()), redirect_stderr(err):

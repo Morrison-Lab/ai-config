@@ -321,7 +321,8 @@ When the user gives an MWC grant (e.g. `/mwc` or "merge when confident"):
    two sides resolved different ids, which is exactly what ai-config#1279 was.
 2. Proceed with the task (e.g. driving PRs to clean via `ardi`).
 3. When a PR reaches 100% clean state, merge it immediately
-   (default: squash merge via `gh pr merge "<number>" -R "<owner>/<repo>" --squash --delete-branch --match-head-commit "<pinned-sha>"`,
+   (default on a base without a merge queue: `gh pr merge "<number>" -R "<owner>/<repo>" --squash --delete-branch --match-head-commit "<pinned-sha>"`;
+   on a base that requires a queue: `gh pr merge "<number>" -R "<owner>/<repo>" --match-head-commit "<pinned-sha>"`, with no strategy and no `--delete-branch`, since `gh` refuses that flag when enqueuing;
    the pin being the `headRefOid` recorded before the instrument ran),
    verify the merge landed on GitHub/GitLab,
    and run the post-merge skill (`post-merge` / `ums`).

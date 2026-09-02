@@ -100,9 +100,9 @@ operations:
     cli: gh pr edit "<N>"
     github_mcp: mcp__github__update_pull_request
   - id: MERGE_PR
-    description: Merge a pull request.
-    cli: gh pr merge "<N>"
-    github_mcp: mcp__github__merge_pull_request
+    description: Merge a pull request, pinned to the head the clean gate evaluated.
+    cli: gh pr merge "<N>" --match-head-commit "<sha>"
+    github_mcp: mcp__github__merge_pull_request (expectedHeadSha="<sha>")
   - id: MARK_PR_READY
     description: Flip a draft pull request to ready for review.
     cli: gh pr ready "<N>"

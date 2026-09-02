@@ -22,7 +22,13 @@ without a stale local copy answering for it.
 **Then check the merged fix for the guard rather than assuming either way.**
 Assuming it has one closes a real gap silently;
 assuming it lacks one re-lands a test that already exists.
-Grep the merged tree for an assertion naming the thing that broke.
+Grep the merged tree for an assertion naming the thing that broke --- and read
+a miss as a prompt rather than as the answer, per
+[`grep-is-not-coverage`](grep-is-not-coverage.md).
+A guard can hold the property structurally without ever naming it: the worked
+case below was settled by reading that the suite supplies its own
+`$SCRIPTS_DIR`, which no grep for the broken path would have found.
+So a hit settles the question and a miss sends you to read the suite.
 
 Once the gap is real, the order matters:
 

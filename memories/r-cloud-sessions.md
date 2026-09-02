@@ -555,3 +555,19 @@ which keeps the R-toolchain and R-package material that applies anywhere.
   search (not `installed.packages(lib.loc=<one dir>)`, which misses base/recommended
   packages and anything already installed in a different lib on the path and
   falsely reports them as missing).
+
+## The remote container has no GNU `time`; use the shell keyword
+
+`/usr/bin/time` is absent in the Claude Code remote container
+(measured 2026-09-01: `/usr/bin/time -v python3 ...` failed with
+`No such file or directory`, and a compound command that started with it
+ran nothing else, so the "timing" run produced an empty log that read like
+a script failure).
+Bash's `time` keyword works: `{ time cmd > log 2>&1 ; } 2>&1` prints
+`real`/`user`/`sys` for the braced command.
+`python3 -m cProfile -s cumtime script.py` is the profiler when the
+question is *where* the time goes rather than how much.
+
+- **Do:** time a command with the `time` keyword, or profile with `cProfile`.
+- **Don't:** reach for `/usr/bin/time -v` in this container, or read its
+  empty log as the timed command having failed.

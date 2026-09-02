@@ -77,7 +77,13 @@ permission or infrastructure change.
 The separate workflow PR can verify the repair directly; after it merges,
 re-run the original PR's checks against the corrected default-branch workflow.
 
-[ucdavis/rampp#155](https://github.com/ucdavis/rampp/pull/155), 2026-09-02:
+This is the CI-repair case of two rules already written down, and it belongs beside them rather than as a third statement of the same idea:
+[`preferences.md`](preferences.md)'s "Keep PRs focused on a single concern" bullet, which already names CI and workflow infrastructure as the thing not to mix into a feature PR, and
+[`shared/workflow/issue-first.md`](../shared/workflow/issue-first.md)'s "Deferring a request out of the current change" section, which supplies the mechanism: the deferred repair is filed as an issue in the same reply that reverts it, so the revert is a deferral and not a dropped fix.
+It applies to a PR of your own as much as to one you are reviewing;
+it lives in this file because the incident below surfaced while driving a review round, and this file is where review-round lessons land.
+
+[ucdavis/rampp#155](https://github.com/ucdavis/rampp/pull/155) (a private repository, so the links resolve only for lab members), 2026-09-02:
 the Claude review job failed during its OIDC app-token exchange because the
 workflow granted `contents: read`.
 The temporary `contents: write` repair was

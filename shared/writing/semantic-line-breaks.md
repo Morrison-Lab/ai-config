@@ -212,6 +212,70 @@ lesson, until review consolidated it here instead.
   After #2085, `--write` splits what `classify_line` flags.
   It still is not the diff-scoped CI job.
 
+**Fifth dated recurrence, 2026-09-02: the gap costs review rounds, not only
+CI, since a reviewer applies the wider convention the script does not.**
+Four PRs pushed the same day
+([#3004](https://github.com/Morrison-Lab/ai-config/pull/3004),
+[#3007](https://github.com/Morrison-Lab/ai-config/pull/3007),
+[#3016](https://github.com/Morrison-Lab/ai-config/pull/3016),
+[#3036](https://github.com/Morrison-Lab/ai-config/pull/3036), all merged)
+each carried a scoped `semantic-line-breaks.py` run reporting clean, and
+twice still drew a Copilot finding for clause density on a line the script
+had approved: `shared/workflow/metacognitive-monitoring.md:1057` in #3007
+("uses compound sentences as physical lines ... contrary to this corpus's
+semantic-line-break convention of one clause per line"), and
+`shared/workflow/pr-on-claim.md:275` plus `skills/daytb/SKILL.md:86` in
+#3036 ("diverges from this repo's semantic line break convention (one
+clause per line)").
+Every flagged line joined its clauses with a comma or a coordinating
+conjunction and carried no mid-line semicolon, so the gate's own clause
+rule --- the semicolon predicate documented above --- had nothing to catch
+either.
+This is the narrower-by-design gap arriving as a review comment instead of
+a CI failure, which the script's own docstring already predicts but no
+prior recurrence here had measured.
+
+The reformatter also worked against the fix once found, in both directions
+already named above.
+On #3007, splitting a comma-and-conjunction line at the conjunction still
+left `scripts/semantic-line-breaks.py` wanting to rejoin the halves,
+because a comma-clause split creates no sentence-ending punctuation for it
+to preserve.
+On #3016 the split fell into this file's own digit/parenthesis-opener case,
+first recorded at
+[ai-config#2127](https://github.com/Morrison-Lab/ai-config/pull/2127): a
+hand-split second sentence there opened with
+`(Verified 2026-09-02, ...)`.
+Not a new mechanism, but confirmation that it still fires more than a week
+after #2085's rewrite, on a fresh instance neither tool sees.
+Both times, and in the pre-emptive fourth split on #3036, the fix was the
+same: rewrite the pair as one full sentence split into two, rather than a
+single sentence with a hand-inserted clause break, which satisfies the
+script and the gate at once instead of trading one off against the other.
+
+- **Do:** when the script and the convention disagree, restructure the
+  sentence --- usually splitting one long sentence into two --- so both
+  pass, rather than picking a side.
+- **Do:** read a clean scoped run of `scripts/semantic-line-breaks.py` as
+  "no multi-sentence or semicolon-clause lines," not as "this section
+  satisfies the one-clause-per-line convention" --- the two claims differ
+  in kind, not only in degree.
+- **Don't:** treat the reformatter's silence on a comma-or-conjunction-joined
+  line as clearance; a reviewer applying the convention by eye still flags
+  it, and did, twice, the same day.
+- **Don't:** fight the reformatter's rejoin by reinstating the same
+  hand-break; convert the clause pair into two genuine sentences instead.
+
+(Morrison-Lab/ai-config, 2026-09-02.
+Copilot findings read from `gh api
+repos/Morrison-Lab/ai-config/pulls/{3007,3036}/comments`; the rejoin and
+restructure account is from the PRs' own commit messages, not inferred.
+Whether the reformatter should learn comma/conjunction clause boundaries
+was considered and declined: that is the
+[ai-config#2586](https://github.com/Morrison-Lab/ai-config/issues/2586)
+measurement above, over-splitting more than half of comma boundaries in
+clean prose, and nothing in this recurrence changes that trade-off.)
+
 **Until [ai-config#1730](https://github.com/Morrison-Lab/ai-config/issues/1730) gated the job,
 a green check run named for this gate might not have run it,
 and both runs carried the same name.**

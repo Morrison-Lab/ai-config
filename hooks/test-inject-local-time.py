@@ -40,6 +40,11 @@ WARN = "Do NOT state a PDT/PST time in this turn without measuring it first."
 
 
 def run(env):
+    # An ambient TZ=America/Los_Angeles would make the plain `date` call look
+    # like the override call to the stub, so the second-rung case could pass
+    # without the hook ever falling past the first rung. Strip it.
+    env = dict(env)
+    env.pop("TZ", None)
     p = subprocess.run(["sh", HOOK], capture_output=True, text=True, env=env)
     return p.returncode, p.stdout
 
@@ -56,12 +61,15 @@ def check(desc, cond):
 def stubs(tz_answer, plain_answer, powershell_body):
     """A temp dir holding a `date` stub and a `powershell` stub for PATH.
 
-    The `date` stub answers `tz_answer` when TZ is America/Los_Angeles (the
-    hook's first rung), `plain_answer` otherwise (its second rung), and the
-    real UTC shape for `date -u`. The `powershell` stub runs
-    `powershell_body` only for a `-NoProfile -Command <conversion program>`
-    call naming the Pacific zone, and exits 1 for anything else. Keying on TZ is what lets a case pin one
-    rung: a stub that ignored TZ would pass the first-rung case identically
+    The `date` stub answers `tz_answer` when TZ is America/Los_Angeles,
+    which is the hook's first rung.
+    It answers `plain_answer` otherwise, which is the second rung,
+    and the real UTC shape for `date -u`.
+    The `powershell` stub runs `powershell_body` only for a
+    `-NoProfile -Command <conversion program>` call naming the Pacific zone,
+    and exits 1 for anything else.
+    Keying on TZ is what lets a case pin one rung:
+    a stub that ignored TZ would pass the first-rung case identically
     if the hook skipped straight to the second."""
     d = tempfile.mkdtemp()
     date_stub = os.path.join(d, "date")

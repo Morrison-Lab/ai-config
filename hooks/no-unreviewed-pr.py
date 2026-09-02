@@ -352,9 +352,12 @@ def request_ident(cmd):
     `last` is True when the matched request is the LAST simple command in the
     chain. That is exactly when the harness `is_error` exit status (which
     reflects the WHOLE call, i.e. its last command) is authoritative for the
-    request's own outcome -- so the discharge can trust `err` only then. A
-    request chained AHEAD of other commands has an is_error that belongs to a
-    later command, so the discharge treats it as ambiguous and does not fire.
+    request's own outcome -- so the discharge can trust `err` only then.
+    A request chained AHEAD of other commands shares one status with them, and
+    which command produced it is not recoverable here -- `_simple_commands`
+    discards the operators, and a failing request short-circuits a following
+    `&&` so the status can be the request's own. The discharge therefore
+    treats a non-last request as unattributable and does not fire.
     """
     cmds = _simple_commands(cmd)
     if cmds is None:
@@ -364,6 +367,32 @@ def request_ident(cmd):
         if ok:
             return True, num, repo, (i == len(cmds) - 1)
     return False, None, None, False
+
+
+def nonlast_requests(cmd):
+    """Every reviewer request in `cmd` that is NOT the call's last command.
+
+    `request_ident` stops at the first match, which is right for the discharge
+    -- one call yields one exit status, so one request can be credited by it.
+    It is wrong for the diagnostic: a call requesting reviewers for two PRs and
+    then verifying them names only the first, and the block leaves the second
+    out (Copilot on ai-config#3024).
+
+    Returns a list of (num, repo). The last simple command is excluded here
+    rather than by the caller, since a request in that position is the one the
+    exit status can speak to and is handled by the discharge.
+    """
+    cmds = _simple_commands(cmd)
+    if cmds is None:
+        return []
+    found = []
+    for i, argv in enumerate(cmds):
+        if i == len(cmds) - 1:
+            continue
+        ok, num, repo = _argv_request(argv)
+        if ok:
+            found.append((num, repo))
+    return found
 
 
 def _argv_draft(argv):
@@ -1049,6 +1078,9 @@ def result_ident(body):
     return None, None
 
 
+_OBL_SEQ = 0
+
+
 def _new_obl(num, repo, tid, self_, slast, srnum, srrepo, push=False):
     """One outstanding-open record.
 
@@ -1061,9 +1093,18 @@ def _new_obl(num, repo, tid, self_, slast, srnum, srrepo, push=False):
     `push` marks an obligation re-armed by a push rather than by an open, so the
     warning can say the head moved instead of claiming the PR was never
     reviewed at all.
+
+    `seq` is a monotonic birth index. The deferred `nonlast` sweep needs it:
+    applied at end of scan with no ordering, a chained request already
+    superseded by a credited standalone one would mark an obligation created
+    afterwards, and the block would blame chaining for a head that simply moved
+    (adversarial review on ai-config#3024).
     """
+    global _OBL_SEQ
+    _OBL_SEQ += 1
     return {"num": num, "repo": repo, "tid": tid, "self": self_,
-            "slast": slast, "srnum": srnum, "srrepo": srrepo, "push": push}
+            "slast": slast, "srnum": srnum, "srrepo": srrepo, "push": push,
+            "seq": _OBL_SEQ}
 
 
 # A PR number seen in two DIFFERENT repositories. `live` is keyed by number
@@ -1305,8 +1346,10 @@ def _resolve_arm(pending_arm, rid, failed, obligations, live, uncertain=()):
         the push that re-headed it still owes a reviewer. Arm.
       * SUCCEEDED -- the PR is drafted or retired and owes nothing. Withhold.
       * AMBIGUOUS -- a transition chained ahead of another command shares one
-        combined exit status, which belongs to the LAST command, so this call
-        cannot attribute an outcome to the transition at all (the combined
+        combined exit status with them, and which command produced it is not
+        recoverable here (the operators are discarded, and a failing transition
+        short-circuits a following `&&`), so this call cannot attribute an
+        outcome to the transition at all (the combined
         -result rule in shared/principles/fail-fast.md). Withhold, which is what
         the draft and terminal discharges in this same call already do on the
         same input: an ambiguous call changes nothing in either direction
@@ -1327,6 +1370,40 @@ def _resolve_arm(pending_arm, rid, failed, obligations, live, uncertain=()):
 
 def _repo_ok(a, b):
     return a is None or b is None or a == b
+
+
+def _mark_nonlast(obligations, num, repo, seq=None, tid=None):
+    """Flag every obligation a non-last request for (num, repo) speaks about.
+
+    Message-only: nothing here discharges or arms.
+
+    Applied from a sweep after `scan`'s loop rather than where the request is
+    seen, because the obligation it speaks about may not exist yet (`_rearm`
+    appends on the push path) and may not know its number yet (a bare
+    `gh pr create`/`ready` backfills it from the RESULT).
+
+    `seq` and `tid` restore the ordering that deferral gives up. Without them a
+    chained request already SUPERSEDED by a credited standalone one marks an
+    obligation created afterwards, and the block blames chaining for a head
+    that simply moved. An obligation born at or before the request is one the
+    request could speak about; one born later is only reachable when the same
+    tool_use created it, which is the push-in-the-same-call case
+    (adversarial review on ai-config#3024).
+
+    `_rearm` prefixes its own tid with ``rearm:``, so that spelling is admitted
+    too -- without it the push-in-the-same-call case, which is the whole reason
+    the tid escape exists, never matches.
+    """
+    if num is None:
+        return
+    for ob in obligations:
+        if ob["num"] is None or ob["num"] != num \
+                or not _repo_ok(ob["repo"], repo):
+            continue
+        if seq is not None and ob.get("seq", 0) > seq \
+                and ob["tid"] not in (tid, "rearm:%s" % (tid,)):
+            continue
+        ob["nonlast"] = True
 
 
 def _clear(obligations, num, repo):
@@ -1361,6 +1438,10 @@ def scan(path):
     two PRs, or the same number in two repositories, are two obligations.
     """
     obligations = []
+    # (num, repo) per non-last reviewer request, applied once after the loop:
+    # see the `nonlast_reqs.append` site for why the marking cannot be applied
+    # where the request is seen.
+    nonlast_reqs = []
     pending = {}        # tool_use_id -> (num, repo) for reviewer requests
     pending_clear = {}  # tool_use_id -> (num, repo) for draft transitions
     pending_close = {}  # tool_use_id -> (num, repo) for merge/close actions
@@ -1764,12 +1845,63 @@ def scan(path):
                     # must not silently discharge this open.
                     obligations.append(_new_obl(
                         onum, orepo, tid, requested, rlast, rnum, rrepo))
+                    # A number-less request chained ahead of another command
+                    # resolves no number on EITHER side, so the number-matched
+                    # loop below cannot reach it and it needs marking here.
+                    # BOTH sides must be number-less for the attribution to
+                    # hold. `rnum is None` covers the create's own `--reviewer`
+                    # and a current-branch `gh pr edit --add-reviewer`, neither
+                    # of which names a PR. `onum is None` is the other half:
+                    # it admits `gh pr create` and a bare `gh pr ready`, which
+                    # are this branch's own PR, and excludes `gh pr ready <N>`,
+                    # which names a PR that need not be this branch's -- there
+                    # a current-branch add-reviewer targets a DIFFERENT PR than
+                    # the one being readied, and marking it would claim a
+                    # request that does not exist for it (Copilot on
+                    # ai-config#3024).
+                    # The two exclusions differ, and only one is covered
+                    # elsewhere. A request resolving its own number is not
+                    # lost: the number-matched loop below reaches it. A
+                    # number-less request chained ahead of `gh pr ready <N>`
+                    # is reached by neither path, and that is deliberate --
+                    # attribution does not hold there, so the block falls back
+                    # to naming only failure as the cause. The `ready_named`
+                    # test asserts that absence rather than leaving it to be
+                    # rediscovered as a gap.
+                    # `_repo_ok` for the same reason the loop applies it:
+                    # two explicit `-R` flags naming different repositories,
+                    # both number-less, would otherwise mark the opened PR for
+                    # a request that targeted another repo entirely
+                    # (claude-review on ai-config#3024).
+                    if requested and not rlast and rnum is None and onum is None \
+                            and _repo_ok(orepo, rrepo):
+                        obligations[-1]["nonlast"] = True
                     _note_live(live, onum, orepo)
                 # A create --reviewer both opens and requests; its `self` flag
                 # discharges it on the create's own result, so it is not also a
                 # separate pending request here.
                 if requested and not opened:
                     pending[tid] = (rnum, rrepo, rlast)
+                for _rn, _rr in nonlast_requests(cmd_raw):
+                    # A request COMMAND appears ahead of another simple command
+                    # in this call. That is a syntactic fact and not a claim
+                    # that it ran: `false && <request> && ...` short-circuits
+                    # before it (Copilot on ai-config#3024). What follows from
+                    # the position alone is that the call's single exit status
+                    # cannot be attributed to the request, so the discharge
+                    # withholds -- and from inside the turn that is
+                    # indistinguishable from a request that ran and failed,
+                    # since the message otherwise names only failure
+                    # (ai-config#3017).
+                    #
+                    # DEFERRED to after the loop rather than applied here: the
+                    # obligation this request speaks about may not exist yet
+                    # (`_rearm` appends on the push path) and may not know its
+                    # number yet (a bare `gh pr create`/`ready` backfills it
+                    # from the RESULT, which arrives in a later block). Only a
+                    # sweep at the end sees every obligation in its final
+                    # state (Copilot on ai-config#3024).
+                    nonlast_reqs.append((_rn, _rr, _OBL_SEQ, tid))
                 # Terminal actions and status reads are registered regardless of
                 # the branches above: `gh pr merge` is neither an open nor a
                 # draft transition, and a `gh pr view` chained after a create
@@ -1827,6 +1959,9 @@ def scan(path):
                 if pushed:
                     _rearm(obligations, live, tid, turn_targets, pending_arm,
                            uncertain)
+    # One sweep, after every obligation exists and every number is backfilled.
+    for _rn, _rr, _rs, _rt in nonlast_reqs:
+        _mark_nonlast(obligations, _rn, _rr, _rs, _rt)
     return obligations, text
 
 
@@ -1884,22 +2019,65 @@ def main() -> int:
     except Exception:
         pass
 
+    # A request WAS issued for one of these PRs and was not credited, which is
+    # a different fact from no request at all and has a different remedy.
+    # Named, not aggregated with a bare any(): the paragraph asserts a fact
+    # about a SPECIFIC PR, and several can be outstanding at once. Saying "this
+    # PR" over a mixed set tells the reader a request exists for one that never
+    # had one -- the same overclaim the rnum guard above prevents at marking
+    # time, reappearing at aggregation (ai-config#3017 review round 4).
+    flagged = sorted({o["num"] for o in obligations
+                      if o.get("nonlast") and o["num"]}, key=int)
+    # Plural-aware: each API request targets exactly ONE PR, so a singular
+    # sentence over several flagged numbers is wrong twice -- grammatically,
+    # and about how many requests were made (Copilot on ai-config#3024).
+    names = ", ".join("#" + n for n in flagged)
+    chained = ((
+        "A reviewer request for %s appears in the transcript and was not "
+        "credited: it was chained AHEAD of another command, so this guard "
+        "does not attribute that call's exit status to the request. It "
+        "reads the commands and not the operators between them, so it "
+        "cannot tell whether the status came from the request, from a "
+        "later command, or from an earlier one that short-circuited the "
+        "request away. That is why this looks identical to a request that "
+        "failed.\n\n" % names
+    ) if len(flagged) == 1 else (
+        "Reviewer requests for %s appear in the transcript and none was "
+        "credited: each was chained AHEAD of another command, so no call's "
+        "exit status is attributed to its own request -- these requests "
+        "need not share a call, and each call carries one status. This "
+        "guard reads the commands and not the operators between them, so "
+        "it cannot tell whether a status came from the request, from a "
+        "later command, or from an earlier one that short-circuited the "
+        "request away. That is why this looks identical to requests that "
+        "failed.\n\n" % names
+    )) if flagged else ""
+
     print(json.dumps({
         "decision": "block",
         "reason": (
             lead.format(w=which) + "\n\n"
-            "Request it now, in this same message. Quote every placeholder -- "
+            + chained +
+            "Request it now, as the only command in this call. Chained "
+            "ahead of anything else, including the verification below, the "
+            "call's exit status is no longer attributed to the request, so "
+            "it is not credited whatever it returned. Quote every "
+            "placeholder -- "
             "an unquoted `<` is a shell redirect:\n\n"
             "    gh api \"repos/<owner>/<repo>/pulls/<N>/requested_reviewers\" "
             "\\\n      -X POST -f "
             "'reviewers[]=copilot-pull-request-reviewer[bot]'\n\n"
-            "Then verify a review actually lands at the current head -- the "
-            "request itself can 422, and a pending request can vanish from "
-            "both `reviewRequests` and the GET endpoint (see "
-            "memories/gh-cli.md):\n\n"
-            "    gh pr view \"<N>\" --json reviews \\\n"
-            "      --jq '[.reviews[] | select(.author.login | "
-            "startswith(\"copilot\"))] | length'\n\n"
+            "Then, in a SEPARATE call, verify a review actually lands at the "
+            "current head -- the request itself can 422, and a pending request "
+            "can vanish from both `reviewRequests` and the GET endpoint (see "
+            "memories/gh-cli.md). Note the list below is per-PR, not "
+            "per-head: a review satisfies THIS head only when its `sha` "
+            "equals `head`, so read those two rather than the number of "
+            "reviews.\n\n"
+            "    gh pr view \"<N>\" --json headRefOid,reviews \\\n"
+            "      --jq '{head: .headRefOid[0:8], copilot: [.reviews[] "
+            "| select((.author.login // \"\") | startswith(\"copilot\")) "
+            "| {sha: .commit.oid[0:8], at: .submittedAt}]}'\n\n"
             "Two legitimate reasons to defer, and neither is silence:\n\n"
             "  * The PR is deliberately a DRAFT -- a draft does not trigger "
             "the review bot (see shared/workflow/pr-on-claim.md). Say so "

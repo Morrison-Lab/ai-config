@@ -99,9 +99,10 @@ Record the head before reading anything else in this step, since every read belo
 
 ``` bash
 PINNED=$(gh pr view "$N" --repo "$REPO" --json headRefOid -q .headRefOid)   # VIEW_PR
+BASE=$(gh pr view "$N" --repo "$REPO" --json baseRefName -q .baseRefName)   # VIEW_PR; a retarget at the same tip must not pass
 ```
 
-If the head changes before the merge lands, start this step again from here.
+If the head or the base name changes before the merge lands, start this step again from here.
 
 A bump is only “safe to merge” if every required check passes. `skipping` is fine (path-filtered jobs); `pending` means wait, `fail` means stop.
 
@@ -127,7 +128,7 @@ For a Renovate PR, tick the rebase checkbox in the PR body (or its Dependency Da
 
 ### 4. Safe bumps (patch / minor / submodule + green) → merge
 
-Require the live head to equal the `$PINNED` recorded at the top of step 3 immediately before the merge command, since a regenerated head that already contains the base would pass a currency check with CI never read for it. Then run the base-currency check from [`fully-clean`](../../shared/workflow/fully-clean.md)’s stale-base rule (the Do bullets beginning “for a direct merge”), since a green head can still break the base when the base gained a check after the head’s CI ran. When it is stale, the bot-bump recovery is to update the branch, wait for the new head SHA and assign it back (`PINNED=$(gh pr view "$N" --repo "$REPO" --json headRefOid -q .headRefOid)`), since the merge command below pins to `$PINNED`, rerun the CI and conflict checks this skill gates on against that SHA (review stays skipped on bot PRs), and recheck currency and that the head is still that SHA immediately before merging. `gh api -X PUT "repos/$REPO/pulls/$N/update-branch" -f expected_head_sha="$PINNED"` merges the base in, pinned to the head whose CI was read. A `422` whose message names an expected-head mismatch (match on the substring `expected head sha`, since the live text carries a curly apostrophe and a trailing period that this ASCII rendering cannot show) means the bot or another writer already replaced that head, so re-read before touching it. Any other `422` is a failed update: stop and read the message. `@dependabot rebase` rewrites the head onto it and also clears a conflict. Then merge directly. Dependabot deletes its own branch on merge.
+Require the live head to equal the `$PINNED` and the live base name to equal the `$BASE` recorded at the top of step 3, immediately before the merge command. A regenerated head that already contains the base would otherwise pass a currency check with CI never read for it. Then run the base-currency check from [`fully-clean`](../../shared/workflow/fully-clean.md)’s stale-base rule (the Do bullets beginning “for a direct merge”), since a green head can still break the base when the base gained a check after the head’s CI ran. When it is stale, the bot-bump recovery is to update the branch, wait for the new head SHA and assign it back (`PINNED=$(gh pr view "$N" --repo "$REPO" --json headRefOid -q .headRefOid)`), since the merge command below pins to `$PINNED`, rerun the CI and conflict checks this skill gates on against that SHA (review stays skipped on bot PRs), and recheck currency and that the head is still that SHA immediately before merging. `gh api -X PUT "repos/$REPO/pulls/$N/update-branch" -f expected_head_sha="$PINNED"` merges the base in, pinned to the head whose CI was read. A `422` whose message names an expected-head mismatch (match on the substring `expected head sha`, since the live text carries a curly apostrophe and a trailing period that this ASCII rendering cannot show) means the bot or another writer already replaced that head, so re-read before touching it. Any other `422` is a failed update: stop and read the message. `@dependabot rebase` rewrites the head onto it and also clears a conflict. Then merge directly. Dependabot deletes its own branch on merge.
 
 ``` bash
 gh pr merge "$N" --repo "$REPO" --squash --match-head-commit "$PINNED"   # MERGE_PR; $PINNED is the headRefOid recorded above
@@ -135,17 +136,7 @@ gh pr merge "$N" --repo "$REPO" --squash --match-head-commit "$PINNED"   # MERGE
 
 Pick a merge method the repo actually allows — `--squash` errors when squash merges are disabled; swap in `--merge` or `--rebase` to match the repo’s settings.
 
-If checks are still running and you want it to land once they pass, and only where the repository requires an up-to-date branch before merging or a correctly configured merge queue tests the merge, and every check this skill gates on is required or aggregated behind a required check (both settings block on required checks alone, and a deferred merge runs after the base-currency check, so elsewhere the check is stale by the time it fires):
-
-``` bash
-gh pr merge "$N" --repo "$REPO" --squash --auto --match-head-commit "$PINNED"   # MERGE_PR --- needs auto-merge enabled; swap --squash for --merge/--rebase if squash is disabled
-```
-
-For **Dependabot** you can also hand the merge back to the bot, under the same up-to-date-branch or queue condition as `--auto` — it waits for CI, merges, and deletes its branch (handy when the branch needs a rebase first):
-
-``` bash
-gh pr comment "$N" --repo "$REPO" --body "@dependabot squash and merge"   # COMMENT_PR — Dependabot only
-```
+Do not arm `gh pr merge --auto` and do not hand the merge to `@dependabot squash and merge`. Auto-merge stays enabled across later pushes and fires on required checks alone, so the classified head can be replaced and different content merge without this skill’s scope and bump-risk checks rerunning. Wait for the checks and merge synchronously with the pin instead.
 
 `@dependabot ...` comment commands do nothing on **Renovate** PRs — for those, use `gh pr merge` (or tick the merge checkbox in Renovate’s Dependency Dashboard).
 

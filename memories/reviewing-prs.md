@@ -120,17 +120,29 @@ An issue on a repo I own is different from a PR on it:
 filing, triaging, and commenting on issues is fine,
 and an issue someone else's open PR already fixes is left to that PR (not grabbed, and that PR not driven either).
 
-## Land a rule at every restatement in one push
+## Inspect every restatement of a rule in one pass
 
 When a reviewer's finding adds an arm, a veto, or a recheck to one
-restatement of a rule, the same gap is open at every other restatement,
-and the reviewer finds them one round at a time.
+restatement of a rule, the same gap may be open at any other restatement,
+and the reviewer finds those one round at a time.
 `Morrison-Lab/ai-config#2913` (2026-09-01) spent Copilot rounds thirty-two
-through thirty-six landing one exclusion veto and one pre-write recheck
+through thirty-five landing one exclusion veto and one pre-write recheck
 site by site: `chores`, then `AGENTS.md`, `ardia`, and `post-merge`, then
-`memories/github.md`, then `check-history`.
-A corpus grep for the rule's vocabulary after round thirty-two would have
-folded the next four rounds into one push.
+`memories/github.md`.
+A corpus grep for the rule's vocabulary after round thirty-two, with each
+hit read against the widened rule, would have folded the next three rounds
+into one push.
+Round thirty-six was a different gap (a live-claim check in
+`check-history`, distinct from scope), so it is not an instance of this
+lesson and a restatement sweep would not have caught it.
+
+A sweep inspects; it does not rewrite.
+Some restatements are already correct, and some are deliberately narrower
+(`ardia`'s recheck reads author and assignees only, because its predicate
+has no title or label arm), so each hit is read against the new scope and
+changed only when it carries the gap, per
+[`address-every-comment`](../shared/workflow/address-every-comment.md)'s
+broadening-fix section.
 
 A "reapply the test before each write" sentence has two populations to
 enumerate, and recalling either one misses members: the write actions per
@@ -138,12 +150,15 @@ step (grep the skill for `close`, `comment`, `merge`, `push`) and the
 predicate's mutable inputs (read them off the filter itself: `chores`
 reads title and labels, not only author and assignees).
 
-- **Do:** grep every restatement of the rule the finding touched, fix all
-  of them, and say in the ARD reply which sites the push covered.
+- **Do:** grep every restatement of the rule the finding touched, read
+  each hit against the widened rule, fix the ones that carry the gap, and
+  say in the ARD reply which sites were inspected and which changed.
 - **Do:** derive both populations for a before-each-write sentence from
   the file, and name them in it.
 - **Don't:** fix the one site the finding quoted and wait for the next
   round to name the next one.
+- **Don't:** rewrite a restatement that is correct or deliberately
+  narrower just because the grep returned it.
 
 ## Search the issue thread before rebutting "no source exists"
 

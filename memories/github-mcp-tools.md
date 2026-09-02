@@ -340,11 +340,16 @@ See ai-config#694 for the precedent.
   `copilot-pull-request-reviewer` check run on the new head for several
   minutes, while `request_copilot_review` started one within about fifteen
   seconds each time and the review posted five to six minutes later.
-  `get_check_runs` is the tell: a Copilot review that is coming shows that
-  check run within a minute of the push, so an absent run is a request to
-  re-issue, not a review to wait for.
+  `get_check_runs` is the tell.
+  On the pushes that did get a review (`28c20e5` and the three
+  re-requested ones), the check run appeared within about a minute, so one
+  minute is the operational heuristic rather than a guarantee: an absent
+  run after that is grounds to re-issue, at the cost of a duplicate request
+  when check creation was merely delayed, which is cheap next to a check-in
+  that waits on a round that never started.
   - **Do:** after every push, confirm the check run exists on the new head,
-    and call `request_copilot_review` when it does not.
+    and call `request_copilot_review` when it is still absent after about a
+    minute.
   - **Don't:** arm a check-in that waits on a round that never started.
 - **A Copilot review reporting `Comments generated: 0 new` can still carry
   findings.**

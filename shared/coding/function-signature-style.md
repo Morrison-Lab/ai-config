@@ -66,4 +66,18 @@ repo-wide conversion of pre-existing hanging signatures there is tracked in
 `ucdavis/rampp#139`.
 The diff-scoped-invisibility half is from `UCD-SERG/serocalculator` #633,
 2026-08, where a 4-space signature copied from a neighbouring file drew a lint
-failure on the new file alone.)
+failure on the new file alone.
+It recurred on serocalculator#668, 2026-09-01, in the other direction: the
+files were pre-existing, `lint-changed-files` held them to the rule for the
+first time, and the session read the repo-wide +4 form as "the package's own
+convention" and declined to reformat, filing serocalculator#672 for a
+`.lintr.R` change instead --- with this fragment loaded.
+A census of `R/*.R` there found 27 multi-line signatures at +4 and 12 at +2,
+so the neighbours were the majority and still not the rule.
+The user asked why the lint's own recommendation could not be applied, and the
+reformat took one commit.)
+
+- **Do:** reformat a flagged +4 signature in a file you are already touching,
+  even when every neighbouring file uses the same form.
+- **Don't:** file a linter-config change to preserve a form the written
+  convention already rejects, on the strength of how many files carry it.

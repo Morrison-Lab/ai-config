@@ -62,8 +62,9 @@ without asking confirmation before every merge.
   the compare endpoint's `behind_by` in a remote session without `git`,
   no merge at all from a session that can run neither until
   [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) wires it
-  into the instrument, and no manual check under a merge queue whose
-  required checks cover the whole clean gate on `merge_group`.
+  into the instrument, and a stop on a base that requires a merge
+  queue until [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030)
+  lands.
   On a direct merge a stale merge-base means an update pinned to the
   recorded head (`PUT .../pulls/<N>/update-branch` with
   `expected_head_sha`, or the MCP tool's `expectedHeadSha`; a `422`
@@ -87,8 +88,9 @@ without asking confirmation before every merge.
   gate is the only closure, per
   [`fully-clean`](../../shared/workflow/fully-clean.md).
   A repeat names the moving ref: when the base moved twice it outruns
-  the gate, so merge through a queue or strict up-to-date protection
-  instead, and when the head moved another writer is on the branch, so
+  the gate, so merge under strict up-to-date protection instead (or
+  through a merge queue once [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030)
+  lands), and when the head moved another writer is on the branch, so
   settle ownership per [`claim-pr`](../claim-pr/SKILL.md) before
   rerunning, per [`fully-clean`](../../shared/workflow/fully-clean.md).
 - **Session Duration**: The grant expires automatically when the session ends
@@ -324,16 +326,11 @@ When the user gives an MWC grant (e.g. `/mwc` or "merge when confident"):
    two sides resolved different ids, which is exactly what ai-config#1279 was.
 2. Proceed with the task (e.g. driving PRs to clean via `ardi`).
 3. When a PR reaches 100% clean state, merge it immediately
-   (default on a base without a merge queue: `gh pr merge "<number>" -R "<owner>/<repo>" --squash --delete-branch --match-head-commit "<pinned-sha>"`;
-   on a base that requires a queue: `gh pr merge "<number>" -R "<owner>/<repo>" --match-head-commit "<pinned-sha>"`, with no strategy and no `--delete-branch`, since `gh` refuses that flag when enqueuing;
-   the pin being the `headRefOid` recorded before the instrument ran),
-   verify the merge landed on GitHub/GitLab (under a queue the command
-   returns on enqueue, so poll the GraphQL `state`, `isInMergeQueue`, and
-   `mergeQueueEntry` fields per [`merge-it`](../merge-it/SKILL.md) step 3:
-   `MERGED` is success, `OPEN` with `isInMergeQueue` true is still
-   waiting, and `OPEN` with `isInMergeQueue` false and a null
-   `mergeQueueEntry`, read after the enqueue succeeded, is an eviction to
-   report as a failed merge),
+   (default: `gh pr merge "<number>" -R "<owner>/<repo>" --squash --delete-branch --match-head-commit "<pinned-sha>"`,
+   the pin being the `headRefOid` recorded before the instrument ran;
+   on a base that requires a merge queue, stop and report instead, per
+   [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030)),
+   verify the merge landed on GitHub/GitLab,
    and run the post-merge skill (`post-merge` / `ums`).
 4. If the user revokes the grant, run `skills/session-lock/scripts/ai-session.sh disable-mwc` immediately.
 

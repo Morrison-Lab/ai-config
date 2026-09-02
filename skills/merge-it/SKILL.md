@@ -71,8 +71,7 @@ standing yes (see `preferences.md`).
   In a remote session without `git`, read `gh api "repos/<owner>/<repo>/compare/<base-encoded>...<head-sha>"` (the base name encoded as one path segment, `jq -rn --arg b "<base>" '$b|@uri'`)
   and require `behind_by` of 0.
   Where neither is available, do not merge until [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) supplies the tool.
-  Under a merge queue whose required checks cover the whole clean gate on `merge_group`,
-  skip the check and let the queue's speculative merge test the base.
+  On a base that requires a merge queue, stop and report: the queue form of this gate is [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030) and is out of scope until it lands.
   It is a manual step until [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) wires it into `check-pr-fully-clean.py`,
   and on a repository that does not require an up-to-date branch GitHub would otherwise permit the stale merge, which is why the manual check stays required there.
   When it fails on a direct merge, update the branch pinned to the recorded head.
@@ -91,7 +90,7 @@ standing yes (see `preferences.md`).
   That closes the head side only.
   The base can still advance between the read and the merge, and where that must not happen the repository needs a merge queue or an up-to-date-branch requirement with every clean-gate check required, per `fully-clean.md`.
   A repeat names the moving ref, not the remedy.
-  When the base moved twice it outruns the gate: merge through a queue or strict up-to-date protection instead, per `fully-clean.md`.
+  When the base moved twice it outruns the gate: merge under strict up-to-date protection instead (or through a merge queue once [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030) lands), per `fully-clean.md`.
   When the head moved, another writer is on the branch: settle ownership per `claim-pr` before rerunning, since no queue or protection setting stabilizes a head someone else pushes to.
 - Default to **squash** for a feature branch with many small iteration commits
   (and/or a merge-of-main commit) — it gives `main` one clean commit. Use a
@@ -150,14 +149,7 @@ for that repo.
 
 Confirm `merged == true` (the merge tool's result) and re-check the PR state and
 that the linked issue auto-closed.
-On a base that requires a merge queue the merge command returns when the PR is enqueued, not when it merges.
-`state` alone cannot tell a waiting PR from an evicted one, since both read `OPEN`, so poll the GraphQL fields instead: `gh api graphql -f query='query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){pullRequest(number:$n){state isInMergeQueue mergeQueueEntry{state}}}}' -f o="<owner>" -f r="<repo>" -F n="<N>"`.
-The poll starts only after the merge command exited 0 having enqueued the PR, which is what gives the reading its meaning.
-`state` `MERGED` is success.
-`OPEN` with `isInMergeQueue` true is still waiting.
-`OPEN` with `isInMergeQueue` false and a null `mergeQueueEntry`, read after that enqueue, means the queue removed the PR (a failed speculative check) and is a failed merge to report.
-Before any enqueue the same reading only means not queued, so do not classify from it.
-Measured 2026-09-02 (Pacific) on [#2989](https://github.com/Morrison-Lab/ai-config/pull/2989), a PR never enqueued: both fields exist on the pull request object and read false and null there, which is the not-queued reading, not an eviction.
+A base that requires a merge queue never reaches this step from an agent path: [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030) carries the queue form (enrollment is asynchronous and needs its own state machine), and until it lands the procedure stops before the merge command there.
 If the merge didn't land (conflict, branch
 protection, not mergeable), **stop and report** — don't tidy or run UMS.
 
@@ -166,7 +158,8 @@ protection, not mergeable), **stop and report** — don't tidy or run UMS.
 Run the `post-merge` skill (invoke it by name) for the rest: tidy the local
 branch (checkout `main`, pull, `git branch -d`, remove any worktree), confirm
 deferred items are tracked, and **run UMS** to bank what the PR's review
-lifecycle taught. Do this without a separate prompt — opening the UMS follow-up
+lifecycle taught.
+Do this without a separate prompt — opening the UMS follow-up
 branch + PR is a standing yes (`preferences.md`).
 
 ## Relationship to other skills

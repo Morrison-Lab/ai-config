@@ -1170,7 +1170,7 @@ a GIA session merged it under `mwc`,
 and `validate` on `main` went red at `da1a2d03` until [#2983](https://github.com/Morrison-Lab/ai-config/pull/2983) regenerated the manifest.
 The head-only verdict cannot see this, and no path diff can prove the base gained no check through a script or a reusable workflow,
 so for a direct merge the rule is the one [`sync-with-main`](sync-with-main.md) already states: a stale merge-base means update first.
-Under a merge queue where every workflow in the clean gate listens for `merge_group`,
+Under a merge queue where every clean-gate check both executes for `merge_group` and is required (or aggregated behind a required check),
 the queue's speculative merge test covers this,
 and [`merge-queue`](merge-queue.md) forbids the manual update loop.
 There the `merge_group` checks are the gate.

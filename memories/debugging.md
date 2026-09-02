@@ -2,7 +2,6 @@
 
 See [`memories/shell.md`](shell.md) for shell and bash scripting conventions, temp-file management, heredoc traps, and background process-waiter hygiene.
 
-
 ## Markdown line-by-line processors: every inner loop needs its own fence tracker
 
 When writing a script that reformats Markdown line by line, the outer loop usually
@@ -1169,4 +1168,3 @@ is the only heredoc-adjacent fix that is genuinely safe and should be kept.
 `echo $((1<<2)) && git grep -lO…` (must flag).
 
 (Morrison-Lab/wai#125, PR #137, 2026-08-29, three review rounds.)
-

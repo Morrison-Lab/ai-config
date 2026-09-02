@@ -11,7 +11,7 @@ Because the pattern is a substring of the searcher's own `argv`, this causes sil
 2. **Deadlocks across scripts**:
    A sequence guarding a step with `while pgrep -f "task.sh"; do sleep 3; done` blocks indefinitely if an earlier waiter (`until ! pgrep -f "task.sh" ...`) remains alive, even though the original `task.sh` exited.
 3. **Self-inflicted process termination**:
-   Running `pkill -f 'pgrep -f "task.sh"'` matches the executing shell itself and terminates the calling session mid-command (exit code 144) before any cleanup or follow-up runs.
+   Running `pkill -f 'pgrep -f "task.sh"'` matches the executing shell itself and terminates the calling session mid-command (a 128-plus-signal exit status) before any cleanup or follow-up runs.
 
 ### Robust remedies
 
@@ -36,7 +36,7 @@ Because the pattern is a substring of the searcher's own `argv`, this causes sil
 - **Anchor `pgrep -f` when unavoidable**:
   Anchor to the interpreter binary (`pgrep -f "^bash .*<name>"`) or exclude the current shell process to avoid self-matching.
 
-(Measured 2026-09-01 during `serocalculator#668` session, documented in ai-config#2915.)
+(Measured 2026-09-01 during the [`serocalculator#668`](https://github.com/UCD-SERG/serocalculator/pull/668) session, documented in [ai-config#2915](https://github.com/Morrison-Lab/ai-config/issues/2915).)
 
 ## Heredocs in chained terminal commands are unreliable
 

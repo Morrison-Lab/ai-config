@@ -795,7 +795,43 @@ A clean automated review from every available provider evaluating the current HE
   Yes.
   Unit test suites must assert differential failure on base fixtures and regression coverage for non-standard link text.
 
-## Pattern 42: `pgrep -f` Self-Matching in Background Waiters and Process Status Pollers
+## Pattern 42: Declaring an Instrument Blocked Without Reading Its Own `--help`
+- **Do**: Before reporting that a required instrument cannot run in this
+  environment, run its `--help` and read the memory file for the environment
+  (`memories/github-remote-sessions.md` for a remote/web session);
+  an instrument this corpus requires usually ships the remote-session route
+  beside the flag that needs it.
+- **Don't**: Hand-build an input the repo has a builder for,
+  then read the harness denying the hand-building commands as the instrument
+  being unrunnable,
+  and hand the user a BLOCKER with options that all cost them a step.
+- **Example**: 2026-09-01 on `Morrison-Lab/ai-config`, the GIA session that
+  merged [#2896](https://github.com/Morrison-Lab/ai-config/pull/2896) and
+  [#2932](https://github.com/Morrison-Lab/ai-config/pull/2932):
+  `check-pr-fully-clean.py --from-json` needs a payload file,
+  the session transcribed MCP tool output into it through Bash heredocs,
+  the auto-mode classifier denied those commands three times,
+  and the two clean PRs sat unmerged for hours behind a boxed BLOCKER.
+  `python3 scripts/check-pr-fully-clean.py --help` names
+  `scripts/build-pr-payload.py OWNER/REPO N FILE`, which builds the payload
+  from plain REST in one command;
+  run once, it scored six PRs FULLY CLEAN and they merged within minutes.
+  The near-miss is that the report looked diligent (three attempts, a clear
+  blocker box) while the cheapest check was never run.
+- **Canonical Rule**:
+  [`growth-mindset.md`](../shared/workflow/growth-mindset.md),
+  [`research-before-asking.md`](../shared/workflow/research-before-asking.md),
+  and [`get-under-the-hood.md`](../shared/principles/get-under-the-hood.md).
+- **Fix**: `fully-clean.md` now names the builder beside the `--from-json`
+  sentence, so the fragment that governs the gate carries the remote-session
+  route ([#2938](https://github.com/Morrison-Lab/ai-config/issues/2938)).
+- **Algorithmatizable?**
+  Partly.
+  A `Stop` guard could warn when a reply carries a BLOCKER box naming a
+  `scripts/*.py` instrument and the transcript shows no `--help` invocation
+  of that script; not built yet.
+
+## Pattern 44: `pgrep -f` Self-Matching in Background Waiters and Process Status Pollers
 - **Do**: When monitoring background tasks or long-running scripts,
   wait on an explicit sentinel done-marker file
   (`until [ -f "$DIR/job.done" ]; do sleep 5; done`)
@@ -806,7 +842,7 @@ A clean automated review from every available provider evaluating the current HE
   the executing shell or waiter loop itself contains the search pattern in its `argv`,
   causing `pgrep` to match itself and report false "still running" statuses,
   deadlock on dead processes,
-  or trigger self-inflicted kills (exit code 144) when running `pkill -f`.
+  or trigger self-inflicted kills (a 128-plus-signal exit status) when running `pkill -f`.
 - **Example**: 2026-09-01 during a `serocalculator` [PR #668](https://github.com/UCD-SERG/serocalculator/pull/668) session (documented in [Issue #2915](https://github.com/Morrison-Lab/ai-config/issues/2915)):
   A background waiter `until ! pgrep -f "install.R"; do sleep 10; done` ran indefinitely
   because its own command line matched `install.R`,
@@ -814,12 +850,10 @@ A clean automated review from every available provider evaluating the current HE
   A subsequent script waiting with `while pgrep -f "mut2.sh"; do sleep 3; done` deadlocked on the lingering waiter,
   and a cleanup `pkill -f 'pgrep -f ...'` killed the active Bash execution mid-run.
 - **Canonical Rule**: [`memories/shell.md`](shell.md) (Background process waiters section)
-  and [`shared/workflow/no-empty-promises.md`](../shared/workflow/no-empty-promises.md).
+  and [`shared/principles/fail-fast.md`](../shared/principles/fail-fast.md) (a waiter that can never observe completion is a silent failure).
 - **Fix**: Replace process table substring matching with done-file sentinels,
   track and terminate by PID,
   and anchor pattern matching (`pgrep -f "^bash .*<name>"`) when unavoidable.
 - **Algorithmatizable?**
   Yes.
   Static analysis / hooks can flag unanchored `pgrep -f` and `pkill -f` inside while/until loops in shell scripts.
-
-

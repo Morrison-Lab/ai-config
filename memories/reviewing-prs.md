@@ -67,7 +67,7 @@ See also [`shared/workflow/ardi.md`](../shared/workflow/ardi.md).
 
 ## Only work PRs I opened, am assigned to, or asked for by name, or the Actions app authored
 
-Work only on pull requests opened by me (`d-morrison` or `dem-extra1`), assigned to me, explicitly asked for by name in the request, or authored by the GitHub Actions app (app slug `github-actions`, which each API surfaces in its own form as listed below --- a submodule bump, an automated sync PR).
+Work only on pull requests opened by me (`d-morrison` or `dem-extra1`), assigned to me, explicitly asked for by name in the request, or authored by the GitHub Actions app (app slug `github-actions`, which the APIs surface as `github-actions[bot]`, bare `github-actions`, or `app/github-actions` --- a submodule bump, an automated sync PR).
 A PR opened by another lab member, or by any other bot, is not mine to drive unless it is assigned to me or I explicitly asked for it --- however clean, stale, or easy it looks, and however a sweep skill words its scope.
 
 The user stated the **Do** side, in two steps: first the author/assignee test, then (same day) that workflow-opened PRs such as a submodule bump are fine.

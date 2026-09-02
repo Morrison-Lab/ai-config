@@ -67,7 +67,10 @@ This skill is GitHub-first (`gh`). For a GitLab repo, the same shape applies via
 
 ```bash
 ME=$(gh api user --jq .login)   # WHO_AM_I
-IDS=$(jq -cn --arg me "$ME" '[$me]')   # then add the aliases memories/reviewing-prs.md lists for $ME
+# PR_SCOPE_ALIASES: comma-separated logins that are the same person as $ME,
+# taken from memories/reviewing-prs.md (empty when that file lists none for $ME).
+IDS=$(jq -cn --arg me "$ME" --arg al "${PR_SCOPE_ALIASES:-}" \
+  '[$me] + ($al | split(",") | map(select(length > 0))) | unique')
 gh pr list --repo "$REPO" --state open --limit 200 \
   --json number,title,author,assignees,labels,mergeable \
   | jq -r --argjson ids "$IDS" '.[] | select(

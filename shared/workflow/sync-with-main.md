@@ -221,7 +221,8 @@ the new location.** This is the mirror image of the case above: there,
 you're the one resyncing after `main` moved a copy of your logic; here,
 *you* are the one who moved the logic, so the burden of noticing and
 surfacing the resulting conflict falls on you, not on the sibling PR's author
-waiting to hit it, and of fixing it where the scope test below permits.
+waiting to hit it, and of fixing it where `memories/reviewing-prs.md`'s
+scope test permits.
 Don't wait for that PR's own merge/CI to surface the conflict ---
 check every open PR touching the same file right after your extraction
 merges: `git merge-tree "$(git merge-base origin/main origin/<sibling-branch>)" origin/main origin/<sibling-branch>`

@@ -246,7 +246,8 @@ against `memories/reviewing-prs.md`'s scope test before sending the
 instruction: an assignment can change, and a delegated agent may be driving
 an assigned or requested PR that another author opened.
 A branch that fails the test, or that is claimed by an agent that is not
-yours, goes through the scope-filtered scan above step 1 like any other PR.
+yours, is handled like any other open PR: the scope filter decides, and an
+out-of-scope one is reported to the user and left untouched.
 
 **This depends on the coordinator finding out about a merge in the first
 place --- so brief every delegated agent, up front, to report back the

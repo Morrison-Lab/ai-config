@@ -148,6 +148,11 @@ jobs:
       - name: Run check-rendered-references tests
         # ai-config#2879: verify broken rendered reference checking and footnote isolation.
         run: python3 scripts/test_check_rendered_references.py
+      - name: Run local-validation runner tests
+        # ai-config#1940 / #1262: scripts/run-local-validation.py derives the
+        # pre-push check list from THIS file; its dogfood case asserts the
+        # derived plan names every scripts/test_*.py suite.
+        run: python3 scripts/test_run_local_validation.py
       - name: Check that all scripts/test_*.py test suites are gated
         # ai-config#2540: verify every test suite in scripts/ is gated in CI.
         run: python3 scripts/check-test-suites-covered.py

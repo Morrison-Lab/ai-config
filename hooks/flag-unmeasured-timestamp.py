@@ -208,29 +208,42 @@ MCP_POST_TOOLS = getattr(_disclosure, "MCP_POST_TOOLS", (
 ))
 
 BASH_TOOL_NAMES = ("Bash", "bash", "run_command", "execute_command", "terminal", "shell")
+WRITE_TOOL_NAMES = (
+    "Write", "Edit", "write_to_file", "replace_file_content", "apply_diff",
+    "NotebookEdit", "StrReplace", "EditNotebook", "MultiEdit",
+)
 
-# A clock time in the recap format: the Stop sibling's own `RX_CLAIM`, so the
-# two guards agree on what a stamp is -- `HH:MM`, an optional `:SS`, an
-# optional AM/PM, then the Pacific marker. A narrower local pattern let
-# "1:05 PM PT" through silent and captured "12:47:30 PDT" as "47:30 PDT",
-# which `_claim_minutes` then could not parse. The Pacific marker is
-# required: it is what separates "it is now 12:47 PT" from a duration, an
-# ISO timestamp quoted out of an API response, or a time in another zone
-# that the body is relaying rather than asserting. The fallback is that
-# pattern restated, for a session where the sibling is unavailable.
-RX_STAMP = getattr(_clock, "RX_CLAIM", None) or re.compile(
-    r"\b(?:[01]?\d|2[0-3]):[0-5]\d(?::[0-5]\d)?\s*(?:AM|PM)?\s*"
-    r"(?:PDT|PST|\bPT\b)",
+# A clock time in the recap format: HH:MM, optional :SS, optional AM/PM, then
+# the Pacific marker (PDT, PST, PT) or an `ish` suffix, with optional leading ~
+# (ai-config#2900, #2947).
+RX_STAMP = re.compile(
+    r"(?:\b|~)(?:[01]?\d|2[0-3]):[0-5]\d(?::[0-5]\d)?\s*(?:AM|PM)?\s*"
+    r"(?:(?:PDT|PST|\bPT\b)(?:\s*ish)?|ish\b)",
     re.I,
 )
+
+# File path pattern matching on-disk session notebooks and memory files
+RX_NOTEBOOK_OR_MEMORY = re.compile(
+    r"(?:^|[/\\])(?:session-[^/\\]*\.md|.*[/\\]memory[/\\][^/\\]*\.md|.*[/\\]memories[/\\][^/\\]*\.md)$",
+    re.I,
+)
+
+# Bash file write / append redirect to notebook or memory files
+RX_BASH_REDIRECT_NOTEBOOK = re.compile(
+    r"(?:>>?|tee\s+(?:-a\s+)?)\s*[\"']?([^\s\"';&|]+(?:session-[^\s\"';&|]*\.md|[/\\]memory[/\\][^\s\"';&|]*\.md|[/\\]memories[/\\][^\s\"';&|]*\.md))",
+    re.I,
+)
+
+# Command substitution calling `date` inside the command itself (discharges by construction)
+RX_IN_COMMAND_DATE = re.compile(r"(?:\$\(|\`)[^\)\`]*\bdate\b", re.I)
 
 CLOCK_CMD = 'TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"'
 
 NOTE = (
-    "[flag-unmeasured-timestamp] This comment body states the Pacific clock "
+    "[flag-unmeasured-timestamp] This {surface} states the Pacific clock "
     "time \"{stamp}\" and {detail}. A time inferred from how much work has "
     "happened since the last reading drifts by up to an hour (measured "
-    "2026-09-01, ai-config#2900). Run `{cmd}` now and restate the stamp from "
+    "2026-09-01, ai-config#2900, #2947). Run `{cmd}` now and restate the stamp from "
     "its output -- or, if the time is quoted from an artifact rather than "
     "asserted as now, say what it was read from. See CLAUDE.md, \"Timestamp "
     "recaps in local time\"."
@@ -287,22 +300,41 @@ def _blank_quotes(text):
                   text)
 
 
+def _extract_heredoc_bodies(command):
+    """Extract all heredoc bodies from command."""
+    bodies = []
+    # Match <<EOF ... EOF or <<'EOF' ... EOF or <<-EOF ... EOF
+    heredoc_re = re.compile(
+        r"<<-?\s*['\"]?([A-Za-z0-9_]+)['\"]?\s*\n(.*?)\n\s*\1\b",
+        re.DOTALL,
+    )
+    for m in heredoc_re.finditer(command):
+        bodies.append(m.group(2))
+    return bodies
+
+
 def _bash_post(command, cwd):
-    """(kind, body) for a Bash command.
+    """(kind, body, surface) for a Bash command.
 
-    `kind` is None when the command posts no comment, "body" when it posts
-    one this hook can read (with the text), and "unreadable" when it posts
-    one it cannot: a `--body-file` not on disk yet, `--body-file -`, or
-    `--editor`. Heredocs are stripped before matching, as in the rebuttal
-    sibling, so a heredoc quoting `gh pr comment` as prose is not a post.
-
-    The command is judged PER SEGMENT, like the disclosure sibling: a
-    chained `gh pr comment --delete-last; gh pr comment --body ...` is a
-    delete followed by a post, and the post is the one that gets read. The
-    first posting segment decides the verdict.
+    `kind` is None when the command neither posts a comment nor writes to a
+    notebook/memory file, "body" when it writes one this hook can read,
+    and "unreadable" when it posts a comment it cannot read.
     """
+    # First, check if the Bash command writes/appends to a notebook or memory file
+    m_redir = RX_BASH_REDIRECT_NOTEBOOK.search(command)
+    if m_redir:
+        # If the command contains an in-command date read, it is measured by construction
+        if RX_IN_COMMAND_DATE.search(command):
+            return None, None, None
+        target_path = m_redir.group(1)
+        base = os.path.basename(target_path)
+        # Extract heredocs or string literals or raw command text
+        heredocs = _extract_heredoc_bodies(command)
+        body = "\n\n".join(heredocs) if heredocs else command
+        return "body", body, f"edit to `{base}`"
+
     if RX_COMMENT_POST is None or strip_heredocs is None or extract_body_text is None:
-        return None, None
+        return None, None, None
     stripped = strip_heredocs(command)
     for segment in _split_segments(stripped):
         flags_only = _blank_quotes(segment)
@@ -319,25 +351,67 @@ def _bash_post(command, cwd):
         if body is None:
             body = _short_flag_body(segment, cwd)
         if body is None:
-            return "unreadable", None
-        return "body", body
-    return None, None
+            return "unreadable", None, "comment body"
+        return "body", body, "comment body"
+    return None, None, None
+
+
+def _extract_write_content(tool_input):
+    """Extract target path and text content from file write/edit tool inputs."""
+    target_path = (
+        tool_input.get("file_path")
+        or tool_input.get("path")
+        or tool_input.get("TargetFile")
+        or tool_input.get("target_file")
+        or tool_input.get("filePath")
+        or tool_input.get("notebook_path")
+        or ""
+    )
+    if not target_path or not RX_NOTEBOOK_OR_MEMORY.search(target_path):
+        return None, None
+
+    content = (
+        tool_input.get("content")
+        or tool_input.get("text")
+        or tool_input.get("replacement")
+        or tool_input.get("new_string")
+        or tool_input.get("CodeContent")
+        or tool_input.get("ReplacementContent")
+        or ""
+    )
+    if not content and "edits" in tool_input and isinstance(tool_input["edits"], list):
+        content = "\n".join(
+            e.get("replacement") or e.get("new_string") or ""
+            for e in tool_input["edits"] if isinstance(e, dict)
+        )
+    if not content and "cells" in tool_input and isinstance(tool_input["cells"], list):
+        content = "\n".join(
+            c.get("source") or c.get("text") or ""
+            for c in tool_input["cells"] if isinstance(c, dict)
+        )
+    return target_path, content
 
 
 def _post_from_payload(tool_name, tool_input, cwd):
-    """(kind, body) for the comment this tool call would post; see `_bash_post`."""
+    """(kind, body, surface) for the action this tool call would perform."""
     if tool_name in BASH_TOOL_NAMES:
         command = (tool_input.get("command") or tool_input.get("CommandLine")
                    or tool_input.get("cmd") or tool_input.get("script"))
         if not isinstance(command, str) or not command.strip():
-            return None, None
+            return None, None, None
         return _bash_post(command, cwd)
+    if tool_name in WRITE_TOOL_NAMES:
+        target_path, content = _extract_write_content(tool_input)
+        if target_path and isinstance(content, str) and content.strip():
+            base = os.path.basename(target_path)
+            return "body", content, f"edit to `{base}`"
+        return None, None, None
     if tool_name in MCP_POST_TOOLS:
         body = tool_input.get("body")
         # `pull_request_review_write` submits without a body on some methods,
         # and a body never seen is not a body to judge.
-        return ("body", body) if isinstance(body, str) else (None, None)
-    return None, None
+        return ("body", body, "comment body") if isinstance(body, str) else (None, None, None)
+    return None, None, None
 
 
 def _transcript_state(transcript_path):
@@ -371,6 +445,17 @@ def _exempt_context(body, hit):
     return bool(RX_FUTURE_REFERENCE.search(body[line_start:line_end]))
 
 
+def _normalize_stamp_for_minutes(stamp):
+    """Normalize a stamp (stripping ~ prefix, ish suffix, and trailing zone) so _claim_minutes parses it."""
+    s = stamp.lstrip("~").strip()
+    s = re.sub(r"\s*ish\b", "", s, flags=re.I).strip()
+    # If the stamp was only "17:50" without a timezone because "ish" was stripped,
+    # append " PT" so _claim_minutes recognizes it.
+    if not re.search(r"(?:PDT|PST|\bPT\b)", s, flags=re.I):
+        s += " PT"
+    return s
+
+
 def unmeasured_stamp(body, transcript_path):
     """(stamp, detail) for the first stamp in `body` no reading covers, else None.
 
@@ -394,15 +479,14 @@ def unmeasured_stamp(body, transcript_path):
     if _read_in_turn(last_clock, turn_start):
         return None
     for hit in hits:
-        # `RX_CLAIM` has no capture groups: group(0) is the whole stamp,
-        # which is the form `_claim_minutes` parses (hour, minute, AM/PM).
         stamp = hit.group(0)
         if _exempt_context(body, hit):
             continue
         if measured is not None and measured[0] >= turn_start:
             if _claim_minutes is None or _skew is None:
                 return None
-            claimed = _claim_minutes(stamp)
+            norm = _normalize_stamp_for_minutes(stamp)
+            claimed = _claim_minutes(norm)
             if claimed is None:
                 continue
             skew = _skew(claimed, measured[1])
@@ -450,7 +534,7 @@ def main() -> int:
     tpath = payload.get("transcript_path") or ""
 
     try:
-        kind, body = _post_from_payload(tool_name, tool_input, cwd)
+        kind, body, surface = _post_from_payload(tool_name, tool_input, cwd)
         found = None
         if kind == "body" and body:
             found = unmeasured_stamp(body, tpath)
@@ -479,6 +563,7 @@ def main() -> int:
             except Exception:
                 pass
 
+        surface_desc = surface or "comment body"
         if stamp == UNREADABLE_STAMP:
             context = UNREADABLE_NOTE.format(cmd=CLOCK_CMD)
             message = (
@@ -486,9 +571,9 @@ def main() -> int:
                 f"the check and no clock read is in this turn; if it states a "
                 f"Pacific time, run '{CLOCK_CMD}' first.")
         else:
-            context = NOTE.format(stamp=stamp, detail=detail, cmd=CLOCK_CMD)
+            context = NOTE.format(surface=surface_desc, stamp=stamp, detail=detail, cmd=CLOCK_CMD)
             message = (
-                f"Timestamp reminder: this comment states Pacific time "
+                f"Timestamp reminder: this {surface_desc} states Pacific time "
                 f"\"{stamp}\" and {detail}. Run '{CLOCK_CMD}' before restating it.")
         out = {
             "hookSpecificOutput": {

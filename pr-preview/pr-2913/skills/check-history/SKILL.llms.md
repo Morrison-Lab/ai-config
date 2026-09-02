@@ -21,8 +21,8 @@ Before reviewing past history, confirm the issue still needs a *new* PR. Two che
 - **Existing open PR for it?** Search open PRs for one that already addresses the issue, so you don’t open a second, parallel PR for the same work.
 
   ``` bash
-  gh pr list --state open --json number,title,headRefName,body \
-    --jq '.[] | select(((.body // "") | test("#<N>\\b")) or (.title | test("#<N>\\b"))) | "#\(.number) \(.title) [\(.headRefName)]"'   # LIST_PRS
+  gh pr list --state open --json number,title,headRefName,body,author,assignees \
+    --jq '.[] | select(((.body // "") | test("#<N>\\b")) or (.title | test("#<N>\\b"))) | "#\(.number) \(.title) [\(.headRefName); \(.author.login); assignees: \([.assignees[].login] | join(","))]"'   # LIST_PRS
   ```
 
 - **On a long-lived or foundational issue, the issue text AND any design-doc status header can lag the code by several PRs.** A mature feature (a phased effort, or anything with a dedicated design doc) may be partly or mostly implemented even when the issue reads as unstarted. The work can land across sibling PRs that never updated this issue or that header. Before scoping *new* code, verify the **actual implementation state against the code**: read the key source files implementing the feature and the test files, not just the issue body. (Seen on sparta: issue \#164 / \#240 read as “phase 4b not done”, but the core feature was already fully implemented and tested across sibling PRs — nearly rebuilt already-completed work. The right move was to audit, correct the stale issue/doc status, and pick the genuine next slice.)

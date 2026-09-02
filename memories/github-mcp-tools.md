@@ -6,7 +6,7 @@ review/comment/thread mechanics, and the specific failure modes each
 tool has shown in practice.
 Split out of `github.md` pre-emptively at 1199 lines, just under
 `scripts/check-memory-file-size.py`'s gate --- that check fires strictly
-above 1200 lines, so the file never actually tripped it.
+above 1250 lines (enforced with `--strict` in CI per ai-config#2970), so the file never actually tripped it.
 See ai-config#694 for the precedent.
 
 - In remote/web sessions the authenticated GitHub identity **can be** the repo

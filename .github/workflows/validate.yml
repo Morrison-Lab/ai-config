@@ -380,13 +380,11 @@ jobs:
             exit 0
           fi
           python3 scripts/check-context-closure.py --baseline "$REV" || true
-      - name: Check for oversized memory files (advisory)
-        # Non-blocking (ai-config#695): memory files are read on demand, so
-        # length is a real per-use cost -- but crossing the threshold is a
-        # prompt to consider splitting, not a defect that should block an
-        # unrelated PR. See the script's docstring for the threshold's
-        # rationale.
-        run: python3 scripts/check-memory-file-size.py
+      - name: Check for oversized memory files
+        # ai-config#695, #2970: memory files are read on demand, so length is
+        # a real per-use cost. Gated strictly at 1250 lines in CI so the pre-push
+        # check and CI agree.
+        run: python3 scripts/check-memory-file-size.py --strict
       - name: Run stale-record check tests
         run: python3 scripts/test_check_stale_records.py
       - name: Check for stale and orphaned records (advisory)

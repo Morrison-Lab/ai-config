@@ -1173,9 +1173,10 @@ There the `merge_group` checks are the gate.
 A `pull_request`-only workflow added to the base does not run on the queue's branch, so that precondition has to hold before the manual update is skipped.
 
 - **Do:** before merging, fetch and resolve the default branch, then confirm the merge-base with it is its current tip:
-  `git fetch origin && d=$(git remote show origin | sed -n 's/.*HEAD branch: //p') && [ -n "$d" ] && mb=$(git merge-base "origin/$d" <head>) && tip=$(git rev-parse --verify "origin/$d") && [ "$mb" = "$tip" ]`.
+  `d=$(git remote show origin | sed -n 's/.*HEAD branch: //p') && [ -n "$d" ] && git fetch origin "$d" && tip=$(git rev-parse --verify FETCH_HEAD) && mb=$(git merge-base FETCH_HEAD <head>) && [ "$mb" = "$tip" ]`.
   Each result is assigned inside the `&&` chain so an unresolved branch or a failed command fails the check rather than comparing two empty strings as equal.
-  A remote-tracking ref is current only after a fetch, and the default branch is not always `main`.
+  Comparing against `FETCH_HEAD` reads the tip the fetch just returned and writes no remote-tracking ref, so it holds in a single-branch clone (where a bare `git fetch origin` leaves `origin/$d` stale) and under `fetch.prune=true` (where an explicit `branch:refs/remotes/origin/branch` refspec was measured to delete the ref and fail `rev-parse` on its first run).
+  The default branch is not always `main`.
   `git remote show origin` answers in clones where `refs/remotes/origin/HEAD` is unset, which [`challenge-the-assignment.cases.md`](challenge-the-assignment.cases.md) records for the clones this corpus is developed in.
 - **Do:** when it is not and the merge is direct, `gh pr update-branch <N> -R <owner>/<repo>`, then rerun the whole clean gate on the new head, review included, before merging.
   The update is a new head, so a clean verdict on the old one no longer counts, per [`sync-with-main`](sync-with-main.md).

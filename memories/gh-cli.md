@@ -588,9 +588,10 @@
   Measured 2026-09-02 on [#2979](https://github.com/Morrison-Lab/ai-config/pull/2979):
   five Copilot rounds were read and answered while the Claude review repeated the same docstring finding five times unread,
   because each poll read only the verdict line of `check-pr-fully-clean.py` and the Copilot inline comments.
-  The checker prints every open finding as a `  - ` bullet.
-  Those lines are the input, and each reviewer's set has to be read after every push.
-  - **Do:** after each push, read the checker's finding bullets in full and the Claude `### Findings` section alongside the Copilot comments.
+  The checker prints one blocker bullet per selected review, quoting the first matched finding, not every finding.
+  Those bullets say which review still blocks.
+  The findings themselves are in that review's body, and each reviewer's set has to be read after every push.
+  - **Do:** after each push, read the checker's blocker bullets, then the Claude `### Findings` section and the Copilot review body and comments they point at.
   - **Don't:** treat the verdict line, or one reviewer's round, as the whole of what is open on the head.
 
   **Re-measured 2026-08-06 with a wider denominator:** across `Morrison-Lab/ai-config`'s last 60 merged PRs, every Copilot review object carries a refusal body and **zero** are substantive (query in [`shared/workflow/pr-on-claim.md`](../shared/workflow/pr-on-claim.md), which also explains why the object count drifts between runs while the zero does not).

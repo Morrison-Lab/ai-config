@@ -580,14 +580,16 @@ The regex is deliberately narrow:
 `grep push` and `git commit -m "push the button"` do not trip it,
 and the hook's own suite pins that.
 It reads the whole command string, though,
-so a heredoc or `printf` body that quotes a literal `git push -u origin <branch>` line matches exactly as a real push would.
+so a heredoc body that quotes a literal `git push -u origin <branch>` line matches exactly as a real push would.
+A `printf` body matches only when the character before `git` is not a quote (a backtick, in the measured case).
+`printf '%s' 'git push ...'` passes.
 Measured 2026-09-01 while writing an issue body,
 and again while posting the correction to that issue.
 Tracked as [ai-config#2981](https://github.com/Morrison-Lab/ai-config/issues/2981).
 
-- **Do:** write a comment or issue body that quotes a push command with the
-  Write tool, or with a placeholder the shell assembles, rather than inside
-  a Bash heredoc.
+- **Do:** write a comment or issue body that quotes a push command to a file
+  with the Write tool, then post it with `--body-file` (or `-F body=@file`),
+  rather than composing it inside a Bash heredoc.
 - **Do:** reserve `ALLOW_UNREVIEWED_PUSH=1` for the one command that is an
   actual `git push`, and state why in the same turn.
 - **Don't:** read the guard's block on a body-writing command as a real

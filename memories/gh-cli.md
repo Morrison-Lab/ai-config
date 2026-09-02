@@ -543,22 +543,21 @@
   The short version: `Morrison-Lab/ai-config` reproduces the identical 201-then-empty signature while carrying no `copilot_code_review` rule at either scope, so an empty pending list is evidence neither that the request was blocked nor that a review is coming.
   Only the posted review **body** settles which of those happened.
 
-  **The "nor that a review is coming" half now has a positive instance.**
-  On `Morrison-Lab/ai-config#3010` (2026-09-02), a session ran the POST repeatedly, saw `requested_reviewers` come back empty on the immediate read every time, and four Copilot reviews landed on that PR anyway, at `15:51:54Z`, `16:43:37Z`, `16:47:16Z`, and `17:00:45Z`.
-  The `ucdavis/bcs` #648/#649/#650 record further down this file supplies the other direction --- empty list, zero reviews --- so the same empty read has now been seen with reviews arriving and with none arriving.
-  That is what makes the list uninformative rather than merely unreliable.
+  **The "nor that a review is coming" half now has a positive instance, and it is weaker evidence than it first looks.**
+  On `Morrison-Lab/ai-config#3010` (2026-09-02) the session **reports** running the POST repeatedly and seeing `requested_reviewers` come back empty on the immediate read every time, and Copilot reviews did land on that PR anyway.
+  Weigh that empty-read observation as narration rather than measurement: the pending list is only observable at request time, so unlike the reviews themselves it cannot be re-derived afterwards, and the same PR is where the session's own POST count turned out not to match its timeline.
+  [`pr-on-claim.cases.md`](../shared/workflow/pr-on-claim.cases.md)'s "The blocking message prescribes a non-dischargeable shape" carries the derived figures;
+  read them there rather than restating them here, since #3010 is open and any copy drifts.
 
-  **Three cautions on those two data points, none of which the raw counts show.**
-  The bcs record's zero-review direction is not clean evidence: [`challenge-the-assignment.cases.md`](../shared/workflow/challenge-the-assignment.cases.md) records that `_argv_close`'s docstring in `hooks/no-unreviewed-pr.py` documents HTTP 200 on this endpoint as what GitHub returns for an already merged or closed PR, adding nobody by design, and that confound was confirmed to apply to some of those four calls without being shown to explain all of them.
-  On the #3010 side, the PR's timeline carries four `review_requested` events, fewer than the POSTs the session believed it had made, so read the timeline rather than a session's own count when the number matters.
-  And #3010 is still open, so the review count drifts;
-  the four above are what the endpoint returned by `17:00:45Z` on 2026-09-02.
+  So the empty read is confirmed **uninformative in the reviews-arriving direction** and not yet in the other.
+  The `ucdavis/bcs` #648/#649/#650 record further down this file is the zero-review candidate, and it is confounded: [`challenge-the-assignment.cases.md`](../shared/workflow/challenge-the-assignment.cases.md) records `_argv_close`'s docstring in `hooks/no-unreviewed-pr.py` documenting HTTP 200 on this endpoint as what GitHub returns for an already merged or closed PR, adding nobody by design, and that confound was confirmed to apply to some of those four calls without being shown to explain all of them.
+  Until that is settled the honest statement stays *unreliable*, not *uninformative*.
 
   - **Do:** poll the review bodies on the head when you need to know whether a reviewer engaged.
   - **Do:** derive a POST count from `review_requested` timeline events rather than from a narration of the turns.
   - **Don't:** re-POST because the pending list came back empty;
-    that read carries no information in either direction.
-  - **Don't:** cite the bcs zero-review direction as settled --- its status-code confound is open.
+    an empty read has now been seen with reviews arriving, so it is not evidence the request failed.
+  - **Don't:** cite the bcs zero-review direction as settling the converse --- its status-code confound is open.
 
   **Both outcomes were genuinely observed on the same repo the same day, so do not flatten this into "it returns 201".**
   One session ran the POST once and got `422`;

@@ -276,24 +276,21 @@ An instrument with no such result is a finding on its own terms, per [`verify-th
 Five adversarial rounds each found real defects against a fully green suite, and three of the five found them in the verification tooling rather than in the change: a parity metric that could not fail, a negative control patching a function that had moved off the execution path, and an assertion comparing a function against itself.
 The last of those had let a previously-rejected design pass 299 tests.)
 
-## Prose *about* an instrument is reviewed against the instrument, not against the prose
+## A docs-only diff describing an instrument earns MORE rounds, not fewer
 
 The section above says a diff's verification artifacts are the least-guarded part of it.
-Its mirror is a diff carrying no code at all: documentation describing how an instrument behaves.
-That reads as the safest change available --- nothing executes, no suite can break, and the round feels like a copy-edit --- which is exactly why the claims in it go unexecuted.
+Its limit case is a diff carrying no code at all: documentation describing how an instrument behaves.
+That reads as the safest change available --- nothing executes, no suite can break, and the round feels like a copy-edit --- so it is where a review round is most likely to be cut short.
 
-The defect has one shape, and it produces sentences that are fluent, specific, and false: **stating what code plausibly does instead of running it.**
-A consumer is described as reading one field when it falls back to another;
-a format is called unparseable when the parser accepts it;
-a value is called rejected when nothing validates it;
-a set of accepted forms is given as two when the code accepts three.
-None of those reads as a guess afterwards, because each is a claim about a file sitting in the same repository, and knowing roughly what that file does feels like having read it.
+The defect it carries is not new here.
+[`fact-check-prose`](../writing/fact-check-prose.md)'s "Prose that distills code is a code claim, checked like code" already owns it, names the same psychology, and prescribes the same remedy;
+its "condensation of the code that builds it" section extends the rule to a written-out command, and its fenced-block section to program output.
+Read those for what the check is.
+What this section adds is the **review-side** consequence, which none of them states: how many rounds such a diff should be expected to absorb, and that a green suite and an unchanged line count are no argument for stopping.
 
-[`fact-check-prose`](../writing/fact-check-prose.md)'s "A command written into documentation is a condensation of the code that builds it" is the precedent this extends, and it already carries the core of the argument: a flat form quietly asserts that the conditions the code branches on do not exist.
-That section's artifact is a **command**, which at least reads as copy-pasteable and so invites a run.
-What this adds is the case with no such artifact --- a sentence describing what a consumer does, which invites nothing.
-The same file's fenced-block section covers the narrower case of program output composed from convention rather than captured from a run.
-The remedy is common to all three: run the consumer against the exact input the sentence describes, and quote what came back.
+The measured shape is worth carrying because it tells a reviewer where to aim.
+The findings cluster, rather than scattering: a consumer described as reading one field when it falls back to another, a format called unparseable when the parser accepts it, a value called rejected when nothing validates it, a set of accepted forms given as two when the code accepts three.
+None reads as a guess afterwards, because each is a claim about a file in the same repository, and knowing roughly what that file does feels like having read it.
 Where the claim is about which branch fires, read the branch.
 A negative claim --- *this form does not parse*, *nothing accepts this* --- is the one to execute rather than reason about, since it is the shape that cannot be confirmed by reading and is the shape a reviewer will refute.
 
@@ -306,8 +303,7 @@ A negative claim --- *this form does not parse*, *nothing accepts this* --- is t
 
 (Measured 2026-09-02 on [ai-config#3010](https://github.com/Morrison-Lab/ai-config/pull/3010), a documentation-only change carrying 52 insertions and 1 deletion across four files, of which 34 insertions are to this file.
 Twelve adversarial rounds are recoverable from the session: 7, 8, 4, 3, 3, 3, 1, 1, 0, then 4, 1, 0 after the scope reopened.
-Nine of those 35 findings were the one shape above.
-The refuted claims, each disproved by reading or running the named consumer: that the three payload consumers read the payload and nothing else, when they fall back to prose;
+Nine of those 35 findings were the one shape above, and five of the nine are recoverable, each disproved by reading or running the named consumer: that the three payload consumers read the payload and nothing else, when they fall back to prose;
 that a bolded verdict phrase does not parse, when it does;
 that demoting a disclosure marker changes `_reviewer_identity()`, when the Claude Code footer is deliberately excluded from `REVIEW_AGENT_MARKERS`;
 that a non-conforming payload is rejected, when nothing validates it;
@@ -315,8 +311,7 @@ and that the pre-push guard accepts two verdict phrasings, when it accepts three
 
 ## Require detailed and holistic review passes
 
-Reviewers must independently assess both detailed, evidence-backed implementation defects and the whole change:
-requirements, intent, cross-file consistency, integration, regression risk, and validation.
+Reviewers must independently assess both detailed, evidence-backed implementation defects and the whole change: requirements, intent, cross-file consistency, integration, regression risk, and validation.
 A perfunctory scan of isolated diff hunks misses both subtle line-level bugs and systemic architectural drift.
 
 The two passes evaluate complementary failure modes:

@@ -813,23 +813,25 @@ code.
 A `diff -q` guard confirmed the file had changed and did not catch
 the miss.)
 
-**The same collision reaches the ASSERTION, not only the mutation, and there it makes the negative half of a test vacuous.**
+**The same collision reaches the ASSERTION, not only the mutation, and there it makes the whole test vacuous.**
 
 The outcome above is about a mutation landing on the wrong occurrence of a string.
 Its dual is a test whose needle is a string the artifact under test **already** carries somewhere else.
-The positive assertion then passes on the pre-existing occurrence, and the negative assertion --- *this needle must be absent before the fix* --- passes because the needle was present all along in a passage the fix never touches.
-Nothing is red, and the test discriminates nothing.
+The assertion then passes on that pre-existing occurrence, so it passes against the *unfixed* artifact as readily as against the fixed one.
+The control that should have turned it red does not, and the test discriminates nothing.
 
 It bites hardest on a guard whose message is written in the same vocabulary as its own rule, since the phrase that best describes the new behaviour is the phrase an adjacent branch already prints.
 `no-placeholder-reply.py`'s whole-message anchoring, in [`CLAUDE.md`](../../CLAUDE.md), is the shipped form of the same precaution applied to a matcher rather than to a test.
 
 - **Do:** grep the artifact for the needle **before** writing the assertion, and pick one that returns zero hits on the unfixed file.
-- **Do:** run the negative assertion against the pre-fix artifact and confirm it fails there;
+- **Do:** run the assertion against the pre-fix artifact and confirm it **fails** there;
   a needle that passes both ways is not a test.
+- **Do:** scope the assertion to the region the fix touches when a bare needle cannot be made unique.
 - **Don't:** choose a needle by quoting the fix's own explanation --- that wording is the likeliest to already appear in a neighbouring branch or docstring.
 
 (Measured 2026-09-02 while adding a hook test for [ai-config#3017](https://github.com/Morrison-Lab/ai-config/issues/3017).
-The needle was the phrase `chained AHEAD`, which the hook's pre-existing label-exemption paragraph already contained, so the must-be-absent half passed against the unfixed script.)
+The needle was the phrase `chained AHEAD`, and `git show origin/main:hooks/no-unreviewed-pr.py | grep -c 'chained AHEAD'` returns 6 --- five docstrings plus the label-exemption message the fix never touches.
+So the assertion passed against the unfixed script, and the pre-fix control that was supposed to fail did not.)
 
 **A tenth outcome: the property under test is enforced at more than
 one independent site, and mutating one leaves the others standing

@@ -90,7 +90,7 @@ See [`pr-on-claim.cases.md`](pr-on-claim.cases.md),
 **Third occurrence, 2026-09-02, and the new fact is that the hook's own blocking message never states this constraint for the request, though it states it for a neighbouring command.**
 
 The two rules above tell you to run the POST alone.
-The message you read at Stop gives the POST, then `Then verify a review actually lands at the current head`, then a `gh pr view --json reviews` count --- two steps, in two fenced blocks, silent on whether they belong in one Bash call.
+The message you read at Stop gives the POST, then `Then verify a review actually lands at the current head`, then a `gh pr view --json reviews` count --- two steps, each a four-space-indented block inside one reason string, silent on whether they belong in one Bash call.
 Silence is not neutral here, because one call is the cheap reading and the whole instruction arrives in one block.
 Taken that way the POST is no longer last, `request_ident()` reports it as non-last, and the obligation stays live: the hook re-fires, the message repeats verbatim, and following it again reproduces the same shape.
 

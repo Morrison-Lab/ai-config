@@ -648,6 +648,13 @@
               "so the matcher is a prefilter rather than the only gate: the Cursor",
               "names StrReplace/EditNotebook are handled there, not here."
             ]
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-unmeasured-timestamp.py\"",
+            "timeout": 10,
+            "script": "flag-unmeasured-timestamp.py",
+            "why": "CLAUDE.md 'Timestamp recaps in local time', session notebook / memory file edit surface (ai-config#2900, #2947). Warns when writing to session notebooks or memory files stating a Pacific clock time without a date reading in the turn."
           }
         ]
       },
@@ -660,6 +667,13 @@
             "timeout": 10,
             "script": "warn-stale-issue-edit.py",
             "why": "skills/check-history/SKILL.md invokes its issue/PR checks at read time, and the omission is broken at the first Write/Edit, which leaves no artifact for review or tests to catch. Warns, never blocks."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-unmeasured-timestamp.py\"",
+            "timeout": 10,
+            "script": "flag-unmeasured-timestamp.py",
+            "why": "CLAUDE.md 'Timestamp recaps in local time', session notebook / memory file edit surface (ai-config#2900, #2947). Warns when editing session notebooks or memory files stating a Pacific clock time without a date reading in the turn."
           }
         ]
       },
@@ -672,6 +686,13 @@
             "timeout": 10,
             "script": "warn-stale-issue-edit.py",
             "why": "skills/check-history/SKILL.md invokes its issue/PR checks at read time, and the omission is broken at the first Write/Edit, which leaves no artifact for review or tests to catch. Warns, never blocks."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-unmeasured-timestamp.py\"",
+            "timeout": 10,
+            "script": "flag-unmeasured-timestamp.py",
+            "why": "CLAUDE.md 'Timestamp recaps in local time', session notebook / memory file edit surface (ai-config#2900, #2947). Warns when editing session notebooks or memory files stating a Pacific clock time without a date reading in the turn."
           }
         ]
       },

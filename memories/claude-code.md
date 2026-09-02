@@ -99,20 +99,23 @@
   Use temp files instead.
   See [`memories/zsh.md`](zsh.md), "A process substitution feeding a pipeline fails under zsh".
 
-## Skill command blocks — resolve the ai-config repo root with the per-skill symlink
-- To `cd` to the repo root from inside a skill, use the **per-skill** form
-  `git -C ~/.claude/skills/<this-skill> rev-parse --show-toplevel`, never the
-  bare-parent `git -C ~/.claude/skills rev-parse --show-toplevel`. `bootstrap.sh`
-  may symlink skills
+## Skill command blocks — resolve the ai-config repo root with the plugin root or per-skill fallback
+- To `cd` to the repo root from inside a skill, use
+  `${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/<this-skill> rev-parse --show-toplevel 2>/dev/null || pwd)}`,
+  which uses `$CLAUDE_PLUGIN_ROOT` under native plugin installs and falls back to
+  the per-skill symlink `git -C ~/.claude/skills/<this-skill> rev-parse --show-toplevel`
+  under legacy symlink setups, never the bare-parent `git -C ~/.claude/skills rev-parse --show-toplevel`.
+  `bootstrap.sh` may symlink skills
   *per-child* into a real `~/.claude/skills` directory, so the parent isn't a
   symlink into the repo and `git -C` there fails with "not a git repository".
-  The `@claude` reviewer enforces the per-skill form on new skills (it flagged
-  the bare-parent form on PR #71); `skill-builder` and `ums` already use it.
+  The `@claude` reviewer enforces the plugin/per-skill form on new skills;
+  `skill-builder` and `ums` already use it.
 - Issue #36 originally proposed the bare-parent `git -C ~/.claude/skills
   rev-parse --show-toplevel` — but that example is the unreliable one (it can
   error with "not a git repository", not a security risk). #36 was closed by
   PR #110, which standardized on the **per-skill** form for `record-learnings`
-  and `memorize`; PR #109 swept the last straggler #110 missed (`find-overlap`).
+  and `memorize`; PR #109 swept `find-overlap`, and #2530 ported all skills
+  to `${CLAUDE_PLUGIN_ROOT}` with per-skill fallback.
 - **Worktree caveat:** the resolved toplevel is the **MAIN** checkout, often on
   another session's branch — don't author files there. Work in your own
   worktree's `skills/<name>/` dir (full rationale in `skill-builder`'s Ship-it

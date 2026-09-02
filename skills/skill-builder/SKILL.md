@@ -38,7 +38,7 @@ Rule out extending an existing skill *before* scaffolding anything:
 1. **Search the whole corpus, not only `skills/`**, for something that already
    owns (or is adjacent to) this concern:
    ```bash
-   cd "$(git -C ~/.claude/skills/skill-builder rev-parse --show-toplevel)"   # the ai-config repo
+   cd "${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/skill-builder rev-parse --show-toplevel 2>/dev/null || pwd)}"   # the ai-config repo
    ls skills/ scripts/ hooks/
    grep -ril "<keywords>" skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md
    ```
@@ -330,7 +330,7 @@ local-only. Commit via a **branch + PR** (not direct to main), request
 > `git branch --show-current` before committing.
 
 ```bash
-cd "$(git -C ~/.claude/skills/skill-builder rev-parse --show-toplevel)"   # ai-config root — NOTE: the MAIN checkout, NOT your worktree (see caveat above)
+cd "${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/skill-builder rev-parse --show-toplevel 2>/dev/null || pwd)}"   # ai-config root — NOTE: the MAIN checkout, NOT your worktree (see caveat above)
 git fetch origin main && git checkout -b add-<name>-skill origin/main   # FETCH, CREATE_BRANCH
 # write skills/<name>/SKILL.md (+ alias dir, + preferences/CLAUDE.md if it's a rule)
 python3 scripts/sync-codex-skill-wrappers.py   # regenerate codex-skills/ wrappers — REQUIRED for every new/renamed skill

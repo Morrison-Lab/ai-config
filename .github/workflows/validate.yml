@@ -159,6 +159,9 @@ jobs:
         # pre-push check list from THIS file; its dogfood case asserts the
         # derived plan names every scripts/test_*.py suite.
         run: python3 scripts/test_run_local_validation.py
+      - name: Run validate-workflow guard tests
+        # ai-config#1730: the new-line-breaks job's pull_request gate and base-ref.
+        run: python3 scripts/test_validate_workflow.py
       - name: Check that all scripts/test_*.py test suites are gated
         # ai-config#2540: verify every test suite in scripts/ is gated in CI.
         run: python3 scripts/check-test-suites-covered.py
@@ -380,13 +383,11 @@ jobs:
             exit 0
           fi
           python3 scripts/check-context-closure.py --baseline "$REV" || true
-      - name: Check for oversized memory files (advisory)
-        # Non-blocking (ai-config#695): memory files are read on demand, so
-        # length is a real per-use cost -- but crossing the threshold is a
-        # prompt to consider splitting, not a defect that should block an
-        # unrelated PR. See the script's docstring for the threshold's
-        # rationale.
-        run: python3 scripts/check-memory-file-size.py
+      - name: Check for oversized memory files
+        # ai-config#695, #2970: memory files are read on demand, so length is
+        # a real per-use cost. Gated strictly at 1250 lines in CI so the pre-push
+        # check and CI agree.
+        run: python3 scripts/check-memory-file-size.py --strict
       - name: Run stale-record check tests
         run: python3 scripts/test_check_stale_records.py
       - name: Check for stale and orphaned records (advisory)
@@ -413,6 +414,17 @@ jobs:
     uses: Morrison-Lab/gha/.github/workflows/lint-qmd.yml@v2
 
   new-line-breaks:
+    # Only a pull_request event supplies a base to diff against. On a push
+    # run the action used to skip with a warning and conclude `success`, which
+    # on the PR page is indistinguishable from having run and passed
+    # (ai-config#1730: one PR showed a passing push run and a failing PR run
+    # at the same commit). Gating the job makes a push run report `skipped`
+    # instead. A pull_request run can still skip with the same warning when
+    # the diff cannot be computed (the action's own shallow-clone path), so
+    # this fixes the missing-base push status and nothing more.
+    # scripts/test_validate_workflow.py pins this guard and the base-ref
+    # expression below.
+    if: github.event_name == 'pull_request'
     # Diff-scoped, blocking (ai-config#682, ported to gha#300): MD013 is off
     # repo-wide (see .markdownlint-cli2.jsonc) because most of the corpus has
     # drifted from the last semantic-line-breaks reformat. This only flags
@@ -470,12 +482,12 @@ jobs:
           # Quoted: a composite action's inputs are strings, unlike the
           # reusable workflow's typed `boolean`.
           fail: 'true'
-          # On PRs, check only lines added relative to the base; otherwise
-          # (push to main) there is no base to diff against, so the check
-          # skips cleanly instead of scanning the whole tree. This reproduces
-          # the expression the reusable workflow supplied, which is why no
-          # `if: github.event_name == 'pull_request'` guard is needed.
-          base-ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
+          # Lines added relative to the PR base. The job-level `if:` above
+          # already restricts this job to pull_request events, so the
+          # expression can name the base SHA directly; the action's own
+          # skip-with-a-warning path (no base ref) is no longer reachable
+          # from here.
+          base-ref: ${{ github.event.pull_request.base.sha }}
 
   lint-markdown:
     uses: Morrison-Lab/gha/.github/workflows/lint-markdown.yml@v2

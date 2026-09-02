@@ -69,8 +69,12 @@ ADMISSION = re.compile(
     r"""(
       \bi\s+was\s+(wrong|mistaken|incorrect)
     | \bi\s+got\s+(that|this|it)\s+wrong
-    | my\s+(mistake|error)\b
-    | my\s+(earlier|previous|prior|last)\s+
+    # `\bmy`, not bare `my`: without the anchor a word ENDING in "my" supplied
+    # the possessive, so "The dummy error was expected" and "An anatomy
+    # error crept in" both fired as first-person admissions (ai-config#1898,
+    # the same class as the bare `i` alternatives above).
+    | \bmy\s+(mistake|error)\b
+    | \bmy\s+(earlier|previous|prior|last)\s+
         (claim|statement|report|answer|assertion|reading|count)\s+
         was\s+(wrong|incorrect|false)
     | \bi\s+(mischaracterized|misread|miscounted|misdiagnosed|misremembered)

@@ -109,7 +109,7 @@ See [`pr-on-claim.cases.md`](pr-on-claim.cases.md),
 - **Don't:** treat a negative ruleset result as establishing that the request failed --- ai-config returns exactly that while the request still reaches Copilot.
 - **Don't:** re-POST on a repo whose ruleset auto-requests while a `copilot-pull-request-reviewer` check run is queued or in progress on the head --- the retry changes nothing and the empty read repeats.
   A completed run on an unchanged head is no veto: a Rebut/Defer-only round pushes nothing, and [`skills/ardi/SKILL.md`](../../skills/ardi/SKILL.md) requires a fresh request there.
-  A ready head with no such run about a minute after the push is the other case, measured per push in [`memories/github-mcp-tools.md`](../../memories/github-mcp-tools.md): there a run followed the request within seconds, an observed sequence rather than a proven cause, and a merely delayed run makes the request a duplicate that spends one call, the accepted risk.
+  A ready head with no such run about a minute after the push is the other case, measured per push in [`memories/copilot-reviews.md`](../../memories/copilot-reviews.md): there a run followed the request within seconds, an observed sequence rather than a proven cause, and a merely delayed run makes the request a duplicate that spends one call, the accepted risk.
 
 See [`pr-on-claim.cases.md`](pr-on-claim.cases.md),
 "Three surfaces fail to discriminate a vanished pending request".

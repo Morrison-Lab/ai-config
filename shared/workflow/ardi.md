@@ -859,6 +859,17 @@ the tool broadly does.**
 catch it --- assert the two paths that diverge, not the one you just
 touched.**
 
+**And when you mutation-test the fix (revert it, expect the test to fail),
+confirm the test actually EXECUTED under the reverted state, not just that
+its failure count stayed at zero.**
+Identical before/after counts are not reassurance --- an identically-zero
+`FAILED` line is what a test that never ran and a test that ran and passed
+both print.
+Check for `ERROR`/`SKIP` on the specific test in the reverted run before
+reading a matching count as "the guard doesn't need this fix".
+See [`ardi.cases.md`](ardi.cases.md), "A mutation test whose reverted run
+never reached its assertion".
+
 **A systematic audit done by skimming is worse than the one-at-a-time
 version it replaces.**
 

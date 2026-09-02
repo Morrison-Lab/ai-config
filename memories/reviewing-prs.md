@@ -105,3 +105,22 @@ The issue carve-out is inferred too: nothing in either directive mentioned issue
 An issue on a repo I own is different from a PR on it:
 filing, triaging, and commenting on issues is fine,
 and an issue someone else's open PR already fixes is left to that PR (not grabbed, and that PR not driven either).
+## Search the issue thread before rebutting "no source exists"
+
+A reviewer asked for a permalink to the post a chapter summarized.
+The rebuttal said none existed, because the issue *body* carried only a
+paraphrase.
+The permalink sat in a comment on that same issue, and the rebuttal was a
+false state claim (wai#184 / wai#98, 2026-09-01).
+
+An issue is its body plus its comments, and the body is the part that
+gets read.
+Before asserting that a source, a link, or a decision is absent, query the
+comments too:
+`gh api repos/<owner>/<repo>/issues/<N>/comments --paginate`, or
+`issue_read` with `method: get_comments` in a remote session.
+Then cite the found comment by URL.
+
+- **Do:** run the comments query and quote what it returned before writing
+  "no permalink exists".
+- **Don't:** rebut an absence finding from the issue body alone.

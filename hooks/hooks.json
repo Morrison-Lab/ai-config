@@ -29,14 +29,14 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/ensure-open-pr-monitor.py\"",
             "timeout": 10,
             "script": "ensure-open-pr-monitor.py",
-            "why": "Ensures one detached timer continuously reconciles every open PR authored by the authenticated user, including PRs opened outside this session."
+            "why": "Ensures one detached timer continuously reconciles every open GitHub PR and GitLab merge request authored by the authenticated user, including ones opened outside this session."
           },
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/inject-pr-monitor-status.py\"",
             "timeout": 10,
             "script": "inject-pr-monitor-status.py",
-            "why": "Surfaces changed state from no-unmonitored-pr.py's detached timer on the next prompt. The fallback observes a PR while the session is absent but cannot wake a terminated model."
+            "why": "Surfaces changed state from the detached pollers on the next prompt: the per-PR watchers no-unmonitored-pr.py starts (GitHub only) and the all-open-PR monitor, which also polls GitLab merge requests. A poller observes while the session is absent but cannot wake a terminated model."
           },
           {
             "type": "command",
@@ -443,6 +443,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-unmeasured-timestamp.py\"",
+            "timeout": 10,
+            "script": "flag-unmeasured-timestamp.py",
+            "why": "CLAUDE.md 'Timestamp recaps in local time', forge-comment surface (ai-config#2900, #2903; measured 2026-09-01: claim comments stamped 12:15/12:40/12:58 PT off one 12:02 PDT reading, the next real reading 12:21 PDT). Warns, never blocks, when a `gh pr comment`/`gh issue comment`/`gh pr review`/`gh api .../comments` body about to post states a Pacific clock time (the Stop sibling's `RX_CLAIM` shape: HH:MM, optional seconds, optional AM/PM, then PDT, PST, or PT) and no clock read appears in the transcript since the current turn began -- or, when the harness's injected reading is in this turn, the stamp runs ahead of its value. The chat-recap half is `no-unmeasured-clock-claim.py` at Stop, whose `scan()`, `RX_CLAIM`, and context exemptions this hook imports so the two agree on what a turn, a clock read, and a stamp are; a comment body never reaches a Stop hook, which is the gap this fills. A post whose body the hook cannot read (a `--body-file` written by a heredoc in the same call, `--body-file -`) gets a cannot-read note rather than silence, after require-agent-disclosure.py's third verdict. Warns because a quoted or relayed time (a CI timestamp, a reviewer's own stamp) is legitimate and not distinguishable by the body alone."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-new-line-breaks-on-push.py\"",
             "timeout": 15,
             "script": "warn-new-line-breaks-on-push.py",
@@ -475,6 +482,57 @@
               "Activation follows this file's uniform model (see the top-level",
               "_comment and README): the plugin loads it on enable, and",
               "install-hooks.py --fix registers it for a non-plugin install."
+            ]
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-fable-subagent.py\"",
+            "timeout": 10,
+            "script": "no-fable-subagent.py",
+            "why": "Denies an Agent launch that names Fable, or that omits `model` in a session whose own model is Fable (the inherit path is how the violation happens), unless FABLE_SUBAGENT_OK=1 records the user's explicit grant for that launch; warns on a Workflow launch in a Fable session, whose agent() calls it cannot inspect. User directive 2026-09-01, ai-config#2927: 8 of 10 launches in one session inherited Fable and the account hit its usage limit.",
+            "_note_blocks": [
+              "Emits `permissionDecision: deny` only for the two Fable cases above;",
+              "every other Agent launch is untouched, and an unreadable transcript",
+              "adds a note rather than a denial, so a missing file never stops work.",
+              "Never emits `allow`."
+            ]
+          }
+        ]
+      },
+      {
+        "matcher": "Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-fable-subagent.py\"",
+            "timeout": 10,
+            "script": "no-fable-subagent.py",
+            "why": "Denies an Agent launch that names Fable, or that omits `model` in a session whose own model is Fable (the inherit path is how the violation happens), unless FABLE_SUBAGENT_OK=1 records the user's explicit grant for that launch; warns on a Workflow launch in a Fable session, whose agent() calls it cannot inspect. User directive 2026-09-01, ai-config#2927: 8 of 10 launches in one session inherited Fable and the account hit its usage limit.",
+            "_note_blocks": [
+              "Emits `permissionDecision: deny` only for the two Fable cases above;",
+              "every other Agent launch is untouched, and an unreadable transcript",
+              "adds a note rather than a denial, so a missing file never stops work.",
+              "Never emits `allow`."
+            ]
+          }
+        ]
+      },
+      {
+        "matcher": "Workflow",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-fable-subagent.py\"",
+            "timeout": 10,
+            "script": "no-fable-subagent.py",
+            "why": "Warns on a Workflow launch in a Fable session: its agent() calls inherit the session model unless each sets `model`, and the hook cannot inspect the script, so it names the risk and leaves the decision visible (ai-config#2927).",
+            "_note_warns_never_blocks": [
+              "On the Workflow matcher this script only ever adds context; the deny path is reachable from the Agent matcher alone."
             ]
           }
         ]
@@ -538,6 +596,13 @@
             "timeout": 10,
             "script": "require-agent-disclosure.py",
             "why": "The MCP half of the Bash entry above. A remote/web session has no `gh` on PATH, so mcp__github__add_issue_comment and its siblings are the ONLY way it posts a comment -- and hooks.json matches by tool name, so the Bash entry never sees them. Same script, same warn-only behaviour; it reads tool_input.body directly rather than parsing a command line, and stays silent when no string body is present (some pull_request_review_write methods submit without one)."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-unmeasured-timestamp.py\"",
+            "timeout": 10,
+            "script": "flag-unmeasured-timestamp.py",
+            "why": "The MCP half of the Bash entry above, following require-agent-disclosure.py's precedent. The #2900 claim comments went out through mcp__github__add_issue_comment from a remote session with no `gh` on PATH, and hooks.json matches by tool name, so the Bash entry never sees them. Same script, same warn-only behaviour; it reads tool_input.body directly for every tool in require-agent-disclosure.py's MCP_POST_TOOLS (imported, so the two guards cover the same set) and stays silent when no string body is present."
           }
         ]
       },

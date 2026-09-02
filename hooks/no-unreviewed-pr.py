@@ -430,6 +430,163 @@ def draft_ident(cmd):
     return False, None, None, False
 
 
+# Options of `git push` that consume the following token, so a value is never
+# mistaken for a refspec -- nor, in _push_re_heads() below, for the
+# --dry-run/-n or --delete/-d exclusion (ai-config#1935). Shared with
+# no-push-without-self-review.py, which binds these names from this module.
+PUSH_OPTS_WITH_VALUE = {"--repo", "--receive-pack", "--exec", "-o", "--push-option",
+                        "--recurse-submodules"}
+
+# Short options that take a value, for the clustered form (`-qo ci.skip`).
+SHORT_OPTS_WITH_VALUE = "o"
+
+# git's parse-options accepts any UNAMBIGUOUS abbreviation of a long option, so
+# every table here has to be matched through a resolver rather than by string
+# equality. An earlier revision of no-push-without-self-review.py, which owned
+# these tables before ai-config#1935 moved them here, hardened only `--repo`
+# and left the rest exact, which was a fix to one site rather than to the
+# class. Measured there on git 2.43.0, with no `remote.<name>.push` configured
+# so only its indeterminate table could refuse them:
+#
+#   git push --all up   -> refused        git push --al up   -> ALLOWED
+#   git push --mirror up-> refused        git push --mir up  -> ALLOWED
+#   git push --tags up  -> refused        git push --ta up   -> ALLOWED
+#
+# and, defeating the value-aware parsing that guard's refspec walk depends on:
+#
+#   git push -o --repo=other   -> refused
+#   git push --pu --repo=other -> ALLOWED   (`--pu` IS `--push-option`)
+#
+# `--al` ships every ref. So an unresolved abbreviation is not a cosmetic gap.
+# Deliberately partial: it carries the options whose resolution CHANGES a
+# verdict (in either hook), plus enough neighbours to make ambiguity match
+# git's. `--ipv4` and `--ipv6` are absent, which is safe only because they
+# take no value -- an unknown option is passed through, and a valueless one
+# parses identically either way. A future value-taking option added in a
+# namespace this set does not cover would diverge silently, so add it here
+# when one appears.
+PUSH_LONG_OPTS = frozenset({
+    "--all", "--atomic", "--branches", "--delete", "--dry-run", "--exec",
+    "--follow-tags", "--force", "--force-if-includes", "--force-with-lease",
+    "--mirror", "--no-verify", "--porcelain", "--progress", "--prune",
+    "--push-option", "--quiet", "--receive-pack", "--recurse-submodules",
+    "--repo", "--set-upstream", "--signed", "--tags", "--thin", "--verbose",
+    "--verify",
+})
+
+# Ambiguity is the reason this returns a sentinel rather than just resolving.
+# `--re` matches --receive-pack and --recurse-submodules and git REFUSES it, so
+# neither hook may silently pick one: no-push-without-self-review.py bails to
+# indeterminate on it (the fail-closed direction for a refspec walk), and
+# _push_re_heads below need not care, since the command never runs. Distinct
+# from this file's `_AMBIGUOUS`, which marks a PR number seen in two repos.
+AMBIGUOUS_OPTION = object()
+
+
+def resolve_long_opt(head: str):
+    """`head` resolved to the option git would read it as.
+
+    Returns the full option name, AMBIGUOUS_OPTION when several match (git refuses
+    those outright), or `head` unchanged when nothing matches -- an option this
+    table does not know, left to be handled as it was before.
+
+    `--no-<x>` is resolved against `<x>` and returned in its `--no-` form, since
+    git accepts abbreviations there too (`--no-rep` is `--no-repo`).
+    """
+    if head in PUSH_LONG_OPTS:
+        return head
+    # No `--no-verify` special case is needed here: it is in PUSH_LONG_OPTS,
+    # so the exact-match return above has already fired for it.
+    negated = head.startswith("--no-")
+    stem = "--" + head[len("--no-"):] if negated else head
+    if stem in PUSH_LONG_OPTS:
+        return head
+    matches = {o for o in PUSH_LONG_OPTS if o.startswith(stem) and stem != "--"}
+    if len(matches) > 1:
+        return AMBIGUOUS_OPTION
+    if not matches:
+        return head
+    full = matches.pop()
+    return "--no-" + full[2:] if negated else full
+
+
+def walk_push_options(rest):
+    """Yield git's reading of each token after `push` as (kind, head, value).
+
+    The one walk over git's push-option grammar that both this hook and
+    no-push-without-self-review.py consume (ai-config#1935, #1920): this
+    hook to decide whether the command re-heads anything, that one to find
+    the refspecs it ships. Two hand-rolled walks disagreed about how git
+    takes values, which is the class of bug both are meant to catch.
+
+    kind "positional": `head` is the token; everything after a bare `--` is
+    positional whatever it looks like (`refs/heads/-dash` is a valid ref).
+    kind "option": `head` is the long option as git would read it, through
+    `resolve_long_opt` (so an abbreviation resolves, and an ambiguous one
+    is AMBIGUOUS_OPTION); `value` is the attached `=value`, or the next
+    token when the option takes one, else None. kind "short": one letter of
+    a cluster; a value-taking letter (`-o`) takes the rest of the cluster
+    or, when it ends the cluster, the next token (`-on` is `-o` with `n`,
+    `-qo ci.skip` is `-q` then `-o ci.skip`), and ends the cluster.
+    """
+    i = 0
+    end_of_options = False
+    while i < len(rest):
+        tok = rest[i]
+        i += 1
+        if end_of_options or not tok.startswith("-") or tok == "-":
+            yield ("positional", tok, None)
+            continue
+        if tok == "--":
+            end_of_options = True
+            continue
+        if tok.startswith("--"):
+            head, has_value, value = tok.partition("=")
+            head = resolve_long_opt(head)
+            if not has_value:
+                value = None
+                if head in PUSH_OPTS_WITH_VALUE:
+                    value = rest[i] if i < len(rest) else None
+                    i += 1
+            yield ("option", head, value)
+            continue
+        letters = tok[1:]
+        for position, letter in enumerate(letters):
+            if letter in SHORT_OPTS_WITH_VALUE:
+                value = letters[position + 1:]
+                if not value:
+                    value = rest[i] if i < len(rest) else None
+                    i += 1
+                yield ("short", letter, value)
+                break
+            yield ("short", letter, None)
+
+
+def _push_re_heads(rest):
+    """True unless the options after `push` say no ref is re-headed.
+
+    `--dry-run`/`-n` performs no push at all, and `--delete`/`-d` removes a
+    ref rather than advancing one, so neither leaves a new head to review.
+    git reads these last-wins, so `--no-dry-run`/`--no-delete` after one of
+    them restores the push (measured on git 2.43.0: `git push -n
+    --no-dry-run origin main` moves the remote ref). The tokens come from
+    `walk_push_options`, so `-n` as the value of `-o`, `-d` after
+    `--receive-pack`, `-on`, and a positional after `--` are never read as
+    the flag. After an ambiguous abbreviation (`--rec -n`) the answer is
+    immaterial: git refuses the command, so no push happens either way.
+    """
+    re_heads = True
+    for kind, head, _value in walk_push_options(rest):
+        if kind == "option":
+            if head in ("--dry-run", "--delete"):
+                re_heads = False
+            elif head in ("--no-dry-run", "--no-delete"):
+                re_heads = True
+        elif kind == "short" and head in "nd":
+            re_heads = False
+    return re_heads
+
+
 def _argv_push(argv):
     """True if argv is a `git push` that genuinely re-heads a branch.
 
@@ -441,7 +598,9 @@ def _argv_push(argv):
     Global options are skipped so `git -C <dir> push` and `git -c k=v push`
     are recognised. Two push forms are excluded because they do NOT re-head the
     branch, so no new head exists to review: `--dry-run`/`-n` performs no push
-    at all, and `--delete`/`-d` removes a ref rather than advancing one.
+    at all, and `--delete`/`-d` removes a ref rather than advancing one --
+    decided by _push_re_heads(), which walks option values rather than
+    scanning for the bare tokens.
     """
     if not argv or argv[0] != "git":
         return False
@@ -457,7 +616,7 @@ def _argv_push(argv):
         break
     if i >= len(argv) or argv[i] != "push":
         return False
-    return not _has_flag(argv[i + 1:], "--dry-run", "-n", "--delete", "-d")
+    return _push_re_heads(argv[i + 1:])
 
 
 def push_ident(cmd):

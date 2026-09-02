@@ -897,3 +897,30 @@ The duration was computed from the job's start and end timestamps after the merg
 Nothing about the green check prompted it, and without it a false causal claim would have stood on a merged PR and in an issue thread.
 The merge itself was correct to perform under [`sync-with-main`](sync-with-main.md) and stays;
 only the causal claim was wrong.)
+
+## A mutation test whose reverted run never reached its assertion
+
+(`UCD-SERG/serocalculator#668`, 2026-09-01: a regression test guarded a fix
+to a save/restore pair for the RNG kind.
+Mutation-testing the guard --- revert the fix, re-run, expect the test to
+fail --- was run against `pkgload::load_all()` rather than an installed
+build.
+The test spun up a `parallel::parLapplyLB()` cluster, whose PSOCK workers
+`require()` the package by name and cannot see a `load_all()` session's
+environment, so both the fixed and the reverted run **errored** before
+reaching the guard's assertion at all.
+`testthat`'s summary read `FAILED: 0` in both runs, which a glance reads as
+"the guard doesn't discriminate" when the true story is "neither run tested
+anything".
+Installing the package for real (`R CMD INSTALL .`) before re-running the
+mutation surfaced the difference the test was written to catch: `FAILED: 0`
+with the fix in place, a real assertion failure with it reverted.
+
+The tell, worth generalizing past this one platform quirk: any regression
+test reaching a code path that behaves differently under a development
+loader than under an installed package --- a parallel cluster, `system.file()`
+resolution, anything that spawns a second process --- can silently fail to
+execute under the loader without failing loudly, and a mutation count taken
+under that loader proves nothing either way.
+`memories/r-quarto.md`'s "`pkgload::load_all()` cannot serve a PSOCK cluster"
+section carries the mechanism.)

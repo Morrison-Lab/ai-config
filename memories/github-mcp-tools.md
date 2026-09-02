@@ -137,6 +137,11 @@ See ai-config#694 for the precedent.
   `review / gather-context` reading `in_progress` at `16:39:08Z` seconds later.
   That second check is the load-bearing one, since a 204 is an acknowledgement
   and says nothing about whether a job ran.
+  **Every `inputs` value must be a JSON string, even when the workflow declares that input `type: number`.**
+  `inputs: {"pr_number": 179}` (a JSON number) failed with `Invalid value for input 'pr_number'`; `inputs: {"pr_number": "179"}` (the same value as a string) queued the run.
+  This is the `workflow_dispatch` REST API's own contract -- GitHub Actions inputs are always strings on the wire regardless of the declared `type`, which only affects the web-UI form control -- so the tool is not misbehaving, and the fix is to stringify every input value, not just the ones already quoted in an example.
+  **Do:** pass every `actions_run_trigger` input as a string (`"179"`), including a value the workflow declares numeric.
+  **Don't:** pass a bare JSON number for a `type: number` input and expect the declared type to be honored.
   **Do not generalize it to the rerun family.**
   `rerun_failed_jobs`, `rerun_workflow_run`, and `cancel_workflow_run` were not
   exercised in that session, so the bullet above stands unrefuted for them; what
@@ -770,6 +775,11 @@ See ai-config#694 for the precedent.
   whose CI never ran.
   Compare `head_sha` against the PR's live `.head.sha`
   before treating any such event as progress.
+  The earliest measurement of this shape predates this bullet and lives in
+  [`fully-clean.cases.md`](../shared/workflow/fully-clean.cases.md),
+  "A `check_suite.completed` wake at a superseded head"
+  (`ucdavis/bcs#732`, 2026-08-23), which this bullet was written without
+  having found; read the two together.
   This stays a memory rather than a hook despite clearing
   [`deterministic-tools`](../shared/principles/deterministic-tools.md)'s
   third-occurrence bar:

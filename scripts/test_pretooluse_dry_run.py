@@ -158,6 +158,24 @@ class TestPreToolUseDryRun(unittest.TestCase):
         hso = out.get("hookSpecificOutput", {})
         self.assertIn("additionalContext", hso)
 
+    def test_flag_unmeasured_timestamp(self):
+        # ai-config#2903: a Pacific clock time in a comment body with no
+        # transcript (so no clock read) warns; a body with no stamp is silent.
+        code, out, _ = run_hook(
+            "flag-unmeasured-timestamp.py",
+            ["--dry-run", 'gh issue comment 96 -R d-morrison/wai --body "Claiming this -- 12:47 PT."'])
+        self.assertEqual(code, 0)
+        hso = out.get("hookSpecificOutput", {})
+        self.assertIn("additionalContext", hso)
+        self.assertIn("12:47 PT", hso["additionalContext"])
+        self.assertNotIn("permissionDecision", hso)
+
+        code, out, _ = run_hook(
+            "flag-unmeasured-timestamp.py",
+            ["--dry-run", 'gh issue comment 96 -R d-morrison/wai --body "Claiming this."'])
+        self.assertEqual(code, 0)
+        self.assertNotIn("additionalContext", out.get("hookSpecificOutput", {}))
+
     def test_flag_unassigned_worktree(self):
         code, out, _ = run_hook(
             "flag-unassigned-worktree.py",
@@ -167,6 +185,13 @@ class TestPreToolUseDryRun(unittest.TestCase):
         self.assertEqual(code, 0)
         hso = out.get("hookSpecificOutput", {})
         self.assertIn("additionalContext", hso)
+
+    def test_no_fable_subagent(self):
+        payload = json.dumps({"tool_name": "Agent", "tool_input": {"prompt": "x", "model": "fable"}})
+        code, out, _ = run_hook("no-fable-subagent.py", ["--dry-run", payload])
+        self.assertEqual(code, 0)
+        hso = out.get("hookSpecificOutput", {})
+        self.assertEqual(hso.get("permissionDecision"), "deny")
 
 
 if __name__ == "__main__":

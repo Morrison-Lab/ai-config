@@ -101,16 +101,12 @@ standing yes (see `preferences.md`).
   gone stale across the review loop — pass `commit_title` / `commit_message`
   rather than letting GitHub paste the outdated description. Keep `Closes #N` in
   the message so the linked issue auto-closes.
-- If `gh pr merge` fails with `Head branch is out of date`, first read the
-  PR's actual base branch (`gh pr view <N> --json baseRefName -q .baseRefName`
-  — do **not** assume `main`; stacked and release PRs target a different base),
-  sync that base into the PR branch, and retry once. **Syncing the base
-  creates a new head SHA, which invalidates the CI/review "fully clean"
-  snapshot that authorized the original merge attempt** — re-run the ARDI
-  "fully clean" check (`fully-clean.md`) against the new SHA before retrying
-  the merge, don't just retry the merge command itself; a repo that doesn't
-  make every workflow/review a required branch-protection check can
-  otherwise merge an unreviewed/untested new head. If the merge still fails,
+- If `gh pr merge` fails with `Head branch is out of date`, the base advanced after the pre-merge read: go back through the stale-base recovery above (the pinned update, the bounded wait, the currency check, and the whole clean gate on the new head) rather than syncing by hand.
+  The pinned update resolves the PR's configured base itself (stacked and release PRs target a branch other than `main`, and the endpoint reads that from the PR), and the pin refuses to update over a concurrent push, which a hand merge would not.
+  The update creates a new head SHA, so the clean verdict that authorized the first attempt no longer applies,
+  and a repository that does not make every workflow and review a required check would otherwise merge an unreviewed head,
+  which is why that cycle reruns the whole gate before its own pinned merge attempt.
+  If the merge still fails,
   don't compare against `origin` blindly — for a cross-fork PR, `origin` is
   the *base* repo, not necessarily where the head branch lives, so
   `git ls-remote origin refs/heads/<branch>` can silently read a missing ref
@@ -153,7 +149,16 @@ for that repo.
 ### 3. Verify the merge landed — never assume
 
 Confirm `merged == true` (the merge tool's result) and re-check the PR state and
-that the linked issue auto-closed. If the merge didn't land (conflict, branch
+that the linked issue auto-closed.
+On a base that requires a merge queue the merge command returns when the PR is enqueued, not when it merges.
+`state` alone cannot tell a waiting PR from an evicted one, since both read `OPEN`, so poll the GraphQL fields instead: `gh api graphql -f query='query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){pullRequest(number:$n){state isInMergeQueue mergeQueueEntry{state}}}}' -f o="<owner>" -f r="<repo>" -F n="<N>"`.
+The poll starts only after the merge command exited 0 having enqueued the PR, which is what gives the reading its meaning.
+`state` `MERGED` is success.
+`OPEN` with `isInMergeQueue` true is still waiting.
+`OPEN` with `isInMergeQueue` false and a null `mergeQueueEntry`, read after that enqueue, means the queue removed the PR (a failed speculative check) and is a failed merge to report.
+Before any enqueue the same reading only means not queued, so do not classify from it.
+Measured 2026-09-02 (Pacific) on [#2989](https://github.com/Morrison-Lab/ai-config/pull/2989), a PR never enqueued: both fields exist on the pull request object and read false and null there, which is the not-queued reading, not an eviction.
+If the merge didn't land (conflict, branch
 protection, not mergeable), **stop and report** — don't tidy or run UMS.
 
 ### 4. Chain into `post-merge` — automatically

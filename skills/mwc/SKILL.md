@@ -327,7 +327,13 @@ When the user gives an MWC grant (e.g. `/mwc` or "merge when confident"):
    (default on a base without a merge queue: `gh pr merge "<number>" -R "<owner>/<repo>" --squash --delete-branch --match-head-commit "<pinned-sha>"`;
    on a base that requires a queue: `gh pr merge "<number>" -R "<owner>/<repo>" --match-head-commit "<pinned-sha>"`, with no strategy and no `--delete-branch`, since `gh` refuses that flag when enqueuing;
    the pin being the `headRefOid` recorded before the instrument ran),
-   verify the merge landed on GitHub/GitLab,
+   verify the merge landed on GitHub/GitLab (under a queue the command
+   returns on enqueue, so poll the GraphQL `state`, `isInMergeQueue`, and
+   `mergeQueueEntry` fields per [`merge-it`](../merge-it/SKILL.md) step 3:
+   `MERGED` is success, `OPEN` with `isInMergeQueue` true is still
+   waiting, and `OPEN` with `isInMergeQueue` false and a null
+   `mergeQueueEntry`, read after the enqueue succeeded, is an eviction to
+   report as a failed merge),
    and run the post-merge skill (`post-merge` / `ums`).
 4. If the user revokes the grant, run `skills/session-lock/scripts/ai-session.sh disable-mwc` immediately.
 

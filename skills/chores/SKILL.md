@@ -200,7 +200,7 @@ Immediately before the merge command, require the live head to equal `$PINNED`, 
 That check's one-liner assigns the base tip to `tip`, so keep it as `TIP=$tip` and restart the gate if the live tip differs.
 A regenerated head that already contains the base would otherwise pass a currency check with CI never read for it.
 Then, when the base does not require a merge queue, run the base-currency check from [`fully-clean`](../../shared/workflow/fully-clean.md)'s stale-base rule (the Do bullets beginning "for a direct merge"), since a green head can still break the base when the base gained a check after the head's CI ran.
-When the base requires a merge queue, skip the check and the update.
+When the base requires a merge queue, skip the check and the update, provided the queue's coverage was verified against the full clean-gate inventory the way `fully-clean` prescribes (the rules query and every clean-gate workflow's `on:` and `if:`), not against the checks this skill happened to read in step 3, since a check the base gained after the PR's last run is exactly the one that set would miss.
 `gh pr merge` enqueues the PR and the queue's speculative merge tests the base, provided every check this skill reads is required and runs on `merge_group` (per `fully-clean`'s queue exception).
 If it is not, stop rather than update, since a manual update repairs neither gap.
 When that direct-path check finds the base stale (the queue path never reaches this paragraph), the bot-bump recovery is to update the branch pinned to `$PINNED`,
@@ -219,6 +219,10 @@ Dependabot deletes its own branch on merge.
 gh pr merge "$N" --repo "$REPO" --squash --match-head-commit "$PINNED"   # MERGE_PR; $PINNED is the headRefOid recorded above
 # On a base that requires a merge queue, drop --squash (the queue sets the strategy; gh only warns) and do not add --delete-branch.
 ```
+
+Under a queue that command returns when the PR is enqueued, not when it merges.
+`state` alone cannot tell a waiting PR from an evicted one, since both read `OPEN`.
+Poll the GraphQL `state`, `isInMergeQueue`, and `mergeQueueEntry` fields (the query in [`merge-it`](../merge-it/SKILL.md) step 3) until `state` is `MERGED` before counting the bump in the Merged column, and report `OPEN` with `isInMergeQueue` false and a null `mergeQueueEntry`, read after the enqueue succeeded, as an eviction, which is a failed merge.
 
 Pick a merge method the repo actually allows — `--squash` errors when squash
 merges are disabled; swap in `--merge` or `--rebase` to match the repo's

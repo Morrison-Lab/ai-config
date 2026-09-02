@@ -412,8 +412,9 @@
   `gh issue view 1334` returns `{"number":1334,"state":"MERGED",...}` without complaint.
   Same key the timeline bullet above relies on.
   What it adds is that the plain `gh issue view` path answers for both kinds, and so distinguishes neither.)
-- **`gh pr checks` does NOT say which checks are REQUIRED, and the legacy protection endpoint 404s on ruleset-gated repos — so the lazy check confirms the wrong answer.**
-  `gh pr checks` reports check *state* only; required-ness is nowhere in its output.
+- **Plain `gh pr checks` does NOT say which checks are REQUIRED (`--required` does, and only within the current rollup), and the legacy protection endpoint 404s on ruleset-gated repos --- so the lazy check confirms the wrong answer.**
+  Plain `gh pr checks` reports check *state* only.
+  `gh pr checks --required` (present in `gh` 2.98.0, checked 2026-09-02) filters to the required ones among the checks in the current rollup, and neither form can show a required check that is absent from that rollup, which is the base-gained-a-check case.
   And `gh api repos/<o>/<r>/branches/<branch>/protection` returns `404 Branch not protected` on a repo that gates the branch with a **ruleset** rather than legacy branch protection, which reads as "nothing is required" and *confirms* the mistaken assumption.
   Query rulesets too, before any "ready to merge" or "that check doesn't gate us" claim:
   ```bash
@@ -569,6 +570,36 @@
   (`### 🟢 Approval recommended` for clean signoff, `### 🟡 Changes recommended` for changes requested).
   Review verification tools and mistake patterns (Pattern 40) require recognizing `copilot-pull-request-reviewer`
   and its clean/not-clean verdict patterns so Copilot reviews are tracked as part of the automated review gate.
+
+  **On the 2026-09-01 (Pacific) sample, with Copilot reviewing again, the 201-then-empty `requested_reviewers` signature above still held, and the fix is to poll `reviews`, not `reviewRequests`.**
+  On the PRs below, `gh api repos/<owner>/<repo>/pulls/<N>/requested_reviewers -X POST -f 'reviewers[]=copilot-pull-request-reviewer[bot]'` returned HTTP 201 each time.
+  The section above records 422 and refusal as other outcomes.
+  `gh pr view --json reviewRequests` stayed empty each time.
+  On those same requests the review then landed (a few minutes later on [#2976](https://github.com/Morrison-Lab/ai-config/pull/2976)), visible under `gh pr view --json reviews` with author login `copilot-pull-request-reviewer`, which `startswith("copilot")` matches.
+  That is an observation of those PRs, not a guarantee: the empty request list stays inconclusive (see the 201-then-empty section above), and the posted review is the only evidence of arrival.
+  The inline comments of that review (`gh api repos/<owner>/<repo>/pulls/<N>/comments`) carry `user.login` `Copilot` instead, so a query over comments needs a case-insensitive test (`test("copilot"; "i")`) while a query over reviews does not.
+  On those PRs a re-request after a push was followed by a fresh review on the new head.
+  Count reviews per `commit.oid` to tell a new round from the old one.
+  Measured 2026-09-01 on [#2975](https://github.com/Morrison-Lab/ai-config/pull/2975) through [#2979](https://github.com/Morrison-Lab/ai-config/pull/2979) and [#2983](https://github.com/Morrison-Lab/ai-config/pull/2983).
+
+  - **Do:** poll `reviews` (count, login, and `commit.oid`) for the landed review rather than `reviewRequests`.
+  - **Do:** match the inline-comment author case-insensitively, since it is `Copilot` there and `copilot-pull-request-reviewer` on the review.
+  - **Don't:** read an empty `reviewRequests` as a failed request, nor as a review on its way --- it discriminates nothing, so read the check run and the posted review instead.
+  - **Don't:** read a review on an older `commit.oid` as the verdict on the head you just pushed.
+
+  **Two reviewers are two finding streams, and the checker's one-line verdict is not either of them.**
+  Measured 2026-09-02 on [#2979](https://github.com/Morrison-Lab/ai-config/pull/2979):
+  five Copilot rounds were read and answered while the Claude review repeated the same docstring finding five times unread,
+  because each poll read only the verdict line of `check-pr-fully-clean.py` and the Copilot inline comments.
+  The checker prints one or more blocker bullets per selected review (a review state such as `CHANGES_REQUESTED` and a body finding each get one).
+  For a structured review payload that bullet carries the first finding's file and message.
+  For free-text prose it names only the regex pattern that matched.
+  In neither case is it the full findings list.
+  Those bullets say which review still blocks.
+  The findings themselves are in that review's body, and each reviewer's set has to be read after every push.
+  - **Do:** after each push, read the checker's blocker bullets, then the Claude `### Findings` section and the Copilot review body and comments they point at.
+  - **Don't:** treat the verdict line, or one reviewer's round, as the whole of what is open on the head.
+
   **Re-measured 2026-08-06 with a wider denominator:** across `Morrison-Lab/ai-config`'s last 60 merged PRs, every Copilot review object carries a refusal body and **zero** are substantive (query in [`shared/workflow/pr-on-claim.md`](../shared/workflow/pr-on-claim.md), which also explains why the object count drifts between runs while the zero does not).
   Say *refusals* rather than *quota refusals* when reporting a count like this, because the body alone does not name a cause: the 2026-08-06 Actions incident listed "Copilot code review" among its affected components, so a refusal inside that window has two candidate explanations.
   `Morrison-Lab/ai-config#1223` owns that discrimination and carries the timestamp table --- read it rather than re-deriving.

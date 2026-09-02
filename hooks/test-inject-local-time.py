@@ -2,7 +2,7 @@
 """Tests for hooks/inject-local-time.sh (ai-config#1080).
 
 The hook prints the current Pacific time for the model to quote verbatim, and
-must refuse to label a non-Pacific reading as local. Two cases:
+must refuse to label a non-Pacific reading as local. Four cases:
 
   1. First rung: the `date` stub answers PDT only when the hook sets
      `TZ=America/Los_Angeles`, and GMT otherwise -- the output carries the
@@ -12,7 +12,9 @@ must refuse to label a non-Pacific reading as local. Two cases:
      shape) -- the hook must fall past the first rung and still print a
      Pacific reading.
   3. Third rung: the stub answers GMT either way, and a `powershell` stub
-     answers PDT -- the hook must fall through both `date` rungs.
+     answers PDT only when invoked as `-NoProfile -Command` with the
+     Pacific-zone conversion program -- the hook must fall through both
+     `date` rungs and still hand PowerShell the real conversion.
   4. Negative control: GMT either way plus a `powershell` stub that fails --
      the hook prints the UTC-only fallback and the explicit "do NOT state a
      PDT/PST time" warning, never a GMT value labelled local.
@@ -56,7 +58,9 @@ def stubs(tz_answer, plain_answer, powershell_body):
 
     The `date` stub answers `tz_answer` when TZ is America/Los_Angeles (the
     hook's first rung), `plain_answer` otherwise (its second rung), and the
-    real UTC shape for `date -u`. Keying on TZ is what lets a case pin one
+    real UTC shape for `date -u`. The `powershell` stub runs
+    `powershell_body` only for a `-NoProfile -Command <conversion program>`
+    call naming the Pacific zone, and exits 1 for anything else. Keying on TZ is what lets a case pin one
     rung: a stub that ignored TZ would pass the first-rung case identically
     if the hook skipped straight to the second."""
     d = tempfile.mkdtemp()
@@ -68,7 +72,14 @@ def stubs(tz_answer, plain_answer, powershell_body):
                  % (tz_answer, plain_answer))
     ps_stub = os.path.join(d, "powershell")
     with open(ps_stub, "w") as fh:
-        fh.write("#!/bin/sh\n" + powershell_body + "\n")
+        # Answer only when invoked the way the hook's third rung invokes it,
+        # so a hook that drops or mangles the conversion program fails here
+        # rather than passing on any call that merely reaches `powershell`.
+        fh.write("#!/bin/sh\n"
+                 "[ \"$1\" = -NoProfile ] || exit 1\n"
+                 "[ \"$2\" = -Command ] || exit 1\n"
+                 "case \"$3\" in *\"Pacific Standard Time\"*ConvertTimeFromUtc*IsDaylightSavingTime*) ;; *) exit 1 ;; esac\n"
+                 + powershell_body + "\n")
     for f in (date_stub, ps_stub):
         os.chmod(f, os.stat(f).st_mode | stat.S_IXUSR)
     return d

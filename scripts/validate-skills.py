@@ -263,6 +263,7 @@ NON_OPERATION_TOKENS = {
     # env vars: the chores skill's scope inputs (aliases of the invoking user,
     # PR numbers named in the request), per memories/reviewing-prs.md
     "PR_SCOPE_ALIASES",
+    "PR_SCOPE_EXCLUDED",
     "PR_SCOPE_REQUESTED",
     "REBASE_HEAD",
     "REVERT_HEAD",

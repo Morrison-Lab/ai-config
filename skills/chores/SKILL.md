@@ -68,14 +68,18 @@ This skill is GitHub-first (`gh`). For a GitLab repo, the same shape applies via
 
 ### 1. List the open chore PRs
 
-Set the two scope inputs first, the way `REPO` is set above.
+Set the three scope inputs first, the way `REPO` is set above.
 `PR_SCOPE_ALIASES` is the comma-separated list of other logins
 `memories/reviewing-prs.md` names as the same person as the resolved user
 (leave it unset when that file lists none for them), and `PR_SCOPE_REQUESTED`
 is the comma-separated list of PR numbers the user explicitly asked this run
 to work on, never a number merely mentioned or excluded
 (leave it unset when there are none).
-With both unset the filter keeps only the resolved login's own PRs, the
+`PR_SCOPE_EXCLUDED` is the comma-separated list of PR numbers the user told
+this run not to touch ("chores, but do not touch" followed by a number); it
+is a veto checked before every positive arm, bot authors included, so an
+excluded dependency-bot PR is neither listed nor merged.
+With all three unset the filter keeps only the resolved login's own PRs, the
 assigned ones, and the bots', which is the fail-closed default.
 
 ```bash
@@ -90,13 +94,18 @@ if [ -z "$ME" ]; then
 fi
 # e.g. PR_SCOPE_ALIASES=other-login      # from memories/reviewing-prs.md
 # e.g. PR_SCOPE_REQUESTED=123,456       # PRs the user asked this run to work on
+# e.g. PR_SCOPE_EXCLUDED=789            # PRs the user told this run not to touch
 IDS=$(jq -cn --arg me "$ME" --arg al "${PR_SCOPE_ALIASES:-}" \
   '[$me] + ($al | split(",") | map(select(length > 0))) | map(select(length > 0)) | unique')
 REQ=$(jq -cn --arg r "${PR_SCOPE_REQUESTED:-}" \
   '$r | split(",") | map(select(length > 0) | tonumber)')
+EXC=$(jq -cn --arg x "${PR_SCOPE_EXCLUDED:-}" \
+  '$x | split(",") | map(select(length > 0) | tonumber)')
 gh pr list --repo "$REPO" --state open --limit 200 \
   --json number,title,author,assignees,labels,mergeable \
-  | jq -r --argjson ids "$IDS" --argjson req "$REQ" '.[] | select(
+  | jq -r --argjson ids "$IDS" --argjson req "$REQ" --argjson exc "$EXC" '.[] | select(
+          ((.number as $n | $exc | index($n)) == null)
+          and (
           (.author.login | test("^(app/(dependabot|renovate)|(dependabot|renovate)\\[bot\\])$"))
           or (
             (
@@ -109,6 +118,7 @@ gh pr list --repo "$REPO" --state open --limit 200 \
               or (([.labels[].name] | index("dependencies")) != null)
             )
           )
+          )
         ) | "\(.number)\t\(.mergeable)\t\(.title)"'   # LIST_PRS
 ```
 
@@ -119,9 +129,9 @@ If there are none, say so and stop.
 
 That listing is a snapshot.
 Assignment can change while the sweep runs, so refresh the author and
-assignees and reapply the same predicate immediately before each write action
-in steps 3-5 (a `@dependabot` comment, a merge), and drop and report a PR that
-no longer passes.
+assignees and reapply the same predicate, the `PR_SCOPE_EXCLUDED` veto
+included, immediately before each write action in steps 3-5 (a `@dependabot`
+comment, a merge), and drop and report a PR that no longer passes.
 
 ### 2. Classify each PR by bump size
 

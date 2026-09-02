@@ -87,7 +87,9 @@ In repository settings under **Rulesets** -> **Rules** -> **Require merge queue*
 Workflows containing required status checks must listen for the `merge_group` event in addition to `pull_request` and `push`.
 Without `merge_group`, GitHub Actions will not run checks on speculative queue branches, causing queued PRs to hang indefinitely until timeout.
 The queue blocks only on required checks.
-A workflow runs on the speculative branch when its own `on:` block lists `merge_group`, or when it is a reusable workflow (`on: workflow_call`) invoked by a caller workflow whose `on:` block lists `merge_group`, and the trigger and the required-check setting are independent.
+A workflow runs on the speculative branch when its own `on:` block lists `merge_group`,
+or when it is a reusable workflow (`on: workflow_call`) invoked by a caller workflow whose `on:` block lists `merge_group`.
+The trigger and the required-check setting are independent.
 So the event to add lives in the event-triggered caller, not in a reusable callee.
 So a non-required check that lists `merge_group` runs there and cannot block the merge.
 A non-required `pull_request`-only check neither runs nor blocks.

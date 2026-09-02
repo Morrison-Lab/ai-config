@@ -194,7 +194,10 @@ Pick a merge method the repo actually allows — `--squash` errors when squash
 merges are disabled; swap in `--merge` or `--rebase` to match the repo's
 settings.
 
-If checks are still running and you want it to land once they pass, and only where the repository requires an up-to-date branch before merging or a correctly configured merge queue tests the merge (a deferred merge runs after the base-currency check, so elsewhere the check is stale by the time it fires):
+If checks are still running and you want it to land once they pass,
+and only where the repository requires an up-to-date branch before merging
+or a correctly configured merge queue tests the merge
+(a deferred merge runs after the base-currency check, so elsewhere the check is stale by the time it fires):
 
 ```bash
 gh pr merge "$N" --repo "$REPO" --squash --auto   # MERGE_PR — needs auto-merge enabled; swap --squash for --merge/--rebase if squash is disabled

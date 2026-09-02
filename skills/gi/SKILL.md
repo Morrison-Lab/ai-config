@@ -198,8 +198,8 @@ Remove the worktree when the PR merges, per
 ### 7. Create a branch
 
 Step 6b's `worktree add -b` already created the branch; this step is the
-fallback for a session that cannot use worktrees (a container whose harness
-pins one checkout, per [`use-existing-pr-branch`](../../shared/workflow/use-existing-pr-branch.md)):
+fallback for a session that cannot create a worktree, such as a container with
+no writable directory beside the checkout:
 
 ```bash
 git fetch origin main                    # FETCH

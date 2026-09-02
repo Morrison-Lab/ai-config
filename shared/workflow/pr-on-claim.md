@@ -178,7 +178,7 @@ in another repo.**
 See [`pr-on-claim.cases.md`](pr-on-claim.cases.md),
 "A caller's `on:` block is not the workflow's trigger conditions".
 
-So the per-issue order becomes: claim → branch → **open the draft PR now** →
+So the per-issue order becomes: claim → cut a worktree and branch → **open the draft PR now** →
 implement → mark ready-for-review → ARDI.
 
 **Working several issues in one session? Verify you actually switched branches

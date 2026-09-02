@@ -579,8 +579,17 @@
 
   - **Do:** poll `reviews` (count, login, and `commit.oid`) for the landed review rather than `reviewRequests`.
   - **Do:** match the inline-comment author case-insensitively, since it is `Copilot` there and `copilot-pull-request-reviewer` on the review.
-  - **Don't:** read an empty `reviewRequests` as a failed request --- it is the expected transient state.
+  - **Don't:** read an empty `reviewRequests` as a failed request, nor as a review on its way --- it discriminates nothing, so read the check run and the posted review instead.
   - **Don't:** read a review on an older `commit.oid` as the verdict on the head you just pushed.
+
+  **Two reviewers are two finding streams, and the checker's one-line verdict is not either of them.**
+  Measured 2026-09-02 on [#2979](https://github.com/Morrison-Lab/ai-config/pull/2979):
+  five Copilot rounds were read and answered while the Claude review repeated the same docstring finding five times unread,
+  because each poll read only the verdict line of `check-pr-fully-clean.py` and the Copilot inline comments.
+  The checker prints every open finding as a `  - ` bullet.
+  Those lines are the input, and each reviewer's set has to be read after every push.
+  - **Do:** after each push, read the checker's finding bullets in full and the Claude `### Findings` section alongside the Copilot comments.
+  - **Don't:** treat the verdict line, or one reviewer's round, as the whole of what is open on the head.
 
   **Re-measured 2026-08-06 with a wider denominator:** across `Morrison-Lab/ai-config`'s last 60 merged PRs, every Copilot review object carries a refusal body and **zero** are substantive (query in [`shared/workflow/pr-on-claim.md`](../shared/workflow/pr-on-claim.md), which also explains why the object count drifts between runs while the zero does not).
   Say *refusals* rather than *quota refusals* when reporting a count like this, because the body alone does not name a cause: the 2026-08-06 Actions incident listed "Copilot code review" among its affected components, so a refusal inside that window has two candidate explanations.

@@ -1151,8 +1151,8 @@ before reporting a PR ready, not just trust the last green run.
 `mergeStateStatus: CLEAN` means conflict-free plus passing commit status (GitHub's `mergeable` field), not merge-ready.
 A PR without a clean review verdict on the latest commit is not merge-ready.
 
-**A head green on its own branch can turn `main` red on merge, when the base gained a new CI check after the branch was cut.**
-A PR's own CI run exercises only the checks that existed when its workflow last ran.
+**A head green on its own branch can turn `main` red on merge, when the base gained a new CI check after the PR's latest CI run.**
+A `pull_request` run uses the workflow definition current at that run, so the gap opens when `main` gains a check afterwards and no new PR event re-runs CI.
 A check added to `main` after the branch point never runs on the PR's head at all,
 so there is nothing red to see: the check simply never fired.
 Measured on [#2965](https://github.com/Morrison-Lab/ai-config/pull/2965).
@@ -1161,10 +1161,13 @@ That branch added hook bindings to `hooks/hooks.json` before [#2967](https://git
 a GIA session merged it under `mwc`,
 and `validate` on `main` went red at `da1a2d03` until [#2983](https://github.com/Morrison-Lab/ai-config/pull/2983) regenerated the manifest.
 The head-only verdict cannot see this, and no path diff can prove the base gained no check through a script or a reusable workflow,
-so the rule is the one [`sync-with-main`](sync-with-main.md) already states: a stale merge-base means update first.
+so for a direct merge the rule is the one [`sync-with-main`](sync-with-main.md) already states: a stale merge-base means update first.
+Under a merge queue the queue's speculative merge test covers this, and [`merge-queue`](merge-queue.md) forbids the manual update loop.
+There the `merge_group` checks are the gate.
 
 - **Do:** before merging, confirm the merge-base with the default branch is the default branch's current tip (`git merge-base origin/main <head>` equals `git rev-parse origin/main`).
-- **Do:** when it is not, `gh pr update-branch` and let CI re-run at the new base before merging.
+- **Do:** when it is not and the merge is direct, `gh pr update-branch` and let CI re-run at the new base before merging.
+- **Do:** under a merge queue, rely on the `merge_group` checks rather than a manual update.
 - **Don't:** read a head-only FULLY CLEAN verdict as a merge-safe verdict when the base has advanced.
 - **Don't:** substitute a path diff of `.github/workflows/` for the update.
   It cannot see a check that arrived through a script or a reusable workflow.

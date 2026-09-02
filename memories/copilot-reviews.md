@@ -117,31 +117,43 @@ ai-config#2969 (ai-config#694 pattern) to keep both files well under the
   (`ucdavis/rampp#111`: Copilot had prepared the `DESCRIPTION` version bump
   that `version-check` was failing on and was rejected with that error; the
   identical fix pushed fine from this session as `0c72d81`.)
-- **Copilot applies the R-package `one-function-per-file` convention to
-  Python scripts and their test modules, where it does not fit.**
+- **Copilot applies `one-function-per-file` to Python scripts and test
+  modules, and the written rule backs it: rebut only from the rule's own
+  carve-outs, or comply.**
   Measured on [#2976](https://github.com/Morrison-Lab/ai-config/pull/2976):
-  it asked for `_triggers` and a test function to be moved into their own
-  modules, reading `shared/coding/one-function-per-file.md` as if it applied
-  to every language rather than to R packages specifically.
-  `scripts/*.py` are single-purpose CLIs whose module-level helpers live
-  together by design, and `scripts/test_*.py` hold one `test_*` function per
-  behaviour under one shared module, not one file per function.
-  - **Do:** rebut by citing the file's own existing convention (its
-    neighbouring helpers, or its sibling `test_*.py` modules) rather than
-    arguing the rule in the abstract.
-  - **Don't:** split a Python script or test module into one-function files
-    to satisfy this finding --- it fights the file's established shape.
-- **Copilot re-reviews only when re-requested, whether by an explicit
-  `requested_reviewers` call or by a repository ruleset with
-  `review_on_push`, and a re-request after a push can repeat an earlier
-  finding verbatim, even one already addressed.**
-  Requesting a fresh review re-derives every finding from scratch rather
-  than diffing against the prior round, so a finding fixed two rounds ago
-  can reappear worded identically in a new round's inline comments.
-  Read each inline comment's timestamp against the fix commit's timestamp
-  to tell a genuine repeat (worth a fresh rebuttal citing the fix commit)
-  from a new finding.
-  - **Do:** check an inline comment's timestamp against the relevant fix
-    commit before treating it as new.
-  - **Don't:** assume a repeated comment text means the earlier fix did not
-    land --- verify against the commit history first.
+  it asked for `_triggers` and a new `test_*` function to move into their
+  own modules.
+  The first rebuttal called the rule R-only, which
+  [`shared/coding/one-function-per-file.md`](../shared/coding/one-function-per-file.md)
+  contradicts: it applies per-language and names a substantial Python
+  function, and it says an existing multi-function file is no exemption for
+  a new function.
+  What the rule does carve out is a two-liner ("a trivial wrapper or short
+  helper", in its words) grouped with closely related functions in a
+  shared file; "short helper" there describes the two-liner, not a second,
+  looser exemption.
+  So a rebuttal has to show the helper is about two lines and closely
+  related to the functions beside it; anything larger goes in its own
+  module.
+  The helpers from #2976 landed inline before this was checked and are
+  tracked in
+  [#2990](https://github.com/Morrison-Lab/ai-config/issues/2990).
+  - **Do:** rebut only by the rule's own carve-out (short, closely related
+    helpers), citing the fragment, or move a substantial new function into
+    its own module.
+  - **Don't:** call the rule R-only, or cite a file's existing shape as if
+    the fragment did not already address that case.
+- **Outside a `review_on_push` ruleset, Copilot does not re-review after
+  a push until it is re-requested, and a re-requested round can repeat a
+  finding the previous round already answered.**
+  Measured on [#2976](https://github.com/Morrison-Lab/ai-config/pull/2976):
+  a finding rebutted in one ARD comment came back in the next round's
+  inline comments in the same words.
+  A repeat says nothing by itself about whether the earlier disposition was
+  a rebuttal or a fix; compare the repeated comment against the prior
+  disposition on the thread (the ARD comment, or the fix commit) before
+  treating it as new.
+  - **Do:** read the prior round's disposition for a repeated comment, and
+    answer it again by citing that disposition when nothing has changed.
+  - **Don't:** treat repeated comment text as proof that an earlier fix did
+    not land, or as a new finding, without checking the thread.

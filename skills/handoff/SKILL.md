@@ -77,6 +77,9 @@ the existing one).
 If the work has an open PR/MR and you've **claimed** it (see `claim-pr`), post a
 short note so the `@claude` bot and other sessions don't push conflicting
 changes — especially when you have unpushed local commits or running jobs.
+Post it only when that PR still passes `memories/reviewing-prs.md`'s scope
+test: a claim confers no scope, so if the PR has since fallen out of scope,
+skip the note and report the PR to the user instead.
 
 ```bash
 gh pr comment <N> --body "⏸️ **Local session paused** (<local timestamp>) — still claimed.

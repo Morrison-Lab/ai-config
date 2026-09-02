@@ -194,7 +194,7 @@ Then merge directly.
 Dependabot deletes its own branch on merge.
 
 ```bash
-gh pr merge "$N" --repo "$REPO" --squash   # MERGE_PR
+gh pr merge "$N" --repo "$REPO" --squash --match-head-commit "$PINNED"   # MERGE_PR; $PINNED is the headRefOid recorded above
 ```
 
 Pick a merge method the repo actually allows — `--squash` errors when squash
@@ -203,8 +203,9 @@ settings.
 
 If checks are still running and you want it to land once they pass,
 and only where the repository requires an up-to-date branch before merging
-or a correctly configured merge queue tests the merge
-(a deferred merge runs after the base-currency check, so elsewhere the check is stale by the time it fires):
+or a correctly configured merge queue tests the merge,
+and every check this skill gates on is required or aggregated behind a required check
+(both settings block on required checks alone, and a deferred merge runs after the base-currency check, so elsewhere the check is stale by the time it fires):
 
 ```bash
 gh pr merge "$N" --repo "$REPO" --squash --auto   # MERGE_PR — needs auto-merge enabled; swap --squash for --merge/--rebase if squash is disabled

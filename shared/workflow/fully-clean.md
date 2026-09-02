@@ -1189,7 +1189,7 @@ The rule splits by merge mode: a direct merge from a session with `git` and `gh`
 It binds every direct-merge path, including the dependency-bump merges in [`chores`](../../skills/chores/SKILL.md), not only `mwc` and `merge-it`.
 For a bot bump, the gate to rerun after an update is CI plus conflict state, which is what those PRs are gated on, since `@claude` review is skipped on them by design.
 `chores` states that form.
-A deferred merge (`gh pr merge --auto`, or a `@dependabot` merge command) runs after any check made before the command, so it is safe only where the base requires an up-to-date branch or a correctly configured queue tests the merge.
+A deferred merge (`gh pr merge --auto`, or a `@dependabot` merge command) runs after any check made before the command, so it is safe only where the base requires an up-to-date branch or a correctly configured queue tests the merge, and in either case only when every clean-gate check is required or aggregated behind a required check, since both settings block on required checks alone.
 Elsewhere merge synchronously, right after the check.
 
 - **Do:** for a direct merge from a session with `git` and `gh`, record `headRefOid` before the clean gate runs, so the gate's verdict is tied to one SHA.
@@ -1211,8 +1211,9 @@ Elsewhere merge synchronously, right after the check.
   The update is asynchronous: the REST endpoint answers `202 Accepted` while the merge is still in progress, and the MCP tool reports that answer as success, so a gate rerun started at once can read the old head.
   Poll `headRefOid` until it changes, record that SHA, rerun the base-currency check on it, and only then rerun the gate, pinned to that SHA.
   The gate itself takes minutes, so the base can advance again while it runs, and so can the head: a concurrent push that already contains the current base passes a currency-only recheck while the gate's verdict belongs to the earlier SHA ([`github`](../../memories/github.md) records that unpinned-head race).
-  So immediately before the merge command, check both that the live `headRefOid` still equals the pinned SHA and that the base tip is unchanged, and repeat the update-and-gate cycle when either moved.
-  That leaves the smallest window the sequence allows, the seconds between the recheck and the merge, rather than none.
+  So immediately before the merge command, check that the live `headRefOid` still equals the pinned SHA, that `baseRefName` is still the branch the gate ran against (a retarget to another branch at the same commit would otherwise pass a tip comparison), and that the base tip is unchanged, and repeat the update-and-gate cycle when any of them moved.
+  Then make the merge itself carry the pin: `gh pr merge --match-head-commit "<pinned-sha>"` (measured 2026-09-02 (Pacific) in `gh` 2.98.0: the flag is documented as the commit SHA the head must match to allow the merge), or `expectedHeadSha` on the MCP `merge_pull_request` tool, so a push in the seconds after the read is refused by the API rather than merged.
+  The pre-merge read still runs first, because it is what says which ref moved.
   The cycle repeats for either ref, so a repeat says which one to look at rather than which remedy applies.
   When the base moved twice it is advancing faster than the gate runs, which [`batch-merge-and-resolve`](batch-merge-and-resolve.md) measures: stop chasing and merge through a queue or under strict up-to-date protection, or batch the pending merges per that fragment.
   When the head moved, another writer is pushing to the branch, and no queue or protection setting stabilizes that: find the writer per [`claim-pr`](claim-pr.md) and settle who owns the branch before rerunning.

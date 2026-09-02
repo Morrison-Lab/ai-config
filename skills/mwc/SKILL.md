@@ -67,8 +67,11 @@ without asking confirmation before every merge.
   a currency check on it,
   a full re-run of the gate pinned to it,
   then a check immediately before the merge command that the live head
-  is still that SHA and the base tip is unchanged,
-  repeating the cycle when either moved during the gate.
+  is still that SHA, `baseRefName` is unchanged, and the base tip is
+  unchanged, repeating the cycle when any moved during the gate,
+  and `--match-head-commit "<pinned-sha>"` (or `expectedHeadSha` on the
+  MCP merge tool) on the merge command itself, so the API refuses a
+  push that lands after the read.
   A repeat names the moving ref: when the base moved twice it outruns
   the gate, so merge through a queue or strict up-to-date protection
   instead, and when the head moved another writer is on the branch, so

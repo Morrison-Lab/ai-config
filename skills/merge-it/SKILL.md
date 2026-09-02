@@ -80,8 +80,9 @@ standing yes (see `preferences.md`).
   record that SHA,
   rerun the base-currency check on it,
   and then rerun the whole clean gate pinned to it.
-  Immediately before the merge command, check that the live head is still that SHA and that the base tip is unchanged,
-  and repeat the cycle if either moved during the gate (a concurrent push can pass a currency-only recheck while the gate covered the earlier head).
+  Immediately before the merge command, check that the live head is still that SHA, that `baseRefName` is unchanged, and that the base tip is unchanged,
+  and repeat the cycle if any moved during the gate (a concurrent push can pass a currency-only recheck while the gate covered the earlier head).
+  Then pass the pin to the merge itself, `--match-head-commit "<pinned-sha>"` (or `expectedHeadSha` on the MCP merge tool), so a push after the read is refused rather than merged.
   A repeat names the moving ref, not the remedy.
   When the base moved twice it outruns the gate: merge through a queue or strict up-to-date protection instead, per `fully-clean.md`.
   When the head moved, another writer is on the branch: settle ownership per `claim-pr` before rerunning, since no queue or protection setting stabilizes a head someone else pushes to.

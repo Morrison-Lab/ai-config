@@ -79,8 +79,27 @@ a `tail_lines`-capped fetch showed only the last two, and that partial read was 
 An independent scan produced the right set anyway, so the fix was correct while the reason given for it was not.)
 
 **A moving tag does not always turn things red.**
-[`gitlab.md`](gitlab.md)'s "A mutable `include: ref:` plus
-`allow_failure: true` breaks a consumer silently" is the mirror case on
-GitLab: the same moving-pin mechanism, but the consuming job tolerates
-failure, so the break shows up as a missing review with a green pipeline
-instead of a red one.
+[`gitlab.md`](gitlab.md)'s "A mutable `include: ref:` plus `allow_failure: true` breaks a consumer silently" is the mirror case on GitLab: the same moving-pin mechanism, but the consuming job tolerates failure, so the break shows up as a missing review with a green pipeline instead of a red one.
+
+## A fix merging upstream and a moving tag reaching consumers are two different moments
+
+Everything above is about the tag *moving* --- either breaking a consumer (this file) or breaking one silently (`gitlab.md`).
+The same mechanism has a mirror-image failure on the **recovery** side, and it is the one that catches whoever is watching the fix land: a PR that fixes a shared reusable workflow merging to the CI repo's `main` does **not** repair a consumer pinned to a mutable tag (`@v2`).
+The consumer recovers only when that tag itself **slides** to include the merge commit --- a second, separate action, on a clock nobody watching the merge can see.
+
+The gap is invisible from the consumer side by construction: a consumer PR that was red because of the missing fix stays exactly as red after the fix merges, with no new signal --- same failing checks, same log, nothing that distinguishes "not fixed yet" from "fixed but not deployed to me yet."
+Someone who watched the upstream PR merge has every reason to expect green on the next re-run and gets the identical failure instead.
+
+- **Do:** after a shared-workflow fix merges upstream, check whether the consumer's pinned tag was **moved** to include that commit (`gh api repos/<ci-repo>/git/refs/tags/<tag>`, or diff the tag's target SHA against the merge SHA) before expecting a consumer re-run to go green.
+- **Do:** read a still-red consumer check right after an upstream merge as "the tag hasn't slid yet," not as "the fix didn't work."
+- **Don't:** treat a merged upstream PR as equivalent to a deployed fix for every `@<tag>`-pinned consumer --- a SHA pin would recover on the next fetch;
+  a tag pin recovers only when someone moves the tag.
+- **Don't:** re-diagnose a consumer's still-failing check as a new bug immediately after the fix merges, without first checking the tag's target.
+
+This is the third sign of the same mutable-tag mechanism inside one day, and the two other signs cut in opposite directions --- worth holding together rather than as "pin everything to a SHA": `HACtions@v2` sliding **broke** a consumer silently, with a green pipeline and no posted review (`ucdavis/hac.sap`#38, `gitlab.md`'s "A mutable `include: ref:` plus `allow_failure: true`" entry, cross-referenced above), and `Morrison-Lab/gha@v2` sliding will **repair** one that also changed nothing.
+A mutable tag cuts both ways --- it is the single point where an upstream regression silently reaches every consumer, and the single point where an upstream fix silently reaches every consumer, on the same un-signaled schedule.
+
+(Measured 2026-09-02: `Morrison-Lab/gha`#813 adds `.github/actions/classify-review-verdict/` and points `claude-code-review.yml` at `uses: Morrison-Lab/gha/.github/actions/classify-review-verdict@v2`, fixing `gha`#812.
+The action 404s at both `v2` and `main` (`gh api "repos/Morrison-Lab/gha/contents/.github/actions/classify-review-verdict/action.yml?ref=v2"`) because #813 was still open, unmerged --- it exists only on the PR's own branch.
+Downstream: `Morrison-Lab/ai-config`#3000, since `ai-config/.github/workflows/claude-review.yml:50` pins `Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v2`;
+`ai-config` PR #2999 is red on `review/post-review`, `review/require-clean-verdict`, and `review/require-review` for exactly this reason, while `review/claude-review` itself passes --- the review runs fine, and only the verdict-classifying step downstream of it fails.)

@@ -72,7 +72,10 @@ Through August 2026 `copilot-pull-request-reviewer` could complete `success` wit
 even on a stable, single-push head.
 That is a silent state whose cause [`review-verdict-pitfalls`](review-verdict-pitfalls.md) leaves unresolved.
 That silence is not evidence that Copilot found nothing.
-On 2026-09-01 and 2026-09-02 (Pacific) it posted a formal review whose body opens `### 🟢 Approval recommended` with zero generated comments, on [#2983](https://github.com/Morrison-Lab/ai-config/pull/2983) and [#2976](https://github.com/Morrison-Lab/ai-config/pull/2976) respectively.
+On 2026-09-01 and 2026-09-02 (Pacific) it posted a formal review whose body opens `### 🟢 Approval recommended`, in two forms.
+On [#2983](https://github.com/Morrison-Lab/ai-config/pull/2983), a first review, the body reported `Comments generated: 0`.
+On [#2976](https://github.com/Morrison-Lab/ai-config/pull/2976), a re-requested review after three rounds with findings, it reported `Comments generated: 0 new` and carried no `Suppressed comments` section.
+`0 new` alone does not settle a round, since a re-review body can restate an earlier finding under `Suppressed comments` (see the re-request entry in [`copilot-reviews`](../../memories/copilot-reviews.md)), so read the body for that section before treating the approval as clean.
 Two PRs are a sample, so expect either shape until more is measured.
 A green Copilot check is therefore not a verdict.
 Read `get_reviews`, treat an empty result as "no findings posted", and treat the approval body as the clean verdict, neither of them as something a trickled push caused.

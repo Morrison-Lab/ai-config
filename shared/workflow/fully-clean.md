@@ -1178,7 +1178,12 @@ A `pull_request`-only workflow added to the base does not run on the queue's bra
 and a workflow that lists `merge_group` can still carry a job or step whose `if:` skips that event,
 which branch protection then counts as passing.
 This corpus's clean gate counts every check, not only the required ones,
-so every clean-gate check has to execute for `merge_group`, job and step conditions included, before the manual update is skipped.
+while the queue advances on the required checks alone ([`merge-queue`](merge-queue.md)),
+and a failing non-required check has been measured to leave a PR mergeable ([`github-actions`](../../memories/github-actions.md), the bcs `test-coverage` entry).
+So two conditions hold before the manual update is skipped:
+every clean-gate check executes for `merge_group`, job and step conditions included,
+and every clean-gate check is a required status check on the base, or is aggregated behind one that is.
+A clean-gate check the queue cannot block on is a check the queue does not run as a gate.
 
 - **Do:** before merging, fetch the PR's configured base and confirm the merge-base with the live PR head is that base's current tip.
   Until [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) wires this into `check-pr-fully-clean.py` and the `mwc` and `merge-it` entry points, it is a manual step that runs after the checker and before the merge command:
@@ -1189,7 +1194,8 @@ so every clean-gate check has to execute for `merge_group`, job and step conditi
   The base comes from the PR, not from the repository's default branch: a stacked or release PR targets another branch, and [`merge-it`](../../skills/merge-it/SKILL.md) already warns not to assume `main` for those.
 - **Do:** when the merge-base is not that tip and the merge is direct, `gh pr update-branch <N> -R <owner>/<repo>`, then rerun the whole clean gate on the new head, review included, before merging.
   The update is a new head, so a clean verdict on the old one no longer counts, per [`sync-with-main`](sync-with-main.md).
-- **Do:** under a merge queue, rely on the `merge_group` checks rather than a manual update.
+- **Do:** under a merge queue whose required checks cover the whole clean gate on `merge_group`, rely on those checks rather than a manual update.
+- **Don't:** skip the manual update under a queue while any clean-gate check is non-required or `pull_request`-only, since the queue neither runs nor blocks on it.
 - **Don't:** read a head-only FULLY CLEAN verdict as a merge-safe verdict when the base has advanced.
 - **Don't:** substitute a path diff of `.github/workflows/` for the update.
   It cannot see a check that arrived through a script or a reusable workflow.

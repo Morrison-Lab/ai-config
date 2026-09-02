@@ -117,10 +117,10 @@ ai-config#2969 (ai-config#694 pattern) to keep both files well under the
   (`ucdavis/rampp#111`: Copilot had prepared the `DESCRIPTION` version bump
   that `version-check` was failing on and was rejected with that error; the
   identical fix pushed fine from this session as `0c72d81`.)
-- **Copilot applies `one-function-per-file` to Python scripts and to test modules,
-  and the written rule backs it:
+- **Copilot applied `one-function-per-file` to Python scripts and to test modules on 2026-09-01 (Pacific),
+  and the written rule backs it as a standing requirement:
   rebut only from the rule's own carve-out, or comply.**
-  Measured on [#2976](https://github.com/Morrison-Lab/ai-config/pull/2976):
+  Measured 2026-09-01 (Pacific) on [#2976](https://github.com/Morrison-Lab/ai-config/pull/2976):
   it asked for `_triggers` and a new `test_*` function to move into their
   own modules.
   The first rebuttal called the rule R-only, which
@@ -149,7 +149,7 @@ ai-config#2969 (ai-config#694 pattern) to keep both files well under the
   answered.**
   This is the measured shape on one PR; the per-push behaviour recorded
   earlier in this file is "not guaranteed", not "never".
-  Measured on [#2976](https://github.com/Morrison-Lab/ai-config/pull/2976):
+  Measured 2026-09-01 (Pacific) on [#2976](https://github.com/Morrison-Lab/ai-config/pull/2976):
   a finding rebutted in one ARD comment was restated in the next review
   body's `Suppressed comments` section, in different words, while the
   inline thread kept only the earlier comment.

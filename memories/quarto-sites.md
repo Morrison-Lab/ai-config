@@ -297,23 +297,27 @@ The name tracks the *colliding* document --- the one inheriting both formats ---
 Measured on Quarto 1.9.36 / macOS in a three-page project where `index.qmd` alone declares no `format:` of its own: the render reports `[1/3] docs/design-decisions.md`, `[2/3] index.qmd`, `[3/3] aaa.qmd`, and the error names `index.html`, which is neither first nor last.
 Which stage picks the reported path was not established, and is not needed: the name identifies the document that collided, which is the one to go and fix.
 
-**A green CI check did not reproduce it, and why is still undetermined --- but the Quarto version is ruled out.**
-The `build` check passed on the commits carrying that top-level block, whose `index.qmd` and `docs/design-decisions.md` declare no `format:` of their own, and one of those runs rendered the project's revealjs and docx outputs without hitting the collision.
-The obvious explanation is that CI ran Quarto 1.10.18 on Linux while the failing render was 1.9.36 on macOS.
-That is two variables at once, and one of them is cheap to hold constant, so hold it: installing 1.10.18 and re-running the reduced reproducer on macOS collides exactly as 1.9.36 does.
-Version eliminated, what remains is the platform or something in the real project that the reduced reproducer does not carry.
-Say that, rather than naming a cause.
+**A green CI check here was not weak evidence that the block was fine --- it was no evidence either way.**
+The `build` check passed on the commits carrying that top-level block, and the render step's own environment dump says why: `FORMATS` empty, `RENDER_PROFILE` empty, and `HAS_LABEL_PDF`, `HAS_LABEL_DOCX`, `HAS_LABEL_REVEALJS` all false.
+On that input `Morrison-Lab/gha`'s `preview@v2` takes its no-formats branch, builds `FORMAT_LIST=("html")`, and issues one command: `quarto render . --to html --output-dir _site`.
+A single-format project render renders each document once, so no two formats can contend for `<stem>.html`, and the collision was impossible in that run by construction.
 
-The transferable half is the method, not the answer.
-A divergence between two observations differing in more than one variable licenses no causal claim at all, and the reflex to name the most salient difference --- here a version bump --- is what produces a confident wrong one.
-Vary one variable, and report the eliminated candidate as the finding when the cause is still open.
+**The log reads like a multi-format render, and that is the trap.**
+It carries `Output created: _site/sap-template-revealjs.html` and `_site/sap-template.docx` next to `_site/index.html`, which looks like the project block's revealjs rendering cleanly.
+Those two come from the project's `post-render: Rscript scripts/post-render.R`, which runs `quarto render sap-template.qmd --to revealjs` and the same to `docx`: two single-document renders of the one document whose front matter declares its own `format:` block, with an explicit `output-file:`.
+By this section's own rule that is precisely the document the project block does *not* reach, so those outputs are evidence about per-document front matter and say nothing about the project block.
+
+The reflex explanation is the version, and it is wrong: CI ran Quarto 1.10.18 on Linux against a local 1.9.36 on macOS, but installing 1.10.18 on macOS collides identically, so the version explains nothing.
+The difference that mattered was the render command, sitting in the same log as the environment dump.
+Reach for the command a check actually ran before reaching for its platform or its version.
+[`metacognitive-monitoring.md`](../shared/workflow/metacognitive-monitoring.md) states the general form: a claim about cause owes an alternative you can name and reject.
 Nobody read the deployed preview here, so whether it would have shown the partial site is untested;
 the `pr-preview/pr-<N>/` recipe the bullet above cites is the cheap way to find out before concluding a green check means anything.
 
 - **Do:** put a single document's extra format in that document's own front matter, with an explicit `output-file:`.
 - **Do:** render the project locally before trusting CI on a `_quarto.yml` `format:` change.
-- **Do:** hold one variable constant before attributing a local-versus-CI divergence to any of them;
-  a green remote render and a red local one usually differ in several ways at once.
+- **Do:** read a green render check by asking which formats it rendered, and treat a single-format run as silent on any collision between formats.
+- **Do:** check a project's `post-render` step before reading an output in the log as the project render's work.
 - **Do:** compare the error's source path against the document the format was added for;
   a different path means the entry is reaching documents you did not intend.
 - **Don't:** add a format to the top-level `format:` key for one document's benefit.

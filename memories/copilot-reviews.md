@@ -147,8 +147,11 @@ ai-config#2969 (ai-config#694 pattern) to keep both files well under the
   a push until it is re-requested, and a re-requested round can repeat a
   finding the previous round already answered.**
   Measured on [#2976](https://github.com/Morrison-Lab/ai-config/pull/2976):
-  a finding rebutted in one ARD comment came back in the next round's
-  inline comments in the same words.
+  a finding rebutted in one ARD comment was restated in the next review
+  body's `Suppressed comments` section, in different words, while the
+  inline thread kept only the earlier comment.
+  So read the review body as well as the inline thread when checking for
+  a repeat.
   A repeat says nothing by itself about whether the earlier disposition was
   a rebuttal or a fix; compare the repeated comment against the prior
   disposition on the thread (the ARD comment, or the fix commit) before

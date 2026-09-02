@@ -1159,8 +1159,8 @@ A PR without a clean review verdict on the latest commit is not merge-ready.
 
 **A head green on its own branch can turn `main` red on merge, when the base gained a new CI check after the PR's latest CI run.**
 A `pull_request` run uses the workflow definition current at that run, so the gap opens when `main` gains a check afterwards and no new PR event re-runs CI.
-A check added to `main` after the branch point never runs on the PR's head at all,
-so there is nothing red to see: the check simply never fired.
+A check added to `main` after that run never fires on the PR until a new PR event synthesizes a fresh `refs/pull/N/merge`,
+so there is nothing red to see: the check simply never ran.
 Measured on [#2965](https://github.com/Morrison-Lab/ai-config/pull/2965).
 That branch added hook bindings to `hooks/hooks.json` before [#2967](https://github.com/Morrison-Lab/ai-config/pull/2967) landed the generated `skills/ai-config-hooks/hooks/hooks.json` and its `gen-hooks-plugin.py --check` gate on `main`.
 `check-pr-fully-clean.py` reported [#2965](https://github.com/Morrison-Lab/ai-config/pull/2965) FULLY CLEAN,
@@ -1172,7 +1172,8 @@ Under a merge queue the queue's speculative merge test covers this, and [`merge-
 There the `merge_group` checks are the gate.
 
 - **Do:** before merging, fetch and resolve the default branch, then confirm the merge-base with it is its current tip:
-  `git fetch origin && d=$(git remote show origin | sed -n 's/.*HEAD branch: //p') && [ "$(git merge-base origin/$d <head>)" = "$(git rev-parse origin/$d)" ]`.
+  `git fetch origin && d=$(git remote show origin | sed -n 's/.*HEAD branch: //p') && [ -n "$d" ] && mb=$(git merge-base "origin/$d" <head>) && tip=$(git rev-parse --verify "origin/$d") && [ "$mb" = "$tip" ]`.
+  Each result is assigned inside the `&&` chain so an unresolved branch or a failed command fails the check rather than comparing two empty strings as equal.
   A remote-tracking ref is current only after a fetch, and the default branch is not always `main`.
   `git remote show origin` answers in clones where `refs/remotes/origin/HEAD` is unset, which [`challenge-the-assignment.cases.md`](challenge-the-assignment.cases.md) records for the clones this corpus is developed in.
 - **Do:** when it is not and the merge is direct, `gh pr update-branch` and let CI re-run at the new base before merging.

@@ -571,11 +571,11 @@
   and its clean/not-clean verdict patterns so Copilot reviews are tracked as part of the automated review gate.
 
   **Now that Copilot is live again, the 201-then-empty `requested_reviewers` signature above still holds, and the fix is to poll `reviews`, not `reviewRequests`.**
-  `gh api repos/<owner>/<repo>/pulls/<N>/requested_reviewers -X POST -f 'reviewers[]=copilot-pull-request-reviewer[bot]'` returns HTTP 201, and `gh pr view --json reviewRequests` stays empty.
-  On the PRs below the review then landed within about a minute, visible under `gh pr view --json reviews` with author login `copilot-pull-request-reviewer`, which `startswith("copilot")` matches.
+  On the PRs below, `gh api repos/<owner>/<repo>/pulls/<N>/requested_reviewers -X POST -f 'reviewers[]=copilot-pull-request-reviewer[bot]'` returned HTTP 201 each time (the section above records 422 and refusal as other outcomes), and `gh pr view --json reviewRequests` stayed empty.
+  On those same requests the review then landed within about a minute, visible under `gh pr view --json reviews` with author login `copilot-pull-request-reviewer`, which `startswith("copilot")` matches.
   That is an observation of those PRs, not a guarantee: the empty request list stays inconclusive (see the 201-then-empty section above), and the posted review is the only evidence of arrival.
   The inline comments of that review (`gh api repos/<owner>/<repo>/pulls/<N>/comments`) carry `user.login` `Copilot` instead, so a query over comments needs a case-insensitive test (`test("copilot"; "i")`) while a query over reviews does not.
-  A re-request after a push produces a fresh review on the new head.
+  On those PRs a re-request after a push produced a fresh review on the new head.
   Count reviews per `commit.oid` to tell a new round from the old one.
   Measured 2026-09-01 on [#2975](https://github.com/Morrison-Lab/ai-config/pull/2975) through [#2979](https://github.com/Morrison-Lab/ai-config/pull/2979) and [#2983](https://github.com/Morrison-Lab/ai-config/pull/2983).
 

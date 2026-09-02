@@ -567,3 +567,27 @@ does not surface it.
 The proposed instrument is a grep-level check over `hooks/test-*.py` and
 `scripts/test_*.py` for `git init --bare` or a fixture `git clone`
 without `-b main`, filed for tracking (ai-config#2740).
+
+## A pre-push guard whose sibling module fails to load blocks every Bash command containing the word "push"
+
+`hooks/no-push-without-self-review.py` imports `no-unreviewed-pr.py` as a
+sibling module.
+When that import fails --- observed from a worktree whose registration
+resolved `CLAUDE_PLUGIN_ROOT` to `<worktree>/.claude` instead of the
+checkout's real root --- the guard falls back to blocking on the raw
+command text, so it denies every Bash command whose string contains
+`push`, not only `git push`.
+That includes `gh issue create --title "...push..."` and a `cat > file`
+heredoc that merely quotes the word.
+
+- **Do:** keep the word `push` out of command text that is not an actual
+  push --- write comment/issue bodies with the Write tool instead of a
+  heredoc, and rephrase a title that would otherwise contain it.
+- **Do:** reserve `ALLOW_UNREVIEWED_PUSH=1` for the one command that is an
+  actual `git push`, and state why in the same turn.
+- **Don't:** treat the guard's block on a non-push command as a real
+  self-review gap --- it is the sibling-import fallback misfiring.
+- **Don't:** export `ALLOW_UNREVIEWED_PUSH=1` for the whole session to work
+  around the false positive; that also waives the guard for the real push.
+
+Tracked as [#2981](https://github.com/Morrison-Lab/ai-config/issues/2981).

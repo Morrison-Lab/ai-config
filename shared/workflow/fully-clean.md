@@ -1151,6 +1151,17 @@ before reporting a PR ready, not just trust the last green run.
 `mergeStateStatus: CLEAN` means conflict-free plus passing commit status (GitHub's `mergeable` field), not merge-ready.
 A PR without a clean review verdict on the latest commit is not merge-ready.
 
+**A head green on its own branch can turn `main` red on merge, when the base gained a new CI check after the branch was cut.**
+A PR's own CI run only exercises the checks that existed when its workflow last ran, so a check added to `main` after the branch point never runs on the PR's head at all --- there is nothing red to see, because the check simply never fired.
+Measured on [#2965](https://github.com/Morrison-Lab/ai-config/pull/2965): the branch added hook bindings to `hooks/hooks.json` before [#2967](https://github.com/Morrison-Lab/ai-config/pull/2967) landed the generated `skills/ai-config-hooks/hooks/hooks.json` and its `gen-hooks-plugin.py --check` gate on `main`.
+`check-pr-fully-clean.py` reported #2965 FULLY CLEAN, a GIA session merged it under `mwc`, and `validate` on `main` went red at `da1a2d03` until [#2983](https://github.com/Morrison-Lab/ai-config/pull/2983) regenerated the manifest.
+
+- **Do:** before merging, confirm the merge-base with the default branch is the default branch's current tip, or diff `.github/workflows/` and any generated-file check between the merge-base and the default branch tip (`git diff --name-only <merge-base> origin/main -- .github/workflows scripts/gen-*`).
+- **Do:** when that diff is non-empty, `gh pr update-branch` and let CI re-run at the new base before merging.
+- **Don't:** read a head-only FULLY CLEAN verdict as a merge-safe verdict when the base has advanced and could have gained a check the head never ran.
+
+Tracked as [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982).
+
 - **Do:** always check for merge conflicts (e.g., using `gh pr view <number> --json mergeable` or `gh pr checks`) at the same time you check for CI and review status.
 - **Do:** report a PR as blocked on review when HEAD has no authentic clean verdict, even if GitHub says `CLEAN`.
 - **Don't:** treat green CI plus a clean review as sufficient without independently re-checking merge-conflict state.

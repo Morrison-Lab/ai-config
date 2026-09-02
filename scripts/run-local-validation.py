@@ -59,7 +59,7 @@ from typing import Any, Dict, List, Optional
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_WORKFLOW = ROOT / ".github" / "workflows" / "validate.yml"
 DEFAULT_SKIP = r"^Install dependencies$"
-GITHUB_EXPRESSION = re.compile(r"\$\{\{")
+GITHUB_EXPRESSION = re.compile(r"\$\{\{[^}]*\}\}")
 
 # Local equivalents for jobs that only `uses:` a reusable workflow or a
 # composite action. Keyed by a substring of the `uses:` reference; the value
@@ -139,9 +139,15 @@ def derive_steps(workflow: Dict[str, Any], job_name: str, base: str) -> List[Ste
             cwd=s.get("working-directory"),
             source=job_name,
         )
-        if GITHUB_EXPRESSION.search(step.command) or any(GITHUB_EXPRESSION.search(v) for v in env.values()):
+        expression = GITHUB_EXPRESSION.search(step.command) or next(
+            (m for m in (GITHUB_EXPRESSION.search(v) for v in env.values()) if m), None
+        )
+        if expression:
+            # Name the expression that matched: `${{ secrets.GITHUB_TOKEN }}` is
+            # something a user can supply locally, `${{ github.event.* }}` is not,
+            # and a note that said `github.*` for both misdescribed the first.
             step.runnable = False
-            step.note = "reads a ${{ github.* }} expression that only exists on a runner"
+            step.note = f"reads `{expression.group(0)}`, which only a runner supplies"
         steps.append(step)
     for name, job in jobs.items():
         if name == job_name:

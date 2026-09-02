@@ -57,6 +57,10 @@ jobs:
       - name: Sub-directory step
         working-directory: sub
         run: test "$(basename "$PWD")" = sub
+      - name: Token-env step
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GITHUB_TOKEN"
   new-line-breaks:
     runs-on: ubuntu-latest
     steps:
@@ -88,18 +92,21 @@ def test_derive_steps():
     steps = rlv.derive_steps(yaml.safe_load(FIXTURE), "validate", "origin/main")
     names = [s.name for s in steps]
     check("run: steps derived in file order, uses:-only checkout dropped",
-          names[:6] == ["Install dependencies", "Passing step", "Failing step", "Multi-line step",
-                        "Runner-only step", "Sub-directory step"])
+          names[:7] == ["Install dependencies", "Passing step", "Failing step", "Multi-line step",
+                        "Runner-only step", "Sub-directory step", "Token-env step"])
     by = {s.name: s for s in steps}
     check("step env carried", by["Failing step"].env == {"RC": "3"})
     check("multi-line run kept whole", by["Multi-line step"].command == 'echo one\necho two > "$OUT_FILE"')
     check("working-directory carried", by["Sub-directory step"].cwd == "sub")
-    check("a ${{ github.* }} step is not runnable and says why",
-          not by["Runner-only step"].runnable and "runner" in by["Runner-only step"].note)
+    check("a ${{ ... }} step is not runnable and the note names the expression that matched",
+          not by["Runner-only step"].runnable
+          and "${{ github.event.pull_request.base.sha }}" in by["Runner-only step"].note)
     check("new-line-breaks job maps to the vendored script with the job's globs and the base ref",
           by["new-line-breaks"].command.endswith("gha-check-new-line-breaks.py")
           and by["new-line-breaks"].env["NLB_GLOBS"] == "*.md *.qmd"
           and by["new-line-breaks"].env["NLB_BASE_REF"] == "origin/main")
+    check("an env value carrying ${{ secrets.* }} is not runnable and the note names that expression, not github.*",
+          not by["Token-env step"].runnable and "${{ secrets.GITHUB_TOKEN }}" in by["Token-env step"].note)
     check("new-line-breaks forwards the job's paths-ignore input",
           by["new-line-breaks"].env.get("NLB_PATHS_IGNORE") == "codex-skills/**,docs/**")
     check("lint-markdown is NOT RUN: a markdownlint-only stand-in would report a clean zero for three of the action's four checks",
@@ -160,7 +167,7 @@ def test_run_reports_each_rc_and_fails_overall():
         check("the failing step's own exit code appears in the table", "Failing step" in text and " 3 " in text.replace("\n", " "))
         check("the multi-line step ran under bash and executed its second line", out_file.read_text() == "two\n")
         check("working-directory is honoured", "Sub-directory step" in text)
-        check("the summary carries the denominator", "of 5 step(s) derived" in text and "1 not runnable" in text)
+        check("the summary carries the denominator", "of 6 step(s) derived" in text and "2 not runnable" in text)
 
 
 def test_only_and_skip_filters():

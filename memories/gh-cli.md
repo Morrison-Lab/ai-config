@@ -547,7 +547,9 @@
   `gh api "repos/<owner>/<repo>/issues/<N>/timeline" --jq '[.[] | select(.event=="review_requested") | .requested_reviewer.login] | unique'` returned `["Copilot"]` on `Morrison-Lab/ai-config#3004` immediately after a POST whose own response body already read empty.
   Measured 2026-09-02: the POST returned **200**, not 201, with `"requested_reviewers":[]` in its own response body, and a follow-up `GET` of the same endpoint stayed empty too --- which read as a silently failed request and invited four repeated POSTs, each landing the same way.
   The timeline carried the `review_requested` event the entire time.
-  Cross-checked against `#2979`, a PR Copilot did go on to review: the identical timeline entry is there, and that review posted under the login `copilot-pull-request-reviewer`.
+  Cross-checked against `#2979`, a PR Copilot did go on to review: the identical timeline entry is there, and that review is present.
+  Its login differs by surface, which matters to any jq that filters on one: REST (`gh api .../pulls/<N>/reviews`) returns `copilot-pull-request-reviewer[bot]`, while GraphQL (`gh pr view <N> --json reviews`) returns `copilot-pull-request-reviewer` with the suffix stripped.
+  Match on a prefix rather than on equality, or a filter written against one surface silently returns nothing on the other.
   This settles a narrower question than the paragraph above leaves open --- "was the request accepted" rather than "will Copilot post a review" --- so read it beside that paragraph's conclusion rather than in place of it: the timeline event is the evidence a request landed, and the posted review body is still what a verdict requires.
 
   - **Do:** check the timeline's `review_requested` event before re-issuing a reviewer-request POST that read back empty.

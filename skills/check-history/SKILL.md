@@ -56,6 +56,11 @@ If an open PR already covers it and passes `memories/reviewing-prs.md`'s
 scope test (opened by or assigned to the invoking user, explicitly requested,
 or authored by the GitHub Actions app), **drive that PR to clean** instead of
 re-implementing.
+Scope establishes authorization, not that the branch is free: read the PR's
+claim state first per [`claim-pr`](../../shared/workflow/claim-pr.md), skip it
+while another session's claim is live (a `hold off` comment with a push or
+comment in the last 2 hours), and take over an unclaimed or expired one by
+posting your own claim comment before the first push.
 If it covers the issue but fails that test, leave both the PR and the issue
 alone and report that the PR exists, so the user can assign or name it.
 If `main`
@@ -84,8 +89,10 @@ correct the stale issue/doc status, and scope only the genuine remaining slice.
 
    If an open PR already covers the issue, apply the scope test above to the
    author and assignee logins the listing prints:
-   **review or extend it** when it passes, and leave it untouched (reporting
-   it to the user) when it fails.
+   **review or extend it** when it passes and the same claim check clears
+   (another session's live claim still blocks you, and an expired one is taken
+   over by posting your own claim comment first), and leave it untouched
+   (reporting it to the user) when it fails.
    Either way, do not open a competing one.
    This catches *in-flight* work; the merged/closed
    history below catches *settled* decisions.

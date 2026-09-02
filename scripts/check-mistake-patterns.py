@@ -18,8 +18,9 @@ Checks, in order:
      entries filed under an earlier number) follows its base entry directly
      and its letters run b, c, ... in order.
 
-Headings that are not `## Pattern ...:` are ignored: the file carries a few
-un-numbered `## ` sections and this check has no opinion about them.
+Headings that are not `## Pattern ...:` are ignored: the file carries one
+un-numbered `## ` section (at the time of writing) and this check has no
+opinion about it.
 
 Exit codes:
   0  all pattern headings unique and sequential (the examined count is printed)
@@ -98,7 +99,7 @@ def main(argv: List[str] | None = None) -> int:
     path = Path(args.path)
     try:
         text = path.read_text(encoding="utf-8")
-    except OSError as exc:
+    except (OSError, UnicodeDecodeError) as exc:
         print(f"error: cannot read {path}: {exc}", file=sys.stderr)
         return 2
     numbers = pattern_numbers(text)

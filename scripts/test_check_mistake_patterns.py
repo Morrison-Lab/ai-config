@@ -92,7 +92,17 @@ def test_live_file_is_clean():
     check("exit code is 0 on the live file", cmp_mod.main([str(live)]) == 0)
 
 
+def test_unreadable_file_exits_2():
+    import tempfile
+    with tempfile.NamedTemporaryFile(suffix=".md", delete=False) as fh:
+        fh.write(b"\xff\xfe\x00\x01")
+        bad = fh.name
+    check("a non-UTF-8 file exits 2, not 1", cmp_mod.main([bad]) == 2)
+    check("a missing file exits 2", cmp_mod.main(["/nonexistent/mistake-patterns.md"]) == 2)
+
+
 def main():
+    test_unreadable_file_exits_2()
     test_clean_sequence()
     test_lettered_subpatterns()
     test_duplicate_is_reported_once()

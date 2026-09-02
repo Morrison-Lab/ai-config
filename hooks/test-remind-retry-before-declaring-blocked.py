@@ -92,6 +92,7 @@ def use(tid, command=PUSH, name="Bash", sidechain=False):
     return {
         "type": "assistant",
         "isSidechain": sidechain,
+        "uuid": "u-use-" + tid,
         "message": {"content": [
             {"type": "tool_use", "id": tid, "name": name,
              "input": {"command": command}},
@@ -119,6 +120,7 @@ def result(tid, text, kind=None, sidechain=False, is_error=False):
     rec = {
         "type": "user",
         "isSidechain": sidechain,
+        "uuid": "u-res-" + tid,
         "message": {"content": [
             {"type": "tool_result", "tool_use_id": tid, "content": text,
              "is_error": is_error},
@@ -455,6 +457,19 @@ try:
         use("t1", "git push origin alpha"), denial("t1"),
         use("t2", "update-config add allow rule"), denial("t2"),
         use("t3", "git push origin alpha"), denial("t3")])
+    # The harness replays a record into the same file sometimes: same uuid,
+    # same parentUuid, hundreds of lines apart (measured in 4 of 1191 real
+    # transcripts). Counting the replay would say "you have already re-run
+    # it" when nothing was re-run, withhold the retry advice, and double the
+    # reported count.
+    replayed = [use("t1"), denial("t1")]
+    replayed = replayed + [txt("... work in between ..."), replayed[1]]
+    replayed_t = write_transcript(replayed)
+    # A record with no uuid must still be counted -- older and synthetic
+    # records have none, and dropping them would cost real coverage.
+    no_uuid = write_transcript([
+        {k: v for k, v in use("t1").items() if k != "uuid"},
+        {k: v for k, v in denial("t1").items() if k != "uuid"}])
     # A multi-line command. The message asks for a byte-identical re-run and
     # quotes the command underneath, so the quoted form must be the command
     # itself: collapsing the newline turns `... 2>&1\necho x` into
@@ -507,9 +522,10 @@ try:
          "a user rejection with no toolDenialKind still does not reset it"),
     ]
     # A run the classifier ALLOWED resets the stretch even though the command
-    # then failed. `is_error` is not a reliable failure signal on a real tool
-    # result, so the hook does not try to read one -- and the stretch answers
-    # "how many refusals in a row", which an allowed run ends either way.
+    # then failed. `is_error` is true for a refusal as well as for a failure
+    # (measured: 1,822 true against 1,036 exit-code-prefixed), so it cannot
+    # separate them -- and the stretch answers "how many refusals in a row",
+    # which an allowed run ends either way.
     failed_run = write_transcript([
         use("t1"), denial("t1"),
         use("t2"), result("t2", "fatal: no upstream configured", is_error=True),
@@ -524,9 +540,12 @@ try:
         out_variants = invoke(variants, sdir)
         out_interleaved = invoke(interleaved, sdir)
         out_multiline = invoke(multiline, sdir)
+        out_replayed = invoke(replayed_t, sdir)
+        out_no_uuid = invoke(no_uuid, sdir)
     finally:
         for p in (one, two, both, reset, failed_run, variants, interleaved,
-                  multiline, *[t for t, _ in noreset]):
+                  multiline, replayed_t, no_uuid,
+                  *[t for t, _ in noreset]):
             os.unlink(p)
     content += [
         ("Re-run the same command once" in out_one,
@@ -569,6 +588,12 @@ try:
          "a multi-line command is quoted with its newlines intact"),
         ("2>&1 echo" not in out_multiline,
          "and is not collapsed into a different shell command"),
+        ("denied a tool call once in this session" in out_replayed,
+         "a replayed record is not a second denial"),
+        ("Re-run the same command once" in out_replayed,
+         "so the retry advice is not withheld by a replay"),
+        ("denied a tool call once in this session" in out_no_uuid,
+         "a record with no uuid is still counted"),
         ("denied 3 distinct commands" in out_variants,
          "three phrasings of one goal reach the variation warning"),
         ("stop generating new shapes" in out_variants,

@@ -87,21 +87,30 @@ denial, and say nothing. The message reports the total and turns on the
 stretch, which is why both are computed.
 
 The stretch resets when the permission layer LET THE COMMAND THROUGH -- not
-when it succeeded. The stronger reading was tried and withdrawn: whether a
-call succeeded is not decidable from the tool result, because a real Bash
-failure frequently carries no `is_error` at all (the exit status lands in the
-carrier's `toolUseResult`, and content-sniffing for "fatal:" matches any
-command that merely PRINTS such a line). A fixture asserting the tidy shape
-passes while the harness emits the other, which is exactly what
-`fixtures-are-not-evidence.md` warns a green test can mean.
+when it succeeded. That is a choice about what the number means, not a
+concession to what the transcript can show. Measured over the same corpus on
+2026-09-02: every one of 49,517 Bash tool results carries `is_error`, and all
+1,036 whose content begins `Exit code N` carry it true, so a nonzero exit is
+visible. What `is_error` does NOT do is separate a failure from a refusal --
+it is true on 1,822 results against those 1,036 -- and content-sniffing for
+"fatal:" matches any command that merely PRINTS such a line.
 
-"Permitted" is the property the count needs anyway. The number the message
-quotes answers "how many times has the classifier refused this in a row", so
-an attempt the classifier allowed ends the run whatever the command then did.
-A denial of any OTHER kind does not: a permission-rule refusal, a hook
-refusal, and the user's own rejection all leave the classifier's run intact.
-The user case is the one that matters most -- resetting there would answer a
-decision to respect with a recommendation to re-run.
+(An earlier draft of this paragraph asserted the opposite, that a Bash failure
+"frequently carries no `is_error` at all" and that the exit status lands in
+the carrier's `toolUseResult`. Both are false: absent zero times out of
+49,517, and `toolUseResult` carries `stdout`/`stderr` and no exit-status key.
+The claim came from a review and was written down without being re-derived,
+which is the one thing this file's own subject matter argues against. It is
+recorded rather than deleted because the design it justified is unchanged.)
+
+"Permitted" is the property the count needs anyway, and that is the actual
+argument. The number the message quotes answers "how many times has the
+classifier refused this in a row", so an attempt the classifier allowed ends
+the run whatever the command then did. A denial of any OTHER kind does not: a
+permission-rule refusal, a hook refusal, and the user's own rejection all
+leave the classifier's run intact. The user case is the one that matters most
+-- resetting there would answer a decision to respect with a recommendation
+to re-run.
 
 Fails OPEN and SILENT: any parse trouble prints nothing at all.
 
@@ -166,8 +175,8 @@ On the second denial itself the hook states the tension and stops. Pattern
 43's Do bullet says to stop probing after the second denial of the same goal
 and hand the user the decision; #2994 measured a success after three
 denials. Both are in this corpus, neither has been retired, and a guard is
-the wrong
-place to settle it -- so the message puts both to the user, which is what
+the wrong place to settle it -- so the message puts both to the user, which is
+what
 Pattern 43's Do bullet asks for anyway. Reconciling the two texts is tracked
 as ai-config#3008.
 
@@ -290,12 +299,36 @@ def permitted(record, block):
 
 
 def records(path):
+    """Yield each transcript record once.
+
+    The harness sometimes REPLAYS a record into the same file -- same `uuid`,
+    same `parentUuid`, same timestamp, hundreds of lines apart. Measured
+    2026-09-02: 4 of 1191 transcripts under `~/.claude/projects` carry 4,435
+    such duplicates between them. None has yet landed on a classifier denial,
+    which is why this is a guard rather than a bug report.
+
+    Counting one would be worse than merely wrong. A single denial would read
+    as two, so the reminder would say "you have already re-run it" when
+    nothing was re-run, withhold the one instruction #2994 asked for, and
+    tell the session to report a count that is double the truth -- inside a
+    message whose closing line is "report what was measured".
+
+    A record with no `uuid` is passed through, since synthetic and older
+    records have none and dropping them would cost real coverage.
+    """
+    seen = set()
     with open(path, errors="ignore") as fh:
         for line in fh:
             try:
-                yield json.loads(line)
+                rec = json.loads(line)
             except Exception:
                 continue
+            uid = rec.get("uuid") if isinstance(rec, dict) else None
+            if uid is not None:
+                if uid in seen:
+                    continue
+                seen.add(uid)
+            yield rec
 
 
 def read_transcript(path):

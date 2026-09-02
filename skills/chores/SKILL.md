@@ -201,14 +201,15 @@ When the base requires a merge queue, skip the check and the update.
 `gh pr merge` enqueues the PR and the queue's speculative merge tests the base, provided every check this skill reads is required and runs on `merge_group` (per `fully-clean`'s queue exception).
 If it is not, stop rather than update, since a manual update repairs neither gap.
 When that direct-path check finds the base stale (the queue path never reaches this paragraph), the bot-bump recovery is to update the branch pinned to `$PINNED`,
-wait until `headRefOid` differs from `$PINNED`,
+wait until `headRefOid` differs from `$PINNED`, with a deadline of a few minutes (expiry is a failed update: stop and report it rather than restarting),
 and then start again from the top of step 2: re-record `$PINNED` and `$BASE`, re-classify the bump, and rerun the CI and conflict checks against the new pin (review stays skipped on bot PRs).
 The first different SHA is not necessarily the update's result, since Dependabot or another writer can replace the head in the same window, so re-classification is what keeps the merge pinned to a head this skill has actually judged.
 `gh api -X PUT "repos/$REPO/pulls/$N/update-branch" -f expected_head_sha="$PINNED"` merges the base in, pinned to the head whose CI was read.
 A `422` whose message names an expected-head mismatch (match on the substring `expected head sha`, since the live text carries a curly apostrophe and a trailing period that this ASCII rendering cannot show) means the bot or another writer already replaced that head, so re-read before touching it.
 Any other `422` is a failed update: stop and read the message.
 `@dependabot rebase` rewrites the head onto the base branch and also clears a conflict.
-Then merge directly.
+It too replaces the head, so it is followed by the same bounded wait and restart from step 2, never by a direct merge on the old `$PINNED`.
+With the pin current and the checks green, merge directly.
 Dependabot deletes its own branch on merge.
 
 ```bash

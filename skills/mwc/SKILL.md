@@ -68,7 +68,8 @@ without asking confirmation before every merge.
   whose message names an expected-head mismatch (match on the substring `expected head sha`, since the live text carries a curly apostrophe and a trailing period that this ASCII rendering cannot show)
   means another writer moved the head, so settle ownership instead,
   and any other `422` is a failed update to stop on),
-  a wait until `headRefOid` changes (the update is asynchronous),
+  a wait of a few minutes at most until `headRefOid` changes (the update is
+  asynchronous; expiry is a failed update to stop on and report),
   recording that SHA,
   a currency check on it,
   a full re-run of the gate pinned to it,

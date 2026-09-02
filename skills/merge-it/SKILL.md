@@ -74,14 +74,14 @@ standing yes (see `preferences.md`).
   Under a merge queue whose required checks cover the whole clean gate on `merge_group`,
   skip the check and let the queue's speculative merge test the base.
   It is a manual step until [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) wires it into `check-pr-fully-clean.py`,
-  and a repository that does not require an up-to-date branch merges without it otherwise.
+  and on a repository that does not require an up-to-date branch GitHub would otherwise permit the stale merge, which is why the manual check stays required there.
   When it fails on a direct merge, update the branch pinned to the recorded head.
   Locally: `gh api -X PUT "repos/<owner>/<repo>/pulls/<N>/update-branch" -f expected_head_sha="<pinned-sha>"`.
   Remotely: `update_pull_request_branch` with `expectedHeadSha`.
   A `422` whose message names an expected-head mismatch is the another-writer signal, so settle ownership rather than retrying unpinned.
   Match on the substring `expected head sha`, since the live text carries a curly apostrophe and a trailing period that this ASCII rendering cannot show.
   Any other `422` is a failed update to stop on.
-  Then wait until `headRefOid` changes (the update answers `202 Accepted` before the merge lands),
+  Then wait until `headRefOid` changes (the update answers `202 Accepted` before the merge lands), with a deadline of a few minutes, treating expiry as a failed update to stop on and report,
   record that SHA,
   rerun the base-currency check on it,
   and then rerun the whole clean gate pinned to it.

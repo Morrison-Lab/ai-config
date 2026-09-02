@@ -30,7 +30,8 @@ the repo — so sessions in different worktrees still see each other.
 > Throughout, `ai-session.sh` means
 > `skills/session-lock/scripts/ai-session.sh` (or
 > `${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/skills/session-lock/scripts/ai-session.sh}` /
-> `~/.claude/skills/session-lock/scripts/ai-session.sh`). Use the full path, or alias it for the session.
+> `~/.claude/skills/session-lock/scripts/ai-session.sh`).
+> Use the full path, or alias it for the session.
 
 ## When this fires
 

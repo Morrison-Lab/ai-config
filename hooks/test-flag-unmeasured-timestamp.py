@@ -205,13 +205,93 @@ CASES = [
      mcp("mcp__github__add_issue_comment", "See the 12:47 entry in the log."),
      False, "a bare time with no Pacific marker is not a present-tense claim"),
 
+    ([PROMPT],
+     {"tool_name": "Write", "tool_input": {
+         "file_path": "/Users/user/.claude/projects/proj/memory/session-2026-09-01-gia-mwc.md",
+         "content": "### Sweep wave 1 (~17:35 PDT)\nCompleted issue #2530."}}, True,
+     "#2947: a Write to a session notebook with ~17:35 PDT warns"),
+    ([PROMPT],
+     {"tool_name": "Edit", "tool_input": {
+         "file_path": "/Users/user/repo/memory/session-2026-09-01.md",
+         "text": "Status at 17:50ish: tests green."}}, True,
+     "#2947: an Edit to a memory session notebook with 17:50ish warns"),
+    ([PROMPT],
+     {"tool_name": "Edit", "tool_input": {
+         "file_path": "/Users/user/repo/memory/session-2026-09-01.md",
+         "text": "The benchmark run took 2:30ish."}}, False,
+     "#2947: duration phrasing took 2:30ish in session notebook is silent"),
+    ([PROMPT],
+     {"tool_name": "Edit", "tool_input": {
+         "file_path": "/Users/user/repo/memory/session-2026-09-01.md",
+         "text": "build ended 21:15ish quietly without a marker."}}, False,
+     "#2947: bare 21:15ish without tilde or context in session notebook is silent"),
+    ([PROMPT],
+     {"tool_name": "Edit", "tool_input": {
+         "file_path": "/Users/user/repo/memory/session-2026-09-01.md",
+         "text": "we will pick this up again 23:00ish tomorrow."}}, False,
+     "#2947: bare 23:00ish without tilde or context in session notebook is silent"),
+    ([PROMPT],
+     {"tool_name": "Edit", "tool_input": {
+         "file_path": "/Users/user/repo/memory/session-2026-09-01.md",
+         "text": "Resumed ~21:15ish for wave 3."}}, True,
+     "#2947: ~21:15ish with tilde prefix in session notebook warns"),
+    ([PROMPT],
+     {"tool_name": "NotebookEdit", "tool_input": {
+         "notebook_path": "/Users/user/repo/memory/session-2026-09-01.md",
+         "new_source": "Status at 17:50ish: tests green."}}, True,
+     "#2947: NotebookEdit with new_source targeting memory session notebook warns"),
+    ([PROMPT],
+     {"tool_name": "write_to_file", "tool_input": {
+         "TargetFile": "/Users/user/repo/memories/preferences.md",
+         "CodeContent": "Verified 18:05ish PT: settings updated."}}, True,
+     "#2947: write_to_file to memories/ with 18:05ish PT warns"),
+    ([PROMPT],
+     bash("cat <<'EOF' >> ~/.claude/projects/p/memory/session-2026-09-01.md\n"
+          "### Wave 2 (17:50ish PDT)\nEOF"), True,
+     "#2947: a Bash heredoc appending 17:50ish PDT to session notebook warns"),
+    ([PROMPT],
+     bash('LOGID=$(date +%s); echo "Status at 17:50 PDT: tests green" >> memory/session-2026-09-01.md'), True,
+     "#2947: an unrelated date call in earlier segment does not discharge notebook stamp"),
+    ([PROMPT],
+     bash('echo "Status at 17:50 PDT: tests green; done" >> memory/session-2026-09-01.md'), True,
+     "#2947: a quoted semicolon inside echo content does not truncate the stamp"),
+    ([PROMPT],
+     bash('echo "Status at 17:50 PDT: tests green | done" >> memory/session-2026-09-01.md'), True,
+     "#2947: a quoted pipe inside echo content does not truncate the stamp"),
+    ([PROMPT],
+     bash('echo "Status at 17:50 PDT: tests green" | tee -a memory/session-2026-09-01.md'), True,
+     "#2947: echo piped to tee -a targeting memory notebook warns"),
+    ([PROMPT],
+     bash('echo "Status at $(TZ=America/Los_Angeles date \'+%H:%M %Z\')" | tee -a memory/session-2026-09-01.md'), False,
+     "#2947: in-command date piped to tee -a is measured by construction and does not warn"),
+    ([PROMPT],
+     bash('echo "Status at 17:50 PDT: tests green" >> memory/session-2026-09-01.md; NOW=$(date +%s)'), True,
+     "#2947: an unrelated date call in later segment does not discharge notebook stamp"),
+    ([PROMPT],
+     bash('echo "Status at 17:50 PDT: tests green" | tee -a memory/session-2026-09-01.md; NOW=$(date +%s)'), True,
+     "#2947: an unrelated date call in later segment after tee does not discharge notebook stamp"),
+    ([PROMPT],
+     bash("cat <<EOF >> ~/.claude/projects/p/memory/session-2026-09-01.md\n"
+          "### Wave 2 ($(TZ=America/Los_Angeles date \"+%H:%M %Z\"))\nEOF"), False,
+     "#2947: an in-command date subshell in heredoc is measured by construction and does not warn"),
+    ([PROMPT, DATE],
+     {"tool_name": "Write", "tool_input": {
+         "file_path": "memory/session-2026-09-01.md",
+         "content": "### Wave 1 (17:35 PDT)"}}, False,
+     "#2947: a date call in this turn discharges notebook edits too"),
+    ([PROMPT],
+     {"tool_name": "Write", "tool_input": {
+         "file_path": "src/index.ts",
+         "content": "// Updated 17:50 PDT"}}, False,
+     "#2947: a regular code file outside memory/notebooks is not a notebook/memory file"),
+
     # --- out of scope ---------------------------------------------------------
     ([PROMPT],
      {"tool_name": "Read", "tool_input": {"file_path": "notes.md"}}, False,
      "a non-comment tool is silent"),
     ([PROMPT],
-     bash('echo "as of 12:47 PDT" > notebook.md'), False,
-     "a Bash command that posts no comment is silent"),
+     bash('echo "as of 12:47 PDT" > build/temp.txt'), False,
+     "a Bash command that writes to a non-notebook file is silent"),
     ([PROMPT],
      mcp("mcp__github__create_pull_request", "Opened at 12:47 PT."), False,
      "a non-comment MCP tool is silent"),
@@ -375,6 +455,7 @@ def check_sentinel():
         full = dict(mcp("mcp__github__add_issue_comment", CLAIM),
                     transcript_path=tpath, cwd=os.getcwd())
         env = dict(os.environ, TMPDIR=tmpdir)
+        env.pop("ANTIGRAVITY_AGENT", None)
         first = subprocess.run([sys.executable, HOOK], input=json.dumps(full),
                                capture_output=True, text=True, env=env).stdout
         second = subprocess.run([sys.executable, HOOK], input=json.dumps(full),

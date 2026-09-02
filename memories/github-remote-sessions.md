@@ -85,3 +85,7 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
   Reconcile BOTH before calling a PR clean;
   the agent post-step tends to drip 1-2 pre-existing cosmetic nits per round.
   That drip is a reason to keep iterating, never a reason to stop or to ask whether to stop --- see `skills/ardi/SKILL.md`, "Stopping conditions".
+- **`Stop` hooks in remote/web plugin sessions do not consistently fire on turn completions or context-summary resumptions.**
+  In local Claude Code sessions, `Stop` hooks in `hooks/hooks.json` intercept bare placeholders like `No response requested.` (ai-config#1579, #2943).
+  In remote/web cloud sessions, `Stop` hooks may not be dispatched by the web harness across turn boundaries or after context window summarization.
+  Do not rely on local `Stop` hook enforcement to prevent placeholder turns when running in remote/web cloud sessions --- adhere to `CLAUDE.md`'s "Always produce a reply" rule directly in every turn.

@@ -22,40 +22,20 @@ Threshold rationale (`--max-lines`, default below):
   parameter rather than a literal per
   `shared/coding/configurable-parameters.md`.
 
-WHAT "ADVISORY" DOES AND DOES NOT MEAN HERE
--------------------------------------------
-Read this before concluding the cap is soft. THIS SCRIPT is advisory. The
-CORPUS is gated, from `test_check_memory_file_size.py`, whose final assertion
-calls `oversized_files("memories", DEFAULT_MAX_LINES)` on the live tree and
-exits 1 on any finding -- so a `validate` run goes red at "Run
-memory-file-size check tests", never at the step that runs this file. A PR
-that appends past 1250 lines cannot merge; it has to split first.
-A file already AT the cap cannot take a net-positive append either.
-Recover lines (re-wrap or drop) or split, rather than adding lines.
-A fold has two shapes and neither escapes every gate: putting the new
-sentence on its own source line trips this size test, while densifying
-an existing line leaves the line count flat but makes that line a
+CI AND PRE-PUSH ENFORCEMENT
+---------------------------
+CI (.github/workflows/validate.yml) runs `python3 scripts/check-memory-file-size.py --strict`
+(ai-config#2970), and `scripts/test_check_memory_file_size.py` asserts the live
+corpus is under DEFAULT_MAX_LINES (1250 lines). A PR that appends past 1250 lines
+cannot merge; it has to split first. A file already AT the cap cannot take a
+net-positive append either. Recover lines (re-wrap or drop) or split, rather
+than adding lines. A fold has two shapes and neither escapes every gate:
+putting the new sentence on its own source line trips this size test, while
+densifying an existing line leaves the line count flat but makes that line a
 changed line the new-line-breaks gate can flag.
-Measured 2026-08-25 on memories/preferences.md in ai-config#2262:
-origin/main was exactly 1200 lines. A +5-line append failed
-scripts/test_check_memory_file_size.py; a same-day rewrite that folded
-the additions into three existing lines passed this test and had to
-satisfy new-line-breaks instead.
 
-The two statements are consistent and read as contradictory, which is why
-they are stated together: the advisory exit keeps THIS check from blocking an
-unrelated PR over a file it did not touch, while the test keeps the shipped
-default honest. `shared/workflow/batch-merge-and-resolve.cases.md` records an
-instance of the misreading, and `shared/writing/semantic-line-breaks.md` says
-it in one line: read the test suite itself, not this docstring.
-
-Advisory by default: always exits 0 unless `--strict` is passed. A memory
-file crossing a line count is a prompt to consider splitting, not a defect
-that should block an unrelated PR -- the same stance the repo's other
-advisory check takes (the diff-scoped semantic-line-break check, which
-started here as `scripts/check-new-line-breaks.py` and now runs from
-`Morrison-Lab/gha`'s reusable workflow per gha#300 / ai-config#703), and the
-one `shared/writing/semantic-line-breaks.md` prescribes for style findings.
+Run `python3 scripts/check-memory-file-size.py --strict` before pushing to match CI.
+When run without `--strict`, the script is advisory (exits 0 while printing findings).
 """
 from __future__ import annotations
 

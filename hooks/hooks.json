@@ -734,6 +734,18 @@
             "why": "Warns when a worktree-rooted session cd's into the MAIN checkout of its own repo -- a real path on a different branch, where every edit and every check silently succeeds against somebody else's tree."
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-stale-instrument-checkout.py\"",
+            "timeout": 10,
+            "script": "flag-stale-instrument-checkout.py",
+            "why": "Warns when a deciding instrument (check-pr-fully-clean.py and siblings) is run from a checkout behind origin's default branch -- a stale reading is indistinguishable from the vocabulary false positive fully-clean.md documents, so the documented remedy confirms the wrong conclusion."
+          }
+        ]
       }
     ],
     "Stop": [

@@ -543,7 +543,9 @@
   The short version: `Morrison-Lab/ai-config` reproduces the identical 201-then-empty signature while carrying no `copilot_code_review` rule at either scope, so an empty pending list is evidence neither that the request was blocked nor that a review is coming.
   Only the posted review **body** settles which of those happened.
 
-  **The "nor that a review is coming" half now has a positive instance, and it is weaker evidence than it first looks.**
+  **A #3010 instance bears on the "not blocked" half, not the "nor that a review is coming" half, and is weaker evidence than it first looks.**
+  An empty pending list followed by a landed review shows emptiness is not evidence the request was *blocked*.
+  It says nothing about the other direction, which only a zero-review outcome after an empty read could speak to.
   On `Morrison-Lab/ai-config#3010` (2026-09-02) the session **reports** running the POST repeatedly and seeing `requested_reviewers` come back empty on the immediate read every time, and Copilot reviews did land on that PR anyway.
   Weigh that empty-read observation as narration rather than measurement: the pending list is only observable at request time, so unlike the reviews themselves it cannot be re-derived afterwards, and the same PR is where the session's own POST count turned out not to match its timeline.
   [`pr-on-claim.cases.md`](../shared/workflow/pr-on-claim.cases.md)'s "The blocking message prescribes a non-dischargeable shape" carries the derived figures;

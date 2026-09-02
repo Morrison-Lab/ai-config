@@ -101,7 +101,8 @@ The same constraint binds the request, and the message says nothing about it.
 
 Note also what makes this hard to diagnose from inside the turn.
 The request succeeds and reviews arrive, so every signal available to the session says the obligation is met.
-Nothing distinguishes *the request failed* from *the request was not last*, and the message names only the first.
+The hook itself distinguishes the two perfectly --- `request_ident` returns `rlast`, and the command ordering is right there in the transcript.
+What does not distinguish them is anything the blocked session is shown: the message names only *the request failed*, so the reader has no reason to inspect an ordering the hook already measured.
 
 - **Do:** run the request as the sole command in its call, and verify in a separate call, whether or not the blocking message says so.
 - **Do:** read a verbatim-repeating block message as a candidate gap in the message, once the blocked action's own output says it succeeded.

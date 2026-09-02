@@ -26,8 +26,8 @@ the hook fired after every one of them, and the loop ended on the first turn tha
 Four Copilot reviews landed on the PR while this was going on, at `15:51:54Z`, `16:43:37Z`, `16:47:16Z`, and `17:00:45Z`.
 Every figure in this record is bounded to that window --- `15:00Z` to `17:30Z` on 2026-09-02 --- rather than to the calendar day, because a later turn in the same session added a fifth request and a fifth review.
 
-**Take the turn and POST counts from the timeline, not from the session's own narration, because the two disagree.**
-That session reported eight POSTs across nine turns.
+**Take the count of reviewer ADDITIONS from the timeline rather than from the session's own narration, and note the two count different things.**
+That session reported eight POSTs across nine turns, which is a count of attempts.
 `gh api repos/Morrison-Lab/ai-config/issues/3010/timeline` carries four `review_requested` events inside that window, at `15:47:51Z`, `16:39:35Z`, `16:43:40Z`, and `16:56:17Z`.
 Re-derive by filtering to the window rather than counting the whole endpoint, which keeps growing:
 
@@ -36,8 +36,9 @@ gh api repos/Morrison-Lab/ai-config/issues/3010/timeline --paginate \
   | jq -r '.[] | select(.event == "review_requested") | .created_at' \
   | awk '$0 >= "2026-09-02T15:00:00Z" && $0 <= "2026-09-02T17:30:00Z"'
 ```
-A POST that adds a reviewer emits such an event, so at most four of the claimed eight demonstrably added anyone, and the discrepancy is unexplained.
-That gap is itself the lesson the record is about: a session in this loop cannot tell a request that failed from one that was not last, and it cannot reliably count its own either.
+A POST emits such an event only when it actually adds a reviewer, so the timeline bounds additions and cannot bound attempts: at most four of the eight demonstrably added anyone, and the remaining four are unverifiable rather than disproved.
+A POST against an already-requested reviewer is one way to attempt without adding.
+That gap is itself the lesson the record is about: a session in this loop is shown nothing that separates a request that failed from one that was not last, and its own narration of how many it sent is not independently checkable.
 
 The first two occurrences were a session composing the wrong shape on its own.
 This one had the rule written down twice already, in `pr-on-claim.md` and in `pr-on-claim.rationale.md`, while the message a blocked session actually reads stated it for `gh pr edit --add-label` and not for the request.

@@ -603,7 +603,7 @@ Proceed? (or pick specific branches to act on)</code></pre>
 <span id="cb20-17"><a href="#cb20-17" aria-hidden="true" tabindex="-1"></a><span class="co"># Compare against origin/main (just fetched), NOT local `main` — your local main</span></span>
 <span id="cb20-18"><a href="#cb20-18" aria-hidden="true" tabindex="-1"></a><span class="co"># may be behind, which would hide branches that are actually merged.</span></span>
 <span id="cb20-19"><a href="#cb20-19" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> branch <span class="at">-d</span> <span class="op">&lt;</span>branch<span class="op">&gt;</span>          <span class="co"># -d refuses if NOT actually merged — a safety net</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>A merged branch that appears in <code>/tmp/checked-out.txt</code> gets the status <code>checked out in a worktree</code> in the step 4 plan and is counted under “Skipped” in the step 9 report; <code>clean-worktrees</code> is the skill that retires the worktree first. <code>-d</code> (never <code>-D</code>) is deliberate: <code>error: the branch 'X' is not fully merged</code> means unmerged commits, so treat the branch as <strong>stale</strong>, not dead (see b). <code>error: cannot delete branch 'X' used by worktree at ...</code> means the checked-out set went stale since it was derived; re-derive it rather than retrying.</p>
+<p>A merged branch that appears in <code>/tmp/checked-out.txt</code> gets the status <code>checked out in a worktree</code> in the local plan (the step 4 table when the local rows are folded into a full sweep, or the standalone local plan step 8c describes) and goes under “Skipped (checked out in a worktree)” in the step 9 report; <code>clean-worktrees</code> is the skill that retires the worktree first. <code>-d</code> (never <code>-D</code>) is deliberate: <code>error: the branch 'X' is not fully merged</code> means unmerged commits, so treat the branch as <strong>stale</strong>, not dead (see b). <code>error: cannot delete branch 'X' used by worktree at ...</code> means the checked-out set went stale since it was derived; re-derive it rather than retrying.</p>
 </section>
 <section id="b.-upstream-gone-but-the-pr-merged-delete" class="level4">
 <h4 class="anchored" data-anchor-id="b.-upstream-gone-but-the-pr-merged-delete">b. Upstream gone but the PR merged → delete</h4>
@@ -651,6 +651,9 @@ Proceed? (or pick specific branches to act on)</code></pre>
 ### Skipped (active/new)
 - `fix/42-typo` — open MR !80
 - `experiment` — created 2 days ago
+
+### Skipped (checked out in a worktree)
+- `feature/foo` (merged, but checked out at `../wt-foo`): run `clean-worktrees` first
 
 ### Flagged — local-only, unpushed (left alone)
 - `scratch-idea` — 4 unpushed commits, no MR; your call

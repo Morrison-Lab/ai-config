@@ -263,7 +263,7 @@ git branch --merged origin/main --format='%(refname:short)' \
 git branch -d <branch>          # -d refuses if NOT actually merged — a safety net
 ```
 
-A merged branch that appears in `/tmp/checked-out.txt` gets the status `checked out in a worktree` in the step 4 plan and is counted under “Skipped” in the step 9 report; `clean-worktrees` is the skill that retires the worktree first. `-d` (never `-D`) is deliberate: `error: the branch 'X' is not fully merged` means unmerged commits, so treat the branch as **stale**, not dead (see b). `error: cannot delete branch 'X' used by worktree at ...` means the checked-out set went stale since it was derived; re-derive it rather than retrying.
+A merged branch that appears in `/tmp/checked-out.txt` gets the status `checked out in a worktree` in the local plan (the step 4 table when the local rows are folded into a full sweep, or the standalone local plan step 8c describes) and goes under “Skipped (checked out in a worktree)” in the step 9 report; `clean-worktrees` is the skill that retires the worktree first. `-d` (never `-D`) is deliberate: `error: the branch 'X' is not fully merged` means unmerged commits, so treat the branch as **stale**, not dead (see b). `error: cannot delete branch 'X' used by worktree at ...` means the checked-out set went stale since it was derived; re-derive it rather than retrying.
 
 #### b. Upstream gone but the PR merged → delete
 
@@ -327,6 +327,9 @@ Print a summary covering **both** local and remote:
     ### Skipped (active/new)
     - `fix/42-typo` — open MR !80
     - `experiment` — created 2 days ago
+
+    ### Skipped (checked out in a worktree)
+    - `feature/foo` (merged, but checked out at `../wt-foo`): run `clean-worktrees` first
 
     ### Flagged — local-only, unpushed (left alone)
     - `scratch-idea` — 4 unpushed commits, no MR; your call

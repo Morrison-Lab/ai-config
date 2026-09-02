@@ -719,7 +719,10 @@ What reads clean today is the format the checker was built for: resolved
 prior findings under a heading that is not a `Findings` heading
 (`### Resolved since the last round`), and `### Findings` reporting `None.`
 A resolution whose whole disposition closes the line
-(`**Previously: X.** Now fixed in abc1234.`) also resolves under any heading.
+(`**Previously: X.** Now fixed in abc1234.`) also resolves, provided the
+`Findings` heading itself is marked resolved or non-blocking; under a bare
+`### Findings` heading even a closing-line item stays open, since the heading
+is what admits the section to the item test.
 
 - **Do:** when a review of yours must recount resolved prior findings, file
   them under a non-`Findings` heading and keep `### Findings` for open ones.

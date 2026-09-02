@@ -2398,6 +2398,10 @@ def main() -> int:
               "### Findings \u2014 all resolved\n\n"
               "1. **Previously: X.** Now fixed in abc1234.\n\n### Verdict\n\nReady for merge\n"
           ) is None)
+    check("a closing-line Previously: item under a BARE Findings heading stays open: the heading admits the item test (#2945)",
+          checker._unresolved_finding_pattern(
+              "### Findings\n\n1. **Previously: X.** Now fixed in abc1234.\n\n### Verdict\n\nReady for merge\n"
+          ) is not None)
     check("a Previously: item whose explanation names a new defect stays open (#2945)",
           checker._unresolved_finding_pattern(
               "### Findings \u2014 all resolved\n\n"

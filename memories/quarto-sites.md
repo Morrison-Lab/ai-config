@@ -271,7 +271,8 @@ Caught in self-review on [macros#83](https://github.com/d-morrison/macros/pull/8
 
 The section above is about which **formats** a project renders, and says the project block understates that set.
 This is the other axis: which **documents** a given entry in that block reaches.
-The answer is all of them --- the block is the *default* for any document whose own front matter declares no `format:` --- so adding a format there to give **one** document a slide deck silently gives it to every page in the site.
+The answer is every document that declares no `format:` of its own, since the block is those documents' *default* --- so adding a format there to give **one** document a slide deck silently gives it to every such page in the site.
+A document carrying its own `format:` block escapes it, which is the same override rule read from the other side, and is why the one page you meant to change may be the only page unaffected.
 
 Both axes fall out of the single rule that section states --- per-document front matter *overrides* the project block rather than adding to it --- so the block understates the format set and overstates the document set at the same time.
 What is surprising is the scope rather than the behaviour: the block does exactly what it is documented to do, and the edit was wider than the intent behind it.
@@ -295,10 +296,12 @@ The page named is not the page the format was added for, and that mismatch is it
 Don't read the named page as the first one rendered either, or as the last.
 The name tracks the *colliding* document --- the one inheriting both formats --- and nothing about render position.
 Measured on Quarto 1.9.36 / macOS in a three-page project where `index.qmd` alone declares no `format:` of its own: the render reports `[1/3] docs/design-decisions.md`, `[2/3] index.qmd`, `[3/3] aaa.qmd`, and the error names `index.html`, which is neither first nor last.
-Which stage picks the reported path was not established, and is not needed: the name identifies the document that collided, which is the one to go and fix.
+Which stage picks the reported path was not established, and is not needed: the name identifies a document that inherited the project's formats, which tells you the entry is reaching further than you intended.
+Read it as the symptom rather than the site of the fix.
+The remedy is in the project block and in the front matter of the document you meant to serve --- narrow the one, and give the other an explicit `output-file:` --- not in the page the error happens to name.
 
 **A green CI check here was not weak evidence that the block was fine --- it was no evidence either way.**
-Two runs on `ucdavis/hac.sap#9` carried that top-level block: run `33432191485` (job `99619966191`) at `8c40c4db`, and run `33567826907` (job `100054940478`) at `e6d9e8a`.
+Two runs on [ucdavis/hac.sap#9](https://github.com/ucdavis/hac.sap/pull/9) carried that top-level block: run `33432191485` (job `99619966191`) at `8c40c4db`, and run `33567826907` (job `100054940478`) at `e6d9e8a`.
 Both `build` checks passed, and both render steps dump the same inputs: `FORMATS` empty, `RENDER_PROFILE` empty, `TINYTEX: false`, and `HAS_LABEL_PDF`, `HAS_LABEL_DOCX`, `HAS_LABEL_REVEALJS` all false.
 Read `TINYTEX` as part of that input rather than the labels alone: the action's pdf branch fires on `TINYTEX = true` **or** `HAS_LABEL_PDF = true`, so a false label does not exclude pdf by itself.
 On those inputs `Morrison-Lab/gha`'s `preview@v2` takes its no-formats branch, builds `FORMAT_LIST=("html")`, and issues one command: `quarto render . --to html --output-dir _site`.

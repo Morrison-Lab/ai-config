@@ -896,7 +896,7 @@ Separating the two cases needs a second call --- `find.package("pkg")` errors wi
 - **Don't:** pass an unchecked `system.file()` result to `file.path()`;
   the empty component makes the path absolute instead of failing.
 
-(Measured 2026-09-01 on `ucdavis/hac.sap#9` at commit `e6d9e8a`, where `R/format_sap_table.R` exported two one-line helpers --- `sap_reference_docx()` and `sap_asset_path(name)` --- each returning a bare `system.file(...)` with no `mustWork` and no emptiness check, so a renamed or unbundled asset reached the caller as `""`.
+(Measured 2026-09-01 on [ucdavis/hac.sap#9](https://github.com/ucdavis/hac.sap/pull/9) at commit `e6d9e8a`, where `R/format_sap_table.R` exported two one-line helpers --- `sap_reference_docx()` and `sap_asset_path(name)` --- each returning a bare `system.file(...)` with no `mustWork` and no emptiness check, so a renamed or unbundled asset reached the caller as `""`.
 Cite the commit rather than the file: review caught it, and by `d2befcf` (2026-09-02) both helpers carry an `nzchar()`/`file.exists()` guard and a `cli::cli_abort()`, so the current head shows the fix rather than the defect.
 Tracked as [ai-config#2984](https://github.com/Morrison-Lab/ai-config/issues/2984).)
 

@@ -364,8 +364,10 @@ See ai-config#694 for the precedent.
   collapsed-block case ([#1029](https://github.com/Morrison-Lab/ai-config/pull/1029)).
   - **Do:** read the review body with `get_reviews` every round, selecting
     the entry whose `user.login` is `copilot-pull-request-reviewer[bot]` and
-    whose `commit_id` is the current head, and paging past the first page
-    (`perPage` 5, highest page number) on a long thread.
+    whose `commit_id` is the current head, after paging through every
+    review page and filtering the complete list, as
+    `skills/ardi/SKILL.md`'s `--paginate` query does: later human reviews
+    can push the matching entry off the last page without the head moving.
     The newest entry alone can be a human review or a stale round;
     `shared/workflow/review-verdict-pitfalls.md`'s reviewer-login table
     carries the field and value per surface.

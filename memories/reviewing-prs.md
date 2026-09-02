@@ -148,10 +148,16 @@ returns `AGENTS.md:571`, `memories/reviewing-prs.md:94`,
 plus three unrelated hits (`hooks.md`, `report-mistakes-proactively.md`,
 `math-derivation-steps.md`) that reading against the rule discards.
 That is every file rounds thirty-three through thirty-five changed.
-The one restatement it lands beside rather than on is `post-merge`'s
-scanner brief, whose "explicitly authorized" is wrapped across a line
-break, so a single-line grep needs a second pattern or a read of the
-surrounding section for a wrapped phrase.
+The `post-merge` hit at line 285 is the scanner's own filter, where the
+phrase sits on one line.
+The scanner brief a few paragraphs above it restates the same rule with
+the phrase wrapped across a line break, `explicitly` ending line 231 and
+`authorized` starting line 232
+(`git show 28c20e5:skills/post-merge/SKILL.md | sed -n 231,232p`), so the
+grep reaches that file through the filter and not through the brief.
+A wrapped phrase needs a second pattern or a read of the surrounding
+section, which is one more reason the sweep inspects each hit's file
+rather than only the matching line.
 Round thirty-six was a different gap (a live-claim check in
 `check-history`, distinct from scope), so it is not an instance of this
 lesson and a restatement sweep would not have caught it.

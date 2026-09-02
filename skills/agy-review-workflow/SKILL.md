@@ -12,15 +12,11 @@ allowed-tools:
 # agy-review-workflow
 
 > [!IMPORTANT]
-> **Antigravity is permanently out of service** (user directive, 2026-08-20),
-> confirmed on a dispatched run that ended `request failed (code 429): Your
-> prepayment credits are depleted` / `Execution failed: model unreachable`.
-> This skill is kept as history, not as an option.
-> **Do not dispatch the workflow** --- a dispatch burns a run and leaves a red
-> check for a reviewer that cannot answer.
-> For a cross-vendor second opinion use
-> [`delegate-to-codex`](../delegate-to-codex/SKILL.md), the billed
-> ChatGPT-plan CLI this corpus dispatches.
+> **This workflow's *API-dispatch* status is unverified since 2026-08-20.**
+> That date's dispatched run ended `request failed (code 429): Your prepayment credits are depleted` / `Execution failed: model unreachable`, and nobody has re-tested this specific `antigravity-review.yml` / `antigravity-code-review.yml` dispatch path since.
+> Don't assume it works, and don't assume it is still broken --- probe it before relying on it, and update this banner with what you find.
+> **This is a separate claim from the `agy` CLI**, which is confirmed back in service on Windows as of 2026-09-02 via a direct local install (see `memories/delegation.md`'s IMPORTANT banner and `memories/preferences.md`'s "agy on Windows" section) --- that CLI route does not go through this workflow file at all, so its recovery says nothing about whether the API dispatch here still 429s.
+> Until someone re-runs this workflow and reports a result, prefer [`delegate-to-codex`](../delegate-to-codex/SKILL.md) or a direct `agy --print` CLI dispatch (per `memories/delegation.md`) for a cross-vendor second opinion.
 > Copilot stays requestable on the PR where the org's licensing reaches it.
 > Tracked as ai-config#1776.
 

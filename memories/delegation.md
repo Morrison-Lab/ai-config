@@ -7,17 +7,12 @@ this section is self-contained.
 ## Delegate heavy work to another CLI first --- codex, agy, opencode, and openrouter
 
 > [!IMPORTANT]
-> **`agy` (Google Antigravity)'s API-dispatch route is permanently out of
-> service** (user directive, 2026-08-20; scope corrected 2026-08-23),
-> confirmed via a dispatched run's `429: prepayment credits depleted`.
-> Route no API-dispatched subagent work to it.
-> **The API and the CLI are two separate paths: the API is out of commission,
-> but the agy CLI is available** (user clarification, 2026-08-25),
-> so headless `agy --print` invocations
-> --- including adversarial review dispatch ---
-> remain usable.
-> The interactive subscription/extension is unaffected and not at quota ---
-> don't extrapolate this into "uninstall the extension".
+> **`agy` (Google Antigravity) is back in service as a dispatchable subagent** (user directives, 2026-09-02: "start using agy as a subagent where feasible", "use agy cli for it").
+> The 2026-08-20 API-dispatch outage (`429: prepayment credits depleted`, user directive that day, scope corrected 2026-08-23) stays on record as history --- it explains why an earlier version of this banner said "out of service" --- but it no longer describes the CLI, which the 2026-08-25 clarification already carved out as a separate, unaffected path.
+> **A fresh Windows install on 2026-09-02, from the official `google-antigravity/antigravity-cli` GitHub release, confirms the CLI works end to end**: `agy --version` reports 1.1.24, `agy models` lists a real roster, and a headless smoke test returned the expected output in about 5 seconds.
+> See this file's "agy on Windows" section below for the install steps and `memories/preferences.md`'s "agy on Windows" section for the parallel write-up kept there for discoverability.
+> Route dispatchable subagent work to the `agy` CLI accordingly, per the ladder below --- after `opencode`'s free tier on cost, alongside `codex` on capability.
+> The interactive subscription/extension was never affected and was never at quota.
 > Tracked as ai-config#1776.
 
 For heavy, parallelizable **read / draft / verify** work ---
@@ -232,6 +227,59 @@ reaffirmed 2026-07-06 ("always use codex first
 (until we hit the 5-hour limits) before using up claude quota"),
 and widened 2026-08-15 ("in addition to codex, we have agy quota to use;
 try using both of those as subagents before exhausting claude quota").
+
+## agy on Windows
+
+Measured 2026-09-02 on the user's Windows 11 machine.
+This is a fresh, from-scratch install, distinct from the 1.1.13 install this file's mechanics sections above already document --- re-run these steps rather than assuming an existing install matches.
+
+**Install from the official GitHub release, not from an IDE bundle.**
+
+```bash
+gh release download 1.1.24 -R google-antigravity/antigravity-cli \
+  -p agy_cli_windows_x64.zip
+# unzip, then copy the extracted antigravity.exe to ~/.local/bin/agy.exe
+```
+
+It authenticated with no extra step, reusing the Antigravity IDE's own login.
+`agy --version` reports `1.1.24`.
+
+**`agy models` lists a real roster**, unquoted here since a model roster is exactly the kind of fact a vendor changes without notice --- run the command rather than trusting a pasted list.
+As of 2026-09-02 it included several `gemini-3.x-flash-{high,medium,low}` tiers, `gemini-3.1-pro-{high,low}`, `claude-sonnet-4-6`, `claude-opus-4-6-thinking`, and `gpt-oss-120b-medium`.
+
+**A headless smoke test confirms the print path works end to end:**
+
+```bash
+agy --print "Reply with only the word BANANA." \
+  --model gemini-3.8-flash-medium --output-format text </dev/null
+```
+
+Returned `BANANA` in about 5 seconds.
+The existing "`agy --print` CONSUMES THE NEXT TOKEN" rule above still applies --- keep the prompt immediately after `--print`.
+
+**Headless mode cannot satisfy a tool's permission prompt, and it fails with a named cause rather than hanging.**
+A tool needing a permission it hasn't been granted (`read_file` is the one observed) makes the run print `jetski: no output produced --- a tool required the "read_file" permission that headless mode cannot prompt for` and produce nothing.
+The available escapes are `--mode plan` (read-only), `--mode accept-edits`, `--dangerously-skip-permissions`, or an allow-rule under `permissions.allow` in `settings.json` --- but this file's own auto-mode classifier section below already found `--dangerously-skip-permissions` and `--mode accept-edits` denied by Claude Code's permission classifier, so those two may not be reachable from an orchestrated dispatch even where they solve the headless problem.
+**Which of these actually works for a read-only review dispatch is unmeasured as of 2026-09-02** --- probe it and update this section with a result before relying on any one of them, rather than assuming `--mode plan` is the safe default merely because it sounds read-only.
+
+**A `language_server.exe agentapi` fallback exists for when no CLI is installed but the Antigravity IDE is already open.**
+This is not a CLI dispatch at all --- it talks to the IDE's own running language server:
+
+```bash
+language_server.exe agentapi new-conversation \
+  --model=flash|flash_lite|pro "<prompt>"
+```
+
+with environment variables read from the running IDE process: `ANTIGRAVITY_LS_ADDRESS=127.0.0.1:<higher of the two LISTENING ports of language_server.exe>`, `ANTIGRAVITY_CSRF_TOKEN=<the --csrf_token value from that process's own command line>`, and `ANTIGRAVITY_PROJECT_ID=<the workspace path>`.
+The reply lands as a `PLANNER_RESPONSE` step in `~/.gemini/antigravity/brain/<conversationId>/.system_generated/logs/transcript.jsonl`, not on stdout, so a caller has to poll or tail that file rather than capturing a return value.
+This route did real tool work and two edit-only doc fixes on 2026-09-02, so it is a working fallback, not merely a documented one --- but it depends on the IDE process already running, which the direct CLI install above does not.
+
+- **Do:** install from the official `antigravity-cli` GitHub release when setting up `agy` fresh on Windows, and confirm with `agy --version` and `agy models` before trusting the install.
+- **Do:** read `agy models`' own output for the current roster rather than reusing a pasted list, since a vendor roster is exactly the kind of claim this corpus times.
+- **Do:** reach for the `agentapi` fallback only when the IDE is already open --- it reads the IDE's own ports and token, so it cannot start a fresh Antigravity session on its own.
+- **Don't:** treat any of `--mode plan`, `--mode accept-edits`, `--dangerously-skip-permissions`, or a `permissions.allow` rule as the settled fix for a headless permission denial until one has actually been tried and reported --- this section names the options, not a verdict.
+- **Don't:** expect the `agentapi` transcript file to update instantly;
+  it is a log a background process appends to, not a synchronous response.
 
 ## A measured lane comparison: codex, opencode, agy, and Sonnet reviewers, one real task each
 

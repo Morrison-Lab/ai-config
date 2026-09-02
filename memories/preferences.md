@@ -1070,6 +1070,7 @@ Both were caught by the `@claude` review bot, not by me --- mentally (or actuall
 
 Moved to [delegation.md](delegation.md) --- the cost-first order,
 usage-window rules, and headless dispatch mechanics live there.
+Its "agy on Windows" section is a 2026-09-02 install-and-mechanics writeup (the official `antigravity-cli` GitHub release, `agy models`, a headless smoke test, the headless permission-denial failure mode, and a `language_server.exe agentapi` fallback for when the IDE is open but no CLI is installed) --- kept there rather than duplicated here, since it is mechanics for the same CLI this section already points at.
 
 ## Ephemeral-session commit tension
 

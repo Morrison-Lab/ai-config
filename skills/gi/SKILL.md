@@ -186,9 +186,9 @@ git worktree add ../<repo>-<slug> -b fix/<slug> origin/main         # CREATE_WOR
 cd ../<repo>-<slug>
 ```
 
-`git worktree add` does not change directory, a worktree cannot check out a
-branch another worktree already has, and a repo script run from a worktree
-can still measure the main checkout ---
+`git worktree add` does not change directory, two worktrees on one branch
+name can silently move the shared ref instead of erroring, and a repo script
+run from a worktree can still measure the main checkout ---
 [`memories/git-worktrees.md`](../../memories/git-worktrees.md) carries these
 and the other measured gotchas; the [`session-lock`](../session-lock/SKILL.md)
 skill wraps the same step with a collision check.

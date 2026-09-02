@@ -2359,6 +2359,55 @@ def main() -> int:
               "### Findings \u2014 non-blocking\n\n- Minor formatting note.\n\n"
               "### Verdict\nReady for merge\n")
           is None)
+    # ai-config#2945, a NEGATIVE result pinned as tests. A resolution log
+    # whose items read "**Previously: X.** Now fixed --- <explanation>" under a
+    # resolved Findings heading scores as open findings, because no lexical
+    # rule can tell "Now fixed; the pathspec is quoted" from "Now fixed; the
+    # query leaks memory on every call", and a same-comment CLEAN payload is
+    # the same author's verdict line in JSON, which fully-clean.md says loses
+    # to findings. Two attempts (a caveat blocklist, a payload gate) were
+    # withdrawn in #2950. The reviewer-side format that reads clean today is
+    # asserted below: resolved prior findings under a heading that is not a
+    # Findings heading, with `### Findings` reporting none.
+    prior_status_log = (
+        "### Findings \u2014 all three from the prior rounds are now resolved\n\n"
+        "1. **Previously: `LIST_PRS` omitted `assignees`.** Now fixed \u2014 "
+        "`skills/ardia/SKILL.md:25` includes `assignees` in the `--json` field list.\n"
+        "2. **Previously: duplicated scope bullet.** The old bullet has been fully removed "
+        "(confirmed via `grep`, zero hits).\n\n"
+        "### Verdict\n\nReady for merge\n"
+    )
+    check("a resolution log with free-prose explanations under a resolved Findings heading stays open by design (#2945)",
+          checker._unresolved_finding_pattern(prior_status_log) is not None)
+    check("the same log stays open even with a same-comment CLEAN payload: the payload is the author's own verdict, and findings win (#2945)",
+          checker._unresolved_finding_pattern(
+              prior_status_log
+              + "\n<!-- review-data:\n"
+              + '{"schema_version": "1.0", "reviewer": "claude", "verdict": "CLEAN", "findings": []}\n-->\n'
+          ) is not None)
+    check("the reviewer-side format resolves: prior findings under a non-Findings heading, Findings reporting none (#2945)",
+          checker._unresolved_finding_pattern(
+              "### Resolved since the last round\n\n"
+              "1. **Previously: `LIST_PRS` omitted `assignees`.** Now fixed \u2014 "
+              "`skills/ardia/SKILL.md:25` includes `assignees` in the `--json` field list.\n"
+              "2. **Previously: duplicated scope bullet.** The old bullet has been fully removed.\n\n"
+              "### Findings\n\nNone.\n\n### Verdict\n\nReady for merge\n"
+          ) is None)
+    check("a Previously: item whose resolution closes the line resolves under a resolved Findings heading (#2945)",
+          checker._unresolved_finding_pattern(
+              "### Findings \u2014 all resolved\n\n"
+              "1. **Previously: X.** Now fixed in abc1234.\n\n### Verdict\n\nReady for merge\n"
+          ) is None)
+    check("a closing-line Previously: item under a BARE Findings heading stays open: the heading admits the item test (#2945)",
+          checker._unresolved_finding_pattern(
+              "### Findings\n\n1. **Previously: X.** Now fixed in abc1234.\n\n### Verdict\n\nReady for merge\n"
+          ) is not None)
+    check("a Previously: item whose explanation names a new defect stays open (#2945)",
+          checker._unresolved_finding_pattern(
+              "### Findings \u2014 all resolved\n\n"
+              "1. **Previously: X.** Now fixed; the query now leaks memory on every call.\n\n"
+              "### Verdict\n\nReady for merge\n"
+          ) is not None)
     check("### Findings from prior rounds --- now resolved resolves (#2781)",
           checker._unresolved_finding_pattern(
               "### Findings from prior rounds \u2014 now resolved\n\n"

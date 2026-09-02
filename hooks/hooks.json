@@ -472,6 +472,16 @@
               "The Agent|Task|SendMessage matcher is there because the measured failure",
               "was a brief handed to a subagent, which cannot check a premise about the",
               "author's own environment."
+            ],
+            "_note_deliberate_under_approximation": [
+              "The Bash matcher requires the git invocation to sit at a command",
+              "position, so a range merely quoted inside another command's argument",
+              "is inert. That deliberately UNDER-approximates: a backtick",
+              "substitution, `bash -c \"...\"`, and any wrapper word outside",
+              "sudo/env/time/nohup/xargs/command are missed. A missed reminder costs a",
+              "review round; one fired on quoted prose trains everyone to ignore it.",
+              "Agent|Task|SendMessage briefs are prose with no command structure, so",
+              "they use an unanchored pattern instead."
             ]
           }
         ]
@@ -747,6 +757,16 @@
               "The Agent|Task|SendMessage matcher is there because the measured failure",
               "was a brief handed to a subagent, which cannot check a premise about the",
               "author's own environment."
+            ],
+            "_note_deliberate_under_approximation": [
+              "The Bash matcher requires the git invocation to sit at a command",
+              "position, so a range merely quoted inside another command's argument",
+              "is inert. That deliberately UNDER-approximates: a backtick",
+              "substitution, `bash -c \"...\"`, and any wrapper word outside",
+              "sudo/env/time/nohup/xargs/command are missed. A missed reminder costs a",
+              "review round; one fired on quoted prose trains everyone to ignore it.",
+              "Agent|Task|SendMessage briefs are prose with no command structure, so",
+              "they use an unanchored pattern instead."
             ]
           }
         ]
@@ -771,6 +791,16 @@
               "The Agent|Task|SendMessage matcher is there because the measured failure",
               "was a brief handed to a subagent, which cannot check a premise about the",
               "author's own environment."
+            ],
+            "_note_deliberate_under_approximation": [
+              "The Bash matcher requires the git invocation to sit at a command",
+              "position, so a range merely quoted inside another command's argument",
+              "is inert. That deliberately UNDER-approximates: a backtick",
+              "substitution, `bash -c \"...\"`, and any wrapper word outside",
+              "sudo/env/time/nohup/xargs/command are missed. A missed reminder costs a",
+              "review round; one fired on quoted prose trains everyone to ignore it.",
+              "Agent|Task|SendMessage briefs are prose with no command structure, so",
+              "they use an unanchored pattern instead."
             ]
           }
         ]
@@ -795,6 +825,16 @@
               "The Agent|Task|SendMessage matcher is there because the measured failure",
               "was a brief handed to a subagent, which cannot check a premise about the",
               "author's own environment."
+            ],
+            "_note_deliberate_under_approximation": [
+              "The Bash matcher requires the git invocation to sit at a command",
+              "position, so a range merely quoted inside another command's argument",
+              "is inert. That deliberately UNDER-approximates: a backtick",
+              "substitution, `bash -c \"...\"`, and any wrapper word outside",
+              "sudo/env/time/nohup/xargs/command are missed. A missed reminder costs a",
+              "review round; one fired on quoted prose trains everyone to ignore it.",
+              "Agent|Task|SendMessage briefs are prose with no command structure, so",
+              "they use an unanchored pattern instead."
             ]
           }
         ]

@@ -37,7 +37,7 @@ if not os.path.isfile(HOOK):
     )
 
 
-def run(command, _unused=None, tool_name="Bash", tool_input=None):
+def run(command, tool_name="Bash", tool_input=None):
     """Run the hook on one payload; return WARN or silent."""
     if tool_input is None:
         tool_input = {"command": command}
@@ -103,6 +103,17 @@ WARN_CASES = [
      "an explicit local ref is still a local branch"),
     ("git diff --stat main...pr-98",
      "an option between the subcommand and the range"),
+    ("git diff 123-fix...HEAD",
+     "an issue-numbered branch is not a tag -- the commonest branch prefix in "
+     "this corpus, and a bare-integer tag exemption would swallow it"),
+    ("git diff 2026-08-01...HEAD",
+     "a date-shaped name is likelier a branch than a tag"),
+    ("echo hi && git diff main...pr-98",
+     "a command after `&&` is at a command position"),
+    ("for b in x; do git diff main...pr-98; done",
+     "a loop body is a command position -- the review-dispatch shape"),
+    ("sudo git diff main...pr-98",
+     "a wrapper word does not hide the command"),
     ("git fetch origin && git diff main...pr-98",
      "a fetch in the same command line does not discharge: the hook keys on "
      "the ref named, not on freshness it cannot measure"),
@@ -119,6 +130,10 @@ SILENT_CASES = [
      "a raw SHA names one commit, not a moving branch"),
     ("git diff v1.2.0...v1.3.0",
      "version tags are immutable"),
+    ("git diff v1.2.0-rc1...HEAD",
+     "a pre-release tag is immutable too"),
+    ("git diff 1.2.0...HEAD",
+     "a dotted version needs no `v` prefix to be unambiguous"),
     ("git diff --cached",
      "no range at all"),
     ("git diff DESCRIPTION",
@@ -135,14 +150,22 @@ SILENT_CASES = [
      "grepping for the anti-pattern must not trip the hook that documents it"),
     ("gh pr comment 98 --body \"I ran git diff main...pr-98\"",
      "a PR comment body is quoted text"),
+    ("gh pr comment 98 --body \"the base was local (git diff main...pr-98) so "
+     "the scope grew\"",
+     "a parenthesis inside quoted prose must not re-arm the anchor -- this is "
+     "the comment a session writes when reporting this very rule"),
+    ("git commit -m \"fix scope (git diff main...HEAD was wrong)\"",
+     "same, in a commit message"),
     ("git diff origin/main...HEAD -- a.b..c.d",
      "a pathspec after `--` is not a range, and the base here is already right"),
     ("git log --grep=main...HEAD",
      "an option value is not a range"),
     ("git diff -...HEAD",
-     "a base with no alphanumeric names no ref -- `-` is in the ref class and "
-     "survives dot-stripping, so this is the guard `normalize_base` does NOT "
-     "subsume"),
+     "an option-shaped token is skipped before any ref classification"),
+    ("git diff ~...HEAD",
+     "a base with no alphanumeric reaches `is_local_branch_base` (it does not "
+     "start with `-`) and names no ref: the guard `normalize_base` does NOT "
+     "subsume, since `~` survives dot-stripping"),
 ]
 
 BRIEF_WARN = (
@@ -186,21 +209,24 @@ _ok = _proc.returncode == 0 and not _proc.stdout.strip()
 wrong += not _ok
 print(f"{'silent' if _ok else 'WARN':<7} unparseable stdin fails open")
 
-# `git remote` is consulted only to classify a slash-bearing base. A cwd that
-# is not a git repository must fall back rather than raise, and must still
-# reach a verdict -- a silent failure here would read as a pass on every case.
-_proc = subprocess.run(
-    [sys.executable, HOOK],
-    input=json.dumps({"tool_name": "Bash",
-                      "tool_input": {"command": "git diff main...pr-98"},
-                      "cwd": "/nonexistent-path-for-this-test"}),
-    capture_output=True, text=True,
-)
-total += 1
-_ok = _proc.returncode == 0 and "additionalContext" in _proc.stdout
-wrong += not _ok
-print(f"{'WARN' if _ok else 'silent':<7} a nonexistent cwd falls back to the "
-      "default remote names and still warns")
+# A cwd that is not a directory must fall back to FALLBACK_REMOTES rather than
+# running `git remote` wherever the hook process sits. `origin` is in the
+# fallback set, so it is exempt; `hc2-gitlab` is not, so it warns. Asserting
+# both directions is what distinguishes a real fallback from an ambient read --
+# a base of `main` would warn under any remote set and pin nothing.
+for _base, _want in (("origin/main", "silent"), ("hc2-gitlab/main", "WARN")):
+    _proc = subprocess.run(
+        [sys.executable, HOOK],
+        input=json.dumps({"tool_name": "Bash",
+                          "tool_input": {"command": f"git diff {_base}...HEAD"},
+                          "cwd": "/nonexistent-path-for-this-test"}),
+        capture_output=True, text=True,
+    )
+    total += 1
+    _got = "WARN" if (_proc.returncode == 0 and _proc.stdout.strip()) else "silent"
+    wrong += _got != _want
+    print(f"{_got:<7} a nonexistent cwd falls back to the default remote names "
+          f"({_base} -> {_want})")
 
 # `origin` is a real remote of this repository, so the real list exempts it.
 # `fork` is not, and the fallback set contains it -- so if the fallback were
@@ -259,6 +285,43 @@ try:
     wrong += not _ok
     print(f"{'silent' if _ok else 'WARN':<7} `git -C <path>` classifies against "
           "that repository's remotes, not the session's")
+    # A quoted `-C` path containing spaces must still match, and must still
+    # resolve. Both the option-scanning pattern and the `-C` capture used to
+    # stop at the first space, and both degraded silently.
+    _spaced = os.path.join(_scratch, "a dir with spaces")
+    subprocess.run(["git", "init", "-q", _spaced], check=True,
+                   capture_output=True)
+    _proc = subprocess.run(
+        [sys.executable, HOOK],
+        input=json.dumps({"tool_name": "Bash",
+                          "tool_input": {"command":
+                                         f'git -C "{_spaced}" diff '
+                                         "main...pr-98"},
+                          "cwd": REPO_ROOT}),
+        capture_output=True, text=True,
+    )
+    total += 1
+    _ok = _proc.returncode == 0 and _proc.stdout.strip()
+    wrong += not _ok
+    print(f"{'WARN' if _ok else 'silent':<7} a quoted `-C` path containing "
+          "spaces still matches")
+
+    # A relative `-C` path resolves against the SESSION cwd, not the hook
+    # process's. `hc2-gitlab` is exempt only if the right repo was read.
+    _proc = subprocess.run(
+        [sys.executable, HOOK],
+        input=json.dumps({"tool_name": "Bash",
+                          "tool_input": {"command":
+                                         f"git -C {os.path.basename(_scratch)} "
+                                         "diff hc2-gitlab/main...HEAD"},
+                          "cwd": os.path.dirname(_scratch)}),
+        capture_output=True, text=True,
+    )
+    total += 1
+    _ok = _proc.returncode == 0 and not _proc.stdout.strip()
+    wrong += not _ok
+    print(f"{'silent' if _ok else 'WARN':<7} a relative `-C` path resolves "
+          "against the session cwd")
 finally:
     shutil.rmtree(_scratch, ignore_errors=True)
 

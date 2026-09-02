@@ -13,7 +13,8 @@ WHAT HAPPENED
 Measured 2026-09-02 while reviewing ucdavis/matt.contracts#98.
 The PR head was fetched as a local branch `pr-98`, and an adversarial reviewer
 was dispatched against `git diff main...pr-98` using the worktree's local
-`main`, two commits behind the remote:
+`main`, 128 commits behind the remote (28 by first-parent, and 0 ahead:
+`git rev-list --count 43d59cc..7ec49fe`):
 
     base                     files  insertions
     stale local `main`          53        2999
@@ -83,7 +84,7 @@ RX_RANGE = re.compile(
 # Only these subcommands take a range whose base is a review scope. `git
 # rebase`, `git merge`, and friends are excluded on purpose.
 _GIT_RANGE_CMD = (
-    r"git\b(?:\s+-[-A-Za-z0-9]+(?:[= ]\S+)?)*\s+"
+    r"git\b(?:\s+-[-A-Za-z0-9]+(?:[= ](?:'[^']*'|\"[^\"]*\"|\S+))?)*\s+"
     r"(diff|log|shortlog|merge-base|rev-list|range-diff)\b"
 )
 
@@ -97,8 +98,24 @@ _GIT_RANGE_CMD = (
 # `git diff "main...pr-98"`, which git really does run, and it mangles ordinary
 # English, where an apostrophe in "the branch's diff" opens a span that swallows
 # everything up to the next contraction.
+# `(` is deliberately NOT in the separator class. A bare parenthesis occurs
+# inside quoted prose constantly --- `gh pr comment --body "the base was local
+# (git diff main...pr-98), so the scope grew"` is the very comment a session
+# writes when reporting this rule --- and admitting it would re-arm the pattern
+# inside the strings the anchor exists to exclude. `$(` is admitted explicitly,
+# since a command substitution really is a command position.
+#
+# This anchor UNDER-approximates on purpose. It misses a backtick substitution,
+# and it recognizes only the wrapper words listed here, so `bash -c "git diff
+# main...HEAD"` and any wrapper not in the list stay silent. A missed reminder
+# costs a review round; a reminder fired on quoted prose trains everyone to
+# ignore it, which is the failure README calls worse than a missing hook.
 RX_GIT_RANGE_CMD_SHELL = re.compile(
-    r"(?:\A|[\n;|&(]|&&|\|\|)\s*(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*" + _GIT_RANGE_CMD
+    r"(?:\A|[\n;|&`]|&&|\|\||\$\(|\bthen\b|\bdo\b)\s*"
+    r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
+    r"(?:(?:sudo|env|time|nohup|xargs|command)\s+"
+    r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*)*"
+    + _GIT_RANGE_CMD
 )
 
 # A brief is prose, not a shell line, so the invocation is quoted or inline by
@@ -120,11 +137,17 @@ SYMBOLIC = {
 }
 
 RX_SHA = re.compile(r"\A[0-9a-f]{7,40}\Z")
-# A tag is immutable, so it cannot go stale the way a branch does. Covers a
-# pre-release suffix (`v1.2.0-rc1`) and a date tag (`2026-08-01`), both of which
-# a bare `[vV]?\d+(\.\d+)*` form would have warned on.
-RX_TAG = re.compile(r"\A(?:[vV]?\d+(?:\.\d+)*(?:[-+][0-9A-Za-z][0-9A-Za-z.]*)?"
-                    r"|\d{4}-\d{2}-\d{2})\Z")
+# A tag is immutable, so it cannot go stale the way a branch does. But a tag
+# and a branch are lexically indistinguishable, so this exempts only the two
+# unambiguous forms: a `v`-prefixed version, and a dotted version of at least
+# two components. Both admit a pre-release suffix (`v1.2.0-rc1`).
+#
+# Deliberately NOT exempted: a bare integer or integer-dash form. `123-fix`,
+# `2261-ums`, and `2026-08-01` are all far likelier to be branches --- issue
+# numbers are the commonest branch prefix in this corpus --- and a warn-only
+# reminder should take the false positive over the missed base.
+RX_TAG = re.compile(r"\A(?:[vV]\d+(?:\.\d+)*|\d+(?:\.\d+)+)"
+                    r"(?:[-+][0-9A-Za-z][0-9A-Za-z.]*)?\Z")
 # `[^\n]*` after the delimiter is load-bearing: `cat <<'EOF' > f.md` puts a
 # redirection between the delimiter and the newline, and a pattern anchored
 # straight to `\n` misses exactly the form used to write a file.
@@ -184,10 +207,14 @@ def strip_heredocs(command):
 
 def remote_names(cwd):
     """Remote names for `cwd`, falling back to a small set on any failure."""
+    # An unusable cwd falls back rather than running `git remote` wherever the
+    # hook process sits: that would read a third repository's remote list and
+    # report it as this one's.
+    if not cwd or not os.path.isdir(cwd):
+        return FALLBACK_REMOTES
     try:
         proc = subprocess.run(
-            ["git", "remote"],
-            cwd=cwd if cwd and os.path.isdir(cwd) else None,
+            ["git", "remote"], cwd=cwd,
             capture_output=True, text=True, timeout=5,
         )
     except (OSError, subprocess.SubprocessError):
@@ -249,7 +276,7 @@ def is_local_branch_base(token, remotes):
     return True
 
 
-RX_DASH_C = re.compile(r"(?<![A-Za-z0-9-])git\s+-C\s+(\S+)")
+RX_DASH_C = re.compile(r"(?<![A-Za-z0-9-])git\s+-C\s+('[^']*'|\"[^\"]*\"|\S+)")
 
 
 def target_repo(command, default):
@@ -265,6 +292,12 @@ def target_repo(command, default):
     if not match:
         return default
     path = match.group(1).strip("'\"")
+    if not os.path.isabs(path):
+        # Relative to the SESSION's cwd, not to wherever the hook process
+        # happens to sit --- resolving it against the latter would classify
+        # the base against a third repository, which is this fragment's own
+        # substitution committed by its own instrument.
+        path = os.path.join(default, path)
     return path if os.path.isdir(path) else default
 
 
@@ -298,9 +331,15 @@ def _emit(note, summary):
 
     `additionalContext` reaches the model; `systemMessage` reaches the user's
     terminal. This hook exists to correct a premise the AUTHOR asserted, so
-    the human-visible channel is the one that closes the loop --- 13 of the
-    16 registered PreToolUse warn hooks emit it, and `check-hook-output-shape`
-    does not require it here because its rule is scoped to `Stop` hooks.
+    the human-visible channel is the one that closes the loop.
+
+    `check-hook-output-shape.py` does not require it here: its emit rule is
+    scoped to `Stop` hooks, and its PreToolUse rule governs the test rather
+    than the hook. So the convention is the reason, and it is derivable ---
+    of the 16 `warn-`/`flag-`/`remind-` hooks registered under PreToolUse
+    besides this one, 14 emit `systemMessage` (measured 2026-09-02; the two
+    that do not are `warn-pr-create-without-dupe-check.py` and
+    `flag-cd-into-main-checkout.py`).
     """
     print(json.dumps({
         "hookSpecificOutput": {

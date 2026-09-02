@@ -46,7 +46,18 @@ if not os.path.isfile(HOOK):
     )
 
 # The four denial texts, transcribed from real transcripts under
-# ~/.claude/projects (2026-09-02). Only the first is ours.
+# ~/.claude/projects (2026-09-02); each is the most common form of its kind.
+# Only the first is ours.
+#
+# Transcribed, not paraphrased, and the difference bit: an earlier draft of
+# this file invented the last two from memory, and both were wrong -- the
+# unavailable text says "cannot determine the safety of Bash right now", not
+# "cannot decide whether to allow this action", and every one of the 105
+# real pre-push refusals breaks the line after "policy:" rather than
+# continuing on it. Neither changed a verdict, because both are silent
+# controls that stay silent either way. That is precisely the shape
+# `fixtures-are-not-evidence.md` warns about: a fixture that vouches for
+# itself, passes, and would have misled the next change built on it.
 CLASSIFIER = (
     "Permission for this action was denied by the Claude Code auto mode "
     "classifier. Reason: Blocked by classifier. If you have other tasks that "
@@ -63,12 +74,15 @@ PERMISSION_RULE = (
     "-u origin HEAD has been denied."
 )
 HOOK_REFUSAL = (
-    "git push blocked by the pre-push self-review policy: No "
-    "`adversarial-reviewer` subagent was dispatched in this session."
+    "git push blocked by the pre-push self-review policy:\n"
+    "No `adversarial-reviewer` subagent was dispatched in this session.\n"
+    "Dispatch it against your committed diff and address its findings before "
+    "pushing."
 )
 AUTOMODE_UNAVAILABLE = (
     "claude-sonnet-5[1m] is temporarily unavailable, so auto mode cannot "
-    "decide whether to allow this action."
+    "determine the safety of Bash right now. Wait briefly and then try this "
+    "action again."
 )
 
 PUSH = "ALLOW_UNREVIEWED_PUSH=1 git push -u origin HEAD"

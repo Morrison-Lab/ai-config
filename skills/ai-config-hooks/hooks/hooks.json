@@ -119,7 +119,7 @@
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/remind-retry-before-declaring-blocked.py\"'",
             "timeout": 10,
             "script": "remind-retry-before-declaring-blocked.py",
-            "why": "ai-config#2994, measured 2026-09-02: the auto-mode permission classifier denied an `ALLOW_UNREVIEWED_PUSH=1 git push` three times, the session reported the path as permanently closed -- to the user, in a memory entry, and on this repo's own tracker -- and the byte-identical command then succeeded on the fourth attempt, with no settings change and no permission rule added. Injects, never blocks, when a classifier denial has no later re-attempt of the same command.",
+            "why": "ai-config#2994, measured 2026-09-02: the auto-mode permission classifier denied an `ALLOW_UNREVIEWED_PUSH=1 git push` three times, the session reported the path as permanently closed -- to the user, in a memory entry, and on this repo's own tracker -- and the byte-identical command then succeeded, with no settings change and no permission rule added. (#2994 is not self-consistent about how many of those three denials were the push itself rather than the `update-config` edit that followed it, so the hook's wording holds under both readings; #3008 tracks settling it.) Injects, never blocks, when a classifier denial has no later re-attempt of the same command.",
             "_note_not_a_stop_hook": [
               "UserPromptSubmit, inject-only, for the same reason as the",
               "reminders above: reporting a denial is RIGHT to send. The",

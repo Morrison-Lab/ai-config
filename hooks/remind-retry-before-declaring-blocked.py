@@ -18,8 +18,9 @@ the success arriving after the point the session stopped -- not on which
 attempt number it was.
 
 Repeated denials do not FEEL like a claim. They feel like a measurement: the
-command ran, and the system said no, three times. So "I cannot do this" reads as reporting an
-observation rather than asserting a fact about the future, and none of the
+command ran, and the system said no, three times. So "I cannot do this" reads
+as reporting an observation rather than asserting a fact about the future, and
+none of the
 claim-checking rules that would otherwise fire (`metacognitive-monitoring.md`
 on a claim about state, `ardi.md` on verifying an asserted blocker) engages at
 all. The conclusion is also self-confirming: deciding the path is closed means
@@ -121,7 +122,8 @@ carrier record sets.
   permission-rule      315  "Permission to use Bash with command ... has been
                             denied.", plus every hook refusal
   automode-unavailable  18  "... is temporarily unavailable, so auto mode
-                            cannot decide ..."
+                            cannot determine the safety of Bash right now
+                            ..."
   user-rejected          6  "The user doesn't want to proceed with this tool
                             use. ..."
 
@@ -141,9 +143,9 @@ exactly.
 #2994's success arrived after three denials, on either reading of how many
 were the command itself. A message answering the second denial with "hand the
 user the decision" and nothing else would stop the session short of the thing
-that worked -- which is precisely what the incident session did. So the second-denial branch says an
-identical re-run is still supported, and reserves "hand the user the decision"
-for the case where the session stops anyway.
+that worked -- which is precisely what the incident session did. So the
+second-denial branch says an identical re-run is still supported, and reserves
+"hand the user the decision" for the case where the session stops anyway.
 
 What it does warn off is variation, which is Pattern 43's actual mechanism:
 "each denied variant makes the classifier more suspicious", its three denials
@@ -223,7 +225,7 @@ def identity(name, inp):
     The second return value is the command UNTOUCHED, because the two uses
     pull opposite ways and sharing one string got it wrong. The message asks
     for a byte-identical re-run and quotes the command underneath, so a
-    displayed line that merely matches is worse than useless: collapsing a
+    displayed string that merely matches is worse than useless: collapsing a
     newline inside a multi-line script turns `... 2>&1\necho x` into
     `... 2>&1 echo x`, which is a different command in shell, and the change
     is invisible -- unlike the length truncation, which marks itself. A
@@ -394,9 +396,14 @@ def message(label, stretch, total, shapes=1):
     warning attached to a repeat count can never reach the shape Pattern 43
     actually measured.
     """
-    # Indented block rather than an inline value, because the command is
-    # shown verbatim and may carry newlines. Truncation marks itself; the
-    # whitespace collapse this deliberately does NOT apply would not.
+    # An indented block rather than an inline value, so a multi-line command
+    # keeps its line structure instead of being collapsed into a different
+    # shell command. The six-space indent is display framing and is the one
+    # thing here that is not the command: a quoted heredoc's terminator is
+    # indented with the rest, so the block is a faithful RENDERING of the
+    # command rather than a copy-paste-ready one. Truncation marks itself
+    # with an ellipsis; a whitespace collapse would not, which is why the
+    # collapsed matching key is never what gets displayed.
     text = label if len(label) <= 300 else label[:297] + "..."
     shown = "\n".join("      " + line for line in text.splitlines()) or "      "
     run = "once" if stretch == 1 else f"{stretch} times"

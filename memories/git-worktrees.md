@@ -1055,7 +1055,8 @@ The second is about why the prose did not help.
 It was read, and the rule was broken anyway, because it is consulted at read time and violated at composition time --- which is [`deterministic-tools`](../shared/principles/deterministic-tools.md)'s argument for an instrument over a sentence, and at two occurrences the bar is close.
 **No instrument was built, and the reason is worth recording so the question is not reopened from scratch.**
 Agent liveness is harness state, not repository state.
-A hook sees one tool call's payload and the filesystem; it cannot enumerate live agents, and nothing in a worktree distinguishes "the agent that owns this finished" from "it is between edits".
+A hook sees one tool call's payload and the filesystem;
+it cannot enumerate live agents, and nothing in a worktree distinguishes "the agent that owns this finished" from "it is between edits".
 `git worktree list` reports the same rows either way, which is the same reason the section above exists.
 
 The decidable slice is upstream of the failure rather than at it, and it is already built: `hooks/flag-unassigned-worktree.py` warns on a write-capable `Agent` launch with no `isolation`, and an agent that was given its own worktree is one the orchestrator has no occasion to reclaim.

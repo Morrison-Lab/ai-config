@@ -3,16 +3,26 @@ each as a `git` invocation.
 
 WHY THIS MODULE EXISTS
 ----------------------
-`_simple_commands` was copied into SEVEN hooks before this module was written:
+This splitter was copied into EIGHT hooks before the module was written:
 
     hooks/flag-add-a-outside-pathspec.py       hooks/no-clobbering-push.py
     hooks/flag-reset-hard-uncommitted-work.py  hooks/no-delete-branch-under-stacked-pr.py
     hooks/flag-stale-adjacent-comment.py       hooks/no-unreviewed-pr.py
-    hooks/warn-nonglobal-substitution.py
+    hooks/remind-ci-crosscheck-sim-verdict.py  hooks/warn-nonglobal-substitution.py
+
+Derive that set from the CONSTANT, not from the function name:
+
+    grep -rlF '_SHELL_OPS = set("();|&")' hooks/   ->  8 files
+    grep -rl  "def _simple_commands"      hooks/   ->  7 files
+
+`remind-ci-crosscheck-sim-verdict.py` spells its copy `simple_commands`, so an
+identifier search misses it and a migration keyed on that search would leave
+one behind. The loop variable differs between copies too (`t` in some, `tok`
+in others), which is why a use-site grep is the wrong query as well.
 
 The bodies are identical, and so is the heredoc defect `_heredoc_free` fixes
-below -- which is the argument for a module rather than an eighth copy. Those
-seven are NOT rewired here: migrating seven live guards, three of them denying,
+below -- which is the argument for a module rather than a ninth copy. Those
+eight are NOT rewired here: migrating eight live guards, three of them denying,
 is its own change with its own review, tracked as ai-config#2993. This module
 is where the fix landed and where new callers import from.
 
@@ -28,12 +38,12 @@ in POSIX mode already knows the quoting rules, so a caller asking "is `git push`
 the command word of some simple command" gets the answer without accreting one
 regex clause per quoting shape.
 
-THREE LIMITS, ALL INHERITED FROM THE SEVEN COPIES
+THREE LIMITS, ALL INHERITED FROM THE EIGHT COPIES
 --------------------------------------------------
 The heredoc pre-pass and the newline rewrite run on RAW TEXT, ahead of `shlex`,
 so neither knows the quoting rules the paragraph above credits `shlex` with.
 State that here rather than letting the argv-split argument imply otherwise --
-this docstring is the contract ai-config#2993 will migrate seven live guards
+this docstring is the contract ai-config#2993 will migrate eight live guards
 onto, three of them denying.
 
   * `RX_HEREDOC` is QUOTE-BLIND. A `<<` inside a quoted argument -- a commit
@@ -97,7 +107,7 @@ fails BOTH ways -- a phantom command and a hidden one -- and is stated
 separately for that reason. Fixing any of them
 means a quote-aware pre-scan, which is a real parser and out of scope for an
 extraction; ai-config#2993 is where that belongs, alongside migrating the
-seven copies.
+eight copies.
 """
 from __future__ import annotations
 
@@ -154,7 +164,7 @@ def _heredoc_free(command):
     """Blank heredoc BODIES, leaving the surrounding shell intact.
 
     The substitution is `" << "`, with the spaces, and they are load-bearing.
-    Substituting a bare `"<<"` -- what all seven copies of this function do --
+    Substituting a bare `"<<"` -- what all eight copies of this function do --
     leaves `<<` flush against the newline that the caller then rewrites to `;`.
     `shlex` with `punctuation_chars=True` emits that run as the SINGLE token
     `<<;`, whose character set is not a subset of `_SHELL_OPS` (which has no

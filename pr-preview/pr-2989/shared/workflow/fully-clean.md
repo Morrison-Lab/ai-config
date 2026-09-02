@@ -1188,7 +1188,7 @@ A clean-gate check the queue cannot block on is a check the queue does not run a
 The rule splits by merge mode: a direct merge from a session with `git` and `gh`, a direct merge from a remote session without `git`, and a merge queue.
 
 - **Do:** for a direct merge from a session with `git` and `gh`, before the merge command, fetch the PR's configured base and confirm the merge-base with the live PR head is that base's current tip.
-  Until [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) wires this into `check-pr-fully-clean.py` and the `mwc` and `merge-it` entry points, it is a manual step that runs after the checker and before the merge command:
+  Until [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) wires this into `check-pr-fully-clean.py`, which [`mwc`](../../skills/mwc/SKILL.md) already runs, both [`mwc`](../../skills/mwc/SKILL.md) and [`merge-it`](../../skills/merge-it/SKILL.md) name it as a manual step after their readiness check and before the merge command:
   `url=$(gh repo view "<owner>/<repo>" --json url -q .url) && b=$(gh pr view "<N>" -R "<owner>/<repo>" --json baseRefName -q .baseRefName) && [ -n "$url" ] && [ -n "$b" ] && git fetch "$url" "$b" && tip=$(git rev-parse --verify FETCH_HEAD) && git fetch "$url" "refs/pull/<N>/head" && head=$(git rev-parse --verify FETCH_HEAD) && [ "$(git merge-base "$tip" "$head")" = "$tip" ]`.
   Both fetches name the repository the `-R` reads came from, not the checkout's `origin`, which in a fork or another checkout can be a different repository whose same-numbered PR would let the gate compare unrelated commits.
   Each result is assigned inside the `&&` chain so an unresolved branch or a failed command fails the check rather than comparing two empty strings as equal.
@@ -1200,10 +1200,14 @@ The rule splits by merge mode: a direct merge from a session with `git` and `gh`
   That is the fail-closed direction, per [`fail-fast`](../principles/fail-fast.md).
 - **Do:** when the merge-base is not that tip and the merge is direct, `gh pr update-branch "<N>" -R "<owner>/<repo>"` (or `update_pull_request_branch` remotely), then rerun the whole clean gate on the new head, review included, before merging.
   The update is a new head, so a clean verdict on the old one no longer counts, per [`sync-with-main`](sync-with-main.md).
+  The update is asynchronous: the REST endpoint answers `202 Accepted` while the merge is still in progress, and the MCP tool reports that answer as success, so a gate rerun started at once can read the old head.
+  Poll `headRefOid` until it changes, rerun the base-currency check on the new head, and only then rerun the gate.
 - **Do:** under a merge queue whose required checks cover the whole clean gate on `merge_group`, rely on those checks and skip the two direct-merge checks above.
   The queue's speculative merge is the base-currency test there.
-- **Don't:** skip the manual update under a queue while any clean-gate check is non-required, since such a check can run on `merge_group` and still not block the merge.
-- **Don't:** skip it while any clean-gate check is `pull_request`-only either: a non-required one never runs on the queue branch, and a required one holds the queue until it times out waiting for a result that never arrives.
+- **Don't:** rely on a queue while any clean-gate check is non-required, since such a check can run on `merge_group` and still not block the merge.
+- **Don't:** rely on a queue while any clean-gate check is `pull_request`-only either: a non-required one never runs on the queue branch, and a required one holds the queue until it times out waiting for a result that never arrives.
+  A manual update repairs neither case, since it cannot make a check block or make a workflow run on `merge_group`.
+  Make every clean-gate check required (or aggregated behind one) and `merge_group`-triggered, or merge directly where the repository permits it, with the direct-merge checks above.
 - **Don't:** read a head-only FULLY CLEAN verdict as a merge-safe verdict when the base has advanced.
 - **Don't:** substitute a path diff of `.github/workflows/` for the update.
   It cannot see a check that arrived through a script or a reusable workflow.

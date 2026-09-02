@@ -1205,6 +1205,10 @@ Elsewhere merge synchronously, right after the check.
   The update is a new head, so a clean verdict on the old one no longer counts, per [`sync-with-main`](sync-with-main.md).
   The update is asynchronous: the REST endpoint answers `202 Accepted` while the merge is still in progress, and the MCP tool reports that answer as success, so a gate rerun started at once can read the old head.
   Poll `headRefOid` until it changes, rerun the base-currency check on the new head, and only then rerun the gate.
+  The gate itself takes minutes, so the base can advance again while it runs: recheck currency after the gate passes and immediately before the merge command, and repeat the update-and-gate cycle when it is stale again.
+  That leaves the smallest window the sequence allows, the seconds between the recheck and the merge, rather than none.
+  When the cycle repeats more than once the base is advancing faster than the gate runs, which [`batch-merge-and-resolve`](batch-merge-and-resolve.md) measures.
+  Stop chasing and merge through a queue or under strict up-to-date protection, or batch the pending merges per that fragment.
 - **Do:** under a merge queue whose required checks cover the whole clean gate on `merge_group`, rely on those checks and skip the two direct-merge checks above.
   The queue's speculative merge is the base-currency test there.
 - **Don't:** rely on a queue while any clean-gate check is non-required, since such a check can run on `merge_group` and still not block the merge.

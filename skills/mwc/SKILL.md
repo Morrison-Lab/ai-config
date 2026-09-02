@@ -59,7 +59,13 @@ without asking confirmation before every merge.
   required checks cover the whole clean gate on `merge_group`.
   On a direct merge a stale merge-base means `gh pr update-branch`,
   a wait until `headRefOid` changes (the update is asynchronous),
-  and a full re-run of the gate on the new head.
+  a currency check on the new head,
+  a full re-run of the gate on it,
+  then a currency recheck immediately before the merge command,
+  repeating the cycle when the base moved during the gate.
+  A cycle that repeats more than once means the base outruns the gate:
+  merge through a queue or strict up-to-date protection instead, per
+  [`fully-clean`](../../shared/workflow/fully-clean.md).
 - **Session Duration**: The grant expires automatically when the session ends
   or when explicitly revoked via `/mwc revoke` or `disable-mwc`.
 

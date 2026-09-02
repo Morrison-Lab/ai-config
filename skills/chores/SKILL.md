@@ -76,7 +76,12 @@ With both unset the filter keeps only the resolved login's own PRs, the
 assigned ones, and the bots', which is the fail-closed default.
 
 ```bash
-ME=$(gh api user --jq .login)   # WHO_AM_I
+ME=$(gh api user --jq .login 2>/dev/null) || ME=""   # WHO_AM_I
+if [ -z "$ME" ]; then
+  # Fail closed, and say so: with no identity the author and assignee arms
+  # stay unevaluated, so only bot-authored and explicitly requested PRs pass.
+  echo "::warning::identity lookup failed; author/assignee arms unevaluated (report this)" >&2
+fi
 # e.g. PR_SCOPE_ALIASES=other-login      # from memories/reviewing-prs.md
 # e.g. PR_SCOPE_REQUESTED=123,456       # PR numbers named in the request
 IDS=$(jq -cn --arg me "$ME" --arg al "${PR_SCOPE_ALIASES:-}" \

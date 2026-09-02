@@ -408,6 +408,70 @@ pushing branch A afterward compares its shipped commit `X` against the held `Y`,
 - **Don't:** read that refusal as a defect in branch A's review;
   the guard has no notion of "branch" to be defective about, and the SHA comparison is doing exactly what it is built to do.
 
+**The harness appends an `agentId:` trailer to a subagent's report, USUALLY as its own block and rarely concatenated onto the last line.**
+The frequency is the point, and an earlier draft of this section got it backwards by generalizing from the two dispatches it happened to watch.
+
+Measured 2026-09-02 over this machine's whole transcript corpus, 565 files:
+
+```
+trailer as its own content block : 334
+trailer concatenated onto text   :   0
+```
+
+The concatenated form was observed twice, in one session, and did not reproduce in the corpus sweep:
+
+```
+--- end of report ---agentId: ae8726223279fc9e8 (use SendMessage with to: '...')
+```
+
+In the prevailing shape the trailer is a separate content block, and `_result_text` joins blocks with a newline, so the fingerprint line is untouched and nothing below arises at all.
+
+**Two conditions have to hold together before any of this can bite, and a conforming report fails the first.**
+The trailer must concatenate rather than arrive as its own block, AND the fingerprint must be the report's last line.
+This file's own contract puts the JSON payload last, and [`.claude/agents/adversarial-reviewer.md`](../../.claude/agents/adversarial-reviewer.md) says to emit nothing after its closing marker --- so a conforming report ends with the payload, the trailer lands on that, and the fingerprint is never exposed.
+The measured occurrence was a report that put the verdict and fingerprint AFTER the payload, which is the ordering this file's "Structured review data" section rules out.
+
+So read the rest of this section as what happens when a brief reorders the tail, not as a hazard of ordinary dispatch.
+
+**Even then, for the mandated 40-character form nothing happens, and saying otherwise would be the easy overclaim here.**
+`no-push-without-self-review.py`'s `REVIEWED_COMMIT` captures `([0-9a-fA-F]{7,40})`, so a full sha stops the capture exactly at the boundary and the suffix is never reached.
+Run through the guard's own regex:
+
+| fingerprint | captured |
+|---|---|
+| 40 chars, then `agentId: a3f5...` | the correct sha |
+| 39 chars, then `agentId: a3f5...` | 40 chars ending in the `a` of `agentId` --- a **wrong sha, silently** |
+| 7 chars, then `agentId: a3f5...` | 8 chars, wrong |
+
+So the hazard is real and it is a **truncation** hazard rather than a suffix hazard.
+`agentId` begins with a hex character, which is what turns a short fingerprint into a plausible-looking wrong one instead of a parse failure.
+A wrong sha refuses the push with "the clean verdict is for commit X, but this push would ship Y" --- a message that reads as a stale verdict and is nothing of the kind.
+
+The remedy costs one line either way, and is cheap insurance rather than a fix for a demonstrated break at 40 characters.
+The block below is the TAIL of a report whose JSON payload precedes it, not a whole report --- the payload stays last under this file's own contract:
+
+```
+Verdict: <phrase>
+Reviewed-Commit: <full sha>
+--- end of report ---
+```
+
+It puts a non-hex line between the fingerprint and anything the harness appends, so the fingerprint's length stops mattering.
+
+Two caveats.
+The concatenation has been observed on Claude Code's `Agent` tool and nowhere else, so it is a claim about that harness on that date rather than about subagent dispatch generally.
+And the sentinel sits in tension with [`.claude/agents/adversarial-reviewer.md`](../../.claude/agents/adversarial-reviewer.md)'s own instruction to emit nothing after the JSON payload's closing `-->`;
+a brief asking for both is asking the reviewer to order them, and the ordering that worked put the verdict, the fingerprint and the sentinel after the payload.
+Reconciling the two contracts is its own open decision, filed as [ai-config#3050](https://github.com/Morrison-Lab/ai-config/issues/3050), rather than something to settle inside a review brief.
+It is adjacent to [#2483](https://github.com/Morrison-Lab/ai-config/issues/2483) and not the same item: that issue is about verdicts arriving via background task notifications going unregistered.
+
+- **Do:** state the fingerprint as the **full 40-character** sha, which is what actually protects it.
+- **Do:** add the sentinel line after it, as cheap insurance against a truncated or reformatted fingerprint.
+- **Do:** read a "verdict is for commit X, but this push would ship Y" refusal as possibly a *misparsed* fingerprint rather than only a stale one --- print what the guard captured before concluding.
+- **Don't:** claim the suffix breaks a 40-character fingerprint;
+  run `REVIEWED_COMMIT` over the line before asserting either way.
+- **Don't:** abbreviate the sha in a review brief's template, which is the input that turns the suffix into a silently wrong parse.
+
 ## Structured review data (JSON payload)
 
 Every reviewer emits two representations of one verdict: the human-readable Markdown report, then a machine-readable JSON payload in a trailing HTML comment.

@@ -145,8 +145,8 @@ disrupt, which gets the report instead however it scores on the test.
   with each conflict before claiming anything.
 - **Do:** report both counts --- conflicts found, and conflicts caused --- so
   the gap between them is visible rather than implied.
-- **Do:** comment rather than push when a conflict you caused sits on a branch
-  you do not own.
+- **Do:** report to the user rather than push or comment when a conflict you
+  caused sits on a PR that fails the scope test.
 - **Don't:** read a post-merge sweep's hit list as your work queue; on an old
   backlog most of it predates your merge.
 - **Don't:** derive that path set with `git show` --- it reports nothing for a

@@ -221,6 +221,21 @@ CASES = [
          "text": "The benchmark run took 2:30ish."}}, False,
      "#2947: duration phrasing took 2:30ish in session notebook is silent"),
     ([PROMPT],
+     {"tool_name": "Edit", "tool_input": {
+         "file_path": "/Users/user/repo/memory/session-2026-09-01.md",
+         "text": "build ended 21:15ish quietly without a marker."}}, False,
+     "#2947: bare 21:15ish without tilde or context in session notebook is silent"),
+    ([PROMPT],
+     {"tool_name": "Edit", "tool_input": {
+         "file_path": "/Users/user/repo/memory/session-2026-09-01.md",
+         "text": "we will pick this up again 23:00ish tomorrow."}}, False,
+     "#2947: bare 23:00ish without tilde or context in session notebook is silent"),
+    ([PROMPT],
+     {"tool_name": "Edit", "tool_input": {
+         "file_path": "/Users/user/repo/memory/session-2026-09-01.md",
+         "text": "Resumed ~21:15ish for wave 3."}}, True,
+     "#2947: ~21:15ish with tilde prefix in session notebook warns"),
+    ([PROMPT],
      {"tool_name": "NotebookEdit", "tool_input": {
          "notebook_path": "/Users/user/repo/memory/session-2026-09-01.md",
          "new_source": "Status at 17:50ish: tests green."}}, True,

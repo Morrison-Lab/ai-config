@@ -192,7 +192,7 @@ RX_NOTEBOOK_STAMP = re.compile(
     r"|(?:\((?:[01]?\d|2[0-3]):[0-5]\d\s*ish(?:\s*(?:PDT|PST|\bPT\b))?\))"
     r"|(?:(?:^|\n)\s*#{1,6}\s*(?:.*?\b)?(?:[01]?\d|2[0-3]):[0-5]\d\s*ish\b)"
     r"|(?:\b(?:at|around|about|as of|Status at)\s+(?:[01]?\d|2[0-3]):[0-5]\d\s*ish\b)"
-    r"|(?:~[01]?\d|2[0-3]):[0-5]\d\s*ish\b",
+    r"|~(?:[01]?\d|2[0-3]):[0-5]\d\s*ish\b",
     re.I,
 )
 

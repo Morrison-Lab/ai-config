@@ -190,11 +190,11 @@ try:
         "scripts", "lib")
     if _LIB not in sys.path:
         sys.path.insert(0, _LIB)
-    from shellcmd import env_value, git_subcommand, simple_commands, strip_env
+    from shellcmd import env_value, git_subcommand, simple_commands
 except Exception as _exc:  # broken install; fail open and say so
     print(f"no-commit-chained-to-push: cannot load scripts/lib/shellcmd.py "
           f"({_exc}); not evaluating", file=sys.stderr)
-    env_value = git_subcommand = simple_commands = strip_env = None
+    env_value = git_subcommand = simple_commands = None
 
 DENY = """\
 A `git commit` and a `git push` are in the SAME Bash call.

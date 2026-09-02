@@ -412,7 +412,9 @@ pushing branch A afterward compares its shipped commit `X` against the held `Y`,
 A subagent's result is returned to the dispatching session with a trailer the harness writes itself.
 Measured 2026-09-02 in Claude Code, on two separate `Agent` calls:
 
-    --- end of report ---agentId: ae8726223279fc9e8 (use SendMessage with to: '...')
+```
+--- end of report ---agentId: ae8726223279fc9e8 (use SendMessage with to: '...')
+```
 
 Concatenated, no separator.
 Whatever line is last absorbs that suffix, so the question is what happens when the last line is the `Reviewed-Commit` fingerprint.
@@ -433,7 +435,11 @@ A wrong sha refuses the push with "the clean verdict is for commit X, but this p
 
 The remedy costs one line either way, and is cheap insurance rather than a fix for a demonstrated break at 40 characters:
 
-    Verdict: <phrase> Reviewed-Commit: <full sha> --- end of report ---
+```
+Verdict: <phrase>
+Reviewed-Commit: <full sha>
+--- end of report ---
+```
 
 It puts a non-hex line between the fingerprint and anything the harness appends, so the fingerprint's length stops mattering.
 

@@ -184,7 +184,9 @@ confirmed it fixed.)
 
 Never chain a `git commit` into a `git push` in one shell invocation:
 
-    git add -A && git commit -F msg.txt && git push -u origin my-branch
+```
+git add -A && git commit -F msg.txt && git push -u origin my-branch
+```
 
 A `PreToolUse` guard denies the **whole invocation**, before any part of it runs.
 [`memories/claude-code-hooks.md`](../../memories/claude-code-hooks.md)'s "A hook's deny rejects the WHOLE call" section states that mechanism in general and measured it on 2026-08-17 (ai-config#1609, a `git checkout -b` lost to an unrelated deny).

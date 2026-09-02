@@ -575,11 +575,14 @@ _mutate("an unanchored override is cleared by a mere mention",
 #       which is what an earlier revision did. A stale prefix on an unrelated
 #       `git status` then silently disarms the guard.
 def _unscoped_override(m):
+    # Its own handle on the library: the hook imports only what it calls,
+    # and it does not call `strip_env`.
+    import shellcmd as _shellcmd
     real = m.evaluate
 
     def evaluate(command):
         for argv in (m.simple_commands(command) or []):
-            env, _rest = m.strip_env(argv)
+            env, _rest = _shellcmd.strip_env(argv)
             if m.env_value(env, m.OVERRIDE) == "1":
                 return None
         return real(command)

@@ -86,6 +86,9 @@ The rule therefore narrows the directive's "workflow-opened" on purpose, because
   Match the app slug `github-actions` in whichever form the source returns it (forms measured 2026-09-01 against `cli/cli` trunk and the REST API;
   re-check if a tool's output format changes): the REST API and the MCP tools suffix it (`github-actions[bot]`), GraphQL and `scripts/pr-sweep.py` return it bare (`github-actions`), and `gh pr list --json author` prefixes it (`app/github-actions`, with `is_bot: true`).
 - **Do:** on a sweep (`ardia`, `gia`, `ardiaei`, `gmd`), filter the PR list by that test first, and say in the report which PRs were excluded and why.
+- **Do (inferred):** when no identity operation is available (no `gh`, no `mcp__github__get_me`, no `glab`), fail closed:
+  leave the author and assignee arms unevaluated, keep only the PRs the user explicitly asked for or the Actions app authored, and say so in the report.
+  `skills/ardia/SKILL.md` step 1 and `AGENTS.md` state the same fallback.
 - **Don't:** push commits to, rewrite the title or body of, dispatch a paid review on, or resolve threads on a PR that fails the test.
 - **Don't:** read a skill's "drive every open PR" as a scope grant that overrides this --- "every" means every PR that is mine.
 - **Don't:** treat a PR from a bot other than the repository's workflows (a Dependabot PR, a Copilot-agent PR) as mine by default;
@@ -105,6 +108,7 @@ The issue carve-out is inferred too: nothing in either directive mentioned issue
 An issue on a repo I own is different from a PR on it:
 filing, triaging, and commenting on issues is fine,
 and an issue someone else's open PR already fixes is left to that PR (not grabbed, and that PR not driven either).
+
 ## Search the issue thread before rebutting "no source exists"
 
 A reviewer asked for a permalink to the post a chapter summarized.

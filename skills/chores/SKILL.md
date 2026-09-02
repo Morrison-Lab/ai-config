@@ -29,21 +29,22 @@ for the user's call before merging.
 
 ## What counts as a chore PR
 
-A PR is in scope when **both** of these hold:
+A PR is in scope when **either** of these holds:
 
-- Its author passes `memories/reviewing-prs.md`'s scope test for this
-  invocation: a dependency bot (`app/dependabot`, `dependabot[bot]`,
-  `app/renovate`, `renovate[bot]`), the GitHub Actions app
-  (`github-actions`, which opens `chore(submodule):` bumps), or the invoking
-  user, or the invoking user is among its assignees.
-  An explicit `chores` call names the Dependabot/Renovate population, which is
-  what admits those two bots; it admits no other author.
-- It looks like a chore: the title starts with `chore(` (e.g.
+- Its author is one of the dependency bots this skill exists for, matched in
+  the exact login form the source returns: `app/dependabot`,
+  `dependabot[bot]`, `app/renovate`, `renovate[bot]`.
+  An explicit `chores` call names that population, which is what admits those
+  two bots and no other author.
+- It looks like a chore --- the title starts with `chore(` (e.g.
   `chore(actions):`, `chore(submodule):`, `chore(deps):`), or the labels
-  include `dependencies`.
+  include `dependencies` --- **and** it passes `memories/reviewing-prs.md`'s
+  scope test for the invoking user: authored by the GitHub Actions app
+  (`github-actions`, which opens `chore(submodule):` bumps) or by the invoking
+  user or one of their aliases, or assigned to one of them.
 
-Human-authored feature PRs are **out of scope** — those go through `ardia` /
-`gia` (review-to-clean), not this skill — and so is a chore-titled or
+Human-authored feature PRs are **out of scope** --- those go through `ardia` /
+`gia` (review-to-clean), not this skill --- and so is a chore-titled or
 `dependencies`-labelled PR whose author is another lab member or another bot,
 unless the invoking user is assigned to it.
 
@@ -66,16 +67,20 @@ This skill is GitHub-first (`gh`). For a GitLab repo, the same shape applies via
 
 ```bash
 ME=$(gh api user --jq .login)   # WHO_AM_I
+IDS=$(jq -cn --arg me "$ME" '[$me]')   # then add the aliases memories/reviewing-prs.md lists for $ME
 gh pr list --repo "$REPO" --state open --limit 200 \
   --json number,title,author,assignees,labels,mergeable \
-  | jq -r --arg me "$ME" '.[] | select(
-          (
-            (.author.login | test("dependabot|renovate|github-actions"))
-            or (.author.login == $me)
-            or ([.assignees[].login] | index($me))
-          ) and (
-            (.title | startswith("chore("))
-            or ([.labels[].name] | index("dependencies"))
+  | jq -r --argjson ids "$IDS" '.[] | select(
+          (.author.login | test("^(app/)?(dependabot|renovate)(\\[bot\\])?$"))
+          or (
+            (
+              (.author.login | test("^(app/)?github-actions(\\[bot\\])?$"))
+              or ((.author.login as $a | $ids | index($a)) != null)
+              or any(.assignees[].login; . as $x | ($ids | index($x)) != null)
+            ) and (
+              (.title | startswith("chore("))
+              or (([.labels[].name] | index("dependencies")) != null)
+            )
           )
         ) | "\(.number)\t\(.mergeable)\t\(.title)"'   # LIST_PRS
 ```
@@ -235,6 +240,7 @@ bump is sitting unflagged.
 - ❌ Force-merging a PR with `pending` or `fail` checks.
 - ❌ Reporting "chores done" while a flagged major bump is still open with no
   decision recorded.
-- ❌ Treating human feature PRs as chores (or vice-versa) — scope by author
-  **and** `chore(` title or `dependencies` label, never by title or label
-  alone.
+- ❌ Treating human feature PRs as chores (or vice-versa) --- a dependency
+  bot's PR is a chore by author; any other PR needs the `chore(` title or
+  `dependencies` label **and** an in-scope author or assignee, never the
+  title or label alone.

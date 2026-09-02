@@ -343,12 +343,15 @@ current branch):
 ```bash
 # Branches checked out in ANY worktree (the current branch included) cannot
 # be deleted, and the --format listing below carries no marker for them, so
-# derive that set read-only first and keep it for the plan (step 4).
+# derive that set read-only first and keep it for the local plan. A
+# per-run temp file, not a fixed /tmp name: two sessions sweeping at once
+# would otherwise read each other's set.
+CHECKED_OUT=$(mktemp)
 git worktree list --porcelain \
-  | awk '/^branch /{sub("refs/heads/", "", $2); print $2}' | sort -u > /tmp/checked-out.txt
+  | awk '/^branch /{sub("refs/heads/", "", $2); print $2}' | sort -u > "$CHECKED_OUT"
 
 git branch --merged origin/main --format='%(refname:short)' \
-  | grep -vxF -e main -e master -f /tmp/checked-out.txt
+  | grep -vxF -e main -e master -f "$CHECKED_OUT"
 # --format gives plain names. Plain `git branch` prefixes the current branch
 # with `*` and a branch checked out in a linked worktree with `+`, so a
 # column-anchored grep on the plain listing mangled such a name into
@@ -362,7 +365,7 @@ git branch --merged origin/main --format='%(refname:short)' \
 git branch -d <branch>          # -d refuses if NOT actually merged — a safety net
 ```
 
-A merged branch that appears in `/tmp/checked-out.txt` gets the status
+A merged branch that appears in `$CHECKED_OUT` gets the status
 `checked out in a worktree` in the local plan (the step 4 table when the
 local rows are folded into a full sweep, or the standalone local plan step
 8c describes) and goes under "Skipped (checked out in a worktree)" in the

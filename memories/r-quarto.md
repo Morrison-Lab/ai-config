@@ -868,7 +868,7 @@ This is the same silence one layer out: an argument that arrives, carries a valu
 An absent package is not distinguishable from an absent file, either;
 both return `""`.
 
-The consumers are what make it worth a note, because only one of the three refuses the empty path (measured on R 4.6.0 / macOS, `.Platform$OS.type == "unix"`, 2026-09-01):
+The consumers are what make it worth a note, because none of the three errors on the empty path and each fails differently (measured on R 4.6.0 / macOS, `.Platform$OS.type == "unix"`, 2026-09-01):
 
 ```r
 system.file("no-such-file.txt", package = "stats")      #> ""
@@ -883,20 +883,21 @@ readLines("")                                           #> character(0), with on
 That is a POSIX-shaped claim --- the separator is `/` on Windows too, but whether a leading `/` reads as the root depends on the consumer.
 `readLines("")` returns `character(0)` and emits a warning rather than an error, so an analysis over zero rows proceeds and looks like a real result.
 Its warning names nothing about the lookup that failed --- it reads `file("") only supports open = "w+" and open = "w+b": using the former` --- so grepping the log for the missing filename finds nothing.
-`file.exists()` is the only one that reports a problem, and it reports it as "the file is not there" rather than as "the package lookup failed".
+`file.exists()` is the only one whose return value answers the question it was asked, and even it says "the file is not there" rather than "the package lookup failed".
 
-`mustWork = TRUE` converts the miss into an error, which is [`fail-fast`](../shared/principles/fail-fast.md)'s "validate inputs and assumptions at the top of a function" applied where the value is produced instead of where it is consumed.
+`mustWork = TRUE` converts the miss into an error, which is [`fail-fast`](../shared/principles/fail-fast.md)'s "Validate inputs and assumptions at the top of a function" applied where the value is produced instead of where it is consumed.
 It does not disambiguate, though: both calls above abort with the identical, uninformative `no file found`, naming neither the package nor the file.
 Separating the two cases needs a second call --- `find.package("pkg")` errors with `there is no package called 'pkg'`, and `requireNamespace("pkg", quietly = TRUE)` returns `FALSE`.
 
 - **Do:** pass `mustWork = TRUE` whenever the file is required, rather than testing the return value downstream.
 - **Do:** `stopifnot(nzchar(path))` on the result immediately, when `mustWork = TRUE` is not wanted, naming the variable the call was assigned to.
-- **Do:** call `find.package()` or `requireNamespace()` in the error branch, so the message says whether the package or the file was missing.
+- **Do:** check `requireNamespace()` first when both failures are reachable, so the abort can say which one happened --- `mustWork = TRUE` aborts at the call site, so there is no later branch to disambiguate from.
 - **Don't:** infer from a `""` which of the two went wrong --- an uninstalled or misnamed package returns exactly what an absent file does, and so does `mustWork = TRUE`'s error text.
 - **Don't:** pass an unchecked `system.file()` result to `file.path()`;
   the empty component makes the path absolute instead of failing.
 
-(Measured 2026-09-01 while reviewing a pull request on `ucdavis/hac.sap`, whose `R/format_sap_table.R` exports two one-line helpers --- `sap_reference_docx()` and `sap_asset_path(name)` --- each returning a bare `system.file(...)` with no `mustWork` and no emptiness check, so a renamed or unbundled asset reaches the caller as `""`.
+(Measured 2026-09-01 on `ucdavis/hac.sap#9` at commit `e6d9e8a`, where `R/format_sap_table.R` exported two one-line helpers --- `sap_reference_docx()` and `sap_asset_path(name)` --- each returning a bare `system.file(...)` with no `mustWork` and no emptiness check, so a renamed or unbundled asset reached the caller as `""`.
+Cite the commit rather than the file: review caught it, and by `d2befcf` (2026-09-02) both helpers carry an `nzchar()`/`file.exists()` guard and a `cli::cli_abort()`, so the current head shows the fix rather than the defect.
 Tracked as [ai-config#2984](https://github.com/Morrison-Lab/ai-config/issues/2984).)
 
 ## A container with no R at all is not a blocker: apt for R, P3M for the packages, a tarball for Quarto

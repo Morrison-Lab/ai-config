@@ -273,13 +273,14 @@ The section above is about which **formats** a project renders, and says the pro
 This is the other axis: which **documents** a given entry in that block reaches.
 The answer is all of them --- the block is the *default* for any document whose own front matter declares no `format:` --- so adding a format there to give **one** document slides silently gives it to every page in the site.
 
-The two are not opposite directions of one claim, and reading them as such is what makes this surprising: the block behaves exactly as documented, and it is the author's intent that was narrower than the edit.
+The two axes are not opposite directions of one claim, and reading them as such is what makes the document scope surprising: the block behaves exactly as documented, and it is the author's intent that was narrower than the edit.
 
 The failure is the filename collision already recorded twice in this corpus, reached from the project side with no document edited at all.
 Both formats claim `<stem>.html`, and the render dies rather than rendering something wrong.
-The "Verify a redirect on a site build" bullet above carries the remedy (an explicit `output-file:` on the second format), and [`debugging.md`](debugging.md)'s "Reproduce heavy-tool project bugs minimally" carries a two-file, R-free reproducer for the same `safeMoveSync`/`renderProject` collision --- reach for that before rendering a real project twice.
+The "Verify a redirect on a site build" bullet above carries the remedy: an explicit `output-file:` on the second format.
+[`debugging.md`](debugging.md)'s "Reproduce heavy-tool project bugs minimally" carries a two-file, R-free reproducer for the same `safeMoveSync`/`renderProject` collision --- reach for that before rendering a real project twice.
 
-Two things this adds to those.
+Two things the new observation adds to those two records.
 
 **The blast radius is the whole site, and the error names one page.**
 Measured on Quarto 1.9.36 / macOS, a `revealjs:` block added under the top-level `format:` key of a website project:
@@ -289,17 +290,19 @@ ERROR: NotFound ... rename 'docs/design-decisions.html' -> '_site/docs/design-de
 ```
 
 The output directory was left missing `index.html`, `styles.css`, `search.json`, and `site_libs/`.
-The page named is whichever collision the render reached first, not the page the format was added for --- and that mismatch is itself the tell that the scope is project-wide rather than per-document.
+The page named is not the page the format was added for, and that mismatch is itself the tell that the scope is project-wide rather than per-document.
+Don't read the named page as the first one rendered either: an independent reproduction on the same Quarto and OS named the page rendered *last*, because the path that fails is chosen by the post-render move loop rather than by render order.
 
 **A green CI check is not evidence the block is scoped correctly.**
 Quarto 1.10.18 on a Linux runner accepted the identical config that 1.9.36 on macOS refused.
 Both the version and the platform differ between those two observations, so neither is attributable on this evidence;
 what is established is only that a passing remote render does not reproduce a local one.
-The deployed preview is still worth reading, per the `pr-preview/pr-<N>/` recipe the bullet above cites --- it is the check, not the forge, that was blind here.
+Nobody read the deployed preview here, so whether it would have shown the partial site is untested;
+the `pr-preview/pr-<N>/` recipe the bullet above cites is the cheap way to find out before concluding a green check means anything.
 
 - **Do:** put a single document's extra format in that document's own front matter, with an explicit `output-file:`.
 - **Do:** render the project locally before trusting CI on a `_quarto.yml` `format:` change.
-- **Do:** grep the error's source path against the document you actually edited;
+- **Do:** compare the error's source path against the document the format was added for;
   a different path means the entry is reaching documents you did not intend.
 - **Don't:** add a format to the top-level `format:` key for one document's benefit.
 - **Don't:** treat the page named in a `rename ... NotFound` as the page at fault.

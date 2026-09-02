@@ -577,7 +577,7 @@
   On those same requests the review then landed within about a minute, visible under `gh pr view --json reviews` with author login `copilot-pull-request-reviewer`, which `startswith("copilot")` matches.
   That is an observation of those PRs, not a guarantee: the empty request list stays inconclusive (see the 201-then-empty section above), and the posted review is the only evidence of arrival.
   The inline comments of that review (`gh api repos/<owner>/<repo>/pulls/<N>/comments`) carry `user.login` `Copilot` instead, so a query over comments needs a case-insensitive test (`test("copilot"; "i")`) while a query over reviews does not.
-  On those PRs a re-request after a push produced a fresh review on the new head.
+  On those PRs a re-request after a push was followed by a fresh review on the new head.
   Count reviews per `commit.oid` to tell a new round from the old one.
   Measured 2026-09-01 on [#2975](https://github.com/Morrison-Lab/ai-config/pull/2975) through [#2979](https://github.com/Morrison-Lab/ai-config/pull/2979) and [#2983](https://github.com/Morrison-Lab/ai-config/pull/2983).
 

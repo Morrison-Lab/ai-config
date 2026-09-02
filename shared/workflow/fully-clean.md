@@ -1163,7 +1163,7 @@ so the gap opens when `main` gains a check afterwards
 and no new PR event re-runs CI.
 A check added to `main` after that run never fires on the PR until a new PR event synthesizes a fresh `refs/pull/N/merge`,
 so there is nothing red to see: the check simply never ran.
-Measured on [#2965](https://github.com/Morrison-Lab/ai-config/pull/2965).
+Measured 2026-09-01 (Pacific) on [#2965](https://github.com/Morrison-Lab/ai-config/pull/2965).
 That branch added hook bindings to `hooks/hooks.json` before [#2967](https://github.com/Morrison-Lab/ai-config/pull/2967) landed the generated `skills/ai-config-hooks/hooks/hooks.json` and its `gen-hooks-plugin.py --check` gate on `main`.
 `check-pr-fully-clean.py` reported [#2965](https://github.com/Morrison-Lab/ai-config/pull/2965) FULLY CLEAN,
 a GIA session merged it under `mwc`,
@@ -1175,15 +1175,16 @@ the queue's speculative merge test covers this,
 and [`merge-queue`](merge-queue.md) forbids the manual update loop.
 There the `merge_group` checks are the gate.
 A `pull_request`-only workflow added to the base does not run on the queue's branch,
-and this corpus's clean gate counts every check, not only the required ones,
-so that precondition has to hold for all of them before the manual update is skipped.
+and a workflow that lists `merge_group` can still carry a job or step whose `if:` skips that event,
+which branch protection then counts as passing.
+This corpus's clean gate counts every check, not only the required ones,
+so every clean-gate check has to execute for `merge_group`, job and step conditions included, before the manual update is skipped.
 
-- **Do:** before merging, fetch and resolve the default branch, then confirm the merge-base with it is its current tip:
-  `d=$(git remote show origin | sed -n 's/.*HEAD branch: //p') && [ -n "$d" ] && git fetch origin "$d" && tip=$(git rev-parse --verify FETCH_HEAD) && mb=$(git merge-base FETCH_HEAD <head>) && [ "$mb" = "$tip" ]`.
+- **Do:** before merging, fetch the PR's configured base and confirm the merge-base with the live PR head is that base's current tip:
+  `b=$(gh pr view <N> -R <owner>/<repo> --json baseRefName -q .baseRefName) && [ -n "$b" ] && git fetch origin "$b" && tip=$(git rev-parse --verify FETCH_HEAD) && git fetch origin "refs/pull/<N>/head" && head=$(git rev-parse --verify FETCH_HEAD) && [ "$(git merge-base "$tip" "$head")" = "$tip" ]`.
   Each result is assigned inside the `&&` chain so an unresolved branch or a failed command fails the check rather than comparing two empty strings as equal.
-  Comparing against `FETCH_HEAD` reads the tip the fetch just returned and writes no remote-tracking ref, so it holds in a single-branch clone (where a bare `git fetch origin` leaves `origin/$d` stale) and under `fetch.prune=true` (where an explicit `branch:refs/remotes/origin/branch` refspec was measured to delete the ref and fail `rev-parse` on its first run).
-  The default branch is not always `main`.
-  `git remote show origin` answers in clones where `refs/remotes/origin/HEAD` is unset, which [`challenge-the-assignment.cases.md`](challenge-the-assignment.cases.md) records for the clones this corpus is developed in.
+  Reading `FETCH_HEAD` after each fetch uses the tip the fetch just returned and writes no remote-tracking ref, so it holds in a single-branch clone (where a bare `git fetch origin` leaves `origin/<branch>` stale) and under `fetch.prune=true` (where an explicit `branch:refs/remotes/origin/branch` refspec was measured to delete the ref and fail `rev-parse` on its first run).
+  The base comes from the PR, not from the repository's default branch: a stacked or release PR targets another branch, and [`merge-it`](../../skills/merge-it/SKILL.md) already warns not to assume `main` for those.
 - **Do:** when the merge-base is not that tip and the merge is direct, `gh pr update-branch <N> -R <owner>/<repo>`, then rerun the whole clean gate on the new head, review included, before merging.
   The update is a new head, so a clean verdict on the old one no longer counts, per [`sync-with-main`](sync-with-main.md).
 - **Do:** under a merge queue, rely on the `merge_group` checks rather than a manual update.

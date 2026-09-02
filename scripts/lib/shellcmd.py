@@ -109,8 +109,16 @@ def simple_commands(command):
     DEQUOTED, so a quoted `"git push"` arrives as one token inside some other
     command's argv rather than as its own simple command.
     """
-    command = re.sub(r"\\\r?\n", " ", command)
+    # ORDER MATTERS, and the natural order is wrong. Joining continuations
+    # first lets a heredoc BODY line ending in a backslash eat its own
+    # terminator, after which `RX_HEREDOC` closes at some later occurrence of
+    # the delimiter word -- or never -- and everything between is swallowed.
+    # Measured: `git commit -F - <<EOF / a \\ / EOF / git push` lost the push
+    # entirely, so the guard went silent. A heredoc body is literal text and a
+    # backslash in it continues nothing, so it must be removed BEFORE the
+    # continuation join runs over what remains.
     command = _heredoc_free(command)
+    command = re.sub(r"\\\r?\n", " ", command)
     command = command.replace("\n", ";")
     try:
         lex = shlex.shlex(command, posix=True, punctuation_chars=True)

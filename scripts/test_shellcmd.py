@@ -80,6 +80,20 @@ check("<<- tab-indented terminator",
 check("a heredoc body's git commands are not command positions",
       subs("cat > /tmp/b <<'EOF'\ngit commit -m x\ngit push\nEOF"), [])
 
+# ORDERING: heredoc blanking must run BEFORE the backslash-continuation join.
+# A heredoc body is literal text and a backslash in it continues nothing, but
+# joining first lets a body line ending in `\` eat its own terminator -- after
+# which the heredoc never closes and its body tokens leak out as commands.
+# Measured under the wrong order this returns three argv lists, the middle one
+# being body text (`['body', 'EOF']`), rather than two.
+check("a body line ending in a backslash does not leak body tokens",
+      shellcmd.simple_commands(
+          "git commit -F - <<'EOF'\nbody \\\nEOF\ngit push"),
+      [["git", "commit", "-F", "-", "<<"], ["git", "push"]])
+check("that case still finds exactly the two git commands",
+      subs("git commit -F - <<'EOF'\nbody \\\nEOF\ngit push"),
+      ["commit", "push"])
+
 # ------------------------------------------------------------- quoting
 
 check("a quoted git command is one token, not a command",

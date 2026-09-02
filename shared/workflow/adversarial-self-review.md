@@ -408,30 +408,47 @@ pushing branch A afterward compares its shipped commit `X` against the held `Y`,
 - **Don't:** read that refusal as a defect in branch A's review;
   the guard has no notion of "branch" to be defective about, and the SHA comparison is doing exactly what it is built to do.
 
-**The harness can append text to the report's last line, with no newline, and the fingerprint is the line it lands on.**
+**The harness can append text to the report's last line, with no newline.**
 A subagent's result is returned to the dispatching session with a trailer the harness writes itself.
-Measured 2026-09-02 in Claude Code: a completed `Agent` call's final line came back as
+Measured 2026-09-02 in Claude Code, on two separate `Agent` calls:
 
     --- end of report ---agentId: ae8726223279fc9e8 (use SendMessage with to: '...')
 
---- concatenated, no separator.
-Whatever line is last absorbs that suffix.
-When the last line is the fingerprint, `Reviewed-Commit: <sha>` becomes `Reviewed-Commit: <sha>agentId: ...`, and the guard is then comparing the push's commit against a string that is not a SHA --- so a genuine, clean, correctly-formatted review is refused, and the refusal reads exactly like an unreviewed push.
+Concatenated, no separator.
+Whatever line is last absorbs that suffix, so the question is what happens when the last line is the `Reviewed-Commit` fingerprint.
 
-The remedy costs one line: require the report to end with a literal sentinel after the fingerprint, so the sentinel is what gets corrupted.
+**For the mandated 40-character form, nothing happens, and saying otherwise would be the easy overclaim here.**
+`no-push-without-self-review.py`'s `REVIEWED_COMMIT` captures `([0-9a-fA-F]{7,40})`, so a full sha stops the capture exactly at the boundary and the suffix is never reached.
+Run through the guard's own regex:
+
+| fingerprint | captured |
+|---|---|
+| 40 chars, then `agentId: a3f5...` | the correct sha |
+| 39 chars, then `agentId: a3f5...` | 40 chars ending in the `a` of `agentId` --- a **wrong sha, silently** |
+| 7 chars, then `agentId: a3f5...` | 8 chars, wrong |
+
+So the hazard is real and it is a **truncation** hazard rather than a suffix hazard.
+`agentId` begins with a hex character, which is what turns a short fingerprint into a plausible-looking wrong one instead of a parse failure.
+A wrong sha refuses the push with "the clean verdict is for commit X, but this push would ship Y" --- a message that reads as a stale verdict and is nothing of the kind.
+
+The remedy costs one line either way, and is cheap insurance rather than a fix for a demonstrated break at 40 characters:
 
     Verdict: <phrase> Reviewed-Commit: <full sha> --- end of report ---
 
-Two caveats, both measured rather than assumed.
-This has been observed on Claude Code's `Agent` tool and nowhere else, so it is a claim about that harness on that date rather than about subagent dispatch in general.
-And the sentinel sits in tension with [`.claude/agents/adversarial-reviewer.md`](../../.claude/agents/adversarial-reviewer.md)'s own instruction to emit nothing after the JSON payload's closing `-->`;
-a brief that asks for both is asking the reviewer to order them, and the ordering that worked put the verdict, the fingerprint, and the sentinel after the payload.
-Reconciling the two contracts is [ai-config#2483](https://github.com/Morrison-Lab/ai-config/issues/2483)'s business, not something to settle inside a review brief.
+It puts a non-hex line between the fingerprint and anything the harness appends, so the fingerprint's length stops mattering.
 
-- **Do:** end every review brief with an explicit sentinel line after the `Reviewed-Commit` fingerprint, and say in the brief that it is required.
-- **Do:** read a "the clean verdict is for commit X, but this push would ship Y" refusal as possibly a corrupted fingerprint rather than only a stale one --- print the parsed value before concluding.
-- **Don't:** let the fingerprint be the report's last line in a dispatch whose result is returned by a harness.
-- **Don't:** generalize the concatenation to other harnesses without measuring one.
+Two caveats.
+The concatenation has been observed on Claude Code's `Agent` tool and nowhere else, so it is a claim about that harness on that date rather than about subagent dispatch generally.
+And the sentinel sits in tension with [`.claude/agents/adversarial-reviewer.md`](../../.claude/agents/adversarial-reviewer.md)'s own instruction to emit nothing after the JSON payload's closing `-->`;
+a brief asking for both is asking the reviewer to order them, and the ordering that worked put the verdict, the fingerprint and the sentinel after the payload.
+Reconciling the two contracts is [ai-config#2483](https://github.com/Morrison-Lab/ai-config/issues/2483)'s business rather than something to settle inside a review brief.
+
+- **Do:** state the fingerprint as the **full 40-character** sha, which is what actually protects it.
+- **Do:** add the sentinel line after it, as cheap insurance against a truncated or reformatted fingerprint.
+- **Do:** read a "verdict is for commit X, but this push would ship Y" refusal as possibly a *misparsed* fingerprint rather than only a stale one --- print what the guard captured before concluding.
+- **Don't:** claim the suffix breaks a 40-character fingerprint;
+  run `REVIEWED_COMMIT` over the line before asserting either way.
+- **Don't:** abbreviate the sha in a review brief's template, which is the input that turns the suffix into a silently wrong parse.
 
 ## Structured review data (JSON payload)
 

@@ -205,24 +205,72 @@ check("override prefixing the push also clears it",
 # `export` is accepted because no-unauthorized-merge.py's ALLOW_MERGE anchor
 # accepts it. An escape valve that rejects the spelling its own precedent uses
 # sends the author looking for a bypass instead.
-check("export as its own command clears it",
+check("export as its own leading command clears it",
       fires("export ALLOW_COMMIT_AND_PUSH=1 && git commit -m x && git push"),
       False)
-check("a bare assignment as its own command clears it",
+check("a bare leading assignment clears it",
       fires("ALLOW_COMMIT_AND_PUSH=1\ngit commit -m x\ngit push"), False)
+check("a bare leading assignment before a semicolon clears it",
+      fires("ALLOW_COMMIT_AND_PUSH=1; git commit -m x && git push"), False)
 check("export prefixing the commit clears it",
       fires("export ALLOW_COMMIT_AND_PUSH=1 git commit -m x && git push"),
       False)
-# SCOPE. A stale prefix on some unrelated third command must NOT disarm the
-# guard -- it says nothing about the author having considered this call.
-check("an override on an unrelated third command does not clear it",
+
+# SCOPE. Each of the four below LOOKS like the override and authorizes
+# nothing, so each must still deny. The first two were measured clearing an
+# earlier revision of this guard while setting no variable at all.
+check("a subshell assignment does not persist, so it does not clear",
+      fires("(ALLOW_COMMIT_AND_PUSH=1); git commit -m x && git push"), True)
+check("a short-circuited assignment never runs, so it does not clear",
+      fires("false && ALLOW_COMMIT_AND_PUSH=1; git commit -m x && git push"),
+      True)
+check("an assignment scoped to a third command does not clear it",
       fires("ALLOW_COMMIT_AND_PUSH=1 git status --short && git commit -m x "
             "&& git push"), True)
 check("a MENTION of the override does not clear it",
       fires("git commit -m 'set ALLOW_COMMIT_AND_PUSH=1 next time' && git push"),
       True)
-check("override set to something other than 1 does not clear it",
+# Strictness: only the exact value `1`. Both the leading-assignment path and
+# the per-command path are covered, because relaxing `== "1"` to
+# `is not None` at either site alone survives a suite that pins only the other.
+check("a leading assignment to 0 does not clear it",
+      fires("ALLOW_COMMIT_AND_PUSH=0; git commit -m x && git push"), True)
+check("a leading assignment to the empty string does not clear it",
+      fires("ALLOW_COMMIT_AND_PUSH=; git commit -m x && git push"), True)
+check("a prefix assignment to 0 does not clear it",
       fires("ALLOW_COMMIT_AND_PUSH=0 git commit -m x && git push"), True)
+check("a prefix assignment to true does not clear it",
+      fires("ALLOW_COMMIT_AND_PUSH=true git commit -m x && git push"), True)
+
+# 7b. INERT commands. A push that transfers nothing and a commit that creates
+# nothing each remove the hazard, and both siblings decline to examine the
+# push forms -- so denying them would be a pure false positive.
+check("a dry-run push", fires("git commit -m x; git push --dry-run"), False)
+check("a dry-run push, short form",
+      fires("git commit -m x && git push -n"), False)
+check("a branch-deletion push",
+      fires("git commit -m x && git push --delete origin b"), False)
+check("a branch-deletion push, short form",
+      fires("git commit -m x && git push -d origin b"), False)
+check("a dry-run commit", fires("git commit --dry-run -m x && git push"),
+      False)
+# ... and none of those exemptions may mask a real one alongside it.
+check("a dry-run push does not mask a real push after it",
+      fires("git commit -m x && git push --dry-run; git push"), True)
+check("a dry-run commit does not mask a real commit after it",
+      fires("git commit --dry-run -m x; git commit -m y && git push"), True)
+check("a literal --dry-run after -- is an argument, not a flag",
+      fires("git commit -m x && git push origin -- --dry-run"), True)
+
+# 7c. THE REMEDY LINES the deny message prints are copy-paste text, so they
+# must be requoted rather than space-joined. A space join re-emits
+# `git commit -m "fix: a b; rm -rf x"` as a command that commits `fix:` and
+# then runs `rm -rf x`.
+remedy = hook.evaluate('git commit -m "fix: a b; rm -rf x" && git push') or ""
+check("the remedy requotes an argument containing a separator",
+      "git commit -m 'fix: a b; rm -rf x'" in remedy, True)
+check("the remedy does not emit the argument bare",
+      "git commit -m fix: a b; rm -rf x" in remedy, False)
 
 # 8. Degenerate inputs.
 check("empty command", fires(""), False)
@@ -327,20 +375,20 @@ def _mutate(label, patch, command, expect_mutant):
           expect_mutant)
 
 
-# M1 -- drop the ORDER constraint. Patched at the COLLABORATOR (`git_subcommand`
-#       is left alone; the ordering state is what changes), so the real
-#       `evaluate` still runs. Must start firing on push-then-commit.
+# M1 -- drop the ORDER constraint, by patching a COLLABORATOR rather than
+#       `evaluate`. Reversing the command list makes a push-then-commit call
+#       look like commit-then-push to the real `evaluate`, so the order clause
+#       is the only thing that can decide it. An earlier revision reassigned
+#       `m.evaluate` and supplied its own order-blind fallback, which passed
+#       against an `evaluate` gutted to `return None` -- the mutation was
+#       testing its own stand-in.
 def _drop_order(m):
-    real = m.evaluate
+    real = m.simple_commands
 
-    def evaluate(command):
-        if real(command) is not None:
-            return "hit"
-        # order-blind fallback: any commit and any push anywhere
-        cmds = m.simple_commands(command) or []
-        names = {p[0] for p in (m.git_subcommand(a) for a in cmds) if p}
-        return "hit" if {"commit", "push"} <= names else None
-    m.evaluate = evaluate
+    def split(command):
+        cmds = real(command)
+        return None if cmds is None else list(reversed(cmds))
+    m.simple_commands = split
 
 
 _mutate("dropping the order constraint fires on push-then-commit",
@@ -431,37 +479,41 @@ def _prefix_filter(m):
 _mutate("prefix matching at the discriminating clause fires on commit-graph",
         _prefix_filter, "git commit-graph write && git push", True)
 
-# M7 -- drop `strip_env`'s two-token `export` handling, which is the reachable
-#       half of the escape valve's export spelling. The unreachable half (an
-#       `export ` prefix inside a single token) was removed rather than
-#       mutated: shlex never produces one, and a mutation of it left the suite
-#       green, which is how the dead code was found.
-def _no_export(m):
-    import shellcmd as sc
-    real = sc.strip_env
+# M7 -- widen the leading-override anchor from a SEPARATOR to any whitespace,
+#       which is what an earlier revision did. `ALLOW_COMMIT_AND_PUSH=1 git
+#       status && git commit && git push` then clears the guard, even though
+#       that assignment is scoped to `git status` and never reaches the push.
+def _loose_leading_anchor(m):
+    import re as _re
+    m.LEADING_OVERRIDE = _re.compile(
+        r"\A\s*(?:export\s+)?" + m.OVERRIDE + r"=1(?:\s|;|&|\Z)")
 
-    def strip(argv):
-        if argv and argv[0] == "export":
-            return [], list(argv)  # `export` treated as an ordinary program
-        return real(argv)
-    m.strip_env = strip
-    m.env_value = sc.env_value
 
-    real_eval = m.evaluate
+_mutate("a whitespace-anchored override is cleared by a scoped prefix",
+        _loose_leading_anchor,
+        "ALLOW_COMMIT_AND_PUSH=1 git status --short && git commit -m x "
+        "&& git push", False)
+
+
+# M9 -- rejoin the remedy lines with a bare space instead of `shlex.join`, so
+#       the message re-emits dequoted argv as copy-paste text.
+def _space_join(m):
+    real = m.evaluate
 
     def evaluate(command):
-        cmds = m.simple_commands(command) or []
-        for argv in cmds:
-            env, rest = strip(argv)
-            if not rest and m.env_value(env, m.OVERRIDE) == "1":
-                return None
-        return real_eval(command)
+        out = real(command)
+        return out if out is None else out.replace("'", "")
     m.evaluate = evaluate
 
 
-_mutate("dropping export handling denies a call the escape valve should clear",
-        _no_export,
-        "export ALLOW_COMMIT_AND_PUSH=1 && git commit -m x && git push", True)
+mspec = importlib.util.spec_from_file_location("mutant_join", HOOK)
+mutant_join = importlib.util.module_from_spec(mspec)
+mspec.loader.exec_module(mutant_join)
+_space_join(mutant_join)
+check("MUTATION a space-joined remedy loses the quoting",
+      "git commit -m 'fix: a b; rm -rf x'" in (mutant_join.evaluate(
+          'git commit -m "fix: a b; rm -rf x" && git push') or ""),
+      False)
 
 # M4 -- widen the override to any mention. Must start CLEARING a deny it should
 #       not, so the expectation is False against a real-module baseline of True.

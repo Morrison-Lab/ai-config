@@ -12,10 +12,7 @@ instance.
 
 So in this shape:
 
-    git add -A && git commit -F - <<'EOF'
-    ...
-    EOF
-    git push -u origin my-branch
+    git add -A && git commit -m "..." && git push -u origin my-branch
 
 a refusal of the push loses the commit too. `no-push-without-self-review.py`
 and `no-clobbering-push.py` are both registered `PreToolUse` on `Bash`, and
@@ -23,6 +20,28 @@ either can refuse. Their refusals speak only about the push, so the message
 reads as "the push was blocked" while `git add`, `git commit` and `git push`
 all never ran -- the work is still an uncommitted working-tree edit, one
 `git checkout -- .` from destruction.
+
+**One shape is currently safe, and it is the one the incident was reported
+in**, which is worth stating rather than letting the example imply otherwise.
+Both siblings still carry the `_simple_commands` heredoc defect (ai-config#2993,
+which `scripts/lib/shellcmd.py` fixes and does not backport), so on
+
+    git add -A && git commit -F - <<'EOF'
+    ...
+    EOF
+    git push -u origin my-branch
+
+neither sibling sees a push at all and neither refuses. Measured 2026-09-02:
+this guard denies that call and both siblings return nothing. So for a heredoc
+commit, TODAY, nothing would have been lost.
+
+That is a reason to fix #2993, not a reason to exempt the shape. The guard
+cannot know which of a changing set of `PreToolUse` guards will refuse a given
+push, the exemption would expire the moment #2993 lands, and a rule the author
+must apply differently depending on how the commit message is written is not a
+rule anyone will follow. What it does change is the CLAIM: neither this
+docstring nor the deny message may assert that a sibling would have refused
+this particular call.
 
 Reported 2026-09-02 by a session on this machine that lost a commit this way
 and caught it only because an adversarial reviewer independently checked
@@ -58,7 +77,15 @@ It stops the chain from reaching the siblings at all, and it is always
 satisfiable -- the remedy is to issue the same two commands as two Bash calls.
 That is the test `no-clobbering-push.py` applies to its own deny: nothing is
 lost by complying, no information is unavailable, and being wrong costs one
-extra tool call against a silently discarded commit in the other direction.
+extra tool call.
+
+State the other side of that comparison precisely, because the obvious phrasing
+overclaims. The cost of a MISS is not "a discarded commit" on every call --- it
+is a discarded commit on the calls where a sibling would in fact have refused,
+which is unknowable at match time and, per the heredoc note above, is currently
+not all of them. The argument the refusal actually rests on is the asymmetry
+between a bounded, certain cost and an unbounded, uncertain one, not a claim
+that every chained call is about to lose a commit.
 
 ai-config#2992 proposes a DIFFERENT fix: extend the denying guards' own
 messages to say a commit in the same chain did not run. That is complementary
@@ -140,6 +167,8 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import shlex
 import sys
 
 OVERRIDE = "ALLOW_COMMIT_AND_PUSH"
@@ -164,12 +193,15 @@ A `git commit` and a `git push` are in the SAME Bash call.
 
 A PreToolUse guard denies the whole invocation, not the offending half. Both
 `no-push-without-self-review.py` and `no-clobbering-push.py` are registered
-PreToolUse on Bash and either can refuse this push -- and when one does, the
-commit never runs either. Their refusal names only the push, so it reads as
-"the push was blocked" while the change is still an uncommitted working-tree
-edit, one `git checkout -- .` from destruction. `memories/claude-code-hooks.md`
-records the general mechanism; ai-config#2992 records this instance of it,
-caught only because an adversarial reviewer checked whether HEAD had moved.
+PreToolUse on Bash and either MAY refuse a push -- and when one does, the
+commit never runs either. Whether one would refuse THIS call is not something
+this guard checked, and it does not need to be: you cannot know in advance
+either, and the set of guards changes. Their refusal names only the push, so it
+reads as "the push was blocked" while the change is still an uncommitted
+working-tree edit, one `git checkout -- .` from destruction.
+`memories/claude-code-hooks.md` records the general mechanism; ai-config#2992
+records this instance of it, caught only because an adversarial reviewer
+checked whether HEAD had moved.
 
 Split them into two Bash calls:
 
@@ -186,21 +218,69 @@ not be split.
 """
 
 
-def _standalone_override(cmds):
-    """True when some simple command in the call just sets the override.
+# A standalone assignment counts only at the very START of the command text.
+# Anywhere else it may not run, or may not persist, and two measured shapes
+# cleared the guard while setting nothing at all:
+#
+#     (ALLOW_COMMIT_AND_PUSH=1); git commit -m x && git push
+#         -- a subshell assignment, discarded when the subshell exits
+#     false && ALLOW_COMMIT_AND_PUSH=1; git commit -m x && git push
+#         -- short-circuited, so it never executes
+#
+# The argv split cannot see either, because it discards connectors and peels
+# `(`/`)` as shell keywords. Anchoring on the raw text sidesteps that entirely:
+# a leading assignment is the one position where the shell guarantees the
+# variable is set for everything after it.
+# The trailing group requires a SEPARATOR, not merely whitespace. Accepting
+# any whitespace made `ALLOW_COMMIT_AND_PUSH=1 git status && git commit && git
+# push` clear the guard, and that assignment is scoped to `git status` alone --
+# it does not persist, so nothing about the push was authorized. That is the
+# same scope defect as reading the override off a third command, arriving by a
+# different route.
+LEADING_OVERRIDE = re.compile(
+    r"\A[ \t]*(?:export[ \t]+)?" + OVERRIDE + r"=1[ \t]*(?:;|&&|\|\||\r?\n|\Z)")
 
-    `export ALLOW_COMMIT_AND_PUSH=1` and a bare `ALLOW_COMMIT_AND_PUSH=1` are
-    both real assignments that persist for the rest of the call, so both count.
-    A command that ASSIGNS the override and then runs something is handled by
-    the per-command check instead, and only for the commit and the push --
-    reading it off any third command would let a stale prefix on an unrelated
-    `git status` silently disarm the guard.
+
+def _standalone_override(command):
+    """True when the call OPENS with an assignment of the override to 1.
+
+    `export ALLOW_COMMIT_AND_PUSH=1 && ...` and a bare
+    `ALLOW_COMMIT_AND_PUSH=1` on the first line both qualify. An assignment
+    that appears later, in a subshell, or behind a short-circuit does not --
+    see the comment above. An assignment that PREFIXES the commit or the push
+    is handled by the per-command check in `evaluate` instead, which is scoped
+    to those two commands so a stale prefix on an unrelated `git status`
+    cannot disarm the guard.
     """
-    for argv in cmds:
-        env, rest = strip_env(argv)
-        if rest:
-            continue  # it ran something; not a bare assignment
-        if env_value(env, OVERRIDE) == "1":
+    return LEADING_OVERRIDE.match(command) is not None
+
+
+# A push that TRANSFERS NOTHING and a commit that CREATES NOTHING each remove
+# the hazard, so neither is matched.
+#
+#   `git push --dry-run` / `-n`, and `git push --delete` / `-d`
+#       `no-push-without-self-review.py` documents both as never examined, and
+#       `no-clobbering-push.py` skips them too -- so no sibling can refuse
+#       them, and there is nothing for a chained commit to be lost to.
+#   `git commit --dry-run`
+#       The docstring's own order rationale applies: nothing was created, so
+#       nothing can go missing.
+#
+# Only the long spellings and the exact short flags are recognized. A short
+# CLUSTER is deliberately not decomposed (`-n` inside `-qn` is not matched),
+# because guessing wrong here means going silent on a real push -- the
+# expensive direction -- and `no-clobbering-push.py` already carries the full
+# short-option grammar for anyone who needs it.
+PUSH_INERT = {"--dry-run", "-n", "--delete", "-d"}
+COMMIT_INERT = {"--dry-run"}
+
+
+def _inert(rest, flags):
+    """True when `rest` carries one of `flags` before a `--` end-of-options."""
+    for tok in rest:
+        if tok == "--":
+            return False
+        if tok in flags:
             return True
     return False
 
@@ -212,7 +292,7 @@ def evaluate(command):
     cmds = simple_commands(command)
     if not cmds:
         return None
-    if _standalone_override(cmds):
+    if _standalone_override(command):
         return None
 
     commit_argv = None
@@ -220,16 +300,27 @@ def evaluate(command):
         parsed = git_subcommand(argv)
         if parsed is None:
             continue
-        sub, _rest, env = parsed
+        sub, rest, env = parsed
         if sub not in ("commit", "push"):
             continue
         if env_value(env, OVERRIDE) == "1":
             return None
         if sub == "commit" and commit_argv is None:
+            if _inert(rest, COMMIT_INERT):
+                continue
             commit_argv = argv
         elif sub == "push" and commit_argv is not None:
-            return DENY.format(commit=" ".join(commit_argv),
-                               push=" ".join(argv), override=OVERRIDE)
+            if _inert(rest, PUSH_INERT):
+                continue
+            # `shlex.join`, never `" ".join`. The message offers these lines
+            # as copy-paste remedies under "nothing else needs to change", and
+            # the argv is DEQUOTED -- so joining on spaces re-emits
+            # `git commit -m "fix: a b; rm -rf x"` as
+            # `git commit -m fix: a b; rm -rf x`, which commits `fix:` and
+            # then runs `rm -rf x`. A guard whose remedy is more dangerous
+            # than the command it refused is worse than no guard.
+            return DENY.format(commit=shlex.join(commit_argv),
+                               push=shlex.join(argv), override=OVERRIDE)
     return None
 
 

@@ -198,17 +198,12 @@ Fail-safe direction --- it under-blanks rather than over-blanks --- but it still
 Fix tracked in that issue rather than applied here;
 this entry is the transferable authoring lesson, not the checker patch.)
 
-## Office Open XML (.docx / .xlsx) — editing committed content
-- `.docx`/`.xlsx` are zip archives. To strip or edit content (e.g. remove a sensitive
-  link from a committed Word doc): `unzip` the file, edit `word/document.xml` for body
-  text, and edit `word/_rels/document.xml.rels` for hyperlink **targets** — a clickable
-  URL's address lives in the `.rels` `Target`, not just the visible `<w:t>` text, so
-  delete both the `<w:hyperlink r:id="rIdN">...</w:hyperlink>` element and its matching
-  `<Relationship Id="rIdN" ... Target="...">` to remove link and address.
-- Re-zip from the extracted dir: `zip -r -X out.docx '[Content_Types].xml' _rels docProps word`
-  (plus `customXml` if present). Verify with `unzip -t out.docx` and re-extract + grep to
-  confirm the removed strings are gone before committing. (Done on ucdavis/bcs#237 to strip
-  an internal SharePoint URL and a server reference from a to-do doc.)
+## Office Open XML (`.docx` / `.xlsx`)
+
+Editing committed `.docx`/`.xlsx` content,
+redlining a document with tracked changes and comments,
+and the `docx` skill's helper scripts
+now live in [`office-open-xml.md`](office-open-xml.md).
 
 ## Evergreen-conditional citation phrasing can still regress in adjacent prose
 

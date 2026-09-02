@@ -533,7 +533,7 @@
   Both additions were already on `main` in fuller form, and the diff had also rewritten three *correct* relative links into broken ones --- the `check-links.py` failure being blamed on that session all along.)
 
 - **Don't touch anyone else's branch.**
-  **Do:** only push to or modify branches I created in my own worktree, or a PR branch that passes `memories/reviewing-prs.md`'s scope test (assigned to me, explicitly requested, or the Actions app's) and carries no live claim from another session.
+  **Do:** only push to or modify branches I created in my own worktree, or a PR branch that passes `memories/reviewing-prs.md`'s scope test (opened by me, assigned to me, explicitly requested, or the Actions app's) and carries no live claim from another session.
   **Don't:** push commits, force-push, checkout, or edit branches belonging to another session or user that fail that test --- even if the content looks worth keeping or the branch looks abandoned.
   If a branch needs work that isn't mine, flag it and let the owner handle it.
   A live claim on an in-scope branch still means waiting for it to expire, per `claim-pr`.

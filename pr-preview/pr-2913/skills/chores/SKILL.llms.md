@@ -15,7 +15,7 @@ Sweep a repo’s open **dependency-bump PRs** — the `chore(...)`-titled, bot-a
 A PR is in scope when **either** of these holds:
 
 - Its author is one of the dependency bots this skill exists for, matched in the exact login form the source returns: `app/dependabot`, `dependabot[bot]`, `app/renovate`, `renovate[bot]`. An explicit `chores` call names that population, which is what admits those two bots and no other author.
-- It looks like a chore — the title starts with `chore(` (e.g. `chore(actions):`, `chore(submodule):`, `chore(deps):`), or the labels include `dependencies` — **and** it passes `memories/reviewing-prs.md`’s scope test for the invoking user: authored by the GitHub Actions app (`github-actions`, which opens `chore(submodule):` bumps) or by the invoking user or one of their aliases, or assigned to one of them.
+- It looks like a chore — the title starts with `chore(` (e.g. `chore(actions):`, `chore(submodule):`, `chore(deps):`), or the labels include `dependencies` — **and** it passes `memories/reviewing-prs.md`’s scope test for the invoking user: authored by the GitHub Actions app (`github-actions`, which opens `chore(submodule):` bumps) or by the invoking user or one of their aliases, assigned to one of them, or named by number in the request.
 
 Human-authored feature PRs are **out of scope** — those go through `ardia` / `gia` (review-to-clean), not this skill — and so is a chore-titled or `dependencies`-labelled PR whose author is another lab member or another bot, unless the invoking user is assigned to it.
 
@@ -40,15 +40,19 @@ ME=$(gh api user --jq .login)   # WHO_AM_I
 # taken from memories/reviewing-prs.md (empty when that file lists none for $ME).
 IDS=$(jq -cn --arg me "$ME" --arg al "${PR_SCOPE_ALIASES:-}" \
   '[$me] + ($al | split(",") | map(select(length > 0))) | unique')
+# PR_SCOPE_REQUESTED: comma-separated PR numbers the user named in this request.
+REQ=$(jq -cn --arg r "${PR_SCOPE_REQUESTED:-}" \
+  '$r | split(",") | map(select(length > 0) | tonumber)')
 gh pr list --repo "$REPO" --state open --limit 200 \
   --json number,title,author,assignees,labels,mergeable \
-  | jq -r --argjson ids "$IDS" '.[] | select(
+  | jq -r --argjson ids "$IDS" --argjson req "$REQ" '.[] | select(
           (.author.login | test("^(app/)?(dependabot|renovate)(\\[bot\\])?$"))
           or (
             (
               (.author.login | test("^(app/)?github-actions(\\[bot\\])?$"))
               or ((.author.login as $a | $ids | index($a)) != null)
               or any(.assignees[].login; . as $x | ($ids | index($x)) != null)
+              or ((.number as $n | $req | index($n)) != null)
             ) and (
               (.title | startswith("chore("))
               or (([.labels[].name] | index("dependencies")) != null)

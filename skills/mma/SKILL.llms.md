@@ -1,6 +1,6 @@
 # mma
 
-Repo-wide fan-out of [`sync-pr-branch`](../../skills/sync-pr-branch/SKILL.llms.md): instead of resyncing one branch, resync **every currently-open PR** in the repo against `main` (and each PR’s own remote), so a burst of merges into `main` doesn’t leave the rest of the queue stale and conflict-prone.
+Repo-wide fan-out of [`sync-pr-branch`](../../skills/sync-pr-branch/SKILL.llms.md): instead of resyncing one branch, resync **every currently-open PR** in the repo that passes `memories/reviewing-prs.md`’s scope test against `main` (and each PR’s own remote), so a burst of merges into `main` doesn’t leave the rest of the queue stale and conflict-prone.
 
 This is not a duplicate of `sync-pr-branch` — it’s an orchestration layer on top of it. The per-branch mechanics (fetch, merge `origin/main`, merge `origin/<branch>`, resolve conflicts, run checks, push) are unchanged; only `sync-pr-branch` owns that logic. Keep it that way — if the per-branch steps ever need to change, fix them in `sync-pr-branch` and this skill inherits the fix for free.
 
@@ -11,7 +11,7 @@ This is not a duplicate of `sync-pr-branch` — it’s an orchestration layer on
 
 ## The procedure
 
-1.  **List every open PR in the repo** (`mcp__github__list_pull_requests` / `gh pr list`). Note each PR’s number and `headRefName`.
+1.  **List every open PR in the repo** (`mcp__github__list_pull_requests` / `gh pr list --json number,headRefName,author,assignees`). Note each PR’s number, `headRefName`, `author`, and `assignees`. Filter the list by `memories/reviewing-prs.md`’s scope test first, as `ardia` step 1 does (opened by or assigned to the invoking user, explicitly requested by name, or authored by the GitHub Actions app (`github-actions`)), and report the PRs dropped: a resync pushes a merge commit, which that memory forbids on any other PR.
 
 2.  **Check whether main is actually ahead** before touching anything:
 

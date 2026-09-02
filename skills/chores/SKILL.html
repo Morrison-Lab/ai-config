@@ -387,13 +387,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="what-counts-as-a-chore-pr" class="level2">
 <h2 class="anchored" data-anchor-id="what-counts-as-a-chore-pr">What counts as a chore PR</h2>
-<p>A PR is in scope if <strong>any</strong> of these hold:</p>
+<p>A PR is in scope when <strong>either</strong> of these holds:</p>
 <ul>
-<li>Author is a bot: <code>app/dependabot</code>, <code>dependabot[bot]</code>, <code>app/renovate</code>, <code>renovate[bot]</code>.</li>
-<li>Title is a conventional-commit chore: starts with <code>chore(</code> (e.g. <code>chore(actions):</code>, <code>chore(submodule):</code>, <code>chore(deps):</code>).</li>
-<li>Labels include <code>dependencies</code>.</li>
+<li>Its author is one of the dependency bots this skill exists for, matched in the exact login form the source returns: <code>app/dependabot</code>, <code>dependabot[bot]</code>, <code>app/renovate</code>, <code>renovate[bot]</code>. An explicit <code>chores</code> call names that population, which is what admits those two bots and no other author.</li>
+<li>It looks like a chore — the title starts with <code>chore(</code> (e.g. <code>chore(actions):</code>, <code>chore(submodule):</code>, <code>chore(deps):</code>), or the labels include <code>dependencies</code> — <strong>and</strong> it passes <code>memories/reviewing-prs.md</code>’s scope test for the invoking user: authored by the GitHub Actions app (<code>github-actions</code>, which opens <code>chore(submodule):</code> bumps) or by the invoking user or one of their aliases, assigned to one of them, or one the user explicitly asked this run to work on (a mention such as “do not touch” followed by a number is not a request).</li>
 </ul>
-<p>Human-authored feature PRs are <strong>out of scope</strong> — those go through <code>ardia</code> / <code>gia</code> (review-to-clean), not this skill.</p>
+<p>Human-authored feature PRs are <strong>out of scope</strong> — those go through <code>ardia</code> / <code>gia</code> (review-to-clean), not this skill — and so is a chore-titled or <code>dependencies</code>-labelled PR whose author is another lab member or another bot, unless the invoking user is assigned to it or explicitly asked this run to work on it.</p>
 </section>
 <section id="procedure" class="level2">
 <h2 class="anchored" data-anchor-id="procedure">Procedure</h2>
@@ -406,15 +405,47 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="list-the-open-chore-prs" class="level3">
 <h3 class="anchored" data-anchor-id="list-the-open-chore-prs">1. List the open chore PRs</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> pr list <span class="at">--repo</span> <span class="st">"</span><span class="va">$REPO</span><span class="st">"</span> <span class="at">--state</span> open <span class="at">--limit</span> 200 <span class="dt">\</span></span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">--json</span> number,title,author,labels,mergeable <span class="dt">\</span></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">--jq</span> <span class="st">'.[] | select(</span></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="st">          (.author.login | test("dependabot|renovate"))</span></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="st">          or (.title | startswith("chore("))</span></span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="st">          or ([.labels[].name] | index("dependencies"))</span></span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="st">        ) | "\(.number)\t\(.mergeable)\t\(.title)"'</span>   <span class="co"># LIST_PRS</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Set the three scope inputs first, the way <code>REPO</code> is set above. <code>PR_SCOPE_ALIASES</code> is the comma-separated list of other logins <code>memories/reviewing-prs.md</code> names as the same person as the resolved user (leave it unset when that file lists none for them), and <code>PR_SCOPE_REQUESTED</code> is the comma-separated list of PR numbers the user explicitly asked this run to work on, never a number merely mentioned or excluded (leave it unset when there are none). <code>PR_SCOPE_EXCLUDED</code> is the comma-separated list of PR numbers the user told this run not to touch (“chores, but do not touch” followed by a number); it is a veto checked before every positive arm, bot authors included, so an excluded dependency-bot PR is neither listed nor merged. With all three unset the filter keeps only the resolved login’s own PRs, the assigned ones, and the bots’, which is the fail-closed default.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="bu">set</span> <span class="at">-eo</span> pipefail   <span class="co"># a failed command, or a failed gh pr list in the pipeline below, stops here</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="va">ME</span><span class="op">=</span><span class="va">$(</span><span class="ex">gh</span> api user <span class="at">--jq</span> .login <span class="dv">2</span><span class="op">&gt;</span>/dev/null<span class="va">)</span> <span class="kw">||</span> <span class="va">ME</span><span class="op">=</span><span class="st">""</span>   <span class="co"># WHO_AM_I</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="bu">[</span> <span class="ot">-z</span> <span class="st">"</span><span class="va">$ME</span><span class="st">"</span> <span class="bu">]</span><span class="kw">;</span> <span class="cf">then</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Fail closed, and say so: with no identity the author and assignee arms</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>  <span class="co"># stay unevaluated (aliases included), so only bot-authored and explicitly</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>  <span class="co"># requested PRs pass.</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>  <span class="va">PR_SCOPE_ALIASES</span><span class="op">=</span><span class="st">""</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>  <span class="bu">echo</span> <span class="st">"::warning::identity lookup failed; author/assignee arms unevaluated (report this)"</span> <span class="op">&gt;&amp;</span><span class="dv">2</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="cf">fi</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="co"># e.g. PR_SCOPE_ALIASES=other-login      # from memories/reviewing-prs.md</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="co"># e.g. PR_SCOPE_REQUESTED=123,456       # PRs the user asked this run to work on</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="co"># e.g. PR_SCOPE_EXCLUDED=789            # PRs the user told this run not to touch</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="va">IDS</span><span class="op">=</span><span class="va">$(</span><span class="ex">jq</span> <span class="at">-cn</span> <span class="at">--arg</span> me <span class="st">"</span><span class="va">$ME</span><span class="st">"</span> <span class="at">--arg</span> al <span class="st">"</span><span class="va">${PR_SCOPE_ALIASES</span><span class="op">:-</span><span class="va">}</span><span class="st">"</span> <span class="dt">\</span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>  <span class="st">'[$me] + ($al | split(",") | map(select(length &gt; 0))) | map(select(length &gt; 0)) | unique'</span><span class="va">)</span></span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="va">REQ</span><span class="op">=</span><span class="va">$(</span><span class="ex">jq</span> <span class="at">-cn</span> <span class="at">--arg</span> r <span class="st">"</span><span class="va">${PR_SCOPE_REQUESTED</span><span class="op">:-</span><span class="va">}</span><span class="st">"</span> <span class="dt">\</span></span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>  <span class="st">'$r | split(",") | map(select(length &gt; 0) | tonumber)'</span><span class="va">)</span></span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a><span class="va">EXC</span><span class="op">=</span><span class="va">$(</span><span class="ex">jq</span> <span class="at">-cn</span> <span class="at">--arg</span> x <span class="st">"</span><span class="va">${PR_SCOPE_EXCLUDED</span><span class="op">:-</span><span class="va">}</span><span class="st">"</span> <span class="dt">\</span></span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>  <span class="st">'$x | split(",") | map(select(length &gt; 0) | tonumber)'</span><span class="va">)</span></span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> pr list <span class="at">--repo</span> <span class="st">"</span><span class="va">$REPO</span><span class="st">"</span> <span class="at">--state</span> open <span class="at">--limit</span> 200 <span class="dt">\</span></span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>  <span class="at">--json</span> number,title,author,assignees,labels,mergeable <span class="dt">\</span></span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>  <span class="kw">|</span> <span class="ex">jq</span> <span class="at">-r</span> <span class="at">--argjson</span> ids <span class="st">"</span><span class="va">$IDS</span><span class="st">"</span> <span class="at">--argjson</span> req <span class="st">"</span><span class="va">$REQ</span><span class="st">"</span> <span class="at">--argjson</span> exc <span class="st">"</span><span class="va">$EXC</span><span class="st">"</span> <span class="st">'.[] | select(</span></span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a><span class="st">          ((.number as $n | $exc | index($n)) == null)</span></span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a><span class="st">          and (</span></span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a><span class="st">          (.author.login | test("^(app/(dependabot|renovate)|(dependabot|renovate)\\[bot\\])$"))</span></span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a><span class="st">          or (</span></span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a><span class="st">            (</span></span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a><span class="st">              (.author.login | test("^(app/github-actions|github-actions\\[bot\\]|github-actions)$"))</span></span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a><span class="st">              or ((.author.login as $a | $ids | index($a)) != null)</span></span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a><span class="st">              or any(.assignees[].login; . as $x | ($ids | index($x)) != null)</span></span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a><span class="st">              or ((.number as $n | $req | index($n)) != null)</span></span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a><span class="st">            ) and (</span></span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a><span class="st">              (.title | startswith("chore("))</span></span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a><span class="st">              or (([.labels[].name] | index("dependencies")) != null)</span></span>
+<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a><span class="st">            )</span></span>
+<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a><span class="st">          )</span></span>
+<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a><span class="st">          )</span></span>
+<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a><span class="st">        ) | "\(.number)\t\(.mergeable)\t\(.title)"'</span>   <span class="co"># LIST_PRS</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p><code>--limit 200</code> because <code>gh pr list</code> defaults to 30 — a piled-up weekly backlog would otherwise be silently truncated.</p>
 <p>If there are none, say so and stop.</p>
+<p>That listing is a snapshot. Assignment, the title, and the labels can all change while the sweep runs, so re-fetch every input the predicate reads (author, assignees, title, labels) and reapply the same predicate, the <code>PR_SCOPE_EXCLUDED</code> veto included, immediately before each write action in steps 2-5 (closing a bump PR, a <code>@dependabot</code> comment, a merge), and drop and report a PR that no longer passes.</p>
 </section>
 <section id="classify-each-pr-by-bump-size" class="level3">
 <h3 class="anchored" data-anchor-id="classify-each-pr-by-bump-size">2. Classify each PR by bump size</h3>
@@ -496,7 +527,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li>❌ Resolving a Dependabot merge conflict by hand — comment <code>@dependabot rebase</code> and let the bot redo it.</li>
 <li>❌ Force-merging a PR with <code>pending</code> or <code>fail</code> checks.</li>
 <li>❌ Reporting “chores done” while a flagged major bump is still open with no decision recorded.</li>
-<li>❌ Treating human feature PRs as chores (or vice-versa) — scope by author / <code>chore(</code> title / <code>dependencies</code> label.</li>
+<li>❌ Treating human feature PRs as chores (or vice-versa) — a dependency bot’s PR is a chore by author; any other PR needs the <code>chore(</code> title or <code>dependencies</code> label <strong>and</strong> an in-scope author or assignee, never the title or label alone.</li>
 </ul>
 
 

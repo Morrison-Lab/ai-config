@@ -131,20 +131,22 @@ So its empty answer and its broken answer look alike, per
 [`fail-fast`](../principles/fail-fast.md).
 Use the `git diff <merge>^1 <merge>` form above.
 
-Then match the response to standing, not only to cause.
-A conflict you caused on a branch you do not own is an explanatory comment
-naming the deletion or rename and where the content went, rather than a push.
-[`sync-with-main`](sync-with-main.md) does prescribe pushing the re-applied
-change to a sibling branch, and that fits a CI workflow in a repo you drive; it
-does not fit a release branch carrying an out-of-band process a push can
-disrupt.
+Then match the response to scope, not only to cause.
+A conflict you caused on a PR that fails `memories/reviewing-prs.md`'s scope
+test is a report to the user naming the deletion or rename and where the
+content went, and the PR is left untouched: no comment, no push.
+On a PR that passes the test, [`sync-with-main`](sync-with-main.md) does
+prescribe pushing the re-applied change to the sibling branch, and that fits
+a CI workflow in a repo you drive.
+It does not fit a release branch carrying an out-of-band process a push can
+disrupt, which gets the report instead however it scores on the test.
 
 - **Do:** derive the merge's own deleted and renamed paths, and intersect them
   with each conflict before claiming anything.
 - **Do:** report both counts --- conflicts found, and conflicts caused --- so
   the gap between them is visible rather than implied.
-- **Do:** comment rather than push when a conflict you caused sits on a branch
-  you do not own.
+- **Do:** report to the user rather than push or comment when a conflict you
+  caused sits on a PR that fails the scope test.
 - **Don't:** read a post-merge sweep's hit list as your work queue; on an old
   backlog most of it predates your merge.
 - **Don't:** derive that path set with `git show` --- it reports nothing for a

@@ -617,6 +617,8 @@ One to three sentences is enough.
 The trailing marker is required, per the section above: this comment paraphrases the user in the user's own voice under the user's own login, which is the shape most easily read as their own writing.
 Don't quote verbatim — paraphrase so it reads naturally in the PR thread.
 Skip trivial acknowledgments or conversational exchanges with nothing to act on.
+Post it only on a PR that passes `memories/reviewing-prs.md`'s scope test.
+Feedback about an out-of-scope PR, such as a request not to touch it, stays in chat and the session notebook rather than on that PR.
 
 This makes context visible to future @claude sessions, other reviewers, and contributors who only see the PR thread.
 
@@ -930,7 +932,7 @@ The key points, restated here because a bare pointer is invisible to a consumer 
   Attribution is a second axis, and it runs before the claim: intersect the merge's own deleted and renamed paths (`git diff --name-status -M "$merge^1" "$merge" | grep -E '^(D|R)'`) with each conflict, and report conflicts caused alongside conflicts found.
   `git show --name-status <merge>` cannot supply that set for a **true** (two-parent) merge --- it prints no file list at all there, and grepping its header for `^[ADMR]` returns three phantom paths.
   It does diff a squash merge normally, so whether it works depends on how the repo merges rather than on the commit in front of you.
-  A conflict you caused on a branch you do not own is an explanatory comment, not a push.
+  A conflict you caused on a PR that fails `memories/reviewing-prs.md`'s scope test is a report to the user, not a comment or a push.
 - **Independent per-PR checking cannot see pair collisions.**
   Every PR can be clean against `main` while two of them conflict with each other.
   Only a pairwise `git merge-tree` between PR heads finds that.
@@ -1829,6 +1831,8 @@ recurred immediately in a `jq` filter reading a PR review body.)
   A peer may have further commits planned, so merging one that just went clean can destroy work it was about to push --- and that is exactly the case where the peer's PR unblocks yours and the temptation is strongest.
   Start the clock at the clean verdict on the current head, which a push resets, rather than at the PR's `updatedAt`, which any comment bumps.
   The threshold is an inference, so confirm it: message the owning session directly when `ListAgents` reaches it, and otherwise post a comment saying you intend to merge and wait a further five minutes for a hold-off.
+  The path applies only to a peer PR that passes `memories/reviewing-prs.md`'s scope test (a peer session under your own login satisfies the author arm).
+  Another lab member's PR that fails the test gets neither the comment nor the merge.
   [`mwc`](skills/mwc/SKILL.md)'s "Another session's PR" section carries the derivation and the pattern/anti-pattern pair (ai-config#2460).
 
 **One standing exception: PRs targeting `Morrison-Lab/ai-config` carry a standing `mwc` grant**, with no per-session re-issue and no `enable-mwc` step --- `hooks/no-unauthorized-merge.py` reads the merge's target repo off the command.

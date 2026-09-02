@@ -181,10 +181,11 @@ See [`pr-on-claim.cases.md`](pr-on-claim.cases.md),
 So the per-issue order becomes: claim → cut a worktree and branch → **open the draft PR now** →
 implement → mark ready-for-review → ARDI.
 
-**Working several issues in one session? Verify you are actually in the second
-issue's worktree, on its branch, before writing its code.** The worktree cut
-for issue 1 does not carry over to issue 2 --- cut a new one for each issue,
-and `cd` into it, since `git worktree add` leaves the shell where it was
+**Working several issues in one session?
+Verify you are actually in the second issue's worktree, on its branch, before writing its code.**
+The worktree cut for issue 1 does not carry over to issue 2:
+cut a new one for each issue, and `cd` into it,
+since `git worktree add` leaves the shell where it was
 ([`memories/git-worktrees.md`](../../memories/git-worktrees.md)).
 On the no-worktree fallback path the same slip is forgetting to run
 `git checkout -b <type>/<slug> origin/main` again with a new branch name.

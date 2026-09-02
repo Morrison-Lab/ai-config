@@ -6,11 +6,15 @@ must refuse to label a non-Pacific reading as local. Four cases:
 
   1. First rung: the `date` stub answers PDT only when the hook sets
      `TZ=America/Los_Angeles`, and GMT otherwise -- the output carries the
-     Pacific reading plus the verbatim-use line.
+     Pacific reading plus the verbatim-use line. A winter variant answers
+     PST with matching UTC, so the hook's PST acceptance branch is pinned
+     too.
   2. Second rung: the stub answers GMT under the TZ override and PDT when
-     TZ is unset (a system zone that is already Pacific, the Git Bash
-     shape) -- the hook must fall past the first rung and still print a
-     Pacific reading.
+     TZ is unset -- the hook must fall past the first rung and still print
+     a Pacific reading. This models the Git Bash host ai-config#1918
+     describes, where the override answered GMT; that record does not
+     include a plain `date` reading, so the Pacific system zone here is
+     the hook's own assumption, not a measurement.
   3. Third rung: the stub answers GMT either way, and a `powershell` stub
      answers PDT only when invoked as `-NoProfile -Command` with the
      Pacific-zone conversion program -- the hook must fall through both
@@ -21,8 +25,8 @@ must refuse to label a non-Pacific reading as local. Four cases:
 
 Every case runs against stubs rather than the ambient host, so the suite
 passes and fails for the same reasons on macOS, on Ubuntu CI, and on a host
-with no TZ database. Case 2 is the Git Bash shape ai-config#1918 measured,
-where the TZ override answers GMT and the system zone is already Pacific.
+with no TZ database. Case 2 models the Git Bash shape ai-config#1918
+describes (the override answers GMT); the Pacific system zone is assumed.
 Case 4 is what tells a hook that checks the zone from one that merely
 prints whatever `date` said.
 """
@@ -59,7 +63,7 @@ def check(desc, cond):
     print(f"  {'ok' if cond else 'WRONG':<6} {desc}")
 
 
-def stubs(tz_answer, plain_answer, powershell_body):
+def stubs(tz_answer, plain_answer, powershell_body, utc_answer="2026-07-01T19:00:00Z"):
     """A temp dir holding a `date` stub and a `powershell` stub for PATH.
 
     The `date` stub answers `tz_answer` when TZ is America/Los_Angeles,
@@ -81,11 +85,11 @@ def stubs(tz_answer, plain_answer, powershell_body):
         fh.write("#!/bin/sh\n"
                  "if [ \"$1\" = -u ]; then\n"
                  "  [ \"$2\" = '+%%Y-%%m-%%dT%%H:%%M:%%SZ' ] || exit 1\n"
-                 "  printf '2026-07-01T19:00:00Z\\n'; exit 0\n"
+                 "  printf '%s\\n'; exit 0\n"
                  "fi\n"
                  "[ \"$1\" = '+%%Y-%%m-%%d %%H:%%M:%%S %%Z' ] || exit 1\n"
                  "if [ \"${TZ:-}\" = America/Los_Angeles ]; then printf '%s\\n'; else printf '%s\\n'; fi\n"
-                 % (tz_answer, plain_answer))
+                 % (utc_answer, tz_answer, plain_answer))
     ps_stub = os.path.join(d, "powershell")
     with open(ps_stub, "w") as fh:
         # Answer only for the hook's invocation shape, and record the program
@@ -127,6 +131,11 @@ check("prints the Pacific local reading and the UTC reading", bool(LOCAL.search(
 check("prints the verbatim-use instruction", VERBATIM in out)
 check("does not print the fallback warning", WARN not in out)
 
+print("\nfirst rung in winter (TZ override answers PST):")
+rc, out = run(with_stubs(stubs("2026-01-15 12:00:00 PST", "2026-01-15 20:00:00 GMT", "exit 1", utc_answer="2026-01-15T20:00:00Z")))
+check("exit 0", rc == 0)
+check("a PST reading is accepted as local", "local: 2026-01-15 12:00:00 PST" in out and WARN not in out)
+
 print("\nsecond rung (TZ override answers GMT, plain date answers PDT):")
 rc, out = run(with_stubs(stubs(GMT, PDT, "exit 1")))
 check("exit 0", rc == 0)
@@ -151,6 +160,6 @@ check("prints the UTC-only fallback line", bool(FALLBACK.search(out)))
 check("prints the do-NOT-state warning", WARN in out)
 check("never labels the GMT reading as local", "local:" not in out and "GMT" not in out)
 
-total = 15
+total = 17
 print(f"\n{total - wrong}/{total} correct" + ("" if wrong == 0 else f"  ({wrong} WRONG)"))
 sys.exit(1 if wrong else 0)

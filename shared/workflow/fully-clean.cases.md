@@ -1419,3 +1419,28 @@ the round as clean.
 Push the next code change, or the round's own follow-up, so a fresh round is
 worded cleanly, and let the instrument read that one.
 Only a round with no such phrase and no such heading exits 0.)
+
+## The checker's own vocabulary as a PR's subject matter
+
+(`Morrison-Lab/gha#811`, `#814` and `#820`, 2026-09-02: a GII wave whose
+changes were about classifying blocking language in review verdicts.
+`check-pr-fully-clean.py` reported NOT clean on all three while every
+reviewer's stated verdict was clean, in two distinct shapes.
+
+On #811 and #820 the match was a *sentence-level* negation: a clean Claude
+verdict's own Stopping Point line said "no blocking findings", which the
+`(?<!non-)` and `(?<!non\s)` lookbehinds do not cover --- they exempt the
+compound word, and here the negator was three words upstream.
+
+On #814 the match was the PR's subject itself: Copilot's approval body used
+the phrase "blocking language" as ordinary prose, and a `### Non-blocking`
+heading appeared in a findings section that listed nothing blocking.
+Neither is inside a code span or a fence, so the blanking mitigation does not
+reach either.
+
+What settled it was grepping the fetched review bodies for the reported
+pattern and reading the surrounding line --- one command per PR.
+The diff was re-read first on #811 and established nothing, which it could
+not have: the match was never in the diff.
+Tracked as
+[ai-config#3009](https://github.com/Morrison-Lab/ai-config/issues/3009).)

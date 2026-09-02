@@ -707,6 +707,55 @@ NOT clean over a clean verdict.**
 - **Don't:** treat a `contains findings (matched pattern ...)` line as a real
   finding without reading the verdict body it matched.
 
+**Two shapes evade the blanking mitigation, and both were measured on one
+wave: a sentence-level negation, and a PR whose SUBJECT is the vocabulary.**
+
+The blanking pass removes *cited* vocabulary --- fenced blocks and inline code
+spans --- and the finding pattern carries `(?<!non-)` and `(?<!non\s)`
+lookbehinds for the compound form.
+Neither reaches a negation living in the surrounding *sentence*.
+A clean verdict whose own Stopping Point line reads "no blocking findings"
+matches, because the negator sits three words away rather than glued to the
+token.
+
+The second shape is the worse one, because it recurs on every round rather
+than on one unlucky wording.
+When a PR's subject matter IS the checker's own vocabulary --- a change to
+blocking-language classification, say --- every review of it discusses that
+vocabulary in ordinary prose: a Copilot approval body says "blocking
+language", and a reviewer files an entirely unobjectionable `### Non-blocking`
+heading.
+The instrument's exit 1 is then evidence about the review's *wording* and
+never about the PR, and no amount of re-reading the diff can show that,
+because the diff is not where the match is.
+
+That is the recursion
+[`examples-are-scanned`](../writing/examples-are-scanned.md) names for a
+checker whose scanned file carries its own explanatory example, arriving one
+layer out: here the checker scans the *reviews of* the change that is about
+it.
+
+So confirm it in the review bodies rather than in the diff.
+Grep the fetched review text for the pattern the script reported and read the
+line around each hit.
+A hit inside a negation, inside a heading, or inside a sentence describing the
+PR's own subject is a wording artifact; a hit inside a findings list is a
+finding.
+
+- **Do:** grep the review bodies for the reported pattern, and read the
+  surrounding line.
+- **Do:** expect every round to trip it when the change is about the
+  vocabulary, and say so on the PR instead of re-requesting review.
+- **Don't:** re-read the diff --- the match is in the review, so the diff
+  cannot settle it either way.
+- **Don't:** read the `non-` lookbehinds as covering negation generally; they
+  cover the compound word alone.
+
+(Measured 2026-09-02 on `Morrison-Lab/gha#811`, `#814` and `#820`, whose
+subject was exactly this classification.
+Tracked as
+[ai-config#3009](https://github.com/Morrison-Lab/ai-config/issues/3009).)
+
 **One shape of that false positive is deliberate, and the fix for it is on the
 reviewer's side: a resolution log filed under a `Findings` heading.**
 A confirming review that writes

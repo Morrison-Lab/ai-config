@@ -335,6 +335,63 @@ I don't care if they run on this computer or in the cloud."
   a failed cheap attempt plus a retry costs more than starting at the
   right tier once.
 
+## Never dispatch a subagent on Fable without explicit, specific permission
+
+The rule, its guard (`hooks/no-fable-subagent.py`), and the
+`FABLE_SUBAGENT_OK=1` grant mechanism live in `CLAUDE.md`'s section of the
+same rule ([#2927](https://github.com/Morrison-Lab/ai-config/issues/2927));
+read them there rather than here.
+This entry adds the one inferred step the rule does not spell out,
+and keeps the case records behind it.
+
+- **Do (inferred):** before dispatching an agent from a definition file under
+  `.claude/agents/`, read its frontmatter for `model:`;
+  if the line is absent, pass one on the call.
+  `adversarial-reviewer` is one such definition, and `CLAUDE.md`'s pre-push
+  rule dispatches it by name, so this is the common path onto Fable.
+- **Don't (inferred):** read the conductor's `/model` setting as saying
+  anything about what a worker may run on;
+  a session switched to Fable mid-way turns every model-less dispatch after
+  the switch into a Fable launch with nothing in the call recording it.
+
+Three sessions produced case records on 2026-09-01, and they are three
+events, not three tellings of one.
+
+**The directive.**
+The session that received it is the one `CLAUDE.md` and the hook's docstring
+measure:
+10 `Agent` launches, 8 of them inheriting `claude-fable-5-1`
+(six adversarial reviews, two sidecars),
+until the account hit its usage limit.
+
+**A near miss** (session `01CEJjpA4tREQecY1yJzae2U`).
+Four dispatches ran.
+Three passed `model: "sonnet"`.
+One --- `adversarial-reviewer`, whose definition carries no `model:` ---
+passed nothing and inherited Opus 5, because the session was on Opus 5 at
+12:47 PDT.
+At 13:12 PDT the user switched the session to Fable with `/model`.
+The same dispatch issued after that switch would have run on Fable with an
+identical call, and no artifact would have recorded the difference.
+Asked "have you been spawning subagents using fable?", the session checked
+every dispatch's parameters and the reviewer definition's frontmatter and
+answered no;
+the answer was one timestamp away from yes.
+
+**A breach** (session `01VJ5YLpnoipBafisrTZkCCt`, the `gia /mwc /daytb` sweep
+driving [#2896](https://github.com/Morrison-Lab/ai-config/pull/2896) and
+issue [#1935](https://github.com/Morrison-Lab/ai-config/issues/1935)).
+It dispatched `adversarial-reviewer` for every pre-push self-review round
+--- eleven rounds on
+[#2896](https://github.com/Morrison-Lab/ai-config/pull/2896) and two on
+[#1935](https://github.com/Morrison-Lab/ai-config/issues/1935) ---
+with no `model` parameter on any call,
+on a session that was on `claude-fable-5-1` throughout,
+so all thirteen inherited Fable.
+Nothing in any call recorded it;
+what made the inheritance visible was the last dispatch dying with
+`rate_limit ... model sent to the API: claude-fable-5-1`.
+
 ## opencode free tier: a full authoring task, validated mechanically
 
 Measured 2026-08-28 on opencode CLI 1.18.15 (macOS),

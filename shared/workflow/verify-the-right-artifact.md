@@ -203,13 +203,15 @@ It is the changes since whatever commit your **local** `main` shares with `pr-98
 The three-dot form is what conceals it: a merge-base is a real computation over real history, so the range feels self-correcting, and the sensation of having used the careful form stands in for having checked the ref the careful form is computed from.
 A merge-base is only ever as fresh as the ref you fed it.
 
-**The error has a direction, and the direction is what makes it costly rather than merely wrong.**
-A stale base can only move the merge-base *earlier*, so the diff only ever gets **bigger**.
-The extra content is commits that already merged --- other people's work, already reviewed, already landed.
-A review run on it produces findings against code the author of this PR never wrote, which spends the author's time and the reviewer's credibility at once.
-An under-wide diff would at least fail to say anything; an over-wide one says confident false things.
+**The error runs in both directions, and the quieter one is the worse.**
+A base **behind** its remote moves the merge-base earlier, so the diff gets bigger.
+The extra content is commits that already merged --- other people's work, already reviewed, already landed --- and a review run on it produces findings against code the author of this PR never wrote, spending the author's time and the reviewer's credibility at once.
+A base that has **diverged**, carrying local commits the remote lacks that the head branch also carries, moves the merge-base *later*, so the diff gets smaller.
+That is the dangerous one.
+An over-wide diff produces findings the author will dispute, so it announces itself within a round;
+an under-wide one silently omits part of the change and comes back clean, and a clean verdict is the one nobody questions.
 
-**Nothing in the output announces it.**
+**Nothing in the output announces either direction.**
 A 53-file diff and a 14-file diff are equally plausible artifacts.
 Every finding derived from the wrong scope is individually well-formed, correctly quoted, and about a real line of real code.
 So the usual detector --- a finding that looks wrong --- never fires, because none of them do.
@@ -231,30 +233,30 @@ gh pr view <N> --json changedFiles,additions,deletions
 ```
 
 The two readings must agree.
-A mismatch is not a rounding difference or a merge artifact; it means the base is wrong.
+A mismatch is not a rounding difference or a merge artifact;
+it means the base is wrong.
 Resolve the default branch from the repo rather than assuming `main`, and note the remote is not always `origin` --- a dual-forge repo has the PR's forge under a second remote name, and the fetch has to name that one.
 
 The `fetch` is the load-bearing half, for the reason the working-directory section already gives: a remote-tracking ref is itself a cached copy, current only to the last fetch.
 A fetch at session start does not cover a review dispatched an hour later, which is [`check-before-pushing`](check-before-pushing.md)'s point about a reading of a moment that has passed, moved from the push to the dispatch.
 
 Report the base you resolved.
-A review brief, or a review comment, that states the merge-base SHA and the file and insertion counts alongside its findings is one a reader can check; one that says "the PR's diff" is not.
+A review brief, or a review comment, that states the merge-base SHA and the file and insertion counts alongside its findings is one a reader can check;
+one that says "the PR's diff" is not.
 
 - **Do:** resolve a review diff's base from a remote-tracking ref, after fetching that remote, and state the merge-base SHA and the file and insertion counts beside it.
 - **Do:** cross-check the derived counts against the forge's own (`gh pr view --json changedFiles,additions,deletions`) before dispatching, and treat any mismatch as a wrong base rather than as noise.
 - **Don't:** pass a bare local branch name as a diff's base, in your own command or in a brief you hand a subagent.
 - **Don't:** read the three-dot form as self-correcting --- it computes a merge-base from refs you supplied, and cannot know one of them is behind.
-- **Don't:** wait for an implausible finding to reveal it; over-wide scope produces findings that are all individually sound.
+- **Don't:** wait for an implausible finding to reveal it;
+  over-wide scope produces findings that are all individually sound.
 
-`hooks/warn-stale-review-diff-base.py` is the instrument, per
-[`algorithmatize-checks`](algorithmatize-checks.md): the rule it enforces is not
-"was the local ref fresh", which no hook can know, but "name a remote-tracking
-ref", which is lexical.
-It warns and never blocks, because a bare local base is entirely correct for an
-ordinary local comparison and the hook cannot tell those apart.
+`hooks/warn-stale-review-diff-base.py` is the instrument, per [`algorithmatize-checks`](algorithmatize-checks.md).
+The rule it enforces is not "was the local ref fresh", which no hook can know, but "name a remote-tracking ref", which is lexical.
+It warns and never blocks, because a bare local base is entirely correct for an ordinary local comparison and the hook cannot tell those apart.
+It has no fetch-based discharge on purpose: [`keep-checkouts-fresh`](keep-checkouts-fresh.md) mandates a fetch at session start, so keying on one would silence the hook in exactly the sessions that follow the corpus.
 
-See [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md), "A stale local base that tripled a review diff".
-
+See [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md), "A stale local base that quadrupled a review diff's file count".
 
 ## A summary is another shape, and the auto-loaded copy is the one you read
 

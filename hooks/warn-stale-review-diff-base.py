@@ -29,9 +29,13 @@ The rule is not "was the local ref fresh", which no hook can know.
 The rule is "name a remote-tracking ref", which is lexical: a base token
 carrying no remote prefix is a local branch name, and that is the whole
 condition.
-A stale base can only move the merge-base earlier, so the error is
-single-signed --- the diff only ever grows --- which is why an over-wide scope
-produces confident false findings rather than an obvious failure.
+A base that is strictly BEHIND its remote moves the merge-base earlier, so the
+diff grows and the review returns confident false findings about already-merged
+work. A base that has DIVERGED --- carrying local commits the remote lacks that
+the head branch also carries --- moves the merge-base later, so the diff
+shrinks and part of the change is silently never reviewed. The second is the
+worse of the two: an over-wide diff produces findings the author will dispute,
+while an under-wide one produces a clean verdict nobody questions.
 
 WHY WARN RATHER THAN BLOCK
 --------------------------
@@ -48,18 +52,27 @@ It also fires on `Agent`/`Task` prompts, because the measured failure was a
 brief handed to a subagent rather than a command run directly, and the
 recipient cannot check a premise about the author's own environment.
 
-Fails open everywhere: an unreadable payload, an unreadable transcript, or any
-unexpected exception returns 0 silently.
+There is deliberately no session-level discharge. An earlier `git fetch` was
+the obvious candidate and is worthless here: `keep-checkouts-fresh.md` mandates
+a fetch at session start, which is exactly the reading that had already expired
+in the measured case, so keying on one would silence the hook on its own
+motivating incident.
+
+Fails open everywhere: an unreadable payload, an unreadable git checkout, or
+any unexpected exception returns 0 silently.
 """
 
 import json
 import os
 import re
+import subprocess
 import sys
 
-# A git range: <base>..<head> or <base>...<head>. The character class
-# deliberately excludes `<` and `>` so documentation placeholders such as
-# `origin/<default-branch>...HEAD` cannot match.
+# A git range: <base>..<head> or <base>...<head>.
+# `.` is inside the class because it is legal in a ref name, which means this
+# pattern DOES match documentation placeholders: `origin/<default-branch>...HEAD`
+# matches with base `.`, since `>` is outside the class and the separator dots
+# are all that is left. `is_local_branch_base` rejects that, not this pattern.
 RX_RANGE = re.compile(
     r"(?<![A-Za-z0-9._/@^~-])"
     r"([A-Za-z0-9._/@^~-]+)"
@@ -74,13 +87,15 @@ RX_GIT_RANGE_CMD = re.compile(
     r"(diff|log|shortlog|merge-base|rev-list|range-diff)\b"
 )
 
-# A fetch anywhere earlier in the session discharges the reminder: the session
-# has already demonstrated it is thinking about ref freshness.
-RX_DISCHARGE = re.compile(
-    r"(?<![A-Za-z0-9-])git\b[^\n;|&]*\b(fetch|ls-remote|remote\s+update)\b"
-)
-
 # Refs that are not local branch names, so cannot be the failure this catches.
+# Remote names to fall back on when `git remote` cannot be read. A local branch
+# may contain `/` too --- `feature/foo`, `release/2.0`, this repo's own
+# `ums/...` and `fix/...` --- so a slash alone says nothing, and treating it as
+# a remote prefix is what would blind the hook to a stacked-PR base.
+FALLBACK_REMOTES = frozenset({
+    "origin", "upstream", "github", "gitlab", "fork", "downstream",
+})
+
 SYMBOLIC = {
     "HEAD", "@", "FETCH_HEAD", "ORIG_HEAD", "MERGE_HEAD", "CHERRY_PICK_HEAD",
     "REVERT_HEAD", "BISECT_HEAD", "AUTO_MERGE",
@@ -92,6 +107,12 @@ RX_TAG = re.compile(r"\A[vV]?\d+(\.\d+)*\Z")
 # `[^\n]*` after the delimiter is load-bearing: `cat <<'EOF' > f.md` puts a
 # redirection between the delimiter and the newline, and a pattern anchored
 # straight to `\n` misses exactly the form used to write a file.
+# A quoted span is text the command carries rather than refs it operates on:
+# `git commit -m "stop using git diff main...HEAD"`, `grep -rn "git diff
+# main...pr-98"`, `gh pr comment --body "..."`. README names firing on a merely
+# quoted invocation as the cautionary example (`require-gh-repo-flag.py`).
+RX_QUOTED_SPAN = re.compile(r"'[^']*'|\"(?:[^\"\\]|\\.)*\"")
+
 RX_HEREDOC = re.compile(
     r"<<-?\s*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1[^\n]*\n.*?^\s*\2\s*$",
     re.DOTALL | re.MULTILINE,
@@ -110,11 +131,12 @@ of a remote one, and `A...B` computes from the merge-base of the refs you
 supplied -- so the three-dot form is not self-correcting. It is only as fresh
 as the local ref.
 
-The error is single-signed: a stale base moves the merge-base earlier, so the
-diff only ever gets BIGGER. The extra content is already-merged work by other
-people, and a review run on it returns findings against code this branch never
-touched. Nothing in the output announces it -- a 53-file diff and a 14-file
-diff look equally plausible, and every finding is individually well-formed.
+A base that is BEHIND its remote widens the diff, so a review runs on
+already-merged work by other people and returns findings against code this
+branch never touched. A base that has DIVERGED narrows it, so part of the
+change is never reviewed at all and the verdict comes back clean. Neither is
+announced: a 53-file diff and a 14-file diff look equally plausible, and every
+finding either produces is individually well-formed.
 
 Resolve the base from a remote-tracking ref, after fetching that remote:
 
@@ -129,7 +151,7 @@ the remote is not always `origin`.
 
 If the base is deliberately local -- comparing two branches you just built, or
 inspecting your own work in progress -- carry on. This is a reminder, not a
-refusal.
+refusal, and it does not know which kind of comparison this is.
 """
 
 
@@ -138,6 +160,27 @@ def strip_heredocs(command):
     if not isinstance(command, str):
         return ""
     return RX_HEREDOC.sub("<<HEREDOC", command)
+
+
+def strip_quoted(command):
+    """Blank out quoted spans, so a command that merely quotes a range is inert."""
+    return RX_QUOTED_SPAN.sub('""', command)
+
+
+def remote_names(cwd):
+    """Remote names for `cwd`, falling back to a small set on any failure."""
+    try:
+        proc = subprocess.run(
+            ["git", "remote"],
+            cwd=cwd if cwd and os.path.isdir(cwd) else None,
+            capture_output=True, text=True, timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return FALLBACK_REMOTES
+    if proc.returncode != 0:
+        return FALLBACK_REMOTES
+    names = {line.strip() for line in proc.stdout.splitlines() if line.strip()}
+    return (names | FALLBACK_REMOTES) if names else FALLBACK_REMOTES
 
 
 def normalize_base(token):
@@ -153,23 +196,34 @@ def normalize_base(token):
     return token.strip(".")
 
 
-def is_local_branch_base(token):
+def is_local_branch_base(token, remotes):
     """True when `token` looks like a bare local branch name.
 
-    A remote-tracking ref carries a remote prefix, so it contains `/`. A
-    symbolic ref, a raw SHA, and a version tag each name something a fetch
+    A remote-tracking ref is `<remote>/<branch>` for a remote this repository
+    actually has, or an explicit `refs/remotes/...`. A slash on its own proves
+    nothing: `feature/foo` and `release/2.0` are local.
+
+    A symbolic ref, a raw SHA, and a version tag each name something a fetch
     cannot make staler.
     """
     token = normalize_base(token)
-    if not token or "/" in token:
+    if not token:
         return False
     # A run of dots is the separator itself, reached when the text before it
-    # ends in a character the ref class excludes --- as `origin/<default-
-    # branch>...HEAD` does. It names no ref.
+    # ends in a character the ref class excludes. `.` normalizes to empty and
+    # is caught above; `-...HEAD` reaches here. Neither names a ref.
     if not re.search(r"[A-Za-z0-9]", token):
         return False
+    if token.startswith("refs/remotes/"):
+        return False
+    if "/" in token:
+        head = token.split("/", 1)[0]
+        if head in remotes:
+            return False
+        if token.startswith("refs/heads/"):
+            token = token[len("refs/heads/"):]
     # Strip revision suffixes: `main~2`, `main^`, `main@{u}`.
-    stem = re.split(r"[~^@]", token, 1)[0]
+    stem = re.split(r"[~^@]", token, maxsplit=1)[0]
     if not stem or stem in SYMBOLIC:
         return False
     if RX_SHA.match(stem) or RX_TAG.match(stem):
@@ -177,83 +231,29 @@ def is_local_branch_base(token):
     return True
 
 
-def stale_bases(text):
+def stale_bases(text, remotes):
     """Return the bare-local-branch bases of any git range in `text`."""
     if not isinstance(text, str) or not text:
         return []
-    body = strip_heredocs(text)
+    body = strip_quoted(strip_heredocs(text))
     found = []
     for match in RX_GIT_RANGE_CMD.finditer(body):
-        # Look only at the remainder of that command, up to a separator.
-        tail = re.split(r"[\n;|&]", body[match.end():], 1)[0]
-        for base, _dots, _head in RX_RANGE.findall(tail):
-            if not is_local_branch_base(base):
+        # Only this command's own arguments, up to a separator.
+        tail = re.split(r"[\n;|&]", body[match.end():], maxsplit=1)[0]
+        for token in tail.split():
+            # `--` ends the ref arguments; everything after it is a pathspec.
+            if token == "--":
+                break
+            # An option, and an option's `=` value, are not refs.
+            if token.startswith("-"):
                 continue
-            base = normalize_base(base)
-            if base not in found:
-                found.append(base)
+            for base, _dots, _head in RX_RANGE.findall(token):
+                if not is_local_branch_base(base, remotes):
+                    continue
+                base = normalize_base(base)
+                if base not in found:
+                    found.append(base)
     return found
-
-
-def _tool_uses(entry):
-    """Yield (name, payload_dict) for each tool_use in a transcript entry."""
-    message = entry.get("message")
-    content = message.get("content") if isinstance(message, dict) else entry.get("content")
-    if isinstance(content, list):
-        for block in content:
-            if not isinstance(block, dict) or block.get("type") != "tool_use":
-                continue
-            name = block.get("name")
-            payload = block.get("input")
-            yield (name if isinstance(name, str) else ""), (payload if isinstance(payload, dict) else {})
-
-    calls = entry.get("tool_calls")
-    if isinstance(calls, list):
-        for call in calls:
-            if not isinstance(call, dict):
-                continue
-            name = call.get("name") or (call.get("function") or {}).get("name") or ""
-            payload = (call.get("args") or call.get("input")
-                       or (call.get("function") or {}).get("arguments") or {})
-            if isinstance(payload, str):
-                try:
-                    payload = json.loads(payload)
-                except ValueError:
-                    payload = {"command": payload}
-            yield name, (payload if isinstance(payload, dict) else {})
-
-
-def _payload_text(payload):
-    """Yield the command-ish and brief-ish strings from a tool input dict."""
-    for key in ("command", "cmd", "CommandLine") + BRIEF_KEYS:
-        value = payload.get(key)
-        if isinstance(value, str) and value:
-            yield value
-
-
-def transcript_has_fetch(transcript_path):
-    """True when some earlier command fetched or queried a remote.
-
-    Returns True (discharged, silent) on any read failure --- fail open.
-    """
-    if not transcript_path or not os.path.isfile(transcript_path):
-        return True
-    try:
-        with open(transcript_path, encoding="utf-8", errors="replace") as fh:
-            for line in fh:
-                if not line.strip():
-                    continue
-                try:
-                    entry = json.loads(line)
-                except ValueError:
-                    continue
-                for _name, payload in _tool_uses(entry):
-                    for text in _payload_text(payload):
-                        if RX_DISCHARGE.search(strip_heredocs(text)):
-                            return True
-    except OSError:
-        return True
-    return False
 
 
 def _emit(note):
@@ -305,15 +305,16 @@ def main():
         else:
             return 0
 
+        if not any(isinstance(t, str) and ".." in t for t in texts):
+            return 0
+
+        remotes = remote_names(payload.get("cwd") or os.getcwd())
         bases = []
         for text in texts:
-            for base in stale_bases(text):
+            for base in stale_bases(text, remotes):
                 if base not in bases:
                     bases.append(base)
         if not bases:
-            return 0
-
-        if transcript_has_fetch(payload.get("transcript_path") or ""):
             return 0
 
         _emit(NOTE.format(bases=", ".join("`%s`" % b for b in bases)))

@@ -38,7 +38,6 @@ def bash(cmd):
 
 
 NOISE = [bash("ls -la"), bash("git status --short")]
-FETCH = [bash("git fetch origin --quiet")]
 
 
 def run(command, records, tool_name="Bash", tool_input=None):
@@ -104,10 +103,17 @@ WARN_CASES = [
      "git log takes a range too"),
     ("git merge-base main pr-98 && git diff main...pr-98", NOISE,
      "a merge-base call does not itself resolve the base from a remote"),
-    ("git diff main...pr-98", [],
-     "an empty transcript is not a fetch"),
+    ("git diff feature/foo...HEAD", NOISE,
+     "a slash does not make a ref remote-tracking -- local branches carry one"),
+    ("git diff release/2.0...HEAD", NOISE,
+     "a release branch is local too"),
+    ("git diff refs/heads/main...HEAD", NOISE,
+     "an explicit local ref is still a local branch"),
     ("git diff --stat main...pr-98", NOISE,
      "an option between the subcommand and the range"),
+    ("git fetch origin && git diff main...pr-98", NOISE,
+     "a fetch in the same command line does not discharge: the hook keys on "
+     "the ref named, not on freshness it cannot measure"),
 ]
 
 SILENT_CASES = [
@@ -115,8 +121,8 @@ SILENT_CASES = [
      "a remote-tracking base is the correct form"),
     ("git diff github/main...pr-98", NOISE,
      "the remote is not always named origin"),
-    ("git diff main...pr-98", NOISE + FETCH,
-     "a fetch earlier in the session discharges the reminder"),
+    ("git diff refs/remotes/origin/main...HEAD", NOISE,
+     "an explicit remote-tracking ref"),
     ("git diff HEAD~1..HEAD", NOISE,
      "a symbolic base cannot go stale"),
     ("git diff 6345e92...pr-98", NOISE,
@@ -133,6 +139,16 @@ SILENT_CASES = [
      "a documentation placeholder must not match"),
     ("cat <<'EOF' > f.md\ngit diff main...pr-98\nEOF", NOISE,
      "a heredoc body is file content, not a command"),
+    ("git commit -m \"stop using git diff main...HEAD as the base\"", NOISE,
+     "a quoted mention is text the command carries, not a ref it reads"),
+    ("grep -rn 'git diff main...pr-98' shared/", NOISE,
+     "grepping for the anti-pattern must not trip the hook that documents it"),
+    ("gh pr comment 98 --body \"I ran git diff main...pr-98\"", NOISE,
+     "a PR comment body is quoted text"),
+    ("git diff origin/main...HEAD -- a.b..c.d", NOISE,
+     "a pathspec after `--` is not a range, and the base here is already right"),
+    ("git log --grep=main...HEAD", NOISE,
+     "an option value is not a range"),
     ("git diff -...HEAD", NOISE,
      "a base with no alphanumeric names no ref -- `-` is in the ref class and "
      "survives dot-stripping, so this is the guard `normalize_base` does NOT "
@@ -173,21 +189,6 @@ for prompt, desc, want in ((BRIEF_WARN[0], BRIEF_WARN[1], "WARN"),
     print(f"{verdict:<7} {desc}")
 
 print("\n--- fail-open")
-_fd, _p = tempfile.mkstemp(suffix=".jsonl")
-os.close(_fd)
-os.unlink(_p)
-_proc = subprocess.run(
-    [sys.executable, HOOK],
-    input=json.dumps({"tool_name": "Bash",
-                      "tool_input": {"command": "git diff main...pr-98"},
-                      "transcript_path": _p}),
-    capture_output=True, text=True,
-)
-total += 1
-_ok = _proc.returncode == 0 and not _proc.stdout.strip()
-wrong += not _ok
-print(f"{'silent' if _ok else 'WARN':<7} a missing transcript fails open")
-
 _proc = subprocess.run([sys.executable, HOOK], input="not json",
                        capture_output=True, text=True)
 total += 1
@@ -195,37 +196,21 @@ _ok = _proc.returncode == 0 and not _proc.stdout.strip()
 wrong += not _ok
 print(f"{'silent' if _ok else 'WARN':<7} unparseable stdin fails open")
 
-# An unreadable-but-present transcript exercises the OSError branch, which the
-# missing-transcript case above cannot reach: `os.path.isfile` returns False
-# there, so that case returns early and never enters the `try`.
-_fd, _unreadable = tempfile.mkstemp(suffix=".jsonl")
-os.write(_fd, b"{}\n")
-os.close(_fd)
-os.chmod(_unreadable, 0o000)
-if os.access(_unreadable, os.R_OK):
-    # Running as root, or on a filesystem ignoring the mode bits. Skipping
-    # silently would print a pass for a case that never ran.
-    os.chmod(_unreadable, 0o600)
-    os.unlink(_unreadable)
-    sys.exit(
-        "FATAL: could not make a file unreadable, so the OSError fail-open "
-        "branch cannot be exercised. Do not report a pass for it."
-    )
-try:
-    _proc = subprocess.run(
-        [sys.executable, HOOK],
-        input=json.dumps({"tool_name": "Bash",
-                          "tool_input": {"command": "git diff main...pr-98"},
-                          "transcript_path": _unreadable}),
-        capture_output=True, text=True,
-    )
-finally:
-    os.chmod(_unreadable, 0o600)
-    os.unlink(_unreadable)
+# `git remote` is consulted only to classify a slash-bearing base. A cwd that
+# is not a git repository must fall back rather than raise, and must still
+# reach a verdict -- a silent failure here would read as a pass on every case.
+_proc = subprocess.run(
+    [sys.executable, HOOK],
+    input=json.dumps({"tool_name": "Bash",
+                      "tool_input": {"command": "git diff main...pr-98"},
+                      "cwd": tempfile.gettempdir()}),
+    capture_output=True, text=True,
+)
 total += 1
-_ok = _proc.returncode == 0 and not _proc.stdout.strip()
+_ok = _proc.returncode == 0 and "additionalContext" in _proc.stdout
 wrong += not _ok
-print(f"{'silent' if _ok else 'WARN':<7} an unreadable transcript fails open")
+print(f"{'WARN' if _ok else 'silent':<7} a non-repository cwd falls back to the "
+      "default remote names and still warns")
 
 print(f"\n{total - wrong}/{total} correct")
 sys.exit(1 if wrong else 0)

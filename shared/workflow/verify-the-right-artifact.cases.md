@@ -207,7 +207,7 @@ An adversarial review of that same PR then caught a second instance of the same 
 The fix had been swept across `CLAUDE.md` and `shared/workflow/check-before-pushing.md` but not `AGENTS.md`, which `CLAUDE.md:3-5` names as the authoritative cross-agent contract and which carried a near-verbatim twin of the edited paragraph.
 The sweep had been keyed on the file that prompted the work rather than on the population carrying the claim.
 
-## A stale local base that tripled a review diff
+## A stale local base that quadrupled a review diff's file count
 
 Measured 2026-09-02 while reviewing [ucdavis/matt.contracts#98](https://github.com/ucdavis/matt.contracts/pull/98).
 
@@ -227,6 +227,10 @@ The merge-base moved accordingly, and so did the diff:
 | true merge-base `6345e92` | 14 | 1584 |
 
 The 39 extra files were already-merged work from other pull requests --- among them an unrelated `.Rbuildignore` template-name cleanup and a `foodwebr`-to-`covr` swap in `Suggests`.
+
+The base was *behind*, so the diff grew.
+A base that has diverged from its remote fails the other way, narrowing the diff and hiding part of the change behind a clean verdict;
+that direction was not what happened here.
 
 **The detection was accidental, which is the part worth recording.**
 No finding looked wrong, because none were: every one quoted a real line and applied a real rule.

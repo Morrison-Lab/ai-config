@@ -335,19 +335,24 @@ See ai-config#694 for the precedent.
   the same PR two days earlier.)
 - **Copilot's per-push review is not guaranteed, and a missing one is
   silent.**
-  Measured on [Morrison-Lab/ai-config#2913](https://github.com/Morrison-Lab/ai-config/pull/2913), 2026-09-01:
-  three consecutive
-  pushes (`988b545`, `3b32086`, `ab89045`) produced no
-  `copilot-pull-request-reviewer` check run on the new head for several
-  minutes, while `request_copilot_review` started one within about fifteen
-  seconds each time and the review posted five to six minutes later.
+  Measured on [Morrison-Lab/ai-config#2913](https://github.com/Morrison-Lab/ai-config/pull/2913), 2026-09-01
+  (times UTC, commits from `git log --format=%cI`, reviews from
+  `get_reviews`).
+  `28c20e5` (committed 03:17:52) got an auto-started
+  `copilot-pull-request-reviewer` check run at 03:18:28.
+  `988b545` (03:24:10) had no run at 03:30 and `3b32086` (03:36:59) none
+  at 03:38.
+  `request_copilot_review` at about 03:31 and 03:39 started a run within
+  seconds each time, and those reviews posted at 03:35:41 and 03:44:37.
+  `ab89045` (03:47:53) was re-requested at about 03:48 without waiting and
+  its review posted at 03:53:50, so it says nothing about whether an
+  auto-run would have come.
   `get_check_runs` is the tell.
-  On the pushes that did get a review (`28c20e5` and the three
-  re-requested ones), the check run appeared within about a minute, so one
-  minute is the operational heuristic rather than a guarantee: an absent
-  run after that is grounds to re-issue, at the cost of a duplicate request
-  when check creation was merely delayed, which is cheap next to a check-in
-  that waits on a round that never started.
+  Where a run did start on its own or on request, it appeared within about
+  a minute, so one minute is the operational heuristic rather than a
+  guarantee: an absent run after that is grounds to re-issue, at the cost
+  of a duplicate request when check creation was merely delayed, which is
+  cheap next to a check-in that waits on a round that never started.
   - **Do:** after every push, confirm the check run exists on the new head,
     and call `request_copilot_review` when it is still absent after about a
     minute.

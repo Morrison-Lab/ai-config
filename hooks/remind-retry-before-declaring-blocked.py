@@ -2,29 +2,30 @@
 """UserPromptSubmit reminder: a classifier denial is a sample, not a wall.
 
 ai-config#2994, measured 2026-09-02 (PT): an
-`ALLOW_UNREVIEWED_PUSH=1 git push` was denied by the auto-mode permission
-classifier three times, and the session reported the path as permanently
-closed -- in a blocking report to the user, in a project memory entry, and in a
-comment on this repo's own tracker. With no settings change and no permission
-rule added, the byte-identical command then succeeded on the fourth attempt.
+`ALLOW_UNREVIEWED_PUSH=1 git push` and the attempt to grant it a permission
+rule were denied by the auto-mode permission classifier three times over, and
+the session reported the path as permanently closed -- in a blocking report to
+the user, in a project memory entry, and in a comment on this repo's own
+tracker. With no settings change and no permission rule added, the
+byte-identical command then succeeded.
 
 How many of those three denials were the command ITSELF is not settled by the
 issue, and this file deliberately does not settle it either. #2994's headline
-says "three identical denials"; its narrative lists the push, one identical
-re-run, and an `update-config` edit adding the allow rule, which would make
-the success the third attempt of the command rather than the fourth. Every
-claim below is worded to hold under both readings, because the design turns on
-the success arriving after the point the session stopped -- not on which
-attempt number it was.
+says "three identical denials" and calls the success "the fourth attempt";
+its narrative lists the push, one identical re-run, and an `update-config`
+edit adding the allow rule, which would make the success the command's third
+attempt. Every claim here is worded to hold under both readings, because the
+design turns on the success arriving after the point the session stopped --
+not on which attempt number it was.
 
 Repeated denials do not FEEL like a claim. They feel like a measurement: the
-command ran, and the system said no, three times. So "I cannot do this" reads
-as reporting an observation rather than asserting a fact about the future, and
-none of the
-claim-checking rules that would otherwise fire (`metacognitive-monitoring.md`
-on a claim about state, `ardi.md` on verifying an asserted blocker) engages at
-all. The conclusion is also self-confirming: deciding the path is closed means
-stopping, which destroys the only evidence that would refute it.
+thing was tried, and the system said no, again and again. So "I cannot do
+this" reads as reporting an observation rather than asserting a fact about the
+future, and none of the claim-checking rules that would otherwise fire
+(`metacognitive-monitoring.md` on a claim about state, `ardi.md` on verifying
+an asserted blocker) engages at all. The conclusion is also self-confirming:
+deciding the path is closed means stopping, which destroys the only evidence
+that would refute it.
 
 WHAT THE EVIDENCE SUPPORTS, AND WHAT IT DOES NOT
 ------------------------------------------------
@@ -164,8 +165,8 @@ it.
 On the second denial itself the hook states the tension and stops. Pattern
 43's Do bullet says to stop probing after the second denial of the same goal
 and hand the user the decision; #2994 measured a success after three
-denials.
-Both are in this corpus, neither has been retired, and a guard is the wrong
+denials. Both are in this corpus, neither has been retired, and a guard is
+the wrong
 place to settle it -- so the message puts both to the user, which is what
 Pattern 43's Do bullet asks for anyway. Reconciling the two texts is tracked
 as ai-config#3008.

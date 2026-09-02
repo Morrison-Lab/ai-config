@@ -61,7 +61,10 @@ without asking confirmation before every merge.
   [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) wires it
   into the instrument, and no manual check under a merge queue whose
   required checks cover the whole clean gate on `merge_group`.
-  On a direct merge a stale merge-base means `gh pr update-branch`,
+  On a direct merge a stale merge-base means an update pinned to the
+  recorded head (`PUT .../pulls/<N>/update-branch` with
+  `expected_head_sha`, or the MCP tool's `expectedHeadSha`; a `422`
+  means another writer moved the head, so settle ownership instead),
   a wait until `headRefOid` changes (the update is asynchronous),
   recording that SHA,
   a currency check on it,

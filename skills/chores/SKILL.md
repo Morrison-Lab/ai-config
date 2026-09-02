@@ -188,7 +188,8 @@ When it is stale, the bot-bump recovery is to update the branch,
 wait for the new head SHA,
 rerun the CI and conflict checks this skill gates on against that SHA (review stays skipped on bot PRs),
 and recheck currency and that the head is still that SHA immediately before merging.
-`gh pr update-branch "$N" --repo "$REPO"` merges the base in.
+`gh api -X PUT "repos/$REPO/pulls/$N/update-branch" -f expected_head_sha="$PINNED"` merges the base in, pinned to the head whose CI was read.
+A `422` means the bot or another writer already replaced that head, so re-read before touching it.
 `@dependabot rebase` rewrites the head onto it and also clears a conflict.
 Then merge directly.
 Dependabot deletes its own branch on merge.
@@ -208,7 +209,7 @@ and every check this skill gates on is required or aggregated behind a required 
 (both settings block on required checks alone, and a deferred merge runs after the base-currency check, so elsewhere the check is stale by the time it fires):
 
 ```bash
-gh pr merge "$N" --repo "$REPO" --squash --auto   # MERGE_PR — needs auto-merge enabled; swap --squash for --merge/--rebase if squash is disabled
+gh pr merge "$N" --repo "$REPO" --squash --auto --match-head-commit "$PINNED"   # MERGE_PR — needs auto-merge enabled; swap --squash for --merge/--rebase if squash is disabled
 ```
 
 For **Dependabot** you can also hand the merge back to the bot, under the same up-to-date-branch or queue condition as `--auto` --- it waits for

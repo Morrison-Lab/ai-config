@@ -75,7 +75,8 @@ standing yes (see `preferences.md`).
   skip the check and let the queue's speculative merge test the base.
   It is a manual step until [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) wires it into `check-pr-fully-clean.py`,
   and a repository that does not require an up-to-date branch merges without it otherwise.
-  When it fails on a direct merge, `gh pr update-branch "<N>" -R "<owner>/<repo>"` (or `update_pull_request_branch` remotely),
+  When it fails on a direct merge, update the branch pinned to the recorded head, `gh api -X PUT "repos/<owner>/<repo>/pulls/<N>/update-branch" -f expected_head_sha="<pinned-sha>"` (or `update_pull_request_branch` with `expectedHeadSha` remotely),
+  treating a `422` as the another-writer signal rather than retrying unpinned,
   wait until `headRefOid` changes (the update answers `202 Accepted` before the merge lands),
   record that SHA,
   rerun the base-currency check on it,

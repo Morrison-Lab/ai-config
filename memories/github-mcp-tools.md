@@ -345,7 +345,7 @@ See ai-config#694 for the precedent.
   on `GET repos/Morrison-Lab/ai-config/issues/2913/timeline`; review times
   from `get_reviews`.
   `28c20e5`: committed 03:17:52, requested 03:18:15, run `100111746156`
-  started 03:18:28, review 03:23:02.
+  started 03:18:28, review 03:23:12.
   `988b545`: committed 03:24:10, no run at 03:30, requested 03:31:08, run
   `100114154380` started 03:31:22, review 03:35:41.
   `3b32086`: committed 03:36:59, no run at 03:38, requested 03:39:03, run
@@ -364,9 +364,11 @@ See ai-config#694 for the precedent.
     check run exists on the new head within about a minute.
     Where one exists, `pr-on-claim.md`'s rule against re-posting on an
     auto-requesting repo holds.
-    Call `request_copilot_review` only when none has appeared: that rule's
-    premise, that the retry changes nothing, is what the two heads above
-    that waited refute.
+    Call `request_copilot_review` only when none has appeared.
+    On the two heads above that waited, minutes with no run were followed
+    by a run within seconds of the request; that is the observed sequence,
+    not proof the request caused it, and a merely delayed run would make
+    the request a harmless duplicate.
   - **Don't:** arm a check-in that waits on a round that never started.
 - **A Copilot review reporting `Comments generated: 0 new` can still carry
   findings.**

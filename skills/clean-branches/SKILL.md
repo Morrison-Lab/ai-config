@@ -341,32 +341,36 @@ current branch):
 #### a. Merged into main → delete
 
 ```bash
+# Branches checked out in ANY worktree (the current branch included) cannot
+# be deleted, and the --format listing below carries no marker for them, so
+# derive that set read-only first and keep it for the plan (step 4).
+git worktree list --porcelain \
+  | awk '/^branch /{sub("refs/heads/", "", $2); print $2}' | sort -u > /tmp/checked-out.txt
+
 git branch --merged origin/main --format='%(refname:short)' \
-  | grep -vxF -e main -e master -e "$(git branch --show-current)"
+  | grep -vxF -e main -e master -f /tmp/checked-out.txt
 # --format gives plain names. Plain `git branch` prefixes the current branch
 # with `*` and a branch checked out in a linked worktree with `+`, so a
 # column-anchored grep on the plain listing mangled such a name into
 # `+ feature/foo` and the delete below failed on it (ai-config#1882; the
-# clean-worktrees skill's step 3c records the same hazard). With no `*` to
-# filter, the current branch is excluded by name instead. `grep -vxF`
-# matches whole lines literally, so only `main`, `master`, and the current
-# branch are excluded, and a branch like `maintain-docs` or
-# `feature-main-menu` is NOT silently filtered out. A branch checked out in
-# a linked worktree still appears; `git branch -d` refuses it, and the note
-# below says how to read that refusal.
+# clean-worktrees skill's step 3c records the same hazard). `grep -vxF`
+# matches whole lines literally, so only `main`, `master`, and the
+# checked-out set are excluded, and a branch like `maintain-docs` or
+# `feature-main-menu` is NOT silently filtered out.
 # Compare against origin/main (just fetched), NOT local `main` — your local main
 # may be behind, which would hide branches that are actually merged.
 git branch -d <branch>          # -d refuses if NOT actually merged — a safety net
 ```
 
-`-d` (never `-D`) is deliberate, and its refusal has two readings.
-`error: the branch 'X' is not fully merged` means unmerged commits, so treat the
-branch as **stale**, not dead (see b).
-`error: cannot delete branch 'X' used by worktree at ...` means the branch is
-checked out in a linked worktree, so leave it alone, give it the status
-`checked out in a worktree` in the step 4 plan table, and count it under
+A merged branch that appears in `/tmp/checked-out.txt` gets the status
+`checked out in a worktree` in the step 4 plan and is counted under
 "Skipped" in the step 9 report; `clean-worktrees` is the skill that retires
 the worktree first.
+`-d` (never `-D`) is deliberate: `error: the branch 'X' is not fully merged`
+means unmerged commits, so treat the branch as **stale**, not dead (see b).
+`error: cannot delete branch 'X' used by worktree at ...` means the
+checked-out set went stale since it was derived; re-derive it rather than
+retrying.
 
 #### b. Upstream gone but the PR merged → delete
 

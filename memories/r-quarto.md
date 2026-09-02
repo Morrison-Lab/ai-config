@@ -508,6 +508,18 @@ short assignment-shaped fragment.
     so the only bare occurrence came from a filename
     rather than from anything the prose said.
     Renamed to `_checking-convergence-codes.qmd`, with no WORDLIST addition.)
+  - **When a whole page is a stack of includes, strip the shortcode lines
+    before checking instead of renaming.**
+    `spelling::spell_check_files()` (2.3.x) parses `.qmd` as Markdown and
+    skips code spans, so a sweep over `chapters/**/*.qmd` works --- but a
+    chapter file that is forty `{{< include ai-tools/<slug>.qmd >}}` lines
+    reports `ai`, `qmd`, `claude`, and every other path segment dozens of
+    times, and there is nothing to rename.
+    Copy the files to a temp dir, drop lines matching
+    `^\s*\{\{<.*>\}\}\s*$`, and check the copies.
+    (Morrison-Lab/wai#177, 2026-09-01: 191 raw hits on the chapters, of which
+    the include paths were the bulk; `spell_check_package()` had never scanned
+    them because they are not vignettes.)
 - **Regenerating `man/*.Rd`: run `devtools::document()` (or
   `roxygen2::roxygenise()`) --- never hand-edit the `.Rd`.** A `docs-check` /
   `R-check-docs` job runs `roxygenize()` then `git diff --exit-code man/`, so a

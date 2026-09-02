@@ -226,7 +226,9 @@ The merge-base moved accordingly, and so did the diff:
 | stale local `main` | 53 | 2999 |
 | true merge-base `6345e92` | 14 | 1584 |
 
-The 39 extra files were already-merged work from other pull requests --- among them an unrelated `.Rbuildignore` template-name cleanup and a `foodwebr`-to-`covr` swap in `Suggests`.
+The 39 extra files were already-merged work from other pull requests.
+The contamination was not confined to whole extra files, which is the more insidious half.
+`DESCRIPTION` and `.Rbuildignore` are both among the 14 the pull request really changes, and the wide diff mixed already-merged hunks into them --- a `foodwebr`-to-`covr` swap in `Suggests`, and a template-name cleanup --- so the spurious content sat inside files the reviewer had every reason to be reading.
 
 The base was *behind*, so the diff grew.
 A base that has diverged from its remote fails the other way, narrowing the diff and hiding part of the change behind a clean verdict;
@@ -239,6 +241,7 @@ A scope correction sent mid-run had the subagent discard the out-of-scope findin
 
 Note which check would have caught it and which would not.
 A session-start freshness pass per [`keep-checkouts-fresh`](keep-checkouts-fresh.md) had no bearing, since the staleness accrued afterwards.
-The forge cross-check would have: `gh pr view 98 --json changedFiles,additions,deletions` reports 14 and 1584, and the derived 53 and 2999 disagree loudly.
+The forge cross-check would have: `gh pr view 98 --json changedFiles,additions,deletions` reported 14 and 1584 against head `9446e72`, and the derived 53 and 2999 disagree loudly.
+Re-run later it returns different figures, because the pull request's head moves; compare against the head you actually diffed.
 
 Tracked as [ai-config#3013](https://github.com/Morrison-Lab/ai-config/issues/3013).

@@ -206,7 +206,7 @@ A merge-base is only ever as fresh as the ref you fed it.
 **The error runs in both directions, and the quieter one is the worse.**
 A base **behind** its remote moves the merge-base earlier, so the diff gets bigger.
 The extra content is commits that already merged --- other people's work, already reviewed, already landed --- and a review run on it produces findings against code the author of this PR never wrote, spending the author's time and the reviewer's credibility at once.
-A base that has **diverged**, carrying local commits the remote lacks that the head branch also carries, moves the merge-base *later*, so the diff gets smaller.
+A base carrying local commits the remote lacks --- **ahead** of it, or diverged from it --- where the head branch also carries those commits, moves the merge-base *later*, so the diff gets smaller.
 That is the dangerous one.
 An over-wide diff produces findings the author will dispute, so it announces itself within a round;
 an under-wide one silently omits part of the change and comes back clean, and a clean verdict is the one nobody questions.

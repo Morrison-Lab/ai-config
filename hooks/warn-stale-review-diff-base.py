@@ -33,8 +33,8 @@ carrying no remote prefix is a local branch name, and that is the whole
 condition.
 A base that is strictly BEHIND its remote moves the merge-base earlier, so the
 diff grows and the review returns confident false findings about already-merged
-work. A base that has DIVERGED --- carrying local commits the remote lacks that
-the head branch also carries --- moves the merge-base later, so the diff
+work. A base carrying local commits the remote lacks --- ahead, or diverged ---
+where the head branch also carries them, moves the merge-base later, so the diff
 shrinks and part of the change is silently never reviewed. The second is the
 worse of the two: an over-wide diff produces findings the author will dispute,
 while an under-wide one produces a clean verdict nobody questions.
@@ -50,7 +50,7 @@ A missed reminder costs a review round; a false block costs every local `git
 diff` with a range in it.
 So this only ever adds context.
 
-It also fires on `Agent`/`Task` prompts, because the measured failure was a
+It also fires on `Agent`, `Task` and `SendMessage` prompts, because the measured failure was a
 brief handed to a subagent rather than a command run directly, and the
 recipient cannot check a premise about the author's own environment.
 
@@ -160,14 +160,15 @@ RX_SHA = re.compile(r"\A[0-9a-f]{7,40}\Z")
 # `2261-ums`, and `2026-08-01` are all far likelier to be branches --- issue
 # numbers are the commonest branch prefix in this corpus --- and a warn-only
 # reminder should take the false positive over the missed base.
+VALUE_OPTIONS = frozenset({
+    "--grep", "--author", "--committer", "--since", "--until", "--before",
+    "--after", "--format", "--pretty", "--output", "-S", "-G", "-L",
+    "-O", "--git-dir", "--work-tree",
+})
+
 # The suffix is a recognized pre-release or build-metadata form, not any word:
 # a bare `-[0-9A-Za-z]+` exempted `v2-rewrite` and `v3-api`, which are feature
 # branches. A dot is required throughout, so a bare `v1` warns too.
-VALUE_OPTIONS = frozenset({
-    "--grep", "--author", "--committer", "--since", "--until", "--before",
-    "--after", "--format", "--pretty", "--output", "-S", "-G", "-L", "-C",
-    "-O", "--git-dir", "--work-tree",
-})
 RX_TAG = re.compile(r"\A(?:[vV]\d+(?:\.\d+)+|\d+(?:\.\d+){2,})"
                     r"(?:-(?:rc|alpha|beta|pre|dev|snapshot)[0-9.]*)?"
                     r"(?:\+[0-9A-Za-z][0-9A-Za-z.]*)?\Z")
@@ -199,11 +200,11 @@ when it is not.
 
 A base that is BEHIND its remote widens the diff, so a review runs on
 already-merged work by other people and returns findings against code this
-branch never touched. A base that has DIVERGED, in commits the head branch
-also carries, narrows it -- so part of the change is never reviewed at all and
-the verdict comes back clean. Neither is
-announced: a 53-file diff and a 14-file diff look equally plausible, and every
-finding either produces is individually well-formed.
+branch never touched. A base carrying local commits the remote lacks --- ahead,
+or diverged -- narrows it, so part of the change is never reviewed at all and
+the verdict comes back clean. Neither is announced: a 53-file diff and a
+14-file diff look equally plausible, and every finding either produces is
+individually well-formed.
 
 Resolve the base from a remote-tracking ref, after fetching that remote:
 
@@ -238,11 +239,25 @@ def inside_quotes(body, pos):
     were each excluded because each occurs inside quoted prose, and this test
     answers that question directly.
     """
+    return quote_state_map(body)[min(pos, len(body))]
+
+
+def quote_state_map(body):
+    """Per-offset quote state for `body`, computed in a single pass.
+
+    `inside_quotes` used to rescan from index 0 for every match, which is
+    quadratic: a 44 KB command carrying 2000 ranges took 11.7 s against the
+    10 s timeout `hooks.json` declares. One pass makes it linear, and the
+    per-match lookup an index.
+    """
+    states = [False] * (len(body) + 1)
     single = double = False
     i = 0
-    while i < pos and i < len(body):
+    while i < len(body):
+        states[i] = single or double
         ch = body[i]
         if ch == "\\" and not single:
+            states[min(i + 1, len(body))] = single or double
             i += 2
             continue
         if ch == "'" and not double:
@@ -250,7 +265,8 @@ def inside_quotes(body, pos):
         elif ch == '"' and not single:
             double = not double
         i += 1
-    return single or double
+    states[len(body)] = single or double
+    return states
 
 
 def strip_heredocs(command):
@@ -299,6 +315,16 @@ def normalize_base(token):
     return token.strip(".")
 
 
+def is_remote_tracking(token, remotes):
+    """True when `token` names a remote-tracking ref of this repository."""
+    token = normalize_base(token)
+    if not token:
+        return False
+    if token.startswith("refs/remotes/"):
+        return True
+    return "/" in token and token.split("/", 1)[0] in remotes
+
+
 def is_local_branch_base(token, remotes):
     """True when `token` looks like a bare local branch name.
 
@@ -319,12 +345,14 @@ def is_local_branch_base(token, remotes):
         return False
     if token.startswith("refs/remotes/"):
         return False
+    if token.startswith("refs/heads/"):
+        # The prefix is unambiguous proof this is a local branch, so return
+        # before the tag test: `refs/heads/v1.2.0` is a branch, not a tag.
+        return True
     if "/" in token:
         head = token.split("/", 1)[0]
         if head in remotes:
             return False
-        if token.startswith("refs/heads/"):
-            token = token[len("refs/heads/"):]
     # Strip revision suffixes: `main~2`, `main^`, `main@{u}`.
     stem = re.split(r"[~^@]", token, maxsplit=1)[0]
     if not stem or stem in SYMBOLIC:
@@ -372,9 +400,10 @@ def stale_bases(text, remotes, pattern, quote_aware=False):
     if not isinstance(text, str) or not text:
         return []
     body = strip_heredocs(text)
+    states = quote_state_map(body) if quote_aware else None
     found = []
     for match in pattern.finditer(body):
-        if quote_aware and inside_quotes(body, match.start()):
+        if states is not None and states[min(match.start(), len(body))]:
             continue
         # Only this command's own arguments, up to a separator.
         tail = re.split(r"[\n;|&]", body[match.end():], maxsplit=1)[0]
@@ -392,8 +421,22 @@ def stale_bases(text, remotes, pattern, quote_aware=False):
             if skip_next:
                 skip_next = False
                 continue
-            for base, _dots, _head in RX_RANGE.findall(token):
+            for rng in RX_RANGE.finditer(token):
+                base, _dots, head = rng.groups()
+                # A shell expansion is not a ref name. `$BASE...HEAD` matches
+                # with base `BASE` because `$` is outside the ref class, and
+                # warning there would fire on the NOTE's own recommended
+                # remediation. The quoted and braced spellings already miss.
+                start = rng.start(1)
+                if start and token[start - 1] in "${":
+                    continue
                 if not is_local_branch_base(base, remotes):
+                    continue
+                # `<local>..<remote>` measures the local ref's staleness --- the
+                # idiom `post-merge` prescribes --- rather than claiming a
+                # review scope. The local ref is the subject there, so naming a
+                # remote-tracking base would defeat the measurement.
+                if is_remote_tracking(head, remotes):
                     continue
                 base = normalize_base(base)
                 if base not in found:

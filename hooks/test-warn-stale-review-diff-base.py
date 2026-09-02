@@ -85,6 +85,13 @@ def run(command, tool_name="Bash", tool_input=None):
 
 
 WARN_CASES = [
+    ("git diff -C main...HEAD",
+     "`-C` is find-copies and never takes a SEPARATE argument in `git diff` "
+     "or `git log`, so listing it in VALUE_OPTIONS ate the real range "
+     "(`-L` and `-O` genuinely do take one, and stay)"),
+    ("git diff refs/heads/v1.2.0...HEAD",
+     "a `refs/heads/` prefix is proof of a local branch, so the tag test must "
+     "not see the stripped stem -- `refs/heads/v1.2.0` is a BRANCH"),
     ("git diff main...pr-98",
      "the measured case: a bare local base in a three-dot review range"),
     ("git diff main..pr-98",
@@ -132,6 +139,16 @@ WARN_CASES = [
 ]
 
 SILENT_CASES = [
+    ("git rev-list --count main..origin/main",
+     "`<local>..<remote>` measures the local ref's staleness -- the idiom "
+     "`post-merge` prescribes -- so the local ref is the measurement SUBJECT, "
+     "not a review scope"),
+    ("git log --oneline main..origin/main",
+     "the same freshness idiom in its `log` spelling"),
+    ("git diff $BASE...HEAD",
+     "a shell expansion is not a ref: `$` sits outside the ref class, so the "
+     "match sees a base named `BASE`, and warning here would fire on the "
+     "NOTE's OWN recommended remediation"),
     ("git diff origin/main...HEAD",
      "a remote-tracking base is the correct form"),
     ("git diff refs/remotes/origin/main...HEAD",
@@ -207,6 +224,14 @@ BRIEF_SILENT = (
     "Review the diff: git diff origin/main...pr-98.",
     "an Agent brief with a remote-tracking base",
 )
+# `github` is NOT a remote of this checkout, so this case is silent only
+# because a brief unions FALLBACK_REMOTES in. Deleting that union leaves
+# `origin/main` above silent either way, which is why that case cannot pin it.
+BRIEF_SILENT_FALLBACK = (
+    "Review the diff: git diff github/main...pr-98.",
+    "a brief naming a remote this checkout lacks is still exempt, via the "
+    "FALLBACK_REMOTES union (deleting the union must fail HERE)",
+)
 
 total = wrong = 0
 print("--- expected WARN")
@@ -225,7 +250,9 @@ for cmd, desc in SILENT_CASES:
 
 print("\n--- Agent briefs")
 for prompt, desc, want in ((BRIEF_WARN[0], BRIEF_WARN[1], "WARN"),
-                           (BRIEF_SILENT[0], BRIEF_SILENT[1], "silent")):
+                           (BRIEF_SILENT[0], BRIEF_SILENT[1], "silent"),
+                           (BRIEF_SILENT_FALLBACK[0],
+                            BRIEF_SILENT_FALLBACK[1], "silent")):
     verdict = run(None, tool_name="Agent",
                   tool_input={"prompt": prompt, "description": "review"})
     total += 1
@@ -233,6 +260,28 @@ for prompt, desc, want in ((BRIEF_WARN[0], BRIEF_WARN[1], "WARN"),
     print(f"{verdict:<7} {desc}")
 
 print("\n--- fail-open and environment")
+# A type-confused `cwd` reaches `os.path.join` inside `main()` and is the
+# cheapest way to force the broad handler the docstring advertises. Without it
+# the "fails open everywhere" guarantee is unpinned by any test.
+_proc = subprocess.run(
+    [sys.executable, HOOK],
+    input=json.dumps({"tool_name": "Bash",
+                      "tool_input": {"command": "git diff main...HEAD"},
+                      "cwd": 5}),
+    capture_output=True, text=True,
+)
+total += 1
+_ok = _proc.returncode == 0
+wrong += not _ok
+print(f"{'silent' if _ok else 'WARN':<7} a non-string cwd cannot break the tool "
+      "(exit 0 from the broad handler)")
+
+_proc = subprocess.run([sys.executable, HOOK, "--dry-run",
+                        "git diff main...HEAD"], capture_output=True, text=True)
+total += 1
+_ok = _proc.returncode == 0 and "main" in _proc.stdout
+wrong += not _ok
+print(f"{'ok' if _ok else 'FAIL':<7} `--dry-run` names the base on stdout")
 _proc = subprocess.run([sys.executable, HOOK], input="not json",
                        capture_output=True, text=True)
 total += 1

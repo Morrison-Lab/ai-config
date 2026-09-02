@@ -219,19 +219,24 @@ This is about the right tool reporting success without measuring anything, and
 it is harder to catch because there is nothing to notice: the check run is
 green, its name is correct, and it sits in the same list as the real one.
 
-The workflow's base-ref input is `github.event.pull_request.base.sha` on a
-pull request and empty otherwise, which is deliberate --- it makes a push to
-`main` skip cleanly instead of scanning the whole tree
-(`.github/workflows/validate.yml`, the `new-line-breaks` job's own comment).
-The consequence for a *branch* push is the part worth stating: that run has no
-base ref either, so it skips the diff scan and concludes `success` having
+Until ai-config#1730 was fixed, the workflow's base-ref input was
+`github.event.pull_request.base.sha` on a pull request and empty otherwise,
+which made a push to `main` skip cleanly instead of scanning the whole tree.
+The consequence for a *branch* push was the part worth stating: that run had no
+base ref either, so it skipped the diff scan and concluded `success` having
 examined nothing.
 
-A PR therefore shows **two** check runs called
+A PR therefore showed **two** check runs called
 `new-line-breaks / check-new-line-breaks`.
-Only the `pull_request`-triggered one is a verdict.
-The `push`-triggered one is green unconditionally, so reading either one, or
-reading "the check is green", answers a question it was never asked.
+Only the `pull_request`-triggered one was a verdict.
+The `push`-triggered one was green unconditionally, so reading either one, or
+reading "the check is green", answered a question it was never asked.
+
+The `new-line-breaks` job in `.github/workflows/validate.yml` now carries
+`if: github.event_name == 'pull_request'`, so the push-triggered run reports
+`skipped` rather than `success` and a green run of that name is one that ran.
+The rule below still applies to any other workflow of this shape, and to any
+repository whose copy of the job predates that guard.
 
 The asymmetry that makes this dangerous: the vacuous run can only ever say
 success, so it never disagrees with a real failure loudly enough to notice ---
@@ -240,11 +245,12 @@ and the green one is not evidence of anything.
 Distinguish them by the triggering event rather than by the name, and prefer
 the run whose `event` is `pull_request`.
 
-- **Do:** read the triggering event of a `new-line-breaks` run before treating
-  it as a verdict, since a PR carries one real run and one vacuous one under
-  the same name.
+- **Do:** read the triggering event of a base-diffing run before treating it
+  as a verdict wherever the job is not gated on `pull_request`, since such a PR
+  carries one real run and one vacuous one under the same name.
 - **Don't:** conclude the gate passed from a green check run alone --- confirm
-  it was the `pull_request`-triggered one.
+  it was the `pull_request`-triggered one, or that the job is gated so the
+  push run reports `skipped`.
 
 **The disagreement had a second, sharper form: the gate split a boundary the
 reformatter left whole.**

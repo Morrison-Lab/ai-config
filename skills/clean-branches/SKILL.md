@@ -341,17 +341,48 @@ current branch):
 #### a. Merged into main → delete
 
 ```bash
-git branch --merged origin/main | grep -vE '^\s*\*|^\s*main\s*$|^\s*master\s*$'
-# Line-anchored so only the literal `main`/`master` lines (and the current `*`
-# branch) are excluded — a branch like `maintain-docs` or `feature-main-menu`
-# is NOT silently filtered out.
+# Branches checked out in ANY worktree cannot be deleted, and the --format
+# listing below carries no marker for them, so derive that set read-only
+# first. A per-run temp file, not a fixed /tmp name: two sessions sweeping
+# at once would otherwise read each other's set.
+CHECKED_OUT=$(mktemp); MERGED=$(mktemp); CURRENT=$(git branch --show-current)
+git worktree list --porcelain \
+  | awk '/^branch /{sub("refs/heads/", "", $2); print $2}' | sort -u > "$CHECKED_OUT"
+
+# The unfiltered merged list, so the two rows below can both be derived.
+git branch --merged origin/main --format='%(refname:short)' \
+  | grep -vxF -e main -e master -e "$CURRENT" > "$MERGED"
+# --format gives plain names. Plain `git branch` prefixes the current branch
+# with `*` and a branch checked out in a linked worktree with `+`, so a
+# column-anchored grep on the plain listing mangled such a name into
+# `+ feature/foo` and the delete below failed on it (ai-config#1882; the
+# clean-worktrees skill's step 3c records the same hazard). With no `*` to
+# filter, the current branch is excluded by name, per this step's contract.
+# `grep -vxF` matches whole lines literally, so a branch like
+# `maintain-docs` or `feature-main-menu` is NOT silently filtered out.
+
+# Merged but held by a linked worktree: skipped, and listed as such.
+grep -xF -f "$CHECKED_OUT" "$MERGED"
+# Merged and free: delete candidates.
+grep -vxF -f "$CHECKED_OUT" "$MERGED"
 # Compare against origin/main (just fetched), NOT local `main` — your local main
 # may be behind, which would hide branches that are actually merged.
 git branch -d <branch>          # -d refuses if NOT actually merged — a safety net
 ```
 
-`-d` (never `-D`) is deliberate: if git refuses, the branch has unmerged
-commits — treat it as **stale**, not dead (see b).
+A merged branch in the first list gets the status `checked out in a
+worktree` in the local plan (the step 4 table when the local rows are
+folded into a full sweep, or the standalone local plan step 8c describes)
+and goes under "Skipped (checked out in a worktree)" in the step 9 report.
+Clearing it is the worktree's business, not this skill's: switch that
+checkout to another branch, or run `clean-worktrees` when the worktree is
+one it would retire (it never removes the main or current worktree, and it
+skips active or fresh ones).
+`-d` (never `-D`) is deliberate: `error: the branch 'X' is not fully merged`
+means unmerged commits, so treat the branch as **stale**, not dead (see b).
+`error: cannot delete branch 'X' used by worktree at ...` means the
+checked-out set went stale since it was derived; re-derive it rather than
+retrying.
 
 #### b. Upstream gone but the PR merged → delete
 
@@ -440,6 +471,9 @@ Print a summary covering **both** local and remote:
 ### Skipped (active/new)
 - `fix/42-typo` — open MR !80
 - `experiment` — created 2 days ago
+
+### Skipped (checked out in a worktree)
+- `feature/foo` (merged, but checked out at `../wt-foo`): run `clean-worktrees` first
 
 ### Flagged — local-only, unpushed (left alone)
 - `scratch-idea` — 4 unpushed commits, no MR; your call

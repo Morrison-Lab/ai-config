@@ -36,7 +36,8 @@ mutates a PR stays serial.
      so a lab member running this corpus from a vendored checkout filters on their own identity rather than the corpus owner's.
      When no identity operation is available, fail closed: leave the author and assignee arms unevaluated, keep only explicitly requested and Actions-app-authored PRs, and say so in the report.
      Normalise the fields first: the author is `author.login` in `gh --json`, `user.login` in REST and `mcp__github__list_pull_requests`, and `author.username` on GitLab;
-     assignees are `assignees[].login` (GitHub) or `assignees[].username` (GitLab).
+     assignees are `assignees[].login` in `gh --json` and REST, bare login strings in `assignees` from `mcp__github__list_pull_requests`, or `assignees[].username` on GitLab.
+     The MCP list tool omits the `assignees` key on an unassigned PR (measured 2026-09-02).
      Keep a PR only when its author is one of those logins or the repository's own workflow bot (the app slug `github-actions`, in whichever form the source returns it;
      `memories/reviewing-prs.md` lists the forms),
      one of those logins is among its `assignees`,

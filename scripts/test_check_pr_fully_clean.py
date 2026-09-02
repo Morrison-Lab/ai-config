@@ -4680,7 +4680,20 @@ def main() -> int:
             checker.classify_verdict(clean_body) == "clean"
             and checker._unresolved_finding_pattern(clean_body) is None,
         )
-    # The paren-aside and character branches of the clause scan must stay
+    # Issue #2960: parenthesized asides in lead-in or method phrase that name
+    # in-progress work or defect investigations must not classify clean.
+    for label, aside_body in (
+        ("investigation in lead-in aside", "### Verdict\n**Ready for merge.** The prior blocking crash (root cause under investigation) is resolved."),
+        ("investigation in method aside", "### Verdict\n**Ready for merge.** The prior blocking finding is resolved by (patch applied, root cause still under investigation)."),
+        ("in-progress in method aside", "### Verdict\n**Ready for merge.** The prior blocking finding is resolved by (a fix is in progress)."),
+        ("critical error in method aside", "### Verdict\n**Ready for merge.** The prior blocking finding is resolved by (a critical error in the login flow)."),
+    ):
+        check(
+            f"{label} stays not-clean (#2960)",
+            checker.classify_verdict(aside_body) == "not-clean"
+            and checker._unresolved_finding_pattern(aside_body) is not None,
+        )
+
     # disjoint: an overlapping `(` was exponential backtracking (51s) on a
     # failing enumeration. Probed on _is_resolved_blocking_mention directly:
     # classify_verdict short-circuits on the leading "Needs more work"

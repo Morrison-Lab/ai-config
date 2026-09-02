@@ -1186,10 +1186,28 @@ _RESOLUTION_FORBIDDEN_LOOKAHEAD = (
     r"comment(?:ed|ing)?\s+out\s+(?:(?:the|an?|all|these|those|that|our|any)\s+)?(?:[a-z0-9_-]+\s+)?(?:tests?|checks?|assertions?|warnings?|linters?|guards?|lints?|detectors?|errors?))\b)"
 )
 
+# Parenthesized asides inside the lead-in or method phrase are checked against
+# a stricter lookahead per character: finite verbs, progress indicators,
+# open-work phrasing, and defect words are forbidden so an aside like "(root
+# cause under investigation)" or "(a fix is in progress)" cannot masquerade
+# as a benign clarification (ai-config#2960).
+_ASIDE_FORBIDDEN_LOOKAHEAD = (
+    r"(?!\b(?:"
+    r"and|but|while|although|however|yet|though|except|because|since|if|unless|when|where|"
+    r"not|never|neither|nor|none|nothing|without|hardly|barely|scarcely|"
+    r"is|are|was|were|will|would|could|should|can|has|have|had|be|being|been|remains?|persists?|"
+    r"investigat\w*|progress|pend\w*|wip|tbd|todo|open|broken|failing|fails?|failed|"
+    r"need\w*|requir\w*|follow[- ]?up|still|reproduc\w*|incomplet\w*|partially?|"
+    r"(?<!\bno\s)(?<!zero\s)(?:defects?|bugs?|errors?|crashes?|leaks?|faults?|flaws?|regressions?|unresolved|unfixed|unaddressed|problem\w*)|"
+    r"(?:suppress|disabl|mut|weaken|bypass|silenc|remov|delet|revert)(?:e|ed|ing)?\s+(?:(?:the|an?|all|these|those|that|our|any)\s+)?(?:[a-z0-9_-]+\s+)?(?:tests?|checks?|assertions?|warnings?|linters?|guards?|lints?|detectors?|errors?)|"
+    r"comment(?:ed|ing)?\s+out\s+(?:(?:the|an?|all|these|those|that|our|any)\s+)?(?:[a-z0-9_-]+\s+)?(?:tests?|checks?|assertions?|warnings?|linters?|guards?|lints?|detectors?|errors?)"
+    r")\b)"
+)
+
 _RESOLUTION_METHOD_PHRASE = (
     r"(?:\s+(?:by|in|via|with|through|as|per|on|against)\b"
     r"(?:" + _RESOLUTION_FORBIDDEN_LOOKAHEAD
-    + r"(?:\((?:" + _RESOLUTION_FORBIDDEN_LOOKAHEAD + r"[^()\n]){0,120}\)"
+    + r"(?:\((?:" + _ASIDE_FORBIDDEN_LOOKAHEAD + r"[^()\n]){0,120}\)"
     r"|[^;:,.!?()]|\.(?!\s|$))){1,180})?"
 )
 
@@ -1233,7 +1251,7 @@ RESOLVED_BLOCKING_SUFFIX = re.compile(
     # shared lookahead also carries the conjunction stop (and, but, while,
     # although, however) the lead-in used to assert on its own.
     r"^(?:" + _RESOLUTION_FORBIDDEN_LOOKAHEAD
-    + r"(?:\((?:" + _RESOLUTION_FORBIDDEN_LOOKAHEAD + r"[^()\n]){0,120}\)"
+    + r"(?:\((?:" + _ASIDE_FORBIDDEN_LOOKAHEAD + r"[^()\n]){0,120}\)"
     r"|[^,:;.!?()])){0,120}\b(?:"
     r"(?:is|are|was|were)\s+(?:(?:now|since|already|also|fully|completely|satisfactorily|properly|cleanly|successfully)\s+)?"
     r"(?:fixed|resolved|addressed|closed|removed|corrected)"

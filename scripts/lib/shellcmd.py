@@ -1,60 +1,111 @@
-"""Split a shell command string into simple-command argv lists.
+"""Split a shell command string into simple-command argv lists, and classify
+each as a `git` invocation.
 
-Extracted so the git-command guards stop each carrying their own copy.
-`hooks/no-clobbering-push.py` and `hooks/flag-reset-hard-uncommitted-work.py`
-both grew an identical `_simple_commands`, and this module is that function
-plus the `git`-invocation classifier every one of those guards needs next.
-Those two are not rewired here -- migrating a live deny guard is its own
-change with its own review -- but new callers import from here rather than
-adding a fourth copy.
+WHY THIS MODULE EXISTS
+----------------------
+`_simple_commands` was copied into SEVEN hooks before this module was written:
 
-Why an argv split rather than a regex over the raw string: the false positives
-that matter to a corpus about git workflow are all QUOTING failures. This repo
-writes `git commit` and `git push` constantly inside commit messages, issue
-bodies, heredocs, and prose, and a line-oriented scan cannot tell a quoted
-example from an executed command -- which is exactly what
-`shared/writing/examples-are-scanned.md` names. `shlex` in POSIX mode already
-knows the quoting rules, so a caller that asks "is `git push` the command word
-of some simple command" gets the answer for free, rather than accreting one
+    hooks/flag-add-a-outside-pathspec.py       hooks/no-clobbering-push.py
+    hooks/flag-reset-hard-uncommitted-work.py  hooks/no-delete-branch-under-stacked-pr.py
+    hooks/flag-stale-adjacent-comment.py       hooks/no-unreviewed-pr.py
+    hooks/warn-nonglobal-substitution.py
+
+The bodies are identical, and so is the heredoc defect `_heredoc_free` fixes
+below -- which is the argument for a module rather than an eighth copy. Those
+seven are NOT rewired here: migrating seven live guards, three of them denying,
+is its own change with its own review, tracked as ai-config#2993. This module
+is where the fix landed and where new callers import from.
+
+WHY AN ARGV SPLIT RATHER THAN A REGEX
+-------------------------------------
+The false positives that matter to a corpus about git workflow are all QUOTING
+failures. This repo writes `git commit` and `git push` constantly inside commit
+messages, issue bodies, heredocs, and prose, and a line-oriented scan cannot
+tell a quoted example from an executed command --
+`shared/writing/examples-are-scanned.md` names exactly that hazard, and an argv
+split is the "teach the checker about code regions" fix it prescribes. `shlex`
+in POSIX mode already knows the quoting rules, so a caller asking "is `git push`
+the command word of some simple command" gets the answer without accreting one
 regex clause per quoting shape.
 """
 from __future__ import annotations
 
+import os
 import re
 import shlex
 
-# A heredoc body is data, not commands, so it is blanked before splitting.
-# Both the quoted (`<<'EOF'`) and unquoted (`<<EOF`) tags are matched, and
-# `<<-` allows the terminator to be tab-indented.
+# `<<WORD`, `<<'WORD'`, `<<-"WORD"`, then the body up to a terminator that `<<-`
+# allows to be tab-indented. The NEWLINE AFTER the terminator is deliberately
+# outside the match -- see `_heredoc_free`.
 RX_HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1.*?\n[ \t]*\2\b", re.S)
 
-# A leading `NAME=value` on a simple command is an env assignment, not the
-# command word. `LEAD_WORDS` are the words that can precede a command word
-# without being one.
-ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
-LEAD_WORDS = {"then", "do", "else", "!", "time", "sudo", "command", "exec",
-              "nohup", "env"}
+ENV_ASSIGNMENT = re.compile(r"\A(?:export\s+)?[A-Za-z_][A-Za-z0-9_]*=")
+
+# Wrappers that RUN the command following them, so `git` is not argv[0] even
+# though a git command is exactly what executes. Taken from
+# `hooks/no-push-without-self-review.py`, which is the tested in-repo
+# implementation of this classification; keeping a narrower set here would mean
+# a guard silently disagreeing with the guard it is paired against.
+COMMAND_WRAPPERS = {"env", "command", "nohup", "time", "exec", "builtin",
+                    "sudo", "timeout", "stdbuf", "nice", "ionice", "doas"}
+
+# Shell keywords that can open a simple command. Dropping these is a regression
+# rather than a simplification: the splitter below breaks on `;` and `&&`, so
+# the keyword becomes argv[0] of the segment holding the git command, and
+# `skills/push/SKILL.md` prescribes a retry loop whose body starts with `do`.
+SHELL_KEYWORDS = {"!", "{", "}", "(", ")", "if", "then", "elif", "else", "fi",
+                  "while", "until", "do", "done", "for", "case", "esac"}
+
+# An unexpanded `$GIT` / `${GIT}` program token; shlex leaves it literal.
+GIT_VARIABLE = re.compile(r"\A\$\{?GIT\}?\Z")
+
+# How far past a wrapper to look for the git token. Six covers
+# `sudo -u name -H git`, and bounds the scan so an unrelated command running
+# git much later on the line is not mistaken for a wrapped one.
+WRAPPER_ARG_WINDOW = 6
 
 _SHELL_OPS = set("();|&")
 
 # `git`'s own global options that consume the FOLLOWING token, skipped before
-# the subcommand is read so `git -C /repo commit` classifies as `commit`.
-# The `--opt=value` inline spellings need no entry: they are one token and the
+# the subcommand is read so `git -C /repo commit` classifies as `commit`. The
+# `--opt=value` inline spellings need no entry: they are one token, and the
 # generic single-step branch handles them.
 GIT_VALUE_OPTS = {"-C", "-c", "--git-dir", "--work-tree", "--namespace",
                   "--exec-path"}
+
+
+def _heredoc_free(command):
+    """Blank heredoc BODIES, leaving the surrounding shell intact.
+
+    The substitution is `" << "`, with the spaces, and they are load-bearing.
+    Substituting a bare `"<<"` -- what all seven copies of this function do --
+    leaves `<<` flush against the newline that the caller then rewrites to `;`.
+    `shlex` with `punctuation_chars=True` emits that run as the SINGLE token
+    `<<;`, whose character set is not a subset of `_SHELL_OPS` (which has no
+    `<`), so the separator is swallowed and the following command is absorbed
+    into the previous one's argv:
+
+        git commit -F - <<'EOF'      ->  [['git','commit','-F','-',
+        msg                                '<<;','git','push']]
+        EOF
+        git push
+
+    Two commands read as one. Adding `<` to `_SHELL_OPS` is the wrong repair:
+    it would split `sort x > out` into two commands as well.
+    """
+    return RX_HEREDOC.sub(" << ", command)
 
 
 def simple_commands(command):
     """Split `command` into simple-command argv lists; `None` on a parse error.
 
     Join backslash-continued lines, blank heredoc bodies, turn unquoted
-    newlines into `;`, then let `shlex` split and dequote. The returned tokens
-    are DEQUOTED, so a quoted `"git push"` arrives as one token inside some
-    other command's argv rather than as its own simple command.
+    newlines into `;`, then let `shlex` split and dequote. The tokens come back
+    DEQUOTED, so a quoted `"git push"` arrives as one token inside some other
+    command's argv rather than as its own simple command.
     """
     command = re.sub(r"\\\r?\n", " ", command)
-    command = RX_HEREDOC.sub("<<", command)
+    command = _heredoc_free(command)
     command = command.replace("\n", ";")
     try:
         lex = shlex.shlex(command, posix=True, punctuation_chars=True)
@@ -75,30 +126,94 @@ def simple_commands(command):
     return cmds
 
 
+def strip_env(argv):
+    """`(env, argv_with_git_first)` for one simple command.
+
+    Adapted from `hooks/no-push-without-self-review.py`'s `_strip_env`, which is
+    the tested in-repo implementation. Leading env assignments, command
+    wrappers, and shell keywords are peeled off, and the program token is
+    normalized to its basename -- so `/usr/bin/git push`, `timeout 60 git push`,
+    `{ git commit -m x; }`, and `sudo -u me git push` all resolve to a `git`
+    first token, as they do for the guard this one is paired against.
+
+    `env` is the list of assignment TOKENS, in order, including any `export`
+    prefix.
+    """
+    rest, env, after_wrapper = list(argv), [], False
+    while rest:
+        tok = rest[0]
+        if ENV_ASSIGNMENT.match(tok):
+            env.append(tok)
+            rest = rest[1:]
+            after_wrapper = False
+            continue
+        if tok == "export" and len(rest) > 1 and ENV_ASSIGNMENT.match(rest[1]):
+            rest = rest[1:]  # `export FOO=1` split by shlex into two tokens
+            continue
+        if tok in COMMAND_WRAPPERS:
+            after_wrapper = True
+            rest = rest[1:]
+            continue
+        if tok in SHELL_KEYWORDS:
+            after_wrapper = False
+            rest = rest[1:]
+            continue
+        # A wrapper's own arguments, so `env -i`, `timeout 5` and `sudo -u me`
+        # do not stop the scan before `git`. Enumerating each wrapper's option
+        # grammar would be its own parser, so instead look ahead a bounded
+        # distance for the git token and drop what precedes it. Nothing is
+        # consumed unless git is actually found, so a wrapper running something
+        # else is left alone.
+        if after_wrapper:
+            window = rest[1:1 + WRAPPER_ARG_WINDOW]
+            hit = next((i for i, t in enumerate(window, start=1)
+                        if GIT_VARIABLE.match(t) or os.path.basename(t) == "git"),
+                       None)
+            if hit is not None:
+                rest = rest[hit:]
+                continue
+        break
+    if rest and (GIT_VARIABLE.match(rest[0]) or os.path.basename(rest[0]) == "git"):
+        rest = ["git"] + rest[1:]
+    return env, rest
+
+
+def env_value(env_tokens, name):
+    """The value assigned to `name` by `env_tokens`, or `None`.
+
+    Tolerates an `export ` prefix on the token, which is how
+    `hooks/no-unauthorized-merge.py` anchors `ALLOW_MERGE`. A caller reading an
+    override must match that precedent or its documented escape valve will not
+    work for someone following it.
+    """
+    value = None
+    for tok in env_tokens:
+        bare = tok[len("export "):].lstrip() if tok.startswith("export ") else tok
+        key, sep, val = bare.partition("=")
+        if sep and key == name:
+            value = val
+    return value
+
+
 def git_subcommand(argv):
     """`(subcommand, rest, env)` when `argv` is a `git` invocation, else `None`.
 
-    `env` maps the leading `NAME=value` assignments, so a caller can read an
-    override prefix without re-scanning. `rest` is everything after the
-    subcommand word.
+    `env` is the leading assignment tokens, so a caller can read an override
+    prefix scoped to THIS command rather than to any segment of the line.
+    `rest` is everything after the subcommand word.
 
-    The subcommand is returned VERBATIM, which is what keeps a caller from
-    repeating `no-unshipped-commit.py`'s measured bug: a `\\b` word boundary
-    sits happily between `commit` and `-`, so `git commit-tree` and
-    `git commit-graph write` both matched a `git\\s+commit\\b` scan. Comparing
-    the whole token with `==` cannot make that mistake.
+    The subcommand is returned VERBATIM for the caller to compare with `==`,
+    which is what keeps a caller from repeating `no-unshipped-commit.py`'s
+    measured bug: a `\\b` word boundary sits happily between `commit` and `-`,
+    so a `git\\s+commit\\b` scan matched `git commit-tree` and
+    `git commit-graph write`.
     """
-    i, env = 0, {}
-    while i < len(argv) and (ASSIGNMENT.match(argv[i]) or argv[i] in LEAD_WORDS):
-        if ASSIGNMENT.match(argv[i]):
-            name, _, value = argv[i].partition("=")
-            env[name] = value
-        i += 1
-    if i >= len(argv) or argv[i] != "git":
+    env, rest = strip_env(argv)
+    if not rest or rest[0] != "git":
         return None
-    i += 1
-    while i < len(argv) and argv[i].startswith("-"):
-        i += 2 if argv[i] in GIT_VALUE_OPTS else 1
-    if i >= len(argv):
+    i = 1
+    while i < len(rest) and rest[i].startswith("-"):
+        i += 2 if rest[i] in GIT_VALUE_OPTS else 1
+    if i >= len(rest):
         return None  # bare `git`, or global options only
-    return argv[i], argv[i + 1:], env
+    return rest[i], rest[i + 1:], env

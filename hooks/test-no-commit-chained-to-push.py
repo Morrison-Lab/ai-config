@@ -56,20 +56,36 @@ def run_hook(command, tool_name="Bash"):
 
 # --------------------------------------------------------------- must fire
 
-# TEST CASE #1 -- the incident verbatim (ai-config#2992, 2026-09-02): an
-# `add`, a heredoc commit, an `echo`, and the push, all in one call. Per
-# `shared/workflow/algorithmatize-checks.md`'s "test the instrument against
-# the incident that prompted it, verbatim", this reproduces the shape rather
-# than a tidier summary of it -- heredoc and interleaved `echo` included.
+# TEST CASE #1 -- the REPORTED shape (ai-config#2992, 2026-09-02): an `add`, a
+# heredoc commit message, and the push, in one call. Reconstructed, not
+# verbatim: #2992's author states they verified the mechanism from the hook
+# registration and did NOT reproduce the lost commit, and the issue carries no
+# command text. Saying "verbatim" over a second-hand report is the overclaim
+# `shared/writing/fact-check-prose.md` exists to catch.
+#
+# The heredoc is the load-bearing part and is the reason this case is first.
+# An earlier revision of this fixture also carried an interleaved
+# `echo committed;`, and that `echo`'s semicolon was the ONLY reason it fired:
+# `scripts/lib/shellcmd.py`'s heredoc blanking emitted `<<` flush against the
+# newline-derived `;`, shlex merged them into one `<<;` token that the
+# separator test did not recognize, and the push was absorbed into the
+# commit's argv. The suite was green over a guard that was silent on the
+# commonest way this corpus writes a commit. Keep this case echo-free.
 INCIDENT = (
     "git add -A && git commit -F - <<'EOF'\n"
     "feat(hooks): add a guard\n"
     "\n"
     "Body text mentioning git push, because commit messages do.\n"
     "EOF\n"
-    "echo committed; git push -u origin hook-branch"
+    "git push -u origin hook-branch"
 )
-check("the measured incident shape", fires(INCIDENT), True)
+check("the reported incident shape", fires(INCIDENT), True)
+check("a heredoc commit and a push separated only by the terminator newline",
+      fires("git commit -F - <<'EOF'\nmsg\nEOF\ngit push"), True)
+check("a heredoc commit and a push joined with &&",
+      fires("git commit -F - <<'EOF'\nmsg\nEOF\n&& git push"), True)
+check("a heredoc commit and a push joined with ;",
+      fires("git commit -F - <<'EOF'\nmsg\nEOF\n; git push"), True)
 
 check("&& chained", fires("git commit -m x && git push"), True)
 check("semicolon separated", fires("git commit -m x; git push"), True)
@@ -84,6 +100,22 @@ check("env assignment prefixes",
       fires("GIT_AUTHOR_NAME=x git commit -m y; GIT_TERMINAL_PROMPT=0 git push"),
       True)
 check("subshell grouping", fires("(git commit -m x; git push)"), True)
+check("brace grouping", fires("{ git commit -m x; } && git push"), True)
+# The guard must fire wherever its siblings would. Each spelling below is
+# denied by no-push-without-self-review.py and was SILENT here until
+# scripts/lib/shellcmd.py adopted that guard's own wrapper classification.
+check("timeout wrapper on the push",
+      fires("git commit -m x && timeout 60 git push -u origin b"), True)
+check("absolute path to git",
+      fires("git commit -m x && /usr/bin/git push"), True)
+check("an unexpanded $GIT program token",
+      fires("git commit -m x && $GIT push"), True)
+check("sudo with its own options before git",
+      fires("git commit -m x && sudo -u me git push"), True)
+check("env wrapper on the commit",
+      fires("env git commit -m x && git push"), True)
+check("a retry loop body opening with do",
+      fires("git commit -m x; for i in 1 2; do git push; done"), True)
 check("extra whitespace", fires("git   commit  -m x ;  git   push"), True)
 check("an intervening unrelated command does not mask it",
       fires("git commit -m x; python3 scripts/check-links.py; git push"), True)
@@ -166,10 +198,26 @@ check("a grep for both strings",
 
 # 7. THE OVERRIDE, anchored to a real env assignment on one of the matched
 #    commands rather than to a mention anywhere in the text.
-check("override clears the refusal",
+check("override prefixing the commit clears the refusal",
       fires("ALLOW_COMMIT_AND_PUSH=1 git commit -m x && git push"), False)
-check("override on the push half also clears it",
+check("override prefixing the push also clears it",
       fires("git commit -m x && ALLOW_COMMIT_AND_PUSH=1 git push"), False)
+# `export` is accepted because no-unauthorized-merge.py's ALLOW_MERGE anchor
+# accepts it. An escape valve that rejects the spelling its own precedent uses
+# sends the author looking for a bypass instead.
+check("export as its own command clears it",
+      fires("export ALLOW_COMMIT_AND_PUSH=1 && git commit -m x && git push"),
+      False)
+check("a bare assignment as its own command clears it",
+      fires("ALLOW_COMMIT_AND_PUSH=1\ngit commit -m x\ngit push"), False)
+check("export prefixing the commit clears it",
+      fires("export ALLOW_COMMIT_AND_PUSH=1 git commit -m x && git push"),
+      False)
+# SCOPE. A stale prefix on some unrelated third command must NOT disarm the
+# guard -- it says nothing about the author having considered this call.
+check("an override on an unrelated third command does not clear it",
+      fires("ALLOW_COMMIT_AND_PUSH=1 git status --short && git commit -m x "
+            "&& git push"), True)
 check("a MENTION of the override does not clear it",
       fires("git commit -m 'set ALLOW_COMMIT_AND_PUSH=1 next time' && git push"),
       True)
@@ -245,29 +293,52 @@ check("unparseable command fails open", fires("git commit -m \"unclosed && git p
 #
 # `shared/principles/fail-fast.md`: a guard whose condition ANDs several
 # clauses masks its own mutation test, because breaking one clause leaves the
-# others still refusing the positive cases. So each mutation below is checked
-# against the specific case it should break, not against the suite as a whole.
+# others still refusing the positive cases. So each mutation is checked against
+# the specific case it should break rather than against the suite as a whole.
 #
-# This runs the real module under a patched dependency rather than editing the
-# file, so the check is reproducible in CI instead of being a claim about
-# something somebody did by hand once.
+# TWO properties are asserted per mutation, and the second is what an earlier
+# revision of this section lacked. A mutation that REPLACES `evaluate` with a
+# locally written stand-in asserts a property of the stand-in: an adversarial
+# review gutted `evaluate` to `return None` and two of the four mutations here
+# still passed, because they never called the original at all. So every
+# mutation now also asserts that the UNMUTATED module answers differently on
+# the same input. A mutation whose two halves agree is testing nothing, and
+# `_mutate` fails it explicitly rather than passing quietly.
 
-def _mutate(label, patch, command, expect):
-    """Apply `patch` to a fresh copy of the module and assert `evaluate`."""
+def _mutate(label, patch, command, expect_mutant):
+    """Assert the mutant answers `expect_mutant` AND the real module differs.
+
+    The differential half is the guard against a vacuous mutation. If the
+    unmutated module already gives the mutant's answer, the case distinguishes
+    nothing, and that is reported as a failure of the TEST rather than of the
+    hook.
+    """
+    baseline = hook.evaluate(command) is not None
+    if baseline == expect_mutant:
+        failures.append(
+            f"MUTATION {label}: vacuous -- the unmutated module also answers "
+            f"{baseline!r} on this input, so the case distinguishes nothing")
+        return
     mspec = importlib.util.spec_from_file_location("mutant", HOOK)
     mutant = importlib.util.module_from_spec(mspec)
     mspec.loader.exec_module(mutant)
     patch(mutant)
-    check(f"MUTATION {label}", mutant.evaluate(command) is not None, expect)
+    check(f"MUTATION {label}", mutant.evaluate(command) is not None,
+          expect_mutant)
 
 
-# M1 -- drop the ORDER constraint (treat any commit/push pair as a hit).
-#       Must start firing on push-then-commit, which is legitimate.
+# M1 -- drop the ORDER constraint. Patched at the COLLABORATOR (`git_subcommand`
+#       is left alone; the ordering state is what changes), so the real
+#       `evaluate` still runs. Must start firing on push-then-commit.
 def _drop_order(m):
+    real = m.evaluate
+
     def evaluate(command):
+        if real(command) is not None:
+            return "hit"
+        # order-blind fallback: any commit and any push anywhere
         cmds = m.simple_commands(command) or []
-        subs = [s for s in (m.git_subcommand(a) for a in cmds) if s]
-        names = {s[0] for s in subs}
+        names = {p[0] for p in (m.git_subcommand(a) for a in cmds) if p}
         return "hit" if {"commit", "push"} <= names else None
     m.evaluate = evaluate
 
@@ -275,20 +346,44 @@ def _drop_order(m):
 _mutate("dropping the order constraint fires on push-then-commit",
         _drop_order, "git push; git commit -m x", True)
 
-# M2 -- replace the argv split with a raw substring scan, the naive
-#       implementation this hook exists to avoid. Must start firing on a
-#       commit message that merely names a push.
-def _substring_scan(m):
-    def evaluate(command):
-        i = command.find("git commit")
-        j = command.find("git push")
-        return "hit" if 0 <= i < j else None
-    m.evaluate = evaluate
+# M2 -- replace the ARGV SPLIT with a raw substring scan, the naive
+#       implementation this hook exists to avoid. Patched at the collaborator,
+#       so the real `evaluate` runs over a deliberately quoting-blind split:
+#       every whitespace-separated word becomes its own one-token command, so
+#       `git push` inside a commit message reads as a command position.
+def _quoting_blind_split(m):
+    def split(command):
+        out, cur = [], []
+        for word in command.replace("&&", ";").replace("\n", ";").split():
+            if word == ";":
+                if cur:
+                    out.append(cur)
+                    cur = []
+            elif word.endswith(";"):
+                cur.append(word[:-1])
+                out.append(cur)
+                cur = []
+            else:
+                cur.append(word)
+        if cur:
+            out.append(cur)
+        # a quoting-blind scanner sees each `git <sub>` as its own command
+        flat = []
+        for argv in out:
+            i = 0
+            while i < len(argv):
+                if argv[i].strip("\"'") == "git" and i + 1 < len(argv):
+                    flat.append(["git", argv[i + 1].strip("\"'")])
+                    i += 2
+                else:
+                    i += 1
+        return flat or out
+    m.simple_commands = split
 
 
-_mutate("a raw substring scan fires on a quoted commit message",
-        _substring_scan, 'git commit -m "split the commit from the git push"',
-        True)
+_mutate("a quoting-blind split fires on a quoted commit message",
+        _quoting_blind_split,
+        'git commit -m "split the commit from the git push"', True)
 
 # M3 -- compare the subcommand with `startswith` instead of `==`, which is the
 #       `git\s+commit\b` bug `no-unshipped-commit.py` measured twice.
@@ -310,7 +405,8 @@ def _prefix_match(m):
 _mutate("prefix matching fires on git commit-tree",
         _prefix_match, "git commit-tree $T -m x; git push", True)
 
-# M4 -- stop honouring the override anchor (match a mention anywhere).
+# M4 -- widen the override to any mention. Must start CLEARING a deny it should
+#       not, so the expectation is False against a real-module baseline of True.
 def _loose_override(m):
     real = m.evaluate
 
@@ -325,6 +421,46 @@ _mutate("an unanchored override is cleared by a mere mention",
         _loose_override,
         "git commit -m 'set ALLOW_COMMIT_AND_PUSH=1 next time' && git push",
         False)
+
+# M5 -- read the override off ANY command rather than the commit or push,
+#       which is what an earlier revision did. A stale prefix on an unrelated
+#       `git status` then silently disarms the guard.
+def _unscoped_override(m):
+    real = m.evaluate
+
+    def evaluate(command):
+        for argv in (m.simple_commands(command) or []):
+            env, _rest = m.strip_env(argv)
+            if m.env_value(env, m.OVERRIDE) == "1":
+                return None
+        return real(command)
+    m.evaluate = evaluate
+
+
+_mutate("an unscoped override is cleared by a prefix on a third command",
+        _unscoped_override,
+        "ALLOW_COMMIT_AND_PUSH=1 git status --short && git commit -m x "
+        "&& git push",
+        False)
+
+# M6 -- restore the heredoc-blanking defect in the library: substitute a bare
+#       `<<` so it fuses with the newline-derived `;` into one `<<;` token the
+#       separator test does not recognize. Must go silent on the reported
+#       incident shape, which is the regression this suite exists to hold.
+def _fuse_heredoc(m):
+    import re as _re
+    real_split = m.simple_commands
+
+    def split(command):
+        import shellcmd as sc
+        patched = _re.sub(r"\\\r?\n", " ", command)
+        patched = sc.RX_HEREDOC.sub("<<", patched).replace("\n", ";")
+        return real_split(patched)
+    m.simple_commands = split
+
+
+_mutate("fusing the heredoc marker with the separator goes silent",
+        _fuse_heredoc, INCIDENT, False)
 
 if failures:
     print("FAILED:")

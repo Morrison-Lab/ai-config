@@ -151,6 +151,10 @@ jobs:
       - name: Run markdown fences library tests
         # ai-config#2540: scripts/lib/fences.py code block and code span parsing.
         run: python3 scripts/test_fences.py
+      - name: Run shell-command library tests
+        # ai-config#2992: scripts/lib/shellcmd.py argv splitting, heredoc
+        # blanking, and git-invocation classification.
+        run: python3 scripts/test_shellcmd.py
       - name: Run check-rendered-references tests
         # ai-config#2879: verify broken rendered reference checking and footnote isolation.
         run: python3 scripts/test_check_rendered_references.py

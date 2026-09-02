@@ -43,8 +43,9 @@ mutates a PR stays serial.
      one of those logins is among its `assignees`,
      or the user explicitly asked for work on that PR (or, via an explicit `chores` call, on the bot population) --- a mention such as "do not touch [#284](https://github.com/UCD-SERG/serodynamics/pull/284)" is not a request;
      exclude every other PR from the action queue before doing anything else, and name the excluded ones in the report so the user can assign or name any they want driven.
-     Keep the full listing for the stack detection in step 3, so an in-scope PR based on an out-of-scope PR's branch is still recognised as stacked (it is synced against that base as it stands;
-     the base itself is left to its author).
+     Keep the full listing for the stack detection in step 3, so an in-scope PR based on an out-of-scope PR's branch is still recognised as stacked.
+     Such a child is driven only while its base is clean or merged.
+     An open, unclean out-of-scope base is left to its author, and the child is parked and reported with it, per the stacked-PR rule in step 3.
      "Every open PR" anywhere in this skill means every PR that survives this filter.
      An out-of-scope PR (one that fails this test: another lab member's, or any other bot's, such as Dependabot's or a Copilot agent's) is not driven, reviewed, or edited, however clean it looks (see `memories/reviewing-prs.md`, "Only work PRs I opened, am assigned to, or asked for by name, or the Actions app authored";
      measured on `UCD-SERG/serodynamics` 2026-09-01, where the sweep drove four other authors' PRs before the correction arrived).
@@ -194,6 +195,9 @@ mutates a PR stays serial.
    review findings), complete ARDI on the base first to drive it to clean and
    merge it, then start the derived PR. Never run ARDI on a derived PR while its
    base is still open and unclean — you'd be reviewing against a moving target.
+   When the base fails the scope test in step 1, do not run ARDI on it either:
+   park the derived PR, report the pair so the user can assign or name the
+   base, and move to the next PR.
 
    A PR reaching **clean-but-unmerged** is that PR's terminal state, **not** a
    reason to pause the sweep: merging is human-gated (you don't self-merge), but

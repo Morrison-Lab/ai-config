@@ -571,6 +571,9 @@ GitHub Actions app (`github-actions`).
 A mention such as "do not touch" followed by a PR number is not a request, a
 claim comment confers no scope, and a sweep skill's "every open PR" means
 every PR that passes this test.
+A review-only run that CI or a skill invocation dispatched naming the target
+PR (an `@claude review`, a `claude-code-review.yml` run) is that explicit
+request, whoever authored the PR; it reviews and stops there.
 An out-of-scope PR is reported to the user and left untouched.
 When no identity operation is available, fail closed the way `ardia` does:
 leave the author and assignee arms unevaluated, act only on PRs the user

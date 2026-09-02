@@ -387,13 +387,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="what-counts-as-a-chore-pr" class="level2">
 <h2 class="anchored" data-anchor-id="what-counts-as-a-chore-pr">What counts as a chore PR</h2>
-<p>A PR is in scope if <strong>any</strong> of these hold:</p>
+<p>A PR is in scope when <strong>both</strong> of these hold:</p>
 <ul>
-<li>Author is a bot: <code>app/dependabot</code>, <code>dependabot[bot]</code>, <code>app/renovate</code>, <code>renovate[bot]</code>.</li>
-<li>Title is a conventional-commit chore: starts with <code>chore(</code> (e.g. <code>chore(actions):</code>, <code>chore(submodule):</code>, <code>chore(deps):</code>).</li>
-<li>Labels include <code>dependencies</code>.</li>
+<li>Its author passes <code>memories/reviewing-prs.md</code>’s scope test for this invocation: a dependency bot (<code>app/dependabot</code>, <code>dependabot[bot]</code>, <code>app/renovate</code>, <code>renovate[bot]</code>), the GitHub Actions app (<code>github-actions</code>, which opens <code>chore(submodule):</code> bumps), or the invoking user, or the invoking user is among its assignees. An explicit <code>chores</code> call names the Dependabot/Renovate population, which is what admits those two bots; it admits no other author.</li>
+<li>It looks like a chore: the title starts with <code>chore(</code> (e.g. <code>chore(actions):</code>, <code>chore(submodule):</code>, <code>chore(deps):</code>), or the labels include <code>dependencies</code>.</li>
 </ul>
-<p>Human-authored feature PRs are <strong>out of scope</strong> — those go through <code>ardia</code> / <code>gia</code> (review-to-clean), not this skill.</p>
+<p>Human-authored feature PRs are <strong>out of scope</strong> — those go through <code>ardia</code> / <code>gia</code> (review-to-clean), not this skill — and so is a chore-titled or <code>dependencies</code>-labelled PR whose author is another lab member or another bot, unless the invoking user is assigned to it.</p>
 </section>
 <section id="procedure" class="level2">
 <h2 class="anchored" data-anchor-id="procedure">Procedure</h2>
@@ -406,13 +405,19 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="list-the-open-chore-prs" class="level3">
 <h3 class="anchored" data-anchor-id="list-the-open-chore-prs">1. List the open chore PRs</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> pr list <span class="at">--repo</span> <span class="st">"</span><span class="va">$REPO</span><span class="st">"</span> <span class="at">--state</span> open <span class="at">--limit</span> 200 <span class="dt">\</span></span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">--json</span> number,title,author,labels,mergeable <span class="dt">\</span></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">--jq</span> <span class="st">'.[] | select(</span></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="st">          (.author.login | test("dependabot|renovate"))</span></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="st">          or (.title | startswith("chore("))</span></span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="st">          or ([.labels[].name] | index("dependencies"))</span></span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="st">        ) | "\(.number)\t\(.mergeable)\t\(.title)"'</span>   <span class="co"># LIST_PRS</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="va">ME</span><span class="op">=</span><span class="va">$(</span><span class="ex">gh</span> api user <span class="at">--jq</span> .login<span class="va">)</span>   <span class="co"># WHO_AM_I</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> pr list <span class="at">--repo</span> <span class="st">"</span><span class="va">$REPO</span><span class="st">"</span> <span class="at">--state</span> open <span class="at">--limit</span> 200 <span class="dt">\</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">--json</span> number,title,author,assignees,labels,mergeable <span class="dt">\</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>  <span class="kw">|</span> <span class="ex">jq</span> <span class="at">-r</span> <span class="at">--arg</span> me <span class="st">"</span><span class="va">$ME</span><span class="st">"</span> <span class="st">'.[] | select(</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="st">          (</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="st">            (.author.login | test("dependabot|renovate|github-actions"))</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="st">            or (.author.login == $me)</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="st">            or ([.assignees[].login] | index($me))</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="st">          ) and (</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="st">            (.title | startswith("chore("))</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="st">            or ([.labels[].name] | index("dependencies"))</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="st">          )</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="st">        ) | "\(.number)\t\(.mergeable)\t\(.title)"'</span>   <span class="co"># LIST_PRS</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p><code>--limit 200</code> because <code>gh pr list</code> defaults to 30 — a piled-up weekly backlog would otherwise be silently truncated.</p>
 <p>If there are none, say so and stop.</p>
 </section>
@@ -496,7 +501,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li>❌ Resolving a Dependabot merge conflict by hand — comment <code>@dependabot rebase</code> and let the bot redo it.</li>
 <li>❌ Force-merging a PR with <code>pending</code> or <code>fail</code> checks.</li>
 <li>❌ Reporting “chores done” while a flagged major bump is still open with no decision recorded.</li>
-<li>❌ Treating human feature PRs as chores (or vice-versa) — scope by author / <code>chore(</code> title / <code>dependencies</code> label.</li>
+<li>❌ Treating human feature PRs as chores (or vice-versa) — scope by author <strong>and</strong> <code>chore(</code> title or <code>dependencies</code> label, never by title or label alone.</li>
 </ul>
 
 

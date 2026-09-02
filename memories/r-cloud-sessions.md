@@ -72,6 +72,23 @@ which keeps the R-toolchain and R-package material that applies anywhere.
   HTML render is blocked. Let CI do the authoritative HTML render. (macros#71:
   DT/knitr uninstallable, but a base-R interpretation-completeness check + a
   lualatex PDF render of the new macros validated the change before push.)
+  **That installer can also fail while exiting 0.**
+  Measured 2026-09-01 in a remote Claude Code container: `quarto install
+  tinytex --no-prompt` printed `ERROR: Unable to determine latest release for
+  rstudio/tinytex-releases / 403 - Forbidden` (the unauthenticated
+  GitHub-releases lookup, the same signature `quarto-sites.md` records for
+  shared runners) and still returned exit 0, leaving no TeX at all, so a
+  `| tail` on its output read as success.
+  Verify with `quarto check` (`Tex: (not detected)`) rather than the exit
+  status.
+  The fallback that worked, about three minutes: `apt-get install -y
+  --no-install-recommends texlive-luatex texlive-latex-recommended
+  texlive-latex-extra texlive-fonts-recommended lmodern`, then
+  `texlive-fonts-extra` as well, because Quarto's callout preamble needs
+  `fontawesome5.sty`, which the first set does not carry (`! LaTeX Error:
+  File 'fontawesome5.sty' not found`).
+  - **Do:** read `quarto check` after installing TinyTeX in a container.
+  - **Don't:** trust `quarto install tinytex`'s exit code, or a tailed log.
   **Before accepting "uninstallable," try `install.packages()` straight from a
   source CRAN mirror** (`options(repos = c(CRAN = "https://cloud.r-project.org"));
   install.packages(c("knitr", "rmarkdown", "DT"))`, no P3M) — it builds sass/DT

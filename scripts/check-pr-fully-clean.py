@@ -1532,74 +1532,9 @@ _ITEM_NON_BLOCKING_TAG = re.compile(
 )
 
 
-# A finding item written as a resolution LOG entry: a bold past-status lead
-# ("**Previously: <what was wrong>.**") followed by the disposition. The
-# reviewer that writes these puts the explanation of the fix AFTER the
-# resolution verb ("Now fixed --- `foo.md:25` includes ..."), so the
-# end-of-line test below never matches and a fully resolved section reads as
-# open findings (ai-config#2945, measured on #2913's 2026-09-02T00:26Z
-# review). Two signals are required, not one: the lead names the line as a
-# report of a PRIOR finding, and a resolution verb after it states the
-# disposition. "closed" is deliberately absent from the verb list, since
-# "closed as not planned" is a deferral, not a resolution.
-#
-# The lead runs to the first closing ``**``, so a glob or nested emphasis
-# inside the clause (``**Previously: *.md files were skipped.**``) still
-# matches; code spans are blanked before this scan runs.
-_PRIOR_STATUS_LEAD = re.compile(
-    r"(?i)^[ \t]*(?:[-*+]|\d+[.)])?[ \t]*\*\*\s*"
-    r"(?:previously|was|prior(?:\s+round)?|earlier|before)\s*:.*?\*\*"
-)
-_RESOLUTION_VERB = re.compile(
-    r"(?i)\b(?:"
-    r"(?:is|are|has|have)\s+(?:now\s+|been\s+|also\s+)*(?:fully\s+|completely\s+)?"
-    r"|now\s+"
-    r")?"
-    r"(?:fixed|resolved|addressed|removed|corrected|cleared)\b"
-)
-def _prior_status_item_is_resolved(line: str, structured_clean: bool = False) -> bool:
-    """True for "**Previously: X.** <...> fixed/resolved/addressed <explanation>".
-
-    The lead and a resolution verb are required, and a negator or hedge
-    between them keeps the item open (_NEGATOR_RE, _PREFIX_DISQUALIFY_RE, the
-    same two the end-of-line path applies before its verb); the caller has
-    already rejected any line carrying an unresolved phrase.
-
-    What may follow the verb is decided the way the end-of-line path decides
-    it: the remainder must match _AFFIRMATIVE_RESOLUTION_SUFFIX, a short closed
-    allowlist. A free-prose explanation of the fix fails that test, by design,
-    since no word list can tell "Now fixed; the pathspec is quoted" from "Now
-    fixed; the query leaks memory on every call". The ONE way such an
-    explanation is accepted is *structured_clean*: the same comment's
-    machine-readable payload declares a CLEAN verdict with a PRESENT, EMPTY
-    findings list (payload_is_clean). That is a third, independent statement
-    by the reviewer -- its finding COUNT, the thing fully-clean.md says
-    structured output should carry -- alongside the resolved heading and the
-    per-item lead, and the reviewer that writes resolution logs emits it. A
-    log with no payload, or a payload listing any finding, falls back to the
-    end-of-line rule and reads as open (ai-config#2945).
-    """
-    lead = _PRIOR_STATUS_LEAD.match(line)
-    if not lead:
-        return False
-    rest = line[lead.end():]
-    verb = _RESOLUTION_VERB.search(rest)
-    if not verb:
-        return False
-    before = rest[:verb.start()]
-    if _NEGATOR_RE.search(before) or _PREFIX_DISQUALIFY_RE.search(before):
-        return False
-    after = rest[verb.end():]
-    if _AFFIRMATIVE_RESOLUTION_SUFFIX.match(after):
-        return True
-    return structured_clean
-
-
-def _item_is_resolved(line: str, structured_clean: bool = False) -> bool:
+def _item_is_resolved(line: str) -> bool:
     if _LINE_UNRESOLVED_WORDS.search(line):
         return False
-    if _prior_status_item_is_resolved(line, structured_clean):
-        return True
     res_match = _LINE_RESOLUTION_WORDS.search(line)
     if not res_match:
         return False
@@ -1619,7 +1554,7 @@ def _item_is_resolved(line: str, structured_clean: bool = False) -> bool:
 
 
 def _section_has_unresolved_blocking_items(
-    section: str, is_non_blocking_heading: bool = False, structured_clean: bool = False
+    section: str, is_non_blocking_heading: bool = False
 ) -> bool:
     """True when the section contains unresolved severity-tagged, untagged, or blocking items."""
     for line in section.splitlines():
@@ -1629,7 +1564,7 @@ def _section_has_unresolved_blocking_items(
         if _LINE_UNRESOLVED_WORDS.search(line):
             return True
         if _SECTION_FINDING_ITEM.search(line):
-            if _item_is_resolved(line, structured_clean):
+            if _item_is_resolved(line):
                 continue
             if is_non_blocking_heading and _ITEM_NON_BLOCKING_TAG.search(line):
                 continue
@@ -1638,7 +1573,7 @@ def _section_has_unresolved_blocking_items(
 
 
 def _is_exempt_findings_heading(
-    scan_body: str, match_start: int, match_end: int, structured_clean: bool = False
+    scan_body: str, match_start: int, match_end: int
 ) -> bool:
     """True when a Findings heading indicates non-blocking or resolved findings,
     AND the section body underneath it contains no unresolved severity-tagged, untagged, or blocking items.
@@ -1671,9 +1606,7 @@ def _is_exempt_findings_heading(
         if next_heading
         else scan_body[section_start:]
     )
-    if _section_has_unresolved_blocking_items(
-        section, is_non_blocking_heading=is_non_blocking, structured_clean=structured_clean
-    ):
+    if _section_has_unresolved_blocking_items(section, is_non_blocking_heading=is_non_blocking):
         return False
 
     return True
@@ -2118,11 +2051,6 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
     if payload_is_blocking(structured):
         return f"structured blocking verdict ({normalize_verdict(structured.get('verdict'))})"
 
-    # A CLEAN payload with a present, empty findings list is the reviewer's
-    # own finding count; it is consulted only inside a resolved Findings
-    # section (see _prior_status_item_is_resolved) and never overrides an
-    # unresolved item or a not-clean phrase.
-    structured_clean = payload_is_clean(structured)
     scan_body, cited = strip_cited_finding_vocab_with_mask(body)
     for pat in FINDING_PATTERNS:
         for match in re.finditer(pat, scan_body, re.IGNORECASE | re.MULTILINE):
@@ -2138,7 +2066,7 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
             if pat == _BARE_REJECTION:
                 if _is_resolved_blocking_mention(scan_body, match, cited):
                     continue
-                if _is_exempt_findings_heading(scan_body, match.start(), match.end(), structured_clean):
+                if _is_exempt_findings_heading(scan_body, match.start(), match.end()):
                     continue
             if pat == _FINDINGS_HEADING_PATTERN:
                 # The section-resolution check REPLACES the 60-char suffix
@@ -2148,12 +2076,12 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
                 # #2370's review of this very fix). The replacement keeps
                 # the shortcut's first-line trigger and adds the item veto
                 # over the rest of the section.
-                if _is_exempt_findings_heading(scan_body, match.start(), match.end(), structured_clean):
+                if _is_exempt_findings_heading(scan_body, match.start(), match.end()):
                     continue
                 if _findings_section_resolves_empty(scan_body, match.end()):
                     continue
             elif pat in FINDING_HEADING_PATTERNS:
-                if _is_exempt_findings_heading(scan_body, match.start(), match.end(), structured_clean):
+                if _is_exempt_findings_heading(scan_body, match.start(), match.end()):
                     continue
                 suffix = scan_body[match.end():match.end() + 60]
                 if NOT_CLEAN_NEGATION_SUFFIX.search(suffix):

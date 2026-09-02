@@ -2359,101 +2359,51 @@ def main() -> int:
               "### Findings \u2014 non-blocking\n\n- Minor formatting note.\n\n"
               "### Verdict\nReady for merge\n")
           is None)
-    # ai-config#2945: a resolution LOG whose items are "**Previously: X.** Now
-    # fixed --- <explanation>". The heading already read as resolved (#2781),
-    # but each item's resolution verb is followed by the explanation of the
-    # fix, so the end-of-line resolution test never matched and the section
-    # scored as open findings. The fixture is #2913's 2026-09-02T00:26Z review
-    # section, verbatim apart from shortened explanations.
+    # ai-config#2945, a NEGATIVE result pinned as tests. A resolution log
+    # whose items read "**Previously: X.** Now fixed --- <explanation>" under a
+    # resolved Findings heading scores as open findings, because no lexical
+    # rule can tell "Now fixed; the pathspec is quoted" from "Now fixed; the
+    # query leaks memory on every call", and a same-comment CLEAN payload is
+    # the same author's verdict line in JSON, which fully-clean.md says loses
+    # to findings. Two attempts (a caveat blocklist, a payload gate) were
+    # withdrawn in #2950. The reviewer-side format that reads clean today is
+    # asserted below: resolved prior findings under a heading that is not a
+    # Findings heading, with `### Findings` reporting none.
     prior_status_log = (
         "### Findings \u2014 all three from the prior rounds are now resolved\n\n"
         "1. **Previously: `LIST_PRS` omitted `assignees`.** Now fixed \u2014 "
-        "`skills/ardia/SKILL.md:25` includes `assignees` in the `--json` field list, "
-        "and the same field was propagated to every other `gh pr list` call this PR touches.\n"
-        "2. **Previously: duplicated scope bullet in `ardia/SKILL.md`.** The old bullet "
-        "has been fully removed (confirmed via `grep`, zero hits) and consolidated into "
-        "the new bullet at `skills/ardia/SKILL.md:32-49`.\n"
-        "3. **Previously: hardcoded `d-morrison`/`dem-extra1` in tension with the "
-        "\"Never hardcode usernames\" rule.** Now addressed with an explicit, accurate "
-        "citation: `memories/reviewing-prs.md:80-82` states the exemption verbatim.\n\n"
+        "`skills/ardia/SKILL.md:25` includes `assignees` in the `--json` field list.\n"
+        "2. **Previously: duplicated scope bullet.** The old bullet has been fully removed "
+        "(confirmed via `grep`, zero hits).\n\n"
         "### Verdict\n\nReady for merge\n"
     )
-    structured_clean_block = (
-        "\n<!-- review-data:\n"
-        '{"schema_version": "1.0", "reviewer": "claude", "commit_sha": "fb8283797176964be41d23792c168b2e936ecf11", '
-        '"verdict": "CLEAN", "findings": []}\n-->\n'
-    )
-    check("a resolved Findings log whose items lead with Previously: resolves when the same comment's "
-          "structured payload is CLEAN with an empty findings list (#2945)",
-          checker._unresolved_finding_pattern(prior_status_log + structured_clean_block) is None)
-    check("the same log with no structured payload stays open: free-prose explanations need the reviewer's own count (#2945)",
+    check("a resolution log with free-prose explanations under a resolved Findings heading stays open by design (#2945)",
           checker._unresolved_finding_pattern(prior_status_log) is not None)
-    check("the same log with a structured payload listing a finding stays open (#2945)",
+    check("the same log stays open even with a same-comment CLEAN payload: the payload is the author's own verdict, and findings win (#2945)",
           checker._unresolved_finding_pattern(
               prior_status_log
               + "\n<!-- review-data:\n"
-              + '{"schema_version": "1.0", "reviewer": "claude", "verdict": "CLEAN", '
-              + '"findings": [{"file": "a.md", "line": 1, "message": "x"}]}\n-->\n'
+              + '{"schema_version": "1.0", "reviewer": "claude", "verdict": "CLEAN", "findings": []}\n-->\n'
           ) is not None)
-    check("Previously: item whose explanation is the end-of-line affirmative suffix resolves without a payload (#2945)",
+    check("the reviewer-side format resolves: prior findings under a non-Findings heading, Findings reporting none (#2945)",
+          checker._unresolved_finding_pattern(
+              "### Resolved since the last round\n\n"
+              "1. **Previously: `LIST_PRS` omitted `assignees`.** Now fixed \u2014 "
+              "`skills/ardia/SKILL.md:25` includes `assignees` in the `--json` field list.\n"
+              "2. **Previously: duplicated scope bullet.** The old bullet has been fully removed.\n\n"
+              "### Findings\n\nNone.\n\n### Verdict\n\nReady for merge\n"
+          ) is None)
+    check("a Previously: item whose resolution closes the line resolves under a resolved Findings heading (#2945)",
           checker._unresolved_finding_pattern(
               "### Findings \u2014 all resolved\n\n"
               "1. **Previously: X.** Now fixed in abc1234.\n\n### Verdict\n\nReady for merge\n"
           ) is None)
-    check("Previously: item whose free-prose explanation names a new defect stays open without a payload (#2945)",
+    check("a Previously: item whose explanation names a new defect stays open (#2945)",
           checker._unresolved_finding_pattern(
               "### Findings \u2014 all resolved\n\n"
               "1. **Previously: X.** Now fixed; the query now leaks memory on every call.\n\n"
               "### Verdict\n\nReady for merge\n"
           ) is not None)
-    check("Previously: item followed by 'Still not fixed' stays open (#2945)",
-          checker._unresolved_finding_pattern(
-              "### Findings \u2014 all resolved\n\n"
-              "1. **Previously: X.** Still not fixed \u2014 see below.\n\n### Verdict\n\nReady for merge\n"
-          ) is not None)
-    check("Previously: item whose verb is hedged ('Should be fixed by') stays open (#2945)",
-          checker._unresolved_finding_pattern(
-              "### Findings \u2014 all resolved\n\n"
-              "1. **Previously: X.** Should be fixed by the next push.\n\n### Verdict\n\nReady for merge\n"
-          ) is not None)
-    check("Previously: item negated before the verb ('was not applied') stays open (#2945)",
-          checker._unresolved_finding_pattern(
-              "### Findings \u2014 all resolved\n\n"
-              "1. **Previously: X.** The fix was not applied.\n\n### Verdict\n\nReady for merge\n"
-          ) is not None)
-    check("Previously: item 'closed as not planned' is a deferral, not a resolution (#2945)",
-          checker._unresolved_finding_pattern(
-              "### Findings \u2014 all resolved\n\n"
-              "1. **Previously: X.** Closed as not planned.\n\n### Verdict\n\nReady for merge\n"
-          ) is not None)
-    check("an item without the Previously: lead still needs the end-of-line resolution (#2945)",
-          checker._unresolved_finding_pattern(
-              "### Findings \u2014 all resolved\n\n"
-              "1. **Defect** `foo()` crashes on empty input. Now fixed in abc1234 but the test is missing.\n\n"
-              "### Verdict\n\nReady for merge\n"
-          ) is not None)
-    check("Previously: item whose explanation reintroduces the bug stays open (#2945)",
-          checker._unresolved_finding_pattern(
-              "### Findings \u2014 all resolved\n\n"
-              "1. **Previously: X.** Removed the guard, which reintroduces the crash.\n\n### Verdict\n\nReady for merge\n"
-          ) is not None)
-    check("Previously: item resolved 'in the docstring; the code is unchanged and still wrong' stays open (#2945)",
-          checker._unresolved_finding_pattern(
-              "### Findings \u2014 all resolved\n\n"
-              "1. **Previously: X.** Now addressed in the docstring; the code is unchanged and still wrong.\n\n"
-              "### Verdict\n\nReady for merge\n"
-          ) is not None)
-    check("Previously: item 'Now fixed, but the test is missing' stays open (#2945)",
-          checker._unresolved_finding_pattern(
-              "### Findings \u2014 all resolved\n\n"
-              "1. **Previously: X.** Now fixed, but the test is missing.\n\n### Verdict\n\nReady for merge\n"
-          ) is not None)
-    check("Previously: lead containing a glob asterisk still resolves (#2945)",
-          checker._unresolved_finding_pattern(
-              "### Findings \u2014 all resolved\n\n"
-              "1. **Previously: *.md files were skipped by the glob.** Now fixed \u2014 the pathspec is quoted "
-              "and the run lists all 731 files.\n\n### Verdict\n\nReady for merge\n" + structured_clean_block
-          ) is None)
     check("### Findings from prior rounds --- now resolved resolves (#2781)",
           checker._unresolved_finding_pattern(
               "### Findings from prior rounds \u2014 now resolved\n\n"

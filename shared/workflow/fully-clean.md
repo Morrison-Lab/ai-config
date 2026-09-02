@@ -701,6 +701,31 @@ NOT clean over a clean verdict.**
 - **Don't:** treat a `contains findings (matched pattern ...)` line as a real
   finding without reading the verdict body it matched.
 
+**One shape of that false positive is deliberate, and the fix for it is on the
+reviewer's side: a resolution log filed under a `Findings` heading.**
+A confirming review that writes
+`### Findings --- all three from the prior rounds are now resolved` and lists
+`1. **Previously: X.** Now fixed --- <explanation of the fix>` scores as open
+findings, because the explanation after the verb is free prose and no lexical
+rule can tell "Now fixed; the pathspec is quoted" from "Now fixed; the query
+leaks memory on every call".
+The same comment's structured `CLEAN` payload does not change that, since it is
+the same author's verdict line in JSON, and the rule above says findings win.
+Two narrowing attempts, a caveat word-list and a payload gate, were withdrawn
+in [#2950](https://github.com/Morrison-Lab/ai-config/pull/2950); the tests
+that pin the safe behaviour are in `scripts/test_check_pr_fully_clean.py`
+([#2945](https://github.com/Morrison-Lab/ai-config/issues/2945)).
+What reads clean today is the format the checker was built for: resolved
+prior findings under a heading that is not a `Findings` heading
+(`### Resolved since the last round`), and `### Findings` reporting `None.`
+A resolution whose whole disposition closes the line
+(`**Previously: X.** Now fixed in abc1234.`) also resolves under any heading.
+
+- **Do:** when a review of yours must recount resolved prior findings, file
+  them under a non-`Findings` heading and keep `### Findings` for open ones.
+- **Don't:** ask the checker to read a free-prose explanation as a resolution;
+  the human reading the verdict body is the fallback the rule above names.
+
 **Calling the checker is not consuming it: grepping its PROSE instead of
 reading its EXIT STATUS re-opens the whole failure one layer up.**
 

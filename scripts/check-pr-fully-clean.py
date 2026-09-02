@@ -1163,6 +1163,49 @@ _BARE_REJECTION = (
 # tense-checked ("is/are/was/were ... fixed", "has/have been fixed", "no
 # longer applies") so a live directive like "must be fixed before merge"
 # never reads as already resolved.
+# The method phrase after a resolution verb ("fixed by re-running the
+# suite", "resolved via a rebase") and after the verified continuation
+# below ("fixed and verified by executing the script"). One definition, so
+# the forbidden-token lookahead that keeps "fixed by disabling the test"
+# not-clean guards both sites identically (ai-config#2957).
+_RESOLUTION_METHOD_PHRASE = (
+    r"(?:\s+(?:by|in|via|with|through|as|per|on|against)\b"
+    r"(?:(?!\b(?:and|but|while|although|however|yet|though|"
+    r"not|never|neither|nor|no|none|nothing|without|"
+    r"hardly|barely|scarcely|zero|"
+    r"partially?|incomplete(?:ly)?|ignor(?:e|ed|ing|es)?|omit(?:s|ted|ting)?|skip(?:s|ped|ping)?|"
+    r"except|unresolved|unfixed|unaddressed|open|reproduce[s]?|broken|failing|fails?|"
+    r"(?:suppress|disabl|mut|weaken|bypass|silenc|remov|delet|revert)(?:e|ed|ing)?\s+(?:(?:the|an?|all|these|those|that|our|any)\s+)?(?:[a-z0-9_-]+\s+)?(?:tests?|checks?|assertions?|warnings?|linters?|guards?|lints?|detectors?|errors?)|"
+    r"comment(?:ed|ing)?\s+out\s+(?:(?:the|an?|all|these|those|that|our|any)\s+)?(?:[a-z0-9_-]+\s+)?(?:tests?|checks?|assertions?|warnings?|linters?|guards?|lints?|detectors?|errors?))\b)"
+    r"(?:\([^()\n]{0,120}\)|[^;:,.!?()]|\.(?!\s|$))){1,180})?"
+)
+
+# "are fixed and verified by <method>" is how a reviewer says the fix was
+# checked rather than merely made. The method phrase reuses the guarded
+# body above, so the continuation admits no more than the bare form does.
+_RESOLUTION_VERIFIED_CONTINUATION = (
+    r"\s+and\s+(?:re-?)?(?:verified|confirmed|validated|checked)\b"
+    + _RESOLUTION_METHOD_PHRASE
+)
+
+# A `;`-joined clause after a resolved mention, admitted only when nothing
+# in it could carry a finding: no negator, and none of the open, remaining,
+# obligation, failure, or finding vocabulary. Anything else fails safe and
+# the mention stays blocking (ai-config#2957).
+_BENIGN_TRAILING_CLAUSE = re.compile(
+    r"^\s*(?:(?!\b(?:not|never|neither|nor|no|none|nothing|without"
+    r"|hardly|barely|scarcely|zero"
+    r"|open|unresolved|unfixed|unaddressed|outstanding|pending"
+    r"|remain(?:s|ing|ed)?|still|yet"
+    r"|must|should|needs?|required?|todo|fixme|before\s+merg(?:e|ing)"
+    r"|broken|failing|fails?|regress(?:es|ed|ion|ions)?"
+    r"|partial(?:ly)?|incomplete(?:ly)?|except"
+    r"|block(?:ed|ing|ers?)?|reject(?:ed)?|unapproved"
+    r"|nits?|findings?|issues?|bugs?)\b)"
+    r"[^;\n]){1,240}$",
+    re.IGNORECASE,
+)
+
 RESOLVED_BLOCKING_SUFFIX = re.compile(
     r"^(?:(?!\b(?:and|but|while|although|however)\b)"
     r"(?:\([^()\n]{0,120}\)|[^,:;.!?()])){0,120}\b(?:"
@@ -1172,18 +1215,11 @@ RESOLVED_BLOCKING_SUFFIX = re.compile(
     r"(?:fixed|resolved|addressed|closed|removed|corrected)"
     r"|no\s+longer\s+applies"
     r")\b"
-    r"(?:\s+(?:by|in|via|with|through|as|per|on)\b"
-    r"(?:(?!\b(?:and|but|while|although|however|yet|though|"
-    r"not|never|neither|nor|no|none|nothing|without|"
-    r"hardly|barely|scarcely|zero|"
-    r"partially?|incomplete(?:ly)?|ignor(?:e|ed|ing|es)?|omit(?:s|ted|ting)?|skip(?:s|ped|ping)?|"
-    r"except|unresolved|unfixed|unaddressed|open|reproduce[s]?|broken|failing|fails?|"
-    r"(?:suppress|disabl|mut|weaken|bypass|silenc|remov|delet|revert)(?:e|ed|ing)?\s+(?:(?:the|an?|all|these|those|that|our|any)\s+)?(?:[a-z0-9_-]+\s+)?(?:tests?|checks?|assertions?|warnings?|linters?|guards?|lints?|detectors?|errors?)|"
-    r"comment(?:ed|ing)?\s+out\s+(?:(?:the|an?|all|these|those|that|our|any)\s+)?(?:[a-z0-9_-]+\s+)?(?:tests?|checks?|assertions?|warnings?|linters?|guards?|lints?|detectors?|errors?))\b)"
-    r"(?:\([^()\n]{0,120}\)|[^;:,.!?()]|\.(?!\s|$))){1,180})?"
-    r"(?:"
+    + _RESOLUTION_METHOD_PHRASE
+    + r"(?:"
     r"\s+and\s+(?:confirmed\s+)?passing"
-    r"|,?\s+and\s+(?:(?![.!?])[\s\S]){1,180}\b"
+    + "|" + _RESOLUTION_VERIFIED_CONTINUATION
+    + r"|,?\s+and\s+(?:(?![.!?])[\s\S]){1,180}\b"
     r"(?:is|are|was|were)\s+(?:also\s+)?"
     r"(?:fixed|resolved|addressed|closed|removed|corrected)"
     r"|,?\s+with\s+no\s+new\s+(?:issues?|findings?)"
@@ -1335,9 +1371,20 @@ def _has_resolution_suffix(scan: str, match: re.Match) -> bool:
     if paragraph is None:
         return False
     following = paragraph.group(0)[sentence.end():]
+    if AFFIRMATIVE_RESOLUTION_FOLLOWUP.fullmatch(following) is None:
+        return False
+    text = sentence.group(0)
+    if RESOLVED_BLOCKING_SUFFIX.fullmatch(text) is not None:
+        return True
+    # A `;`-joined clause is inside the sentence, so it defeats the `$`
+    # anchor even when it carries nothing. Retry on the head alone and
+    # require the tail to be provably benign (ai-config#2957).
+    head, sep, tail = text.partition(";")
+    if not sep:
+        return False
     return (
-        RESOLVED_BLOCKING_SUFFIX.fullmatch(sentence.group(0)) is not None
-        and AFFIRMATIVE_RESOLUTION_FOLLOWUP.fullmatch(following) is not None
+        RESOLVED_BLOCKING_SUFFIX.fullmatch(head) is not None
+        and _BENIGN_TRAILING_CLAUSE.fullmatch(tail) is not None
     )
 
 

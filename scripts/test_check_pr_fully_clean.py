@@ -1852,6 +1852,40 @@ def main() -> int:
               "### Verdict\n**Ready for merge.** The previously blocking "
               "line-break failure is fixed and confirmed passing.\n", "")
           == "clean")
+    # ai-config#2957: "fixed and verified by <method>" is a fourth
+    # continuation, and a `;` clause after it is admitted only when benign.
+    # The clean case is the wai#187 round-4 verdict line verbatim.
+    _wai187_verdict = (
+        "### Verdict\n\n**Ready for merge** \u2014 both previously blocking "
+        "issues are fixed and verified by actually executing the spellcheck "
+        "script against the current checkout (clean exit, \"No spelling "
+        "errors found\"); the one new commit since the last round is a "
+        "small, accurate documentation correction.\n"
+    )
+    check("'fixed and verified by <method>; <benign clause>' reads as clean (#2957)",
+          checker.classify_verdict(_wai187_verdict, "") == "clean")
+    check("'fixed and verified by <method>' with no ';' clause reads as clean",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The previously blocking "
+              "failure is fixed and verified by re-running the suite.\n", "")
+          == "clean")
+    check("'fixed and verified by disabling the failing test' stays not-clean",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The previously blocking "
+              "failure is fixed and verified by disabling the failing test.\n", "")
+          == "not-clean")
+    check("a ';' clause that leaves a finding open stays not-clean",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The previously blocking "
+              "crash is fixed and verified by running the suite; the second "
+              "finding remains open.\n", "")
+          == "not-clean")
+    check("a ';' clause carrying a negator stays not-clean (fails safe)",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The previously blocking "
+              "crash is fixed and verified by running the suite; nothing else "
+              "was checked.\n", "")
+          == "not-clean")
     check("a resolved prior verdict blocking issue is not an active finding",
           checker.classify_verdict(
               "### Verdict\n**Ready for merge.** The prior verdict's blocking "

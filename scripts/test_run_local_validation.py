@@ -87,6 +87,58 @@ def _write_fixture(tmp):
     return wf
 
 
+SIBLING = """
+name: review
+on:
+  pull_request:
+    types: [opened, synchronize]
+  workflow_dispatch:
+jobs:
+  review:
+    uses: Morrison-Lab/gha/.github/workflows/claude-review.yml@v2
+"""
+
+
+def test_other_workflow_files():
+    """#1881: every other workflow file beside the target is listed as NOT RUN
+    with its triggers, so a check living outside validate.yml is visible in
+    the denominator rather than silently absent from it."""
+    with tempfile.TemporaryDirectory() as tmp:
+        wf = _write_fixture(tmp)
+        (Path(tmp) / "review.yml").write_text(SIBLING, encoding="utf-8")
+        (Path(tmp) / "broken.yaml").write_text("jobs: [unclosed", encoding="utf-8")
+        sib = rlv.other_workflow_files(wf)
+        names = [s.name for s in sib]
+        check("other_workflow_files lists every other workflow file and never the target",
+              names == ["broken.yaml", "review.yml"])
+        check("every other file is NOT RUN, sourced as [workflow]",
+              all(not s.runnable and s.source == "workflow" for s in sib))
+        review = next(s for s in sib if s.name == "review.yml")
+        check("an other file's note names its on: triggers",
+              "pull_request" in review.note and "workflow_dispatch" in review.note)
+        broken = next(s for s in sib if s.name == "broken.yaml")
+        check("an unparseable other file is listed with the parse error rather than dropped",
+              "could not parse" in broken.note)
+        # PyYAML reads a bare `on:` key as True; the trigger reader must see it.
+        check("_triggers reads the YAML-1.1 True spelling of on:",
+              rlv._triggers({True: ["push", "pull_request"]}) == "push, pull_request")
+        out = io.StringIO()
+        with redirect_stdout(out):
+            rc = rlv.main(["--workflow", str(wf), "--list", "--root", tmp])
+        text = out.getvalue()
+        check("--list prints the other file as NOT RUN [workflow]",
+              rc == 0 and "NOT RUN  [workflow] review.yml: other workflow file, not derived (on: pull_request, workflow_dispatch)" in text)
+        check("--list tally counts the other files apart from the derived steps",
+              "plus 2 other workflow file(s) listed as NOT RUN" in text and "step(s) derived from" in text)
+        out = io.StringIO()
+        with redirect_stdout(out):
+            rlv.main(["--workflow", str(wf), "--list", "--no-other-workflows", "--root", tmp])
+        check("--no-other-workflows drops them and the tally has no plus clause",
+              "review.yml" not in out.getvalue() and "plus" not in out.getvalue())
+        check("_denominator with no other files is the plain derived count",
+              rlv._denominator(5, 0, "w.yml") == "5 step(s) derived from w.yml")
+
+
 def test_derive_steps():
     import yaml
     steps = rlv.derive_steps(yaml.safe_load(FIXTURE), "validate", "origin/main")
@@ -230,6 +282,7 @@ def test_live_workflow_derives_every_python_test_suite():
 
 def main():
     test_expression_regex_edge_cases()
+    test_other_workflow_files()
     test_derive_steps()
     test_missing_job_is_exit_2()
     test_list_does_not_execute()

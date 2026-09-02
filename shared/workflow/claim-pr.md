@@ -268,9 +268,10 @@ The reconciliation was correct (its rationale for preferring the wider scan hold
 - **Don't:** assume a live claim comment stops a bot (or a second session) from pushing to the branch it names --- this is the same collision `check-before-pushing.md`'s "Ownership is what suppresses the check" section already lists, observed again with a claim already standing.
 - **Don't:** treat a local reconciliation commit as shipped just because it exists and is correct --- check the PR's actual merged head (`gh pr view <N> --json mergeCommit,mergedAt`) before crediting it with anything, since a merge that completes first ships the branch as it stood, not your unpushed fix-up on top of it.
 
-**When the second driver has already pushed over your live claim, the cheap
-resolution is to stop driving and merge-gate, not to race.**
-Measured 2026-09-01 during a `gia` sweep of this repo: the sweep posted claim
+**Fourth occurrence, 2026-09-01 --- when the second driver has already pushed
+over your live claim, the cheap resolution is to stop driving and merge-gate,
+not to race.**
+During a `gia` sweep of this repo, the sweep posted claim
 comments on [#2913](https://github.com/Morrison-Lab/ai-config/pull/2913) and
 [#2924](https://github.com/Morrison-Lab/ai-config/pull/2924), pushed one round
 to each, and within the hour another Claude Code session pushed its own round

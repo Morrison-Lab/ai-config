@@ -173,10 +173,9 @@ it.
 
 On the second denial itself the hook states the tension and stops. Pattern
 43's Do bullet says to stop probing after the second denial of the same goal
-and hand the user the decision; #2994 measured a success after three
-denials. Both are in this corpus, neither has been retired, and a guard is
-the wrong place to settle it -- so the message puts both to the user, which is
-what
+and hand the user the decision; #2994 measured a success after three denials.
+Both are in this corpus, neither has been retired, and a guard is the wrong
+place to settle it -- so the message puts both to the user, which is what
 Pattern 43's Do bullet asks for anyway. Reconciling the two texts is tracked
 as ai-config#3008.
 
@@ -390,9 +389,15 @@ def unretried(path):
     denials since the classifier last let the command through, which is what
     the advice turns on; `total` is every denial of it in this transcript,
     which is what the message reports and what the sentinel keys on, because
-    it never goes back down. `shapes` is how many DISTINCT commands the
-    classifier has denied at all, which is the only visible trace of a
-    session rephrasing one goal.
+    it never goes back down. `shapes` is simply how many candidates there
+    are -- distinct commands standing denied with no re-attempt -- which is
+    the only visible trace of a session rephrasing one goal. A command the
+    classifier later allowed is excluded by the candidate filter itself,
+    because an allowed run IS a re-attempt: counting it would report an
+    escalation that has already relented. Deriving `shapes` separately was
+    tried and dropped; it differed from the candidate count only for a
+    re-attempt with no recorded result, which is a transcript still being
+    written rather than a distinction worth carrying.
 
     Ordered by each command's FIRST denial. The command denied earliest is
     the original; a command first denied later is what the session reworded
@@ -415,7 +420,8 @@ def unretried(path):
     # workaround denied, push denied again puts the workaround first, which is
     # the ordering this sort exists to prevent.
     out.sort(key=lambda row: row[4])
-    return [row[:4] for row in out if row[0]], len(denied)
+    candidates = [row[:4] for row in out if row[0]]
+    return candidates, len(candidates)
 
 
 def message(label, stretch, total, shapes=1):

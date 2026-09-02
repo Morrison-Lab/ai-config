@@ -46,8 +46,16 @@ if not os.path.isfile(HOOK):
     )
 
 # The four denial texts, transcribed from real transcripts under
-# ~/.claude/projects (2026-09-02); each is the most common form of its kind.
-# Only the first is ours.
+# ~/.claude/projects (2026-09-02). Only the first is ours.
+#
+# Each is the OPENING of the most common form of its kind, elided with a
+# trailing "..." where the real message runs on -- the classifier's own runs
+# to about 1000 characters. The marker is load-bearing rather than tidy: the
+# elided remainder of CLASSIFIER is where the classifier says to stop and
+# explain to the user when a capability is essential, which is the sentence
+# the hook's docstring and both hooks.json copies cite as the reason this
+# injects rather than blocks. An unmarked prefix would let a reader check
+# that justification against this fixture and conclude it was invented.
 #
 # Transcribed, not paraphrased, and the difference bit: an earlier draft of
 # this file invented the last two from memory, and both were wrong -- the
@@ -61,7 +69,7 @@ if not os.path.isfile(HOOK):
 CLASSIFIER = (
     "Permission for this action was denied by the Claude Code auto mode "
     "classifier. Reason: Blocked by classifier. If you have other tasks that "
-    "don't depend on this action, continue working on those."
+    "don't depend on this action, continue working on those. ..."
 )
 USER_REJECTED = (
     "The user doesn't want to proceed with this tool use. The tool use was "
@@ -82,7 +90,7 @@ HOOK_REFUSAL = (
 AUTOMODE_UNAVAILABLE = (
     "claude-sonnet-5[1m] is temporarily unavailable, so auto mode cannot "
     "determine the safety of Bash right now. Wait briefly and then try this "
-    "action again."
+    "action again. ..."
 )
 
 PUSH = "ALLOW_UNREVIEWED_PUSH=1 git push -u origin HEAD"
@@ -465,6 +473,13 @@ try:
     replayed = [use("t1"), denial("t1")]
     replayed = replayed + [txt("... work in between ..."), replayed[1]]
     replayed_t = write_transcript(replayed)
+    # One command denied and then ALLOWED on retry, another still refused.
+    # Counting the discharged one fires the variation warning citing an
+    # escalation that has already relented.
+    discharged = write_transcript([
+        use("t1", "git push origin a"), denial("t1"),
+        use("t2", "git push origin b"), denial("t2"),
+        use("t3", "git push origin a"), result("t3", "ok")])
     # A record with no uuid must still be counted -- older and synthetic
     # records have none, and dropping them would cost real coverage.
     no_uuid = write_transcript([
@@ -542,9 +557,10 @@ try:
         out_multiline = invoke(multiline, sdir)
         out_replayed = invoke(replayed_t, sdir)
         out_no_uuid = invoke(no_uuid, sdir)
+        out_discharged = invoke(discharged, sdir)
     finally:
         for p in (one, two, both, reset, failed_run, variants, interleaved,
-                  multiline, replayed_t, no_uuid,
+                  multiline, replayed_t, no_uuid, discharged,
                   *[t for t, _ in noreset]):
             os.unlink(p)
     content += [
@@ -594,6 +610,8 @@ try:
          "so the retry advice is not withheld by a replay"),
         ("denied a tool call once in this session" in out_no_uuid,
          "a record with no uuid is still counted"),
+        ("stop generating new shapes" not in out_discharged,
+         "a command the classifier later allowed is not a live variant"),
         ("denied 3 distinct commands" in out_variants,
          "three phrasings of one goal reach the variation warning"),
         ("stop generating new shapes" in out_variants,

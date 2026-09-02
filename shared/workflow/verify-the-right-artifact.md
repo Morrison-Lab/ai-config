@@ -723,3 +723,47 @@ Read a `w:ins` grep over `word/document.xml` carefully when building the split a
 `w:instrText` contains the substring `w:ins`, so a plain `grep -c` reports a match in a document that has none.
 [`memories/office-open-xml.md`](../../memories/office-open-xml.md) carries the docx-specific mechanics,
 including the two-pandoc-diff verification for a redlined document.)
+
+**A tenth: a diff's changed lines, standing in for the file they changed.**
+
+The shapes above substitute one file, run, or environment for another.
+This one keeps the right file and reads only the fraction of it a diff highlighted.
+A diff marks what changed;
+it says nothing about what the surrounding text, including context the same diff adds, now means.
+Grepping the diff for a keyword returns exactly the lines matching that keyword and nothing about the lines around them --- which is the file's meaning as often as not, because a change is scoped by its neighbours.
+
+The tell is a conclusion drawn from **removed or added lines alone**, when the same diff's own added context sits one hunk away and narrows what the removal actually licenses.
+
+Case: `Morrison-Lab/gha#811` deleted three lines from `examples/quarto-publish.yml` --- `concurrency:` / `group: gh-pages` / `cancel-in-progress: false` --- with no replacement.
+Reading that removal through `gh pr diff | grep` for `concurrency`/`group` lines supports one conclusion: the PR tells consumers to delete the block outright.
+The same diff, six lines above the deletion, adds a NOTE the grep pattern never matched: "Do NOT declare a top-level `concurrency:` block naming `gh-pages`" in the caller workflow.
+That sentence is scoped to the group's *name*, not to the presence of a block.
+A caller-level group with a different name --- `quarto-publish-${{ github.ref }}`, the pattern `gha#667` already used elsewhere in the same repo --- names something else and is not what the note forbids.
+The removal and the addition are two edits inside one diff, and only reading the file whole, rather than the diff's hunks in isolation, shows that the second scopes the first.
+
+**This survives the quote-the-passage check, which is what makes it worth recording rather than dismissed as ordinary carelessness.**
+[`quotable-findings`](quotable-findings.md) requires a finding to quote the exact passage it is about, on the theory that a quotable finding is a checked one.
+Quoting the three removed lines satisfies that rule to the letter: the passage exists, the quote is exact, the mechanical filter passes clean.
+What the filter cannot check is whether the *file*, read whole, means what the quoted fragment suggests once its own neighbouring lines are included.
+The check that would have caught this reads "open the file the passage lives in," not "quote the passage" --- a stricter requirement than quotable-findings states, and this is the shape that shows the gap between them.
+
+**Before writing a retraction, check whether the head moved.**
+A wrong claim about a file can be wrong for two different reasons, and they produce different retractions.
+The commit could have changed since the claim was written, in which case the honest statement is "this changed" and no misreading occurred.
+Or the commit could be exactly the one that was read, in which case the honest statement is "I misread it" --- and conflating the two either lets a real misreading hide behind an invented edit, or accuses a PR of moving when it did not.
+Settle it before writing either sentence: fetch the specific commit SHA the claim was written against (`gh api repos/<owner>/<repo>/contents/<path>?ref=<sha>`) and confirm it is unchanged, rather than assuming from the PR's current state.
+In the case above, the commit the wrong claim cited (`856b8702`) was the head at the time of both comments;
+nothing had moved, so the retraction correctly said "I misread it" rather than blaming drift.
+
+- **Do:** read the file a diff's hunk lives in, not only the hunk, before concluding what a removal licenses or forbids.
+- **Do:** treat added context in the *same* diff as evidence about scope, even when it sits in a different hunk than the lines a grep matched.
+- **Do:** fetch the exact commit a wrong claim was written against before deciding whether to retract it as "I misread" or "this changed."
+- **Don't:** treat a clean pass of quotable-findings's quote-the-passage check as evidence the file was read;
+  it only proves the passage exists.
+- **Don't:** infer a rule's scope from the lines a diff removed when the same diff also adds prose stating the scope.
+
+(Measured 2026-09-02 on [`Morrison-Lab/gha#811`](https://github.com/Morrison-Lab/gha/pull/811).
+Two PR comments asserted the stub "tells consumers to delete the block" and that a consumer's merged rename therefore contradicted it, both derived from `gh pr diff | grep`-ing the changed `concurrency`/`group`/`cancel-in-progress` lines.
+The stub's own added NOTE at the cited commit (`856b8702`) read "Do NOT declare a top-level `concurrency:` block naming `gh-pages`," which scopes the prohibition to the group's name and forbids nothing about a renamed group.
+Verified with `gh api "repos/Morrison-Lab/gha/contents/examples/quarto-publish.yml?ref=856b8702" --jq '.content' | base64 -d`, and against the head-moved question above: `856b8702` was the head both comments cited, so the retraction correctly read as a misreading rather than a moved target.
+Both claims were retracted in the PR thread.)

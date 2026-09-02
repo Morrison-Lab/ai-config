@@ -2406,6 +2406,28 @@ def main() -> int:
               "1. **Defect** `foo()` crashes on empty input. Now fixed in abc1234 but the test is missing.\n\n"
               "### Verdict\n\nReady for merge\n"
           ) is not None)
+    check("Previously: item whose explanation reintroduces the bug stays open (#2945)",
+          checker._unresolved_finding_pattern(
+              "### Findings \u2014 all resolved\n\n"
+              "1. **Previously: X.** Removed the guard, which reintroduces the crash.\n\n### Verdict\n\nReady for merge\n"
+          ) is not None)
+    check("Previously: item resolved 'in the docstring; the code is unchanged and still wrong' stays open (#2945)",
+          checker._unresolved_finding_pattern(
+              "### Findings \u2014 all resolved\n\n"
+              "1. **Previously: X.** Now addressed in the docstring; the code is unchanged and still wrong.\n\n"
+              "### Verdict\n\nReady for merge\n"
+          ) is not None)
+    check("Previously: item 'Now fixed, but the test is missing' stays open (#2945)",
+          checker._unresolved_finding_pattern(
+              "### Findings \u2014 all resolved\n\n"
+              "1. **Previously: X.** Now fixed, but the test is missing.\n\n### Verdict\n\nReady for merge\n"
+          ) is not None)
+    check("Previously: lead containing a glob asterisk still resolves (#2945)",
+          checker._unresolved_finding_pattern(
+              "### Findings \u2014 all resolved\n\n"
+              "1. **Previously: *.md files were skipped by the glob.** Now fixed \u2014 the pathspec is quoted "
+              "and the run lists all 731 files.\n\n### Verdict\n\nReady for merge\n"
+          ) is None)
     check("### Findings from prior rounds --- now resolved resolves (#2781)",
           checker._unresolved_finding_pattern(
               "### Findings from prior rounds \u2014 now resolved\n\n"

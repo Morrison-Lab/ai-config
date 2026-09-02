@@ -1542,9 +1542,13 @@ _ITEM_NON_BLOCKING_TAG = re.compile(
 # report of a PRIOR finding, and a resolution verb after it states the
 # disposition. "closed" is deliberately absent from the verb list, since
 # "closed as not planned" is a deferral, not a resolution.
+#
+# The lead runs to the first closing ``**``, so a glob or nested emphasis
+# inside the clause (``**Previously: *.md files were skipped.**``) still
+# matches; code spans are blanked before this scan runs.
 _PRIOR_STATUS_LEAD = re.compile(
     r"(?i)^[ \t]*(?:[-*+]|\d+[.)])?[ \t]*\*\*\s*"
-    r"(?:previously|was|prior(?:\s+round)?|earlier|before)\s*:[^*]*\*\*"
+    r"(?:previously|was|prior(?:\s+round)?|earlier|before)\s*:.*?\*\*"
 )
 _RESOLUTION_VERB = re.compile(
     r"(?i)\b(?:"
@@ -1553,14 +1557,37 @@ _RESOLUTION_VERB = re.compile(
     r")?"
     r"(?:fixed|resolved|addressed|removed|corrected|cleared)\b"
 )
+# What the explanation AFTER the verb may not say. The end-of-line path
+# admits only a short affirmative suffix there (_AFFIRMATIVE_RESOLUTION_SUFFIX);
+# this path exists precisely because the explanation is long, so instead it
+# refuses the vocabulary a reviewer uses to qualify a resolution: a
+# contrastive conjunction, a regression word, a "still"/"remains" state, an
+# incompleteness word. Untagged prose past the verb that carries none of
+# these is accepted, the same residual the end-of-line path has on its own
+# line (see _findings_section_resolves_empty).
+_AFTER_VERB_CAVEAT = re.compile(
+    r"(?i)\b(?:"
+    r"but|however|except|although|though|yet"
+    r"|reintroduc\w*|regress\w*|reopen\w*|revert\w*"
+    r"|still\b|remains?\b|unchanged|incomplete|partial(?:ly)?"
+    r"|not\s+(?:yet|fully|completely|entirely)"
+    r"|missing|todo|fixme|wrong|broken"
+    r")\b"
+)
 
 
 def _prior_status_item_is_resolved(line: str) -> bool:
     """True for "**Previously: X.** <...> fixed/resolved/addressed <explanation>".
 
-    Guards reuse the end-of-line path's: an unresolved phrase anywhere on the
-    line, or a negator or hedge between the lead and the verb, keeps the item
-    open. The caller has already applied the unresolved-words test.
+    Three guards, none shared verbatim with the end-of-line path because the
+    line shape differs: the caller has already rejected any line carrying an
+    unresolved phrase (_LINE_UNRESOLVED_WORDS); a negator or hedge between the
+    lead and the verb keeps the item open (_NEGATOR_RE, _PREFIX_DISQUALIFY_RE,
+    the same two the end-of-line path applies before its verb); and the
+    explanation after the verb may not carry a caveat word
+    (_AFTER_VERB_CAVEAT), which replaces the end-of-line path's short
+    affirmative-suffix requirement, since this shape's whole point is that
+    the explanation follows the verb.
     """
     lead = _PRIOR_STATUS_LEAD.match(line)
     if not lead:
@@ -1571,6 +1598,8 @@ def _prior_status_item_is_resolved(line: str) -> bool:
         return False
     before = rest[:verb.start()]
     if _NEGATOR_RE.search(before) or _PREFIX_DISQUALIFY_RE.search(before):
+        return False
+    if _AFTER_VERB_CAVEAT.search(rest[verb.end():]):
         return False
     return True
 

@@ -859,6 +859,49 @@ Check both the missing and the invalid case when guarding a forwarded
 argument, not only the one the issue reports.
 (d-morrison/altdoc#64.)
 
+## `system.file()` returns `""` on a miss, and its path consumers disagree about rejecting it
+
+The section above covers a *missing* argument reaching a callee.
+This is the same silence one layer out: an argument that arrives, carries a value, and is empty.
+
+`system.file()` signals nothing when it finds nothing --- it returns the empty string, so a helper built on it fails silently and hands `""` to whatever consumes the path.
+An absent package is not distinguishable from an absent file, either;
+both return `""`.
+
+The consumers are what make it worth a note, because none of the three errors on the empty path and each fails differently (measured on R 4.6.0 / macOS, `.Platform$OS.type == "unix"`, 2026-09-01):
+
+```r
+system.file("no-such-file.txt", package = "stats")      #> ""
+system.file(package = "nosuchpkg1234")                  #> ""   (not an error)
+
+file.exists("")                                         #> FALSE
+file.path("", "extdata", "x.csv")                       #> "/extdata/x.csv"
+readLines("")                                           #> character(0), with only a warning
+```
+
+`file.path()` is the one that produces a wrong answer rather than an empty one: an empty first component makes the result **absolute**, so a lookup meant to land inside the installed package retargets the filesystem root.
+That is a POSIX-shaped claim --- the separator is `/` on Windows too, but whether a leading `/` reads as the root depends on the consumer.
+`readLines("")` returns `character(0)` and emits a warning rather than an error.
+Whether that becomes a silent wrong answer depends on the consumer: one that rejects empty input fails loudly and harmlessly, while one that tolerates it --- a `for` loop, a `vapply` over the result, a summary that reports zero rows --- proceeds and looks like a real result.
+The hazard is that class of consumer, not the `character(0)` itself.
+Its warning names nothing about the lookup that failed --- it reads `file("") only supports open = "w+" and open = "w+b": using the former` --- so grepping the log for the missing filename finds nothing.
+`file.exists()` is the only one whose return value answers the question it was asked, and even it says "the file is not there" rather than "the package lookup failed".
+
+`mustWork = TRUE` converts the miss into an error, which is [`fail-fast`](../shared/principles/fail-fast.md)'s "Validate inputs and assumptions at the top of a function" applied where the value is produced instead of where it is consumed.
+It does not disambiguate, though: both calls above abort with the identical, uninformative `no file found`, naming neither the package nor the file.
+Separating the two cases needs a second call --- `find.package("pkg")` errors with `there is no package called 'pkg'`, and `requireNamespace("pkg", quietly = TRUE)` returns `FALSE`.
+
+- **Do:** pass `mustWork = TRUE` whenever the file is required, rather than testing the return value downstream.
+- **Do:** `stopifnot(nzchar(path))` on the result immediately, when `mustWork = TRUE` is not wanted, naming the variable the call was assigned to.
+- **Do:** check `requireNamespace()` first when both failures are reachable, so the abort can say which one happened --- `mustWork = TRUE` aborts at the call site, so there is no later branch to disambiguate from.
+- **Don't:** infer from a `""` which of the two went wrong --- an uninstalled or misnamed package returns exactly what an absent file does, and so does `mustWork = TRUE`'s error text.
+- **Don't:** pass an unchecked `system.file()` result to `file.path()`;
+  the empty component makes the path absolute instead of failing.
+
+(Measured 2026-09-01 on [ucdavis/hac.sap#9](https://github.com/ucdavis/hac.sap/pull/9) at commit `e6d9e8a`, where `R/format_sap_table.R` exported two one-line helpers --- `sap_reference_docx()` and `sap_asset_path(name)` --- each returning a bare `system.file(...)` with no `mustWork` and no emptiness check, so a renamed or unbundled asset reached the caller as `""`.
+Cite the commit rather than the file: review caught it, and by `d2befcf` (2026-09-02) both helpers carry an `nzchar()`/`file.exists()` guard and a `cli::cli_abort()`, so the current head shows the fix rather than the defect.
+Tracked as [ai-config#2984](https://github.com/Morrison-Lab/ai-config/issues/2984).)
+
 ## A container with no R at all is not a blocker: apt for R, P3M for the packages, a tarball for Quarto
 
 The bullets above assume R already exists and only its *packages* are
@@ -1039,6 +1082,44 @@ reached them, and the prediction --- sound reasoning applied to an
 unchecked population --- did not hold.
 See [`metacognitive-monitoring`](../shared/workflow/metacognitive-monitoring.md)'s
 "A sound measurement does not license the claim standing next to it".)
+
+**A third, adjacent trap in the same package-loading machinery: `load_all()` and `library()` produce differently-locked bindings, and a patch or mutation harness that patches a package's own functions is sensitive to which one it got.**
+Built a throwaway one-function package and loaded it with `pkgload::load_all(export_all = FALSE)`:
+
+```
+ns.locked = TRUE    attached.locked = FALSE    identical(ns, attached) = FALSE
+assign("fmt", mutant, envir = as.environment("package:tstpkg"))   -> SUCCEEDED
+```
+
+Installed packages loaded with `library()` lock **both** environments.
+Measured across `jsonlite`, `rlang`, `cli`, `glue`, and `stats` (all `ns.locked=TRUE attached.locked=TRUE`), and the equivalent `assign()` fails there with `cannot change value of locked binding for '<name>'`.
+A peer session independently reproduced this on `cli`, `flextable`, and `knitr` installed, against `hac.sap` under `load_all()`.
+Every measurement in this subsection was taken on 2026-09-02, R 4.6.0 / macOS.
+
+Three consequences, in descending order of how long they stay useful:
+
+1. **A patch or mutation harness written against `load_all()` can fail once the package is installed, and whether it fails loudly is up to the harness.**
+   The `assign()` itself is loud: it raises `cannot change value of locked binding`, as the measurement above shows.
+   The quiet failure needs one more ingredient --- a `try()`, a permissive `tryCatch`, or captured output nobody reads --- and harnesses acquire those honestly, since a patch routine spanning several environments has real reasons to tolerate one of them being absent.
+   Once the error is discarded, a dead harness reports every mutation as undetected, which is indistinguishable from a suite that genuinely catches nothing.
+   So a harness must assert liveness on every path it runs on --- development and `R CMD check` --- not only the one it was authored against: an invocation counter, or a mutation known to be caught, run in the same invocation.
+2. **`unlockBinding()` against the attached environment is a no-op under `load_all()`**, because that binding was never locked there.
+   It is load-bearing only against the namespace --- which is the environment a `load_all()`-based harness least needs to patch, since the suite resolves the attached copy.
+   So the ceremony and the effective target sit in different environments, and a harness can perform all of the former against none of the latter.
+3. **When comparing the two environments, take an exported name.**
+   `ls(asNamespace(pkg))[1]` sorts over everything the namespace holds, exported and internal alike, so it *can* land on a name the attached environment does not carry --- and then the comparison skips rather than answering.
+   Whether it does is a property of the package's alphabet, which is why the failure is intermittent across packages and looks like the packages being unreadable.
+   The peer hit exactly this and reported five bogus SKIPs before switching to exported names.
+
+- **Do:** assert a mutation harness is live (an invocation counter, or a known-caught mutation) in every environment it runs in, not only the one it was authored against.
+- **Do:** patch the environment the tests actually resolve from, and prove which one that is with an invocation counter rather than reasoning about it.
+  Under `load_all()` that was the **attached** environment, on the peer session's measurement rather than one reproduced here: their invocation counter recorded the namespace-only patch called zero times, leaving the suite at 31 pass / 0 fail, while a patch reaching the attached environment gave 27 / 4.
+  Those figures come from a private repository, so treat them as the peer's evidence for the direction rather than as numbers you can re-derive.
+- **Do:** compare `ns`/`attached` locking (or membership) using an exported name, never `ls(asNamespace(pkg))[1]`.
+- **Don't:** trust any verdict from a mutation harness --- "all caught" or "none caught" --- without evidence the mutations were applied on the path being scored.
+  The undetected verdict is the one this failure produces, and the one that reads as a finding about the suite rather than about the harness.
+
+([ucdavis/hac.sap#27](https://github.com/ucdavis/hac.sap/issues/27) --- a **private** repository, so the link resolves only with access --- a mutation-testing investigation where eight exported formatters accepted a `"MUTANT"` return with the suite still reporting 31/31 passing.)
 
 ## `{cli}` glue-interpolates every message string, and the two brace forms fail differently
 

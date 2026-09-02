@@ -67,13 +67,25 @@ Default to holding, and spend a round on an optional improvement only when it cl
 That default is about the fix and not about the fact, so where a declined note asserts something checkable, verify it against the code before writing it off -- the cost argument here holds whether the note is right or wrong, and only checking says which, per [`address-every-comment`](address-every-comment.md)'s "A note the reviewer declined to raise is still a claim".
 
 Keep the Copilot observation separate, and do not attribute it to your own pushes.
-Copilot posts no formal review when it finds nothing, so `copilot-pull-request-reviewer` can complete `success` with `get_reviews` empty even on a stable, single-push head -- the silent-reviewer state [`review-verdict-pitfalls`](review-verdict-pitfalls.md) owns.
-A green Copilot check is therefore not a verdict; read `get_reviews`, and treat its emptiness as "no findings posted", not as approval and not as something a trickled push caused.
+Copilot's end-of-run state with no posted findings has been observed in two shapes (a round with findings is a third, ordinary outcome).
+Through August 2026 `copilot-pull-request-reviewer` could complete `success` with `get_reviews` empty,
+even on a stable, single-push head.
+That is a silent state whose cause [`review-verdict-pitfalls`](review-verdict-pitfalls.md) leaves unresolved.
+That silence is not evidence that Copilot found nothing.
+On 2026-09-01 and 2026-09-02 (Pacific) it posted a formal review whose body opens `### 🟢 Approval recommended`, in two forms.
+On [#2983](https://github.com/Morrison-Lab/ai-config/pull/2983), a first review, the body reported `Comments generated: 0`.
+On [#2976](https://github.com/Morrison-Lab/ai-config/pull/2976), a re-requested review after four rounds with findings, it reported `Comments generated: 0 new` and carried no `Suppressed comments` section.
+`0 new` alone does not settle a round, since a re-review body can restate an earlier finding under `Suppressed comments` (see the re-request entry in [`copilot-reviews`](../../memories/copilot-reviews.md)), so read the body for that section before treating the approval as clean.
+Two PRs are a sample, so expect either shape until more is measured.
+A green Copilot check is therefore not a verdict.
+Read `get_reviews`, treat an empty result as "no verdict posted" (not as a finding of nothing), and treat the approval body as the clean verdict.
+Neither is something a trickled push was shown to cause.
 
 - **Do:** report ready when a clean verdict stands over only a note the reviewer declined to raise as a finding.
 - **Do:** read a Copilot verdict from `get_reviews`, never from the check run's color.
 - **Don't:** treat an explicitly-declined optional note as an open item and spend a round on it -- per [`ardi`](../../skills/ardi/SKILL.md)'s Stopping conditions, a review with no raised findings is a stop.
-- **Don't:** read an empty `get_reviews` under a green Copilot check as approval or as self-inflicted; it is Copilot's no-findings behavior.
+- **Don't:** read an empty `get_reviews` under a green Copilot check as approval, as self-inflicted, or as evidence Copilot found nothing.
+  It is a silent state with no verdict in it.
 
 **A caveat reporting that the reviewer *could not check* is not a declined note, and the two call for opposite responses.**
 The rule above governs a note the reviewer weighed and ranked low.

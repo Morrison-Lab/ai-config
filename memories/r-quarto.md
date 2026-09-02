@@ -1040,6 +1040,36 @@ unchecked population --- did not hold.
 See [`metacognitive-monitoring`](../shared/workflow/metacognitive-monitoring.md)'s
 "A sound measurement does not license the claim standing next to it".)
 
+**A third, adjacent trap in the same package-loading machinery: `load_all()` and `library()` produce differently-locked bindings, and a patch or mutation harness that patches a package's own functions is sensitive to which one it got.**
+Built a throwaway one-function package and loaded it with `pkgload::load_all(export_all = FALSE)`:
+
+```r
+ns.locked = TRUE    attached.locked = FALSE    identical(ns, attached) = FALSE
+assign("fmt", mutant, envir = as.environment("package:tstpkg"))   #> SUCCEEDED
+```
+
+Installed packages loaded with `library()` lock **both** environments.
+Measured across `jsonlite`, `rlang`, `cli`, `glue`, and `stats` (all `ns.locked=TRUE attached.locked=TRUE`), and the equivalent `assign()` fails there with `cannot change value of locked binding for '<name>'`.
+A peer session independently reproduced this on `cli`, `flextable`, and `knitr` installed, against `hac.sap` under `load_all()`. (Verified 2026-09-02, R 4.6.0 / macOS.)
+
+Three consequences, in descending order of how long they stay useful:
+
+1. **A patch or mutation harness written against `load_all()` can fail once the package is installed, and it fails quietly.**
+   A dead harness reports every mutation as undetected, which is indistinguishable from a suite that genuinely catches nothing.
+   So a harness must assert liveness on every path it runs on --- development and `R CMD check` --- not only the one it was authored against: an invocation counter, or a mutation known to be caught, run in the same invocation.
+2. **`unlockBinding()` against the attached environment is a no-op under `load_all()`**, because that binding was never locked there.
+   It is load-bearing only against the namespace.
+3. **When comparing the two environments, take an exported name.**
+   `ls(asNamespace(pkg))[1]` returns internal symbols that are absent from the attached environment, which produces spurious skips rather than a real comparison.
+   The peer hit exactly this and reported five bogus SKIPs before switching to exported names.
+
+- **Do:** assert a mutation harness is live (an invocation counter, or a known-caught mutation) in every environment it runs in, not only the one it was authored against.
+- **Do:** unlock (or patch) the namespace binding, not the attached one, when the target might be running under `load_all()`.
+- **Do:** compare `ns`/`attached` locking (or membership) using an exported name, never `ls(asNamespace(pkg))[1]`.
+- **Don't:** trust a mutation-testing harness's "all mutations caught" verdict without confirming it ran the same way under `load_all()` and under an installed package.
+
+([ucdavis/hac.sap#27](https://github.com/ucdavis/hac.sap/issues/27), a mutation-testing investigation where eight exported formatters accepted a `"MUTANT"` return with the suite still reporting 31/31 passing.)
+
 ## `{cli}` glue-interpolates every message string, and the two brace forms fail differently
 
 `cli_ul()`, `cli_alert_*()`, `cli_abort()` and the rest run each string

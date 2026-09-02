@@ -584,7 +584,28 @@
   - **Don't:** read the timeline event as proof a review is coming;
     it confirms the request, not the outcome.
 
-  **Both outcomes were genuinely observed on the same repo the same day, so do not flatten this into "it returns 201".**
+  **A #3010 instance bears on the "not blocked" half, not the "nor that a review is coming" half, and is weaker evidence than it first looks.**
+  An empty pending list followed by a landed review shows emptiness is not evidence the request was *blocked*.
+  It says nothing about the other direction, which only a zero-review outcome after an empty read could speak to.
+  On `Morrison-Lab/ai-config#3010` (2026-09-02) the session **reports** running the POST repeatedly and seeing `requested_reviewers` come back empty on the immediate read every time, and Copilot reviews did land on that PR anyway.
+  Weigh that empty-read observation as narration rather than measurement: the pending list is only observable at request time, so unlike the reviews themselves it cannot be re-derived afterwards, and the same PR is where the session's own POST count turned out not to match its timeline.
+  [`pr-on-claim.cases.md`](../shared/workflow/pr-on-claim.cases.md)'s "The blocking message prescribes a non-dischargeable shape" carries the derived figures;
+  read them there rather than restating them here, since #3010 is open and any copy drifts.
+
+  So this instance does not upgrade the claim.
+  What is measured on #3010 is that reviews arrived;
+  that they arrived *over an empty pending read* rests entirely on the session's own report, from the one session whose self-counting is known to have been wrong.
+  The `ucdavis/bcs` #648/#649/#650 record further down this file is the zero-review candidate for the other direction, and it is confounded too: [`challenge-the-assignment.cases.md`](../shared/workflow/challenge-the-assignment.cases.md) records `_argv_close`'s docstring in `hooks/no-unreviewed-pr.py` documenting HTTP 200 on this endpoint as what GitHub returns for an already merged or closed PR, adding nobody by design, and that confound was confirmed to apply to some of those four calls without being shown to explain all of them.
+  Both candidate directions are therefore unconfirmed, and the honest statement stays *unreliable*, not *uninformative*.
+
+  - **Do:** poll the review bodies on the head when you need to know whether a reviewer engaged.
+  - **Do:** read `review_requested` timeline events as a lower bound on requests that actually **added** a reviewer, never as a POST count.
+    Why a POST can add nobody is unsettled here --- the untested 422 reconciliation below is one account, a silent no-op another --- so take the bound from the events themselves and leave the mechanism open.
+  - **Don't:** treat an empty pending read as evidence the request failed, nor as evidence a review is coming;
+    that was already the rule and neither new data point changes it.
+  - **Don't:** cite either direction as settled --- the bcs status-code confound is open, and the #3010 empty reads are unverifiable after the fact.
+
+  **Both response codes --- the `422` and the `201` above, not the two directions just discussed --- were genuinely observed on the same repo the same day, so do not flatten this into "it returns 201".**
   One session ran the POST once and got `422`;
   another ran it three times, across all three login spellings, and got `201` every time.
   Neither session was lying, and the first one's real mistake was not the observation but the generalisation -- it turned a single failed attempt into a stated property of the repository, wrote that into a PR body as settled fact, and steered two later rounds with it.

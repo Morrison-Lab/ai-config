@@ -18,6 +18,39 @@ The request was written `gh api -X POST .../requested_reviewers -f 'reviewers[]=
 The hook still fired at Stop, correctly, because `tail` owned the exit status.
 Re-running the POST bare discharged it and produced a second, identical refusal at `07:53:03Z`.)
 
+## The blocking message prescribes a non-dischargeable shape
+
+(Morrison-Lab/ai-config#3010, 2026-09-02, and the third occurrence of the chained-request mistake after rpt#181 and ai-config#1139 above.
+The session ran the request across a run of successive turns, chaining the block message's own verify command after the POST each time, which is what left the request non-last;
+the hook fired after every one of them, and the loop ended on the first turn that ran the POST as the sole command in its call.
+Four Copilot reviews landed on the PR while this was going on, at `15:51:54Z`, `16:43:37Z`, `16:47:16Z`, and `17:00:45Z`.
+Every figure in this record is bounded to that window --- `15:00Z` to `17:30Z` on 2026-09-02 --- rather than to the calendar day, because a later turn in the same session added a fifth request and a fifth review.
+
+**Take the count of reviewer ADDITIONS from the timeline rather than from the session's own narration, and note the two count different things.**
+That session reported eight POSTs across nine turns, which is a count of attempts.
+`gh api repos/Morrison-Lab/ai-config/issues/3010/timeline` carries four `review_requested` events inside that window, at `15:47:51Z`, `16:39:35Z`, `16:43:40Z`, and `16:56:17Z`.
+Re-derive by filtering to the window rather than counting the whole endpoint, which keeps growing:
+
+```bash
+gh api repos/Morrison-Lab/ai-config/issues/3010/timeline --paginate \
+  | jq -r '.[] | select(.event == "review_requested") | .created_at' \
+  | awk '$0 >= "2026-09-02T15:00:00Z" && $0 <= "2026-09-02T17:30:00Z"'
+```
+A POST emits such an event only when it actually adds a reviewer, so the timeline bounds additions and cannot bound attempts: at most four of the eight demonstrably added anyone, and the remaining four are unverifiable rather than disproved.
+A POST against an already-requested reviewer is one way to attempt without adding.
+That gap is itself the lesson the record is about: a session in this loop is shown nothing that separates a request that failed from one that was not last, and its own narration of how many it sent is not independently checkable.
+
+The first two occurrences were a session composing the wrong shape on its own.
+This one had the rule written down twice already, in `pr-on-claim.md` and in `pr-on-claim.rationale.md`, while the message a blocked session actually reads stated it for `gh pr edit --add-label` and not for the request.
+That is why #3017 proposes fixing the message rather than adding another sentence of prose.
+
+One smaller finding from the same turns: the message's verification query counts Copilot reviews on the PR rather than on the head, and returned 1 over a review that predated a force-push.
+
+Tracked as [ai-config#3017](https://github.com/Morrison-Lab/ai-config/issues/3017), open at the time of writing.
+The PR was open when this was written, so the endpoints' totals keep growing;
+the figures above are what they returned for the `15:00Z`--`17:30Z` window on 2026-09-02, which is why the query above filters rather than counts.
+A whole-day bound would already be wrong: a request at `18:27:05Z` and a review at `18:30:15Z` fall on the same date and outside the window.)
+
 ## The blocked-request test's false positive on auto-requesting repos
 
 (Morrison-Lab/ai-config#1077, 2026-08-03: two explicit requests each returned `["Copilot"]` and each left `reviewRequests` empty within a minute, and both were reported as a possible blocked/silent reviewer.

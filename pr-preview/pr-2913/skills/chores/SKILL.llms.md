@@ -15,7 +15,7 @@ Sweep a repo’s open **dependency-bump PRs** — the `chore(...)`-titled, bot-a
 A PR is in scope when **either** of these holds:
 
 - Its author is one of the dependency bots this skill exists for, matched in the exact login form the source returns: `app/dependabot`, `dependabot[bot]`, `app/renovate`, `renovate[bot]`. An explicit `chores` call names that population, which is what admits those two bots and no other author.
-- It looks like a chore — the title starts with `chore(` (e.g. `chore(actions):`, `chore(submodule):`, `chore(deps):`), or the labels include `dependencies` — **and** it passes `memories/reviewing-prs.md`’s scope test for the invoking user: authored by the GitHub Actions app (`github-actions`, which opens `chore(submodule):` bumps) or by the invoking user or one of their aliases, assigned to one of them, or named by number in the request.
+- It looks like a chore — the title starts with `chore(` (e.g. `chore(actions):`, `chore(submodule):`, `chore(deps):`), or the labels include `dependencies` — **and** it passes `memories/reviewing-prs.md`’s scope test for the invoking user: authored by the GitHub Actions app (`github-actions`, which opens `chore(submodule):` bumps) or by the invoking user or one of their aliases, assigned to one of them, or one the user explicitly asked this run to work on (a mention such as “do not touch” followed by a number is not a request).
 
 Human-authored feature PRs are **out of scope** — those go through `ardia` / `gia` (review-to-clean), not this skill — and so is a chore-titled or `dependencies`-labelled PR whose author is another lab member or another bot, unless the invoking user is assigned to it.
 
@@ -34,7 +34,7 @@ This skill is GitHub-first (`gh`). For a GitLab repo, the same shape applies via
 
 ### 1. List the open chore PRs
 
-Set the two scope inputs first, the way `REPO` is set above. `PR_SCOPE_ALIASES` is the comma-separated list of other logins `memories/reviewing-prs.md` names as the same person as the resolved user (leave it unset when that file lists none for them), and `PR_SCOPE_REQUESTED` is the comma-separated list of PR numbers the user named in this request (leave it unset when the request named none). With both unset the filter keeps only the resolved login’s own PRs, the assigned ones, and the bots’, which is the fail-closed default.
+Set the two scope inputs first, the way `REPO` is set above. `PR_SCOPE_ALIASES` is the comma-separated list of other logins `memories/reviewing-prs.md` names as the same person as the resolved user (leave it unset when that file lists none for them), and `PR_SCOPE_REQUESTED` is the comma-separated list of PR numbers the user explicitly asked this run to work on, never a number merely mentioned or excluded (leave it unset when there are none). With both unset the filter keeps only the resolved login’s own PRs, the assigned ones, and the bots’, which is the fail-closed default.
 
 ``` bash
 ME=$(gh api user --jq .login 2>/dev/null) || ME=""   # WHO_AM_I
@@ -44,11 +44,12 @@ if [ -z "$ME" ]; then
   echo "::warning::identity lookup failed; author/assignee arms unevaluated (report this)" >&2
 fi
 # e.g. PR_SCOPE_ALIASES=other-login      # from memories/reviewing-prs.md
-# e.g. PR_SCOPE_REQUESTED=123,456       # PR numbers named in the request
+# e.g. PR_SCOPE_REQUESTED=123,456       # PRs the user asked this run to work on
 IDS=$(jq -cn --arg me "$ME" --arg al "${PR_SCOPE_ALIASES:-}" \
   '[$me] + ($al | split(",") | map(select(length > 0))) | map(select(length > 0)) | unique')
 REQ=$(jq -cn --arg r "${PR_SCOPE_REQUESTED:-}" \
   '$r | split(",") | map(select(length > 0) | tonumber)')
+set -o pipefail   # a failed gh pr list must not read as "no chores"
 gh pr list --repo "$REPO" --state open --limit 200 \
   --json number,title,author,assignees,labels,mergeable \
   | jq -r --argjson ids "$IDS" --argjson req "$REQ" '.[] | select(

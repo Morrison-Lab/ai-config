@@ -23,7 +23,7 @@ Detect the forge (GitHub `gh` / GitLab `glab`) from `git remote get-url origin`.
 
 **Confirm which repo first when several are in reach.** GIA (like `ardia` and `gii`) clears *one* repo’s queue, but a session may start in a directory holding several repos (e.g. a web session scoped to multiple repos). If the working dir isn’t itself a single repo, or more than one repo is in scope, ask which repo’s queue to clear before surveying — don’t assume the first one found.
 
-**Confirm whose PRs are in scope, too.** Both phases act only on PRs the invoking user opened, is assigned to, or explicitly requested by name, plus PRs the GitHub Actions app authored (app slug `github-actions`); `ardia`’s step 1 resolves that user, applies the filter, and reports what it dropped. An out-of-scope PR (one that fails that filter: another lab member’s, or any other bot’s) stays theirs, and an issue such a PR already fixes is left to it rather than grabbed.
+**Confirm whose PRs are in scope, too.** Both phases act only on PRs opened by the invoking user, assigned to that user, explicitly requested by name, or authored by the GitHub Actions app (app slug `github-actions`); `ardia`’s step 1 resolves that user, applies the filter, and reports what it dropped. An out-of-scope PR (one that fails that filter: another lab member’s, or any other bot’s) stays theirs, and an issue such a PR already fixes is left to it rather than grabbed.
 
 ### Phase 1 — ARDIA (existing open PRs/MRs)
 
@@ -94,6 +94,6 @@ Within either phase, a single PR’s own round can still delegate lightweight si
 - ❌ Running Phase 2 unbounded — keep GII’s wave boundary.
 - ❌ Starting the next wave on your own once the current one is fully finished — stop and ask, with a recommendation, per “Stopping conditions”.
 - ❌ Grabbing an issue a pending Phase-1 PR already closes.
-- ❌ Driving, reviewing, or editing a PR the user neither opened, is assigned to, nor explicitly requested by name, unless the Actions app authored it — “every open PR” means every one of the user’s.
+- ❌ Driving, reviewing, or editing a PR that was not opened by the user, not assigned to the user, not explicitly requested by name, and not authored by the Actions app — “every open PR” means every one of the user’s.
 
 Back to top

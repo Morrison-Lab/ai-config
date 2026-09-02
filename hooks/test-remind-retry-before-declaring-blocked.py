@@ -216,6 +216,14 @@ SILENT = [
     ([{"type": "assistant", "message": {"content": "not a list"}},
       use("t1"), denial("t1"), use("t2")],
      "a string-content record is skipped, and the retry still discharges"),
+    # A user's rejection sits BETWEEN two classifier denials. It must not
+    # reset the stretch, because the message for a stretch of 1 recommends a
+    # re-run -- which would answer a decision to respect by re-running the
+    # command the user just declined. The wording block below pins the count.
+    ([use("t1"), denial("t1"), use("t2"),
+      result("t2", USER_REJECTED, "user-rejected", is_error=True),
+      use("t3"), denial("t3"), use("t4")],
+     "a user rejection between denials, then a real re-attempt"),
     *ANCHOR_CONTROLS,
     *IS_ERROR_CONTROLS,
 ]
@@ -361,9 +369,20 @@ try:
         seq.append(("REMIND" if invoke(same, shared).strip() else "silent",
                     "silent", "and then goes quiet at that count"))
 
+        # The command then RAN, and was denied again. The stretch is back
+        # to 1, so a sentinel keyed on the stretch would collide with the
+        # count-1 reminder already written above and swallow this one -- the
+        # single case the reset logic exists to produce.
+        append_records(same, [use("t3"), result("t3", "ok"),
+                              use("t4"), denial("t4")])
+        seq.append(("REMIND" if invoke(same, shared).strip() else "silent",
+                    "REMIND", "denied again after a success -- still fires"))
+        seq.append(("REMIND" if invoke(same, shared).strip() else "silent",
+                    "silent", "and then goes quiet at that denial"))
+
         # A SECOND, distinct denied command in the same session is its own
         # reminder. Keying the sentinel on the session alone would swallow it.
-        append_records(same, [use("t3", "git push origin other"), denial("t3")])
+        append_records(same, [use("t5", "git push origin other"), denial("t5")])
         seq.append(("REMIND" if invoke(same, shared).strip() else "silent",
                     "REMIND", "a second distinct denied command fires"))
         seq.append(("REMIND" if invoke(same, shared).strip() else "silent",
@@ -397,13 +416,37 @@ try:
     reset = write_transcript([
         use("t1"), denial("t1"), use("t2"), result("t2", "ok"),
         use("t3"), denial("t3")])
+    # Three things that are NOT a successful run, each sitting between two
+    # classifier denials. Counting any of them as a reset would understate the
+    # count the message quotes, and would re-arm the retry advice -- after the
+    # user's own refusal, in the third case.
+    noreset = [
+        (write_transcript([
+            use("t1"), denial("t1"),
+            use("t2"), result("t2", "fatal: no upstream", is_error=True),
+            use("t3"), denial("t3")]),
+         "a failed run does not reset the count"),
+        (write_transcript([
+            use("t1"), denial("t1"),
+            use("t2"), result("t2", PERMISSION_RULE, "permission-rule",
+                              is_error=True),
+            use("t3"), denial("t3")]),
+         "a permission-rule denial does not reset the count"),
+        (write_transcript([
+            use("t1"), denial("t1"),
+            use("t2"), result("t2", USER_REJECTED, "user-rejected",
+                              is_error=True),
+            use("t3"), denial("t3")]),
+         "the user's own rejection does not reset the count"),
+    ]
     try:
         out_one = invoke(one, sdir)
         out_two = invoke(two, sdir)
         out_both = [invoke(both, sdir), invoke(both, sdir)]
         out_reset = invoke(reset, sdir)
+        out_noreset = [(invoke(t, sdir), d) for t, d in noreset]
     finally:
-        for p in (one, two, both, reset):
+        for p in (one, two, both, reset, *[t for t, _ in noreset]):
             os.unlink(p)
     content += [
         ("Re-run the same command once" in out_one,
@@ -429,6 +472,14 @@ try:
         ("Re-run the same command once" in out_reset,
          "a success restores the retry advice"),
     ]
+    content += [("denied 2 times so far" in out, desc)
+                for out, desc in out_noreset]
+    content += [("Re-run the same command once" not in out,
+                 desc.replace("does not reset the count",
+                              "does not restore the retry advice")
+                     .replace("rejection does not reset the count",
+                              "rejection does not restore the retry advice"))
+                for out, desc in out_noreset]
 finally:
     shutil.rmtree(sdir, ignore_errors=True)
 

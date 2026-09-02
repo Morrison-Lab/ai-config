@@ -3,18 +3,19 @@
 
 ai-config#2994, measured 2026-09-02 (PT): an
 `ALLOW_UNREVIEWED_PUSH=1 git push` was denied by the auto-mode permission
-classifier, re-run once and denied again, and a `update-config` edit adding the
+classifier, re-run once and denied again, and an `update-config` edit adding the
 allow rule was denied too. The session then reported the path as permanently
 closed -- in a blocking report to the user, in a project memory entry, and in a
 comment on this repo's own tracker. With no settings change and no permission
 rule added, the byte-identical push then succeeded on its third attempt.
 
-Three identical denials do not FEEL like a claim. They feel like a
-measurement: the command ran, the system said no, three times. So "I cannot do
-this" reads as reporting an observation rather than asserting a fact about the
-future, and none of the claim-checking rules that would otherwise fire
-(`metacognitive-monitoring.md` on a claim about state, `ardi.md` on verifying
-an asserted blocker) engages at all. The conclusion is also self-confirming:
+Repeated identical denials do not FEEL like a claim. They feel like a
+measurement: the command ran, the system said no, twice, and a third route to
+the same goal was refused as well. So "I cannot do this" reads as reporting an
+observation rather than asserting a fact about the future, and none of the
+claim-checking rules that would otherwise fire (`metacognitive-monitoring.md`
+on a claim about state, `ardi.md` on verifying an asserted blocker) engages at
+all. The conclusion is also self-confirming:
 deciding the path is closed means stopping, which destroys the only evidence
 that would refute it.
 
@@ -59,18 +60,28 @@ stdout on exit 0 is added to Claude's context. `inject-local-time.sh` and
 `remind-ums-after-error.py` already prove that path works in this harness.
 
 Fires when a tool result carrying the classifier's own denial has no LATER
-tool call re-attempting the same command. Fires once per distinct denied
-command per denial count, keyed by a content hash of the command, the count,
-and the transcript path: a reminder repeated every turn is noise, and noise is
-what gets a guard ignored, but a SECOND denial of the same command is new
-information and gets its own one-time reminder. At most one reminder is
-printed per prompt, the newest unreminded one, so several denied commands
-surface over several prompts rather than all at once.
+tool call re-attempting the same command. Fires once per DENIAL of a distinct
+command, keyed by a content hash of the command, the number of times it has
+been denied in this transcript, and the transcript path: a reminder repeated
+every turn is noise, and noise is what gets a guard ignored, but each fresh
+denial is new information and gets its own one-time reminder. At most one
+reminder is printed per prompt, the newest unreminded one, so several denied
+commands surface over several prompts rather than all at once.
 
-The count resets on a successful run. A command denied, then run, then denied
-again is on its first denial of the current stretch, not its second -- it
-demonstrably works, which is the strongest case there is for attempting it
-again.
+The number in that key is the RUNNING TOTAL, which only ever grows. The number
+the message quotes is the current STRETCH, which resets on a success -- so the
+two are deliberately different. Keying on the stretch would swallow the one
+reminder the reset exists to produce: denied, ran, denied again would compute a
+stretch of 1, match the sentinel already written for the first denial, and say
+nothing.
+
+The stretch resets on a success, and only on a success -- not on a failure, a
+permission-rule denial, a hook refusal, or the user's own rejection. A command
+that has actually run since its last classifier denial demonstrably works,
+which is the strongest case there is for attempting it again; a command that
+merely failed differently has shown nothing of the kind. Letting a USER's
+rejection reset it would be worse still: the hook would answer a decision to
+respect with a recommendation to re-run.
 
 Fails OPEN and SILENT: any parse trouble prints nothing at all.
 
@@ -201,6 +212,19 @@ def is_classifier_denial(record, block):
     return content.lstrip().startswith(CLASSIFIER_MARKER)
 
 
+def succeeded(record, block):
+    """True when the call actually ran and produced a non-error result.
+
+    Deliberately narrower than "was not denied by the classifier". A command
+    that failed, that a `deny` rule or a `PreToolUse` hook refused, or that
+    the USER declined has not run, so none of those may reset the denial
+    count. The user case is the one that matters most: answering a decision
+    to respect with "re-run the same command once" is exactly what this
+    hook's scoping exists to prevent.
+    """
+    return not block.get("is_error") and not record.get("toolDenialKind")
+
+
 def records(path):
     with open(path, errors="ignore") as fh:
         for line in fh:
@@ -247,19 +271,22 @@ def read_transcript(path):
                 if not seen:
                     continue
                 at, key = seen
-                bucket = denied if is_classifier_denial(rec, b) else ran
-                bucket.setdefault(key, []).append(at)
+                if is_classifier_denial(rec, b):
+                    denied.setdefault(key, []).append(at)
+                elif succeeded(rec, b):
+                    ran.setdefault(key, []).append(at)
 
     return attempts, denied, ran, labels
 
 
 def unretried(path):
-    """Return [(label, key, count)] for each denial with no later re-attempt.
+    """Return [(label, key, stretch, total)] per denial with no re-attempt.
 
     Newest first, so the caller reports the freshest one it has not already
-    reported. `count` is the run of denials since the command last ran
-    successfully, which is what decides whether a further re-run is still
-    worth recommending.
+    reported. `stretch` is the run of denials since the command last ran
+    successfully, which decides whether a further re-run is still worth
+    recommending; `total` is every denial of it in this transcript, which is
+    what the sentinel keys on because it never goes back down.
     """
     attempts, denied, ran, labels = read_transcript(path)
     out = []
@@ -269,9 +296,9 @@ def unretried(path):
             continue
         floor = max(ran.get(key) or [-1])
         out.append((labels.get(key, ""), key,
-                    sum(1 for j in hits if j > floor), last))
-    out.sort(key=lambda row: row[3], reverse=True)
-    return [(label, key, count) for label, key, count, _ in out if label]
+                    sum(1 for j in hits if j > floor), len(hits), last))
+    out.sort(key=lambda row: row[4], reverse=True)
+    return [row[:4] for row in out if row[0]]
 
 
 def message(label, count):
@@ -325,17 +352,18 @@ def main() -> int:
     except Exception:
         return 0
 
-    for label, key, count in candidates:
+    for label, key, stretch, total in candidates:
         # Keyed on the transcript path as well as the command, so the sentinel
         # is per session: without it, two sessions denied the same command
         # share one sentinel in /tmp and the second session is silenced. Keyed
-        # on the COUNT as well, so a second denial of an already-reported
-        # command gets its own one-time reminder -- that is the moment the
-        # advice changes, and the moment the session most needs it.
-        # Deliberately NOT keyed on a record index, which shifts as the
-        # transcript grows and would re-fire on every prompt.
+        # on the RUNNING TOTAL as well, so every fresh denial of an
+        # already-reported command gets its own one-time reminder -- that is
+        # when the advice changes, and when the session most needs it. The
+        # total is used rather than the stretch the message quotes, because
+        # the stretch returns to 1 after a success and would collide with the
+        # sentinel already written for the first denial.
         digest = hashlib.sha256(
-            f"{path}:{key}:{count}".encode()).hexdigest()[:16]
+            f"{path}:{key}:{total}".encode()).hexdigest()[:16]
         sentinel = os.path.join(
             tempfile.gettempdir(), f".claude-retry-before-blocked-{digest}")
         if os.path.exists(sentinel):
@@ -344,7 +372,7 @@ def main() -> int:
             open(sentinel, "w").close()
         except Exception:
             pass
-        print(message(label, count))
+        print(message(label, stretch))
         return 0
 
     return 0

@@ -736,9 +736,9 @@ The tell is a conclusion drawn from **removed or added lines alone**, when the s
 
 Case: `Morrison-Lab/gha#811` deleted three lines from `examples/quarto-publish.yml` --- `concurrency:` / `group: gh-pages` / `cancel-in-progress: false` --- with no replacement.
 Reading that removal through `gh pr diff | grep` for `concurrency`/`group` lines supports one conclusion: the PR tells consumers to delete the block outright.
-The same diff, six lines above the deletion, adds a NOTE the grep pattern never matched: "Do NOT declare a top-level `concurrency:` block naming `gh-pages`" in the caller workflow.
+The same diff, earlier in the same file, adds a six-line NOTE the grep pattern never matched: "Do NOT declare a top-level `concurrency:` block naming `gh-pages`" in the caller workflow.
 That sentence is scoped to the group's *name*, not to the presence of a block.
-A caller-level group with a different name --- `quarto-publish-${{ github.ref }}`, the pattern `gha#667` already used elsewhere in the same repo --- names something else and is not what the note forbids.
+A caller-level group with a different name --- `website-publish-${{ github.ref }}`, the literal name `gha#667` gave a different workflow's group in the same repo, or `quarto-publish-${{ github.ref }}`, the name the consumer PR that motivated this fix later merged --- names something else and is not what the note forbids.
 The removal and the addition are two edits inside one diff, and only reading the file whole, rather than the diff's hunks in isolation, shows that the second scopes the first.
 
 **This survives the quote-the-passage check, which is what makes it worth recording rather than dismissed as ordinary carelessness.**
@@ -752,8 +752,10 @@ A wrong claim about a file can be wrong for two different reasons, and they prod
 The commit could have changed since the claim was written, in which case the honest statement is "this changed" and no misreading occurred.
 Or the commit could be exactly the one that was read, in which case the honest statement is "I misread it" --- and conflating the two either lets a real misreading hide behind an invented edit, or accuses a PR of moving when it did not.
 Settle it before writing either sentence: fetch the specific commit SHA the claim was written against (`gh api repos/<owner>/<repo>/contents/<path>?ref=<sha>`) and confirm it is unchanged, rather than assuming from the PR's current state.
-In the case above, the commit the wrong claim cited (`856b8702`) was the head at the time of both comments;
-nothing had moved, so the retraction correctly said "I misread it" rather than blaming drift.
+In the case above, the branch head had in fact already moved by the time of both flagged comments --- a separate commit (`e34e03d5`) landed less than a minute before the first of them, fixing an unrelated review round --- but a direct compare (`gh api repos/<owner>/<repo>/compare/<cited-sha>...<later-sha>`) shows that commit never touched `examples/quarto-publish.yml`.
+So the file the claim was about was genuinely unchanged, and the retraction's "I misread it" holds;
+but the retraction described the cited commit as the one its comments were written against without checking the branch's own commit history, which shows a different commit was already the head by then.
+A retraction is a claim like any other, and this one needed the same check.
 
 - **Do:** read the file a diff's hunk lives in, not only the hunk, before concluding what a removal licenses or forbids.
 - **Do:** treat added context in the *same* diff as evidence about scope, even when it sits in a different hunk than the lines a grep matched.
@@ -763,7 +765,9 @@ nothing had moved, so the retraction correctly said "I misread it" rather than b
 - **Don't:** infer a rule's scope from the lines a diff removed when the same diff also adds prose stating the scope.
 
 (Measured 2026-09-02 on [`Morrison-Lab/gha#811`](https://github.com/Morrison-Lab/gha/pull/811).
-Two PR comments asserted the stub "tells consumers to delete the block" and that a consumer's merged rename therefore contradicted it, both derived from `gh pr diff | grep`-ing the changed `concurrency`/`group`/`cancel-in-progress` lines.
+Two comments on the PR, both derived from `gh pr diff | grep`-ing the changed `concurrency`/`group`/`cancel-in-progress` lines, argued that the deletion was the wrong fix and that a rename (as `gha#667` had already used elsewhere in the same repo) should have been kept instead;
+a later comment restated the same position once a consumer PR merged its own renamed group, phrasing it as the stub telling consumers to delete the block while the consumer had shipped a rename.
 The stub's own added NOTE at the cited commit (`856b8702`) read "Do NOT declare a top-level `concurrency:` block naming `gh-pages`," which scopes the prohibition to the group's name and forbids nothing about a renamed group.
-Verified with `gh api "repos/Morrison-Lab/gha/contents/examples/quarto-publish.yml?ref=856b8702" --jq '.content' | base64 -d`, and against the head-moved question above: `856b8702` was the head both comments cited, so the retraction correctly read as a misreading rather than a moved target.
-Both claims were retracted in the PR thread.)
+Verified with `gh api "repos/Morrison-Lab/gha/contents/examples/quarto-publish.yml?ref=856b8702" --jq '.content' | base64 -d`.
+The claim was retracted in the PR thread;
+the retraction described `856b8702` as the commit its comments were written against, which a separate check against `gh api repos/Morrison-Lab/gha/pulls/811/commits` and `.../compare/856b8702...e34e03d5` did not confirm, though the file itself was confirmed unchanged.)

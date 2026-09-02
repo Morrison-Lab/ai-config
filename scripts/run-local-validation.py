@@ -59,7 +59,9 @@ from typing import Any, Dict, List, Optional
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_WORKFLOW = ROOT / ".github" / "workflows" / "validate.yml"
 DEFAULT_SKIP = r"^Install dependencies$"
-GITHUB_EXPRESSION = re.compile(r"\$\{\{[^}]*\}\}")
+# Non-greedy to the closing `}}`, so a body carrying its own `}` (a fromJSON
+# literal) still matches; `[^}]*` would silently pass such a step as runnable.
+GITHUB_EXPRESSION = re.compile(r"\$\{\{.*?\}\}")
 
 # Local equivalents for jobs that only `uses:` a reusable workflow or a
 # composite action. Keyed by a substring of the `uses:` reference; the value

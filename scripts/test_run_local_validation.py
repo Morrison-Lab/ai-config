@@ -115,6 +115,17 @@ def test_derive_steps():
           not by["lint-qmd"].runnable and "lint-qmd.yml" in by["lint-qmd"].note)
 
 
+def test_expression_regex_edge_cases():
+    rx = rlv.GITHUB_EXPRESSION
+    nested = "echo ${{ toJSON(fromJSON('{\"a\":1}')) }}"
+    m = rx.search(nested)
+    check("an expression whose body contains a literal } is still detected",
+          m is not None and m.group(0).startswith("${{ toJSON(") and m.group(0).endswith("}}"))
+    two = "${{ github.actor }} ${{ secrets.GITHUB_TOKEN }}"
+    check("two expressions on one line: the first is named", rx.search(two).group(0) == "${{ github.actor }}")
+    check("a plain shell brace expansion is not an expression", rx.search("echo ${HOME} {a,b}") is None)
+
+
 def test_missing_job_is_exit_2():
     with tempfile.TemporaryDirectory() as tmp:
         wf = _write_fixture(tmp)
@@ -218,6 +229,7 @@ def test_live_workflow_derives_every_python_test_suite():
 
 
 def main():
+    test_expression_regex_edge_cases()
     test_derive_steps()
     test_missing_job_is_exit_2()
     test_list_does_not_execute()

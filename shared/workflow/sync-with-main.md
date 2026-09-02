@@ -225,13 +225,16 @@ to hit it. Don't wait for that PR's own merge/CI to surface the conflict ---
 check every open PR touching the same file right after your extraction
 merges: `git merge-tree "$(git merge-base origin/main origin/<sibling-branch>)" origin/main origin/<sibling-branch>`
 (or `gh pr diff <N>` against the new `main`) shows whether it still applies
-cleanly. Re-apply the
-sibling PR's actual semantic change (not a mechanical `--theirs`) to the new
-location, verify with a direct diff that the extracted unit now differs from
-`main` by exactly that PR's intended change and nothing else, then push when
-the sibling PR passes `memories/reviewing-prs.md`'s scope test and flag what
-you did in a PR comment; otherwise report the prepared diff to the user and
-leave the sibling PR untouched, since they can assign or name it first.
+cleanly.
+That check reads the sibling branch and edits nothing, so it runs for every
+sibling PR.
+Then apply `memories/reviewing-prs.md`'s scope test before preparing
+anything: for a sibling PR that fails it, report the conflict to the user and
+leave the PR untouched, since they can assign or name it first.
+For one that passes, re-apply the sibling PR's actual semantic change (not a
+mechanical `--theirs`) to the new location, verify with a direct diff that
+the extracted unit now differs from `main` by exactly that PR's intended
+change and nothing else, then push and flag what you did in a PR comment.
 
 See [`sync-with-main.cases.md`](sync-with-main.cases.md), "Check other open
 PRs after merging an extraction".

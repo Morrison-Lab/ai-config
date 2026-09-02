@@ -565,8 +565,9 @@ dispatching a paid review of, or merging any PR, resolve the invoking user
 and read the PR's author and assignees.
 Proceed only when the author or one of the assignees is that user (or an
 alias `memories/reviewing-prs.md` lists for that same user), the user
-explicitly asked for work on that PR by name, or the author is the GitHub
-Actions app (`github-actions`).
+explicitly asked for work on that PR by name (or, through an explicit
+`chores` call, on the Dependabot/Renovate population), or the author is the
+GitHub Actions app (`github-actions`).
 A mention such as "do not touch" followed by a PR number is not a request, a
 claim comment confers no scope, and a sweep skill's "every open PR" means
 every PR that passes this test.

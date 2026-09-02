@@ -291,7 +291,9 @@ ERROR: NotFound ... rename 'docs/design-decisions.html' -> '_site/docs/design-de
 
 The output directory was left missing `index.html`, `styles.css`, `search.json`, and `site_libs/`.
 The page named is not the page the format was added for, and that mismatch is itself the tell that the scope is project-wide rather than per-document.
-Don't read the named page as the first one rendered either: an independent reproduction on the same Quarto and OS named the page rendered *last*, because the path that fails is chosen by the post-render move loop rather than by render order.
+Don't read the named page as the first one rendered either.
+An independent reproduction on the same Quarto and OS named the page rendered *last*, so the naming does not track render order;
+which stage picks the reported path was not established, and the usable fact is only that the name identifies neither the edited document nor the first one rendered.
 
 **A green CI check is not evidence the block is scoped correctly.**
 Quarto 1.10.18 on a Linux runner accepted the identical config that 1.9.36 on macOS refused.

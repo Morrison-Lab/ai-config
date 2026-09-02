@@ -443,6 +443,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li><strong>Don’t:</strong> start the next wave on your own judgment once the current one is fully finished.</li>
 <li><strong>Don’t:</strong> read the boundary as forbidding parallel PRs <em>within</em> a wave.</li>
 </ul>
+<p><strong>A UMS pass is not a new wave, and neither is the PR it opens.</strong> The boundary above counts <em>issue grabs</em>: a wave is the set of issues taken from the repo’s backlog and the PRs that ship them. A UMS pass records what the wave taught, in <code>ai-config</code> or the repo’s own docs, and it is owed at the wave’s clean verdicts and merges by <a href="../../shared/workflow/run-ums-proactively.md"><code>run-ums-proactively</code></a> — so a “finish the wave, no new wave” instruction still includes it, and holding it back until the user says go is the deferral that fragment rules out. The near-miss is reading “don’t start a new wave” as “open no more PRs”: a UMS PR is not a grab from the backlog, and treating it as one strands the wave’s learnings in the conversation.</p>
+<ul>
+<li><strong>Do:</strong> run the owed UMS pass, and open its PR, after a “finish the wave, no new wave” instruction.</li>
+<li><strong>Don’t:</strong> count a UMS pass or its PR as a grab, or hold it until the next wave is authorized.</li>
+</ul>
+<p>(User directive, 2026-09-01: “cai: ums don’t count as a new wave”, given while a GIA run was wrapping its wave under a “finish the current wave but don’t start a new one” instruction and a UMS top-up sat deferred behind it.)</p>
 </section>
 <section id="e.-recurse" class="level4">
 <h4 class="anchored" data-anchor-id="e.-recurse">e. Recurse</h4>

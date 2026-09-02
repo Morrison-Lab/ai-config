@@ -7,8 +7,8 @@ The rest of the sentence is not read.
 A line that *says* the keyword is not being used still closes `#N` when the
 keyword sits next to the number.
 
-Split out of [`github.md`](github.md) because that file sits at the 1200-line
-gate (`scripts/check-memory-file-size.py` fires strictly above 1200).
+Split out of [`github.md`](github.md) because that file sits at the 1250-line
+gate (`scripts/check-memory-file-size.py` fires strictly above 1250, enforced with `--strict` in CI per ai-config#2970).
 
 ## Measured case
 

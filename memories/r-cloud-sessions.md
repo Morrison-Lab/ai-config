@@ -85,8 +85,8 @@ which keeps the R-toolchain and R-package material that applies anywhere.
   --no-install-recommends texlive-luatex texlive-latex-recommended
   texlive-latex-extra texlive-fonts-recommended lmodern`, then
   `texlive-fonts-extra` as well, because Quarto's callout preamble needs
-  `fontawesome5.sty`, which the first set does not carry (`! LaTeX Error:
-  File 'fontawesome5.sty' not found`).
+  `fontawesome5.sty`, which the first set does not carry
+  (the render dies with `File 'fontawesome5.sty' not found`).
   - **Do:** read `quarto check` after installing TinyTeX in a container.
   - **Don't:** trust `quarto install tinytex`'s exit code, or a tailed log.
   **Before accepting "uninstallable," try `install.packages()` straight from a

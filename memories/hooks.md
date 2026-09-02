@@ -1,6 +1,7 @@
 # Active Hooks Catalog & Proactive Compliance Guide
 
-This document indexes all 52 active hooks in `Morrison-Lab/ai-config` (51 registered in [`hooks/hooks.json`](../hooks/hooks.json) plus the `monitor-open-prs.py` daemon; count verified 2026-09-02), detailing their lifecycle events, triggering conditions, verification mechanisms, and rules for **proactive compliance** so agents can satisfy requirements naturally without tripping guards.
+This document indexes all 52 active hooks in `Morrison-Lab/ai-config` (51 registered in [`hooks/hooks.json`](../hooks/hooks.json) plus the `monitor-open-prs.py` daemon;
+count verified 2026-09-02), detailing their lifecycle events, triggering conditions, verification mechanisms, and rules for **proactive compliance** so agents can satisfy requirements naturally without tripping guards.
 
 For agents operating in this repository or consuming its skills, proactive compliance means following these rules by default rather than waiting for a hook to fire or block.
 

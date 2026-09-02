@@ -238,17 +238,12 @@ Copilot beside `claude-review` is the common pairing, and
 separately-billed ChatGPT-plan CLI.
 Re-dispatching the reviewer that already ran is the weakest of the available options, since it re-reads the same diff through the same model.
 
-**Antigravity is not one of these any more, and the difference matters here more
-than anywhere else.**
-It is permanently out of service (user directive, 2026-08-20), confirmed the
-same day on a dispatched run that ended
-`request failed (code 429): Your prepayment credits are depleted` and
-`Execution failed: model unreachable`.
-That is not the transient outage this fragment otherwise teaches you to re-check
-each round --- re-checking it will never succeed.
-So the pairing above is now Copilot and `delegate-to-codex`.
-Copilot and that CLI reviewer are not interchangeable, which is why the preference still needs
-reading rather than collapsing to one name.
+**The automated Antigravity PR-review workflow is not one of these any more, and the difference matters here more than anywhere else.**
+The automated `antigravity-review.yml` / `antigravity-code-review.yml` dispatch stays out of service: its 2026-08-20 run ended `request failed (code 429): Your prepayment credits are depleted` and `Execution failed: model unreachable`, and a 2026-09-01 retest (`workflow_dispatch` run 33557587761) failed again with a different error, `Spend cap breached` (code 403).
+Two different failures a week apart both stop this dispatch path, so keep it disabled rather than re-running it on spec.
+**This is a separate claim from the `agy` CLI**, which is confirmed working on Windows as of 2026-09-02 (`memories/delegation.md`'s "agy on Windows" section) and is usable for a manually-dispatched second opinion, the same way `delegate-to-codex` is.
+So the pairing above is Copilot and `delegate-to-codex`, with a manual `agy --print` CLI dispatch as a further option once confirmed on your own platform.
+Copilot, `delegate-to-codex`, and a manual `agy` CLI dispatch are not interchangeable, which is why the preference still needs reading rather than collapsing to one name.
 Copilot is **requested** on the PR, and answers only where the org's licensing
 reaches it.
 `delegate-to-codex` is the billed ChatGPT-plan CLI this corpus

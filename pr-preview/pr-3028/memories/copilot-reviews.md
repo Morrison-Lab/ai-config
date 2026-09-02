@@ -117,3 +117,49 @@ ai-config#2969 (ai-config#694 pattern) to keep both files well under the
   (`ucdavis/rampp#111`: Copilot had prepared the `DESCRIPTION` version bump
   that `version-check` was failing on and was rejected with that error; the
   identical fix pushed fine from this session as `0c72d81`.)
+- **Copilot applied `one-function-per-file` to Python scripts and to test modules on 2026-09-01 (Pacific),
+  and the written rule backs it as a standing requirement:
+  rebut only from the rule's own carve-out, or comply.**
+  Measured 2026-09-01 (Pacific) on [#2976](https://github.com/Morrison-Lab/ai-config/pull/2976):
+  it asked for `_triggers` and a new `test_*` function to move into their
+  own modules.
+  The first rebuttal called the rule R-only, which
+  [`shared/coding/one-function-per-file.md`](../shared/coding/one-function-per-file.md)
+  contradicts: it applies per-language and names a substantial Python
+  function, and it says an existing multi-function file is no exemption for
+  a new function.
+  What the rule does carve out is a two-liner ("a trivial wrapper or short
+  helper", in its words) grouped with closely related functions in a
+  shared file; "short helper" there describes the two-liner, not a second,
+  looser exemption.
+  So a rebuttal has to show the helper is about two lines and closely
+  related to the functions beside it; anything larger goes in its own
+  module.
+  The helpers from [#2976](https://github.com/Morrison-Lab/ai-config/pull/2976) landed inline before this was checked and are
+  tracked in
+  [#2990](https://github.com/Morrison-Lab/ai-config/issues/2990).
+  - **Do:** rebut only by the rule's own carve-out (a two-liner grouped
+    with closely related functions), citing the fragment, or move any
+    larger new function into its own module.
+  - **Don't:** call the rule R-only, or cite a file's existing shape as if
+    the fragment did not already address that case.
+- **On a repository without a `review_on_push` ruleset, Copilot was not
+  observed to re-review after a push until re-requested, and a
+  re-requested round can repeat a finding the previous round already
+  answered.**
+  This is the measured shape on one PR; the per-push behaviour recorded
+  earlier in this file is "not guaranteed", not "never".
+  Measured 2026-09-01 (Pacific) on [#2976](https://github.com/Morrison-Lab/ai-config/pull/2976):
+  a finding rebutted in one ARD comment was restated in the next review
+  body's `Suppressed comments` section, in different words, while the
+  inline thread kept only the earlier comment.
+  So read the review body as well as the inline thread when checking for
+  a repeat.
+  A repeat says nothing by itself about whether the earlier disposition was
+  a rebuttal or a fix; compare the repeated comment against the prior
+  disposition on the thread (the ARD comment, or the fix commit) before
+  treating it as new.
+  - **Do:** read the prior round's disposition for a repeated comment, and
+    answer it again by citing that disposition when nothing has changed.
+  - **Don't:** treat repeated comment text as proof that an earlier fix did
+    not land, or as a new finding, without checking the thread.

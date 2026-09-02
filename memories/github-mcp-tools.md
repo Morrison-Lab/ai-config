@@ -336,8 +336,7 @@ See ai-config#694 for the precedent.
 - **Copilot's per-push review is not guaranteed, and a missing one is
   silent.**
   Measured on [Morrison-Lab/ai-config#2913](https://github.com/Morrison-Lab/ai-config/pull/2913)
-  on 2026-09-01 PT, which is 2026-09-02 on the UTC clock every time below
-  uses.
+  on 2026-09-01 PT (2026-09-02 on the UTC clock used below).
   Every source is public and re-runnable: commit times from
   `git log --format=%cI` on `refs/pull/2913/head`; check runs from
   `GET repos/Morrison-Lab/ai-config/commits/<sha>/check-runs` filtered to
@@ -356,30 +355,25 @@ See ai-config#694 for the precedent.
   Every run followed a request by twelve to sixteen seconds.
   None of the four pushes started a run on its own in the time it was
   given, and the two that waited went seven and two minutes without one.
-  `get_check_runs` is the tell for the current head, and the per-SHA
-  endpoint above for an earlier one.
-  A requested run appeared within seconds and the measured absences were
-  minutes long, so one minute is the operational heuristic rather than a
-  guarantee: an absent run after that is grounds to re-issue, at the cost
-  of a duplicate request when check creation was merely delayed, which is
-  cheap next to a check-in that waits on a round that never started.
+  `get_check_runs` (current head) or the per-SHA endpoint above is the tell.
+  One minute is therefore the operational heuristic rather than a
+  guarantee: an absent run after that is grounds to re-issue, and a
+  duplicate request when check creation was merely delayed is the cheap
+  side of the trade.
   - **Do:** after every push, confirm a `copilot-pull-request-reviewer`
     check run exists on the new head within about a minute.
-    Where one exists, the repo's ruleset or an earlier request started it,
-    and `pr-on-claim.md`'s rule against re-posting on an auto-requesting
-    repo holds.
-    Call `request_copilot_review` only when none has appeared, the case that
-    rule's premise (the retry changes nothing) does not cover: on the two
-    heads above that waited, the request is what started the run.
+    Where one exists, `pr-on-claim.md`'s rule against re-posting on an
+    auto-requesting repo holds.
+    Call `request_copilot_review` only when none has appeared: that rule's
+    premise, that the retry changes nothing, is what the two heads above
+    that waited refute.
   - **Don't:** arm a check-in that waits on a round that never started.
 - **A Copilot review reporting `Comments generated: 0 new` can still carry
   findings.**
-  They sit under `Suppressed comments` in the review body that `get_reviews`
-  returns (state `COMMENTED`, header `Needs a closer look`) and nowhere in
-  `get_review_comments`, so a `success` check run plus zero open threads is
-  not a clean round.
-  Rounds thirty-five and thirty-six on [#2913](https://github.com/Morrison-Lab/ai-config/pull/2913) each carried two
-  such findings.
+  They sit under `Suppressed comments` in the `COMMENTED` review body that
+  `get_reviews` returns and nowhere in `get_review_comments`, so a
+  `success` check run plus zero open threads is not a clean round.
+  Rounds thirty-five and thirty-six on [#2913](https://github.com/Morrison-Lab/ai-config/pull/2913) each carried two such findings.
   The same shape from the `gh` side is `fully-clean.cases.md`'s
   collapsed-block case ([#1029](https://github.com/Morrison-Lab/ai-config/pull/1029)).
   - **Do:** read the review body with `get_reviews` every round.

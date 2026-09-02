@@ -67,8 +67,11 @@ Default to holding, and spend a round on an optional improvement only when it cl
 That default is about the fix and not about the fact, so where a declined note asserts something checkable, verify it against the code before writing it off -- the cost argument here holds whether the note is right or wrong, and only checking says which, per [`address-every-comment`](address-every-comment.md)'s "A note the reviewer declined to raise is still a claim".
 
 Keep the Copilot observation separate, and do not attribute it to your own pushes.
-Copilot posts no formal review when it finds nothing, so `copilot-pull-request-reviewer` can complete `success` with `get_reviews` empty even on a stable, single-push head -- the silent-reviewer state [`review-verdict-pitfalls`](review-verdict-pitfalls.md) owns.
-A green Copilot check is therefore not a verdict; read `get_reviews`, and treat its emptiness as "no findings posted", not as approval and not as something a trickled push caused.
+Copilot's no-findings state has had two shapes.
+Through August 2026 it posted no formal review when it found nothing, so `copilot-pull-request-reviewer` could complete `success` with `get_reviews` empty even on a stable, single-push head -- the silent-reviewer state [`review-verdict-pitfalls`](review-verdict-pitfalls.md) owns.
+Since September 2026 it posts a formal review whose body opens `### 🟢 Approval recommended` with zero generated comments (measured on [#2976](https://github.com/Morrison-Lab/ai-config/pull/2976) and [#2983](https://github.com/Morrison-Lab/ai-config/pull/2983)).
+A green Copilot check is therefore not a verdict.
+Read `get_reviews`, treat an empty result as "no findings posted", and treat the approval body as the clean verdict, neither of them as something a trickled push caused.
 
 - **Do:** report ready when a clean verdict stands over only a note the reviewer declined to raise as a finding.
 - **Do:** read a Copilot verdict from `get_reviews`, never from the check run's color.

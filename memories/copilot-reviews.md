@@ -131,8 +131,10 @@ ai-config#2969 (ai-config#694 pattern) to keep both files well under the
     arguing the rule in the abstract.
   - **Don't:** split a Python script or test module into one-function files
     to satisfy this finding --- it fights the file's established shape.
-- **Copilot re-reviews only when re-requested, and a re-request after a
-  push can repeat an earlier finding verbatim, even one already addressed.**
+- **Copilot re-reviews only when re-requested, whether by an explicit
+  `requested_reviewers` call or by a repository ruleset with
+  `review_on_push`, and a re-request after a push can repeat an earlier
+  finding verbatim, even one already addressed.**
   Requesting a fresh review re-derives every finding from scratch rather
   than diffing against the prior round, so a finding fixed two rounds ago
   can reappear worded identically in a new round's inline comments.

@@ -1152,13 +1152,22 @@ before reporting a PR ready, not just trust the last green run.
 A PR without a clean review verdict on the latest commit is not merge-ready.
 
 **A head green on its own branch can turn `main` red on merge, when the base gained a new CI check after the branch was cut.**
-A PR's own CI run only exercises the checks that existed when its workflow last ran, so a check added to `main` after the branch point never runs on the PR's head at all --- there is nothing red to see, because the check simply never fired.
-Measured on [#2965](https://github.com/Morrison-Lab/ai-config/pull/2965): the branch added hook bindings to `hooks/hooks.json` before [#2967](https://github.com/Morrison-Lab/ai-config/pull/2967) landed the generated `skills/ai-config-hooks/hooks/hooks.json` and its `gen-hooks-plugin.py --check` gate on `main`.
-`check-pr-fully-clean.py` reported #2965 FULLY CLEAN, a GIA session merged it under `mwc`, and `validate` on `main` went red at `da1a2d03` until [#2983](https://github.com/Morrison-Lab/ai-config/pull/2983) regenerated the manifest.
+A PR's own CI run exercises only the checks that existed when its workflow last ran.
+A check added to `main` after the branch point never runs on the PR's head at all,
+so there is nothing red to see: the check simply never fired.
+Measured on [#2965](https://github.com/Morrison-Lab/ai-config/pull/2965).
+That branch added hook bindings to `hooks/hooks.json` before [#2967](https://github.com/Morrison-Lab/ai-config/pull/2967) landed the generated `skills/ai-config-hooks/hooks/hooks.json` and its `gen-hooks-plugin.py --check` gate on `main`.
+`check-pr-fully-clean.py` reported [#2965](https://github.com/Morrison-Lab/ai-config/pull/2965) FULLY CLEAN,
+a GIA session merged it under `mwc`,
+and `validate` on `main` went red at `da1a2d03` until [#2983](https://github.com/Morrison-Lab/ai-config/pull/2983) regenerated the manifest.
+The head-only verdict cannot see this, and no path diff can prove the base gained no check through a script or a reusable workflow,
+so the rule is the one [`sync-with-main`](sync-with-main.md) already states: a stale merge-base means update first.
 
-- **Do:** before merging, confirm the merge-base with the default branch is the default branch's current tip, or diff `.github/workflows/` and any generated-file check between the merge-base and the default branch tip (`git diff --name-only <merge-base> origin/main -- .github/workflows scripts/gen-*`).
-- **Do:** when that diff is non-empty, `gh pr update-branch` and let CI re-run at the new base before merging.
-- **Don't:** read a head-only FULLY CLEAN verdict as a merge-safe verdict when the base has advanced and could have gained a check the head never ran.
+- **Do:** before merging, confirm the merge-base with the default branch is the default branch's current tip (`git merge-base origin/main <head>` equals `git rev-parse origin/main`).
+- **Do:** when it is not, `gh pr update-branch` and let CI re-run at the new base before merging.
+- **Don't:** read a head-only FULLY CLEAN verdict as a merge-safe verdict when the base has advanced.
+- **Don't:** substitute a path diff of `.github/workflows/` for the update.
+  It cannot see a check that arrived through a script or a reusable workflow.
 
 Tracked as [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982).
 

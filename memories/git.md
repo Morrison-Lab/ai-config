@@ -572,18 +572,18 @@ without `-b main`, filed for tracking (ai-config#2740).
 
 `hooks/no-push-without-self-review.py` imports `no-unreviewed-pr.py` as a
 sibling module.
-When that import fails --- observed from a worktree whose registration
-resolved `CLAUDE_PLUGIN_ROOT` to `<worktree>/.claude` instead of the
-checkout's real root --- the guard cannot parse the command, so it falls back
-to a narrow regex over the raw command text that matches a `git ... push`
-invocation and denies the command.
-The regex is deliberately narrow (`grep push` and `git commit -m "push the
-button"` do not trip it, and the hook's own suite pins that), but it reads
-the whole command string, so a heredoc or `printf` body that quotes a
-literal `git push -u origin <branch>` line matches exactly as a real push would.
-Measured 2026-09-01 while writing an issue body and again while posting the
-correction to that issue; tracked as
-[ai-config#2981](https://github.com/Morrison-Lab/ai-config/issues/2981).
+When that import fails, the guard cannot parse the command.
+It was observed from a worktree whose registration resolved `CLAUDE_PLUGIN_ROOT` to `<worktree>/.claude` instead of the checkout's real root.
+The guard then falls back to a narrow regex over the raw command text,
+which matches a `git ... push` invocation and denies the command.
+The regex is deliberately narrow:
+`grep push` and `git commit -m "push the button"` do not trip it,
+and the hook's own suite pins that.
+It reads the whole command string, though,
+so a heredoc or `printf` body that quotes a literal `git push -u origin <branch>` line matches exactly as a real push would.
+Measured 2026-09-01 while writing an issue body,
+and again while posting the correction to that issue.
+Tracked as [ai-config#2981](https://github.com/Morrison-Lab/ai-config/issues/2981).
 
 - **Do:** write a comment or issue body that quotes a push command with the
   Write tool, or with a placeholder the shell assembles, rather than inside

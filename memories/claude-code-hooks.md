@@ -325,3 +325,12 @@ When a hook emits a multi-paragraph message with blank lines (`\n\n`), each blan
 To keep warnings legible and avoid visual clutter:
 - Format warn-only `Stop` hook `systemMessage` strings as a concise, single-line actionable reminder.
 - Avoid internal double newlines (`\n\n`) in `systemMessage` payloads emitted by `Stop` guards.
+
+## Stop hook payload schemas and remote session tolerance
+
+`Stop` hook scripts receive a JSON payload on stdin that varies across harnesses and runtime environments:
+- **Transcript path key variants**: `transcript_path` (standard Claude Code CLI snake_case), `transcriptPath` (camelCase in some harnesses), `transcript`, or `history_file`.
+  Scripts that inspect the transcript must check all four keys rather than assuming snake_case alone.
+- **Direct message fields**: In contexts where the transcript file is omitted or piped directly, payloads may supply `reply`, `last_assistant_message`, `message`, `content`, or `text`.
+- **Remote / web session boundary**: In remote/web cloud sessions (such as `claude.ai/code`), plugin `Stop` hooks may not be dispatched by the cloud container across turn completions or context summarizations (ai-config#2943).
+  Do not treat local `Stop` hook enforcement as an active safety net in remote web sessions --- follow instruction rules like "Always produce a reply" directly in model reasoning.

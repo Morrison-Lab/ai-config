@@ -574,3 +574,23 @@ used repo-root-relative paths from inside `memories/`.
 `git diff --name-only origin/main...HEAD | grep -c memories/` returned 0, so the
 PR was unaffected --- but that was established afterwards, by query, and the
 original "links OK" claim had no such basis.
+
+## A mutation rationale that named the wrong exit code
+
+(`Morrison-Lab/gha#811`, fixed in commit `0262c1c6`, 2026-09-02, in
+`.github/workflows/scripts/tests/run-audit-example-concurrency-tests.py`.
+
+The `another owner's uses:` case carried a rationale saying that loosening
+`USES_RE` turns the case red "because the callee file would then be looked up
+and found missing" --- an exit 2.
+Measured, it turns red with exit 1: the fixture writes the callee under that
+same name, so a loosened regex resolves it and reports a real collision.
+The case discriminates either way; only the stated mechanism was wrong.
+
+Two things made it durable rather than a slip.
+It was written from the shape of the code rather than from a run, and the
+script does have a 2 for a different condition, so re-reading the code confirms
+the number without confirming the claim.
+It was introduced by round one's own fix, `21751be5`, survived rounds two
+through five, and was caught by the sixth --- established by walking that file
+through each commit rather than from recollection.)

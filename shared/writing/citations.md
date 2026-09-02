@@ -38,6 +38,44 @@ source repo instead --- see the `github/docs` bullet in `memories/claude-code.md
 statement --- it had moved to the "Triggering a workflow" article; caught by
 review.)
 
+**Second occurrence, `Morrison-Lab/gha#811`, 2026-09-02, where the citations
+were never fetched at all rather than remembered from an earlier fetch.**
+Two `github/community` discussions were cited for a GitHub Actions message ---
+`Canceling since a deadlock for concurrency group '<group>' was detected
+between 'top level workflow' and '<job>'`, whose left slot is that fixed
+literal rather than a second variable --- and neither carries it: #30708 reports
+`Canceling since a higher priority waiting request ... exists`, whose cause is
+a `github.workflow` naming collision, and #43510 is about the default two-run
+concurrency limit.
+[rhysd/actionlint#538](https://github.com/rhysd/actionlint/issues/538) does
+carry it, as
+`Canceling since a deadlock for concurrency group 'ci-939eda80...' was detected
+between 'top level workflow' and 'build-image'`.
+The rule above already prescribes the remedy.
+
+What is new is the **tell**, because this section states its cause as staleness
+--- a pairing that was once right --- and a citation that was never checked
+matches none of that wording.
+The cause here is that the message was *known to be real*, so the URLs were
+selected to support a claim already believed rather than read to establish one,
+which feels like sourcing rather than like asserting.
+The round-two commit that retracted them, `385d4f43`, states it plainly: "I
+cited two community discussions for the deadlock message without opening
+either."
+
+- **Do:** fetch a citation you are adding to support a claim you already
+  believe, on the same terms as one you are adding to establish a claim.
+- **Don't:** treat confidence in the underlying claim as evidence about the
+  URL --- a real message can be cited to two pages that do not carry it.
+
+These two URLs were then reproduced a round later, from a summary of that round
+rather than from `385d4f43`, into an `ai-config` entry that also misattributed
+them.
+That hop is governed by
+[`verify-the-right-artifact`](../workflow/verify-the-right-artifact.md)'s
+"A summary is another shape, and the auto-loaded copy is the one you read",
+which already points back here.
+
 **The other authoring-side counterpart: run the exact-substring check on your
 own quotation, not only on one a reviewer disputes.**
 The bullet further down

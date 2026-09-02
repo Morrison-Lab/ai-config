@@ -803,11 +803,45 @@ session had applied minutes earlier; see
 [`fact-check-prose`](../writing/fact-check-prose.md)'s "A command written
 into documentation is a condensation of the code that builds it".
 
-This meets [`deterministic-tools`](../principles/deterministic-tools.md)'s
-third-occurrence bar and does not yield an instrument, which is worth stating
-rather than leaving as a silent omission.
+4th recorded occurrence, 2026-09-02, `Morrison-Lab/gha#811`, across six
+adversarial pre-push rounds returning 11, 11, 11, 6, 3 and 2 findings ---
+counted from the branch's own commit messages, `21751be5` through `0262c1c6`,
+rather than from recollection, which had dropped a round of eleven and read the
+last round's two prose items as zero.
+Two instances, both in fixes for **convention** findings: an over-long-line fix
+put its break on a dangling `and`, in five files, because the fix was applied
+uniformly; and a forward-reference fix reworded the pointer into two new
+forward references.
+
+A convention finding arrives *with* its instrument --- the linter, script or
+grep that produced it --- so the omission here was simply not pointing that
+instrument at the fix.
+The corpus already says to do so, in three places this session did not consult:
+[`ardi.cases.md`](ardi.cases.md)'s "Run the literal-verification check over
+your own fix too", which calls running the rule against the fix "the entire
+mechanism";
+[`semantic-line-breaks`](../writing/semantic-line-breaks.md), which requires
+re-running the check after committing whenever it flags lines you believe you
+already fixed;
+and [`ardi`](ardi.md)'s own added-line scan, owed after every pass that edited
+the diff, your own reflow included.
+So this occurrence adds no new rule, only a carve-out to the conclusion below
+and evidence about how the existing three get missed: the fix is authored while
+holding the convention in mind, and therefore feels exempt from it.
+
+The chain above meets
+[`deterministic-tools`](../principles/deterministic-tools.md)'s
+third-occurrence bar and does not yield an instrument *for the general class*,
+which is worth stating rather than leaving as a silent omission.
 Whether a fix reproduces the finding it closes is a judgment about meaning,
 not a condition decidable over a diff, so no hook can decide it.
+The 4th occurrence above carves out a narrower subclass still: a finding whose
+detector would also flag the fix.
+That held for its forward-reference instance and not for its line-length one,
+where the fix broke on a dangling conjunction and no detector in this corpus
+sees those --- `scripts/semantic-line-breaks.py` says so in its own header.
+So the carve-out is "run the check the finding came with, when that check can
+see the fix", which is a subset of a subclass rather than a general remedy.
 The procedural equivalent already exists and simply has to be run: the fix is
 "a diff nobody has read", per
 [`adversarial-self-review`](adversarial-self-review.md)'s "The review gates

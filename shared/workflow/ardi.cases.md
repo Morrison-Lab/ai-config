@@ -924,3 +924,46 @@ execute under the loader without failing loudly, and a mutation count taken
 under that loader proves nothing either way.
 `memories/r-quarto.md`'s "`pkgload::load_all()` cannot serve a PSOCK cluster"
 section carries the mechanism.)
+
+## Prose staled by its own fixes, three rounds running
+
+(`Morrison-Lab/gha#811`, 2026-09-02.
+Six adversarial pre-push review rounds returned 11, 11, 11, 6, 3 and 2
+findings.
+Prose was the dominant category from round three onward --- round three's
+message records that nine of its eleven were prose, round five's that all three
+were, round six's that both were --- and within it, a comment or a document
+describing code inaccurately is what `0262c1c6` calls "the class this branch
+has spent five rounds on -- a comment describing code inaccurately".
+
+That class is wider than this record's own subject, which is the part of it
+staled by the branch's own fixes; the commits do not separate the two, so read
+the five-round figure as bounding this record rather than measuring it.
+What the commits do establish for the narrower class is three consecutive
+rounds of it in `gha`'s `CLAUDE.md`, which is what follows.
+
+`gha`'s `CLAUDE.md` is not merely a contributor guide.
+It runs to several thousand lines recording, per capability, which composite
+does what, which exit code means what, which default each of two YAML files
+declares, and which mutation kills which test case.
+Almost any behavioural fix therefore falsifies a sentence in it, and a later
+reader who finds code and prose disagreeing has good reason to take the prose.
+
+The sharpest instance: a group-acceptance rule was changed, to close an earlier
+finding, from "an integer is accepted, a bool is refused" to "every non-string
+is refused".
+`CLAUDE.md` went on saying an integer "round-trips and is accepted", and went
+on prescribing that bool be tested before int --- an ordering the new rule makes
+meaningless.
+Both sentences had been accurate when written.
+Neither was outside the diff, which is the sharper fact: `385d4f43` edited
+`CLAUDE.md` in the same commit as the code change, and one of the two staled
+sentences sits in that commit's own hunk as trailing context.
+It was rendered on screen, unchanged, directly beneath the change that
+falsified it, and the round still pushed --- so proximity is not the remedy,
+and a grep for the replaced value is.
+
+What makes it recur rather than merely happen is that each round's fix creates
+the next round's stale sentence, which is what
+[`ardi`](ardi.md)'s grep bullet now says explicitly: the grep is owed after
+every round's fix, not once when the PR's headline defect is closed.)

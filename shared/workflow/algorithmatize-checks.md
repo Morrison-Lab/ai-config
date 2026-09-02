@@ -305,6 +305,22 @@ of which side of it a claim sits on.**
 - **Don't:** settle a mechanism attribution by plausible reasoning; a
   reasoned-but-wrong one reads exactly like a correct one.
 
+**Second occurrence, 2026-09-02 on `Morrison-Lab/gha#811`, where the disputed
+part of the attribution was an EXIT CODE.**
+The Do lines above already prescribe the remedy.
+What is new is the tell, because an exit code reads as a detail of the
+assertion rather than as an attribution claim, so the fact-checking exemption
+this section denies to comments gets granted to it silently.
+
+- **Do:** record the exit code the run actually returned, not the one the code
+  reads as though it would return.
+- **Don't:** read a comment naming a plausible exit code as already mutation-
+  checked --- the mutation this section prescribes observes only that the case
+  flipped, so a status named beside it is a separate, unmeasured claim.
+
+See [`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md),
+"A mutation rationale that named the wrong exit code".
+
 **Running the mutation is not the check, because the rule above asks WHETHER
 the case flips and a comment can be wrong about WHICH WAY.**
 
@@ -695,8 +711,14 @@ unrelated case flips and the row reports caught.
   the row on that case failing rather than on any case failing.
 - **Do:** read a case that survives a mutation aimed at a clause it never
   reaches as an unmeasured clause rather than a robust one.
+- **Do:** delete the clause a negative case is written for and confirm the
+  input is then ACCEPTED, at the moment the case is authored --- if it is still
+  rejected, an earlier stage is doing the work and the case measures nothing.
 - **Don't:** accept "some case flipped" as "the case written for this clause
   flipped" --- those come apart wherever the clauses are stages.
+- **Don't:** build a negative case out of input malformed in more ways than
+  one --- each extra defect is a rejection point ahead of the clause you meant
+  to measure, and the input stays rejected with that clause gone.
 - **Don't:** infer coverage from a matrix whose rows all read caught; the count
   is a fact about the rows, and only the identity check makes it one about the
   clauses.
@@ -846,6 +868,23 @@ A line-length property was enforced by two separately anchored
 regexes, `PIPE_ROW` and `DELIMITER_ROW`.
 Reverting only one left the other still enforcing the limit, and the
 test suite stayed green.)
+
+**Second occurrence, 2026-09-02 on `Morrison-Lab/gha#811`**, where a
+non-mapping-job guard was declared in both `job_groups` and
+`callee_calls`, because both walk the parsed workflow and both need
+it.
+The Do lines above already prescribe the sweep.
+What they do not say is what happens *after* it resolves: the
+second site is now known to exist, and the mutation matrix records
+scores rather than structure, so the finding has nowhere to live
+unless it is written down.
+
+- **Do:** name each enforcing site in a comment at the others, which
+  is the destination this file already prescribes for a
+  "which guard handles which case" claim.
+- **Don't:** let "the other site still holds" stand as the whole
+  record --- it explains the survivor and loses the structural fact
+  that produced it.
 
 **When a mutation survives, the first hypothesis is that the mutation
 was wrong --- mis-targeted, incomplete, or vacuous --- not that the

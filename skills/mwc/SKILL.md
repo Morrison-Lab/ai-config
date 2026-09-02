@@ -75,6 +75,11 @@ without asking confirmation before every merge.
   and `--match-head-commit "<pinned-sha>"` (or `expectedHeadSha` on the
   MCP merge tool) on the merge command itself, so the API refuses a
   push that lands after the read.
+  No merge API pins the base, so on a repository without a merge queue
+  or an up-to-date-branch requirement the base can still move between
+  that read and the merge; where that must not happen, the server-side
+  gate is the only closure, per
+  [`fully-clean`](../../shared/workflow/fully-clean.md).
   A repeat names the moving ref: when the base moved twice it outruns
   the gate, so merge through a queue or strict up-to-date protection
   instead, and when the head moved another writer is on the branch, so

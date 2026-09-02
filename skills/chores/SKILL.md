@@ -156,6 +156,16 @@ the PR body's update table or treat it as **review**.
 
 ### 3. Verify CI is fully green
 
+Record the head before reading anything else in this step,
+since every read below and the merge in step 4 are claims about one SHA,
+and Dependabot can replace the head between two reads:
+
+```bash
+PINNED=$(gh pr view "$N" --repo "$REPO" --json headRefOid -q .headRefOid)   # VIEW_PR
+```
+
+If the head changes before the merge lands, start this step again from here.
+
 A bump is only "safe to merge" if every required check passes. `skipping` is
 fine (path-filtered jobs); `pending` means wait, `fail` means stop.
 
@@ -182,7 +192,7 @@ Dashboard) — `@dependabot` comment commands do nothing on Renovate PRs.
 
 ### 4. Safe bumps (patch / minor / submodule + green) → merge
 
-Record `headRefOid` before reading the CI and conflict state, and require the live head to equal it immediately before the merge command, since Dependabot can rebase or regenerate the branch between the two reads and a regenerated head that already contains the base would pass a currency check with CI never read for it.
+Require the live head to equal the `$PINNED` recorded at the top of step 3 immediately before the merge command, since a regenerated head that already contains the base would pass a currency check with CI never read for it.
 Then run the base-currency check from [`fully-clean`](../../shared/workflow/fully-clean.md)'s stale-base rule (the Do bullets beginning "for a direct merge"), since a green head can still break the base when the base gained a check after the head's CI ran.
 When it is stale, the bot-bump recovery is to update the branch,
 wait for the new head SHA,
@@ -209,7 +219,7 @@ and every check this skill gates on is required or aggregated behind a required 
 (both settings block on required checks alone, and a deferred merge runs after the base-currency check, so elsewhere the check is stale by the time it fires):
 
 ```bash
-gh pr merge "$N" --repo "$REPO" --squash --auto --match-head-commit "$PINNED"   # MERGE_PR — needs auto-merge enabled; swap --squash for --merge/--rebase if squash is disabled
+gh pr merge "$N" --repo "$REPO" --squash --auto --match-head-commit "$PINNED"   # MERGE_PR --- needs auto-merge enabled; swap --squash for --merge/--rebase if squash is disabled
 ```
 
 For **Dependabot** you can also hand the merge back to the bot, under the same up-to-date-branch or queue condition as `--auto` --- it waits for

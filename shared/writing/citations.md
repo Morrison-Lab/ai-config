@@ -38,7 +38,7 @@ source repo instead --- see the `github/docs` bullet in `memories/claude-code.md
 statement --- it had moved to the "Triggering a workflow" article; caught by
 review.)
 
-**Second occurrence, `Morrison-Lab/gha#811`, 2026-09-02, where the citations
+**Second occurrence, 2026-09-02 on `Morrison-Lab/gha#811`, where the citations
 were never fetched at all rather than remembered from an earlier fetch.**
 Two `github/community` discussions were cited for a GitHub Actions message ---
 `Canceling since a deadlock for concurrency group '<group>' was detected
@@ -68,13 +68,11 @@ either."
 - **Don't:** treat confidence in the underlying claim as evidence about the
   URL --- a real message can be cited to two pages that do not carry it.
 
-These two URLs were then reproduced a round later, from a summary of that round
-rather than from `385d4f43`, into an `ai-config` entry that also misattributed
-them.
-That hop is governed by
+The retraction is in `385d4f43` rather than in any later summary of it, which
+matters for anyone reading this record second-hand:
 [`verify-the-right-artifact`](../workflow/verify-the-right-artifact.md)'s
-"A summary is another shape, and the auto-loaded copy is the one you read",
-which already points back here.
+"A summary is another shape, and the auto-loaded copy is the one you read"
+governs that hop, and already points back here.
 
 **The other authoring-side counterpart: run the exact-substring check on your
 own quotation, not only on one a reviewer disputes.**

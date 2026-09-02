@@ -1162,6 +1162,45 @@ A PR without a clean review verdict on the latest commit is not merge-ready.
 - **Don't:** treat green CI plus a clean review as sufficient without independently re-checking merge-conflict state.
 - **Don't:** describe a PR that lacks a clean HEAD review as merge-ready, ready to merge, or "green and merge-ready."
 
+**Because it is a snapshot, a reading you took over a live PR cannot be
+re-derived later --- so capture the command and its output verbatim at the
+moment a decision starts to rest on it.**
+
+The section above says the state moves; this is what that costs when you try to
+explain a reading afterwards.
+Re-running the command answers a question about the PR *now*, and it is
+presented in exactly the form of an answer about the PR *then*, so a
+disagreement between the two invites a hunt for a cause --- a tool version, a
+change in wording, a bug --- when the only established fact is that the PR
+moved.
+That hunt is expensive and it converges on something plausible, because
+plausible explanations for a tool disagreeing with itself are cheap.
+
+It is worse than an ordinary lost measurement because a remembered reading and
+a mis-remembered one are indistinguishable from the inside, and the reading is
+usually the whole basis for whatever was decided next.
+
+- **Do:** paste the command and its verbatim output --- exit status included ---
+  into the issue, PR, or notebook entry at the moment you act on it.
+- **Do:** report the cause as not established when a later re-run disagrees and
+  nothing was captured, rather than naming the likeliest mechanism.
+- **Don't:** treat a re-run as reproducing an earlier reading over a live PR ---
+  the input differs, so the two are separate measurements.
+- **Don't:** file or record a diagnosis whose only evidence is a reading you can
+  no longer produce.
+
+(Measured 2026-09-02 on `Morrison-Lab/ai-config`: differing
+`check-pr-fully-clean.py` readings across `Morrison-Lab/gha#811`, `#814` and
+`#820` were attributed first to a vocabulary false positive and then to a stale
+checker.
+A controlled re-run --- the stale clone at `240650120` against a worktree at
+`origin/main` --- returned identical verdicts on all three (`#814` rc=0, `#820`
+rc=0, `#811` rc=1), refuting both.
+No reading from the original runs had been captured, so what actually differed
+between them is not recoverable.
+ai-config#3022 and #3032 were closed for resting on the false diagnosis;
+ai-config#3031 carries the verified statement.)
+
 **A sync-only push invalidates a clean verdict just as thoroughly as a code push, and arming auto-merge after a sync violates the HEAD review gate.**
 When `main` moves and a direct merge is refused because the branch is not up to date,
 merging `origin/main` in and pushing creates a new HEAD commit ref.

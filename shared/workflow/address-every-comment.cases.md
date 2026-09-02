@@ -814,9 +814,16 @@ uniformly; and a forward-reference fix reworded the pointer into two new
 forward references.
 
 A convention finding arrives *with* its instrument --- the linter, script or
-grep that produced it --- so the omission here was simply not pointing that
-instrument at the fix.
-The corpus already says to do so, in three places this session did not consult:
+grep that produced it.
+For the forward-reference instance that instrument would have flagged the fix,
+so the omission was simply not pointing it there.
+For the line-length one it would not have: the fix broke on a dangling
+conjunction, and `scripts/semantic-line-breaks.py` says in its own header that
+it does not detect conjunction-boundary breaks.
+The corpus already says to re-run a check over your own fix, in three places
+this session did not consult --- the first two govern the forward-reference
+instance, and the third governs neither, being scoped to banned punctuation and
+multi-sentence lines:
 [`ardi.cases.md`](ardi.cases.md)'s "Run the literal-verification check over
 your own fix too", which calls running the rule against the fix "the entire
 mechanism";
@@ -825,8 +832,8 @@ re-running the check after committing whenever it flags lines you believe you
 already fixed;
 and [`ardi`](ardi.md)'s own added-line scan, owed after every pass that edited
 the diff, your own reflow included.
-So this occurrence adds no new rule, only a carve-out to the conclusion below
-and evidence about how the existing three get missed: the fix is authored while
+So this occurrence adds no new rule, only a carve-out to the chain's conclusion
+and evidence about how those places get missed: the fix is authored while
 holding the convention in mind, and therefore feels exempt from it.
 
 The chain above meets

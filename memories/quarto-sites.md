@@ -309,10 +309,10 @@ Two runs on [ucdavis/hac.sap#9](https://github.com/ucdavis/hac.sap/pull/9) carri
 Both `build` checks passed, and both render steps dump the same inputs: `FORMATS` empty, `RENDER_PROFILE` empty, `TINYTEX: false`, and `HAS_LABEL_PDF`, `HAS_LABEL_DOCX`, `HAS_LABEL_REVEALJS` all false.
 Read `TINYTEX` as part of that input rather than the labels alone: the action's pdf branch fires on `TINYTEX = true` **or** `HAS_LABEL_PDF = true`, so a false label does not exclude pdf by itself.
 On those inputs `Morrison-Lab/gha`'s `preview@v2` takes its no-formats branch, builds `FORMAT_LIST=("html")`, and issues one command: `quarto render . --to html --output-dir _site`.
+The runner never echoes the resolved command line, so that reconstruction of the `quarto render` invocation is a derivation over the script text and the `env:` block the runner does print, rather than an observation of the command itself.
 Within the project render that command produces one output per document, so no two formats can contend for `<stem>.html`, and the collision was impossible in that phase by construction.
 Scope that to the project render deliberately: the same run renders `sap-template.qmd` twice more afterwards, through the `post-render` hook described below.
 Those extra renders cannot collide either, for a different reason --- each carries an explicit `output-file:`, so they claim `sap-template-revealjs.html` and `sap-template.docx` rather than a name any other output wants.
-The runner never echoes the resolved command line, so that last step is a derivation over the script text and the `env:` block it does print, rather than an observation of the command itself.
 
 **The later run's log reads like a multi-format render, and that is the trap.**
 Run `33567826907` carries `Output created: _site/sap-template-revealjs.html` and `_site/sap-template.docx` next to `_site/index.html`, which looks like the project block's revealjs rendering cleanly.

@@ -289,6 +289,16 @@ The review caught it, and it is the same class of unmeasured claim.)
 - **Do:** run the clock command again immediately before typing a time into a forge comment, exactly as before a chat recap or a file edit.
 - **Don't:** infer a clock time from the number of tool calls or actions taken since the last real reading.
 
+Two hooks are this rule's mechanism, one per surface.
+`hooks/no-unmeasured-clock-claim.py` reads the reply at `Stop`.
+`hooks/flag-unmeasured-timestamp.py` reads a comment body at `PreToolUse`,
+on the `gh` comment and review commands
+and on the `mcp__github__` comment tools that `hooks/require-agent-disclosure.py` covers.
+Each warns, never blocks, when the text states a Pacific clock time
+and no clock read appears in the transcript since the turn began,
+naming the stamp and the command to run before restating it
+(ai-config#2903, filed on the same day the rule above was written and broken again).
+
 ## State the actual time when reporting a scheduled check-in
 
 When telling the user I've scheduled a wakeup or check-in (`ScheduleWakeup`, or an equivalent poll-later mechanism), state the clock time it fires at, not just the relative delay or a bare "I scheduled a check-in."
@@ -958,6 +968,28 @@ The fragment also sets the default direction for the age factor: among several o
 Nothing parallelizable should ever sit "queued" --- writing "queued", "next up", "I owe you X", or "still need to" into a status recap is the trigger to launch a subagent on it right then, not a way to describe the plan.
 Sidecar delegation (independent investigation, verification, a disjoint slice, an owed UMS pass, a routed `cai`) is pre-authorized and never worth asking about; keep only the blocking critical-path edit local.
 Research and reading are dispatchable too, sized by how much comprehension the result needs rather than by how small the fetch looks --- the fragment above covers why that category of work is easy to route wrong without anything in the artifact showing it.
+
+## Never launch a subagent on Fable without explicit, specific permission
+
+An `Agent` call that omits `model` inherits the conductor's model.
+In a Fable session that makes the cheapest thing to type the most expensive thing to run, and nothing reports the substitution: the call reads as "default", the transcript records `claude-fable-5-1`, and the account hits its usage limit.
+Measured 2026-09-01: 10 launches in one session, 8 of them inherited Fable (six adversarial reviews, two sidecars), and only the two that set `model: sonnet` did not.
+
+The rule is the user's, verbatim: never spawn a subagent on Fable without their explicit, specific permission.
+"Specific" means for that launch, not a standing yes for the session.
+`hooks/no-fable-subagent.py` is the mechanism: it denies an `Agent` launch that names Fable, or that omits `model` while the session's own model is Fable, and warns on a `Workflow` launch in a Fable session, whose `agent()` calls it cannot inspect.
+`FABLE_SUBAGENT_OK=1` on the one approved command is how a grant is recorded.
+Exporting it for a session is the violation wearing an environment variable.
+The persona files under `.claude/agents/` and `.opencode/agents/` deliberately carry no `model:` (per `skills/agent-builder/SKILL.md`, the tier is pinned at the call site so one persona serves every tier), which is exactly why the call site has to name it: every `Agent()`, `Task`, or `Workflow` `agent()` invocation passes `model`, and the hook denies the Claude Code launch that does not.
+
+- **Do:** pass `model` on every `Agent` call, `sonnet` or `haiku` for bounded or mechanical work, and ask before naming Fable.
+- **Do:** set `FABLE_SUBAGENT_OK=1` only on the single command the user approved, after they approved it.
+- **Don't:** omit `model` and let the launch inherit, which in a Fable session is a Fable launch nobody chose.
+- **Don't:** treat a `daytb`, `away`, or `mwc` grant as covering the model tier; none of them does.
+
+(Directive from the user, 2026-09-01: "have you been spawning subagents using fable?
+don't ever do that without my explicit specific permission".
+Tracked as ai-config#2927.)
 
 ## Derive a set of work items; never hand over an enumeration of it
 
@@ -1756,8 +1788,23 @@ must itself contain a backslash escape.
   on this platform, measured 2026-08-22, it does not.
 - **Don't:** carry the claim to another platform without re-measuring; it did
   not reproduce in a Linux CI runner.
+  It also did not reproduce in a Linux remote Claude Code container on
+  2026-09-01: the same reproducer left both backslashes of `a\\nb` intact
+  under `repr()`.
 - **Don't:** trust a green suite after writing a regex through a heredoc; read
   the emitted line back.
+
+**Knowing this rule does not stop you tripping it, so add a check rather than trusting recall.**
+Measured 2026-09-01: this section was loaded and had just been read
+when a heredoc'd Python edit wrote `'\\n\\n'` into a file,
+which arrived as the literal text `\n` and corrupted the script it was patching.
+`ast.parse` caught it immediately, and the fix was the `chr(92)` placeholder this entry prescribes.
+So the remedy works; what fails is noticing that the moment has arrived,
+because nothing about typing an escape sequence announces itself as the trigger.
+Run a parse or round-trip check after any heredoc'd edit that writes escape sequences.
+
+- **Do:** parse-check (or read back) a file a heredoc just wrote with escapes in it.
+- **Don't:** treat having read this section as the check --- it was, and the collapse happened anyway.
 
 (Measured 2026-08-22; tracked as
 [ai-config#1923](https://github.com/Morrison-Lab/ai-config/issues/1923).

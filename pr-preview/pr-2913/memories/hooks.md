@@ -25,7 +25,7 @@ They inject real-time local timestamps, surface detached background monitor stat
 | Hook Script | Matcher | Type | Trigger / Purpose | Proactive Compliance Rule |
 |---|---|---|---|---|
 | [`inject-local-time.sh`](../hooks/inject-local-time.sh) | None | Inject | Injects local Pacific time (`America/Los_Angeles`) and UTC time into turn context. | Read the injected timestamp or run `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"` fresh before stating recaps. Never guess or recall local time from memory. |
-| [`ensure-open-pr-monitor.py`](../hooks/ensure-open-pr-monitor.py) | None | Background Service | Ensures the detached timer monitoring all open PRs authored by the user is running. | Infrastructure daemon; no manual agent action required. |
+| [`ensure-open-pr-monitor.py`](../hooks/ensure-open-pr-monitor.py) | None | Background Service | Ensures the detached timer monitoring all open GitHub PRs and GitLab merge requests authored by the user is running. | Infrastructure daemon; no manual agent action required. |
 | [`inject-pr-monitor-status.py`](../hooks/inject-pr-monitor-status.py) | None | Inject | Injects changed PR status or consecutive monitor error alerts from the detached PR poller. | When status updates are injected, acknowledge them and address any CI failures or review findings immediately. |
 | [`remind-ums-after-error.py`](../hooks/remind-ums-after-error.py) | None | Warn / Reminder | Reminds when an admitted mistake has no subsequent memory or skill write. | When admitting an error, immediately follow up with an explicit UMS pass (`skills/ums`) to persist the correction to `memories/` or `skills/`. |
 | [`no-mistake-without-a-hook.py`](../hooks/no-mistake-without-a-hook.py) | None | Warn / Reminder (also Stop) | Reminds when an admitted, mechanizable mistake lacks an accompanying hook implementation. | Whenever a mistake is mechanizable, author an enforcement hook in `hooks/` with test suite and manifest entry in the same session. |
@@ -66,6 +66,7 @@ Blocking hooks deny execution (exit code 2), while warning hooks emit actionable
 | [`flag-uncited-rebuttal.py`](../hooks/flag-uncited-rebuttal.py) | Warn | Warns when posting a comment disputing a finding that cites an external URL when no `WebFetch` or `WebSearch` fetched that URL. | Fetch and inspect the external URL cited by the reviewer before posting a rebuttal comment. | None. |
 | [`require-agent-disclosure.py`](../hooks/require-agent-disclosure.py) | Warn | Warns when posting a forge comment lacking the agent disclosure trailer. | Append `\n\n_Posted by <Agent Name> (AI agent) --- not written by a human._` to every posted comment. Never use the robot emoji. | None. |
 | [`flag-uncounted-comment-claims.py`](../hooks/flag-uncounted-comment-claims.py) | Warn | Warns when a forge comment asserts file counts or lists identifiers without a deriving command. | Run deriving commands (`grep -c`, `wc -l`, `ls`, etc.) in the session and cite the deriving command when stating cardinality. | None. |
+| [`flag-unmeasured-timestamp.py`](../hooks/flag-unmeasured-timestamp.py) | Warn | Warns when a `gh` comment or review body states a Pacific clock time (`HH:MM`, optional seconds, optional AM/PM, then `PDT`, `PST`, or `PT`) with no clock read in the current turn, or when the body cannot be read (a `--body-file` not yet on disk). | Run `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"` immediately before typing a time into a claim or status comment, and restate the stamp from its output. | None. |
 | [`flag-cd-into-main-checkout.py`](../hooks/flag-cd-into-main-checkout.py) | Warn | Warns when a worktree-rooted session `cd`s into the primary/main checkout of the repository. | Keep all file edits and command executions rooted within the dedicated worktree directory. | None. |
 
 ### 2.2 Agent, Task & SendMessage Interceptors
@@ -73,6 +74,7 @@ Blocking hooks deny execution (exit code 2), while warning hooks emit actionable
 | Hook Script | Matcher | Type | Trigger / Purpose | Proactive Compliance Rule |
 |---|---|---|---|---|
 | [`flag-unassigned-worktree.py`](../hooks/flag-unassigned-worktree.py) | `Agent` | Warn | Warns when a write-capable subagent is launched without worktree isolation. | Specify `isolation: "worktree"` (or workspace branch) when launching subagents that perform file modifications. |
+| [`no-fable-subagent.py`](../hooks/no-fable-subagent.py) | `Agent`, `Task`, `Workflow` | Block | Denies an Agent launch on Fable, explicit or inherited from a Fable session, without the user's grant; warns on a Workflow launch in a Fable session. | Pass `model: sonnet` (or `haiku`) on the call, or, once the user has approved that specific launch, run it with `FABLE_SUBAGENT_OK=1` for that one command. Set `FABLE_SUBAGENT_OK=1` for the one approved launch only; never export it for a session. |
 | [`remind-brief-premises.py`](../hooks/remind-brief-premises.py) | `Agent`, `Task`, `SendMessage` | Warn / Reminder | Reminds when subagent briefs assert corpus facts or file counts not derived in the session. | Include verified derivation commands or concrete file paths in subagent briefs rather than unverified assertions. |
 
 ### 2.3 MCP Tool Interceptors (`mcp__github__.*`)
@@ -82,6 +84,7 @@ Blocking hooks deny execution (exit code 2), while warning hooks emit actionable
 | [`no-unauthorized-merge.py`](../hooks/no-unauthorized-merge.py) | **Block** | Blocks `merge_pull_request` MCP calls without authorization. | Do not invoke MCP merge tools without explicit permission or active `/mwc`. |
 | [`warn-pr-create-without-dupe-check.py`](../hooks/warn-pr-create-without-dupe-check.py) | Warn | Warns when creating PRs/issues via MCP without a prior search query. | Run `search_issues` or `search_pull_requests` before creating items via MCP tools. |
 | [`require-agent-disclosure.py`](../hooks/require-agent-disclosure.py) | Warn | Warns when posting comments via MCP without the disclosure trailer. | Include `\n\n_Posted by <Agent Name> (AI agent) --- not written by a human._` in the `body` argument of MCP comment tools. |
+| [`flag-unmeasured-timestamp.py`](../hooks/flag-unmeasured-timestamp.py) | Warn | Warns when the `body` of any `mcp__github__` comment tool that `require-agent-disclosure.py` covers states a Pacific clock time with no clock read in the current turn. | Run `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"` before typing a time into the `body` argument of MCP comment tools. |
 
 ### 2.4 Write, Edit & NotebookEdit Interceptors
 
@@ -117,7 +120,7 @@ Blocking hooks prevent the turn from ending until the missing artifact or requir
 
 ## 4. Detached Timers & Monitoring Services
 
-- **[`monitor-open-prs.py`](../hooks/monitor-open-prs.py)**: Background daemon reconciling all open PRs authored by the authenticated user every two minutes.
+- **[`monitor-open-prs.py`](../hooks/monitor-open-prs.py)**: Background daemon reconciling all open GitHub PRs and GitLab merge requests authored by the authenticated user every two minutes (`gh` and/or `glab`).
 - **Detached Execution**: Automatically started and verified via `ensure-open-pr-monitor.py` on session start.
 
 ---
@@ -129,6 +132,9 @@ When authoring a new hook:
 2. Add comprehensive unit tests in `hooks/test-<name>.py`.
 3. Register the hook in [`hooks/hooks.json`](../hooks/hooks.json) under the correct event and matcher.
 4. Add a row to the README hooks table in [`README.md`](../README.md#enforcement-hooks-hooks).
+   The row's matcher list must equal the `hooks.json` groups for that script joined by `, `, in file order:
+   `check-hook-catalog.py` concatenates the groups as it meets them and compares the string, so `(Agent, Task, Workflow)` fails against a manifest that lists `Task` before `Agent`.
+   Write the manifest first, then copy its order into the row (measured 2026-09-01, ai-config#2930).
 5. Update this catalog in [`memories/hooks.md`](hooks.md).
 6. Validate with:
    ```bash

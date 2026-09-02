@@ -17,7 +17,7 @@ Don’t report from memory or assume a merge did/didn’t happen — query each 
 
 ``` bash
 gh pr list --state open --json number,title,headRefName,author,assignees,mergeable,mergeStateStatus,comments \
-  --jq '.[] | "#\(.number) [\(.author.login); assignees: \([.assignees[].login] | join(","))] \(.title) [\(.mergeable)]"'   # LIST_PRS
+  --jq '.[] | "#\(.number) \(.headRefName) [\(.author.login); assignees: \([.assignees[].login] | join(","))] \(.title) [\(.mergeable)]"'   # LIST_PRS
 gh issue list --state open --json number,title --jq '.[] | "#\(.number) \(.title)"'   # LIST_ISSUES
 git status --short                         # uncommitted work?
 git worktree list                          # leftover worktrees (agent isolation / session-lock)?

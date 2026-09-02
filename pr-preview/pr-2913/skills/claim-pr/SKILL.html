@@ -496,6 +496,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li><strong><code>require-agent-disclosure.py</code></strong>: Every claim, update, or unclaim comment must include the disclosure trailer <code>_Posted by &lt;Agent Name&gt; (AI agent) --- not written by a human._</code> on its own line after a blank line. Never use the robot emoji.</li>
 <li><strong><code>warn-pr-create-without-dupe-check.py</code> &amp; <code>warn-dupe-check-chained-to-create.py</code></strong>: When opening an immediate PR under <a href="../../shared/workflow/pr-on-claim.md"><code>pr-on-claim</code></a>, search for existing PRs (<code>gh pr list --state all --search "&lt;keywords&gt;"</code>) in a separate tool call before creating the PR.</li>
 <li><strong><code>flag-uncounted-comment-claims.py</code></strong>: When referencing file lists or counts in comments, ensure deriving commands (<code>grep -c</code>, <code>wc -l</code>) ran in the session.</li>
+<li><strong><code>flag-unmeasured-timestamp.py</code></strong>: A claim comment that carries a clock time needs a fresh <code>TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"</code> in the same turn. Never infer the time from how many tool calls have run since the last reading.</li>
 </ul>
 </section>
 <section id="notes" class="level2">

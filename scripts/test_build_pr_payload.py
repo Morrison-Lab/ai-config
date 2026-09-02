@@ -233,7 +233,130 @@ def test_rest_get_paginates_enveloped_check_runs():
         urllib.request.urlopen = real
 
 
+def test_run_ids_from_check_runs():
+    runs = [
+        {"html_url": "https://github.com/o/r/actions/runs/33570074739/job/100061971212"},
+        {"html_url": "https://github.com/o/r/actions/runs/33570074739/job/100061971299"},
+        {"html_url": "https://github.com/o/r/actions/runs/33572727768/job/1"},
+        {"html_url": "https://github.com/o/r/runs/5"},
+        {"html_url": "https://github.com/o/r/actions/runs/777"},
+        {"html_url": None},
+    ]
+    check(
+        "run ids are extracted once each, in first-seen order, skipping URLs the checker itself would not resolve",
+        build_pr_payload.run_ids_from_check_runs(runs) == ["33570074739", "33572727768"],
+    )
+
+
+def test_build_payload_carries_actions_runs():
+    runs = {"1": {"path": ".github/workflows/claude-review.yml"}}
+    payload = build_pr_payload.build_payload(
+        "example-org/example-repo", PR_RAW, [], [], COMMITS_RAW, CHECK_RUNS_RAW, runs
+    )
+    check("actions_runs is carried through verbatim", payload["actions_runs"] == runs)
+    without = build_pr_payload.build_payload(
+        "example-org/example-repo", PR_RAW, [], [], COMMITS_RAW, CHECK_RUNS_RAW
+    )
+    check("actions_runs is absent when not gathered", "actions_runs" not in without)
+
+
+def test_fetch_actions_runs_maps_paths_and_skips_404():
+    """A run past retention 404s; that run is skipped with a warning, not fatal."""
+    import io
+    import urllib.error
+    import urllib.request
+
+    class _Resp(io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    calls = []
+
+    def fake_urlopen(req):
+        url = req.full_url
+        calls.append(url)
+        if "/actions/runs/404404" in url:
+            raise urllib.error.HTTPError(url, 404, "Not Found", {}, io.BytesIO(b"{}"))
+        run_id = url.split("/actions/runs/")[1].split("?")[0]
+        return _Resp(json.dumps({"id": int(run_id), "path": f".github/workflows/{run_id}.yml"}).encode())
+
+    real = urllib.request.urlopen
+    urllib.request.urlopen = fake_urlopen
+    err = io.StringIO()
+    real_err = sys.stderr
+    sys.stderr = err
+    try:
+        got = build_pr_payload.fetch_actions_runs("o/r", ["1", "404404", "2"], "t")
+    finally:
+        urllib.request.urlopen = real
+        sys.stderr = real_err
+    check(
+        "each reachable run maps to its workflow path",
+        got == {"1": {"path": ".github/workflows/1.yml"}, "2": {"path": ".github/workflows/2.yml"}},
+    )
+    check("a 404 run is skipped and named on stderr", "404404" in err.getvalue() and "404404" not in got)
+    check("each run id is fetched exactly once", len(calls) == 3)
+
+
+def test_cancelled_run_superseded_end_to_end():
+    """The #1697 case, scored through the real checker on a built payload.
+
+    Fails on the pre-fix builder (no actions_runs, so the checker cannot see
+    that both runs belong to one workflow) and passes with it.
+    """
+    lib = Path(__file__).parent / "lib"
+    if str(lib) not in sys.path:
+        sys.path.insert(0, str(lib))
+    checker_spec = importlib.util.spec_from_file_location(
+        "check_pr_fully_clean", Path(__file__).parent / "check-pr-fully-clean.py"
+    )
+    checker = importlib.util.module_from_spec(checker_spec)
+    checker_spec.loader.exec_module(checker)
+    from payload_fetcher import PayloadFetcher
+
+    cancelled_then_green = [
+        {"name": "review / claude-review", "status": "completed", "conclusion": "cancelled",
+         "started_at": "2026-09-01T23:14:00Z", "completed_at": "2026-09-01T23:16:00Z",
+         "html_url": "https://github.com/o/r/actions/runs/1/job/1"},
+        {"name": "review / claude-review", "status": "completed", "conclusion": "success",
+         "started_at": "2026-09-01T23:50:00Z", "completed_at": "2026-09-01T23:51:00Z",
+         "html_url": "https://github.com/o/r/actions/runs/2/job/2"},
+    ]
+    same_workflow = {"1": {"path": ".github/workflows/claude-review.yml"},
+                     "2": {"path": ".github/workflows/claude-review.yml"}}
+    other_workflow = {"1": {"path": ".github/workflows/a.yml"},
+                      "2": {"path": ".github/workflows/b.yml"}}
+
+    def score(actions_runs):
+        payload = build_pr_payload.build_payload(
+            "o/r", PR_RAW, [], [], COMMITS_RAW, cancelled_then_green, actions_runs
+        )
+        checker._FETCHER = PayloadFetcher(payload)
+        try:
+            pr = checker.get_pr_info(str(PR_RAW["number"]), "o/r")
+            return checker.check_ci_runs(pr)
+        finally:
+            checker._FETCHER = None
+
+    ok_same, issues_same = score(same_workflow)
+    check("cancelled run superseded when the payload attributes both runs to one workflow",
+          ok_same and issues_same == [])
+    ok_none, issues_none = score(None)
+    check("without actions_runs the cancelled run still blocks (the pre-fix behaviour, safe direction)",
+          not ok_none and any("cancelled" in i for i in issues_none))
+    ok_other, issues_other = score(other_workflow)
+    check("cancelled run is not superseded by a same-name success from another workflow",
+          not ok_other and any("cancelled" in i for i in issues_other))
+
+
 def main():
+    test_run_ids_from_check_runs()
+    test_build_payload_carries_actions_runs()
+    test_fetch_actions_runs_maps_paths_and_skips_404()
+    test_cancelled_run_superseded_end_to_end()
     test_maps_pr_fields()
     test_state_merged()
     test_review_decision_changes_requested_wins()

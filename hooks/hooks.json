@@ -460,7 +460,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-stale-review-diff-base.py\"",
             "timeout": 10,
             "script": "warn-stale-review-diff-base.py",
-            "why": "verify-the-right-artifact 'A comparison's base is an artifact too' -- a bare local branch as a diff's base widens the range when it is behind, and narrows it when it carries local commits the remote lacks (ahead, or diverged) that the head branch also carries, so a review runs on already-merged work or silently skips part of the change; this names the base and the remote-tracking form.",
+            "why": "verify-the-right-artifact 'A comparison's base is an artifact too' -- a bare local branch as a diff's base widens the range when it is behind, and narrows it when it is ahead of or diverged from its remote in commits the head branch also carries, so a review runs on already-merged work or silently skips part of the change; this names the base and the remote-tracking form.",
             "_note_warn_only": [
               "Reminder only: emits hookSpecificOutput.additionalContext and never a",
               "decision. The hook cannot tell a review diff from an ordinary local",
@@ -747,7 +747,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-stale-review-diff-base.py\"",
             "timeout": 10,
             "script": "warn-stale-review-diff-base.py",
-            "why": "verify-the-right-artifact 'A comparison's base is an artifact too' -- a bare local branch as a diff's base widens the range when it is behind, and narrows it when it carries local commits the remote lacks (ahead, or diverged) that the head branch also carries, so a review runs on already-merged work or silently skips part of the change; this names the base and the remote-tracking form.",
+            "why": "verify-the-right-artifact 'A comparison's base is an artifact too' -- a bare local branch as a diff's base widens the range when it is behind, and narrows it when it is ahead of or diverged from its remote in commits the head branch also carries, so a review runs on already-merged work or silently skips part of the change; this names the base and the remote-tracking form.",
             "_note_see_bash_entry": "Design notes live on this hook's Bash entry, per this file's precedent (require-agent-disclosure.py, warn-stale-issue-edit.py). Repeating them per matcher guarantees sibling divergence on the next correction."
           }
         ]
@@ -760,7 +760,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-stale-review-diff-base.py\"",
             "timeout": 10,
             "script": "warn-stale-review-diff-base.py",
-            "why": "verify-the-right-artifact 'A comparison's base is an artifact too' -- a bare local branch as a diff's base widens the range when it is behind, and narrows it when it carries local commits the remote lacks (ahead, or diverged) that the head branch also carries, so a review runs on already-merged work or silently skips part of the change; this names the base and the remote-tracking form.",
+            "why": "verify-the-right-artifact 'A comparison's base is an artifact too' -- a bare local branch as a diff's base widens the range when it is behind, and narrows it when it is ahead of or diverged from its remote in commits the head branch also carries, so a review runs on already-merged work or silently skips part of the change; this names the base and the remote-tracking form.",
             "_note_see_bash_entry": "Design notes live on this hook's Bash entry, per this file's precedent (require-agent-disclosure.py, warn-stale-issue-edit.py). Repeating them per matcher guarantees sibling divergence on the next correction."
           }
         ]
@@ -773,7 +773,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-stale-review-diff-base.py\"",
             "timeout": 10,
             "script": "warn-stale-review-diff-base.py",
-            "why": "verify-the-right-artifact 'A comparison's base is an artifact too' -- a bare local branch as a diff's base widens the range when it is behind, and narrows it when it carries local commits the remote lacks (ahead, or diverged) that the head branch also carries, so a review runs on already-merged work or silently skips part of the change; this names the base and the remote-tracking form.",
+            "why": "verify-the-right-artifact 'A comparison's base is an artifact too' -- a bare local branch as a diff's base widens the range when it is behind, and narrows it when it is ahead of or diverged from its remote in commits the head branch also carries, so a review runs on already-merged work or silently skips part of the change; this names the base and the remote-tracking form.",
             "_note_see_bash_entry": "Design notes live on this hook's Bash entry, per this file's precedent (require-agent-disclosure.py, warn-stale-issue-edit.py). Repeating them per matcher guarantees sibling divergence on the next correction."
           }
         ]

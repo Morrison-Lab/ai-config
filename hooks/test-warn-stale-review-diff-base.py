@@ -15,12 +15,13 @@ Run:  python3 hooks/test-warn-stale-review-diff-base.py \
           hooks/warn-stale-review-diff-base.py
 """
 
+import io
 import json
 import os
 import shutil
 import subprocess
-import time
 import sys
+import time
 import tempfile
 
 if len(sys.argv) < 2:
@@ -38,17 +39,26 @@ if not os.path.isfile(HOOK):
     )
 
 
-def run(command, tool_name="Bash", tool_input=None):
-    """Run the hook on one payload; return WARN or silent."""
+def run(command, tool_name="Bash", tool_input=None, timeout=None):
+    """Run the hook on one payload; return WARN or silent.
+
+    `timeout` exists so a case guarding against a RUNAWAY hook can fail
+    promptly. Without it a regression does not fail the case at all --- it
+    blocks until the hook finishes, surfacing as an unattributed CI hang
+    rather than the named FAIL line the case is written to print.
+    """
     if tool_input is None:
         tool_input = {"command": command}
     payload = {"tool_name": tool_name, "tool_input": tool_input,
                "cwd": REPO_ROOT}
-    proc = subprocess.run(
-        [sys.executable, HOOK],
-        input=json.dumps(payload),
-        capture_output=True, text=True,
-    )
+    try:
+        proc = subprocess.run(
+            [sys.executable, HOOK],
+            input=json.dumps(payload),
+            capture_output=True, text=True, timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        return "TIMEOUT"
 
     if proc.returncode != 0:
         sys.exit(f"FATAL: hook exited {proc.returncode}\n{proc.stderr.strip()}")
@@ -86,6 +96,9 @@ def run(command, tool_name="Bash", tool_input=None):
 
 
 WARN_CASES = [
+    ("git diff main...refs/remotes/origin/feature",
+     "a DIFFERENT branch behind the fully-qualified spelling still warns, so "
+     "the `refs/remotes/` arm is pinned in both directions"),
     ("git diff main...origin/feature",
      "an ordinary review diff whose HEAD is remote-tracking: the head says "
      "NOTHING about the base's freshness, and exempting it would blind the "
@@ -147,6 +160,15 @@ WARN_CASES = [
 ]
 
 SILENT_CASES = [
+    ("git rev-list --count main..refs/remotes/origin/main",
+     "the fully-qualified remote-tracking spelling of the freshness idiom: "
+     "pins the `refs/remotes/` arm of `remote_tracking_branch`, which the "
+     "base-side case cannot reach"),
+    ("git rev-list --count refs/heads/main..origin/main",
+     "and the fully-qualified LOCAL spelling: the comparison must normalize "
+     "the base, or it warns on the very idiom it exempts"),
+    ("git rev-list --count main~2..origin/main",
+     "a revision suffix on the base is still that branch"),
     ("git diff main...origin/main",
      "same branch on both sides is a staleness measurement, not a review "
      "scope -- the ONLY shape the head exemption may cover"),
@@ -271,17 +293,49 @@ for prompt, desc, want in ((BRIEF_WARN[0], BRIEF_WARN[1], "WARN"),
     print(f"{verdict:<7} {desc}")
 
 # The command-position pattern once admitted 2^N parses over N option tokens
-# when the overall match failed: n=34 took 8.4s against a 10s timeout. Bounded
-# repetition makes it flat. A wall-clock assertion is crude, but the failure it
-# guards is a wall-clock one.
-_t0 = time.time()
-run("git " + "-a " * 40 + "nope main...HEAD")
-_elapsed = time.time() - _t0
+# when the overall match failed: n=34 took 8.4s against a 10s timeout.
+#
+# Time the PATTERN, in this process, rather than a hook subprocess. The
+# Run the probe in a SUBPROCESS under a timeout. Timing it in-process cannot
+# work: under the regression the search itself blocks for minutes, so the guard
+# would hang rather than fail -- which is the very defect it exists to catch,
+# merely relocated. A timeout converts the hang into a prompt, attributable
+# failure. Timing the pattern alone (not the hook) keeps an unrelated stall in
+# `git remote`, itself under a 5s timeout, from being misread as backtracking.
+_PROBE = (
+    "import re, sys, time\n"
+    "ns = {}\n"
+    "exec(compile(open(sys.argv[1], encoding='utf-8').read(), sys.argv[1],"
+    " 'exec'), {'__name__': '_probe'}, ns)\n"
+    "probe = 'git ' + '-a ' * 40 + 'nope main...HEAD'\n"
+    "t = time.time()\n"
+    "ns['RX_GIT_RANGE_CMD_SHELL'].search(probe)\n"
+    "print(time.time() - t)\n"
+)
+try:
+    _proc = subprocess.run([sys.executable, "-c", _PROBE, HOOK],
+                           capture_output=True, text=True, timeout=15)
+    _elapsed = float(_proc.stdout.strip())
+    _ok = _elapsed < 1.0
+    _detail = f"{_elapsed * 1000:.1f}ms"
+except subprocess.TimeoutExpired:
+    _ok = False
+    _detail = "TIMED OUT -- catastrophic backtracking is back"
+except (ValueError, KeyError) as _exc:
+    _ok = False
+    _detail = f"probe failed: {_exc}"
 total += 1
-_ok = _elapsed < 5.0
 wrong += not _ok
 print(f"{'ok' if _ok else 'FAIL':<7} many option tokens before an unlisted "
-      f"subcommand stay fast ({_elapsed:.2f}s)")
+      f"subcommand stay fast ({_detail})")
+
+# And the end-to-end path must not hang: a runaway hook fails HERE, promptly.
+_verdict = run("git " + "-a " * 40 + "nope main...HEAD", timeout=20)
+total += 1
+_ok = _verdict != "TIMEOUT"
+wrong += not _ok
+print(f"{'ok' if _ok else 'FAIL':<7} the same command completes end to end "
+      "within 20s")
 
 print("\n--- fail-open and environment")
 # A type-confused `cwd` reaches `os.path.join` inside `main()` and is the

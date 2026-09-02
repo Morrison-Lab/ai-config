@@ -84,6 +84,14 @@ RX_RANGE = re.compile(
 
 # Only these subcommands take a range whose base is a review scope. `git
 # rebase`, `git merge`, and friends are excluded on purpose.
+# The option repetition is BOUNDED. Unbounded, the optional value group makes
+# each token ambiguous --- consumable as `option value` or as two options --- so
+# an outer `*` admits 2^N parses whenever the overall match fails: measured
+# 8.4s at 34 tokens, growing ~2.7x per token, against a 10s timeout. Requiring
+# `=` would remove the ambiguity but break `git -C <path> diff`, which this
+# hook needs. The cutoff costs a missed reminder past 13 `-c k=v` options (or
+# 25 bare flags, since one repetition can swallow two tokens), and a missed
+# reminder is the cheaper side of this trade.
 _GIT_RANGE_CMD = (
     r"git\b(?:\s+-[-A-Za-z0-9]+(?:[= ](?:'[^']*'|\"[^\"]*\"|\S+))?){0,12}\s+"
     r"(diff|log|shortlog|merge-base|rev-list|range-diff)\b"
@@ -145,6 +153,17 @@ SYMBOLIC = {
 }
 
 RX_SHA = re.compile(r"\A[0-9a-f]{7,40}\Z")
+# Options taking a SEPARATE argument, whose value must not be read as a ref:
+# `git log --grep main...HEAD` searches for a pattern, it does not take a
+# range. Membership is by real git behaviour, not by shape --- `-L` and `-O`
+# genuinely require a separate value, while `-C` (find-copies) never takes one,
+# and listing `-C` here ate the real range of `git diff -C main...HEAD`.
+VALUE_OPTIONS = frozenset({
+    "--grep", "--author", "--committer", "--since", "--until", "--before",
+    "--after", "--format", "--pretty", "--output", "-S", "-G", "-L",
+    "-O", "--git-dir", "--work-tree",
+})
+
 # A tag is immutable, so it cannot go stale the way a branch does. But a tag
 # and a branch are lexically indistinguishable, so this exempts only the two
 # unambiguous forms: a `v`-prefixed dotted version (`v1.2`, `v1.2.0`), and an
@@ -160,12 +179,6 @@ RX_SHA = re.compile(r"\A[0-9a-f]{7,40}\Z")
 # `2261-ums`, and `2026-08-01` are all far likelier to be branches --- issue
 # numbers are the commonest branch prefix in this corpus --- and a warn-only
 # reminder should take the false positive over the missed base.
-VALUE_OPTIONS = frozenset({
-    "--grep", "--author", "--committer", "--since", "--until", "--before",
-    "--after", "--format", "--pretty", "--output", "-S", "-G", "-L",
-    "-O", "--git-dir", "--work-tree",
-})
-
 # The suffix is a recognized pre-release or build-metadata form, not any word:
 # a bare `-[0-9A-Za-z]+` exempted `v2-rewrite` and `v3-api`, which are feature
 # branches. A dot is required throughout, so a bare `v1` warns too.
@@ -201,7 +214,7 @@ when it is not.
 A base that is BEHIND its remote widens the diff, so a review runs on
 already-merged work by other people and returns findings against code this
 branch never touched. A base carrying local commits the remote lacks --- ahead,
-or diverged -- narrows it, so part of the change is never reviewed at all and
+or diverged --- narrows it, so part of the change is never reviewed at all and
 the verdict comes back clean. Neither is announced: a 53-file diff and a
 14-file diff look equally plausible, and every finding either produces is
 individually well-formed.
@@ -315,6 +328,33 @@ def normalize_base(token):
     return token.strip(".")
 
 
+def local_branch_stem(token):
+    """The plain branch name a local-ref spelling denotes.
+
+    `refs/heads/main` -> `main`; `main~2` and `main^` -> `main`. The file
+    already knows both normalizations --- `is_local_branch_base` treats a
+    `refs/heads/` prefix as proof of a local branch and splits on `[~^@]` ---
+    so any comparison against a base has to apply them too, or the
+    fully-qualified spelling of an exempt idiom warns.
+    """
+    token = normalize_base(token)
+    if token.startswith("refs/heads/"):
+        token = token[len("refs/heads/"):]
+    return re.split(r"[~^@]", token, maxsplit=1)[0]
+
+
+def remote_prefix(token, remotes):
+    """The remote whose name prefixes `token`, longest first, or None.
+
+    Git permits a `/` in a remote name, so testing only the first segment
+    misreads `my/remote/main` as a local branch called `my`.
+    """
+    for name in sorted(remotes, key=len, reverse=True):
+        if token.startswith(name + "/"):
+            return name
+    return None
+
+
 def remote_tracking_branch(token, remotes):
     """The branch part of a remote-tracking ref, or None.
 
@@ -326,10 +366,12 @@ def remote_tracking_branch(token, remotes):
         return None
     if token.startswith("refs/remotes/"):
         rest = token[len("refs/remotes/"):]
+        name = remote_prefix(rest, remotes)
+        if name:
+            return rest[len(name) + 1:]
         return rest.split("/", 1)[1] if "/" in rest else None
-    if "/" in token and token.split("/", 1)[0] in remotes:
-        return token.split("/", 1)[1]
-    return None
+    name = remote_prefix(token, remotes)
+    return token[len(name) + 1:] if name else None
 
 
 def is_local_branch_base(token, remotes):
@@ -356,10 +398,8 @@ def is_local_branch_base(token, remotes):
         # The prefix is unambiguous proof this is a local branch, so return
         # before the tag test: `refs/heads/v1.2.0` is a branch, not a tag.
         return True
-    if "/" in token:
-        head = token.split("/", 1)[0]
-        if head in remotes:
-            return False
+    if "/" in token and remote_prefix(token, remotes):
+        return False
     # Strip revision suffixes: `main~2`, `main^`, `main@{u}`.
     stem = re.split(r"[~^@]", token, maxsplit=1)[0]
     if not stem or stem in SYMBOLIC:
@@ -448,7 +488,7 @@ def stale_bases(text, remotes, pattern, quote_aware=False):
                 # remote-tracking head says nothing about the base's freshness
                 # --- exempting it would blind the hook to this incident's own
                 # shape, one fetch removed.
-                if remote_tracking_branch(head, remotes) == normalize_base(base):
+                if remote_tracking_branch(head, remotes) == local_branch_stem(base):
                     continue
                 base = normalize_base(base)
                 if base not in found:

@@ -40,6 +40,24 @@ a Python subprocess, so the split is that the **agent** retrieves and the
 **script** judges: gather the PR's state via MCP, write it to a file, and pass
 `--from-json <file>`.
 
+Build that file with the repo's own builder rather than by hand:
+
+```bash
+python3 scripts/build-pr-payload.py OWNER/REPO N out.json
+python3 scripts/check-pr-fully-clean.py N -R OWNER/REPO --from-json out.json
+```
+
+`scripts/build-pr-payload.py` (ai-config#2908) assembles the whole payload
+from plain REST, which a remote session's proxy does reach even where its
+GraphQL surface is pinned.
+The table below documents the payload's shape so the builder can be checked
+and extended, and is the fallback when the builder itself cannot run;
+it is not an instruction to transcribe MCP output by hand.
+A session that did transcribe it by hand had the transcribing commands
+denied three times and reported the gate as blocked for hours, while the
+one-line builder was named in the instrument's own `--help`
+(ai-config#2938).
+
 | Payload key | Gather with | Notes |
 | :--- | :--- | :--- |
 | `repo` | the `OWNER/REPO` under check | Or pass `-R` instead. |
@@ -387,7 +405,7 @@ Worked-example case records for the rules below live in
    - **Don't:** resolve a same-name disagreement by workflow name.
      On this shape both runs carry the same one.
 
-   (Measured 2026-08-22 on [ai-config#1884](https://github.com/Morrison-Lab/ai-config/pull/1884).
+   (Measured 2026-08-21 on [ai-config#1884](https://github.com/Morrison-Lab/ai-config/pull/1884).
    Run `32545283504` (`event=push`) and run `32545289903` (`event=pull_request`) both had `head_sha=8c456074`, both were named `new-line-breaks / check-new-line-breaks`, and they concluded `success` and `failure` respectively.
    The push run was read first and taken as the verdict.
    The PR run was the one carrying four real findings.)

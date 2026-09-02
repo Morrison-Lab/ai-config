@@ -149,13 +149,15 @@ OVERRIDE_ENV = re.compile(r"\AALLOW_UNREVIEWED_PUSH=1\Z")
 # a PreToolUse deny is not user-overridable.
 DEGRADED_OVERRIDE = re.compile(r"(?:^|[;&|`(\s])ALLOW_UNREVIEWED_PUSH=1\s")
 
-# Options of `git push` that consume the following token, so a value is never
-# mistaken for a refspec.
-PUSH_OPTS_WITH_VALUE = {"--repo", "--receive-pack", "--exec", "-o", "--push-option",
-                        "--recurse-submodules"}
+# Options after which no single reviewed commit can describe the push.
+# `--branches` is git's own documented alias of `--all` (`git push -h`), so it
+# ships every branch while looking like an ordinary unknown option.
+PUSH_OPTS_INDETERMINATE = {"--all", "--branches", "--mirror", "--tags",
+                           "--follow-tags"}
 
-# Short options that take a value, for the clustered form (`-qo ci.skip`).
-SHORT_OPTS_WITH_VALUE = "o"
+# `--recurse-submodules` in these modes pushes commits in ANOTHER repository,
+# which no fingerprint naming a commit in this one can describe.
+SUBMODULE_PUSH_MODES = {"on-demand", "only"}
 
 # The config forms of PUSH_OPTS_INDETERMINATE. Each entry is (key, the flag it
 # mirrors, a predicate on the configured value). `{remote}` is filled from the
@@ -173,83 +175,6 @@ CONFIG_LIKE_INDETERMINATE_FLAGS = (
     ("push.recurseSubmodules", "--recurse-submodules",
      lambda v: v.strip().lower() in SUBMODULE_PUSH_MODES, False),
 )
-
-
-# Options after which no single reviewed commit can describe the push.
-# `--branches` is git's own documented alias of `--all` (`git push -h`), so it
-# ships every branch while looking like an ordinary unknown option.
-PUSH_OPTS_INDETERMINATE = {"--all", "--branches", "--mirror", "--tags",
-                           "--follow-tags"}
-
-# git's parse-options accepts any UNAMBIGUOUS abbreviation of a long option, so
-# every table below has to be matched through a resolver rather than by string
-# equality. An earlier revision hardened only `--repo` and left the rest exact,
-# which was a fix to one site rather than to the class. Measured on git 2.43.0,
-# with no `remote.<name>.push` configured so only the indeterminate table could
-# refuse them:
-#
-#   git push --all up   -> refused        git push --al up   -> ALLOWED
-#   git push --mirror up-> refused        git push --mir up  -> ALLOWED
-#   git push --tags up  -> refused        git push --ta up   -> ALLOWED
-#
-# and, defeating the value-aware parsing the walk below depends on:
-#
-#   git push -o --repo=other   -> refused
-#   git push --pu --repo=other -> ALLOWED   (`--pu` IS `--push-option`)
-#
-# `--al` ships every ref. So an unresolved abbreviation is not a cosmetic gap.
-# Deliberately partial: it carries the options whose resolution CHANGES a
-# verdict, plus enough neighbours to make ambiguity match git's. `--ipv4` and
-# `--ipv6` are absent, which is safe only because they take no value -- an
-# unknown option is passed through, and a valueless one parses identically
-# either way. A future value-taking option added in a namespace this set does
-# not cover would diverge silently, so add it here when one appears.
-PUSH_LONG_OPTS = frozenset({
-    "--all", "--atomic", "--branches", "--delete", "--dry-run", "--exec",
-    "--follow-tags", "--force", "--force-if-includes", "--force-with-lease",
-    "--mirror", "--no-verify", "--porcelain", "--progress", "--prune",
-    "--push-option", "--quiet", "--receive-pack", "--recurse-submodules",
-    "--repo", "--set-upstream", "--signed", "--tags", "--thin", "--verbose",
-    "--verify",
-})
-
-# Ambiguity is the reason this returns a sentinel rather than just resolving.
-# `--re` matches --receive-pack and --recurse-submodules and git REFUSES it, so
-# the guard must not silently pick one; AMBIGUOUS makes the caller bail to
-# indeterminate, which is the fail-closed direction.
-AMBIGUOUS = object()
-
-
-def resolve_long_opt(head: str):
-    """`head` resolved to the option git would read it as.
-
-    Returns the full option name, AMBIGUOUS when several match (git refuses
-    those outright), or `head` unchanged when nothing matches -- an option this
-    table does not know, left to be handled as it was before.
-
-    `--no-<x>` is resolved against `<x>` and returned in its `--no-` form, since
-    git accepts abbreviations there too (`--no-rep` is `--no-repo`).
-    """
-    if head in PUSH_LONG_OPTS:
-        return head
-    # No `--no-verify` special case is needed here: it is in PUSH_LONG_OPTS,
-    # so the exact-match return above has already fired for it.
-    negated = head.startswith("--no-")
-    stem = "--" + head[len("--no-"):] if negated else head
-    if stem in PUSH_LONG_OPTS:
-        return head
-    matches = {o for o in PUSH_LONG_OPTS if o.startswith(stem) and stem != "--"}
-    if len(matches) > 1:
-        return AMBIGUOUS
-    if not matches:
-        return head
-    full = matches.pop()
-    return "--no-" + full[2:] if negated else full
-
-
-# `--recurse-submodules` in these modes pushes commits in ANOTHER repository,
-# which no fingerprint naming a commit in this one can describe.
-SUBMODULE_PUSH_MODES = {"on-demand", "only"}
 
 
 # --- push detection, borrowed rather than re-derived ------------------------
@@ -281,6 +206,19 @@ except Exception as exc:  # covered by orphan_cases() in
                           # copy of this file in a directory without the sibling
     _SIBLING = None
     _SIBLING_ERROR = str(exc)
+
+# The walk over git's push-option grammar, its tables, and the abbreviation
+# resolver live in the sibling and are bound here rather than declared twice
+# (ai-config#1935, #1920): the sibling decides whether a command is a push at
+# all, and that decision reads values and abbreviations exactly as this
+# file's refspec walk must, so one walk keeps the two halves of the decision
+# from disagreeing about how git's CLI works. With no sibling the names stay
+# unbound: every path that consults them sits behind the deny that a missing
+# sibling triggers.
+if _SIBLING is not None:
+    walk_push_options = _SIBLING.walk_push_options
+    resolve_long_opt = _SIBLING.resolve_long_opt
+    AMBIGUOUS_OPTION = _SIBLING.AMBIGUOUS_OPTION
 
 
 def _load_review_payload():
@@ -867,7 +805,9 @@ def _parse_push(argv: list[str]) -> tuple[list[str], str | None] | None:
     which is why every long option is put through `resolve_long_opt` first. An
     earlier revision skipped that and `--pu --repo=X` walked straight back into
     the same hole, `--pu` being `--push-option`. `--no-repo` clears the value,
-    as it does for git, and the last occurrence wins.
+    as it does for git, and the last occurrence wins. The tokens come from the
+    sibling's `walk_push_options`, the one walk both hooks read git's push
+    grammar through (ai-config#1935).
     """
     try:
         idx = argv.index("push")
@@ -875,56 +815,22 @@ def _parse_push(argv: list[str]) -> tuple[list[str], str | None] | None:
         return None
     positionals: list[str] = []
     repo: str | None = None
-    i = idx + 1
-    end_of_options = False
-    while i < len(argv):
-        tok = argv[i]
-        if not end_of_options and tok == "--":
-            # `--` ends the options, so every later token is a positional even
-            # when it starts with a dash. `refs/heads/-dash` is a valid ref
-            # name that `git check-ref-format` accepts and `git push -- origin
-            # -dash` really ships, so reading `-dash` as an unknown option left
-            # the refspec list empty and graded the command as a bare push
-            # against HEAD -- authorizing an unreviewed branch under a verdict
-            # naming the current one.
-            end_of_options = True
-            i += 1
+    for kind, head, value in walk_push_options(argv[idx + 1:]):
+        if kind == "positional":
+            positionals.append(head)
             continue
-        if not end_of_options and tok.startswith("-") and tok != "-":
-            head, _, value = tok.partition("=")
-            if head.startswith("--"):
-                head = resolve_long_opt(head)
-                if head is AMBIGUOUS:
-                    return None
-            if head in PUSH_OPTS_INDETERMINATE:
-                return None
-            if head == "--recurse-submodules" and value in SUBMODULE_PUSH_MODES:
-                return None
-            if head == "--no-repo":
-                repo = None
-                i += 1
-                continue
-            if head == "--repo" and _:
-                repo = value
-                i += 1
-                continue
-            if head in PUSH_OPTS_WITH_VALUE and not _:
-                if head == "--recurse-submodules" and i + 1 < len(argv) \
-                        and argv[i + 1] in SUBMODULE_PUSH_MODES:
-                    return None
-                if head == "--repo" and i + 1 < len(argv):
-                    repo = argv[i + 1]
-                i += 2
-                continue
-            # A clustered short form (`-qo ci.skip`) takes its value from the
-            # next token when the cluster ends in a value-taking letter.
-            if not tok.startswith("--") and tok[-1] in SHORT_OPTS_WITH_VALUE:
-                i += 2
-                continue
-            i += 1
+        if kind == "short":
             continue
-        positionals.append(tok)
-        i += 1
+        if head is AMBIGUOUS_OPTION:
+            return None
+        if head in PUSH_OPTS_INDETERMINATE:
+            return None
+        if head == "--recurse-submodules" and value in SUBMODULE_PUSH_MODES:
+            return None
+        if head == "--no-repo":
+            repo = None
+        elif head == "--repo":
+            repo = value
     return positionals, repo
 
 

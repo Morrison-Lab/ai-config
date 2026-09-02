@@ -1,13 +1,23 @@
 #!/usr/bin/env python3
 """Inject a changed detached-PR-monitor result on the next user prompt.
 
-A monitor that tracks a consecutive-error streak (today only the
-all-open-PRs monitor writes `error_streak`) is surfaced too once its last
+Two writers share the state directory: the per-PR watchers spawned by
+`no-unmonitored-pr.py` (GitHub only), and `monitor-open-prs.py`, which
+polls every open GitHub PR and GitLab merge request the user authored.
+
+A monitor that tracks a consecutive-error streak (today only
+`monitor-open-prs.py` writes `error_streak`) is surfaced too once its last
 N polls all errored with the same text: a watcher answering "no" forever
 in the same words must stay distinguishable from a watcher finding
 nothing.  A state file with no `error_streak` (the per-PR watchers, a
 pre-fix daemon) surfaces only on change --- ai-config#2035 tracks
 extending the streak to the per-PR watchers.
+
+"Change" is a change in the data or in the error text.  `monitor-open-prs.py`
+polls several sources and keeps the ones that answered beside the error
+from the ones that did not, so `data` can be present (even empty) while
+`error` is set; fingerprinting `data` alone there would read every later
+error text as "no change" and never surface it again.
 """
 import hashlib
 import json
@@ -19,7 +29,20 @@ PERSISTENT_ERROR_POLLS = 3
 
 
 def fingerprint(state):
-    observed = state.get("data") if "data" in state else {"error": state.get("error")}
+    # The observation is the data AND the error, not one or the other: a
+    # multi-source monitor (monitor-open-prs.py) keeps the sources that
+    # answered beside the error from the ones that did not, so an
+    # error-text change under unchanged (or empty) data is still a change
+    # and must still surface.  A healthy state hashes its data alone, so an
+    # already-reported healthy monitor keeps its fingerprint across this
+    # change; an already-reported ERRORING per-PR watcher (error, no data)
+    # does not, and re-surfaces once on the first prompt after upgrade (a
+    # pre-fix daemon in the same shape with its persistent flag set can
+    # re-surface twice: the change pops the flag, then the streak fires).
+    if "error" not in state:
+        observed = state.get("data")
+    else:
+        observed = {"data": state.get("data"), "error": state["error"]}
     return hashlib.sha256(json.dumps(observed, sort_keys=True).encode()).hexdigest()
 
 

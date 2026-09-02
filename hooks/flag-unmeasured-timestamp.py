@@ -288,29 +288,35 @@ def _bash_post(command, cwd):
     # Check if the Bash command writes/appends to a notebook or memory file
     m_redir = RX_BASH_REDIRECT_NOTEBOOK.search(command)
     if m_redir:
-        # Find start of statement containing this redirect (last separator before redirect)
         pos = m_redir.start()
+        # Quote-aware separator scan to avoid splitting on ; or | inside quotes
+        blanked_pre = _blank_quotes(command[:pos])
+
+        # If redirect is `tee`, single pipe '|' connects the producer to tee,
+        # so separator before the pipeline is [;&\n] or double pipes/amps (&&, ||).
+        is_tee = bool(re.search(r"\btee\b", m_redir.group(0), re.I))
+        sep_pattern = r"(?:&&|\|\||[;&\n])\s*" if is_tee else r"(?:&&|\|\||[;&|\n])\s*"
+
         stmt_start = 0
-        for m_sep in re.finditer(r"[;&|]\s*", command[:pos]):
+        for m_sep in re.finditer(sep_pattern, blanked_pre):
             stmt_start = m_sep.end()
 
-        # Find end of statement:
-        # If heredoc, ends after the heredoc terminator.
-        # Otherwise, ends at the next [;&|\n] separator after the redirect target.
-        m_hd = re.search(
-            r"<<-?\s*['\"]?([A-Za-z_][A-Za-z0-9_]*)['\"]?[^\n]*\n(.*?)\n\s*\1\b",
-            command[stmt_start:],
-            re.DOTALL,
-        )
-        if m_hd:
-            stmt_end = stmt_start + m_hd.end()
+        # Find statement end after redirect
+        blanked_rest = _blank_quotes(command[stmt_start:])
+        heredocs = _extract_heredoc_bodies(command[stmt_start:])
+        if heredocs:
+            m_hd = re.search(
+                r"<<-?\s*['\"]?([A-Za-z_][A-Za-z0-9_]*)['\"]?[^\n]*\n(.*?)\n\s*\1\b",
+                command[stmt_start:],
+                re.DOTALL,
+            )
+            stmt_end = (stmt_start + m_hd.end()) if m_hd else len(command)
             stmt = command[stmt_start:stmt_end]
-            heredocs = [m_hd.group(2)]
         else:
-            m_end = re.search(r"[;&|\n]", command[m_redir.end():])
+            rel_redir_end = m_redir.end() - stmt_start
+            m_end = re.search(r"(?:&&|\|\||[;&|\n])", blanked_rest[rel_redir_end:])
             stmt_end = (m_redir.end() + m_end.start()) if m_end else len(command)
             stmt = command[stmt_start:stmt_end]
-            heredocs = []
 
         # If this writing statement contains an in-command date read, it is measured by construction
         if not RX_IN_COMMAND_DATE.search(stmt):

@@ -200,7 +200,7 @@ If checks are still running and you want it to land once they pass, and only whe
 gh pr merge "$N" --repo "$REPO" --squash --auto   # MERGE_PR — needs auto-merge enabled; swap --squash for --merge/--rebase if squash is disabled
 ```
 
-For **Dependabot** you can also hand the merge back to the bot, under the same up-to-date-branch or queue condition as `--auto` — it waits for
+For **Dependabot** you can also hand the merge back to the bot, under the same up-to-date-branch or queue condition as `--auto` --- it waits for
 CI, merges, and deletes its branch (handy when the branch needs a rebase
 first):
 

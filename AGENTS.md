@@ -578,6 +578,14 @@ each recheck and each delegated scan.
 A review-only run that CI or a skill invocation dispatched naming the target
 PR (an `@claude review`, a `claude-code-review.yml` run) is that explicit
 request, whoever authored the PR; it reviews and stops there.
+Every review you post carries both representations of its verdict, whoever
+asked for it and whether or not anything dispatched it: the human-readable
+Markdown report, and the machine-readable `review-data` JSON payload, per
+[`shared/workflow/adversarial-self-review.md`](shared/workflow/adversarial-self-review.md)'s
+"Structured review data" section.
+The payload requirement is easiest to miss exactly here, since no persona was
+dispatched and no push follows
+([ai-config#3006](https://github.com/Morrison-Lab/ai-config/issues/3006)).
 An out-of-scope PR is reported to the user and left untouched.
 When no identity operation is available, fail closed the way `ardia` does:
 leave the author and assignee arms unevaluated, act only on PRs the user

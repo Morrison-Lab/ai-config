@@ -412,6 +412,34 @@ pushing branch A afterward compares its shipped commit `X` against the held `Y`,
 
 Every reviewer emits two representations of one verdict: the human-readable Markdown report, then a machine-readable JSON payload in a trailing HTML comment.
 
+**"Every reviewer" means every review you post, not only one a dispatched persona wrote.**
+The paragraphs around this section are mostly about a review dispatched to the [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md) persona before a push,
+so the requirement reads as that persona's rather than as a rule about reviews.
+It binds every review you post or produce: a forge comment, a local report, a review composed in-transcript.
+The one you are likeliest to write without a payload is the review nobody dispatched and no push follows --- a review-only request on somebody else's PR --- since neither the persona nor the pre-push guard is in play there.
+
+Nothing goes red when the payload is omitted, which is why this needs stating rather than more care.
+Such a review still yields a verdict its consumers read, since Markdown parsing is every one of their fallbacks when no payload is present.
+What a missing payload loses is the per-finding records, which no prose pattern recovers.
+The near-miss is a thorough report --- findings reproduced, locations cited, the disclosure marker appended --- where every standard a human reader can see is met and the machine-readable half is the one absent.
+
+The Markdown half owes a verdict line the consumers' own patterns match, and the forms are not interchangeable.
+Measured 2026-09-02 against the three consumers, on `Ready for merge`:
+
+| form | `check-pr-fully-clean.py` | `parse_report` | `enforce-mwc-review-gate.py` |
+| --- | --- | --- | --- |
+| `Verdict: <phrase>` | reads | reads | **no verdict** |
+| `### Verdict` then `**<phrase>**` | reads | **no verdict** | reads |
+| `### Verdict: <phrase>` | reads | reads | reads |
+
+So write `### Verdict: Ready for merge` or `### Verdict: Needs more work` --- the heading and the phrase on one line, which is the only form all three read.
+The phrase matters as much as the form: the pre-push guard accepts `Ready for merge`, `Needs more work`, and `Needs work` and nothing else, so `Verdict: Clean`, `Verdict: Approved`, and `Verdict: Ready` return no verdict there while `check-pr-fully-clean.py` accepts all of them.
+
+- **Do:** append the payload to any review you post or produce, including one nobody dispatched and one no push follows.
+- **Don't:** read this section as binding the persona alone --- the persona is where it is already implemented, not where it applies.
+- **Don't:** treat a thorough, well-cited, correctly-disclosed report as complete without it;
+  that combination is exactly what the omission looks like from the inside.
+
 ```html
 Reviewed-Commit: <sha>
 
@@ -429,9 +457,15 @@ Reviewed-Commit: <sha>
 For a not-clean verdict, set `"verdict": "NOT_CLEAN"` and give `"findings"` one object per finding, each with the four keys `file`, `line`, `category`, and `message`.
 State those keys in any brief you write, rather than only asking for "finding objects" --- a reviewer that guesses the key names produces `structured finding in unknown: ` as the reported blocking reason.
 
+Name the target repository's schema version in that same brief when it differs from the template above, and its required fields with it --- a version string alone still leaves the reviewer emitting a payload that does not conform to the target's contract, which nothing there validates and so nothing there catches.
+A review you compose yourself has no brief to carry that, so read the target's own reviewer prompt before copying the template: `Morrison-Lab/gha`'s asks for `1.1` and two fields this template does not have.
+Nothing here reads `schema_version`, and this corpus emits `1.0` --- in that template, in both `adversarial-reviewer` persona files, and in `pre-push-review.py` --- while `Morrison-Lab/gha`'s reviewer prompt requires `1.1` with `detailed_assessment` and `holistic_assessment` fields (measured 2026-09-02, [ai-config#3006](https://github.com/Morrison-Lab/ai-config/issues/3006)).
+A reviewer left to copy the template emits `1.0` into a repository asking for `1.1`.
+
 Three rules govern how the payload is read, and each exists because its absence inverted a verdict:
 
 - **The payload must be last, and the last one wins.**
+  Last among `review-data` blocks, that is --- [`disclose-agent-authorship`](disclose-agent-authorship.md) still ends a posted comment with its marker, and the two do not conflict: `extract_structured_review` reads a payload the marker follows (verified 2026-09-02), and [`pre-push-review.py`](../../scripts/pre-push-review.py) already emits the report in that order.
   The authoritative payload follows the verdict and the `Reviewed-Commit` fingerprint.
   A reviewer who quotes the template above (it hardcodes `"verdict": "CLEAN"`) before writing its own would otherwise publish a `NOT_CLEAN` review that scored clean.
 - **A payload inside a code region does not count.**

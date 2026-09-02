@@ -448,7 +448,15 @@ are split for least-privilege security (gha#580):
    The comment contains the human-readable Markdown review,
    the reviewed commit SHA, the run URL link,
    and the machine-readable payload
-   (`<!-- review-data: {"schema_version": "1.0", "verdict": "CLEAN", ...} -->`).
+   (`<!-- review-data: {"schema_version": "1.1", "verdict": "CLEAN", ...} -->`).
+   That review-data comment payload is schema `1.1`, which is a different
+   field from `payload.json`'s own `schema_version` (`1`, set by
+   `pack-review-payload.sh`).
+   gha's reviewer prompt has required `1.1`,
+   with `detailed_assessment` and `holistic_assessment`, since
+   [gha#800](https://github.com/Morrison-Lab/gha/pull/800)
+   (measured 2026-09-02).
+   `ai-config`'s own emitters still write `1.0`, which nothing reads.
 
 ### Why ai-config agents inspect PR comment payloads instead of Actions artifacts
 

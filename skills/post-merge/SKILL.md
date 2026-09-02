@@ -246,7 +246,7 @@ against `memories/reviewing-prs.md`'s scope test before sending the
 instruction: an assignment can change, and a delegated agent may be driving
 an assigned or requested PR that another author opened.
 A branch that fails the test, or that is claimed by an agent that is not
-yours, goes through the filtered scan in step 1 like any other PR.
+yours, goes through the scope-filtered scan above step 1 like any other PR.
 
 **This depends on the coordinator finding out about a merge in the first
 place --- so brief every delegated agent, up front, to report back the
@@ -392,8 +392,8 @@ One-at-a-time keeps the blast radius small.
 Skip any PR whose conflict is in a file you can't understand without more context — comment asking for clarification instead.
 
 **Match the response to scope, not only to cause.**
-Step 2 says whether a conflict is yours; the scope test in step 1 says
-whether the PR is.
+Step 2 says whether a conflict is yours; the scope filter in the paragraph
+above step 1 says whether the PR is.
 A conflict you genuinely caused on a PR that fails that test is a report to
 the user naming the deletion or rename and where the content went; the PR
 gets no comment and no push.

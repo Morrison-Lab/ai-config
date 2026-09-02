@@ -183,11 +183,16 @@ RX_STAMP = getattr(_clock, "RX_CLAIM", None) or re.compile(
     re.I,
 )
 
-# For session notebooks and memory files: also match approximate tilde prefixes
-# and ish suffixes (~17:35 PDT, 17:50ish, 18:05ish PT, ai-config#2947).
+# For session notebooks and memory files: match explicit Pacific markers
+# (~17:35 PDT, 17:50ish PDT, 18:05ish PT, 17:50 PDTish), or timestamps with ish
+# in heading, parenthesized entry, or timestamp-indicator contexts (ai-config#2947).
 RX_NOTEBOOK_STAMP = re.compile(
     r"(?:\b|~)(?:[01]?\d|2[0-3]):[0-5]\d(?::[0-5]\d)?\s*(?:AM|PM)?\s*"
-    r"(?:(?:PDT|PST|\bPT\b)(?:\s*ish)?|ish\b)",
+    r"(?:(?:PDT|PST|\bPT\b)(?:\s*ish\b)?|ish\b\s*(?:PDT|PST|\bPT\b))"
+    r"|(?:\((?:[01]?\d|2[0-3]):[0-5]\d\s*ish(?:\s*(?:PDT|PST|\bPT\b))?\))"
+    r"|(?:(?:^|\n)\s*#{1,6}\s*(?:.*?\b)?(?:[01]?\d|2[0-3]):[0-5]\d\s*ish\b)"
+    r"|(?:\b(?:at|around|about|as of|Status at)\s+(?:[01]?\d|2[0-3]):[0-5]\d\s*ish\b)"
+    r"|(?:~[01]?\d|2[0-3]):[0-5]\d\s*ish\b",
     re.I,
 )
 
@@ -205,6 +210,12 @@ RX_BASH_REDIRECT_NOTEBOOK = re.compile(
 
 # Command substitution calling `date` inside a specific command segment
 RX_IN_COMMAND_DATE = re.compile(r"(?:\$\(|\`)[^\)\`]*\bdate\b", re.I)
+
+# Explicit duration phrasing (e.g. "the suite took 14:32", "the run took 2:30ish")
+RX_DURATION_CONTEXT = re.compile(
+    r"\b(?:took|duration(?:\s*[:=])?|elapsed(?:\s*[:=])?|running for|runtime(?:\s*[:=])?)\s*$",
+    re.I,
+)
 
 CLOCK_CMD = 'TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"'
 
@@ -264,7 +275,7 @@ def _extract_heredoc_bodies(command):
     """Extract all heredoc bodies from command."""
     bodies = []
     heredoc_re = re.compile(
-        r"<<-?\s*['\"]?([A-Za-z_][A-Za-z0-9_]*)['\"]?\s*\n(.*?)\n\s*\1\b",
+        r"<<-?\s*['\"]?([A-Za-z_][A-Za-z0-9_]*)['\"]?[^\n]*\n(.*?)\n\s*\1\b",
         re.DOTALL,
     )
     for m in heredoc_re.finditer(command):
@@ -277,17 +288,34 @@ def _bash_post(command, cwd):
     # Check if the Bash command writes/appends to a notebook or memory file
     m_redir = RX_BASH_REDIRECT_NOTEBOOK.search(command)
     if m_redir:
-        # Find start of the statement containing this redirect (after preceding ; or && or ||)
+        # Find start of statement containing this redirect (last separator before redirect)
         pos = m_redir.start()
         stmt_start = 0
         for m_sep in re.finditer(r"[;&|]\s*", command[:pos]):
             stmt_start = m_sep.end()
-        stmt = command[stmt_start:]
-        # If this statement contains an in-command date read, it is measured by construction
+
+        # Find end of statement:
+        # If heredoc, ends after the heredoc terminator.
+        # Otherwise, ends at the next [;&|\n] separator after the redirect target.
+        m_hd = re.search(
+            r"<<-?\s*['\"]?([A-Za-z_][A-Za-z0-9_]*)['\"]?[^\n]*\n(.*?)\n\s*\1\b",
+            command[stmt_start:],
+            re.DOTALL,
+        )
+        if m_hd:
+            stmt_end = stmt_start + m_hd.end()
+            stmt = command[stmt_start:stmt_end]
+            heredocs = [m_hd.group(2)]
+        else:
+            m_end = re.search(r"[;&|\n]", command[m_redir.end():])
+            stmt_end = (m_redir.end() + m_end.start()) if m_end else len(command)
+            stmt = command[stmt_start:stmt_end]
+            heredocs = []
+
+        # If this writing statement contains an in-command date read, it is measured by construction
         if not RX_IN_COMMAND_DATE.search(stmt):
             target_path = m_redir.group(1)
             base = os.path.basename(target_path)
-            heredocs = _extract_heredoc_bodies(stmt)
             body = "\n\n".join(heredocs) if heredocs else stmt
             return "body", body, f"edit to `{base}`", True
 
@@ -385,10 +413,10 @@ def _read_in_turn(last_clock, turn_start):
 
 
 def _exempt_context(body, hit):
-    """True when the sibling's context exemptions cover this stamp."""
+    """True when context exemptions or duration phrasing covers this stamp."""
     start, end = hit.start(), hit.end()
     prefix = body[max(0, start - 60):start]
-    if RX_UTC_CONVERT.search(prefix) or RX_PAST_CONTEXT.search(prefix):
+    if RX_UTC_CONVERT.search(prefix) or RX_PAST_CONTEXT.search(prefix) or RX_DURATION_CONTEXT.search(prefix):
         return True
     line_start = body.rfind("\n", 0, start) + 1
     line_end = body.find("\n", end)
@@ -399,8 +427,19 @@ def _exempt_context(body, hit):
 
 def _normalize_stamp_for_minutes(stamp):
     """Normalize a stamp (stripping ~ prefix, ish suffix, and trailing zone) so _claim_minutes parses it."""
-    s = stamp.lstrip("~").strip()
+    s = stamp.strip()
+    s = re.sub(r"^(?:#{1,6}\s*|\b(?:at|around|about|as of|Status at)\s+|\()", "", s, flags=re.I)
+    s = re.sub(r"\)$", "", s).strip()
+    s = s.lstrip("~").strip()
     s = re.sub(r"\s*ish\b", "", s, flags=re.I).strip()
+    m = re.search(r"\b(?:[01]?\d|2[0-3]):[0-5]\d(?::[0-5]\d)?\b", s)
+    if m:
+        hhmm = m.group(0)
+        tz = "PT"
+        m_tz = re.search(r"(?:PDT|PST|\bPT\b)", stamp, re.I)
+        if m_tz:
+            tz = m_tz.group(0)
+        return f"{hhmm} {tz}"
     if not re.search(r"(?:PDT|PST|\bPT\b)", s, flags=re.I):
         s += " PT"
     return s

@@ -934,14 +934,14 @@ A clean automated review from every available provider evaluating the current HE
 
 ## Pattern 46: Broad Multi-Surface Matching Without Surface Discrimination
 - **Do**: When extending a pre-tool hook or analyzer to new surfaces (e.g. extending forge comment guards to session notebooks or memory files), use surface-specific pattern matchers and extractors.
-  Require domain-specific markers (such as Pacific timezone indicators `PDT|PST|PT`) on general text surfaces to prevent false positives on bare durations (such as `2:30ish` or `14:32`),
-  and scope in-command exemptions strictly to the specific writing statement/segment rather than evaluating across entire chained command strings.
+  Require domain-specific markers (such as Pacific timezone indicators `PDT|PST|PT`) on general text surfaces and contextual indicators (heading, bullet, or parenthesized timestamps) for approximate `ish` stamps on session notebooks to prevent false positives on bare durations (such as `2:30ish` or `14:32`),
+  and scope in-command exemptions strictly by both start and end statement boundaries so neither preceding nor succeeding chained statements falsely discharge unmeasured stamps.
 - **Don't**: Collapse distinct surfaces into a single loose regex pattern or treat in-command subshell invocations (such as `$(date)`) as globally discharging unrelated write operations within chained commands.
 - **Example**: 2026-09-01 on [PR #2965](https://github.com/Morrison-Lab/ai-config/pull/2965) ([Issue #2947](https://github.com/Morrison-Lab/ai-config/issues/2947)):
-  `flag-unmeasured-timestamp.py` added a bare `ish` alternative (`\b\d+:\d+ish\b`) to `RX_STAMP`, which falsely flagged ordinary comment duration phrasing like "2:30ish" and "14:32" as Pacific clock claims.
-  Additionally, checking `RX_IN_COMMAND_DATE` against the raw unsegmented command string caused `LOGID=$(date +%s); echo "17:50 PDT" >> session.md` to silently suppress the unmeasured warning.
+  `flag-unmeasured-timestamp.py` added a bare `ish` alternative (`\b\d+:\d+ish\b`) to `RX_STAMP`, which falsely flagged ordinary duration phrasing like "2:30ish" and "14:32" as Pacific clock claims.
+  Additionally, checking `RX_IN_COMMAND_DATE` against unsegmented command strings or start-only bounded statement substrings caused `LOGID=$(date +%s); echo "17:50 PDT" >> session.md` or `echo "17:50 PDT" >> session.md; NOW=$(date +%s)` to silently suppress unmeasured warnings.
 - **Canonical Rule**: [`fail-fast.md`](../shared/principles/fail-fast.md) and [`deterministic-tools.md`](../shared/principles/deterministic-tools.md).
-- **Fix**: Separate `RX_STAMP` (requiring explicit `PDT|PST|PT`) from `RX_NOTEBOOK_STAMP`, inspect command strings segment-by-segment, and ensure candidate tool input parameter mappings (such as `NotebookEdit`'s `new_source`) are complete.
+- **Fix**: Separate `RX_STAMP` (requiring explicit `PDT|PST|PT`) from contextual `RX_NOTEBOOK_STAMP`, bound redirect statements strictly by start and end separators, and ensure candidate tool input parameter mappings (such as `NotebookEdit`'s `new_source`) are complete.
 - **Algorithmatizable?**
   Yes.
-  Multi-surface hook unit tests should include negative cases for bare durations and cross-segment chained command interactions.
+  Multi-surface hook unit tests should include negative cases for bare durations, duration phrasing ("took 2:30ish"), and cross-segment chained command interactions (both leading and trailing unrelated date calls).

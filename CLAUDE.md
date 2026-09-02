@@ -191,12 +191,11 @@ Local and on-device models are prohibited because they can crash the user's
 computer.
 When hosted quota is unavailable, report the blocker or use
 deterministic checks instead of starting a local inference runtime.
-`agy` (Google Antigravity)'s **API** route was permanently retired for
-dispatched work (user directive, 2026-08-20, ai-config#1776).
-Only that route is out --- the `agy --print` CLI and the interactive
-subscription/extension are unaffected and not at quota.
-`memories/delegation.md` carries the rule, the usage-window semantics
-across `opencode`, `codex`, and `agy`, and the prepaid-balance details.
+`agy` (Google Antigravity)'s **API** route was retired for dispatched work on 2026-08-20 (ai-config#1776), and a 2026-09-01 retest (`workflow_dispatch` run 33557587761) still failed, now with `request failed (code 403): Spend cap breached` rather than the original 429.
+The `agy --print` CLI is a separate path and was never affected --- it is confirmed working on Windows as of 2026-09-02 via a fresh install from the official `antigravity-cli` GitHub release (user directives that day: "start using agy as a subagent where feasible", "use agy cli for it").
+Route dispatchable subagent work to the `agy` CLI accordingly.
+The interactive subscription/extension was never affected and was never at quota.
+`memories/delegation.md` carries the rule, the usage-window semantics across `opencode`, `codex`, and `agy`, the prepaid-balance details, and the Windows install/mechanics writeup.
 Ground the recommendation in `assess-model-fit`/`select-model` rather than a guess.
 
 **Compaction.**

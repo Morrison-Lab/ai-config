@@ -2321,13 +2321,27 @@ _MULTI_BACKTICK_SPAN_RE = re.compile(
 def _blank_fences_and_spans(body: str) -> str:
     """Blank fenced code blocks and code spans to spaces, preserving length."""
     fenced_lines, _, _ = find_fence_spans(body, swallow_unclosed=True)
-    mask = _citation_mask(body, min_backticks=1)
 
     lines = body.split("\n")
-    unfenced_lines = [
-        "" if idx in fenced_lines else line for idx, line in enumerate(lines)
-    ]
-    unfenced_body = "\n".join(unfenced_lines)
+    mask = bytearray(len(body))
+    line_offset = 0
+    unclaimed_lines = []
+
+    for idx, line in enumerate(lines):
+        if idx in fenced_lines:
+            unclaimed_lines.append("")
+        else:
+            line_span_mask = bytearray(len(line))
+            for m in CODE_SPAN_RE.finditer(line):
+                b, e = m.span()
+                line_span_mask[b:e] = b"\x01" * (e - b)
+                mask[line_offset + b : line_offset + e] = b"\x01" * (e - b)
+            unclaimed_lines.append(
+                "".join(" " if m else c for c, m in zip(line, line_span_mask))
+            )
+        line_offset += len(line) + 1
+
+    unclaimed_body = "\n".join(unclaimed_lines)
 
     line_offsets = []
     curr = 0
@@ -2335,18 +2349,18 @@ def _blank_fences_and_spans(body: str) -> str:
         line_offsets.append(curr)
         curr += len(line) + 1
 
-    unfenced_line_offsets = []
-    curr_unf = 0
-    for unf_line in unfenced_lines:
-        unfenced_line_offsets.append(curr_unf)
-        curr_unf += len(unf_line) + 1
+    unclaimed_line_offsets = []
+    curr_un = 0
+    for un_line in unclaimed_lines:
+        unclaimed_line_offsets.append(curr_un)
+        curr_un += len(un_line) + 1
 
-    for m in _MULTI_BACKTICK_SPAN_RE.finditer(unfenced_body):
-        b_unf, e_unf = m.span()
-        start_line = unfenced_body[:b_unf].count("\n")
-        start_col = b_unf - unfenced_line_offsets[start_line]
-        end_line = unfenced_body[:e_unf].count("\n")
-        end_col = e_unf - unfenced_line_offsets[end_line]
+    for m in _MULTI_BACKTICK_SPAN_RE.finditer(unclaimed_body):
+        b_un, e_un = m.span()
+        start_line = unclaimed_body[:b_un].count("\n")
+        start_col = b_un - unclaimed_line_offsets[start_line]
+        end_line = unclaimed_body[:e_un].count("\n")
+        end_col = e_un - unclaimed_line_offsets[end_line]
 
         if not any(l in fenced_lines for l in range(start_line, end_line + 1)):
             b_orig = line_offsets[start_line] + start_col

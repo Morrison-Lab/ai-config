@@ -313,7 +313,8 @@ When the user gives an MWC grant (e.g. `/mwc` or "merge when confident"):
    two sides resolved different ids, which is exactly what ai-config#1279 was.
 2. Proceed with the task (e.g. driving PRs to clean via `ardi`).
 3. When a PR reaches 100% clean state, merge it immediately
-   (default: squash merge via `gh pr merge <number> --squash --delete-branch`),
+   (default: squash merge via `gh pr merge "<number>" -R "<owner>/<repo>" --squash --delete-branch --match-head-commit "<pinned-sha>"`,
+   the pin being the `headRefOid` recorded before the instrument ran),
    verify the merge landed on GitHub/GitLab,
    and run the post-merge skill (`post-merge` / `ums`).
 4. If the user revokes the grant, run `skills/session-lock/scripts/ai-session.sh disable-mwc` immediately.

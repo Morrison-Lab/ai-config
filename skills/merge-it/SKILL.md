@@ -122,9 +122,9 @@ standing yes (see `preferences.md`).
 
 ```bash
 # MERGE_PR — remote/web (GitHub MCP):
-#   mcp__github__merge_pull_request  merge_method=squash  commit_title=…  commit_message=…
-# local:
-gh pr merge <N> -R <owner>/<repo> --squash --subject "<title>" --body "<accurate summary; Closes #N>"
+#   mcp__github__merge_pull_request  merge_method=squash  expectedHeadSha=<pinned-sha>  commit_title=…  commit_message=…
+# local (the pin is the headRefOid recorded before the readiness check):
+gh pr merge "<N>" -R "<owner>/<repo>" --squash --match-head-commit "<pinned-sha>" --subject "<title>" --body "<accurate summary; Closes #N>"
 ```
 
 **The `-R` is load-bearing, not tidiness --- a bare `gh pr merge <N>` refuses even from inside the repo it would merge into.**

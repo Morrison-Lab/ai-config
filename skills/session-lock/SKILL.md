@@ -19,7 +19,8 @@ silently step on each other:
 - two push to the same branch and one rejects / force-overwrites the other;
 - two kick off the same expensive render/build/test in the same dir.
 
-The system is one script — **`~/.claude/skills/session-lock/scripts/ai-session.sh`**
+The system is one script — **`skills/session-lock/scripts/ai-session.sh`**
+(reachable via `${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/skills/session-lock/scripts/ai-session.sh}` or `~/.claude/skills/session-lock/scripts/ai-session.sh`)
 — backed by a registry of live sessions under the repo's shared git common dir
 (`$(git rev-parse --git-common-dir)/ai-sessions/`). That location is
 machine-local (git never tracks anything under `.git/`, so it is never
@@ -27,8 +28,10 @@ committed or pushed), repo-scoped, and **shared across every `git worktree`** of
 the repo — so sessions in different worktrees still see each other.
 
 > Throughout, `ai-session.sh` means
-> `~/.claude/skills/session-lock/scripts/ai-session.sh` (symlinked there by
-> `bootstrap.sh`). Use the full path, or alias it for the session.
+> `skills/session-lock/scripts/ai-session.sh` (or
+> `${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/skills/session-lock/scripts/ai-session.sh}` /
+> `~/.claude/skills/session-lock/scripts/ai-session.sh`).
+> Use the full path, or alias it for the session.
 
 ## When this fires
 

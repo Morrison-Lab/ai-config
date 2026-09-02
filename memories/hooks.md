@@ -91,6 +91,7 @@ Blocking hooks deny execution (exit code 2), while warning hooks emit actionable
 | Hook Script | Type | Trigger / Purpose | Proactive Compliance Rule |
 |---|---|---|---|
 | [`warn-stale-issue-edit.py`](../hooks/warn-stale-issue-edit.py) | Warn | Warns when editing code for an issue without a fresh `VIEW_ISSUE` and remote default-branch check. | Run `gh issue view <N>` (or `VIEW_ISSUE`) and check `git fetch origin main` / `origin/main` before modifying files for an issue. |
+| [`flag-unmeasured-timestamp.py`](../hooks/flag-unmeasured-timestamp.py) | Warn | Warns when editing or writing to session notebooks (`session-*.md`) or memory files (`memory/*.md`) stating a Pacific clock time without a date reading in the turn. | Run `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"` before writing or appending timestamps to session notebooks or memory files. |
 
 ---
 

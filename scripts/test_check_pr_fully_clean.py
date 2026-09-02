@@ -1880,12 +1880,33 @@ def main() -> int:
               "crash is fixed and verified by running the suite; the second "
               "finding remains open.\n", "")
           == "not-clean")
-    check("a ';' clause carrying a negator stays not-clean (fails safe)",
+    check("a ';' clause outside the whitelist stays not-clean (fails safe)",
           checker.classify_verdict(
               "### Verdict\n**Ready for merge.** The previously blocking "
               "crash is fixed and verified by running the suite; nothing else "
               "was checked.\n", "")
           == "not-clean")
+    # The adversarial review of #2958 showed a blacklist failing open on
+    # ordinary finding vocabulary; the whitelist must refuse these.
+    for _clause in (
+        "a critical error in the login flow",
+        "a serious concern about the auth flow",
+        "a security vulnerability in login",
+        "a data race was spotted separately",
+        "still worth a look",
+    ):
+        check(f"a ';' clause naming an open finding stays not-clean: {_clause!r}",
+              checker.classify_verdict(
+                  "### Verdict\n**Ready for merge.** The previously blocking "
+                  "crash is fixed and verified by running the suite; "
+                  + _clause + ".\n", "")
+              == "not-clean")
+    check("a whitelisted 'no new issues introduced' ';' clause reads as clean",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The previously blocking "
+              "crash is fixed and verified by running the suite; no new "
+              "issues introduced.\n", "")
+          == "clean")
     check("a resolved prior verdict blocking issue is not an active finding",
           checker.classify_verdict(
               "### Verdict\n**Ready for merge.** The prior verdict's blocking "

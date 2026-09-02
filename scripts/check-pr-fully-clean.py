@@ -1188,21 +1188,27 @@ _RESOLUTION_VERIFIED_CONTINUATION = (
     + _RESOLUTION_METHOD_PHRASE
 )
 
-# A `;`-joined clause after a resolved mention, admitted only when nothing
-# in it could carry a finding: no negator, and none of the open, remaining,
-# obligation, failure, or finding vocabulary. Anything else fails safe and
-# the mention stays blocking (ai-config#2957).
+# A `;`-joined clause after a resolved mention. Admitted by WHITELIST: the
+# clause must be one of a few enumerated shapes that carry no finding by
+# construction -- a "no new issues" statement, or the reviewer's habitual
+# note that the round's only commit is a small documentation correction.
+# A blacklist of finding vocabulary was tried first and failed open on the
+# adversarial review of ai-config#2958 ("; a critical error in the login
+# flow" read as clean), which is the dangerous direction by this file's
+# policy: a bounded word list can never enumerate every way to name an
+# open finding, while a whitelist admits only what it names.
 _BENIGN_TRAILING_CLAUSE = re.compile(
-    r"^\s*(?:(?!\b(?:not|never|neither|nor|no|none|nothing|without"
-    r"|hardly|barely|scarcely|zero"
-    r"|open|unresolved|unfixed|unaddressed|outstanding|pending"
-    r"|remain(?:s|ing|ed)?|still|yet"
-    r"|must|should|needs?|required?|todo|fixme|before\s+merg(?:e|ing)"
-    r"|broken|failing|fails?|regress(?:es|ed|ion|ions)?"
-    r"|partial(?:ly)?|incomplete(?:ly)?|except"
-    r"|block(?:ed|ing|ers?)?|reject(?:ed)?|unapproved"
-    r"|nits?|findings?|issues?|bugs?)\b)"
-    r"[^;\n]){1,240}$",
+    r"^\s*(?:"
+    r"(?:I\s+found\s+|there\s+(?:are|were)\s+|with\s+)?no\s+new\s+(?:issues?|findings?)"
+    r"(?:\s+(?:introduced|found|added|identified))?"
+    r"(?:\s+in\s+(?:this|the)\s+(?:round|review|pass|diff))?"
+    r"|nothing\s+else\s+to\s+report"
+    r"|the\s+(?:one|only|single|sole)\s+new\s+commit"
+    r"(?:\s+since\s+(?:the\s+)?(?:last|previous|prior)\s+round)?"
+    r"\s+is\s+an?\s+(?:(?:small|minor|trivial|cosmetic|accurate|correct|harmless|simple),?\s+){0,3}"
+    r"(?:documentation|doc|docs|comment|wording|typo|formatting|whitespace)"
+    r"\s+(?:correction|fix|change|update|tweak)s?"
+    r")\s*[.!?]?\s*$",
     re.IGNORECASE,
 )
 
@@ -1378,7 +1384,8 @@ def _has_resolution_suffix(scan: str, match: re.Match) -> bool:
         return True
     # A `;`-joined clause is inside the sentence, so it defeats the `$`
     # anchor even when it carries nothing. Retry on the head alone and
-    # require the tail to be provably benign (ai-config#2957).
+    # require the tail to be one of the whitelisted benign shapes
+    # (ai-config#2957).
     head, sep, tail = text.partition(";")
     if not sep:
         return False

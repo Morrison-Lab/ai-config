@@ -237,8 +237,8 @@ The `new-line-breaks` job in `.github/workflows/validate.yml` now carries
 `if: github.event_name == 'pull_request'`, so the push-triggered run reports
 `skipped` rather than `success`.
 That closes the missing-base push case only: a `pull_request` run can still
-skip with the action's warning when the diff cannot be computed, so a green
-run is one that ran only once its log shows lines were examined.
+skip with the action's warning when the diff cannot be computed, so treat a
+green run as a verdict only when its log shows lines were examined.
 The rule below still applies to any other workflow of this shape, and to any
 repository whose copy of the job predates that guard.
 

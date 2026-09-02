@@ -2378,8 +2378,34 @@ def main() -> int:
         "citation: `memories/reviewing-prs.md:80-82` states the exemption verbatim.\n\n"
         "### Verdict\n\nReady for merge\n"
     )
-    check("a resolved Findings log whose items lead with Previously: and a resolution verb resolves (#2945)",
-          checker._unresolved_finding_pattern(prior_status_log) is None)
+    structured_clean_block = (
+        "\n<!-- review-data:\n"
+        '{"schema_version": "1.0", "reviewer": "claude", "commit_sha": "fb8283797176964be41d23792c168b2e936ecf11", '
+        '"verdict": "CLEAN", "findings": []}\n-->\n'
+    )
+    check("a resolved Findings log whose items lead with Previously: resolves when the same comment's "
+          "structured payload is CLEAN with an empty findings list (#2945)",
+          checker._unresolved_finding_pattern(prior_status_log + structured_clean_block) is None)
+    check("the same log with no structured payload stays open: free-prose explanations need the reviewer's own count (#2945)",
+          checker._unresolved_finding_pattern(prior_status_log) is not None)
+    check("the same log with a structured payload listing a finding stays open (#2945)",
+          checker._unresolved_finding_pattern(
+              prior_status_log
+              + "\n<!-- review-data:\n"
+              + '{"schema_version": "1.0", "reviewer": "claude", "verdict": "CLEAN", '
+              + '"findings": [{"file": "a.md", "line": 1, "message": "x"}]}\n-->\n'
+          ) is not None)
+    check("Previously: item whose explanation is the end-of-line affirmative suffix resolves without a payload (#2945)",
+          checker._unresolved_finding_pattern(
+              "### Findings \u2014 all resolved\n\n"
+              "1. **Previously: X.** Now fixed in abc1234.\n\n### Verdict\n\nReady for merge\n"
+          ) is None)
+    check("Previously: item whose free-prose explanation names a new defect stays open without a payload (#2945)",
+          checker._unresolved_finding_pattern(
+              "### Findings \u2014 all resolved\n\n"
+              "1. **Previously: X.** Now fixed; the query now leaks memory on every call.\n\n"
+              "### Verdict\n\nReady for merge\n"
+          ) is not None)
     check("Previously: item followed by 'Still not fixed' stays open (#2945)",
           checker._unresolved_finding_pattern(
               "### Findings \u2014 all resolved\n\n"
@@ -2426,7 +2452,7 @@ def main() -> int:
           checker._unresolved_finding_pattern(
               "### Findings \u2014 all resolved\n\n"
               "1. **Previously: *.md files were skipped by the glob.** Now fixed \u2014 the pathspec is quoted "
-              "and the run lists all 731 files.\n\n### Verdict\n\nReady for merge\n"
+              "and the run lists all 731 files.\n\n### Verdict\n\nReady for merge\n" + structured_clean_block
           ) is None)
     check("### Findings from prior rounds --- now resolved resolves (#2781)",
           checker._unresolved_finding_pattern(

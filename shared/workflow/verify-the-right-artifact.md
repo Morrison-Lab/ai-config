@@ -730,7 +730,7 @@ The shapes above substitute one file, run, or environment for another.
 This one keeps the right file and reads only the fraction of it a diff highlighted.
 A diff marks what changed;
 it says nothing about what the surrounding text, including context the same diff adds, now means.
-Grepping the diff for a keyword returns exactly the lines matching that keyword and nothing about the lines around them --- which is the file's meaning as often as not, because a change is scoped by its neighbours.
+Grepping the diff for a keyword returns exactly the lines matching that keyword and nothing about the lines around them --- and those surrounding lines are the file's meaning as often as not, because a change is scoped by its neighbours.
 
 The tell is a conclusion drawn from **removed or added lines alone**, when the same diff's own added context sits one hunk away and narrows what the removal actually licenses.
 
@@ -741,11 +741,11 @@ That sentence is scoped to the group's *name*, not to the presence of a block.
 A caller-level group with a different name --- `website-publish-${{ github.ref }}`, the literal name `gha#667` gave a different workflow's group in the same repo, or `quarto-publish-${{ github.ref }}`, the name the consumer PR that motivated this fix later merged --- names something else and is not what the note forbids.
 The removal and the addition are two edits inside one diff, and only reading the file whole, rather than the diff's hunks in isolation, shows that the second scopes the first.
 
-**This survives the quote-the-passage check, which is what makes it worth recording rather than dismissed as ordinary carelessness.**
+**This survives the quote-the-passage check, which is what makes it worth recording rather than dismissing as ordinary carelessness.**
 [`quotable-findings`](quotable-findings.md) requires a finding to quote the exact passage it is about, on the theory that a quotable finding is a checked one.
 Quoting the three removed lines satisfies that rule to the letter: the passage exists, the quote is exact, the mechanical filter passes clean.
 What the filter cannot check is whether the *file*, read whole, means what the quoted fragment suggests once its own neighbouring lines are included.
-The check that would have caught this reads "open the file the passage lives in," not "quote the passage" --- a stricter requirement than quotable-findings states, and this is the shape that shows the gap between them.
+The check that would have caught this reads "open the file the passage lives in," not "quote the passage" --- a stricter requirement than [`quotable-findings`](quotable-findings.md) states, and this is the shape that shows the gap between them.
 
 **Before writing a retraction, check whether the head moved.**
 A wrong claim about a file can be wrong for two different reasons, and they produce different retractions.
@@ -760,7 +760,7 @@ A retraction is a claim like any other, and this one needed the same check.
 - **Do:** read the file a diff's hunk lives in, not only the hunk, before concluding what a removal licenses or forbids.
 - **Do:** treat added context in the *same* diff as evidence about scope, even when it sits in a different hunk than the lines a grep matched.
 - **Do:** fetch the exact commit a wrong claim was written against before deciding whether to retract it as "I misread" or "this changed."
-- **Don't:** treat a clean pass of quotable-findings's quote-the-passage check as evidence the file was read;
+- **Don't:** treat a clean pass of [`quotable-findings`](quotable-findings.md)'s quote-the-passage check as evidence the file was read;
   it only proves the passage exists.
 - **Don't:** infer a rule's scope from the lines a diff removed when the same diff also adds prose stating the scope.
 

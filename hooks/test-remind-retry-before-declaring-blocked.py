@@ -154,11 +154,11 @@ REMIND = [
     ([use("t1"), denial("t1"),
       txt("The push path is closed; handing this to you.")],
      "prose after the denial does not discharge it"),
-    # The count resets on a success, so this is a FIRST denial of the current
-    # stretch. The wording block below pins that it advises a retry.
+    # The stretch resets on an allowed run, so this is a FIRST denial of the
+    # current stretch. The wording block below pins that it advises a retry.
     ([use("t1"), denial("t1"), use("t2"), result("t2", "ok"),
       use("t3"), denial("t3")],
-     "denied, ran successfully, denied again"),
+     "denied, allowed to run, denied again"),
 ]
 
 # Control group A, for the START anchor. The classifier's sentence appears
@@ -332,6 +332,17 @@ try:
     malformed.append((
         "REMIND" if (p.stdout.strip() or p.returncode) else "silent",
         "an unparseable stdin payload"))
+
+    # Valid JSON that is not an object. Each of these parses cleanly and has
+    # no `.get`, so a hook that only guards the parse exits 1 with a
+    # traceback -- on the one code path that is supposed to be silent.
+    for raw in ("null", "[]", '"x"', "5"):
+        p = subprocess.run(
+            [sys.executable, HOOK], input=raw,
+            capture_output=True, text=True, env=dict(os.environ, TMPDIR=sdir))
+        malformed.append((
+            "REMIND" if (p.stdout.strip() or p.returncode) else "silent",
+            f"a well-formed but non-object payload: {raw}"))
 finally:
     shutil.rmtree(sdir, ignore_errors=True)
 
@@ -423,30 +434,44 @@ try:
     noreset = [
         (write_transcript([
             use("t1"), denial("t1"),
-            use("t2"), result("t2", "fatal: no upstream", is_error=True),
-            use("t3"), denial("t3")]),
-         "a failed run does not reset the count"),
-        (write_transcript([
-            use("t1"), denial("t1"),
             use("t2"), result("t2", PERMISSION_RULE, "permission-rule",
                               is_error=True),
             use("t3"), denial("t3")]),
-         "a permission-rule denial does not reset the count"),
+         "a permission-rule denial does not reset the stretch"),
         (write_transcript([
             use("t1"), denial("t1"),
             use("t2"), result("t2", USER_REJECTED, "user-rejected",
                               is_error=True),
             use("t3"), denial("t3")]),
-         "the user's own rejection does not reset the count"),
+         "the user's own rejection does not reset the stretch"),
+        # The same rejection with the `toolDenialKind` field absent. That
+        # field is present on all 6 measured records, so this pins the second
+        # signal -- the one case where trusting the field alone would answer a
+        # decision to respect with "re-run it once".
+        (write_transcript([
+            use("t1"), denial("t1"),
+            use("t2"), result("t2", USER_REJECTED, is_error=True),
+            use("t3"), denial("t3")]),
+         "a user rejection with no toolDenialKind still does not reset it"),
     ]
+    # A run the classifier ALLOWED resets the stretch even though the command
+    # then failed. `is_error` is not a reliable failure signal on a real tool
+    # result, so the hook does not try to read one -- and the stretch answers
+    # "how many refusals in a row", which an allowed run ends either way.
+    failed_run = write_transcript([
+        use("t1"), denial("t1"),
+        use("t2"), result("t2", "fatal: no upstream configured", is_error=True),
+        use("t3"), denial("t3")])
     try:
         out_one = invoke(one, sdir)
         out_two = invoke(two, sdir)
         out_both = [invoke(both, sdir), invoke(both, sdir)]
         out_reset = invoke(reset, sdir)
         out_noreset = [(invoke(t, sdir), d) for t, d in noreset]
+        out_failed = invoke(failed_run, sdir)
     finally:
-        for p in (one, two, both, reset, *[t for t, _ in noreset]):
+        for p in (one, two, both, reset, failed_run,
+                  *[t for t, _ in noreset]):
             os.unlink(p)
     content += [
         ("Re-run the same command once" in out_one,
@@ -454,31 +479,46 @@ try:
         ("denied once so far" in out_one,
          "one denial: supplies the measured wording"),
         (PUSH in out_one, "one denial: names the denied command"),
-        ("Re-run the same command once" not in out_two,
-         "two denials: does NOT advise another retry"),
-        # Pattern 43's mechanism is VARIATION, and #2994's success was a
-        # byte-identical re-run -- so telling the session to stop re-running
-        # would have discouraged the attempt that worked.
-        ("Do not start rephrasing" in out_two,
+        # #2994's success WAS the third attempt after two denials, so a
+        # second-denial message whose only imperative was "hand the user the
+        # decision" would stop the session one attempt short of the thing
+        # that worked -- the incident, reproduced by following the hook.
+        ("One more identical re-run is still within what the evidence "
+         "supports" in out_two,
+         "two denials: an identical re-run is still supported"),
+        # Pattern 43's mechanism is VARIATION, so it is variation this warns
+        # off, not the byte-identical re-run.
+        ("rephrasing it into new shapes" in out_two,
          "two denials: warns against rephrasing, not against re-running"),
+        ("Pattern 43 records" in out_two,
+         "two denials: cites Pattern 43 as recording, not as measuring"),
         ("denied 2 times so far" in out_two,
          "two denials: reports the count, not 'cannot'"),
         ("git push origin beta" in out_both[0],
          "concurrent denials: the newest is reported first"),
         ("git push origin alpha" in out_both[1],
          "concurrent denials: the older one is not lost behind it"),
-        ("denied once so far" in out_reset,
-         "a success resets the count"),
+        # The stretch drives the advice and the TOTAL is what gets
+        # reported. Quoting the stretch under "so far" wording would tell the
+        # session to report one denial where the transcript records two.
+        ("denied a tool call once in a row" in out_reset,
+         "an allowed run resets the stretch"),
+        ("2 times in this session" in out_reset,
+         "the session total is reported alongside it"),
+        ("denied 2 times so far" in out_reset,
+         "the wording to report quotes the total, not the stretch"),
         ("Re-run the same command once" in out_reset,
-         "a success restores the retry advice"),
+         "an allowed run restores the retry advice"),
+        ("denied a tool call once in a row" in out_failed,
+         "a run the classifier allowed resets it even if it failed"),
     ]
     content += [("denied 2 times so far" in out, desc)
                 for out, desc in out_noreset]
-    content += [("Re-run the same command once" not in out,
-                 desc.replace("does not reset the count",
-                              "does not restore the retry advice")
-                     .replace("rejection does not reset the count",
-                              "rejection does not restore the retry advice"))
+    content += [("One more identical re-run" in out,
+                 desc.replace("does not reset the stretch",
+                              "leaves the stretch at 2")
+                     .replace("still does not reset it",
+                              "still leaves the stretch at 2"))
                 for out, desc in out_noreset]
 finally:
     shutil.rmtree(sdir, ignore_errors=True)

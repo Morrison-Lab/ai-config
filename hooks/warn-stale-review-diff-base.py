@@ -147,9 +147,14 @@ SYMBOLIC = {
 RX_SHA = re.compile(r"\A[0-9a-f]{7,40}\Z")
 # A tag is immutable, so it cannot go stale the way a branch does. But a tag
 # and a branch are lexically indistinguishable, so this exempts only the two
-# unambiguous form: a dotted version of at least two components, with or
-# without a `v` prefix, optionally carrying a pre-release suffix (`v1.2.0-rc1`)
-# or build metadata.
+# unambiguous forms: a `v`-prefixed dotted version (`v1.2`, `v1.2.0`), and an
+# unprefixed one of at least three components (`1.2.0`). Both may carry a
+# pre-release suffix or build metadata.
+#
+# A bare two-component name is NOT exempt: `3.11` and `2.0` are the standard
+# maintenance-branch convention (CPython's live branches are literally `3.11`,
+# `3.12`, `3.13`), so exempting them would take the missed base over the false
+# positive, which is the opposite of the policy below.
 #
 # Deliberately NOT exempted: a bare integer or integer-dash form. `123-fix`,
 # `2261-ums`, and `2026-08-01` are all far likelier to be branches --- issue
@@ -158,7 +163,12 @@ RX_SHA = re.compile(r"\A[0-9a-f]{7,40}\Z")
 # The suffix is a recognized pre-release or build-metadata form, not any word:
 # a bare `-[0-9A-Za-z]+` exempted `v2-rewrite` and `v3-api`, which are feature
 # branches. A dot is required throughout, so a bare `v1` warns too.
-RX_TAG = re.compile(r"\A[vV]?\d+(?:\.\d+)+"
+VALUE_OPTIONS = frozenset({
+    "--grep", "--author", "--committer", "--since", "--until", "--before",
+    "--after", "--format", "--pretty", "--output", "-S", "-G", "-L", "-C",
+    "-O", "--git-dir", "--work-tree",
+})
+RX_TAG = re.compile(r"\A(?:[vV]\d+(?:\.\d+)+|\d+(?:\.\d+){2,})"
                     r"(?:-(?:rc|alpha|beta|pre|dev|snapshot)[0-9.]*)?"
                     r"(?:\+[0-9A-Za-z][0-9A-Za-z.]*)?\Z")
 # `[^\n]*` after the delimiter is load-bearing: `cat <<'EOF' > f.md` puts a
@@ -189,8 +199,9 @@ when it is not.
 
 A base that is BEHIND its remote widens the diff, so a review runs on
 already-merged work by other people and returns findings against code this
-branch never touched. A base that has DIVERGED narrows it, so part of the
-change is never reviewed at all and the verdict comes back clean. Neither is
+branch never touched. A base that has DIVERGED, in commits the head branch
+also carries, narrows it -- so part of the change is never reviewed at all and
+the verdict comes back clean. Neither is
 announced: a 53-file diff and a 14-file diff look equally plausible, and every
 finding either produces is individually well-formed.
 
@@ -201,7 +212,8 @@ Resolve the base from a remote-tracking ref, after fetching that remote:
     git -C <repo> diff --shortstat "$BASE" <head-ref>
     gh pr view <N> --json changedFiles,additions,deletions
 
-The last two readings must agree; a mismatch means the base is wrong.
+The last two readings must agree. A mismatch means one of the two refs is
+wrong -- re-fetch the head before concluding it was the base.
 Resolve the default branch from the repo rather than assuming `main`, and note
 the remote is not always `origin`.
 
@@ -209,6 +221,36 @@ If the base is deliberately local -- comparing two branches you just built, or
 inspecting your own work in progress -- carry on. This is a reminder, not a
 refusal, and it does not know which kind of comparison this is.
 """
+
+
+def inside_quotes(body, pos):
+    """True when `pos` falls inside an unterminated quote in `body`.
+
+    The separator class admits `\n`, because a multi-line shell script's second
+    line really is a command position. But a newline also occurs inside a
+    quoted argument --- a `gh pr comment --body` or `git commit -m` body of more
+    than one line --- and there the anchor would re-arm inside exactly the
+    string it exists to exclude.
+
+    Rather than removing `\n` (which would blind the hook to every multi-line
+    script), track quote state. This subsumes the special cases the anchor was
+    patched for one at a time: `(`, a backtick, and the words `then` and `do`
+    were each excluded because each occurs inside quoted prose, and this test
+    answers that question directly.
+    """
+    single = double = False
+    i = 0
+    while i < pos and i < len(body):
+        ch = body[i]
+        if ch == "\\" and not single:
+            i += 2
+            continue
+        if ch == "'" and not double:
+            single = not single
+        elif ch == '"' and not single:
+            double = not double
+        i += 1
+    return single or double
 
 
 def strip_heredocs(command):
@@ -295,12 +337,16 @@ def is_local_branch_base(token, remotes):
 RX_DASH_C = re.compile(r"(?<![A-Za-z0-9-])git\s+-C\s+('[^']*'|\"[^\"]*\"|\S+)")
 
 
-def target_repo(command, default):
-    """The repository a `git -C <path> ...` command operates on.
+def target_repo(command, session_cwd):
+    """The repository a `git -C <path> ...` command names, or None.
 
     Without this, a `git -C /other/repo diff feature/x...HEAD` is classified
     against the SESSION's remote list rather than that repository's --- which
     is this fragment's own substitution, committed by its own instrument.
+
+    Returns None rather than a fallback so the caller can distinguish "this
+    text names a repository" from "it does not", which the two call sites
+    answer differently.
 
     `--git-dir=` is NOT handled: it names a git directory rather than a working
     tree, so recovering the repository from it is a second lookup. Such a
@@ -308,35 +354,43 @@ def target_repo(command, default):
     unresolved half of this function.
     """
     if not isinstance(command, str):
-        return default
+        return None
     match = RX_DASH_C.search(command)
     if not match:
-        return default
+        return None
     path = os.path.expanduser(match.group(1).strip("'\""))
     if not os.path.isabs(path):
         # Relative to the SESSION's cwd, not to wherever the hook process
         # happens to sit --- resolving it against the latter would classify
-        # the base against a third repository, which is this fragment's own
-        # substitution committed by its own instrument.
-        path = os.path.join(default, path)
-    return path if os.path.isdir(path) else default
+        # the base against a third repository.
+        path = os.path.join(session_cwd or os.curdir, path)
+    return path if os.path.isdir(path) else None
 
 
-def stale_bases(text, remotes, pattern):
+def stale_bases(text, remotes, pattern, quote_aware=False):
     """Return the bare-local-branch bases of any git range in `text`."""
     if not isinstance(text, str) or not text:
         return []
     body = strip_heredocs(text)
     found = []
     for match in pattern.finditer(body):
+        if quote_aware and inside_quotes(body, match.start()):
+            continue
         # Only this command's own arguments, up to a separator.
         tail = re.split(r"[\n;|&]", body[match.end():], maxsplit=1)[0]
+        skip_next = False
         for token in tail.split():
             # `--` ends the ref arguments; everything after it is a pathspec.
             if token == "--":
                 break
-            # An option, and an option's `=` value, are not refs.
+            # An option is not a ref, and neither is the value of one that
+            # takes a separate argument --- `git log --grep main...HEAD`
+            # searches for a pattern, it does not read a range.
             if token.startswith("-"):
+                skip_next = token in VALUE_OPTIONS
+                continue
+            if skip_next:
+                skip_next = False
                 continue
             for base, _dots, _head in RX_RANGE.findall(token):
                 if not is_local_branch_base(base, remotes):
@@ -417,13 +471,24 @@ def main():
             return 0
 
         cwd = payload.get("cwd") or os.getcwd()
-        if tool_name == "Bash":
-            cwd = target_repo(tool_input.get("command"), cwd)
-        remotes = remote_names(cwd)
+        source = tool_input.get("command") if tool_name == "Bash" else " ".join(
+            t for t in texts if isinstance(t, str))
+        resolved = target_repo(source, cwd)
+        remotes = remote_names(resolved or cwd)
+        if tool_name in BRIEF_TOOLS and resolved is None:
+            # A brief routinely describes ANOTHER repository, and nothing in it
+            # says which. Classifying `github/main` or `hc2-gitlab/main`
+            # against the session's remote list would warn on a correct
+            # remote-tracking base --- on the measured incident's own fix, since
+            # `github/main` is the right answer there and this repository has no
+            # `github` remote. So a brief that names no `-C` path is judged
+            # permissively, accepting the extra false negatives.
+            remotes = remotes | FALLBACK_REMOTES
 
         bases = []
+        quote_aware = tool_name == "Bash"
         for text in texts:
-            for base in stale_bases(text, remotes, pattern):
+            for base in stale_bases(text, remotes, pattern, quote_aware):
                 if base not in bases:
                     bases.append(base)
         if not bases:

@@ -233,8 +233,9 @@ gh pr view <N> --json changedFiles,additions,deletions
 ```
 
 The two readings must agree.
-A mismatch is not a rounding difference or a merge artifact;
-it means the base is wrong.
+A mismatch means one of the two refs is wrong, and the base is only the first place to look: the local copy of the *head* goes stale the same way, so a PR that has received commits since you fetched it disagrees with a perfectly correct base.
+Re-fetch the head before concluding anything about the base. (Rename detection is a smaller third cause, since `diff.renames` is on by default and the forge counts renames its own way.)
+This section is about attributing a discrepancy to the wrong artifact, so a single diagnosis for a symptom with several causes is the failure it describes rather than a shortcut past it.
 Resolve the default branch from the repo rather than assuming `main`, and note the remote is not always `origin` --- a dual-forge repo has the PR's forge under a second remote name, and the fetch has to name that one.
 
 The `fetch` is the load-bearing half, for the reason the working-directory section already gives: a remote-tracking ref is itself a cached copy, current only to the last fetch.

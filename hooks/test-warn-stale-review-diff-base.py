@@ -118,6 +118,14 @@ WARN_CASES = [
      "a loop body is a command position -- the review-dispatch shape"),
     ("sudo git diff main...pr-98",
      "a wrapper word does not hide the command"),
+    ("git diff 3.11...HEAD",
+     "a bare two-component dotted name is the maintenance-branch convention, "
+     "not unambiguously a tag"),
+    ("git diff 2.0...HEAD",
+     "same"),
+    ("printf 'a\nb\n' && git diff main...pr-98",
+     "a newline in a quoted argument does not stop a later real command "
+     "position from firing"),
     ("git fetch origin && git diff main...pr-98",
      "a fetch in the same command line does not discharge: the hook keys on "
      "the ref named, not on freshness it cannot measure"),
@@ -135,7 +143,9 @@ SILENT_CASES = [
     ("git diff v1.2.0...v1.3.0",
      "version tags are immutable"),
     ("git diff 1.2.0...HEAD",
-     "a dotted version needs no `v` prefix to be unambiguous"),
+     "three components are unambiguous without a `v` prefix"),
+    ("git diff v1.2...HEAD",
+     "two components are, with one"),
     ("git diff --cached",
      "no range at all"),
     ("git diff DESCRIPTION",
@@ -167,6 +177,14 @@ SILENT_CASES = [
      "inside a comment body"),
     ("git commit -m 'see `git diff main...HEAD` for scope'",
      "same, in a commit message"),
+    ('gh pr comment 98 --body "the scope was wrong.\n'
+     'git diff main...pr-98 produced 53 files.\nfixed now"',
+     "a newline INSIDE a quoted body is not a command position, even though a "
+     "newline between commands is"),
+    ('git commit -m "line one\ngit diff main...HEAD is wrong"',
+     "same, in a multi-line commit message"),
+    ("git log --grep main...HEAD",
+     "a space-separated option value is not a range"),
     ("git diff v1.2.0-rc1...HEAD",
      "a recognized pre-release suffix is still a tag"),
     ("git diff origin/main...HEAD -- a.b..c.d",
@@ -242,27 +260,39 @@ for _base, _want in (("origin/main", "silent"), ("hc2-gitlab/main", "WARN")):
     print(f"{_got:<7} a nonexistent cwd falls back to the default remote names "
           f"({_base} -> {_want})")
 
-# `origin` is a real remote of this repository, so the real list exempts it.
-# `fork` is not, and the fallback set contains it -- so if the fallback were
-# unioned in on the success path (rather than used only on failure), a LOCAL
-# branch named `fork/x` would be exempt in every repository.
-_proc = subprocess.run(
-    [sys.executable, HOOK],
-    input=json.dumps({"tool_name": "Bash",
-                      "tool_input": {"command": "git diff fork/x...HEAD"},
-                      "cwd": REPO_ROOT}),
-    capture_output=True, text=True,
-)
-total += 1
-_ok = _proc.returncode == 0 and "additionalContext" in _proc.stdout
-wrong += not _ok
-print(f"{'WARN' if _ok else 'silent':<7} a fallback name is NOT exempt in a "
-      "repo whose real remote list omits it")
+# A fallback name must NOT be exempt in a repository whose real remote list
+# omits it. Pinned against a scratch repo rather than this checkout, since a
+# contributor who has run `git remote add fork ...` -- the convention the
+# fallback set exists for -- would otherwise see a spurious local failure.
+_forkless = tempfile.mkdtemp()
+try:
+    subprocess.run(["git", "init", "-q", _forkless], check=True,
+                   capture_output=True)
+    subprocess.run(["git", "-C", _forkless, "remote", "add", "origin",
+                    "https://example.invalid/r.git"], check=True,
+                   capture_output=True)
+    _proc = subprocess.run(
+        [sys.executable, HOOK],
+        input=json.dumps({"tool_name": "Bash",
+                          "tool_input": {"command": "git diff fork/x...HEAD"},
+                          "cwd": _forkless}),
+        capture_output=True, text=True,
+    )
+    total += 1
+    _ok = _proc.returncode == 0 and _proc.stdout.strip()
+    wrong += not _ok
+    print(f"{'WARN' if _ok else 'silent':<7} a fallback name is NOT exempt in "
+          "a repo whose real remote list omits it")
+finally:
+    shutil.rmtree(_forkless, ignore_errors=True)
 
 # A repository whose remote is named something other than `origin`. This pins
 # that the real `git remote` output is consulted rather than a guessed set:
 # `hc2-gitlab` is in no fallback list, so only a live read can exempt it.
+# Both temp roots are created BEFORE the try, so the finally block cannot
+# raise NameError over a `git init` failure and hide the real cause.
 _scratch = tempfile.mkdtemp()
+_home = tempfile.mkdtemp()
 try:
     subprocess.run(["git", "init", "-q", _scratch], check=True,
                    capture_output=True)
@@ -271,8 +301,14 @@ try:
                    capture_output=True)
 
     # The same repository reachable as `~/repo`, for the expanduser case.
-    _home = tempfile.mkdtemp()
-    os.symlink(_scratch, os.path.join(_home, "repo"))
+    # A platform without symlink privilege skips that one case loudly rather
+    # than failing the suite.
+    try:
+        os.symlink(_scratch, os.path.join(_home, "repo"))
+        _can_symlink = True
+    except (OSError, NotImplementedError) as _exc:
+        _can_symlink = False
+        print(f"SKIP    expanduser case: cannot create a symlink ({_exc})")
     _proc = subprocess.run(
         [sys.executable, HOOK],
         input=json.dumps({"tool_name": "Bash",
@@ -326,20 +362,22 @@ try:
 
     # `~` must be expanded before the path is tested, or the command is
     # classified against the session repository instead.
-    _proc = subprocess.run(
-        [sys.executable, HOOK],
-        input=json.dumps({"tool_name": "Bash",
-                          "tool_input": {"command":
-                                         "git -C ~/repo diff "
-                                         "hc2-gitlab/main...HEAD"},
-                          "cwd": REPO_ROOT}),
-        capture_output=True, text=True,
-        env=dict(os.environ, HOME=_home),
-    )
-    total += 1
-    _ok = _proc.returncode == 0 and not _proc.stdout.strip()
-    wrong += not _ok
-    print(f"{'silent' if _ok else 'WARN':<7} a `~` in a `-C` path is expanded")
+    if _can_symlink:
+        _proc = subprocess.run(
+            [sys.executable, HOOK],
+            input=json.dumps({"tool_name": "Bash",
+                              "tool_input": {"command":
+                                             "git -C ~/repo diff "
+                                             "hc2-gitlab/main...HEAD"},
+                              "cwd": REPO_ROOT}),
+            capture_output=True, text=True,
+            env=dict(os.environ, HOME=_home),
+        )
+        total += 1
+        _ok = _proc.returncode == 0 and not _proc.stdout.strip()
+        wrong += not _ok
+        print(f"{'silent' if _ok else 'WARN':<7} a `~` in a `-C` path is "
+              "expanded")
 
     # A relative `-C` path resolves against the SESSION cwd, not the hook
     # process's. `hc2-gitlab` is exempt only if the right repo was read.

@@ -22,8 +22,10 @@ in others), which is why a use-site grep is the wrong query as well.
 
 The bodies are identical, and so is the heredoc defect `_heredoc_free` fixes
 below -- which is the argument for a module rather than a ninth copy. Those
-eight are NOT rewired here: migrating eight live guards, three of them denying,
-is its own change with its own review, tracked as ai-config#2993. This module
+eight are NOT rewired here: migrating eight live guards, two of which can
+REFUSE (`no-clobbering-push.py` denies, `no-unreviewed-pr.py` blocks; the
+other six only add context), is its own change with its own review, tracked
+as ai-config#2993. This module
 is where the fix landed and where new callers import from.
 
 WHY AN ARGV SPLIT RATHER THAN A REGEX
@@ -44,7 +46,7 @@ The heredoc pre-pass and the newline rewrite run on RAW TEXT, ahead of `shlex`,
 so neither knows the quoting rules the paragraph above credits `shlex` with.
 State that here rather than letting the argv-split argument imply otherwise --
 this docstring is the contract ai-config#2993 will migrate eight live guards
-onto, three of them denying.
+onto, two of which can refuse.
 
   * `RX_HEREDOC` is QUOTE-BLIND. A `<<` inside a quoted argument -- a commit
     message that mentions a heredoc, say -- can be treated as a real operator,

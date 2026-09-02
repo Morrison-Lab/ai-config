@@ -137,6 +137,17 @@ passes.
 
 ### 2. Classify each PR by bump size
 
+Record the head and the base before classifying,
+since the classification, every read in step 3, and the merge in step 4 are claims about one SHA on one target,
+and Dependabot can replace the head between any two of them:
+
+```bash
+PINNED=$(gh pr view "$N" --repo "$REPO" --json headRefOid -q .headRefOid)   # VIEW_PR
+BASE=$(gh pr view "$N" --repo "$REPO" --json baseRefName -q .baseRefName)   # VIEW_PR; a retarget at the same tip must not pass
+```
+
+If the head or the base name changes before the merge lands, start again from here, classification included.
+
 Parse the version pair out of the title (`... from X to Y`) and compare the
 leading number:
 
@@ -147,7 +158,8 @@ leading number:
   don't respect patch semantics either — don't wave these through as safe.
 - **major** — leading number increases (`4 → 7`, `2 → 3`, `1 → 2`) → **review**.
 - **submodule** (`chore(submodule):`) — no semver; it tracks a moving branch by
-  design. Treat a green submodule bump as **safe** (auto-advancing the pointer
+  design.
+  Treat a green submodule bump as **safe** (auto-advancing the pointer
   is the whole point), unless the diff is unexpectedly large.
   If the repository has migrated to a native plugin for the vendored tool (e.g. `ai-config` as a plugin), close the bump PR and remove the redundant submodule instead per [`remove-redundant-plugin-submodules.md`](../../shared/workflow/remove-redundant-plugin-submodules.md).
 
@@ -155,17 +167,6 @@ When the title has no parseable version (some Renovate digests), fall back to
 the PR body's update table or treat it as **review**.
 
 ### 3. Verify CI is fully green
-
-Record the head before reading anything else in this step,
-since every read below and the merge in step 4 are claims about one SHA,
-and Dependabot can replace the head between two reads:
-
-```bash
-PINNED=$(gh pr view "$N" --repo "$REPO" --json headRefOid -q .headRefOid)   # VIEW_PR
-BASE=$(gh pr view "$N" --repo "$REPO" --json baseRefName -q .baseRefName)   # VIEW_PR; a retarget at the same tip must not pass
-```
-
-If the head or the base name changes before the merge lands, start this step again from here.
 
 A bump is only "safe to merge" if every required check passes. `skipping` is
 fine (path-filtered jobs); `pending` means wait, `fail` means stop.
@@ -193,7 +194,7 @@ Dashboard) — `@dependabot` comment commands do nothing on Renovate PRs.
 
 ### 4. Safe bumps (patch / minor / submodule + green) → merge
 
-Require the live head to equal the `$PINNED` and the live base name to equal the `$BASE` recorded at the top of step 3, immediately before the merge command.
+Require the live head to equal the `$PINNED` and the live base name to equal the `$BASE` recorded at the top of step 2, immediately before the merge command.
 A regenerated head that already contains the base would otherwise pass a currency check with CI never read for it.
 Then, when the base does not require a merge queue, run the base-currency check from [`fully-clean`](../../shared/workflow/fully-clean.md)'s stale-base rule (the Do bullets beginning "for a direct merge"), since a green head can still break the base when the base gained a check after the head's CI ran.
 When the base requires a merge queue, skip the check and the update.

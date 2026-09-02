@@ -1186,6 +1186,9 @@ and every clean-gate check is a required status check on the base, or is aggrega
 A clean-gate check the queue cannot block on is a check the queue does not run as a gate.
 
 The rule splits by merge mode: a direct merge from a session with `git` and `gh`, a direct merge from a remote session without `git`, and a merge queue.
+It binds every direct-merge path, including the dependency-bump merges in [`chores`](../../skills/chores/SKILL.md), not only `mwc` and `merge-it`.
+A deferred merge (`gh pr merge --auto`, or a `@dependabot` merge command) runs after any check made before the command, so it is safe only where the base requires an up-to-date branch or a correctly configured queue tests the merge.
+Elsewhere merge synchronously, right after the check.
 
 - **Do:** for a direct merge from a session with `git` and `gh`, before the merge command, fetch the PR's configured base and confirm the merge-base with the live PR head is that base's current tip.
   Until [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) wires this into `check-pr-fully-clean.py`, which [`mwc`](../../skills/mwc/SKILL.md) already runs, both [`mwc`](../../skills/mwc/SKILL.md) and [`merge-it`](../../skills/merge-it/SKILL.md) name it as a manual step after their readiness check and before the merge command:

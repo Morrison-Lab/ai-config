@@ -119,7 +119,7 @@ For a Renovate PR, tick the rebase checkbox in the PR body (or its Dependency Da
 
 ### 4. Safe bumps (patch / minor / submodule + green) → merge
 
-Merge directly. Dependabot deletes its own branch on merge.
+Run the base-currency check from [`fully-clean`](../../shared/workflow/fully-clean.md)’s stale-base rule first (the Do bullets beginning “for a direct merge”), since a green head can still break the base when the base gained a check after the head’s CI ran. Then merge directly. Dependabot deletes its own branch on merge.
 
 ``` bash
 gh pr merge "$N" --repo "$REPO" --squash   # MERGE_PR
@@ -127,13 +127,13 @@ gh pr merge "$N" --repo "$REPO" --squash   # MERGE_PR
 
 Pick a merge method the repo actually allows — `--squash` errors when squash merges are disabled; swap in `--merge` or `--rebase` to match the repo’s settings.
 
-If checks are still running and you want it to land once they pass:
+If checks are still running and you want it to land once they pass, and only where the repository requires an up-to-date branch before merging or a correctly configured merge queue tests the merge (a deferred merge runs after the base-currency check, so elsewhere the check is stale by the time it fires):
 
 ``` bash
 gh pr merge "$N" --repo "$REPO" --squash --auto   # MERGE_PR — needs auto-merge enabled; swap --squash for --merge/--rebase if squash is disabled
 ```
 
-For **Dependabot** you can also hand the merge back to the bot — it waits for CI, merges, and deletes its branch (handy when the branch needs a rebase first):
+For **Dependabot** you can also hand the merge back to the bot, under the same up-to-date-branch or queue condition as `--auto` — it waits for CI, merges, and deletes its branch (handy when the branch needs a rebase first):
 
 ``` bash
 gh pr comment "$N" --repo "$REPO" --body "@dependabot squash and merge"   # COMMENT_PR — Dependabot only

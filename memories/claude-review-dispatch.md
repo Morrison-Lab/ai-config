@@ -488,3 +488,29 @@ embedded directly in PR issue comments and formal reviews via
    the payload with code-fence, inline-span, and indented-block masking,
    verdict normalization, and contradiction checks (e.g., rejecting `CLEAN`
    verdicts that list unresolved findings).
+
+## The reviewer's sandbox is not the CI container: a check that fails there can pass in CI
+
+A review run that installs a tool in its own sandbox and re-runs a repo check
+is testing the sandbox, not the workflow.
+Measured 2026-09-01 on Morrison-Lab/wai#187: the `@claude` review installed
+R plus `spelling`/`hunspell` in its sandbox, ran the PR's new chapter
+spellcheck, and reported ten misspelled words (`config`, `JSON`, `macOS`,
+`repo`, ...) as a blocking CI failure, while the Spellcheck job on the same
+head had already run the same script in `rocker/verse:latest` and printed
+`No spelling errors found.`
+The two containers resolved different `en_US` dictionaries.
+
+The job log is the authority for "does this check pass in CI"; a sandbox
+reproduction is evidence about the sandbox.
+Adding the ten words to the wordlist anyway was cheap and made the check
+robust across dictionaries, which is the right disposition when the fix is
+harmless, but the finding's premise still needed correcting in the ARD
+table so the next round did not re-derive it.
+
+- **Do:** read the workflow job's log for the step in question before
+  accepting a reviewer's "this fails in CI" claim, and cite the log in the
+  ARD disposition.
+- **Don't:** treat a reviewer sandbox's failure as a reproduction of the CI
+  run, or push a fix for it without saying which container it reproduces
+  in.

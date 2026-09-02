@@ -139,9 +139,12 @@ does not exist:
 
 ```bash
 # Branches checked out in ANY worktree cannot be deleted. clean-branches 8a
-# gets this free from the `*` prefix its column-anchored grep filters, but
-# `--format` prints no `*`/`+` marker at all, so switching to it to dodge the
-# `+` mangling ALSO drops that protection. Derive the set explicitly instead.
+# now lists with `--format` too (ai-config#1882), which prints no `*`/`+`
+# marker, so neither skill filters checked-out branches by prefix any more.
+# 8a leaves them to `git branch -d`'s own refusal. This skill cannot: its
+# classification runs before the confirmation gate, which forbids any delete
+# attempt, so it derives the set read-only here and filters the 8a
+# candidates with it below.
 git worktree list --porcelain -z | tr '\0' '\n' \
   | awk '/^branch /{b=substr($0,8); sub("refs/heads/","",b); print b}' \
   | sort -u > "$TMP/checked-out.txt"

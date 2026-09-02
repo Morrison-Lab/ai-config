@@ -341,10 +341,17 @@ current branch):
 #### a. Merged into main → delete
 
 ```bash
-git branch --merged origin/main | grep -vE '^\s*\*|^\s*main\s*$|^\s*master\s*$'
-# Line-anchored so only the literal `main`/`master` lines (and the current `*`
-# branch) are excluded — a branch like `maintain-docs` or `feature-main-menu`
-# is NOT silently filtered out.
+git branch --merged origin/main --format='%(refname:short)' \
+  | grep -vxE 'main|master'
+# --format gives plain names. Plain `git branch` prefixes the current branch
+# with `*` and a branch checked out in a linked worktree with `+`, so a
+# column-anchored grep on the plain listing mangled such a name into
+# `+ feature/foo` and the delete below failed on it (ai-config#1882; the
+# clean-worktrees skill's step 3c records the same hazard). `grep -vx`
+# matches whole lines, so only the literal `main`/`master` are excluded, so a
+# branch like `maintain-docs` or `feature-main-menu` is NOT silently filtered
+# out. The current branch and any worktree-checked-out branch still appear;
+# `git branch -d` refuses both, which is the safety net below.
 # Compare against origin/main (just fetched), NOT local `main` — your local main
 # may be behind, which would hide branches that are actually merged.
 git branch -d <branch>          # -d refuses if NOT actually merged — a safety net

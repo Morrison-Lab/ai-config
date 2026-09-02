@@ -703,3 +703,15 @@ stay a prose instruction;
 
 (Pattern observed in `scdenney/open-science-skills`'s `citation-check`, CC BY-NC 4.0 --- pattern only, nothing copied;
 ai-config#882.)
+
+## A cross-reference by heading quotes the heading, or does not claim to
+
+A cross-reference of the form "see the section of the same name in X" asserts that X carries a heading identical to the one here.
+That is a claim about another file's text, and it is checkable by one grep --- so check it, and when the headings differ, say "the same rule" (or name the target heading verbatim) rather than "the same name".
+The near-miss is writing "same name" from memory of what the sibling entry is *about*, which reads as a precise pointer and sends the reader looking for a heading that is not there.
+
+- **Do:** grep the target file for the heading before writing "of the same name", and quote it verbatim when it differs.
+- **Don't:** write "the section of the same name" as a synonym for "the corresponding section".
+
+(Review finding on ai-config#2924, 2026-09-01: a `memories/delegation.md` entry pointed at `CLAUDE.md`'s "section of the same name", and the two headings differed;
+reworded to "section of the same rule".)

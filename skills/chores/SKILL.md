@@ -203,7 +203,7 @@ and recheck currency and that the head is still that SHA immediately before merg
 `gh api -X PUT "repos/$REPO/pulls/$N/update-branch" -f expected_head_sha="$PINNED"` merges the base in, pinned to the head whose CI was read.
 A `422` whose message names an expected-head mismatch (match on the substring `expected head sha`, since the live text carries a curly apostrophe and a trailing period that this ASCII rendering cannot show) means the bot or another writer already replaced that head, so re-read before touching it.
 Any other `422` is a failed update: stop and read the message.
-`@dependabot rebase` rewrites the head onto it and also clears a conflict.
+`@dependabot rebase` rewrites the head onto the base branch and also clears a conflict.
 Then merge directly.
 Dependabot deletes its own branch on merge.
 

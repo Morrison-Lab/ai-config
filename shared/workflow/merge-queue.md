@@ -123,7 +123,7 @@ jobs:
 | **Strict branch protection without queue** | O(N^2) | Low (always tested against latest base) | High (serial `update-branch` chasing) |
 | **Non-strict branch protection (`strict: false`)** | O(N) | Medium (disjoint changes merge cleanly, but semantic conflicts reach `main`) | Low (immediate merge on approval) |
 | **Manual batch trains (integration branch)** | O(N) | Low (tested together on train branch) | High (manual branch coordination and cherry-picking) |
-| **GitHub Merge Queue** | O(N) or O(N / K) | Low (speculative merge testing guarantees clean `main`) | Minimal (automated queue handoff) |
+| **GitHub Merge Queue** | O(N) or O(N / K) | Low (speculative merge testing guarantees clean `main` when every clean-gate check is required and runs on `merge_group`) | Minimal (automated queue handoff) |
 
 - **Do:** enable `merge_group` event triggers on all workflows that provide required status checks.
 - **Do:** use merge queues to automate pre-merge speculative testing when landing multiple PRs in parallel.

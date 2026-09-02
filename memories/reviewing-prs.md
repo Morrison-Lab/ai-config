@@ -65,6 +65,24 @@ A later request to iterate is a driving request.
 branch, not when you were asked only to read it.
 See also [`shared/workflow/ardi.md`](../shared/workflow/ardi.md).
 
+## Keep incidental CI repairs out of the feature PR
+
+When a failing check exposes a workflow defect unrelated to a PR's stated
+change, restore that PR's original diff and deliver the workflow repair through
+its own issue and PR. Mixing the repair into the affected feature PR obscures
+review scope and makes the feature's CI result depend on an unrelated
+permission or infrastructure change.
+
+The separate workflow PR can verify the repair directly; after it merges,
+re-run the original PR's checks against the corrected default-branch workflow.
+
+[ucdavis/rampp#155](https://github.com/ucdavis/rampp/pull/155), 2026-09-02:
+the Claude review job failed during its OIDC app-token exchange because the
+workflow granted `contents: read`. The temporary `contents: write` repair was
+reverted from the internal-documentation PR, then tracked in
+[issue 156](https://github.com/ucdavis/rampp/issues/156) and isolated in
+[PR 157](https://github.com/ucdavis/rampp/pull/157).
+
 ## Only work PRs I opened, am assigned to, or asked for by name, or the Actions app authored
 
 Work only on pull requests opened by me (`d-morrison` or `dem-extra1`),

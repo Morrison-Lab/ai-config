@@ -57,7 +57,8 @@ without asking confirmation before every merge.
   [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) wires it
   into the instrument, and no manual check under a merge queue whose
   required checks cover the whole clean gate on `merge_group`.
-  On a direct merge a stale merge-base means `gh pr update-branch`
+  On a direct merge a stale merge-base means `gh pr update-branch`,
+  a wait until `headRefOid` changes (the update is asynchronous),
   and a full re-run of the gate on the new head.
 - **Session Duration**: The grant expires automatically when the session ends
   or when explicitly revoked via `/mwc revoke` or `disable-mwc`.

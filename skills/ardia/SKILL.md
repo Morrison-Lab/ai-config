@@ -48,7 +48,7 @@ mutates a PR stays serial.
      Such a child is driven only while its base is clean or merged.
      An open, unclean out-of-scope base is left to its author, and the child is parked and reported with it, per the stacked-PR rule in step 3.
      "Every open PR" anywhere in this skill means every PR that survives this filter.
-     An out-of-scope PR (one that fails this test: another lab member's, or any other bot's, such as Dependabot's or a Copilot agent's) is not driven, reviewed, or edited, however clean it looks (see `memories/reviewing-prs.md`, "Only work PRs I opened, am assigned to, or asked for by name, or the Actions app authored";
+     An out-of-scope PR (one that fails this test: another lab member's or another bot's, such as Dependabot's or a Copilot agent's, that is neither assigned to the user nor explicitly requested) is not driven, reviewed, or edited, however clean it looks (see `memories/reviewing-prs.md`, "Only work PRs I opened, am assigned to, or asked for by name, or the Actions app authored";
      measured on `UCD-SERG/serodynamics` 2026-09-01, where the sweep drove four other authors' PRs before the correction arrived).
    - **Include drafts** (`isDraft: true`) unless another agent is actively driving one.
      A draft is the corpus's own in-flight claim signal ---

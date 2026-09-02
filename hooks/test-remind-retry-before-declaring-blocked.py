@@ -425,12 +425,30 @@ sdir = tempfile.mkdtemp()
 try:
     one = write_transcript([use("t1"), denial("t1")])
     two = write_transcript([use("t1"), denial("t1"), use("t2"), denial("t2")])
-    # Two commands denied in the SAME turn, neither retried. The newest is
-    # reported first, and the older one must still surface on a later prompt
-    # rather than being lost behind the newer one's sentinel.
+    # Two commands denied in the SAME turn, neither retried. The oldest is
+    # reported first, and the newer one must still surface on a later prompt
+    # rather than being lost behind the older one's sentinel.
     both = write_transcript([
         use("t1", "git push origin alpha"), denial("t1"),
         use("t2", "git push origin beta"), denial("t2")])
+    # The same question, interleaved: the original command is denied, a
+    # workaround is denied, and then the original is denied again. Sorting on
+    # each command's LAST denial puts the workaround first here, which is what
+    # the ordering exists to prevent; sorting on its FIRST denial does not.
+    # `both` above cannot see the difference, because one denial each makes
+    # first and last the same index.
+    interleaved = write_transcript([
+        use("t1", "git push origin alpha"), denial("t1"),
+        use("t2", "update-config add allow rule"), denial("t2"),
+        use("t3", "git push origin alpha"), denial("t3")])
+    # A multi-line command. The message asks for a byte-identical re-run and
+    # quotes the command underneath, so the quoted form must be the command
+    # itself: collapsing the newline turns `... 2>&1\necho x` into
+    # `... 2>&1 echo x`, a different command in shell, invisibly.
+    multiline = write_transcript([
+        use("t1", "gh secret delete TOKEN -R Morrison-Lab/qmt 2>&1\n"
+                  "echo '--- secrets now ---'"),
+        denial("t1")])
     # Pattern 43's measured shape: one goal in three phrasings, each denied
     # once. Every variant carries a stretch and total of 1, so a warning
     # attached to either count fires zero times here -- which is the shape
@@ -490,9 +508,11 @@ try:
         out_noreset = [(invoke(t, sdir), d) for t, d in noreset]
         out_failed = invoke(failed_run, sdir)
         out_variants = invoke(variants, sdir)
+        out_interleaved = invoke(interleaved, sdir)
+        out_multiline = invoke(multiline, sdir)
     finally:
-        for p in (one, two, both, reset, failed_run, variants,
-                  *[t for t, _ in noreset]):
+        for p in (one, two, both, reset, failed_run, variants, interleaved,
+                  multiline, *[t for t, _ in noreset]):
             os.unlink(p)
     content += [
         ("Re-run the same command once" in out_one,
@@ -500,10 +520,10 @@ try:
         ("denied once so far" in out_one,
          "one denial: supplies the measured wording"),
         (PUSH in out_one, "one denial: names the denied command"),
-        # #2994's success WAS the third attempt after two denials, so a
-        # second-denial message whose only imperative was "hand the user the
-        # decision" would stop the session one attempt short of the thing
-        # that worked -- the incident, reproduced by following the hook.
+        # #2994's success came after three denials, so a second-denial
+        # message whose only imperative was "hand the user the decision"
+        # would stop the session short of the thing that worked -- the
+        # incident, reproduced by following the hook.
         ("denied 2 times so far" in out_two,
          "two denials: reports the count, not 'cannot'"),
         # Oldest first. The original command is the one the evidence is
@@ -527,6 +547,14 @@ try:
          "an allowed run restores the retry advice"),
         ("denied a tool call once in a row" in out_failed,
          "a run the classifier allowed resets it even if it failed"),
+        ("git push origin alpha" in out_interleaved.split("denied:")[1]
+         .split("A denial is a sample")[0],
+         "interleaved denials: ordered by each command's FIRST denial"),
+        ("gh secret delete TOKEN -R Morrison-Lab/qmt 2>&1\n"
+         in out_multiline,
+         "a multi-line command is quoted with its newlines intact"),
+        ("2>&1 echo" not in out_multiline,
+         "and is not collapsed into a different shell command"),
         ("denied 3 distinct commands" in out_variants,
          "three phrasings of one goal reach the variation warning"),
         ("stop generating new shapes" in out_variants,
@@ -541,7 +569,7 @@ try:
         # bullet asks for.
         ("Pattern 43 says to stop probing" in out_two,
          "two denials: states Pattern 43's rule"),
-        ("succeeding on its third attempt" in out_two,
+        ("succeeding after three denials" in out_two,
          "two denials: states #2994's measurement beside it"),
         ("let them choose" in out_two,
          "two denials: hands the decision to the user"),

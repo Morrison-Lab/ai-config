@@ -3,15 +3,22 @@
 
 ai-config#2994, measured 2026-09-02 (PT): an
 `ALLOW_UNREVIEWED_PUSH=1 git push` was denied by the auto-mode permission
-classifier, re-run once and denied again, and an `update-config` edit adding the
-allow rule was denied too. The session then reported the path as permanently
+classifier three times, and the session reported the path as permanently
 closed -- in a blocking report to the user, in a project memory entry, and in a
 comment on this repo's own tracker. With no settings change and no permission
-rule added, the byte-identical push then succeeded on its third attempt.
+rule added, the byte-identical command then succeeded on the fourth attempt.
 
-Repeated identical denials do not FEEL like a claim. They feel like a
-measurement: the command ran, the system said no, twice, and a third route to
-the same goal was refused as well. So "I cannot do this" reads as reporting an
+How many of those three denials were the command ITSELF is not settled by the
+issue, and this file deliberately does not settle it either. #2994's headline
+says "three identical denials"; its narrative lists the push, one identical
+re-run, and an `update-config` edit adding the allow rule, which would make
+the success the third attempt of the command rather than the fourth. Every
+claim below is worded to hold under both readings, because the design turns on
+the success arriving after the point the session stopped -- not on which
+attempt number it was.
+
+Repeated denials do not FEEL like a claim. They feel like a measurement: the
+command ran, and the system said no, three times. So "I cannot do this" reads as reporting an
 observation rather than asserting a fact about the future, and none of the
 claim-checking rules that would otherwise fire (`metacognitive-monitoring.md`
 on a claim about state, `ardi.md` on verifying an asserted blocker) engages at
@@ -131,10 +138,10 @@ session to stop re-running, and that distinction is load-bearing enough to
 state twice, because the obvious message here would reproduce the incident
 exactly.
 
-#2994's measured success was the THIRD attempt, after two denials. A message
-answering the second denial with "hand the user the decision" and nothing else
-would stop the session one attempt short of the thing that worked -- which is
-precisely what the incident session did. So the second-denial branch says an
+#2994's success arrived after three denials, on either reading of how many
+were the command itself. A message answering the second denial with "hand the
+user the decision" and nothing else would stop the session short of the thing
+that worked -- which is precisely what the incident session did. So the second-denial branch says an
 identical re-run is still supported, and reserves "hand the user the decision"
 for the case where the session stops anyway.
 
@@ -154,7 +161,8 @@ it.
 
 On the second denial itself the hook states the tension and stops. Pattern
 43's Do bullet says to stop probing after the second denial of the same goal
-and hand the user the decision; #2994 measured the third attempt succeeding.
+and hand the user the decision; #2994 measured a success after three
+denials.
 Both are in this corpus, neither has been retired, and a guard is the wrong
 place to settle it -- so the message puts both to the user, which is what
 Pattern 43's Do bullet asks for anyway. Reconciling the two texts is tracked
@@ -206,11 +214,21 @@ BASH_TOOLS = (
 
 
 def identity(name, inp):
-    """Return (key, label) naming "the same command" across a retry.
+    """Return (key, raw) naming "the same command" across a retry.
 
-    Whitespace is collapsed deliberately. A re-attempt that differs only in
-    indentation or line wrapping IS a retry, and treating it as one produces
-    silence -- the safe direction for a guard that can only nag.
+    The KEY collapses whitespace deliberately: a re-attempt that differs only
+    in indentation or line wrapping IS a retry, and treating it as one
+    produces silence, the safe direction for a guard that can only nag.
+
+    The second return value is the command UNTOUCHED, because the two uses
+    pull opposite ways and sharing one string got it wrong. The message asks
+    for a byte-identical re-run and quotes the command underneath, so a
+    displayed line that merely matches is worse than useless: collapsing a
+    newline inside a multi-line script turns `... 2>&1\necho x` into
+    `... 2>&1 echo x`, which is a different command in shell, and the change
+    is invisible -- unlike the length truncation, which marks itself. A
+    session re-issuing the displayed text would produce exactly the reworded
+    variant this hook's own message warns against.
     """
     if not isinstance(inp, dict) or not name:
         return "", ""
@@ -221,10 +239,10 @@ def identity(name, inp):
             raw = json.dumps(inp, sort_keys=True, default=str)
         except Exception:
             return "", ""
-    label = " ".join(raw.split())
-    if not label:
+    collapsed = " ".join(raw.split())
+    if not collapsed:
         return "", ""
-    return name + "\x00" + label, label
+    return name + "\x00" + collapsed, raw
 
 
 def is_classifier_denial(record, block):
@@ -311,11 +329,11 @@ def read_transcript(path):
             if not isinstance(b, dict):
                 continue
             if b.get("type") == "tool_use":
-                key, label = identity(b.get("name") or "", b.get("input") or {})
+                key, raw = identity(b.get("name") or "", b.get("input") or {})
                 if key:
                     uses[b.get("id")] = (i, key)
                     attempts.append((i, key))
-                    labels[key] = label
+                    labels[key] = raw
             elif b.get("type") == "tool_result":
                 seen = uses.get(b.get("tool_use_id"))
                 if not seen:
@@ -340,11 +358,12 @@ def unretried(path):
     classifier has denied at all, which is the only visible trace of a
     session rephrasing one goal.
 
-    OLDEST first, which matters more than it looks. The newest denial is by
-    construction the most-varied last-ditch attempt, and the oldest is the
-    original command -- the one #2994 measured succeeding. Reporting newest
-    first replays that incident by naming the settings edit before the push,
-    and citing "with no settings change" as the reason to re-run it.
+    Ordered by each command's FIRST denial. The command denied earliest is
+    the original; a command first denied later is what the session reworded
+    it into. Reporting the newest first replays #2994 by naming the settings
+    edit before the push, and citing "with no settings change" as the reason
+    to re-run it -- and ordering by each command's most RECENT denial has the
+    same effect as soon as the session interleaves them.
     """
     attempts, denied, ran, labels = read_transcript(path)
     out = []
@@ -354,7 +373,11 @@ def unretried(path):
             continue
         floor = max(ran.get(key) or [-1])
         out.append((labels.get(key, ""), key,
-                    sum(1 for j in hits if j > floor), len(hits), last))
+                    sum(1 for j in hits if j > floor), len(hits), min(hits)))
+    # `min(hits)`, not `last`. Sorting on the most recent denial of each
+    # command reorders them whenever the session interleaves -- push denied,
+    # workaround denied, push denied again puts the workaround first, which is
+    # the ordering this sort exists to prevent.
     out.sort(key=lambda row: row[4])
     return [row[:4] for row in out if row[0]], len(denied)
 
@@ -371,7 +394,11 @@ def message(label, stretch, total, shapes=1):
     warning attached to a repeat count can never reach the shape Pattern 43
     actually measured.
     """
-    shown = label if len(label) <= 160 else label[:157] + "..."
+    # Indented block rather than an inline value, because the command is
+    # shown verbatim and may carry newlines. Truncation marks itself; the
+    # whitespace collapse this deliberately does NOT apply would not.
+    text = label if len(label) <= 300 else label[:297] + "..."
+    shown = "\n".join("      " + line for line in text.splitlines()) or "      "
     run = "once" if stretch == 1 else f"{stretch} times"
     session = "once" if total == 1 else f"{total} times"
     if stretch == total:
@@ -382,22 +409,21 @@ def message(label, stretch, total, shapes=1):
     head = (
         "Retry reminder: the auto-mode permission classifier " + seen +
         ", and no later call re-attempted it.\n"
-        f"  denied: {shown}\n"
+        "  denied:\n" + shown + "\n"
     )
     if stretch == 1:
         act = (
             "A denial is a sample, not a wall. ai-config#2994 measured a "
-            "byte-identical push succeeding on its third attempt, after two "
-            "denials, with no settings change and no permission rule added. "
-            "Re-run the same command once before treating this path as "
-            "closed.\n"
+            "byte-identical command succeeding after three denials, with no "
+            "settings change and no permission rule added. Re-run the same "
+            "command once before treating this path as closed.\n"
         )
     else:
         # Deliberately NOT a verdict either way. The corpus is in genuine
         # tension here: Pattern 43's Do bullet says stop probing after the
         # second denial of the same goal and hand the user the decision,
-        # while #2994 measured the third attempt of the same command
-        # succeeding. This hook is not the place to settle that, so it states
+        # while #2994 measured the same command succeeding after three
+        # denials. This hook is not the place to settle that, so it states
         # both and gives the decision to the person the Do bullet names.
         act = (
             "You have already re-run it, and the corpus pulls both ways from "
@@ -405,9 +431,9 @@ def message(label, stretch, total, shapes=1):
             "the classifier's second denial of the same goal and hand the "
             "user the decision (push manually, restart the session, add a "
             "permission rule); #2994 measured a byte-identical command "
-            "succeeding on its third attempt, after two denials. Put both to "
-            "the user and let them choose, rather than settling it by "
-            "declaring the path closed.\n"
+            "succeeding after three denials. Put both to the user and let "
+            "them choose, rather than settling it by declaring the path "
+            "closed.\n"
         )
     warn = ""
     if shapes > 1:

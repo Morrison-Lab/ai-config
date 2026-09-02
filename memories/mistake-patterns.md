@@ -934,7 +934,7 @@ A clean automated review from every available provider evaluating the current HE
 
 ## Pattern 46: Broad Multi-Surface Matching Without Surface Discrimination
 - **Do**: When extending a pre-tool hook or analyzer to new surfaces (e.g. extending forge comment guards to session notebooks or memory files), use surface-specific pattern matchers and extractors.
-  Require domain-specific markers (such as Pacific timezone indicators `PDT|PST|PT`) on general text surfaces and contextual indicators (heading, bullet, or parenthesized timestamps) for approximate `ish` stamps on session notebooks to prevent false positives on bare durations (such as `2:30ish` or `14:32`),
+  Require domain-specific markers (such as Pacific timezone indicators `PDT|PST|PT`) on general text surfaces and contextual indicators (heading, parenthesized, or context-word timestamps) for approximate `ish` stamps on session notebooks to prevent false positives on bare durations (such as `2:30ish` or `14:32`),
   and scope in-command exemptions strictly by both start and end statement boundaries so neither preceding nor succeeding chained statements falsely discharge unmeasured stamps.
 - **Don't**: Collapse distinct surfaces into a single loose regex pattern or treat in-command subshell invocations (such as `$(date)`) as globally discharging unrelated write operations within chained commands.
 - **Example**: 2026-09-01 on [PR #2965](https://github.com/Morrison-Lab/ai-config/pull/2965) ([Issue #2947](https://github.com/Morrison-Lab/ai-config/issues/2947)):

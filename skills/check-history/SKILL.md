@@ -52,8 +52,13 @@ checks (skipping them wastes a whole issue-pick):
   sibling PRs — nearly rebuilt already-completed work. The right move was to audit,
   correct the stale issue/doc status, and pick the genuine next slice.)
 
-If an open PR already covers it, **drive that PR to clean** instead of
-re-implementing (ask before pushing to a branch you didn't create). If `main`
+If an open PR already covers it and passes `memories/reviewing-prs.md`'s
+scope test (opened by or assigned to the invoking user, explicitly requested,
+or authored by the GitHub Actions app), **drive that PR to clean** instead of
+re-implementing.
+If it covers the issue but fails that test, leave both the PR and the issue
+alone and report that the PR exists, so the user can assign or name it.
+If `main`
 already satisfies the issue, stand it down and report — don't open a no-op PR.
 When the issue is only *partly* done, don't rebuild the done part: audit it,
 correct the stale issue/doc status, and scope only the genuine remaining slice.
@@ -77,8 +82,11 @@ correct the stale issue/doc status, and scope only the genuine remaining slice.
      | jq -r '.[] | select((.description // "") | test("(Closes|Fixes|Resolves) #<N>\\b"; "i")) | "!\(.iid) \(.title)"'
    ```
 
-   If an open PR already covers the issue, **review or extend it** instead of
-   opening a competing one. This catches *in-flight* work; the merged/closed
+   If an open PR already covers the issue, apply the scope test above:
+   **review or extend it** when it passes, and leave it untouched (reporting
+   it to the user) when it fails.
+   Either way, do not open a competing one.
+   This catches *in-flight* work; the merged/closed
    history below catches *settled* decisions.
 
 1. **List recent merged MRs** touching the same area:

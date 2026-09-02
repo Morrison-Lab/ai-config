@@ -232,15 +232,19 @@ have it report back which PRs it found conflicting, what it did about each,
 and any it skipped (already claimed, conflict it couldn't understand). Do the
 scan inline only for a solo (non-orchestrated) session.
 
-**If any OTHER agents already own a claimed branch (an active, resumable
-`Agent`-tool session, not a one-shot `Workflow`-internal `agent()` call),
-message each one directly right after the merge, instead of relying solely on
+**If any OTHER agents of this session already own a claimed branch (an active,
+resumable `Agent`-tool session, not a one-shot `Workflow`-internal `agent()`
+call), message each one directly right after the merge, instead of relying solely on
 a separate scan to find and fix their conflict after the fact:** "main just
 advanced (PR #N merged) --- fetch and merge origin/main into your branch now,
 resolve any conflict yourself (you have the context on your own change), then
 continue." This is faster and higher-context than a scanning subagent
 guessing at the resolution from outside: the branch's own owning agent
 already knows why its code looks the way it does.
+Those branches are this session's own work, opened under the invoking user's
+login, so they pass `memories/reviewing-prs.md`'s scope test by construction;
+a branch claimed by an agent that is not yours goes through the filtered scan
+in step 1 like any other PR.
 
 **This depends on the coordinator finding out about a merge in the first
 place --- so brief every delegated agent, up front, to report back the
@@ -385,16 +389,17 @@ Resolve PRs one at a time — not because worktrees race each other (each worktr
 One-at-a-time keeps the blast radius small.
 Skip any PR whose conflict is in a file you can't understand without more context — comment asking for clarification instead.
 
-**Match the response to standing, not only to cause.**
-Step 2 says whether a conflict is yours; it does not say the branch is.
-A conflict you genuinely caused, on a branch you do not own
---- a colleague's in-flight work,
-and most sharply a release branch carrying an out-of-band process ---
-is an explanatory comment naming the deletion or rename
-and where the content went, rather than a push to their branch.
-`sync-with-main` does prescribe re-applying the change on the sibling branch
-and pushing it, and that fits a workflow or CI file in a repo you drive.
-It is not the default for someone else's release branch.
+**Match the response to scope, not only to cause.**
+Step 2 says whether a conflict is yours; the scope test in step 1 says
+whether the PR is.
+A conflict you genuinely caused on a PR that fails that test is a report to
+the user naming the deletion or rename and where the content went; the PR
+gets no comment and no push.
+On an in-scope PR, `sync-with-main` does prescribe re-applying the change on
+the sibling branch and pushing it, and that fits a workflow or CI file in a
+repo you drive.
+A release branch carrying an out-of-band process gets the report instead,
+whatever the test says.
 
 ### 2. Tidy the local branch
 

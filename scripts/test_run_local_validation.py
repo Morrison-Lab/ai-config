@@ -130,8 +130,10 @@ def test_other_workflow_files():
         text = out.getvalue()
         check("--list prints the other file as NOT RUN [workflow]",
               rc == 0 and "NOT RUN  [workflow] review.yml: other workflow file, not derived (on: pull_request, workflow_dispatch)" in text)
-        check("--list tally counts the other files apart from the derived steps",
-              "plus 2 other workflow file(s) listed as NOT RUN" in text and "step(s) derived from" in text)
+        check("--list tally counts the listed and the broken files apart from the derived steps",
+              "plus 1 other workflow file(s) listed as NOT RUN, plus 1 other workflow file(s) BROKEN" in text
+              and "step(s) derived from" in text)
+        check("--list tags an unparseable other file BROKEN", "BROKEN   [workflow] broken.yaml" in text)
         out = io.StringIO()
         with redirect_stdout(out):
             rlv.main(["--workflow", str(wf), "--list", "--no-other-workflows", "--root", tmp])
@@ -140,9 +142,10 @@ def test_other_workflow_files():
         out = io.StringIO()
         with redirect_stdout(out):
             rlv.main(["--workflow", str(wf), "--list", "--only", "workflow", "--root", tmp])
+        only_text = out.getvalue()
         check("a job whose ID is literally `workflow` is filtered like any derived step, not as a file notice",
-              "NOT RUN  [workflow] workflow:" in out.getvalue() and "plus 2 other" in out.getvalue())
-        check("--list tags an unparseable other file BROKEN", "BROKEN   [workflow] broken.yaml" in text)
+              "NOT RUN  [workflow] workflow:" in only_text and "plus 1 other workflow file(s) listed" in only_text
+              and "BROKEN   [workflow] broken.yaml" in only_text)
         check("_denominator with no other files is the plain derived count",
               rlv._denominator(5, 0, "w.yml") == "5 step(s) derived from w.yml")
         out = io.StringIO()
@@ -150,7 +153,7 @@ def test_other_workflow_files():
             rlv.main(["--workflow", str(wf), "--list", "--only", "Passing", "--skip", "review", "--root", tmp])
         text = out.getvalue()
         check("--only keeps the other-workflow notices in the denominator",
-              "NOT RUN  [workflow] review.yml" in text and "plus 2 other workflow file(s)" in text)
+              "NOT RUN  [workflow] review.yml" in text and "plus 1 other workflow file(s) listed" in text)
         check("--skip never marks an other-workflow notice SKIP",
               "SKIP     [workflow]" not in text)
         # Run mode builds its tally separately from --list, so pin it too.
@@ -159,7 +162,7 @@ def test_other_workflow_files():
             rc = rlv.main(["--workflow", str(wf), "--only", "Passing", "--root", tmp])
         text = out.getvalue()
         check("run-mode tally counts the other files apart from the derived steps",
-              "plus 2 other workflow file(s) listed as NOT RUN" in text
+              "plus 1 other workflow file(s) listed as NOT RUN, plus 1 other workflow file(s) BROKEN" in text
               and "1 step(s) derived from" in text)
         check("run mode exits 1 while an other workflow file is unparseable, and names it",
               rc == 1 and "broken: broken.yaml" in text)

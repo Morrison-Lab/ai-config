@@ -214,13 +214,17 @@ def other_workflow_files(workflow_path: Path) -> List[Step]:
     return out
 
 
-def _denominator(total: int, other_files: int, workflow: str) -> str:
+def _denominator(total: int, other_files: int, workflow: str, broken: int = 0) -> str:
     """The tally line. Steps from other workflow files are listed, not derived,
-    so they are counted apart from the ones read out of `workflow`."""
+    so they are counted apart from the ones read out of `workflow`; a file that
+    did not parse is counted as BROKEN rather than as listed."""
     derived = total - other_files
     line = f"{derived} step(s) derived from {workflow}"
-    if other_files:
-        line += f", plus {other_files} other workflow file(s) listed as NOT RUN"
+    listed = other_files - broken
+    if listed:
+        line += f", plus {listed} other workflow file(s) listed as NOT RUN"
+    if broken:
+        line += f", plus {broken} other workflow file(s) BROKEN (could not be parsed)"
     return line
 
 
@@ -315,7 +319,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             tag = "SKIP" if skipped else ("BROKEN" if s.broken else ("NOT RUN" if not s.runnable else "RUN"))
             detail = s.note if not s.runnable else s.command.splitlines()[0]
             print(f"{tag:8} [{s.source}] {s.name}: {detail}")
-        print(_denominator(len(plan), sum(1 for s, _ in plan if s.kind == "workflow-file"), args.workflow))
+        print(_denominator(len(plan), sum(1 for s, _ in plan if s.kind == "workflow-file"), args.workflow,
+                          broken=sum(1 for s, _ in plan if s.broken)))
         return 0
 
     dirty = dirty_tree(root)
@@ -355,7 +360,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     ran = len(results) - skipped_n - len(not_run)
     print(f"\n{ran - len(failed)} passed, {len(failed)} failed, {skipped_n} skipped, "
           f"{len(not_run)} not runnable locally, of "
-          + _denominator(len(results), sum(1 for s, _, _ in results if s.kind == "workflow-file"), args.workflow))
+          + _denominator(len(results), sum(1 for s, _, _ in results if s.kind == "workflow-file"), args.workflow,
+                         broken=sum(1 for s, _, _ in results if s.broken)))
     for s, _, _ in not_run:
         print(f"  not run: {s.name} ({s.note})")
     for s, rc, _ in results:

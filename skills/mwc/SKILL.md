@@ -77,8 +77,10 @@ without asking confirmation before every merge.
   a currency check on it,
   a full re-run of the gate pinned to it,
   then a check immediately before the merge command that the live head
-  is still that SHA, `baseRefName` is unchanged, and the base tip is
-  unchanged, repeating the cycle when any moved during the gate,
+  is still that SHA, `baseRefName` is unchanged, and the base tip
+  still equals the `<pinned-tip>` the currency check printed (recorded
+  before the gate reran), repeating the cycle when any moved during the
+  gate,
   and `--match-head-commit "<pinned-sha>"` (or `expectedHeadSha` on the
   MCP merge tool) on the merge command itself, so the API refuses a
   push that lands after the read.

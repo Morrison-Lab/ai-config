@@ -59,7 +59,7 @@ operation to the equivalent GitHub MCP tool so any model can run a skill.
 | `REQUEST_COPILOT_REVIEW` | Request a GitHub Copilot code review on a pull request. | `gh api "repos/<owner>/<repo>/pulls/<N>/requested_reviewers" -X POST -f "reviewers[]=copilot-pull-request-reviewer[bot]"` | `mcp__github__request_copilot_review` |
 | `CREATE_PR` | Open a new pull request. | `gh pr create` | `mcp__github__create_pull_request` |
 | `EDIT_PR` | Edit a pull request (reviewers, labels, base, etc.). | `gh pr edit "<N>"` | `mcp__github__update_pull_request` |
-| `MERGE_PR` | Merge a pull request directly, pinned to the head the clean gate evaluated; a base that requires a merge queue is out of scope until ai-config#3030 lands. | `gh pr merge "<N>" -R "<owner>/<repo>" --match-head-commit "<sha>"` | `mcp__github__merge_pull_request (expectedHeadSha="<sha>")` |
+| `MERGE_PR` | Merge a pull request directly, pinned to the head the clean gate evaluated; a base that requires a merge queue is out of scope until [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030) lands. | `gh pr merge "<N>" -R "<owner>/<repo>" --match-head-commit "<sha>"` | `mcp__github__merge_pull_request (expectedHeadSha="<sha>")` |
 | `MARK_PR_READY` | Flip a draft pull request to ready for review. | `gh pr ready "<N>"` | `mcp__github__update_pull_request (draft=false)` |
 | `UPDATE_PR_BRANCH` | Merge the base branch into a pull request's head branch, pinned to the head that was checked. | `gh api -X PUT "repos/<owner>/<repo>/pulls/<N>/update-branch" -f expected_head_sha="<sha>"` | `mcp__github__update_pull_request_branch (expectedHeadSha="<sha>")` |
 | `REOPEN_PR` | Reopen a closed pull request. | `gh pr reopen "<N>"` | `mcp__github__update_pull_request (state=open)` |

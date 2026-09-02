@@ -196,11 +196,12 @@ Dashboard) — `@dependabot` comment commands do nothing on Renovate PRs.
 
 ### 4. Safe bumps (patch / minor / submodule + green) → merge
 
-Immediately before the merge command, require the live head to equal `$PINNED`, the live base name to equal `$BASE`, the live title to equal `$TITLE`, and the base tip to equal the one the currency check tested.
-That check's one-liner assigns the base tip to `tip`, so keep it as `TIP=$tip` and restart the gate if the live tip differs.
-A regenerated head that already contains the base would otherwise pass a currency check with CI never read for it.
-Then run the base-currency check from [`fully-clean`](../../shared/workflow/fully-clean.md)'s stale-base rule (the Do bullets beginning "for a direct merge"), since a green head can still break the base when the base gained a check after the head's CI ran.
+First read whether the base requires a merge queue (the rules probe in `fully-clean`'s stop bullet).
 On a base that requires a merge queue, stop and report the bump as blocked: the queue form of the gate is [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030) and is out of scope until it lands.
+Otherwise run the base-currency check from [`fully-clean`](../../shared/workflow/fully-clean.md)'s stale-base rule (the Do bullets beginning "for a direct merge"), since a green head can still break the base when the base gained a check after the head's CI ran.
+That check's one-liner prints the tested base tip; keep it as `TIP`.
+Immediately before the merge command, require the live head to equal `$PINNED`, the live base name to equal `$BASE`, the live title to equal `$TITLE`, and the live base tip to equal `$TIP`, and restart from the currency check if the tip moved or from step 2 if anything else did.
+A regenerated head that already contains the base would otherwise pass a currency check with CI never read for it.
 When that check finds the base stale, the bot-bump recovery is to update the branch pinned to `$PINNED`,
 wait until `headRefOid` differs from `$PINNED`, with a deadline of a few minutes (expiry is a failed update: stop and report it rather than restarting),
 and then start again from the top of step 2: re-record `$PINNED` and `$BASE`, re-classify the bump, and rerun the CI and conflict checks against the new pin (review stays skipped on bot PRs).

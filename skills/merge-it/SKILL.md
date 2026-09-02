@@ -84,7 +84,7 @@ standing yes (see `preferences.md`).
   record that SHA,
   rerun the base-currency check on it,
   and then rerun the whole clean gate pinned to it.
-  Immediately before the merge command, check that the live head is still that SHA, that `baseRefName` is unchanged, and that the base tip is unchanged,
+  Immediately before the merge command, check that the live head is still that SHA, that `baseRefName` is unchanged, and that the live base tip still equals the `<pinned-tip>` the currency check printed (recorded before the gate reran, since a shell variable does not survive into a later tool call),
   and repeat the cycle if any moved during the gate (a concurrent push can pass a currency-only recheck while the gate covered the earlier head).
   Then pass the pin to the merge itself, `--match-head-commit "<pinned-sha>"` (or `expectedHeadSha` on the MCP merge tool), so a push after the read is refused rather than merged.
   That closes the head side only.

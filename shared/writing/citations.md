@@ -715,3 +715,14 @@ The near-miss is writing "same name" from memory of what the sibling entry is *a
 
 (Review finding on ai-config#2924, 2026-09-01: a `memories/delegation.md` entry pointed at `CLAUDE.md`'s "section of the same name", and the two headings differed;
 reworded to "section of the same rule".)
+
+## A figure carried from a source keeps the source's unit
+
+A count restated from a source is a claim about the source, so the unit travels with the number.
+"27 files whose signatures use the +4 form" and "27 signatures at +4" are different quantities, since one file can hold several, and only the first is what the cited comment measured.
+The near-miss is compressing the source's phrasing for rhythm and letting the unit change under the compression, which reads as a paraphrase and is a new, unmeasured claim.
+
+- **Do:** restate a cited figure with the noun the source counted, and re-run the count if you want the other unit.
+- **Don't:** shorten "27 files with X" to "27 X" in the name of concision.
+
+(Review finding on ai-config#2955, 2026-09-01: a case record wrote "27 multi-line signatures at +4" where the cited serocalculator#672 comment had counted 27 files.)

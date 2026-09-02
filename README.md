@@ -175,9 +175,10 @@ gap as a hooks-only **skills-directory plugin**: a folder under
 `ai-config-hooks@skills-dir`, with no marketplace and no install step.
 Its `hooks/hooks.json` is generated from the canonical catalog by
 `scripts/gen-hooks-plugin.py` (CI fails when the two drift), and each
-command runs through `run-hook.sh`, which stands down when
-`~/.claude/settings.json` already enables an `ai-config@*` plugin so no hook
-fires twice on a machine that has the marketplace install.
+command runs through `run-hook.sh`, which stands down when an `ai-config@*`
+plugin is enabled under Claude Code's scope precedence (local, project, then
+user settings) so no hook fires twice on a machine that has the marketplace
+install.
 Verify it in a fresh web session by checking that the first prompt carries
 the `Current time -- local:` line `inject-local-time.sh` injects.
 

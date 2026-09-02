@@ -18,18 +18,22 @@ so every hook is inert there
 ## Contents
 
 - `.claude-plugin/plugin.json`: the manifest.
-  The plugin bundles no skills, so the 202 skills in `skills/`
+  The plugin bundles no skills, so the skills in `skills/`
   are not registered a second time under an `ai-config-hooks:` prefix.
 - `hooks/hooks.json`: **generated** by
   [`scripts/gen-hooks-plugin.py`](../../scripts/gen-hooks-plugin.py)
   from the canonical catalog.
-  Do not edit it; edit `hooks/hooks.json` and rerun the script.
+  Do not edit it; edit the top-level [`../../hooks/hooks.json`](../../hooks/hooks.json)
+  and rerun the script.
   CI runs the script with `--check` and fails when the two drift.
 - `run-hook.sh`: every generated command runs through it.
-  It exits 0 without running the hook when `~/.claude/settings.json`
-  enables an `ai-config@<marketplace>` plugin,
-  because that plugin already runs the same catalog
+  It exits 0 without running the hook when the marketplace plugin is
+  enabled, because that plugin already runs the same catalog
   and the two would otherwise fire every hook twice.
+  "Enabled" follows Claude Code's scope precedence for `enabledPlugins`
+  (local, then project, then user settings; the highest scope that names
+  an `ai-config@<marketplace>` entry decides, and a `false` there wins),
+  per [`memories/claude-code-settings.md`](../../memories/claude-code-settings.md).
 
 ## How the paths work
 

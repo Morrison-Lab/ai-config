@@ -349,6 +349,24 @@ def main() -> int:
             "skill dir with neither SKILL.md nor manifest is still an error",
             any("no SKILL.md" in e for e in errors),
         )
+        (tmp / "skills" / "bare").rmdir()
+
+        manifest.write_text(
+            json.dumps({"name": "hooks-only", "description": ""}),
+            encoding="utf-8",
+        )
+        errors, _ = run_skills_check(tmp)
+        check(
+            "skills-dir plugin with an empty description is an error",
+            any("empty description" in e for e in errors),
+        )
+
+        manifest.write_text("{not json", encoding="utf-8")
+        errors, _ = run_skills_check(tmp)
+        check(
+            "skills-dir plugin with invalid manifest JSON is one error",
+            len(errors) == 1 and "invalid JSON" in errors[0],
+        )
 
 
     print(f"\n{passes} passed, {failures} failed")

@@ -1192,9 +1192,12 @@ For a bot bump, the gate to rerun after an update is CI plus conflict state, whi
 A deferred merge (`gh pr merge --auto`, or a `@dependabot` merge command) runs after any check made before the command, so it is safe only where the base requires an up-to-date branch or a correctly configured queue tests the merge.
 Elsewhere merge synchronously, right after the check.
 
-- **Do:** for a direct merge from a session with `git` and `gh`, before the merge command, fetch the PR's configured base and confirm the merge-base with the live PR head is that base's current tip.
+- **Do:** for a direct merge from a session with `git` and `gh`, record `headRefOid` before the clean gate runs, so the gate's verdict is tied to one SHA.
+  Then, before the merge command, fetch the PR's configured base, confirm the live PR head is still that SHA, and confirm the merge-base with it is that base's current tip.
+  A concurrent push after the gate can already contain the base tip, so an ancestry check alone would admit a head no verdict covers.
   Until [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) wires this into `check-pr-fully-clean.py`, which [`mwc`](../../skills/mwc/SKILL.md) already runs, both [`mwc`](../../skills/mwc/SKILL.md) and [`merge-it`](../../skills/merge-it/SKILL.md) name it as a manual step after their readiness check and before the merge command:
-  `url=$(gh repo view "<owner>/<repo>" --json url -q .url) && b=$(gh pr view "<N>" -R "<owner>/<repo>" --json baseRefName -q .baseRefName) && [ -n "$url" ] && [ -n "$b" ] && git fetch "$url" "$b" && tip=$(git rev-parse --verify FETCH_HEAD) && git fetch "$url" "refs/pull/<N>/head" && head=$(git rev-parse --verify FETCH_HEAD) && [ "$(git merge-base "$tip" "$head")" = "$tip" ]`.
+  `url=$(gh repo view "<owner>/<repo>" --json url -q .url) && b=$(gh pr view "<N>" -R "<owner>/<repo>" --json baseRefName -q .baseRefName) && [ -n "$url" ] && [ -n "$b" ] && git fetch "$url" "$b" && tip=$(git rev-parse --verify FETCH_HEAD) && git fetch "$url" "refs/pull/<N>/head" && head=$(git rev-parse --verify FETCH_HEAD) && [ "$head" = "<pinned-sha>" ] && [ "$(git merge-base "$tip" "$head")" = "$tip" ]`,
+  where `<pinned-sha>` is the `headRefOid` recorded before the gate ran.
   Both fetches name the repository the `-R` reads came from, not the checkout's `origin`, which in a fork or another checkout can be a different repository whose same-numbered PR would let the gate compare unrelated commits.
   Each result is assigned inside the `&&` chain so an unresolved branch or a failed command fails the check rather than comparing two empty strings as equal.
   Reading `FETCH_HEAD` after each fetch uses the tip the fetch just returned and writes no remote-tracking ref, so it holds in a single-branch clone (where a bare `git fetch origin` leaves `origin/<branch>` stale) and under `fetch.prune=true` (where an explicit `branch:refs/remotes/origin/branch` refspec was measured to delete the ref and fail `rev-parse` on its first run).
@@ -1210,8 +1213,9 @@ Elsewhere merge synchronously, right after the check.
   The gate itself takes minutes, so the base can advance again while it runs, and so can the head: a concurrent push that already contains the current base passes a currency-only recheck while the gate's verdict belongs to the earlier SHA ([`github`](../../memories/github.md) records that unpinned-head race).
   So immediately before the merge command, check both that the live `headRefOid` still equals the pinned SHA and that the base tip is unchanged, and repeat the update-and-gate cycle when either moved.
   That leaves the smallest window the sequence allows, the seconds between the recheck and the merge, rather than none.
-  When the cycle repeats more than once the base is advancing faster than the gate runs, which [`batch-merge-and-resolve`](batch-merge-and-resolve.md) measures.
-  Stop chasing and merge through a queue or under strict up-to-date protection, or batch the pending merges per that fragment.
+  The cycle repeats for either ref, so a repeat says which one to look at rather than which remedy applies.
+  When the base moved twice it is advancing faster than the gate runs, which [`batch-merge-and-resolve`](batch-merge-and-resolve.md) measures: stop chasing and merge through a queue or under strict up-to-date protection, or batch the pending merges per that fragment.
+  When the head moved, another writer is pushing to the branch, and no queue or protection setting stabilizes that: find the writer per [`claim-pr`](claim-pr.md) and settle who owns the branch before rerunning.
 - **Do:** under a merge queue whose required checks cover the whole clean gate on `merge_group`, rely on those checks and skip the two direct-merge checks above.
   The queue's speculative merge is the base-currency test there.
 - **Don't:** rely on a queue while any clean-gate check is non-required, since such a check can run on `merge_group` and still not block the merge.

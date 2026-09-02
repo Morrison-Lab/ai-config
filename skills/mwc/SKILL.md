@@ -48,6 +48,10 @@ without asking confirmation before every merge.
   [`fully-clean`](../../shared/workflow/fully-clean.md) for the payload keys.
   A later all-clear from a different reviewer does not supersede a standing
   not-clean; only a later clean from the same reviewer does.
+  Record `headRefOid` before the instrument runs and require the live
+  head to equal it immediately before every direct merge, so a
+  concurrent push that already contains the base cannot ride a
+  currency-only check past a verdict it never received.
   After the instrument passes, run the base-currency check that
   [`fully-clean`](../../shared/workflow/fully-clean.md) states in its stale-base rule
   (the Do bullets beginning "for a direct merge") before the merge command,
@@ -65,9 +69,11 @@ without asking confirmation before every merge.
   then a check immediately before the merge command that the live head
   is still that SHA and the base tip is unchanged,
   repeating the cycle when either moved during the gate.
-  A cycle that repeats more than once means the base outruns the gate:
-  merge through a queue or strict up-to-date protection instead, per
-  [`fully-clean`](../../shared/workflow/fully-clean.md).
+  A repeat names the moving ref: when the base moved twice it outruns
+  the gate, so merge through a queue or strict up-to-date protection
+  instead, and when the head moved another writer is on the branch, so
+  settle ownership per [`claim-pr`](../claim-pr/SKILL.md) before
+  rerunning, per [`fully-clean`](../../shared/workflow/fully-clean.md).
 - **Session Duration**: The grant expires automatically when the session ends
   or when explicitly revoked via `/mwc revoke` or `disable-mwc`.
 

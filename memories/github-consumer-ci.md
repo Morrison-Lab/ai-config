@@ -77,3 +77,10 @@ The red commit changed only a demo JSON and one GDScript file --- no file the ch
 The log itself was complete, opening `Found 19 non-standard character(s) in 4 file(s)` and listing all four;
 a `tail_lines`-capped fetch showed only the last two, and that partial read was mistaken for the checker's own output.
 An independent scan produced the right set anyway, so the fix was correct while the reason given for it was not.)
+
+**A moving tag does not always turn things red.**
+[`gitlab.md`](gitlab.md)'s "A mutable `include: ref:` plus
+`allow_failure: true` breaks a consumer silently" is the mirror case on
+GitLab: the same moving-pin mechanism, but the consuming job tolerates
+failure, so the break shows up as a missing review with a green pipeline
+instead of a red one.

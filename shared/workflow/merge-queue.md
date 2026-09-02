@@ -122,6 +122,7 @@ jobs:
 
 - **Do:** enable `merge_group` event triggers on all workflows that provide required status checks.
 - **Do:** use merge queues to automate pre-merge speculative testing when landing multiple PRs in parallel.
-- **Do:** treat base-advance staleness on queued PRs as a platform queue concern rather than an immediate need for manual branch re-syncing.
-- **Don't:** run manual `gh pr update-branch` loops on simultaneously ready PRs when a merge queue is active.
+- **Do:** treat base-advance staleness on queued PRs as a platform queue concern rather than an immediate need for manual branch re-syncing, when every clean-gate check is required and runs on `merge_group`.
+  Otherwise the stale-base rule in [`fully-clean`](fully-clean.md) applies, because the queue neither runs nor blocks on the checks it is missing.
+- **Don't:** run manual `gh pr update-branch` loops on simultaneously ready PRs when a merge queue is active and configured that way.
 - **Don't:** omit the `merge_group` trigger from CI workflows when enabling merge queue rulesets.

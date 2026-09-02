@@ -1185,16 +1185,23 @@ every clean-gate check executes for `merge_group`, job and step conditions inclu
 and every clean-gate check is a required status check on the base, or is aggregated behind one that is.
 A clean-gate check the queue cannot block on is a check the queue does not run as a gate.
 
-- **Do:** before merging, fetch the PR's configured base and confirm the merge-base with the live PR head is that base's current tip.
+The rule splits by merge mode: a direct merge from a session with `git` and `gh`, a direct merge from a remote session without `git`, and a merge queue.
+
+- **Do:** for a direct merge from a session with `git` and `gh`, before the merge command, fetch the PR's configured base and confirm the merge-base with the live PR head is that base's current tip.
   Until [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) wires this into `check-pr-fully-clean.py` and the `mwc` and `merge-it` entry points, it is a manual step that runs after the checker and before the merge command:
   `url=$(gh repo view <owner>/<repo> --json url -q .url) && b=$(gh pr view <N> -R <owner>/<repo> --json baseRefName -q .baseRefName) && [ -n "$url" ] && [ -n "$b" ] && git fetch "$url" "$b" && tip=$(git rev-parse --verify FETCH_HEAD) && git fetch "$url" "refs/pull/<N>/head" && head=$(git rev-parse --verify FETCH_HEAD) && [ "$(git merge-base "$tip" "$head")" = "$tip" ]`.
   Both fetches name the repository the `-R` reads came from, not the checkout's `origin`, which in a fork or another checkout can be a different repository whose same-numbered PR would let the gate compare unrelated commits.
   Each result is assigned inside the `&&` chain so an unresolved branch or a failed command fails the check rather than comparing two empty strings as equal.
   Reading `FETCH_HEAD` after each fetch uses the tip the fetch just returned and writes no remote-tracking ref, so it holds in a single-branch clone (where a bare `git fetch origin` leaves `origin/<branch>` stale) and under `fetch.prune=true` (where an explicit `branch:refs/remotes/origin/branch` refspec was measured to delete the ref and fail `rev-parse` on its first run).
   The base comes from the PR, not from the repository's default branch: a stacked or release PR targets another branch, and [`merge-it`](../../skills/merge-it/SKILL.md) already warns not to assume `main` for those.
-- **Do:** when the merge-base is not that tip and the merge is direct, `gh pr update-branch <N> -R <owner>/<repo>`, then rerun the whole clean gate on the new head, review included, before merging.
+- **Do:** for a direct merge from a remote session without `git`, read the compare endpoint instead, `GET repos/<owner>/<repo>/compare/<base>...<head-sha>`, and require `behind_by` of 0.
+  Measured 2026-09-02 (Pacific) on [#2989](https://github.com/Morrison-Lab/ai-config/pull/2989): `behind_by` was 0 and `merge_base_commit.sha` was the base tip, the same answer the `git merge-base` form gives.
+  Where no raw API call is available either, as in an MCP-only session whose tools expose neither endpoint, the gate cannot run, so do not merge from that session until [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) supplies the tool.
+  That is the fail-closed direction, per [`fail-fast`](../principles/fail-fast.md).
+- **Do:** when the merge-base is not that tip and the merge is direct, `gh pr update-branch <N> -R <owner>/<repo>` (or `update_pull_request_branch` remotely), then rerun the whole clean gate on the new head, review included, before merging.
   The update is a new head, so a clean verdict on the old one no longer counts, per [`sync-with-main`](sync-with-main.md).
-- **Do:** under a merge queue whose required checks cover the whole clean gate on `merge_group`, rely on those checks rather than a manual update.
+- **Do:** under a merge queue whose required checks cover the whole clean gate on `merge_group`, rely on those checks and skip the two direct-merge checks above.
+  The queue's speculative merge is the base-currency test there.
 - **Don't:** skip the manual update under a queue while any clean-gate check is non-required, since such a check can run on `merge_group` and still not block the merge.
 - **Don't:** skip it while any clean-gate check is `pull_request`-only either: a non-required one never runs on the queue branch, and a required one holds the queue until it times out waiting for a result that never arrives.
 - **Don't:** read a head-only FULLY CLEAN verdict as a merge-safe verdict when the base has advanced.

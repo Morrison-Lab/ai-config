@@ -62,11 +62,12 @@ standing yes (see `preferences.md`).
 
 ### 2. Merge
 
-- Before the merge command, run the base-currency check that `fully-clean.md` states in its stale-base rule (the Do bullet beginning "before merging, fetch the PR's configured base")
-  (fetch the PR's configured base and `refs/pull/<N>/head` from the `-R` repository and confirm the merge-base is the base tip).
-  It is a manual step until [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) wires it into `check-pr-fully-clean.py`,
-  and a repository that does not require an up-to-date branch merges without it otherwise.
-  When it fails on a direct merge, `gh pr update-branch <N> -R <owner>/<repo>` and rerun the whole clean gate on the new head.
+- Before the merge command, run the base-currency check that `fully-clean.md` states in its stale-base rule (the Do bullets beginning "for a direct merge"), by merge mode:
+  in a local session, fetch the PR's configured base and `refs/pull/<N>/head` from the `-R` repository and confirm the merge-base is the base tip;
+  in a remote session without `git`, read `GET repos/<owner>/<repo>/compare/<base>...<head-sha>` and require `behind_by` of 0, and where neither is available do not merge until [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) supplies the tool;
+  under a merge queue whose required checks cover the whole clean gate on `merge_group`, skip the check and let the queue's speculative merge test the base.
+  It is a manual step until #2982 wires it into `check-pr-fully-clean.py`, and a repository that does not require an up-to-date branch merges without it otherwise.
+  When it fails on a direct merge, `gh pr update-branch <N> -R <owner>/<repo>` (or `update_pull_request_branch` remotely) and rerun the whole clean gate on the new head.
 - Default to **squash** for a feature branch with many small iteration commits
   (and/or a merge-of-main commit) — it gives `main` one clean commit. Use a
   plain merge commit only if the user asks or the repo clearly prefers it; don't

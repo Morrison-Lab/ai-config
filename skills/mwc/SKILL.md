@@ -50,11 +50,15 @@ without asking confirmation before every merge.
   not-clean; only a later clean from the same reviewer does.
   After the instrument passes, run the base-currency check that
   [`fully-clean`](../../shared/workflow/fully-clean.md) states in its stale-base rule
-  (the Do bullet beginning "before merging, fetch the PR's configured base")
-  before the merge command; until
+  (the Do bullets beginning "for a direct merge") before the merge command,
+  by merge mode: the `git merge-base` form in a local session,
+  the compare endpoint's `behind_by` in a remote session without `git`,
+  no merge at all from a session that can run neither until
   [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) wires it
-  into the instrument it is a manual step, and a stale merge-base means
-  `gh pr update-branch` and a full re-run of the gate on the new head.
+  into the instrument, and no manual check under a merge queue whose
+  required checks cover the whole clean gate on `merge_group`.
+  On a direct merge a stale merge-base means `gh pr update-branch`
+  and a full re-run of the gate on the new head.
 - **Session Duration**: The grant expires automatically when the session ends
   or when explicitly revoked via `/mwc revoke` or `disable-mwc`.
 

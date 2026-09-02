@@ -412,7 +412,7 @@
   `gh issue view 1334` returns `{"number":1334,"state":"MERGED",...}` without complaint.
   Same key the timeline bullet above relies on.
   What it adds is that the plain `gh issue view` path answers for both kinds, and so distinguishes neither.)
-- **Plain `gh pr checks` does NOT say which checks are REQUIRED (`--required` does, and only within the current rollup), and the legacy protection endpoint 404s on ruleset-gated repos — so the lazy check confirms the wrong answer.**
+- **Plain `gh pr checks` does NOT say which checks are REQUIRED (`--required` does, and only within the current rollup), and the legacy protection endpoint 404s on ruleset-gated repos --- so the lazy check confirms the wrong answer.**
   Plain `gh pr checks` reports check *state* only.
   `gh pr checks --required` (present in `gh` 2.98.0, checked 2026-09-02) filters to the required ones among the checks in the current rollup, and neither form can show a required check that is absent from that rollup, which is the base-gained-a-check case.
   And `gh api repos/<o>/<r>/branches/<branch>/protection` returns `404 Branch not protected` on a repo that gates the branch with a **ruleset** rather than legacy branch protection, which reads as "nothing is required" and *confirms* the mistaken assumption.

@@ -69,7 +69,7 @@ standing yes (see `preferences.md`).
   In a local session, fetch the PR's configured base and `refs/pull/<N>/head` from the `-R` repository
   and confirm the merge-base is the base tip.
   In a remote session without `git`, read `gh api "repos/<owner>/<repo>/compare/<base-encoded>...<head-sha>"` (the base name encoded as one path segment, `jq -rn --arg b "<base>" '$b|@uri'`)
-  and require `behind_by` of 0, recording `merge_base_commit.sha` as `<pinned-tip>` for the pre-merge recheck of the same endpoint.
+  and require `behind_by` of 0, recording `base_commit.sha` as `<pinned-tip>` for the pre-merge recheck of the same endpoint, which requires `behind_by` of 0 again and `base_commit.sha` equal to that pin.
   Where neither is available, do not merge until [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) supplies the tool.
   On a base that requires a merge queue, stop and report: the queue form of this gate is [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030) and is out of scope until it lands.
   It is a manual step until [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) wires it into `check-pr-fully-clean.py`,
@@ -159,7 +159,7 @@ Run the `post-merge` skill (invoke it by name) for the rest: tidy the local
 branch (checkout `main`, pull, `git branch -d`, remove any worktree), confirm
 deferred items are tracked, and **run UMS** to bank what the PR's review
 lifecycle taught.
-Do this without a separate prompt — opening the UMS follow-up
+Do this without a separate prompt --- opening the UMS follow-up
 branch + PR is a standing yes (`preferences.md`).
 
 ## Relationship to other skills

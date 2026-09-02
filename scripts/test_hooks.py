@@ -227,13 +227,12 @@ def run_suites(timeout=None):
                   + ", ".join(os.path.relpath(c, ROOT) for c in present))
             failures += 1
             continue
-        subject = present[0] if present else candidates[0]
-        rel_test = os.path.relpath(test_path, ROOT)
-        rel_subj = os.path.relpath(subject, ROOT)
-        if not os.path.isfile(subject):
-            print(f"FAIL: {rel_test} has no subject at {rel_subj}")
+        if not present:
+            print(f"FAIL: {os.path.relpath(test_path, ROOT)} has no subject at "
+                  + " or ".join(os.path.relpath(c, ROOT) for c in candidates))
             failures += 1
             continue
+        subject = present[0]
         failures += run_one_suite(test_path, subject, timeout)
     return failures, len(tests)
 
@@ -259,6 +258,11 @@ def check_coverage():
     for name in sorted(KNOWN_UNTESTED):
         if os.path.isfile(os.path.join(HOOKS, test_for(name))):
             print(f"FAIL: {name} now has a test; drop it from KNOWN_UNTESTED")
+            failures += 1
+        elif name not in subs:
+            # A deleted or renamed hook left behind in the allowlist would
+            # otherwise pass both loops while inflating the known-debt count.
+            print(f"FAIL: {name} is in KNOWN_UNTESTED but is not a hook in hooks/; drop it")
             failures += 1
     return failures, tested, len(subs)
 

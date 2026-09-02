@@ -81,7 +81,7 @@ def stubs(tz_answer, plain_answer, powershell_body):
         fh.write("#!/bin/sh\n"
                  "if [ \"$1\" = -u ]; then\n"
                  "  [ \"$2\" = '+%%Y-%%m-%%dT%%H:%%M:%%SZ' ] || exit 1\n"
-                 "  printf '2026-01-01T00:00:00Z\\n'; exit 0\n"
+                 "  printf '2026-07-01T19:00:00Z\\n'; exit 0\n"
                  "fi\n"
                  "[ \"$1\" = '+%%Y-%%m-%%d %%H:%%M:%%S %%Z' ] || exit 1\n"
                  "if [ \"${TZ:-}\" = America/Los_Angeles ]; then printf '%s\\n'; else printf '%s\\n'; fi\n"
@@ -116,8 +116,9 @@ EXPECTED_PS_PROGRAM = " ".join("""
         '{0:yyyy-MM-dd HH:mm:ss} {1}' -f $t, $z
 """.split())
 
-PDT = "2026-01-01 00:00:00 PDT"
-GMT = "2026-01-01 00:00:00 GMT"
+# A July instant, so PDT is a real Pacific reading (January would be PST).
+PDT = "2026-07-01 12:00:00 PDT"
+GMT = "2026-07-01 19:00:00 GMT"
 
 print("first rung (only the TZ override answers PDT):")
 rc, out = run(with_stubs(stubs(PDT, GMT, "exit 1")))

@@ -322,6 +322,10 @@ with tempfile.TemporaryDirectory(prefix="hook-runner-") as tmp:
         # untested.py is still unlisted here, so that failure counts too.
         check("a stale allowlist entry that now has a test fails",
               cov[0] == 2 and "drop it from KNOWN_UNTESTED" in stdout, repr(stdout))
+        th.KNOWN_UNTESTED = {"untested.py", "ghost.py"}
+        (cov, stdout, _) = _capture(th.check_coverage)
+        check("an allowlist entry naming no hook in hooks/ fails",
+              cov[0] == 1 and "ghost.py is in KNOWN_UNTESTED but is not a hook" in stdout, repr(stdout))
     finally:
         th.HOOKS, th.KNOWN_UNTESTED = old_hooks, old_allow
 
@@ -354,6 +358,18 @@ with tempfile.TemporaryDirectory(prefix="hook-runner-") as tmp:
         th.HOOKS = old_hooks
     check("a .sh-only subject resolves and its suite runs",
           counts == (0, 1) and "PASS:" in stdout, repr((counts, stdout)))
+
+with tempfile.TemporaryDirectory(prefix="hook-runner-") as tmp:
+    hooks = Path(tmp)
+    (hooks / "test-orphan.py").write_text(OK, encoding="utf-8")
+    old_hooks = th.HOOKS
+    th.HOOKS = str(hooks)
+    try:
+        (counts, stdout, _) = _capture(lambda: th.run_suites(timeout=5))
+    finally:
+        th.HOOKS = old_hooks
+    check("a suite with no subject names both expected paths",
+          counts == (1, 1) and "orphan.py or " in stdout and "orphan.sh" in stdout, repr((counts, stdout)))
 
 
 print(f"\n{passes}/{passes + failures} checks passed")

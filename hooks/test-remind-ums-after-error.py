@@ -119,6 +119,24 @@ REMIND = [
     ([txt("I overlooked the error in the logs.")], "I overlooked the error"),
     ([txt("It filtered discussion-level timestamps rather than every nested note.")],
      "it filtered ... rather than"),
+    ([txt("That was my mistake; the count was off by one.")],
+     "my mistake (ai-config#1898 anchored form still fires)"),
+    ([txt("My earlier claim was wrong about the pin.")],
+     "my earlier claim was wrong (ai-config#1898 anchored form still fires)"),
+]
+
+# ai-config#1898: the two `my`-led alternatives had no `\b` before `my`,
+# so a word ending in "my" supplied the possessive. These stay silent under
+# the anchored pattern; the "revert mutation" block at the bottom of this
+# file strips the two anchors and checks that every one of them then FIRES,
+# so each control is known to discriminate rather than merely to pass.
+ANCHOR_1898 = [
+    ([txt("The dummy error was expected.")],
+     "dummy error (word ending in my + mistake|error)"),
+    ([txt("An anatomy error crept in.")],
+     "anatomy error (word ending in my + mistake|error)"),
+    ([txt("The academy previous claim was wrong.")],
+     "academy previous claim was wrong (word ending in my + earlier-claim form)"),
 ]
 
 SILENT = [
@@ -215,6 +233,7 @@ SILENT = [
      "toolkit filtered ... rather than (word ending in it)"),
     ([txt("The dummy query missed edge cases.")],
      "dummy query missed (word ending in my)"),
+    *ANCHOR_1898,
     ([txt("The sour query missed the target.")],
      "sour query missed (word ending in our)"),
     ([txt("The rule fires on phrases like `I was wrong` in a message.")],
@@ -379,6 +398,33 @@ for got, want, desc in seq:
     wrong += got != want
     print(f"  {got:<7} {desc}")
 
-total = len(REMIND) + len(SILENT) + len(seq)
+# Revert mutation (ai-config#1898): strip the two `\bmy` anchors from a copy of
+# the hook and run the ANCHOR_1898 controls against it. Every control must
+# REMIND under the mutant; one that stays silent under both patterns pins
+# nothing, which is the inert-control failure #1889's review found.
+print("\nrevert mutation (#1898 anchors removed -- each control must fire):")
+B = chr(92)
+with open(HOOK, encoding="utf-8") as fh:
+    source = fh.read()
+mutant = (source
+          .replace(B + "bmy" + B + "s+(mistake|error)", "my" + B + "s+(mistake|error)")
+          .replace(B + "bmy" + B + "s+(earlier", "my" + B + "s+(earlier"))
+if mutant == source:
+    sys.exit("FATAL: the #1898 anchors were not found in the hook, so the mutation is inert")
+fd, mutant_path = tempfile.mkstemp(suffix=".py")
+with os.fdopen(fd, "w", encoding="utf-8") as fh:
+    fh.write(mutant)
+real_hook = HOOK
+try:
+    HOOK = mutant_path
+    mutation = [(run(recs), desc) for recs, desc in ANCHOR_1898]
+finally:
+    HOOK = real_hook
+    os.unlink(mutant_path)
+for got, desc in mutation:
+    wrong += got != "REMIND"
+    print(f"  {got:<7} {desc}")
+
+total = len(REMIND) + len(SILENT) + len(seq) + len(mutation)
 print(f"\n{total - wrong}/{total} correct" + ("" if wrong == 0 else f"  ({wrong} WRONG)"))
 sys.exit(1 if wrong else 0)

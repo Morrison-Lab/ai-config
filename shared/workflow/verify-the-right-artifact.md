@@ -191,7 +191,7 @@ When a brief, an issue body, or a review finding asserts what a repository says,
 
 See [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md), "A stale branch read that produced two issues and a config edit".
 
-## A comparison's base is an artifact too, and staleness there only ever adds
+## A comparison's base is an artifact too, and it moves the scope in both directions
 
 Every shape above concerns an artifact you **read**.
 A diff is an artifact you **derive**, from two refs, and attention goes to the one you are interested in --- the branch under review.
@@ -256,7 +256,7 @@ The rule it enforces is not "was the local ref fresh", which no hook can know, b
 It warns and never blocks, because a bare local base is entirely correct for an ordinary local comparison and the hook cannot tell those apart.
 It has no fetch-based discharge on purpose: [`keep-checkouts-fresh`](keep-checkouts-fresh.md) mandates a fetch at session start, so keying on one would silence the hook in exactly the sessions that follow the corpus.
 
-See [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md), "A stale local base that quadrupled a review diff's file count".
+See [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md), "A stale local base that nearly quadrupled a review diff's file count".
 
 ## A summary is another shape, and the auto-loaded copy is the one you read
 

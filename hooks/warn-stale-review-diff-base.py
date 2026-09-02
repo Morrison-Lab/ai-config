@@ -82,10 +82,28 @@ RX_RANGE = re.compile(
 
 # Only these subcommands take a range whose base is a review scope. `git
 # rebase`, `git merge`, and friends are excluded on purpose.
-RX_GIT_RANGE_CMD = re.compile(
-    r"(?<![A-Za-z0-9-])git\b(?:\s+-[-A-Za-z0-9]+(?:[= ]\S+)?)*\s+"
+_GIT_RANGE_CMD = (
+    r"git\b(?:\s+-[-A-Za-z0-9]+(?:[= ]\S+)?)*\s+"
     r"(diff|log|shortlog|merge-base|rev-list|range-diff)\b"
 )
+
+# On a shell command line, require the invocation to sit at a COMMAND position:
+# the start of the string, or after a separator or an opening paren. That is
+# what distinguishes a command git will run from one quoted inside another
+# command's argument --- `git commit -m "...git diff main...HEAD"`,
+# `grep -rn 'git diff main...pr-98'`, `gh pr comment --body "..."`.
+#
+# Stripping quoted spans instead would be wrong in both directions: it silences
+# `git diff "main...pr-98"`, which git really does run, and it mangles ordinary
+# English, where an apostrophe in "the branch's diff" opens a span that swallows
+# everything up to the next contraction.
+RX_GIT_RANGE_CMD_SHELL = re.compile(
+    r"(?:\A|[\n;|&(]|&&|\|\|)\s*(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*" + _GIT_RANGE_CMD
+)
+
+# A brief is prose, not a shell line, so the invocation is quoted or inline by
+# construction and no command position exists to anchor to.
+RX_GIT_RANGE_CMD_PROSE = re.compile(r"(?<![A-Za-z0-9-])" + _GIT_RANGE_CMD)
 
 # Refs that are not local branch names, so cannot be the failure this catches.
 # Remote names to fall back on when `git remote` cannot be read. A local branch
@@ -102,17 +120,14 @@ SYMBOLIC = {
 }
 
 RX_SHA = re.compile(r"\A[0-9a-f]{7,40}\Z")
-# A version tag is immutable, so it cannot go stale the way a branch does.
-RX_TAG = re.compile(r"\A[vV]?\d+(\.\d+)*\Z")
+# A tag is immutable, so it cannot go stale the way a branch does. Covers a
+# pre-release suffix (`v1.2.0-rc1`) and a date tag (`2026-08-01`), both of which
+# a bare `[vV]?\d+(\.\d+)*` form would have warned on.
+RX_TAG = re.compile(r"\A(?:[vV]?\d+(?:\.\d+)*(?:[-+][0-9A-Za-z][0-9A-Za-z.]*)?"
+                    r"|\d{4}-\d{2}-\d{2})\Z")
 # `[^\n]*` after the delimiter is load-bearing: `cat <<'EOF' > f.md` puts a
 # redirection between the delimiter and the newline, and a pattern anchored
 # straight to `\n` misses exactly the form used to write a file.
-# A quoted span is text the command carries rather than refs it operates on:
-# `git commit -m "stop using git diff main...HEAD"`, `grep -rn "git diff
-# main...pr-98"`, `gh pr comment --body "..."`. README names firing on a merely
-# quoted invocation as the cautionary example (`require-gh-repo-flag.py`).
-RX_QUOTED_SPAN = re.compile(r"'[^']*'|\"(?:[^\"\\]|\\.)*\"")
-
 RX_HEREDOC = re.compile(
     r"<<-?\s*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1[^\n]*\n.*?^\s*\2\s*$",
     re.DOTALL | re.MULTILINE,
@@ -122,14 +137,19 @@ RX_HEREDOC = re.compile(
 BRIEF_TOOLS = {"Agent", "Task", "SendMessage"}
 BRIEF_KEYS = ("prompt", "message", "description", "summary")
 
+SUMMARY = ("warn-stale-review-diff-base: diff base {bases} is a bare local "
+           "branch. Resolve it from a remote-tracking ref after a fetch, and "
+           "cross-check the counts against `gh pr view --json changedFiles`.")
+
 NOTE = """\
 A diff range in this call names a bare local branch as its base: {bases}
 
 `verify-the-right-artifact.md`'s "A comparison's base is an artifact too"
 covers why that is a claim rather than a label. A local branch is a cached copy
-of a remote one, and `A...B` computes from the merge-base of the refs you
-supplied -- so the three-dot form is not self-correcting. It is only as fresh
-as the local ref.
+of a remote one, so both range forms inherit whatever revision it is parked at:
+`A..B` reads the base you named, and `A...B` computes a merge-base FROM the
+base you named, which is what makes the three-dot form feel self-correcting
+when it is not.
 
 A base that is BEHIND its remote widens the diff, so a review runs on
 already-merged work by other people and returns findings against code this
@@ -162,11 +182,6 @@ def strip_heredocs(command):
     return RX_HEREDOC.sub("<<HEREDOC", command)
 
 
-def strip_quoted(command):
-    """Blank out quoted spans, so a command that merely quotes a range is inert."""
-    return RX_QUOTED_SPAN.sub('""', command)
-
-
 def remote_names(cwd):
     """Remote names for `cwd`, falling back to a small set on any failure."""
     try:
@@ -180,7 +195,10 @@ def remote_names(cwd):
     if proc.returncode != 0:
         return FALLBACK_REMOTES
     names = {line.strip() for line in proc.stdout.splitlines() if line.strip()}
-    return (names | FALLBACK_REMOTES) if names else FALLBACK_REMOTES
+    # Not unioned with the fallback: doing that would exempt a LOCAL branch
+    # named `upstream/foo` in every repository, including ones with no
+    # `upstream` remote. The fallback is for when the real list is unavailable.
+    return names or FALLBACK_REMOTES
 
 
 def normalize_base(token):
@@ -231,13 +249,32 @@ def is_local_branch_base(token, remotes):
     return True
 
 
-def stale_bases(text, remotes):
+RX_DASH_C = re.compile(r"(?<![A-Za-z0-9-])git\s+-C\s+(\S+)")
+
+
+def target_repo(command, default):
+    """The repository a `git -C <path> ...` command operates on.
+
+    Without this, a `git -C /other/repo diff feature/x...HEAD` is classified
+    against the SESSION's remote list rather than that repository's --- which
+    is this fragment's own substitution, committed by its own instrument.
+    """
+    if not isinstance(command, str):
+        return default
+    match = RX_DASH_C.search(command)
+    if not match:
+        return default
+    path = match.group(1).strip("'\"")
+    return path if os.path.isdir(path) else default
+
+
+def stale_bases(text, remotes, pattern):
     """Return the bare-local-branch bases of any git range in `text`."""
     if not isinstance(text, str) or not text:
         return []
-    body = strip_quoted(strip_heredocs(text))
+    body = strip_heredocs(text)
     found = []
-    for match in RX_GIT_RANGE_CMD.finditer(body):
+    for match in pattern.finditer(body):
         # Only this command's own arguments, up to a separator.
         tail = re.split(r"[\n;|&]", body[match.end():], maxsplit=1)[0]
         for token in tail.split():
@@ -256,12 +293,21 @@ def stale_bases(text, remotes):
     return found
 
 
-def _emit(note):
+def _emit(note, summary):
+    """Emit both channels.
+
+    `additionalContext` reaches the model; `systemMessage` reaches the user's
+    terminal. This hook exists to correct a premise the AUTHOR asserted, so
+    the human-visible channel is the one that closes the loop --- 13 of the
+    16 registered PreToolUse warn hooks emit it, and `check-hook-output-shape`
+    does not require it here because its rule is scoped to `Stop` hooks.
+    """
     print(json.dumps({
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "additionalContext": note,
-        }
+        },
+        "systemMessage": summary,
     }))
 
 
@@ -300,24 +346,31 @@ def main():
     try:
         if tool_name == "Bash":
             texts = [tool_input.get("command")]
+            pattern = RX_GIT_RANGE_CMD_SHELL
         elif tool_name in BRIEF_TOOLS:
             texts = [tool_input.get(k) for k in BRIEF_KEYS]
+            pattern = RX_GIT_RANGE_CMD_PROSE
         else:
             return 0
 
         if not any(isinstance(t, str) and ".." in t for t in texts):
             return 0
 
-        remotes = remote_names(payload.get("cwd") or os.getcwd())
+        cwd = payload.get("cwd") or os.getcwd()
+        if tool_name == "Bash":
+            cwd = target_repo(tool_input.get("command"), cwd)
+        remotes = remote_names(cwd)
+
         bases = []
         for text in texts:
-            for base in stale_bases(text, remotes):
+            for base in stale_bases(text, remotes, pattern):
                 if base not in bases:
                     bases.append(base)
         if not bases:
             return 0
 
-        _emit(NOTE.format(bases=", ".join("`%s`" % b for b in bases)))
+        named = ", ".join("`%s`" % b for b in bases)
+        _emit(NOTE.format(bases=named), SUMMARY.format(bases=named))
     except Exception as exc:  # noqa: BLE001 --- a reminder must never break a tool
         print(f"warn-stale-review-diff-base: could not evaluate ({exc})",
               file=sys.stderr)

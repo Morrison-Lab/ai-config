@@ -207,7 +207,7 @@ An adversarial review of that same PR then caught a second instance of the same 
 The fix had been swept across `CLAUDE.md` and `shared/workflow/check-before-pushing.md` but not `AGENTS.md`, which `CLAUDE.md:3-5` names as the authoritative cross-agent contract and which carried a near-verbatim twin of the edited paragraph.
 The sweep had been keyed on the file that prompted the work rather than on the population carrying the claim.
 
-## A stale local base that quadrupled a review diff's file count
+## A stale local base that nearly quadrupled a review diff's file count
 
 Measured 2026-09-02 while reviewing [ucdavis/matt.contracts#98](https://github.com/ucdavis/matt.contracts/pull/98).
 

@@ -4687,6 +4687,11 @@ def main() -> int:
         ("investigation in method aside", "### Verdict\n**Ready for merge.** The prior blocking finding is resolved by (patch applied, root cause still under investigation)."),
         ("in-progress in method aside", "### Verdict\n**Ready for merge.** The prior blocking finding is resolved by (a fix is in progress)."),
         ("critical error in method aside", "### Verdict\n**Ready for merge.** The prior blocking finding is resolved by (a critical error in the login flow)."),
+        ("no fix in aside", "### Verdict\n**Ready for merge.** The prior blocking finding is resolved by (no fix merged)."),
+        ("ignored in aside", "### Verdict\n**Ready for merge.** The prior blocking finding is resolved by (edge case ignored)."),
+        ("omitted in aside", "### Verdict\n**Ready for merge.** The prior blocking finding is resolved by (some inputs omitted)."),
+        ("skipped in aside", "### Verdict\n**Ready for merge.** The prior blocking finding is resolved by (validation skipped for now)."),
+        ("zero in aside", "### Verdict\n**Ready for merge.** The prior blocking finding is resolved by (zero test coverage)."),
     ):
         check(
             f"{label} stays not-clean (#2960)",

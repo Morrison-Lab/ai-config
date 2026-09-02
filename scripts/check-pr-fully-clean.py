@@ -1188,17 +1188,22 @@ _RESOLUTION_FORBIDDEN_LOOKAHEAD = (
 
 # Parenthesized asides inside the lead-in or method phrase are checked against
 # a stricter lookahead per character: finite verbs, progress indicators,
-# open-work phrasing, and defect words are forbidden so an aside like "(root
-# cause under investigation)" or "(a fix is in progress)" cannot masquerade
-# as a benign clarification (ai-config#2960).
+# open-work phrasing, and defect words are forbidden (in addition to everything
+# in _RESOLUTION_FORBIDDEN_LOOKAHEAD) so an aside like "(root cause under
+# investigation)" or "(a fix is in progress)" cannot masquerade as a benign
+# clarification (ai-config#2960).
 _ASIDE_FORBIDDEN_LOOKAHEAD = (
     r"(?!\b(?:"
-    r"and|but|while|although|however|yet|though|except|because|since|if|unless|when|where|"
-    r"not|never|neither|nor|none|nothing|without|hardly|barely|scarcely|"
+    r"and|but|while|although|however|yet|though|"
+    r"not|never|neither|nor|no|none|nothing|without|"
+    r"hardly|barely|scarcely|zero|"
+    r"partially?|incomplete(?:ly)?|ignor(?:e|ed|ing|es)?|omit(?:s|ted|ting)?|skip(?:s|ped|ping)?|"
+    r"except|unresolved|unfixed|unaddressed|open|reproduce[s]?|broken|failing|fails?|failed|"
     r"is|are|was|were|will|would|could|should|can|has|have|had|be|being|been|remains?|persists?|"
-    r"investigat\w*|progress|pend\w*|wip|tbd|todo|open|broken|failing|fails?|failed|"
-    r"need\w*|requir\w*|follow[- ]?up|still|reproduc\w*|incomplet\w*|partially?|"
-    r"(?<!\bno\s)(?<!zero\s)(?:defects?|bugs?|errors?|crashes?|leaks?|faults?|flaws?|regressions?|unresolved|unfixed|unaddressed|problem\w*)|"
+    r"investigat\w*|progress|pend\w*|wip|tbd|todo|"
+    r"need\w*|requir\w*|follow[- ]?up|still|problem\w*|"
+    r"defects?|bugs?|errors?|crashes?|leaks?|faults?|flaws?|regressions?|"
+    r"because|since|if|unless|when|where|"
     r"(?:suppress|disabl|mut|weaken|bypass|silenc|remov|delet|revert)(?:e|ed|ing)?\s+(?:(?:the|an?|all|these|those|that|our|any)\s+)?(?:[a-z0-9_-]+\s+)?(?:tests?|checks?|assertions?|warnings?|linters?|guards?|lints?|detectors?|errors?)|"
     r"comment(?:ed|ing)?\s+out\s+(?:(?:the|an?|all|these|those|that|our|any)\s+)?(?:[a-z0-9_-]+\s+)?(?:tests?|checks?|assertions?|warnings?|linters?|guards?|lints?|detectors?|errors?)"
     r")\b)"

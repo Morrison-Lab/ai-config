@@ -38,7 +38,7 @@ the `gh` command shown if this session doesn't have `gh`:
 
 ```bash
 gh pr list --state open --json number,title,headRefName,author,assignees,mergeable,mergeStateStatus,comments \
-  --jq '.[] | "#\(.number) [\(.author.login); assignees: \([.assignees[].login] | join(","))] \(.title) [\(.mergeable)]"'   # LIST_PRS
+  --jq '.[] | "#\(.number) \(.headRefName) [\(.author.login); assignees: \([.assignees[].login] | join(","))] \(.title) [\(.mergeable)]"'   # LIST_PRS
 gh issue list --state open --json number,title --jq '.[] | "#\(.number) \(.title)"'   # LIST_ISSUES
 git status --short                         # uncommitted work?
 git worktree list                          # leftover worktrees (agent isolation / session-lock)?

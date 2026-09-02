@@ -571,6 +571,9 @@ A mention such as "do not touch #N" is not a request, a claim comment confers
 no scope, and a sweep skill's "every open PR" means every PR that passes this
 test.
 An out-of-scope PR is reported to the user and left untouched.
+When no identity operation is available, fail closed the way `ardia` does:
+leave the author and assignee arms unevaluated, act only on PRs the user
+explicitly asked for or the Actions app authored, and say so in the report.
 `memories/reviewing-prs.md` carries the full rule and its provenance;
 `skills/ardia/SKILL.md` step 1 is the reference implementation.
 

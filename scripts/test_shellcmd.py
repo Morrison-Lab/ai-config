@@ -56,6 +56,19 @@ check("subshell parens split", subs("(git commit -m x; git push)"),
       ["commit", "push"])
 check("unbalanced quote is a parse error",
       shellcmd.simple_commands('git commit -m "unclosed'), None)
+# The heredoc pre-pass and the newline rewrite both run on RAW TEXT, ahead of
+# `shlex`, so neither knows the quoting rules. Both limits are documented in
+# the module docstring and both fail toward `None` or toward a mangled
+# ARGUMENT rather than toward a wrong command boundary. Pinned so a later
+# quote-aware rewrite is a visible change rather than a silent one.
+check("a `<<` inside a quoted argument can unbalance the quote and fail open",
+      shellcmd.simple_commands("git commit -m 'fix a << b'\nb=1\ngit push"),
+      None)
+check("a newline inside a quoted argument arrives in the token as a semicolon",
+      shellcmd.simple_commands("git commit -m 'line1\nline2'"),
+      [["git", "commit", "-m", "line1;line2"]])
+check("but the command boundaries around it are still right",
+      subs("git commit -m 'line1\nline2'\ngit push"), ["commit", "push"])
 check("empty input", shellcmd.simple_commands(""), [])
 
 # ------------------------------------------------------------- heredocs

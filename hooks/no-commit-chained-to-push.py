@@ -142,8 +142,17 @@ that genuinely set the variable for the push:
 
   * as an assignment prefixing the matched commit or push
     (`ALLOW_COMMIT_AND_PUSH=1 git commit -m x && git push`), or
-  * as its own earlier command in the same call
+  * as the call's LEADING assignment
     (`export ALLOW_COMMIT_AND_PUSH=1 && git commit -m x && git push`).
+
+"Leading" is literal: position zero, followed by a separator. An assignment
+further along genuinely sets the variable and is still refused
+(`cd /repo && export ALLOW_COMMIT_AND_PUSH=1 && git commit -m x && git push`
+denies), which is a deliberate trade -- the raw-text anchor is what makes a
+subshell or short-circuited assignment impossible to mistake for a real one,
+and no argv-level test can draw that line, because the split discards
+connectors. Move the assignment to the front, or prefix the commit or the
+push directly.
 
 An assignment on some unrelated third command does NOT clear it, and neither
 does a mention in a commit message. `export` is accepted because
@@ -203,18 +212,27 @@ working-tree edit, one `git checkout -- .` from destruction.
 records this instance of it, caught only because an adversarial reviewer
 checked whether HEAD had moved.
 
-Split them into two Bash calls:
+Split them into two Bash calls. The two commands, re-rendered from the parsed
+argv:
 
     call 1:  {commit}
     call 2:  {push}
 
-The commit is durable before anything can refuse the push, and a refusal then
-means what it says. Nothing else about the commands needs to change.
+Those lines IDENTIFY the commands rather than reproducing them byte for byte:
+quoting is normalized, and a newline inside a quoted argument (a multi-line
+`-m` message) is shown as `;`. Split your original text rather than pasting
+these. Nothing about either command's content needs to change -- only the call
+boundary between them.
+
+The commit is then durable before anything can refuse the push, and a refusal
+means what it says.
 
 `{override}=1` clears this refusal, either prefixing one of the two commands
-above or as its own earlier command (`export {override}=1 && ...`). It is for a
-case this guard did not foresee; reaching for it means saying why the call could
-not be split.
+above or as the call's LEADING assignment (`export {override}=1 && ...`, at
+position zero). An assignment further along the line does not count, even
+though the shell would honour it -- move it to the front. It is for a case this
+guard did not foresee; reaching for it means saying why the call could not be
+split.
 """
 
 
@@ -255,34 +273,37 @@ def _standalone_override(command):
     return LEADING_OVERRIDE.match(command) is not None
 
 
-# A push that TRANSFERS NOTHING and a commit that CREATES NOTHING each remove
-# the hazard, so neither is matched.
+# NO EXEMPTION FOR AN "INERT" COMMIT OR PUSH, and the reason is worth stating
+# because a reviewer asked for one and the exemption was written, shipped, and
+# then removed.
 #
-#   `git push --dry-run` / `-n`, and `git push --delete` / `-d`
-#       `no-push-without-self-review.py` documents both as never examined, and
-#       `no-clobbering-push.py` skips them too -- so no sibling can refuse
-#       them, and there is nothing for a chained commit to be lost to.
-#   `git commit --dry-run`
-#       The docstring's own order rationale applies: nothing was created, so
-#       nothing can go missing.
+# The request was sound on its face: `git push --dry-run` transfers nothing and
+# `git commit --dry-run` creates nothing, and `no-push-without-self-review.py`
+# documents that it never examines a dry-run or a deletion -- so denying those
+# chains looked like a pure false positive. The exemption was added, and a
+# second review measured two ways it went silent on a real loss:
 #
-# Only the long spellings and the exact short flags are recognized. A short
-# CLUSTER is deliberately not decomposed (`-n` inside `-qn` is not matched),
-# because guessing wrong here means going silent on a real push -- the
-# expensive direction -- and `no-clobbering-push.py` already carries the full
-# short-option grammar for anyone who needs it.
-PUSH_INERT = {"--dry-run", "-n", "--delete", "-d"}
-COMMIT_INERT = {"--dry-run"}
-
-
-def _inert(rest, flags):
-    """True when `rest` carries one of `flags` before a `--` end-of-options."""
-    for tok in rest:
-        if tok == "--":
-            return False
-        if tok in flags:
-            return True
-    return False
+#   git commit -m wip && git push --force --delete origin old
+#       `no-clobbering-push.py` DENIES this. Its `delete` exemption lives in
+#       its reading pass only; its refusal pass tests `force` and `dry_run`
+#       and never consults `delete`. So the sibling refuses, the commit is
+#       discarded, and the exemption hid it.
+#   git commit -m wip && git push --dry-run --no-dry-run --force origin main
+#       Every git option has a `--no-` form, so a scan that stops at the first
+#       `--dry-run` reads a live force push as inert. `no-clobbering-push.py`
+#       carries this exact lesson in its own comments, having been bitten by
+#       it, and DENIES this too.
+#
+# Making the exemption sound means reimplementing git's option grammar --
+# last-occurrence-wins, `--no-` negation, short clusters, `--` end-of-options
+# -- and then ALSO tracking which pass of which sibling exempts what, since
+# those differ per guard and per pass. That is a large, drifting surface whose
+# only payoff is not refusing a rare command.
+#
+# The costs are not comparable. Refusing a chained dry-run costs one extra
+# tool call. Missing a chained force-delete costs a silently discarded commit,
+# which is the whole failure this guard exists to prevent. So the exemption is
+# gone and the false positive is accepted, deliberately.
 
 
 def evaluate(command):
@@ -300,25 +321,25 @@ def evaluate(command):
         parsed = git_subcommand(argv)
         if parsed is None:
             continue
-        sub, rest, env = parsed
+        sub, _rest, env = parsed
         if sub not in ("commit", "push"):
             continue
         if env_value(env, OVERRIDE) == "1":
             return None
         if sub == "commit" and commit_argv is None:
-            if _inert(rest, COMMIT_INERT):
-                continue
             commit_argv = argv
         elif sub == "push" and commit_argv is not None:
-            if _inert(rest, PUSH_INERT):
-                continue
-            # `shlex.join`, never `" ".join`. The message offers these lines
-            # as copy-paste remedies under "nothing else needs to change", and
-            # the argv is DEQUOTED -- so joining on spaces re-emits
-            # `git commit -m "fix: a b; rm -rf x"` as
-            # `git commit -m fix: a b; rm -rf x`, which commits `fix:` and
-            # then runs `rm -rf x`. A guard whose remedy is more dangerous
-            # than the command it refused is worse than no guard.
+            # `shlex.join`, never `" ".join`. The argv is DEQUOTED, so a
+            # space join re-emits `git commit -m "fix: a b; rm -rf x"` as
+            # `git commit -m fix: a b; rm -rf x` -- which commits `fix:` and
+            # then runs `rm -rf x`. A guard whose message is more dangerous
+            # than the command it refused is worse than no guard, and someone
+            # WILL paste a line a refusal printed at them.
+            #
+            # `shlex.join` makes it injection-safe and not byte-faithful: a
+            # newline inside a quoted argument has already become `;` in
+            # `simple_commands`, which is quote-blind about the rewrite. The
+            # DENY text says so rather than inviting the paste.
             return DENY.format(commit=shlex.join(commit_argv),
                                push=shlex.join(argv), override=OVERRIDE)
     return None

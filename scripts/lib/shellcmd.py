@@ -27,6 +27,32 @@ split is the "teach the checker about code regions" fix it prescribes. `shlex`
 in POSIX mode already knows the quoting rules, so a caller asking "is `git push`
 the command word of some simple command" gets the answer without accreting one
 regex clause per quoting shape.
+
+TWO LIMITS, BOTH INHERITED FROM THE SEVEN COPIES, BOTH FAIL-OPEN
+-----------------------------------------------------------------
+The heredoc pre-pass and the newline rewrite run on RAW TEXT, ahead of `shlex`,
+so neither knows the quoting rules the paragraph above credits `shlex` with.
+State that here rather than letting the argv-split argument imply otherwise:
+
+  * `RX_HEREDOC` is quote-blind. A `<<` inside a quoted argument -- a commit
+    message that mentions a heredoc, say -- can be treated as a real operator,
+    and consuming up to a delimiter then unbalances the quote. `shlex` raises
+    `ValueError` and `simple_commands` returns `None`. Measured:
+
+        simple_commands("git commit -m 'fix a << b'\nb=1\ngit push")  ->  None
+
+  * The newline rewrite is quote-blind for the same reason, so a newline
+    INSIDE a quoted argument (a multi-line `-m` message) arrives in the token
+    as `;`. The command boundaries are still right; the argument's TEXT is
+    not, so a caller must never present a rejoined argv as the user's original
+    text.
+
+Both fail toward silence or toward a mangled argument rather than toward a
+wrong command boundary, which is the right direction for a guard, and `None`
+is what every caller here treats as "cannot evaluate". Fixing either means a
+quote-aware pre-scan, which is a real parser and out of scope for an
+extraction; ai-config#2993 is where that belongs, alongside migrating the
+seven copies.
 """
 from __future__ import annotations
 

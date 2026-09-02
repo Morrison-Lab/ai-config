@@ -242,25 +242,24 @@ check("a prefix assignment to 0 does not clear it",
 check("a prefix assignment to true does not clear it",
       fires("ALLOW_COMMIT_AND_PUSH=true git commit -m x && git push"), True)
 
-# 7b. INERT commands. A push that transfers nothing and a commit that creates
-# nothing each remove the hazard, and both siblings decline to examine the
-# push forms -- so denying them would be a pure false positive.
-check("a dry-run push", fires("git commit -m x; git push --dry-run"), False)
-check("a dry-run push, short form",
-      fires("git commit -m x && git push -n"), False)
-check("a branch-deletion push",
-      fires("git commit -m x && git push --delete origin b"), False)
-check("a branch-deletion push, short form",
-      fires("git commit -m x && git push -d origin b"), False)
-check("a dry-run commit", fires("git commit --dry-run -m x && git push"),
-      False)
-# ... and none of those exemptions may mask a real one alongside it.
-check("a dry-run push does not mask a real push after it",
-      fires("git commit -m x && git push --dry-run; git push"), True)
-check("a dry-run commit does not mask a real commit after it",
-      fires("git commit --dry-run -m x; git commit -m y && git push"), True)
-check("a literal --dry-run after -- is an argument, not a flag",
-      fires("git commit -m x && git push origin -- --dry-run"), True)
+# 7b. NO EXEMPTION for a "dry-run" or "delete" command. An exemption for these
+# was written on a reviewer's request and then removed, because a second review
+# measured two ways it went silent on a real loss -- see the hook's own
+# "NO EXEMPTION" comment. Each case below is a deliberately accepted FALSE
+# POSITIVE; the two after them are why.
+check("a dry-run push is still denied", fires("git commit -m x; git push --dry-run"), True)
+check("a branch-deletion push is still denied",
+      fires("git commit -m x && git push --delete origin b"), True)
+check("a dry-run commit is still denied",
+      fires("git commit --dry-run -m x && git push"), True)
+# THE REGRESSION CASES. Both are denied by `no-clobbering-push.py` -- which
+# exempts `delete` in its reading pass only, and honours `--no-` negation --
+# so an exemption keyed on the literal flag hid a genuine discarded commit.
+check("a force-delete push is denied, as no-clobbering-push.py denies it too",
+      fires("git commit -m wip && git push --force --delete origin old"), True)
+check("a negated dry-run carrying a force is denied",
+      fires("git commit -m wip && git push --dry-run --no-dry-run --force "
+            "origin main"), True)
 
 # 7c. THE REMEDY LINES the deny message prints are copy-paste text, so they
 # must be requoted rather than space-joined. A space join re-emits
@@ -271,6 +270,23 @@ check("the remedy requotes an argument containing a separator",
       "git commit -m 'fix: a b; rm -rf x'" in remedy, True)
 check("the remedy does not emit the argument bare",
       "git commit -m fix: a b; rm -rf x" in remedy, False)
+for hostile in ('git commit -m "a $HOME b" && git push',
+                "git commit -m 'a `id` b' && git push",
+                'git commit -m "a \\"q\\" b" && git push'):
+    text = hook.evaluate(hostile) or ""
+    check(f"the remedy quotes {hostile[16:28]!r} safely",
+          "call 1:  git commit -m '" in text or 'call 1:  git commit -m "' in text,
+          True)
+# ... but it must NOT claim byte-fidelity, because the newline rewrite in
+# `simple_commands` is quote-blind: a multi-line `-m` message comes back with
+# its newline as `;`. The message says so rather than inviting a paste.
+multiline = hook.evaluate("git commit -m 'line1\nline2' && git push") or ""
+check("a multi-line message is visibly re-rendered",
+      "line1;line2" in multiline, True)
+check("the message warns the lines are not byte-for-byte",
+      "rather than reproducing them byte for byte" in multiline, True)
+check("the message does not promise nothing needs to change",
+      "Nothing else about the commands needs to change" in multiline, False)
 
 # 8. Degenerate inputs.
 check("empty command", fires(""), False)

@@ -930,7 +930,7 @@ The key points, restated here because a bare pointer is invisible to a consumer 
   Attribution is a second axis, and it runs before the claim: intersect the merge's own deleted and renamed paths (`git diff --name-status -M "$merge^1" "$merge" | grep -E '^(D|R)'`) with each conflict, and report conflicts caused alongside conflicts found.
   `git show --name-status <merge>` cannot supply that set for a **true** (two-parent) merge --- it prints no file list at all there, and grepping its header for `^[ADMR]` returns three phantom paths.
   It does diff a squash merge normally, so whether it works depends on how the repo merges rather than on the commit in front of you.
-  A conflict you caused on a branch you do not own is an explanatory comment, not a push.
+  A conflict you caused on a PR that fails `memories/reviewing-prs.md`'s scope test is a report to the user, not a comment or a push.
 - **Independent per-PR checking cannot see pair collisions.**
   Every PR can be clean against `main` while two of them conflict with each other.
   Only a pairwise `git merge-tree` between PR heads finds that.

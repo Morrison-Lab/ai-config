@@ -21,9 +21,10 @@ must refuse to label a non-Pacific reading as local. Four cases:
 
 Every case runs against stubs rather than the ambient host, so the suite
 passes and fails for the same reasons on macOS, on Ubuntu CI, and on a host
-with no TZ database. Case 3 is what tells a hook that checks the zone from
-one that merely prints whatever `date` said (ai-config#1918, the Git Bash
-GMT fallback).
+with no TZ database. Case 2 is the Git Bash shape ai-config#1918 measured,
+where the TZ override answers GMT and the system zone is already Pacific.
+Case 4 is what tells a hook that checks the zone from one that merely
+prints whatever `date` said.
 """
 import os
 import re

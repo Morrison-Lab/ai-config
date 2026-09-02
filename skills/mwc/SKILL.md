@@ -64,7 +64,9 @@ without asking confirmation before every merge.
   On a direct merge a stale merge-base means an update pinned to the
   recorded head (`PUT .../pulls/<N>/update-branch` with
   `expected_head_sha`, or the MCP tool's `expectedHeadSha`; a `422`
-  means another writer moved the head, so settle ownership instead),
+  whose message names an expected-head mismatch (match on the substring `expected head sha`, since the live text carries a curly apostrophe and a trailing period that this ASCII rendering cannot show)
+  means another writer moved the head, so settle ownership instead,
+  and any other `422` is a failed update to stop on),
   a wait until `headRefOid` changes (the update is asynchronous),
   recording that SHA,
   a currency check on it,

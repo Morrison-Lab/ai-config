@@ -79,6 +79,18 @@ the enforcement follow-up: a repo with no such check yet needs to add one, and
 a repo whose check already scans `.R`/`.qmd` needs to extend it.
 In `ai-config` itself, `scripts/check-ascii-punctuation.py` gates `.py` and `.R`
 files and can scan added lines in PRs and working trees (ai-config#2550).
+**Run it on a Markdown edit in diff mode, never in its default mode.**
+Named a `.md` path, the default whole-file mode scans nothing,
+prints `notice: No files found matching criteria.`, and exits 0,
+which reads as a pass;
+`--diff --base origin/<default-branch>` inspects the added lines of `.py`, `.R`, `.qmd`, `.md`, `.sh`, `.yml`, and `.yaml` files,
+and `--extensions` widens that set.
+(Measured 2026-09-01 on ai-config#2944:
+the default mode's notice was read as clean,
+and a reflow-carried em-dash reached the external review.)
+
+- **Do:** check a Markdown diff with `python3 scripts/check-ascii-punctuation.py --diff --base origin/<default-branch>` before pushing.
+- **Don't:** read the default mode's `No files found` notice on a `.md` path as a clean result.
 For `Morrison-Lab/gha`'s `check-non-standard-chars` specifically, that follow-up is tracked in gha#322, which is now **partly done**.
 
 Both halves were re-measured on 2026-08-17, by reading `check-non-standard-chars/check-non-standard-chars.py` at the `v2` tag --- the ref consumers actually pin --- and they now differ:

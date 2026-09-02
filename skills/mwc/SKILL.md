@@ -62,6 +62,10 @@ It is still the wrong default, because a peer may have further commits planned, 
 
 **A peer's PR may be merged once it has been ready to merge for more than twenty minutes** (maintainer directive, 2026-08-27).
 
+That peer's PR must itself pass `memories/reviewing-prs.md`'s scope test first: opened by or assigned to the invoking user, explicitly requested, or authored by the GitHub Actions app.
+A peer session running under your own login satisfies the author arm, which is the case this section was written for.
+Another lab member's PR that fails the test does not become yours by going quiet: it gets neither the warning comment nor the merge, and is reported to the user instead.
+
 The interval is what does the work here, and it is doing something specific rather than being a polite pause.
 A session actively driving a PR pushes again within a few minutes of a clean verdict, so twenty minutes of quiet distinguishes *waiting on a human* from *mid-round* --- which is the only thing you actually need to know, and the one thing you cannot ask the peer for reliably.
 

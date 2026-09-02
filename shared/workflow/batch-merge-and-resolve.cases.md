@@ -32,8 +32,11 @@ PR #555 looked caused, because its conflict was on
 `19ab811d`, confirmed with `git log --diff-filter=D`.
 Without attribution the sweep prescribes claiming and resolving all 20.
 The branch behind #511 was a CRAN release branch this session did not own, so
-the response was an explanatory comment naming the rename and where the content
-went, not a push.
+the response at the time was an explanatory comment naming the rename and where
+the content went, not a push.
+That comment is superseded: #511 was Copilot-authored and assigned to others,
+so under `memories/reviewing-prs.md`'s scope test it gets no comment either,
+and the current response is a report to the user.
 `git show --name-status "$merge"` was the first command reached for and printed
 no file list at all --- both merges here are two-parent merges, which is the
 case that behaves this way; re-measured against this corpus's own merge

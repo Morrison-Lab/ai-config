@@ -59,6 +59,10 @@ operations:
     description: List pull requests.
     cli: gh pr list
     github_mcp: mcp__github__list_pull_requests
+  - id: WHO_AM_I
+    description: Resolve the invoking user's login, for the PR-scope filter in `memories/reviewing-prs.md`.
+    cli: gh api user --jq .login
+    github_mcp: mcp__github__get_me
   - id: SEARCH_PRS
     description: Search pull requests by keyword / query string.
     cli: gh pr list --search "<query>"

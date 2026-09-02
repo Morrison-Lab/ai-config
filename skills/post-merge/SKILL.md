@@ -227,20 +227,35 @@ finding's disposition.)
 subagent** rather than running the scan-and-resolve loop in the main thread
 --- it's exactly the kind of investigation-plus-fix work the coordinator
 should hand off (see `memories/preferences.md`'s coordinator-mode bullet).
-Brief the subagent with the merged PR's number/branch and the steps below;
+Brief the subagent with the merged PR's number/branch, the resolved invoking
+user and their aliases, the exact list of PR numbers the request explicitly
+authorized (possibly empty), the exact list it explicitly excluded (possibly
+empty; a veto over every positive arm, the user's own PRs included), and the
+steps below;
 have it report back which PRs it found conflicting, what it did about each,
 and any it skipped (already claimed, conflict it couldn't understand). Do the
 scan inline only for a solo (non-orchestrated) session.
 
-**If any OTHER agents already own a claimed branch (an active, resumable
-`Agent`-tool session, not a one-shot `Workflow`-internal `agent()` call),
-message each one directly right after the merge, instead of relying solely on
+**If any OTHER agents of this session already own a claimed branch (an active,
+resumable `Agent`-tool session, not a one-shot `Workflow`-internal `agent()`
+call), message each one directly right after the merge, instead of relying solely on
 a separate scan to find and fix their conflict after the fact:** "main just
 advanced (PR #N merged) --- fetch and merge origin/main into your branch now,
 resolve any conflict yourself (you have the context on your own change), then
 continue." This is faster and higher-context than a scanning subagent
 guessing at the resolution from outside: the branch's own owning agent
 already knows why its code looks the way it does.
+Those branches are usually this session's own work, but re-check each one
+against `memories/reviewing-prs.md`'s scope test before sending the
+instruction: an assignment can change, and a delegated agent may be driving
+an assigned or requested PR that another author opened.
+A branch that fails the test, or that is claimed by an agent that is not
+yours, is handled like any other open PR: the scope filter decides, and an
+out-of-scope one is reported to the user and left untouched.
+When the re-check finds one of this session's own agents on a branch that
+now fails the test, tell that agent to stop before reporting the PR;
+withholding the merge-main message alone leaves it free to keep polling and
+pushing.
 
 **This depends on the coordinator finding out about a merge in the first
 place --- so brief every delegated agent, up front, to report back the
@@ -264,10 +279,17 @@ Scan right after the merge is confirmed:
 
 ```bash
 gh pr list --state open \
-  --json number,title,headRefName,mergeable,mergeStateStatus,comments   # LIST_PRS
+  --json number,title,headRefName,author,assignees,mergeable,mergeStateStatus,comments   # LIST_PRS
 ```
 
-For each PR where `mergeable == "CONFLICTING"` **or `"UNKNOWN"`** (GitHub can
+Filter that list by `memories/reviewing-prs.md`'s scope test first, as
+`ardia` step 1 does (opened by or assigned to the invoking user, on the
+explicitly authorized list from the brief, or authored by the GitHub Actions
+app (`github-actions`)), and report the PRs dropped.
+A conflict on an out-of-scope PR is reported to the user and the PR left
+untouched (no comment, no push); a claim comment does not bring it into scope.
+
+For each in-scope PR where `mergeable == "CONFLICTING"` **or `"UNKNOWN"`** (GitHub can
 take minutes to finish computing mergeability after a push — a genuinely
 conflicting PR can sit in `UNKNOWN` and get missed if you filter for
 `CONFLICTING` alone):
@@ -332,7 +354,8 @@ conflicting PR can sit in `UNKNOWN` and get missed if you filter for
    If a live claim stands --- a push or comment within the last 2 hours --- skip the PR.
    Another session owns it.
    An expired claim (over 2 idle hours) no longer blocks.
-   Take over with a fresh claim comment of your own, per [`claim-pr`](../../shared/workflow/claim-pr.md)'s expiration rule.
+   Take over with a fresh claim comment of your own, per [`claim-pr`](../../shared/workflow/claim-pr.md)'s expiration rule;
+   that claim guards against session collisions on a PR already in scope, and never reads an out-of-scope PR into scope.
 4. **Claim it.**
    ```bash
    gh pr comment <N> --body "Working on this — please hold off on pushing to this branch until I'm done.
@@ -378,16 +401,17 @@ Resolve PRs one at a time — not because worktrees race each other (each worktr
 One-at-a-time keeps the blast radius small.
 Skip any PR whose conflict is in a file you can't understand without more context — comment asking for clarification instead.
 
-**Match the response to standing, not only to cause.**
-Step 2 says whether a conflict is yours; it does not say the branch is.
-A conflict you genuinely caused, on a branch you do not own
---- a colleague's in-flight work,
-and most sharply a release branch carrying an out-of-band process ---
-is an explanatory comment naming the deletion or rename
-and where the content went, rather than a push to their branch.
-`sync-with-main` does prescribe re-applying the change on the sibling branch
-and pushing it, and that fits a workflow or CI file in a repo you drive.
-It is not the default for someone else's release branch.
+**Match the response to scope, not only to cause.**
+Step 2 says whether a conflict is yours; the scope filter in the paragraph
+above step 1 says whether the PR is.
+A conflict you genuinely caused on a PR that fails that test is a report to
+the user naming the deletion or rename and where the content went; the PR
+gets no comment and no push.
+On an in-scope PR, `sync-with-main` does prescribe re-applying the change on
+the sibling branch and pushing it, and that fits a workflow or CI file in a
+repo you drive.
+A release branch carrying an out-of-band process gets the report instead,
+whatever the test says.
 
 ### 2. Tidy the local branch
 
@@ -976,5 +1000,6 @@ When this post-merge wrap-up completes the session's work **and no PR this sessi
 - ❌ Treating the whole cascade-scan hit list as work caused by this merge, without
   intersecting it against the merge's own deleted and renamed paths (step 1.5's own step 2) --- on
   an old backlog that claims other people's stale PRs for no reason.
-- ❌ Pushing a resolution to a branch you don't own when a comment would do ---
-  sharpest on a release branch, where a push can disrupt an out-of-band process.
+- ❌ Pushing to, or commenting on, a PR that fails the scope test --- it gets a
+  report to the user --- or pushing to a release branch carrying an out-of-band
+  process even when it passes, where a report is the safe form.

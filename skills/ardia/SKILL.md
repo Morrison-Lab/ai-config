@@ -1,6 +1,6 @@
 ---
 name: ardia
-description: "Drive all open PRs to clean."
+description: "Drive every in-scope open PR to clean."
 user-invocable: true
 allowed-tools:
   - Bash
@@ -12,8 +12,9 @@ allowed-tools:
 
 # ARDIA — ARD + Iterate-All
 
-Apply the ARDI loop (ARD + iterate) to every open PR/MR in the repo, driving
-each to a clean review verdict in series.
+Apply the ARDI loop (ARD + iterate) to every in-scope open PR/MR in the repo
+(step 1's scope test decides which), driving each to a clean review verdict in
+series.
 Triage and local patch preparation may run in parallel first; every action that
 mutates a PR stays serial.
 
@@ -22,13 +23,36 @@ mutates a PR stays serial.
 1. **List the open PRs/MRs and decide which are in scope.**
    ```bash
    gh pr list --state open --limit 100 \
-     --json number,title,headRefName,baseRefName,isDraft,author,reviewDecision   # LIST_PRS
+     --json number,title,headRefName,baseRefName,isDraft,author,assignees,reviewDecision   # LIST_PRS
    ```
    On GitLab, use `glab api "projects/:id/merge_requests?state=opened&per_page=100"`
    and look for `source_branch` (≡ `headRefName`) and `target_branch` (≡ `baseRefName`)
    in the JSON — `glab mr list` alone does not expose these fields.
    State the scope rules when you report, so the user can
    correct:
+   - **Only PRs opened by the user, assigned to the user, explicitly requested by name, or authored by the Actions app are in scope.**
+     Resolve the invoking user first
+     --- `gh api user --jq .login` locally, `mcp__github__get_me` in a remote session, `glab api user | jq -r .username` on GitLab, where the fields are `author.username` and `assignees[].username` ---
+     and add any aliases `memories/reviewing-prs.md` lists for that person,
+     so a lab member running this corpus from a vendored checkout filters on their own identity rather than the corpus owner's.
+     When no identity operation is available, fail closed: leave the author and assignee arms unevaluated, keep only explicitly requested and Actions-app-authored PRs, and say so in the report.
+     Normalise the fields first: the author is `author.login` in `gh --json`, `user.login` in REST and `mcp__github__list_pull_requests`, and `author.username` on GitLab;
+     assignees are `assignees[].login` in `gh --json` and REST, bare login strings in `assignees` from `mcp__github__list_pull_requests`, or `assignees[].username` on GitLab.
+     The MCP list tool omits the `assignees` key on an unassigned PR (measured 2026-09-01).
+     Keep a PR only when its author is one of those logins or the repository's own workflow bot (the app slug `github-actions`, in whichever form the source returns it;
+     `memories/reviewing-prs.md` lists the forms),
+     one of those logins is among its `assignees`,
+     or the user explicitly asked for work on that PR (or, via an explicit `chores` call, on the bot population) --- a mention such as "do not touch [#284](https://github.com/UCD-SERG/serodynamics/pull/284)" is not a request;
+     exclude every other PR from the action queue before doing anything else, and name the excluded ones in the report so the user can assign or name any they want driven.
+     An explicit exclusion in the request ("ardia, but do not touch" followed by a number) is a veto checked before every positive arm, the way `chores`'s `PR_SCOPE_EXCLUDED` works:
+     an excluded PR is dropped even when the user authored it, is assigned to it, or the Actions app opened it, and the exclusion list travels with the sweep into every recheck below and into any brief handed to a subagent.
+     Scope is a live precondition rather than a one-time classification: assignment can change while a sweep runs, so re-read the author and assignees and reapply the test immediately before each push, comment, review, or merge on a PR, and drop and report one that no longer passes.
+     Keep the full listing for the stack detection in step 3, so an in-scope PR based on an out-of-scope PR's branch is still recognised as stacked.
+     Such a child is driven only while its base is clean or merged.
+     An open, unclean out-of-scope base is left to its author, and the child is parked and reported with it, per the stacked-PR rule in step 3.
+     "Every open PR" anywhere in this skill means every PR that survives this filter.
+     An out-of-scope PR (one that fails this test: another lab member's or another bot's, such as Dependabot's or a Copilot agent's, that is neither assigned to the user nor explicitly requested) is not driven, reviewed, or edited, however clean it looks (see `memories/reviewing-prs.md`, "Only work PRs I opened, am assigned to, or asked for by name, or the Actions app authored";
+     measured on `UCD-SERG/serodynamics` 2026-09-01, where the sweep drove four other authors' PRs before the correction arrived).
    - **Include drafts** (`isDraft: true`) unless another agent is actively driving one.
      A draft is the corpus's own in-flight claim signal ---
      [`pr-on-claim`](../../shared/workflow/pr-on-claim.md) opens one from an empty `start:` scaffold commit before any code exists ---
@@ -48,9 +72,6 @@ mutates a PR stays serial.
        mark it ready for review --- a clean verdict is unreachable while it stays draft.
      Name each draft's disposition, and the signal that decided it, in the scope report,
      so the user can veto before the loop touches it.
-   - **Only iterate PRs the user owns / is responsible for** by default. In a
-     shared repo, don't start review loops (which push commits) on other
-     people's PRs unless told to. If unsure who owns what, ask first.
    - **A green PR with no review check run is parked, not finished.**
      On a repo whose review workflow is `workflow_dispatch`-only, nothing
      fires on push, so a PR nobody ever reviewed presents exactly like one
@@ -178,6 +199,9 @@ mutates a PR stays serial.
    review findings), complete ARDI on the base first to drive it to clean and
    merge it, then start the derived PR. Never run ARDI on a derived PR while its
    base is still open and unclean — you'd be reviewing against a moving target.
+   When the base fails the scope test in step 1, do not run ARDI on it either:
+   park the derived PR, report the pair so the user can assign or name the
+   base, and move to the next PR.
 
    A PR reaching **clean-but-unmerged** is that PR's terminal state, **not** a
    reason to pause the sweep: merging is human-gated (you don't self-merge), but

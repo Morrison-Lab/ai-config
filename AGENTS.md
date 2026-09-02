@@ -558,6 +558,33 @@ This grants no merge authority: the strict merge policy below still applies.
   (`gh issue reopen <issue-number>`) per
   [`revert-merge.md`](shared/workflow/revert-merge.md).
 
+## Only work PRs opened by the user, assigned to the user, explicitly requested by the user, or authored by the Actions app
+
+Before pushing to, editing, commenting on, reviewing, resolving threads on,
+dispatching a paid review of, or merging any PR, resolve the invoking user
+and read the PR's author and assignees.
+Proceed only when the author or one of the assignees is that user (or an
+alias `memories/reviewing-prs.md` lists for that same user), the user
+explicitly asked for work on that PR by name (or, through an explicit
+`chores` call, on the Dependabot/Renovate population), or the author is the
+GitHub Actions app (`github-actions`).
+A mention such as "do not touch" followed by a PR number is not a request, a
+claim comment confers no scope, and a sweep skill's "every open PR" means
+every PR that passes this test.
+An explicit exclusion ("do not touch" followed by a PR number) is a veto: it
+removes that PR before any positive arm is evaluated, the user's own PRs and
+the Actions app's included, and every sweep carries the exclusion list into
+each recheck and each delegated scan.
+A review-only run that CI or a skill invocation dispatched naming the target
+PR (an `@claude review`, a `claude-code-review.yml` run) is that explicit
+request, whoever authored the PR; it reviews and stops there.
+An out-of-scope PR is reported to the user and left untouched.
+When no identity operation is available, fail closed the way `ardia` does:
+leave the author and assignee arms unevaluated, act only on PRs the user
+explicitly asked for or the Actions app authored, and say so in the report.
+`memories/reviewing-prs.md` carries the full rule and its provenance;
+`skills/ardia/SKILL.md` step 1 is the reference implementation.
+
 ## Always arm a persistent PR loop
 
 This applies in any repo, not only Morrison-Lab ones.

@@ -134,22 +134,29 @@ An expired claim is taken over by posting your own claim comment, never silently
 
 ```bash
 # GitHub — list open PRs and scan for any whose title or branch references this issue:
-gh pr list --state open --json number,title,headRefName | cat   # LIST_PRS
+gh pr list --state open --json number,title,headRefName,author,assignees \
+  --jq '.[] | "#\(.number) \(.title) [\(.headRefName); \(.author.login); assignees: \([.assignees[].login] | join(","))]"'   # LIST_PRS
 # Authoritative — the issue's cross-referenced open PRs via the REST timeline API.
 # (gh issue view --json has no timelineItems field; in the timeline, source.type is
 #  always "issue", so a PR is one whose source.issue.pull_request is non-null. The
 #  state filter keeps only open PRs — merged/closed siblings aren't active competitors.
 #  --paginate walks every page so a cross-reference past the first 30 events isn't missed.)
 gh api --paginate repos/<owner>/<repo>/issues/<N>/timeline \
-  --jq '.[] | select(.event == "cross-referenced") | .source.issue | select(.pull_request != null) | select(.state == "open") | "#\(.number) \(.title)"' | cat   # ISSUE_LINKED_PRS
+  --jq '.[] | select(.event == "cross-referenced") | .source.issue | select(.pull_request != null) | select(.state == "open") | "#\(.number) \(.title) [\(.user.login); assignees: \([.assignees[].login] | join(","))]"' | cat   # ISSUE_LINKED_PRS
 ```
 
 If an open PR already exists for the issue:
 - **Don't open a competing PR.** The issue is already being worked.
 - Skip it and grab the next unblocked issue instead.
-- Or, if the existing PR is stalled/abandoned and you're taking it over,
+- Or, if the existing PR is stalled/abandoned and it passes
+  `memories/reviewing-prs.md`'s scope test (opened by or assigned to the
+  invoking user, explicitly requested, or authored by the GitHub Actions app;
+  the listing above prints the author and assignee logins), take it over:
   check it out (use the existing PR branch), claim the PR, and ARDI it
   rather than starting fresh.
+- A stalled PR that fails that test is not yours to take over: skip the
+  issue, leave the PR untouched, and report it so the user can assign or
+  name it.
 
 ### 5. Check history, peers, and research DRW
 

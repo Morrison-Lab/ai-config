@@ -318,7 +318,7 @@
   Merge the most-isolated PR (disjoint files) FIRST --- it rides through without a re-resync; sequence foundational/big same-file PRs LAST so lighter PRs rebase onto simpler `main`.
   An agent watching a PR must POLL its own `mergeable`/`mergeStateStatus` on EVERY watch tick (a newly-appearing conflict from someone else's merge is NOT a CI event, so a CI-completion monitor never fires on it), and on catching one immediately `git fetch origin main && git merge origin/main`, resolve, re-run checks, push --- staying in the watch loop until the PR is merged or closed (clean regresses to CONFLICTING when main moves).
   The coordinator's nudge is only a backstop for a genuinely-dead agent. (Learned on sparta 2026-07-01 merging the movement cluster.)
-  Beyond same-file collisions: after ANY merge that advances the base (`main`), proactively re-sync EVERY trailing open PR branch and resolve conflicts --- don't wait for a branch to show DIRTY or for the next review trigger.
+  Beyond same-file collisions: after ANY merge that advances the base (`main`), proactively re-sync EVERY trailing open PR branch that passes `memories/reviewing-prs.md`'s scope test and resolve conflicts (an out-of-scope branch is reported to the user and left untouched) --- don't wait for a branch to show DIRTY or for the next review trigger.
   In R packages the recurring conflicts are DESCRIPTION `Version:` (bump above main) and NEWS.md (union-merge, keeping both sides' bullets and one subsection per heading); the `@claude` bot auto-syncs non-conflicting branches but does NOT resolve these real DESCRIPTION/NEWS conflicts.
   Sequential merges cascade version-check reds and NEWS/DESCRIPTION conflicts down the whole stack of trailing PRs, so keeping them all synced after each merge keeps the queue mergeable; parallelize with worktree-isolated workers, capped at ~3 concurrent to respect shared CI runners. (Learned on ucdavis/bcs.)
   **The DESCRIPTION half of this cascade is obsolete once a repo adopts `Morrison-Lab/gha`'s new `bump-dev-version`/`version-check` capabilities (gha#390, tracking gha#388)** --- PRs stop touching `Version:` at all, so there's no version-bump conflict left to cascade down the stack.
@@ -397,8 +397,10 @@
   The existing instruction already covered this; the gap was execution discipline in a fast multi-merge loop, not missing guidance --- re-read this bullet at the top of every "pick the next backlog item" cycle.
   In a multi-AGENT pipeline, UMS runs at BOTH levels: each subagent runs UMS once ITS PR merges (it stops after reporting CLEAN, so the coordinator resumes it post-merge with a "your PR merged, run UMS" nudge --- or the agent-launch spec bakes in a final UMS step), and the coordinator runs its own UMS for the cross-PR orchestration learnings no single subagent can see (merge-order sequencing, conflict-cascade handling, pipeline mechanics).
   Each agent writes its OWN memory file plus one MEMORY.md index line to keep the conflict surface small; avoid rewriting shared memory bodies concurrently. (Learned on sparta 2026-07-01.)
-- After ANY PR merges to main (under mwc, post-merge, or manual merge), IMMEDIATELY and autonomously sweep all open PRs in the repository for merge conflicts (`gh pr list --state open --json number,title,headRefName,mergeable,mergeStateStatus`).
-  For any PR reporting `CONFLICTING` or `UNKNOWN`, fetch main, test the merge, resolve the conflict in an isolated worktree, and push the sync commit proactively without waiting for the user to point it out or ask for it. (Learned on ai-config, 2026-08-24: "cai: you should have checked PR conflicts on your own".)
+- After ANY PR merges to main (under mwc, post-merge, or manual merge), IMMEDIATELY and autonomously sweep all open PRs in the repository for merge conflicts (`gh pr list --state open --json number,title,headRefName,author,assignees,mergeable,mergeStateStatus`).
+  Filter that list by `memories/reviewing-prs.md`'s scope test first (opened by or assigned to the invoking user, explicitly requested by name, or authored by the GitHub Actions app);
+  an out-of-scope conflicting PR is reported to the user and left untouched.
+  For any in-scope PR reporting `CONFLICTING` or `UNKNOWN`, fetch main, test the merge, resolve the conflict in an isolated worktree, and push the sync commit proactively without waiting for the user to point it out or ask for it. (Learned on ai-config, 2026-08-24: "cai: you should have checked PR conflicts on your own".)
 - Keep it simple.
   Don't over-explain or ask permission for straightforward fixes --- just do them.
 - Don't re-ask a decision that's already settled and built.
@@ -531,9 +533,12 @@
   Both additions were already on `main` in fuller form, and the diff had also rewritten three *correct* relative links into broken ones --- the `check-links.py` failure being blamed on that session all along.)
 
 - **Don't touch anyone else's branch.**
-  **Do:** only push to or modify branches I created in my own worktree.
-  **Don't:** push commits, force-push, checkout, or edit branches belonging to another session or user --- even if the content looks worth keeping or the branch looks abandoned.
-  If a branch needs work that isn't mine, flag it and let the owner handle it. (User directive, 2026-08-19.)
+  **Do:** only push to or modify branches I created in my own worktree, or a PR branch that passes `memories/reviewing-prs.md`'s scope test (opened by me, assigned to me, explicitly requested, or the Actions app's) and carries no live claim from another session.
+  **Don't:** push commits, force-push, checkout, or edit branches belonging to another session or user that fail that test --- even if the content looks worth keeping or the branch looks abandoned.
+  If a branch needs work that isn't mine, flag it and let the owner handle it.
+  A live claim on an in-scope branch still means waiting for it to expire, per `claim-pr`.
+  (User directive, 2026-08-19.
+  The scope-test carve-out follows the 2026-09-01 directives in `reviewing-prs.md`.)
 - **A delegated subagent runs in the parent session's working tree, so the "Use ONE worktree per branch/PR" rule above governs your own agents, not only other sessions.**
   The remedy is already written down: [`gip`](../skills/gip/SKILL.md) says to
   give every subagent `isolation: "worktree"`, and

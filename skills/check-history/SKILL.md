@@ -36,8 +36,8 @@ checks (skipping them wastes a whole issue-pick):
   issue, so you don't open a second, parallel PR for the same work.
 
   ```bash
-  gh pr list --state open --json number,title,headRefName,body \
-    --jq '.[] | select(((.body // "") | test("#<N>\\b")) or (.title | test("#<N>\\b"))) | "#\(.number) \(.title) [\(.headRefName)]"'   # LIST_PRS
+  gh pr list --state open --json number,title,headRefName,body,author,assignees \
+    --jq '.[] | select(((.body // "") | test("#<N>\\b")) or (.title | test("#<N>\\b"))) | "#\(.number) \(.title) [\(.headRefName); \(.author.login); assignees: \([.assignees[].login] | join(","))]"'   # LIST_PRS
   ```
 
 - **On a long-lived or foundational issue, the issue text AND any design-doc
@@ -52,8 +52,18 @@ checks (skipping them wastes a whole issue-pick):
   sibling PRs — nearly rebuilt already-completed work. The right move was to audit,
   correct the stale issue/doc status, and pick the genuine next slice.)
 
-If an open PR already covers it, **drive that PR to clean** instead of
-re-implementing (ask before pushing to a branch you didn't create). If `main`
+If an open PR already covers it and passes `memories/reviewing-prs.md`'s
+scope test (opened by or assigned to the invoking user, explicitly requested,
+or authored by the GitHub Actions app), **drive that PR to clean** instead of
+re-implementing.
+Scope establishes authorization, not that the branch is free: read the PR's
+claim state first per [`claim-pr`](../../shared/workflow/claim-pr.md), skip it
+while another session's claim is live (a `hold off` comment with a push or
+comment in the last 2 hours), and take over an unclaimed or expired one by
+posting your own claim comment before the first push.
+If it covers the issue but fails that test, leave both the PR and the issue
+alone and report that the PR exists, so the user can assign or name it.
+If `main`
 already satisfies the issue, stand it down and report — don't open a no-op PR.
 When the issue is only *partly* done, don't rebuild the done part: audit it,
 correct the stale issue/doc status, and scope only the genuine remaining slice.
@@ -67,18 +77,24 @@ correct the stale issue/doc status, and scope only the genuine remaining slice.
 
    **GitHub:**
    ```bash
-   gh pr list --state open --limit 100 --json number,title,body \
-     --jq '.[] | select((.body // "") | test("(Closes|Fixes|Resolves) #<N>\\b"; "i")) | "#\(.number) \(.title)"'   # LIST_PRS
+   gh pr list --state open --limit 100 --json number,title,body,author,assignees \
+     --jq '.[] | select((.body // "") | test("(Closes|Fixes|Resolves) #<N>\\b"; "i")) | "#\(.number) \(.title) [\(.author.login); assignees: \([.assignees[].login] | join(","))]"'   # LIST_PRS
    ```
 
    **GitLab:**
    ```bash
    glab mr list --state opened --per-page=50 --output json 2>/dev/null \
-     | jq -r '.[] | select((.description // "") | test("(Closes|Fixes|Resolves) #<N>\\b"; "i")) | "!\(.iid) \(.title)"'
+     | jq -r '.[] | select((.description // "") | test("(Closes|Fixes|Resolves) #<N>\\b"; "i")) | "!\(.iid) \(.title) [\(.author.username); assignees: \([.assignees[].username] | join(","))]"'
    ```
 
-   If an open PR already covers the issue, **review or extend it** instead of
-   opening a competing one. This catches *in-flight* work; the merged/closed
+   If an open PR already covers the issue, apply the scope test above to the
+   author and assignee logins the listing prints:
+   **review or extend it** when it passes and the same claim check clears
+   (another session's live claim still blocks you, and an expired one is taken
+   over by posting your own claim comment first), and leave it untouched
+   (reporting it to the user) when it fails.
+   Either way, do not open a competing one.
+   This catches *in-flight* work; the merged/closed
    history below catches *settled* decisions.
 
 1. **List recent merged MRs** touching the same area:

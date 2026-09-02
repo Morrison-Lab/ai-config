@@ -29,16 +29,27 @@ for the user's call before merging.
 
 ## What counts as a chore PR
 
-A PR is in scope if **any** of these hold:
+A PR is in scope when **either** of these holds:
 
-- Author is a bot: `app/dependabot`, `dependabot[bot]`, `app/renovate`,
-  `renovate[bot]`.
-- Title is a conventional-commit chore: starts with `chore(` (e.g.
-  `chore(actions):`, `chore(submodule):`, `chore(deps):`).
-- Labels include `dependencies`.
+- Its author is one of the dependency bots this skill exists for, matched in
+  the exact login form the source returns: `app/dependabot`,
+  `dependabot[bot]`, `app/renovate`, `renovate[bot]`.
+  An explicit `chores` call names that population, which is what admits those
+  two bots and no other author.
+- It looks like a chore --- the title starts with `chore(` (e.g.
+  `chore(actions):`, `chore(submodule):`, `chore(deps):`), or the labels
+  include `dependencies` --- **and** it passes `memories/reviewing-prs.md`'s
+  scope test for the invoking user: authored by the GitHub Actions app
+  (`github-actions`, which opens `chore(submodule):` bumps) or by the invoking
+  user or one of their aliases, assigned to one of them, or one the user
+  explicitly asked this run to work on (a mention such as "do not touch"
+  followed by a number is not a request).
 
-Human-authored feature PRs are **out of scope** — those go through `ardia` /
-`gia` (review-to-clean), not this skill.
+Human-authored feature PRs are **out of scope** --- those go through `ardia` /
+`gia` (review-to-clean), not this skill --- and so is a chore-titled or
+`dependencies`-labelled PR whose author is another lab member or another bot,
+unless the invoking user is assigned to it or explicitly asked this run to
+work on it.
 
 ## Procedure
 
@@ -57,13 +68,57 @@ This skill is GitHub-first (`gh`). For a GitLab repo, the same shape applies via
 
 ### 1. List the open chore PRs
 
+Set the three scope inputs first, the way `REPO` is set above.
+`PR_SCOPE_ALIASES` is the comma-separated list of other logins
+`memories/reviewing-prs.md` names as the same person as the resolved user
+(leave it unset when that file lists none for them), and `PR_SCOPE_REQUESTED`
+is the comma-separated list of PR numbers the user explicitly asked this run
+to work on, never a number merely mentioned or excluded
+(leave it unset when there are none).
+`PR_SCOPE_EXCLUDED` is the comma-separated list of PR numbers the user told
+this run not to touch ("chores, but do not touch" followed by a number); it
+is a veto checked before every positive arm, bot authors included, so an
+excluded dependency-bot PR is neither listed nor merged.
+With all three unset the filter keeps only the resolved login's own PRs, the
+assigned ones, and the bots', which is the fail-closed default.
+
 ```bash
+set -eo pipefail   # a failed command, or a failed gh pr list in the pipeline below, stops here
+ME=$(gh api user --jq .login 2>/dev/null) || ME=""   # WHO_AM_I
+if [ -z "$ME" ]; then
+  # Fail closed, and say so: with no identity the author and assignee arms
+  # stay unevaluated (aliases included), so only bot-authored and explicitly
+  # requested PRs pass.
+  PR_SCOPE_ALIASES=""
+  echo "::warning::identity lookup failed; author/assignee arms unevaluated (report this)" >&2
+fi
+# e.g. PR_SCOPE_ALIASES=other-login      # from memories/reviewing-prs.md
+# e.g. PR_SCOPE_REQUESTED=123,456       # PRs the user asked this run to work on
+# e.g. PR_SCOPE_EXCLUDED=789            # PRs the user told this run not to touch
+IDS=$(jq -cn --arg me "$ME" --arg al "${PR_SCOPE_ALIASES:-}" \
+  '[$me] + ($al | split(",") | map(select(length > 0))) | map(select(length > 0)) | unique')
+REQ=$(jq -cn --arg r "${PR_SCOPE_REQUESTED:-}" \
+  '$r | split(",") | map(select(length > 0) | tonumber)')
+EXC=$(jq -cn --arg x "${PR_SCOPE_EXCLUDED:-}" \
+  '$x | split(",") | map(select(length > 0) | tonumber)')
 gh pr list --repo "$REPO" --state open --limit 200 \
-  --json number,title,author,labels,mergeable \
-  --jq '.[] | select(
-          (.author.login | test("dependabot|renovate"))
-          or (.title | startswith("chore("))
-          or ([.labels[].name] | index("dependencies"))
+  --json number,title,author,assignees,labels,mergeable \
+  | jq -r --argjson ids "$IDS" --argjson req "$REQ" --argjson exc "$EXC" '.[] | select(
+          ((.number as $n | $exc | index($n)) == null)
+          and (
+          (.author.login | test("^(app/(dependabot|renovate)|(dependabot|renovate)\\[bot\\])$"))
+          or (
+            (
+              (.author.login | test("^(app/github-actions|github-actions\\[bot\\]|github-actions)$"))
+              or ((.author.login as $a | $ids | index($a)) != null)
+              or any(.assignees[].login; . as $x | ($ids | index($x)) != null)
+              or ((.number as $n | $req | index($n)) != null)
+            ) and (
+              (.title | startswith("chore("))
+              or (([.labels[].name] | index("dependencies")) != null)
+            )
+          )
+          )
         ) | "\(.number)\t\(.mergeable)\t\(.title)"'   # LIST_PRS
 ```
 
@@ -71,6 +126,14 @@ gh pr list --repo "$REPO" --state open --limit 200 \
 would otherwise be silently truncated.
 
 If there are none, say so and stop.
+
+That listing is a snapshot.
+Assignment, the title, and the labels can all change while the sweep runs,
+so re-fetch every input the predicate reads (author, assignees, title,
+labels) and reapply the same predicate, the `PR_SCOPE_EXCLUDED` veto
+included, immediately before each write action in steps 2-5 (closing a bump
+PR, a `@dependabot` comment, a merge), and drop and report a PR that no longer
+passes.
 
 ### 2. Classify each PR by bump size
 
@@ -222,5 +285,7 @@ bump is sitting unflagged.
 - ❌ Force-merging a PR with `pending` or `fail` checks.
 - ❌ Reporting "chores done" while a flagged major bump is still open with no
   decision recorded.
-- ❌ Treating human feature PRs as chores (or vice-versa) — scope by author /
-  `chore(` title / `dependencies` label.
+- ❌ Treating human feature PRs as chores (or vice-versa) --- a dependency
+  bot's PR is a chore by author; any other PR needs the `chore(` title or
+  `dependencies` label **and** an in-scope author or assignee, never the
+  title or label alone.

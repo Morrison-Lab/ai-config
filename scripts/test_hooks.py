@@ -21,7 +21,8 @@ This runner does two things:
 
 `KNOWN_UNTESTED` records the hooks that currently ship without a test as an
 explicit, reviewable debt; adding a NEW hook without a test fails this check.
-Tracked in ai-config#1080 -- write those tests, then empty the allowlist.
+ai-config#1080 wrote the last of those tests, so the allowlist is empty; it
+stays so a new untested hook is a failure, not a NOTE.
 
 A hung suite used to stall the whole sweep with no timeout and nothing on
 stdout (ai-config#2098, observed on Windows). Each suite now has a deadline;
@@ -69,10 +70,11 @@ DEFAULT_SUITE_TIMEOUT_S = 900
 # this runner targets.
 MAX_SUITE_TIMEOUT_S = 86400
 
-# Hooks that ship without a test today. An explicit, reviewable list -- not a
-# silent gap. A new hook is expected to bring its test; this list should only
-# ever shrink. See ai-config#1080.
-KNOWN_UNTESTED = {"inject-local-time.sh"}
+# Hooks that ship without a test: an explicit, reviewable allowlist rather
+# than a silent gap. Empty since ai-config#1080 wrote the last missing test;
+# the set stays so a new hook without a test fails this check, and an entry
+# added here must cite its tracking issue.
+KNOWN_UNTESTED: set = set()
 
 
 def suite_timeout_s():
@@ -203,6 +205,10 @@ def run_one_suite(test_path, subject, timeout):
     return 1
 
 
+def rel_test_for(test_path):
+    return os.path.relpath(test_path, ROOT)
+
+
 def run_suites(timeout=None):
     """Run each hooks/test-*.py against its subject. Returns failure count."""
     if timeout is None:
@@ -210,7 +216,19 @@ def run_suites(timeout=None):
     failures = 0
     tests = sorted(glob.glob(os.path.join(HOOKS, "test-*.py")))
     for test_path in tests:
-        subject = os.path.join(HOOKS, os.path.basename(test_path)[len("test-"):])
+        # A subject may be a .py or a .sh hook (inject-local-time.sh, #1080);
+        # try the test's own extension first, then the shell spelling.
+        stem = os.path.basename(test_path)[len("test-"):-len(".py")]
+        candidates = [os.path.join(HOOKS, stem + ext) for ext in (".py", ".sh")]
+        present = [c for c in candidates if os.path.isfile(c)]
+        if len(present) > 1:
+            # Two subjects for one suite is ambiguous; picking one silently
+            # would test the wrong file with no signal (fail-fast).
+            print(f"FAIL: {rel_test_for(test_path)} has two subjects: "
+                  + ", ".join(os.path.relpath(c, ROOT) for c in present))
+            failures += 1
+            continue
+        subject = present[0] if present else candidates[0]
         rel_test = os.path.relpath(test_path, ROOT)
         rel_subj = os.path.relpath(subject, ROOT)
         if not os.path.isfile(subject):
@@ -232,7 +250,7 @@ def check_coverage():
         if has_test:
             tested += 1
         elif name in KNOWN_UNTESTED:
-            print(f"NOTE: {name} has no test (known debt, ai-config#1080)")
+            print(f"NOTE: {name} has no test (known debt; track it in an issue)")
         else:
             print(f"FAIL: hooks/{name} has no test ({test_for(name)}); "
                   "add one or add it to KNOWN_UNTESTED with a tracking issue")

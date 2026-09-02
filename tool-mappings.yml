@@ -100,7 +100,7 @@ operations:
     cli: gh pr edit "<N>"
     github_mcp: mcp__github__update_pull_request
   - id: MERGE_PR
-    description: Merge a pull request, pinned to the head the clean gate evaluated.
+    description: Merge a pull request, pinned to the head the clean gate evaluated; on a base that requires a merge queue only the CLI enqueues, since the MCP tool calls the direct merge endpoint, so an MCP-only session stops there.
     cli: gh pr merge "<N>" -R "<owner>/<repo>" --match-head-commit "<sha>"
     github_mcp: mcp__github__merge_pull_request (expectedHeadSha="<sha>")
   - id: MARK_PR_READY

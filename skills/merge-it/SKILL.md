@@ -33,7 +33,7 @@ standing yes (see `preferences.md`).
 
 - Resolve which PR is meant (the one from the current session; if ambiguous,
   ask which number).
-- Then record that PR's `headRefOid` and `baseRefName` before the readiness check below, so its result is tied to one head and one target,
+- Then record that PR's `headRefOid` and `baseRefName` before the readiness check, so its result is tied to one head and one target,
   and require both live values to equal them immediately before every direct merge, on the initially current path as much as after a recovery.
 - Confirm it is **fully clean** before merging (the ARDI terminal state — see
   `shared/workflow/fully-clean.md`): every CI workflow and check run — not
@@ -68,7 +68,7 @@ standing yes (see `preferences.md`).
   (the Do bullets beginning "for a direct merge"), by merge mode.
   In a local session, fetch the PR's configured base and `refs/pull/<N>/head` from the `-R` repository
   and confirm the merge-base is the base tip.
-  In a remote session without `git`, read `gh api "repos/<owner>/<repo>/compare/<base>...<head-sha>"`
+  In a remote session without `git`, read `gh api "repos/<owner>/<repo>/compare/<base-encoded>...<head-sha>"` (the base name encoded as one path segment, `jq -rn --arg b "<base>" '$b|@uri'`)
   and require `behind_by` of 0.
   Where neither is available, do not merge until [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) supplies the tool.
   Under a merge queue whose required checks cover the whole clean gate on `merge_group`,

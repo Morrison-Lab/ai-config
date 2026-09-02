@@ -48,7 +48,9 @@ without asking confirmation before every merge.
   [`fully-clean`](../../shared/workflow/fully-clean.md) for the payload keys.
   A later all-clear from a different reviewer does not supersede a standing
   not-clean; only a later clean from the same reviewer does.
-  Record `headRefOid` and `baseRefName` before the instrument runs and
+  On GitHub (a GitLab MR has no equivalent gate until
+  [#3021](https://github.com/Morrison-Lab/ai-config/issues/3021)),
+  record `headRefOid` and `baseRefName` before the instrument runs and
   require both live values to equal them immediately before every direct
   merge, so a retarget at the same tip cannot pass with an old verdict and a
   concurrent push that already contains the base cannot ride a

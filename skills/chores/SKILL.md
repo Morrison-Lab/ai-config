@@ -137,16 +137,18 @@ passes.
 
 ### 2. Classify each PR by bump size
 
-Record the head and the base before classifying,
-since the classification, every read in step 3, and the merge in step 4 are claims about one SHA on one target,
-and Dependabot can replace the head between any two of them:
+Record the head, the base, and the title before classifying (GitHub only: the pins and the gate they feed have no GitLab form until [#3021](https://github.com/Morrison-Lab/ai-config/issues/3021)),
+since the classification, every read in step 3, and the merge in step 4 are claims about one SHA on one target under one title,
+and Dependabot can replace the head or retitle the PR between any two of them:
 
 ```bash
 PINNED=$(gh pr view "$N" --repo "$REPO" --json headRefOid -q .headRefOid)   # VIEW_PR
 BASE=$(gh pr view "$N" --repo "$REPO" --json baseRefName -q .baseRefName)   # VIEW_PR; a retarget at the same tip must not pass
+TITLE=$(gh pr view "$N" --repo "$REPO" --json title -q .title)   # VIEW_PR; the classification below reads this title
 ```
 
-If the head or the base name changes before the merge lands, start again from here, classification included.
+If the head, the base name, or the title changes before the merge lands, start again from here, classification included.
+A retitle moves neither SHA and can turn a patch-looking bump into a major one.
 
 Parse the version pair out of the title (`... from X to Y`) and compare the
 leading number:
@@ -194,7 +196,8 @@ Dashboard) — `@dependabot` comment commands do nothing on Renovate PRs.
 
 ### 4. Safe bumps (patch / minor / submodule + green) → merge
 
-Require the live head to equal the `$PINNED` and the live base name to equal the `$BASE` recorded at the top of step 2, immediately before the merge command.
+Immediately before the merge command, require the live head to equal `$PINNED`, the live base name to equal `$BASE`, the live title to equal `$TITLE`, and the base tip to equal the one the currency check tested.
+That check's one-liner assigns the base tip to `tip`, so keep it as `TIP=$tip` and restart the gate if the live tip differs.
 A regenerated head that already contains the base would otherwise pass a currency check with CI never read for it.
 Then, when the base does not require a merge queue, run the base-currency check from [`fully-clean`](../../shared/workflow/fully-clean.md)'s stale-base rule (the Do bullets beginning "for a direct merge"), since a green head can still break the base when the base gained a check after the head's CI ran.
 When the base requires a merge queue, skip the check and the update.

@@ -571,6 +571,10 @@ GitHub Actions app (`github-actions`).
 A mention such as "do not touch" followed by a PR number is not a request, a
 claim comment confers no scope, and a sweep skill's "every open PR" means
 every PR that passes this test.
+An explicit exclusion ("do not touch" followed by a PR number) is a veto: it
+removes that PR before any positive arm is evaluated, the user's own PRs and
+the Actions app's included, and every sweep carries the exclusion list into
+each recheck and each delegated scan.
 A review-only run that CI or a skill invocation dispatched naming the target
 PR (an `@claude review`, a `claude-code-review.yml` run) is that explicit
 request, whoever authored the PR; it reviews and stops there.

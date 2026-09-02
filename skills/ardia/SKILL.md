@@ -44,6 +44,8 @@ mutates a PR stays serial.
      one of those logins is among its `assignees`,
      or the user explicitly asked for work on that PR (or, via an explicit `chores` call, on the bot population) --- a mention such as "do not touch [#284](https://github.com/UCD-SERG/serodynamics/pull/284)" is not a request;
      exclude every other PR from the action queue before doing anything else, and name the excluded ones in the report so the user can assign or name any they want driven.
+     An explicit exclusion in the request ("ardia, but do not touch" followed by a number) is a veto checked before every positive arm, the way `chores`'s `PR_SCOPE_EXCLUDED` works:
+     an excluded PR is dropped even when the user authored it, is assigned to it, or the Actions app opened it, and the exclusion list travels with the sweep into every recheck below and into any brief handed to a subagent.
      Scope is a live precondition rather than a one-time classification: assignment can change while a sweep runs, so re-read the author and assignees and reapply the test immediately before each push, comment, review, or merge on a PR, and drop and report one that no longer passes.
      Keep the full listing for the stack detection in step 3, so an in-scope PR based on an out-of-scope PR's branch is still recognised as stacked.
      Such a child is driven only while its base is clean or merged.

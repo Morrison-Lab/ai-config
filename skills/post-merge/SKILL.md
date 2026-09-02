@@ -229,7 +229,9 @@ subagent** rather than running the scan-and-resolve loop in the main thread
 should hand off (see `memories/preferences.md`'s coordinator-mode bullet).
 Brief the subagent with the merged PR's number/branch, the resolved invoking
 user and their aliases, the exact list of PR numbers the request explicitly
-authorized (possibly empty), and the steps below;
+authorized (possibly empty), the exact list it explicitly excluded (possibly
+empty; a veto over every positive arm, the user's own PRs included), and the
+steps below;
 have it report back which PRs it found conflicting, what it did about each,
 and any it skipped (already claimed, conflict it couldn't understand). Do the
 scan inline only for a solo (non-orchestrated) session.

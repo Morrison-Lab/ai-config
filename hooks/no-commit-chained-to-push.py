@@ -154,8 +154,10 @@ and no argv-level test can draw that line, because the split discards
 connectors. Move the assignment to the front, or prefix the commit or the
 push directly.
 
-An assignment on some unrelated third command does NOT clear it, and neither
-does a mention in a commit message. `export` is accepted because
+An assignment on any OTHER command does NOT clear it -- not on an unrelated
+`git status`, and not on an earlier `git push` that is not the one being
+refused, since neither persists to the push that matters. Nor does a mention
+in a commit message. `export` is accepted because
 `no-unauthorized-merge.py`'s `ALLOW_MERGE` anchor accepts it, and an escape
 valve that rejects the spelling its own precedent uses is not an escape valve.
 `no-clobbering-push.py`'s `ALLOW_FORCE_PUSH` is the stricter precedent and does
@@ -322,13 +324,32 @@ def evaluate(command):
         if parsed is None:
             continue
         sub, _rest, env = parsed
-        if sub not in ("commit", "push"):
-            continue
-        if env_value(env, OVERRIDE) == "1":
-            return None
+        # No `if sub not in ("commit", "push"): continue` guard here. It was
+        # load-bearing while the override was read before the branch, and the
+        # scope fix below made it dead -- the two branches already select the
+        # only subcommands that matter. A mutation deleting it survived the
+        # whole suite, which is what surfaced it; keeping unreachable code a
+        # later reader would take for a real filter costs more than the line
+        # saves.
+        #
+        # The override is read off the TWO COMMANDS THIS CALL IS ABOUT, and
+        # nowhere else. Reading it off any commit-or-push reopened the scope
+        # hole the leading-assignment anchor was added to close, by a third
+        # route: an override prefixing an EARLIER, unrelated push does not
+        # persist to the later one and authorizes nothing about it, yet
+        #
+        #     ALLOW_COMMIT_AND_PUSH=1 git push origin y
+        #     git commit -m a && git push origin x
+        #
+        # went silent. Measured. Scoping the read to `commit_argv` and to the
+        # push that triggers the return is the whole fix.
         if sub == "commit" and commit_argv is None:
+            if env_value(env, OVERRIDE) == "1":
+                return None
             commit_argv = argv
         elif sub == "push" and commit_argv is not None:
+            if env_value(env, OVERRIDE) == "1":
+                return None
             # `shlex.join`, never `" ".join`. The argv is DEQUOTED, so a
             # space join re-emits `git commit -m "fix: a b; rm -rf x"` as
             # `git commit -m fix: a b; rm -rf x` -- which commits `fix:` and

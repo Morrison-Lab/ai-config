@@ -28,29 +28,49 @@ in POSIX mode already knows the quoting rules, so a caller asking "is `git push`
 the command word of some simple command" gets the answer without accreting one
 regex clause per quoting shape.
 
-TWO LIMITS, BOTH INHERITED FROM THE SEVEN COPIES, BOTH FAIL-OPEN
------------------------------------------------------------------
+THREE LIMITS, ALL INHERITED FROM THE SEVEN COPIES
+--------------------------------------------------
 The heredoc pre-pass and the newline rewrite run on RAW TEXT, ahead of `shlex`,
 so neither knows the quoting rules the paragraph above credits `shlex` with.
-State that here rather than letting the argv-split argument imply otherwise:
+State that here rather than letting the argv-split argument imply otherwise --
+this docstring is the contract ai-config#2993 will migrate seven live guards
+onto, three of them denying.
 
-  * `RX_HEREDOC` is quote-blind. A `<<` inside a quoted argument -- a commit
+  * `RX_HEREDOC` is QUOTE-BLIND. A `<<` inside a quoted argument -- a commit
     message that mentions a heredoc, say -- can be treated as a real operator,
     and consuming up to a delimiter then unbalances the quote. `shlex` raises
-    `ValueError` and `simple_commands` returns `None`. Measured:
+    `ValueError` and `simple_commands` returns `None`. Measured, writing LF
+    for a literal newline:
 
-        simple_commands("git commit -m 'fix a << b'\nb=1\ngit push")  ->  None
+        simple_commands("git commit -m 'fix a << b'" LF "b=1" LF "git push")
+        ->  None
 
-  * The newline rewrite is quote-blind for the same reason, so a newline
+  * The NEWLINE REWRITE is quote-blind for the same reason, so a newline
     INSIDE a quoted argument (a multi-line `-m` message) arrives in the token
-    as `;`. The command boundaries are still right; the argument's TEXT is
-    not, so a caller must never present a rejoined argv as the user's original
-    text.
+    as `;`. The command boundaries are unaffected; the argument's TEXT is not,
+    so a caller must never present a rejoined argv as the user's original.
 
-Both fail toward silence or toward a mangled argument rather than toward a
-wrong command boundary, which is the right direction for a guard, and `None`
-is what every caller here treats as "cannot evaluate". Fixing either means a
-quote-aware pre-scan, which is a real parser and out of scope for an
+  * WHEN THAT REWRITE CONSUMES THE WHOLE TOKEN, the boundary moves too. This
+    is the case the two above do not cover, and the one that breaks the tidy
+    "only arguments are affected" reading. The separator test is
+    `set(tok) <= _SHELL_OPS`, so an argument that DEQUOTES to nothing but
+    separator characters becomes a separator: it disappears from the argv and
+    splits the command in half.
+
+        simple_commands("git commit -m 'a' -m '" LF "' && git push")
+        ->  [['git', 'commit', '-m', 'a', '-m'], ['git', 'push']]
+        simple_commands("git commit -m ';' && git push")
+        ->  [['git', 'commit', '-m'], ['git', 'push']]
+
+    A caller can therefore see a command that the shell would not run. For a
+    guard this is a FALSE POSITIVE direction, not a false negative: measured,
+    no chained push could be hidden this way, but `git commit -m x && echo '"
+    LF "' git push` splits so that `git push` -- which is really an argument
+    to `echo` -- reads as a command.
+
+The first two fail toward silence or toward a mangled argument. The third does
+not fail open, and is stated separately for that reason. Fixing any of them
+means a quote-aware pre-scan, which is a real parser and out of scope for an
 extraction; ai-config#2993 is where that belongs, alongside migrating the
 seven copies.
 """

@@ -69,6 +69,20 @@ check("a newline inside a quoted argument arrives in the token as a semicolon",
       [["git", "commit", "-m", "line1;line2"]])
 check("but the command boundaries around it are still right",
       subs("git commit -m 'line1\nline2'\ngit push"), ["commit", "push"])
+# ... EXCEPT when the rewritten token is nothing BUT separator characters.
+# The separator test is `set(tok) <= _SHELL_OPS`, so such an argument becomes
+# a separator: it vanishes from the argv and splits the command. Documented as
+# the third limit, and pinned here because it is the one that does NOT fail
+# open -- a caller can see a command the shell would not run.
+check("an argument that dequotes to only a newline is eaten as a separator",
+      shellcmd.simple_commands("git commit -m 'a' -m '\n' && git push"),
+      [["git", "commit", "-m", "a", "-m"], ["git", "push"]])
+check("an argument that dequotes to a bare semicolon likewise",
+      shellcmd.simple_commands("git commit -m ';' && git push"),
+      [["git", "commit", "-m"], ["git", "push"]])
+check("the direction is a false positive, not a hidden command",
+      shellcmd.simple_commands("git commit -m x && echo '\n' git push"),
+      [["git", "commit", "-m", "x"], ["echo"], ["git", "push"]])
 check("empty input", shellcmd.simple_commands(""), [])
 
 # ------------------------------------------------------------- heredocs

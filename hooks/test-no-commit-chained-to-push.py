@@ -188,6 +188,18 @@ check("git commit-graph write is not git commit",
       fires("git commit-graph write && git push"), False)
 check("git push-anything is not git push",
       fires("git commit -m x && git push-mirror"), False)
+# Only `git commit` arms the guard, and only `git push` fires it. Every other
+# subcommand that also writes a commit object is out of scope by design, and
+# these pin that: a mutation widening the commit branch to `("commit",
+# "stash")` otherwise survived the whole suite.
+for other in ("stash", "merge --no-ff other", "cherry-pick abc123",
+              "revert abc123", "am /tmp/p.patch", "rebase --continue"):
+    check(f"git {other.split()[0]} does not arm the guard",
+          fires(f"git {other} && git push"), False)
+check("git fetch does not fire the guard",
+      fires("git commit -m x && git fetch origin"), False)
+check("git send-email is not git push",
+      fires("git commit -m x && git send-email HEAD^"), False)
 
 # 6. Other command words that merely contain the subcommand names.
 check("a script named git-commit-and-push",
@@ -227,6 +239,17 @@ check("a short-circuited assignment never runs, so it does not clear",
 check("an assignment scoped to a third command does not clear it",
       fires("ALLOW_COMMIT_AND_PUSH=1 git status --short && git commit -m x "
             "&& git push"), True)
+# The same scope defect by a third route: an override prefixing an EARLIER,
+# unrelated push. That assignment does not persist to the push being refused,
+# so it authorizes nothing about it -- and because the earlier probe used
+# `git status`, which `evaluate` skips, the mutation covering this clause did
+# not see the hole either.
+check("an override on an earlier unrelated push does not clear it",
+      fires("ALLOW_COMMIT_AND_PUSH=1 git push origin y; git commit -m a "
+            "&& git push origin x"), True)
+check("an override on a later commit does not clear an already-matched chain",
+      fires("git commit -m a && git push origin x; "
+            "ALLOW_COMMIT_AND_PUSH=1 git commit -m b"), True)
 check("a MENTION of the override does not clear it",
       fires("git commit -m 'set ALLOW_COMMIT_AND_PUSH=1 next time' && git push"),
       True)
@@ -567,6 +590,30 @@ _mutate("an unscoped override is cleared by a prefix on a third command",
         _unscoped_override,
         "ALLOW_COMMIT_AND_PUSH=1 git status --short && git commit -m x "
         "&& git push",
+        False)
+
+# M5b -- the same clause, probed with an unrelated PUSH rather than a
+#        `git status`. `evaluate` skips a non-commit/push argv before it ever
+#        reads the override, so M5's probe could not reach the clause that
+#        actually decides this, and a revision reading the override off any
+#        commit-or-push passed M5 while going silent on the shape below.
+def _override_on_any_git(m):
+    real = m.evaluate
+
+    def evaluate(command):
+        for argv in (m.simple_commands(command) or []):
+            parsed = m.git_subcommand(argv)
+            if parsed and parsed[0] in ("commit", "push"):
+                if m.env_value(parsed[2], m.OVERRIDE) == "1":
+                    return None
+        return real(command)
+    m.evaluate = evaluate
+
+
+_mutate("reading the override off any commit or push clears an unrelated one",
+        _override_on_any_git,
+        "ALLOW_COMMIT_AND_PUSH=1 git push origin y; git commit -m a "
+        "&& git push origin x",
         False)
 
 # M6 -- restore the heredoc-blanking defect in the library: substitute a bare

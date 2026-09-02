@@ -2317,20 +2317,8 @@ _REVIEW_STRUCTURE_HEADING = re.compile(
 )
 
 
-def _is_structured_review_body(body: str) -> bool:
-    """True when *body* is shaped like a review REPORT rather than prose.
-
-    Requires both a report heading (Summary / Findings / Verdict families)
-    and a Reviewed-Commit fingerprint line, tested over the CITED-VOCAB
-    STRIPPED body so a casual comment quoting a prior report inside a
-    fence or code span cannot smuggle the structure in (#1202/#2525). The two
-    together are what a pre-push-review or adversarial-self-review report
-    always carries and conversational prose does not, which is what keeps
-    #1798's false-CLEAN direction closed while #2402's supersession path
-    opens.
-    """
-    if not body:
-        return False
+def _blank_fences_and_spans(body: str) -> str:
+    """Blank fenced code blocks and code spans to spaces, preserving length."""
     fenced_lines, _, _ = find_fence_spans(body, swallow_unclosed=True)
     mask = bytearray(len(body))
     offset = 0
@@ -2346,23 +2334,39 @@ def _is_structured_review_body(body: str) -> bool:
         b, e = m.span()
         mask[b:e] = b"\x01" * (e - b)
 
-    def _in_fence_or_span(match_start: int) -> bool:
-        line_idx = body[:match_start].count("\n")
-        if line_idx in fenced_lines:
-            return True
-        return bool(mask[match_start])
+    lines = body.split("\n")
+    out = []
+    line_offset = 0
+    for idx, line in enumerate(lines):
+        if idx in fenced_lines:
+            out.append(" " * len(line))
+        else:
+            line_mask = mask[line_offset : line_offset + len(line)]
+            out.append("".join(" " if m else c for c, m in zip(line, line_mask)))
+        line_offset += len(line) + 1
+    return "\n".join(out)
 
-    scan = strip_cited_finding_vocab(body)
-    has_heading = any(
-        not _in_fence_or_span(m.start())
-        for m in _REVIEW_STRUCTURE_HEADING.finditer(scan)
-    )
-    if not has_heading:
+
+def _is_structured_review_body(body: str) -> bool:
+    """True when *body* is shaped like a review REPORT rather than prose.
+
+    Requires both a report heading (Summary / Findings / Verdict families)
+    and a Reviewed-Commit fingerprint line, tested over the CITED-VOCAB
+    STRIPPED body so a casual comment quoting a prior report inside a
+    fence or code span cannot smuggle the structure in (#1202/#2525). The two
+    together are what a pre-push-review or adversarial-self-review report
+    always carries and conversational prose does not, which is what keeps
+    #1798's false-CLEAN direction closed while #2402's supersession path
+    opens.
+    """
+    if not body:
         return False
-    return any(
-        not _in_fence_or_span(m.start())
-        for m in re.finditer(r"(?im)^\*{0,2}Reviewed[- ]Commit\*{0,2}[ \t]*:", scan)
-    )
+    blanked = _blank_fences_and_spans(body)
+    scan = strip_cited_finding_vocab(blanked)
+    if not _REVIEW_STRUCTURE_HEADING.search(scan):
+        return False
+    return bool(re.search(
+        r"(?im)^\*{0,2}Reviewed[- ]Commit\*{0,2}[ \t]*:", scan))
 
 
 def _commit_activity(pr) -> Dict[str, str]:

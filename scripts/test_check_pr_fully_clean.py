@@ -4714,6 +4714,12 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
             "Here is some commentary with a stray ` backtick.\nMore prose.\n\n## Verdict\n\nReviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\nClean"
         ),
     )
+    check(
+        "_is_structured_review_body: fenced block preceding heading does NOT shift containment offsets (#2525)",
+        checker._is_structured_review_body(
+            "```\nthis is a seventy character fenced block that takes up some space in body\n```\nSome prose with ``two backtick span`` here.\n\n### Verdict\nClean\n\nReviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\n"
+        ),
+    )
 
     # Conflicting representations: prose says Needs work with findings, but JSON says CLEAN
     conflicting_body = """

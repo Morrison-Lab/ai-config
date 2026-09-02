@@ -23,7 +23,7 @@ Detect the forge (GitHub `gh` / GitLab `glab`) from `git remote get-url origin`.
 
 **Confirm which repo first when several are in reach.** GIA (like `ardia` and `gii`) clears *one* repo’s queue, but a session may start in a directory holding several repos (e.g. a web session scoped to multiple repos). If the working dir isn’t itself a single repo, or more than one repo is in scope, ask which repo’s queue to clear before surveying — don’t assume the first one found.
 
-**Confirm whose PRs are in scope, too.** Both phases act only on PRs the invoking user opened, is assigned to, or explicitly requested by name, plus PRs the GitHub Actions app authored (`github-actions[bot]`); `ardia`’s step 1 resolves that user, applies the filter, and reports what it dropped. A PR another lab member or any other bot opened stays theirs, and an issue such a PR already fixes is left to it rather than grabbed.
+**Confirm whose PRs are in scope, too.** Both phases act only on PRs the invoking user opened, is assigned to, or explicitly requested by name, plus PRs the GitHub Actions app authored (`github-actions[bot]`); `ardia`’s step 1 resolves that user, applies the filter, and reports what it dropped. An out-of-scope PR (one that fails that filter: another lab member’s, or any other bot’s) stays theirs, and an issue such a PR already fixes is left to it rather than grabbed.
 
 ### Phase 1 — ARDIA (existing open PRs/MRs)
 

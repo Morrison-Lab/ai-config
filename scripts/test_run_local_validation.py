@@ -77,6 +77,8 @@ jobs:
       config-file: '.markdownlint-cli2.jsonc'
   lint-qmd:
     uses: Morrison-Lab/gha/.github/workflows/lint-qmd.yml@v2
+  workflow:
+    uses: Morrison-Lab/gha/.github/workflows/lint-qmd.yml@v2
 """
 
 
@@ -85,6 +87,87 @@ def _write_fixture(tmp):
     wf.write_text(FIXTURE, encoding="utf-8")
     (Path(tmp) / "sub").mkdir()
     return wf
+
+
+SIBLING = """
+name: review
+on:
+  pull_request:
+    types: [opened, synchronize]
+  workflow_dispatch:
+jobs:
+  review:
+    uses: Morrison-Lab/gha/.github/workflows/claude-review.yml@v2
+"""
+
+
+def test_other_workflow_files():
+    """#1881: every other workflow file beside the target is listed as NOT RUN
+    with its triggers, so a check living outside validate.yml is visible in
+    the denominator rather than silently absent from it."""
+    with tempfile.TemporaryDirectory() as tmp:
+        wf = _write_fixture(tmp)
+        (Path(tmp) / "review.yml").write_text(SIBLING, encoding="utf-8")
+        (Path(tmp) / "broken.yaml").write_text("jobs: [unclosed", encoding="utf-8")
+        sib = rlv.other_workflow_files(wf)
+        names = [s.name for s in sib]
+        check("other_workflow_files lists every other workflow file and never the target",
+              names == ["broken.yaml", "review.yml"])
+        check("every other file is NOT RUN, sourced as [workflow], kind workflow-file",
+              all(not s.runnable and s.source == "workflow" and s.kind == "workflow-file" for s in sib))
+        review = next(s for s in sib if s.name == "review.yml")
+        check("an other file's note names its on: triggers",
+              "pull_request" in review.note and "workflow_dispatch" in review.note)
+        broken = next(s for s in sib if s.name == "broken.yaml")
+        check("an unparseable other file is listed with the parse error rather than dropped",
+              "could not be parsed" in broken.note and broken.broken)
+        # PyYAML reads a bare `on:` key as True; the trigger reader must see it.
+        check("_triggers reads the YAML-1.1 True spelling of on:",
+              rlv._triggers({True: ["push", "pull_request"]}) == "push, pull_request")
+        out = io.StringIO()
+        with redirect_stdout(out):
+            rc = rlv.main(["--workflow", str(wf), "--list", "--root", tmp])
+        text = out.getvalue()
+        check("--list prints the other file as NOT RUN [workflow]",
+              rc == 0 and "NOT RUN  [workflow] review.yml: other workflow file, not derived (on: pull_request, workflow_dispatch)" in text)
+        check("--list tally counts the listed and the broken files apart from the derived steps",
+              "plus 1 other workflow file(s) listed as NOT RUN, plus 1 other workflow file(s) BROKEN" in text
+              and "step(s) derived from" in text)
+        check("--list tags an unparseable other file BROKEN", "BROKEN   [workflow] broken.yaml" in text)
+        out = io.StringIO()
+        with redirect_stdout(out):
+            rlv.main(["--workflow", str(wf), "--list", "--no-other-workflows", "--root", tmp])
+        check("--no-other-workflows drops them and the tally has no plus clause",
+              "review.yml" not in out.getvalue() and "plus" not in out.getvalue())
+        out = io.StringIO()
+        with redirect_stdout(out):
+            rlv.main(["--workflow", str(wf), "--list", "--only", "workflow", "--root", tmp])
+        only_text = out.getvalue()
+        check("a job whose ID is literally `workflow` is filtered like any derived step, not as a file notice",
+              "NOT RUN  [workflow] workflow:" in only_text and "plus 1 other workflow file(s) listed" in only_text
+              and "BROKEN   [workflow] broken.yaml" in only_text)
+        check("_denominator with no other files is the plain derived count",
+              rlv._denominator(5, 0, "w.yml") == "5 step(s) derived from w.yml")
+        out = io.StringIO()
+        with redirect_stdout(out):
+            rlv.main(["--workflow", str(wf), "--list", "--only", "Passing", "--skip", "review", "--root", tmp])
+        text = out.getvalue()
+        check("--only keeps the other-workflow notices in the denominator",
+              "NOT RUN  [workflow] review.yml" in text and "plus 1 other workflow file(s) listed" in text)
+        check("--skip never marks an other-workflow notice SKIP",
+              "SKIP     [workflow]" not in text)
+        # Run mode builds its tally separately from --list, so pin it too.
+        out = io.StringIO()
+        with redirect_stdout(out), redirect_stderr(io.StringIO()):
+            rc = rlv.main(["--workflow", str(wf), "--only", "Passing", "--root", tmp])
+        text = out.getvalue()
+        check("run-mode tally counts the other files apart from the derived steps",
+              "plus 1 other workflow file(s) listed as NOT RUN, plus 1 other workflow file(s) BROKEN" in text
+              and "1 step(s) derived from" in text)
+        check("run mode exits 1 while an other workflow file is unparseable, and names it",
+              rc == 1 and "broken: broken.yaml" in text)
+        check("run-mode not-run report names the other files",
+              "not run: review.yml (other workflow file, not derived (on: pull_request, workflow_dispatch))" in text)
 
 
 def test_derive_steps():
@@ -197,7 +280,7 @@ def test_only_and_skip_filters():
 def test_require_clean_on_dirty_tree():
     with tempfile.TemporaryDirectory() as tmp:
         wf = _write_fixture(tmp)
-        subprocess.run(["git", "init", "-q"], cwd=tmp, check=True)
+        subprocess.run(["git", "init", "-q", "-b", "main"], cwd=tmp, check=True)
         (Path(tmp) / "dirty.txt").write_text("x")
         err = io.StringIO()
         with redirect_stdout(io.StringIO()), redirect_stderr(err):
@@ -230,6 +313,7 @@ def test_live_workflow_derives_every_python_test_suite():
 
 def main():
     test_expression_regex_edge_cases()
+    test_other_workflow_files()
     test_derive_steps()
     test_missing_job_is_exit_2()
     test_list_does_not_execute()

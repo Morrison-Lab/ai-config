@@ -24,6 +24,15 @@ What it runs, in order:
      today) is listed as NOT RUN, and so is a `run:` step that reads a
      `${{ github.* }}` expression, so the denominator shows what CI checks
      that this run did not.
+  3. Every OTHER workflow FILE beside the one being derived (not a job
+     inside it, which item 2 covers), listed as NOT RUN with its `on:`
+     triggers (#1881). validate.yml is a plausible-looking complete list,
+     and a check living in another workflow file is invisible to a runner
+     that reads only validate.yml -- so the denominator names each other
+     file, and a reader can see at a glance which of them fire on
+     pull_request. --no-other-workflows drops them. A file that does not parse
+     is BROKEN rather than NOT RUN, and fails the run, since CI would reject
+     it too.
 
 Steps whose name matches --skip (default: the dependency install, which needs
 the network and is already satisfied locally) are skipped and counted.
@@ -111,6 +120,8 @@ class Step:
     source: str = "validate"      # job the step was derived from
     runnable: bool = True          # False for a uses: job with no local equivalent
     note: str = ""
+    kind: str = "step"            # "step" from the workflow, or "workflow-file" for another file's notice
+    broken: bool = False           # a workflow-file notice whose file could not be parsed
 
 
 def _uses_of(job: Dict[str, Any]) -> str:
@@ -170,6 +181,53 @@ def derive_steps(workflow: Dict[str, Any], job_name: str, base: str) -> List[Ste
     return steps
 
 
+def _triggers(doc: Dict[str, Any]) -> str:
+    """The `on:` triggers of a parsed workflow, as text. PyYAML reads a bare
+    `on:` key as the boolean True (YAML 1.1), so both spellings are checked."""
+    on = doc.get("on", doc.get(True))
+    if isinstance(on, (list, dict)):
+        return ", ".join(str(k) for k in on)
+    return str(on) if on is not None else "(none)"
+
+
+def other_workflow_files(workflow_path: Path) -> List[Step]:
+    """Every other workflow file beside `workflow_path`, as NOT RUN steps (#1881).
+
+    Nothing in them is derived; the point is that the denominator names them,
+    so a PR-blocking check that lives outside validate.yml cannot be silently
+    absent from the plan."""
+    out: List[Step] = []
+    target = workflow_path.resolve()
+    for path in sorted(list(workflow_path.parent.glob("*.yml")) + list(workflow_path.parent.glob("*.yaml"))):
+        if path.resolve() == target:
+            continue
+        broken = False
+        try:
+            note = f"other workflow file, not derived (on: {_triggers(load_workflow(path))})"
+        except RuntimeError as exc:
+            # An unparseable workflow is a defect CI will reject, so it is a
+            # failure here too, not a NOT RUN that run mode ignores.
+            note = f"other workflow file could not be parsed: {exc}"
+            broken = True
+        out.append(Step(name=path.name, command="", source="workflow", runnable=False,
+                        note=note, kind="workflow-file", broken=broken))
+    return out
+
+
+def _denominator(total: int, other_files: int, workflow: str, broken: int = 0) -> str:
+    """The tally line. Steps from other workflow files are listed, not derived,
+    so they are counted apart from the ones read out of `workflow`; a file that
+    did not parse is counted as BROKEN rather than as listed."""
+    derived = total - other_files
+    line = f"{derived} step(s) derived from {workflow}"
+    listed = other_files - broken
+    if listed:
+        line += f", plus {listed} other workflow file(s) listed as NOT RUN"
+    if broken:
+        line += f", plus {broken} other workflow file(s) BROKEN (could not be parsed)"
+    return line
+
+
 def load_workflow(path: Path) -> Dict[str, Any]:
     try:
         import yaml  # type: ignore
@@ -218,9 +276,10 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     p.add_argument("--workflow", default=str(DEFAULT_WORKFLOW))
     p.add_argument("--job", default="validate", help="job whose run: steps to execute (default: validate)")
     p.add_argument("--base", default="origin/main", help="base ref for diff-scoped checks (default: origin/main)")
-    p.add_argument("--only", default=None, help="regex; run only steps whose name matches")
-    p.add_argument("--skip", default=DEFAULT_SKIP, help=f"regex; skip steps whose name matches (default: {DEFAULT_SKIP!r})")
+    p.add_argument("--only", default=None, help="regex; run only derived steps whose name matches (other-workflow-file notices are always listed)")
+    p.add_argument("--skip", default=DEFAULT_SKIP, help=f"regex; skip derived steps whose name matches (default: {DEFAULT_SKIP!r}; never an other-workflow-file notice)")
     p.add_argument("--list", action="store_true", help="print the derived plan and exit 0")
+    p.add_argument("--no-other-workflows", action="store_true", help="do not list the other workflow files as NOT RUN (#1881)")
     p.add_argument("--require-clean", action="store_true", help="exit 2 instead of warning when the working tree is dirty")
     p.add_argument("--timeout", type=float, default=None, help="per-step timeout in seconds")
     p.add_argument("--root", default=str(ROOT), help=argparse.SUPPRESS)
@@ -233,6 +292,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     try:
         workflow = load_workflow(Path(args.workflow))
         steps = derive_steps(workflow, args.job, args.base)
+        if not args.no_other_workflows:
+            steps += other_workflow_files(Path(args.workflow))
     except (RuntimeError, KeyError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
@@ -241,6 +302,13 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     plan = []
     for s in steps:
+        # --only and --skip select among the steps derived from the workflow.
+        # An other-workflow-file notice is not a step to run; it stays in the
+        # denominator whatever the filters say, and only --no-other-workflows
+        # drops it (#1881).
+        if s.kind == "workflow-file":
+            plan.append((s, False))
+            continue
         if only and not only.search(s.name):
             continue
         skipped = bool(skip and skip.search(s.name))
@@ -248,10 +316,11 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     if args.list:
         for s, skipped in plan:
-            tag = "SKIP" if skipped else ("NOT RUN" if not s.runnable else "RUN")
+            tag = "SKIP" if skipped else ("BROKEN" if s.broken else ("NOT RUN" if not s.runnable else "RUN"))
             detail = s.note if not s.runnable else s.command.splitlines()[0]
             print(f"{tag:8} [{s.source}] {s.name}: {detail}")
-        print(f"{len(plan)} step(s) derived from {args.workflow}")
+        print(_denominator(len(plan), sum(1 for s, _ in plan if s.kind == "workflow-file"), args.workflow,
+                          broken=sum(1 for s, _ in plan if s.broken)))
         return 0
 
     dirty = dirty_tree(root)
@@ -266,6 +335,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     for s, skipped in plan:
         if skipped:
             results.append((s, "skip", 0.0))
+            continue
+        if s.broken:
+            results.append((s, "broken", 0.0))
             continue
         if not s.runnable:
             results.append((s, "not run", 0.0))
@@ -287,9 +359,14 @@ def main(argv: Optional[List[str]] = None) -> int:
     not_run = [r for r in results if r[1] == "not run"]
     ran = len(results) - skipped_n - len(not_run)
     print(f"\n{ran - len(failed)} passed, {len(failed)} failed, {skipped_n} skipped, "
-          f"{len(not_run)} not runnable locally, of {len(results)} step(s) derived from {args.workflow}")
+          f"{len(not_run)} not runnable locally, of "
+          + _denominator(len(results), sum(1 for s, _, _ in results if s.kind == "workflow-file"), args.workflow,
+                         broken=sum(1 for s, _, _ in results if s.broken)))
     for s, _, _ in not_run:
         print(f"  not run: {s.name} ({s.note})")
+    for s, rc, _ in results:
+        if rc == "broken":
+            print(f"  broken: {s.name} ({s.note})")
     return 1 if failed else 0
 
 

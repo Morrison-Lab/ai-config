@@ -215,7 +215,7 @@ committed pass.
 
    **Cross-project items** (skills, cross-project memory notes): both live in
    the ai-config repo. Discover its path with
-   `git -C ~/.claude/skills/ums rev-parse --show-toplevel` — point
+   `${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/ums rev-parse --show-toplevel 2>/dev/null || pwd)}` — point
    `-C` at a **skill subdir** (any one), not the `~/.claude/skills` parent.
    `bootstrap.sh` may symlink skills *per-child* into a real `~/.claude/skills`
    directory (cloud/web sessions pre-populate it), so the parent itself isn't a
@@ -242,7 +242,7 @@ committed pass.
    *Already on the open PR's branch* (e.g. mid-ARDI): reuse a worktree for
    it, creating one if this is the first push in the worktree-ified flow.
    ```bash
-   repo="$(git -C ~/.claude/skills/ums rev-parse --show-toplevel)"
+   repo="${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/ums rev-parse --show-toplevel 2>/dev/null || pwd)}"
    wt="../ai-config-worktrees/<branch>"
    git -C "$repo" worktree add "$wt" "<branch>" 2>/dev/null || true   # no-op if it already exists
    cd "$wt"
@@ -256,7 +256,7 @@ committed pass.
 
    *Same-repo case* (this checkout's `origin` IS the repo you're targeting):
    ```bash
-   repo="$(git -C ~/.claude/skills/ums rev-parse --show-toplevel)"
+   repo="${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/ums rev-parse --show-toplevel 2>/dev/null || pwd)}"
    git -C "$repo" fetch origin main   # FETCH
    git -C "$repo" worktree add -b "ums-<topic>" "../ai-config-worktrees/ums-<topic>" origin/main   # CREATE_BRANCH
    cd "../ai-config-worktrees/ums-<topic>"
@@ -271,7 +271,7 @@ committed pass.
    branch. Fetch the intended **upstream** repo explicitly (not just look up
    its default-branch name) and branch the worktree from that fetched ref:
    ```bash
-   repo="$(git -C ~/.claude/skills/ums rev-parse --show-toplevel)"
+   repo="${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/ums rev-parse --show-toplevel 2>/dev/null || pwd)}"
    base="$(gh repo view "<upstream-owner>/<repo>" --json defaultBranchRef -q .defaultBranchRef.name)" \
      && git -C "$repo" fetch "https://github.com/<upstream-owner>/<repo>.git" "$base" \
      && git -C "$repo" worktree add -b "ums-<topic>" "../ai-config-worktrees/ums-<topic>" FETCH_HEAD

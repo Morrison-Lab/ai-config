@@ -1,6 +1,6 @@
 ---
 name: "ardia"
-description: "Drive all open PRs to clean."
+description: "Drive every in-scope open PR to clean."
 ---
 
 # ardia (Codex wrapper)

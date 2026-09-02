@@ -1,6 +1,6 @@
 ---
 name: ardia
-description: "Drive all open PRs to clean."
+description: "Drive every in-scope open PR to clean."
 user-invocable: true
 allowed-tools:
   - Bash
@@ -12,8 +12,9 @@ allowed-tools:
 
 # ARDIA — ARD + Iterate-All
 
-Apply the ARDI loop (ARD + iterate) to every open PR/MR in the repo, driving
-each to a clean review verdict in series.
+Apply the ARDI loop (ARD + iterate) to every in-scope open PR/MR in the repo
+(step 1's scope test decides which), driving each to a clean review verdict in
+series.
 Triage and local patch preparation may run in parallel first; every action that
 mutates a PR stays serial.
 

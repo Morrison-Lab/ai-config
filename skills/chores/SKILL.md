@@ -29,16 +29,23 @@ for the user's call before merging.
 
 ## What counts as a chore PR
 
-A PR is in scope if **any** of these hold:
+A PR is in scope when **both** of these hold:
 
-- Author is a bot: `app/dependabot`, `dependabot[bot]`, `app/renovate`,
-  `renovate[bot]`.
-- Title is a conventional-commit chore: starts with `chore(` (e.g.
-  `chore(actions):`, `chore(submodule):`, `chore(deps):`).
-- Labels include `dependencies`.
+- Its author passes `memories/reviewing-prs.md`'s scope test for this
+  invocation: a dependency bot (`app/dependabot`, `dependabot[bot]`,
+  `app/renovate`, `renovate[bot]`), the GitHub Actions app
+  (`github-actions`, which opens `chore(submodule):` bumps), or the invoking
+  user, or the invoking user is among its assignees.
+  An explicit `chores` call names the Dependabot/Renovate population, which is
+  what admits those two bots; it admits no other author.
+- It looks like a chore: the title starts with `chore(` (e.g.
+  `chore(actions):`, `chore(submodule):`, `chore(deps):`), or the labels
+  include `dependencies`.
 
 Human-authored feature PRs are **out of scope** — those go through `ardia` /
-`gia` (review-to-clean), not this skill.
+`gia` (review-to-clean), not this skill — and so is a chore-titled or
+`dependencies`-labelled PR whose author is another lab member or another bot,
+unless the invoking user is assigned to it.
 
 ## Procedure
 
@@ -58,12 +65,18 @@ This skill is GitHub-first (`gh`). For a GitLab repo, the same shape applies via
 ### 1. List the open chore PRs
 
 ```bash
+ME=$(gh api user --jq .login)   # WHO_AM_I
 gh pr list --repo "$REPO" --state open --limit 200 \
-  --json number,title,author,labels,mergeable \
-  --jq '.[] | select(
-          (.author.login | test("dependabot|renovate"))
-          or (.title | startswith("chore("))
-          or ([.labels[].name] | index("dependencies"))
+  --json number,title,author,assignees,labels,mergeable \
+  | jq -r --arg me "$ME" '.[] | select(
+          (
+            (.author.login | test("dependabot|renovate|github-actions"))
+            or (.author.login == $me)
+            or ([.assignees[].login] | index($me))
+          ) and (
+            (.title | startswith("chore("))
+            or ([.labels[].name] | index("dependencies"))
+          )
         ) | "\(.number)\t\(.mergeable)\t\(.title)"'   # LIST_PRS
 ```
 
@@ -222,5 +235,6 @@ bump is sitting unflagged.
 - ❌ Force-merging a PR with `pending` or `fail` checks.
 - ❌ Reporting "chores done" while a flagged major bump is still open with no
   decision recorded.
-- ❌ Treating human feature PRs as chores (or vice-versa) — scope by author /
-  `chore(` title / `dependencies` label.
+- ❌ Treating human feature PRs as chores (or vice-versa) — scope by author
+  **and** `chore(` title or `dependencies` label, never by title or label
+  alone.

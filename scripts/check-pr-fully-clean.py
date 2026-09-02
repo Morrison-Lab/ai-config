@@ -2357,9 +2357,11 @@ def _blank_fences_and_spans(body: str) -> str:
 
     for m in _MULTI_BACKTICK_SPAN_RE.finditer(unclaimed_body):
         b_un, e_un = m.span()
-        start_line = unclaimed_body[:b_un].count("\n")
+        start_line = bisect.bisect_right(unclaimed_line_offsets, b_un) - 1
         start_col = b_un - unclaimed_line_offsets[start_line]
-        end_line = unclaimed_body[:e_un].count("\n")
+        end_line = (
+            bisect.bisect_right(unclaimed_line_offsets, max(0, e_un - 1)) - 1
+        )
         end_col = e_un - unclaimed_line_offsets[end_line]
 
         if not any(l in fenced_lines for l in range(start_line, end_line + 1)):

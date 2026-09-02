@@ -5185,6 +5185,16 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         _uf_res is None and _uf_secs < 1.0,
     )
 
+    _double_backtick_unit = "Some text with unclosed `` delimiter\n"
+    _double_backtick_body = _double_backtick_unit * 3000
+    _db_secs, _ = best_of_three(
+        checker._blank_fences_and_spans, _double_backtick_body
+    )
+    check(
+        "_blank_fences_and_spans on max-length body of double backticks scales linearly (< 1s)",
+        _db_secs < 1.0,
+    )
+
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 

@@ -63,7 +63,7 @@ one-line builder was named in the instrument's own `--help`
 | `repo` | the `OWNER/REPO` under check | Or pass `-R` instead. |
 | `pr` | `pull_request_read` (`get`, `get_reviews`, `get_comments`) | See the field list below. |
 | `check_runs` | `pull_request_read` (`get_check_runs`) | Bare list or the REST `{"check_runs": [...]}` envelope. |
-| `actions_runs` | `actions_get` (`get_workflow_run`), keyed by run id | Omitting it changes verdicts --- see below. |
+| `actions_runs` | `actions_get` (`get_workflow_run`), keyed by run id; `build-pr-payload.py` fills it from each check run's run id ([#1697](https://github.com/Morrison-Lab/ai-config/issues/1697)) | Omitting it changes verdicts --- see below. |
 
 `pr` needs `headRefOid`, `headRefName`, `state`, `reviewDecision`, and
 `commits[].committedDate`, plus two nested shapes the scan reads directly:

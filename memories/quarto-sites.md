@@ -271,7 +271,7 @@ Caught in self-review on [macros#83](https://github.com/d-morrison/macros/pull/8
 
 The section above is about which **formats** a project renders, and says the project block understates that set.
 This is the other axis: which **documents** a given entry in that block reaches.
-The answer is all of them --- the block is the *default* for any document whose own front matter declares no `format:` --- so adding a format there to give **one** document slides silently gives it to every page in the site.
+The answer is all of them --- the block is the *default* for any document whose own front matter declares no `format:` --- so adding a format there to give **one** document a slide deck silently gives it to every page in the site.
 
 Both axes fall out of the single rule that section states --- per-document front matter *overrides* the project block rather than adding to it --- so the block understates the format set and overstates the document set at the same time.
 What is surprising is the scope rather than the behaviour: the block does exactly what it is documented to do, and the edit was wider than the intent behind it.
@@ -281,7 +281,7 @@ Both formats claim `<stem>.html`, and the render dies rather than rendering some
 The "Verify a redirect on a site build" bullet above carries the remedy: an explicit `output-file:` on the second format.
 [`debugging.md`](debugging.md)'s "Reproduce heavy-tool project bugs minimally" carries a two-file, R-free reproducer for the same `safeMoveSync`/`renderProject` collision --- reach for that before rendering a real project twice.
 
-Two things the new observation adds to those two records.
+Three things the new observation adds to those two records.
 
 **The blast radius is the whole site, and the error names one page.**
 Measured on Quarto 1.9.36 / macOS, a `revealjs:` block added under the top-level `format:` key of a website project:
@@ -298,7 +298,8 @@ Measured on Quarto 1.9.36 / macOS in a three-page project where `index.qmd` alon
 Which stage picks the reported path was not established, and is not needed: the name identifies the document that collided, which is the one to go and fix.
 
 **A green CI check here was not weak evidence that the block was fine --- it was no evidence either way.**
-The `build` check passed on the commits carrying that top-level block, and the render step's own environment dump says why: `FORMATS` empty, `RENDER_PROFILE` empty, and `HAS_LABEL_PDF`, `HAS_LABEL_DOCX`, `HAS_LABEL_REVEALJS` all false.
+The `build` check passed on the commits carrying that top-level block, and the render step's own environment dump says why: `FORMATS` empty, `RENDER_PROFILE` empty, `TINYTEX: false`, and `HAS_LABEL_PDF`, `HAS_LABEL_DOCX`, `HAS_LABEL_REVEALJS` all false.
+Read `TINYTEX` as part of that input rather than the labels alone: the action's pdf branch fires on `TINYTEX = true` **or** `HAS_LABEL_PDF = true`, so a false label does not exclude pdf by itself.
 On that input `Morrison-Lab/gha`'s `preview@v2` takes its no-formats branch, builds `FORMAT_LIST=("html")`, and issues one command: `quarto render . --to html --output-dir _site`.
 A single-format project render renders each document once, so no two formats can contend for `<stem>.html`, and the collision was impossible in that run by construction.
 
@@ -311,8 +312,9 @@ The reflex explanation is the version, and it is wrong: CI ran Quarto 1.10.18 on
 The difference that mattered was the render command, sitting in the same log as the environment dump.
 Reach for the command a check actually ran before reaching for its platform or its version.
 [`metacognitive-monitoring.md`](../shared/workflow/metacognitive-monitoring.md) states the general form: a claim about cause owes an alternative you can name and reject.
-Nobody read the deployed preview here, so whether it would have shown the partial site is untested;
-the `pr-preview/pr-<N>/` recipe the bullet above cites is the cheap way to find out before concluding a green check means anything.
+Reading the deployed preview would not have rescued this either, which is worth knowing before reaching for the `pr-preview/pr-<N>/` recipe the bullet above cites.
+That run wrote a complete html-only site, so the preview had nothing partial to show;
+a preview can only expose what the render command it came from actually built.
 
 - **Do:** put a single document's extra format in that document's own front matter, with an explicit `output-file:`.
 - **Do:** render the project locally before trusting CI on a `_quarto.yml` `format:` change.

@@ -357,18 +357,18 @@ See ai-config#694 for the precedent.
   `get_check_runs` (current head) or the per-SHA endpoint above is the tell.
   One minute is therefore the heuristic rather than a guarantee: an absent
   run after that is grounds to re-issue, and a duplicate request when
-  creation was merely delayed is the cheap side of the trade.
+  creation was merely delayed is the accepted side of the trade.
   - **Do:** after every push to a PR that is ready for review (a draft's
     pushes defer review, per `hooks/no-unreviewed-pr.py`), confirm a
     `copilot-pull-request-reviewer` check run exists on the new head
     within about a minute.
-    Where one exists, `pr-on-claim.md`'s rule against re-posting on an
-    auto-requesting repo holds.
-    Call `request_copilot_review` only when none has appeared.
-    On the two heads above that waited, minutes with no run were followed
-    by a run within seconds of the request; that is the observed sequence,
-    not proof the request caused it, and a merely delayed run would make
-    the request a harmless duplicate.
+    While one is queued or in progress, `pr-on-claim.md`'s rule against
+    re-posting on an auto-requesting repo holds.
+    Call `request_copilot_review` when none has appeared, and after a
+    Rebut/Defer-only round with no push (`skills/ardi/SKILL.md`): the
+    completed run on the unchanged head is no veto.
+    On the two heads above that waited, a run followed the request within
+    seconds, an observed sequence rather than a proven cause.
   - **Don't:** arm a check-in that waits on a round that never started.
 - **A Copilot review reporting `Comments generated: 0 new` can still carry
   findings.**
@@ -381,9 +381,9 @@ See ai-config#694 for the precedent.
   - **Do:** read the review body with `get_reviews` every round.
     Page through every review page first, as `skills/ardi/SKILL.md`'s
     `--paginate` query does.
-    Then filter the complete list to the entry whose `user.login` is
+    Then filter the complete list to every entry whose `user.login` is
     `copilot-pull-request-reviewer[bot]` and whose `commit_id` is the
-    current head.
+    current head, and work each unhandled one in submission order.
     Later human reviews can push that entry off the last page without the
     head moving, and the newest entry alone can be a human review or a
     stale round.

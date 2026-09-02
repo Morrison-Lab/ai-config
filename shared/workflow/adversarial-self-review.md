@@ -408,6 +408,31 @@ pushing branch A afterward compares its shipped commit `X` against the held `Y`,
 - **Don't:** read that refusal as a defect in branch A's review;
   the guard has no notion of "branch" to be defective about, and the SHA comparison is doing exactly what it is built to do.
 
+**The harness can append text to the report's last line, with no newline, and the fingerprint is the line it lands on.**
+A subagent's result is returned to the dispatching session with a trailer the harness writes itself.
+Measured 2026-09-02 in Claude Code: a completed `Agent` call's final line came back as
+
+    --- end of report ---agentId: ae8726223279fc9e8 (use SendMessage with to: '...')
+
+--- concatenated, no separator.
+Whatever line is last absorbs that suffix.
+When the last line is the fingerprint, `Reviewed-Commit: <sha>` becomes `Reviewed-Commit: <sha>agentId: ...`, and the guard is then comparing the push's commit against a string that is not a SHA --- so a genuine, clean, correctly-formatted review is refused, and the refusal reads exactly like an unreviewed push.
+
+The remedy costs one line: require the report to end with a literal sentinel after the fingerprint, so the sentinel is what gets corrupted.
+
+    Verdict: <phrase> Reviewed-Commit: <full sha> --- end of report ---
+
+Two caveats, both measured rather than assumed.
+This has been observed on Claude Code's `Agent` tool and nowhere else, so it is a claim about that harness on that date rather than about subagent dispatch in general.
+And the sentinel sits in tension with [`.claude/agents/adversarial-reviewer.md`](../../.claude/agents/adversarial-reviewer.md)'s own instruction to emit nothing after the JSON payload's closing `-->`;
+a brief that asks for both is asking the reviewer to order them, and the ordering that worked put the verdict, the fingerprint, and the sentinel after the payload.
+Reconciling the two contracts is [ai-config#2483](https://github.com/Morrison-Lab/ai-config/issues/2483)'s business, not something to settle inside a review brief.
+
+- **Do:** end every review brief with an explicit sentinel line after the `Reviewed-Commit` fingerprint, and say in the brief that it is required.
+- **Do:** read a "the clean verdict is for commit X, but this push would ship Y" refusal as possibly a corrupted fingerprint rather than only a stale one --- print the parsed value before concluding.
+- **Don't:** let the fingerprint be the report's last line in a dispatch whose result is returned by a harness.
+- **Don't:** generalize the concatenation to other harnesses without measuring one.
+
 ## Structured review data (JSON payload)
 
 Every reviewer emits two representations of one verdict: the human-readable Markdown report, then a machine-readable JSON payload in a trailing HTML comment.

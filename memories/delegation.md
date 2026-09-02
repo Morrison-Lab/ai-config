@@ -10,9 +10,9 @@ this section is self-contained.
 > **`agy` (Google Antigravity) is confirmed usable as a dispatchable subagent, effective 2026-09-02** (user directives that day: "start using agy as a subagent where feasible", "use agy cli for it").
 > The 2026-08-20 API-dispatch outage (`429: prepayment credits depleted`, user directive that day, scope corrected 2026-08-23) stays on record as history --- it explains why an earlier version of this banner said "out of service" --- but it never described the CLI, which the 2026-08-25 clarification already carved out as a separate, unaffected path.
 > **A fresh Windows install on 2026-09-02, from the official `google-antigravity/antigravity-cli` GitHub release, confirms the CLI works end to end**: `agy --version` reports 1.1.24, `agy models` lists a real roster, and a headless smoke test returned the expected output in about 5 seconds.
-> See this file's "agy on Windows" section below for the install steps;
+> This file's "agy on Windows" section carries the install steps;
 > `memories/preferences.md` points here for the same writeup rather than duplicating it.
-> Route dispatchable subagent work to the `agy` CLI accordingly, per the ladder below --- after `opencode`'s free tier on cost, alongside `codex` on capability.
+> Route dispatchable subagent work to the `agy` CLI accordingly, per this section's cost order --- after `opencode`'s free tier on cost, alongside `codex` on capability.
 > The interactive subscription/extension was never affected and was never at quota.
 > Tracked as ai-config#1776.
 
@@ -260,15 +260,15 @@ The existing "`agy --print` CONSUMES THE NEXT TOKEN" rule above still applies --
 
 **Headless mode cannot satisfy a tool's permission prompt, and it fails with a named cause rather than hanging.**
 A tool needing a permission it hasn't been granted (`read_file` is the one observed) makes the run print `jetski: no output produced --- a tool required the "read_file" permission that headless mode cannot prompt for` and produce nothing.
-The available escapes are `--mode plan` (read-only), `--mode accept-edits`, `--dangerously-skip-permissions`, or an allow-rule under `permissions.allow` in `settings.json` --- but this file's own auto-mode classifier section below already found `--dangerously-skip-permissions` and `--mode accept-edits` denied by Claude Code's permission classifier, so those two may not be reachable from an orchestrated dispatch even where they solve the headless problem.
+The available escapes are `--mode plan` (read-only), `--mode accept-edits`, `--dangerously-skip-permissions`, or an allow-rule under `permissions.allow` in `settings.json` --- but this file's own auto-mode classifier section already found `--dangerously-skip-permissions` and `--mode accept-edits` denied by Claude Code's permission classifier, so those two may not be reachable from an orchestrated dispatch even where they solve the headless problem.
 **Which of these actually works for a read-only review dispatch is unmeasured as of 2026-09-02** --- probe it and update this section with a result before relying on any one of them, rather than assuming `--mode plan` is the safe default merely because it sounds read-only.
 
 **A `language_server.exe agentapi` fallback exists for when no CLI is installed but the Antigravity IDE is already open.**
 This is not a CLI dispatch at all --- it talks to the IDE's own running language server:
 
 ```bash
-language_server.exe agentapi new-conversation \
-  --model=flash|flash_lite|pro "<prompt>"
+# --model accepts one of: flash, flash_lite, pro
+language_server.exe agentapi new-conversation --model=flash "<prompt>"
 ```
 
 with environment variables read from the running IDE process: `ANTIGRAVITY_LS_ADDRESS=127.0.0.1:<higher of the two LISTENING ports of language_server.exe>`, `ANTIGRAVITY_CSRF_TOKEN=<the --csrf_token value from that process's own command line>`, and `ANTIGRAVITY_PROJECT_ID=<the workspace path>`.

@@ -445,7 +445,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a><span class="st">        ) | "\(.number)\t\(.mergeable)\t\(.title)"'</span>   <span class="co"># LIST_PRS</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p><code>--limit 200</code> because <code>gh pr list</code> defaults to 30 — a piled-up weekly backlog would otherwise be silently truncated.</p>
 <p>If there are none, say so and stop.</p>
-<p>That listing is a snapshot. Assignment can change while the sweep runs, so refresh the author and assignees and reapply the same predicate, the <code>PR_SCOPE_EXCLUDED</code> veto included, immediately before each write action in steps 2-5 (closing a bump PR, a <code>@dependabot</code> comment, a merge), and drop and report a PR that no longer passes.</p>
+<p>That listing is a snapshot. Assignment, the title, and the labels can all change while the sweep runs, so re-fetch every input the predicate reads (author, assignees, title, labels) and reapply the same predicate, the <code>PR_SCOPE_EXCLUDED</code> veto included, immediately before each write action in steps 2-5 (closing a bump PR, a <code>@dependabot</code> comment, a merge), and drop and report a PR that no longer passes.</p>
 </section>
 <section id="classify-each-pr-by-bump-size" class="level3">
 <h3 class="anchored" data-anchor-id="classify-each-pr-by-bump-size">2. Classify each PR by bump size</h3>

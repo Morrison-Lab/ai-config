@@ -80,7 +80,7 @@ gh pr list --repo "$REPO" --state open --limit 200 \
 
 If there are none, say so and stop.
 
-That listing is a snapshot. Assignment can change while the sweep runs, so refresh the author and assignees and reapply the same predicate, the `PR_SCOPE_EXCLUDED` veto included, immediately before each write action in steps 2-5 (closing a bump PR, a `@dependabot` comment, a merge), and drop and report a PR that no longer passes.
+That listing is a snapshot. Assignment, the title, and the labels can all change while the sweep runs, so re-fetch every input the predicate reads (author, assignees, title, labels) and reapply the same predicate, the `PR_SCOPE_EXCLUDED` veto included, immediately before each write action in steps 2-5 (closing a bump PR, a `@dependabot` comment, a merge), and drop and report a PR that no longer passes.
 
 ### 2. Classify each PR by bump size
 

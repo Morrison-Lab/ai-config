@@ -30,7 +30,9 @@ What it runs, in order:
      and a check living in another workflow file is invisible to a runner
      that reads only validate.yml -- so the denominator names each other
      file, and a reader can see at a glance which of them fire on
-     pull_request. --no-other-workflows drops them.
+     pull_request. --no-other-workflows drops them. A file that does not parse
+     is BROKEN rather than NOT RUN, and fails the run, since CI would reject
+     it too.
 
 Steps whose name matches --skip (default: the dependency install, which needs
 the network and is already satisfied locally) are skipped and counted.
@@ -118,6 +120,8 @@ class Step:
     source: str = "validate"      # job the step was derived from
     runnable: bool = True          # False for a uses: job with no local equivalent
     note: str = ""
+    kind: str = "step"            # "step" from the workflow, or "workflow-file" for another file's notice
+    broken: bool = False           # a workflow-file notice whose file could not be parsed
 
 
 def _uses_of(job: Dict[str, Any]) -> str:
@@ -197,11 +201,16 @@ def other_workflow_files(workflow_path: Path) -> List[Step]:
     for path in sorted(list(workflow_path.parent.glob("*.yml")) + list(workflow_path.parent.glob("*.yaml"))):
         if path.resolve() == target:
             continue
+        broken = False
         try:
             note = f"other workflow file, not derived (on: {_triggers(load_workflow(path))})"
         except RuntimeError as exc:
-            note = f"other workflow file, not derived (could not parse: {exc})"
-        out.append(Step(name=path.name, command="", source="workflow", runnable=False, note=note))
+            # An unparseable workflow is a defect CI will reject, so it is a
+            # failure here too, not a NOT RUN that run mode ignores.
+            note = f"other workflow file could not be parsed: {exc}"
+            broken = True
+        out.append(Step(name=path.name, command="", source="workflow", runnable=False,
+                        note=note, kind="workflow-file", broken=broken))
     return out
 
 
@@ -293,7 +302,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         # An other-workflow-file notice is not a step to run; it stays in the
         # denominator whatever the filters say, and only --no-other-workflows
         # drops it (#1881).
-        if s.source == "workflow":
+        if s.kind == "workflow-file":
             plan.append((s, False))
             continue
         if only and not only.search(s.name):
@@ -303,10 +312,10 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     if args.list:
         for s, skipped in plan:
-            tag = "SKIP" if skipped else ("NOT RUN" if not s.runnable else "RUN")
+            tag = "SKIP" if skipped else ("BROKEN" if s.broken else ("NOT RUN" if not s.runnable else "RUN"))
             detail = s.note if not s.runnable else s.command.splitlines()[0]
             print(f"{tag:8} [{s.source}] {s.name}: {detail}")
-        print(_denominator(len(plan), sum(1 for s, _ in plan if s.source == "workflow"), args.workflow))
+        print(_denominator(len(plan), sum(1 for s, _ in plan if s.kind == "workflow-file"), args.workflow))
         return 0
 
     dirty = dirty_tree(root)
@@ -321,6 +330,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     for s, skipped in plan:
         if skipped:
             results.append((s, "skip", 0.0))
+            continue
+        if s.broken:
+            results.append((s, "broken", 0.0))
             continue
         if not s.runnable:
             results.append((s, "not run", 0.0))
@@ -343,9 +355,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     ran = len(results) - skipped_n - len(not_run)
     print(f"\n{ran - len(failed)} passed, {len(failed)} failed, {skipped_n} skipped, "
           f"{len(not_run)} not runnable locally, of "
-          + _denominator(len(results), sum(1 for s, _, _ in results if s.source == "workflow"), args.workflow))
+          + _denominator(len(results), sum(1 for s, _, _ in results if s.kind == "workflow-file"), args.workflow))
     for s, _, _ in not_run:
         print(f"  not run: {s.name} ({s.note})")
+    for s, rc, _ in results:
+        if rc == "broken":
+            print(f"  broken: {s.name} ({s.note})")
     return 1 if failed else 0
 
 

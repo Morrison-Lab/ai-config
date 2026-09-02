@@ -413,6 +413,13 @@ jobs:
     uses: Morrison-Lab/gha/.github/workflows/lint-qmd.yml@v2
 
   new-line-breaks:
+    # Only a pull_request event supplies a base to diff against. On a push
+    # run the action used to skip with a warning and conclude `success`, which
+    # on the PR page is indistinguishable from having run and passed
+    # (ai-config#1730: one PR showed a passing push run and a failing PR run
+    # at the same commit). Gating the job makes a push run report `skipped`,
+    # so a green check is always a check that ran.
+    if: github.event_name == 'pull_request'
     # Diff-scoped, blocking (ai-config#682, ported to gha#300): MD013 is off
     # repo-wide (see .markdownlint-cli2.jsonc) because most of the corpus has
     # drifted from the last semantic-line-breaks reformat. This only flags
@@ -470,12 +477,12 @@ jobs:
           # Quoted: a composite action's inputs are strings, unlike the
           # reusable workflow's typed `boolean`.
           fail: 'true'
-          # On PRs, check only lines added relative to the base; otherwise
-          # (push to main) there is no base to diff against, so the check
-          # skips cleanly instead of scanning the whole tree. This reproduces
-          # the expression the reusable workflow supplied, which is why no
-          # `if: github.event_name == 'pull_request'` guard is needed.
-          base-ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
+          # Lines added relative to the PR base. The job-level `if:` above
+          # already restricts this job to pull_request events, so the
+          # expression can name the base SHA directly; the action's own
+          # skip-with-a-warning path (no base ref) is no longer reachable
+          # from here.
+          base-ref: ${{ github.event.pull_request.base.sha }}
 
   lint-markdown:
     uses: Morrison-Lab/gha/.github/workflows/lint-markdown.yml@v2

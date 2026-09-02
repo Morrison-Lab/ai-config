@@ -36,8 +36,8 @@ checks (skipping them wastes a whole issue-pick):
   issue, so you don't open a second, parallel PR for the same work.
 
   ```bash
-  gh pr list --state open --json number,title,headRefName,body \
-    --jq '.[] | select(((.body // "") | test("#<N>\\b")) or (.title | test("#<N>\\b"))) | "#\(.number) \(.title) [\(.headRefName)]"'   # LIST_PRS
+  gh pr list --state open --json number,title,headRefName,body,author,assignees \
+    --jq '.[] | select(((.body // "") | test("#<N>\\b")) or (.title | test("#<N>\\b"))) | "#\(.number) \(.title) [\(.headRefName); \(.author.login); assignees: \([.assignees[].login] | join(","))]"'   # LIST_PRS
   ```
 
 - **On a long-lived or foundational issue, the issue text AND any design-doc

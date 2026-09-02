@@ -209,6 +209,9 @@ _Posted by Claude Code (AI agent) --- not written by a human._"      # COMMENT_P
   (`gh pr list --state all --search "<keywords>"`) in a separate tool call before creating the PR.
 - **`flag-uncounted-comment-claims.py`**: When referencing file lists or counts in comments,
   ensure deriving commands (`grep -c`, `wc -l`) ran in the session.
+- **`flag-unmeasured-timestamp.py`**: A claim comment that carries a clock time
+  needs a fresh `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"` in the same turn.
+  Never infer the time from how many tool calls have run since the last reading.
 
 ## Notes
 

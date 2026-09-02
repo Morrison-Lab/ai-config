@@ -40,6 +40,24 @@ a Python subprocess, so the split is that the **agent** retrieves and the
 **script** judges: gather the PR's state via MCP, write it to a file, and pass
 `--from-json <file>`.
 
+Build that file with the repo's own builder rather than by hand:
+
+```bash
+python3 scripts/build-pr-payload.py OWNER/REPO N out.json
+python3 scripts/check-pr-fully-clean.py N -R OWNER/REPO --from-json out.json
+```
+
+`scripts/build-pr-payload.py` (ai-config#2908) assembles the whole payload
+from plain REST, which a remote session's proxy does reach even where its
+GraphQL surface is pinned.
+The table below documents the payload's shape so the builder can be checked
+and extended, and is the fallback when the builder itself cannot run;
+it is not an instruction to transcribe MCP output by hand.
+A session that did transcribe it by hand had the transcribing commands
+denied three times and reported the gate as blocked for hours, while the
+one-line builder was named in the instrument's own `--help`
+(ai-config#2938).
+
 | Payload key | Gather with | Notes |
 | :--- | :--- | :--- |
 | `repo` | the `OWNER/REPO` under check | Or pass `-R` instead. |
@@ -387,7 +405,7 @@ Worked-example case records for the rules below live in
    - **Don't:** resolve a same-name disagreement by workflow name.
      On this shape both runs carry the same one.
 
-   (Measured 2026-08-22 on [ai-config#1884](https://github.com/Morrison-Lab/ai-config/pull/1884).
+   (Measured 2026-08-21 on [ai-config#1884](https://github.com/Morrison-Lab/ai-config/pull/1884).
    Run `32545283504` (`event=push`) and run `32545289903` (`event=pull_request`) both had `head_sha=8c456074`, both were named `new-line-breaks / check-new-line-breaks`, and they concluded `success` and `failure` respectively.
    The push run was read first and taken as the verdict.
    The PR run was the one carrying four real findings.)
@@ -1034,6 +1052,35 @@ it points the confident direction: the run object's own
 
 See [`fully-clean.cases.md`](fully-clean.cases.md), "`pull_requests[].head.sha`
 named a commit pushed after the run started".
+
+**A fourth surface is the one a script parses first, and it can name a commit
+that exists on no branch: the `commit_sha` field inside the review's own
+structured JSON block.**
+That field reports whatever `git rev-parse HEAD` returned in the reviewer's
+checkout, and on a `pull_request`-triggered run that is the synthetic merge
+commit GitHub builds at `refs/pull/N/merge`, not the branch tip.
+The `Reviewed commit:` trailer the workflow appends beneath the JSON named the
+branch tip in every case observed.
+The same reviewer emits a trustworthy field on one trigger and a
+misleading one on the other, with nothing in the comment saying which.
+The failure this produces is a needless re-request: a script comparing
+JSON `commit_sha` against the PR's `head.sha` reads a verdict on the current
+head as a verdict on an unknown commit.
+
+- **Do:** take the reviewed commit from the `Reviewed commit:` trailer, and
+  fall back to the run's `head_sha` per the surfaces above.
+- **Do:** when the JSON field and the trailer disagree, resolve the JSON's
+  SHA with `git fetch origin <sha>` and read its parents before concluding
+  anything; a two-parent commit whose second parent is your tip is the
+  merge ref, and the verdict covers your tip.
+- **Don't:** compare the JSON `commit_sha` against the PR head to decide
+  staleness --- on a `pull_request`-triggered review it never matches, even
+  when the review is current.
+- **Don't:** read the two repositories' agreement or disagreement as a
+  property of the repository; it is a property of the trigger.
+
+See [`fully-clean.cases.md`](fully-clean.cases.md),
+"The review JSON's `commit_sha` named the synthetic merge commit".
 
 **`check-pr-fully-clean.py` uses the same unreliable body-text surface, and
 whichever SHA that text happens to contain --- present, absent, or wrong ---

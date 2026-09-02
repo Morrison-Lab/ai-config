@@ -62,10 +62,12 @@ In every session --- at session start, and again periodically during long sessio
    A merged hook fix reaches a plugin-consumer session only when the plugin pin in `~/.claude/plugins/installed_plugins.json` advances to a snapshot that contains it ---
    a session restart alone does not advance it (measured 2026-09-01, recorded on [#2899](https://github.com/Morrison-Lab/ai-config/issues/2899): a session restarted under ten minutes after the marketplace pull still ran `a3e0fdb`, and a later app update added a `79def2e` snapshot to the cache without moving any scope's pin off `a3e0fdb`),
    so reporting "pulled the fix" or "restarted" reports a hook as updated that is still running stale.
-   Advance the pin through the plugin CLI (`claude plugin marketplace update <marketplace>`, then `claude plugin install <plugin>@<marketplace>`, per [`use-plugins.md`](use-plugins.md)) --- the documented path, not yet measured against this incident --- then verify the pinned copy in `installed_plugins.json` rather than assuming it moved.
-   (Measured 2026-09-01: the cache hook at rev `a3e0fdb` predated ai-config#2820's fallback while the marketplace clone had pulled past it;
+   Advance the pin through the plugin CLI (`claude plugin marketplace update <marketplace>`, then `claude plugin update <plugin>`) --- the documented path, not yet measured against this incident --- then verify the pinned copy in `installed_plugins.json` rather than assuming it moved.
+   `update` is the subcommand for an already-installed plugin (its help text reads "Update a plugin to the latest version (restart required to apply)", Claude Code 2.1.258, read 2026-09-01);
+   the `install` step in [`use-plugins.md`](use-plugins.md) is the first-time path and does not advance an existing pin.
+   (Measured 2026-09-01: the cache hook at rev `a3e0fdb` predated [ai-config#2820](https://github.com/Morrison-Lab/ai-config/pull/2820)'s fallback while the marketplace clone had pulled past it;
    tracked as [ai-config#2899](https://github.com/Morrison-Lab/ai-config/issues/2899);
-   see [`mistake-patterns.md`](../../memories/mistake-patterns.md) Pattern 42 for the full deadlock.)
+   see [`mistake-patterns.md`](../../memories/mistake-patterns.md) Pattern 43 for the full deadlock.)
    `install-hooks.py --fix` covers the non-plugin path only, and its own docstring is explicit about what it does not do: it never places a file, and it does not check that the script it is registering exists.
    `bootstrap.sh` no longer places `hooks/` under `~/.claude` (see its header comment), so this path currently only helps on a machine whose `~/.claude/hooks` already holds the scripts some other way.
    Registering a hook whose file is absent is worse than leaving it unregistered: an unregistered guard is inert, while a registered-but-absent `PreToolUse` `Bash` hook makes `python3` exit 2 on **every** Bash call and takes the shell down.

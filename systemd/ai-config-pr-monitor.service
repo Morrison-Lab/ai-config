@@ -1,5 +1,5 @@
 [Unit]
-Description=Monitor all open GitHub pull requests authored by this user
+Description=Monitor all open GitHub pull requests and GitLab merge requests authored by this user
 
 [Service]
 Type=simple

@@ -608,20 +608,6 @@ expects it from.
 Prefix the source with `./` so a slash precedes the colon, or use a `cp`
 loop when the file list is small enough not to need rsync.
 
-## Markdown linting (markdownlint, lint-qmd)
-
-- **Table rows must stay on one line (MD055/MD056).**
-  Wrapping a cell across lines breaks the `|` alignment and trips both rules.
-  Rewrite the cell concisely on a single line rather than word-wrapping it.
-  Prefer a short, complete description over hitting a length target.
-- **Don't tag a non-shell CLI block `bash`/`sh` (MD040).**
-  MD040 wants a language on every fence, which invites tagging anything command-shaped as `bash`.
-  Claude slash commands (`/ums`, `/plugin`, `/also`) and other application-level directives are not shell-executable, so `bash` implies a reader can run them and they fail when someone tries.
-  Tag those `text` instead.
-
-(Recovered 2026-07-30 from `a739c69`, an orphaned commit on `ums/ardi-review-link-handling`: it landed about 30 minutes after its own PR [#650](https://github.com/Morrison-Lab/ai-config/pull/650) merged, so it never reached `main` and sat unnoticed for a week.
-Both rules were first learned on [#645](https://github.com/Morrison-Lab/ai-config/pull/645).)
-
 ## The Bash tool runs zsh here, and zsh does not word-split unquoted expansions
 
 Kin to the two path gotchas above --- it produces a confident wrong answer
@@ -1159,7 +1145,10 @@ while `_selftest.yml` was green on `main`.)
 - **[scripts/check-pr-fully-clean.py](../scripts/check-pr-fully-clean.py) `<pr-number>` programmatically enforces ARDI fully-clean criteria.**
   It checks that:
   (1) all CI check runs for the PR's exact HEAD commit SHA are `completed` with conclusion `success`, `neutral`, or `skipped`,
-  (2) an automated review comment evaluating that exact HEAD SHA has been posted by an automated bot account (`github-actions`, `github-actions[bot]`, `claude[bot]`, `claude`) or carries a bot review header (`🤖`, `### 🤖`, `code review`, `claude finished review`, `verdict:`),
+  (2) an automated review comment evaluating that exact HEAD SHA has been posted by a recognized bot account (`github-actions`, `github-actions[bot]`, `claude[bot]`, `claude`, `cursor`, or any `*[bot]` login), or by an OWNER/MEMBER login whose body's review-agent marker resolves to a reviewer identity other than that login (a CLI agent posting under a human account);
+  a comment from any other author is admitted only when it states a blocking `not-clean` verdict, or when it is a structured review report (headings plus a Reviewed-Commit fingerprint) stating a clean verdict, and such a clean never counts toward the merge quorum.
+  A bare body marker (`🤖`, `verdict:`, `code review`) on a human-authored comment admits nothing: `has_review_body_marker()` is consulted only inside `is_non_review_notice()`, to keep a genuine review from being misclassified as a workflow status notice.
+  An earlier revision of this bullet said the marker was an alternate admission path, which is the misreading behind #2306 and the closed #2308 (#2350).
   (3) all matching review comments/objects evaluating the HEAD SHA contain zero findings (verifying multi-item SHA coverage so empty trailing formal review objects cannot hide finding-bearing comments), and
   (4) no formal `CHANGES_REQUESTED` or `REJECTED` state exists on the PR (integrating GitHub's computed `reviewDecision` API field directly from `gh pr view --json reviewDecision` and preserving decision state across subsequent `COMMENTED` reviews).
   Returns exit code 0 only when fully clean.

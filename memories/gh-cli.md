@@ -543,6 +543,19 @@
   The short version: `Morrison-Lab/ai-config` reproduces the identical 201-then-empty signature while carrying no `copilot_code_review` rule at either scope, so an empty pending list is evidence neither that the request was blocked nor that a review is coming.
   Only the posted review **body** settles which of those happened.
 
+  **The issue timeline's `review_requested` event is a fourth surface, and it is the one that does discriminate whether the request landed.**
+  `gh api "repos/<owner>/<repo>/issues/<N>/timeline" --jq '[.[] | select(.event=="review_requested") | .requested_reviewer.login] | unique'` returned `["Copilot"]` on `Morrison-Lab/ai-config#3004` immediately after a POST whose own response body already read empty.
+  Measured 2026-09-02: the POST returned **200**, not 201, with `"requested_reviewers":[]` in its own response body, and a follow-up `GET` of the same endpoint stayed empty too --- which read as a silently failed request and invited four repeated POSTs, each landing the same way.
+  The timeline carried the `review_requested` event the entire time.
+  Cross-checked against `#2979`, a PR Copilot did go on to review: the identical timeline entry is there, and that review posted under the login `copilot-pull-request-reviewer`.
+  This settles a narrower question than the paragraph above leaves open --- "was the request accepted" rather than "will Copilot post a review" --- so read it beside that paragraph's conclusion rather than in place of it: the timeline event is the evidence a request landed, and the posted review body is still what a verdict requires.
+
+  - **Do:** check the timeline's `review_requested` event before re-issuing a reviewer-request POST that read back empty.
+  - **Do:** treat the timeline event as confirmation the request landed, and the posted review body as the separate, later question of whether a review follows.
+  - **Don't:** re-POST a request because the pending-list or `reviewRequests` read came back empty --- both are already documented above as uninformative in either direction.
+  - **Don't:** read the timeline event as proof a review is coming;
+    it confirms the request, not the outcome.
+
   **Both outcomes were genuinely observed on the same repo the same day, so do not flatten this into "it returns 201".**
   One session ran the POST once and got `422`;
   another ran it three times, across all three login spellings, and got `201` every time.

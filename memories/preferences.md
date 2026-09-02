@@ -799,7 +799,7 @@
   Worktrees are already the default, so most sessions start isolated; session-lock surfaces the rare SAME-WORKING-TREE collision before files get clobbered.
   This is the LOCAL counterpart to `claim-pr` (remote) and `sync-pr-branch` (reconcile with origin) --- use all three together on shared PR work.
   Registry lives under `.git/ai-sessions/` (never committed).
-  Script: `~/.claude/skills/session-lock/scripts/ai-session.sh`.
+  Script: `skills/session-lock/scripts/ai-session.sh` (or `~/.claude/skills/session-lock/scripts/ai-session.sh`).
 
 - When writing a description or comment that will reference a follow-up tracking issue, create the issue first, then use the specific issue URL (e.g. `#229`).
   Never use the generic issues list URL as a placeholder --- a reviewer will catch it and the fix costs an extra ARDI round. (Learned on ucdavis/bcs#226.)

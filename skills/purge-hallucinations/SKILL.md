@@ -41,7 +41,7 @@ Pick the narrowest target the user named, in this precedence order:
    `memories/github-mcp-tools.md`); audit only the references the diff *introduces*.
 2. **The memory/instruction corpus** — the ai-config repo's `memories/`,
    `skills/`, and `CLAUDE.md`. Find the repo root with
-   `git -C ~/.claude/skills/purge-hallucinations rev-parse --show-toplevel`.
+   `${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/purge-hallucinations rev-parse --show-toplevel 2>/dev/null || pwd)}`.
 3. **The current repo's code & docs** — when the user says "this repo" or
    names no target while inside a project.
 
@@ -59,7 +59,7 @@ claims. Pull out, with file + line for each:
 | File / path | `src/foo.R`, `here("data/x.csv")`, a relative link in a `.qmd` |
 | Function / object / symbol | `pkg::fn()`, an R object, a shell command, a Make target |
 | Action ref + version | `uses: org/action@v3`, `@<sha>`, a tag/release |
-| Skill name | `~/.claude/skills/<name>/`, a `/slash-command` |
+| Skill name | `skills/<name>/`, `~/.claude/skills/<name>/`, a `/slash-command` |
 | Memory cross-link | `[[some-memory-name]]` in a memory body |
 | URL / link | `https://…`, a docs anchor, a badge target |
 | Citation / package | a CRAN/Bioconductor package, a DOI, a `DESCRIPTION` dep |

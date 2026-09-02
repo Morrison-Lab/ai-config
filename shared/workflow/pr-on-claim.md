@@ -256,7 +256,8 @@ Merge-tree answers "will this apply", never "is this new".
 
 - **Do:** settle whether work is merged from the PR's own state, or from whether the branch's own additions are present in the default branch's current content.
 - **Don't:** read a non-empty `<base>..<branch>` range as unmerged work in a squash-merging repo --- it says nothing there, however fresh the base.
-- **Don't:** read a non-empty two-dot `git diff <base> <branch>` as unmerged work either, for the same reason the range can't say it: the base advancing past the fork point makes the diff non-empty on its own, whether or not the branch's own content ever landed.
+- **Don't:** read a non-empty two-dot `git diff <base> <branch>` as unmerged work either.
+  The base advancing past the fork point makes that diff non-empty on its own, whether or not the branch's own content ever landed --- which is the same reason the commit range cannot say it.
   Scoping the diff to the branch's own files does not fix this --- a sibling PR that touched the same file after the fork reproduces the same confusion.
   Use a one-directional `git diff <base>...<branch>` (three-dot, merge base on the left) to isolate the branch's own additions, then confirm those specific lines are present in the base with `git show <base>:<path> | grep -c '<distinctive phrase>'`.
 - **Don't:** offer a clean or a conflicting `merge-tree` as evidence either way about novelty.

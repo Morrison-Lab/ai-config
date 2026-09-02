@@ -69,7 +69,8 @@ See also [`shared/workflow/ardi.md`](../shared/workflow/ardi.md).
 
 When a failing check exposes a workflow defect unrelated to a PR's stated
 change, restore that PR's original diff and deliver the workflow repair through
-its own issue and PR. Mixing the repair into the affected feature PR obscures
+its own issue and PR.
+Mixing the repair into the affected feature PR obscures
 review scope and makes the feature's CI result depend on an unrelated
 permission or infrastructure change.
 
@@ -78,7 +79,8 @@ re-run the original PR's checks against the corrected default-branch workflow.
 
 [ucdavis/rampp#155](https://github.com/ucdavis/rampp/pull/155), 2026-09-02:
 the Claude review job failed during its OIDC app-token exchange because the
-workflow granted `contents: read`. The temporary `contents: write` repair was
+workflow granted `contents: read`.
+The temporary `contents: write` repair was
 reverted from the internal-documentation PR, then tracked in
 [issue 156](https://github.com/ucdavis/rampp/issues/156) and isolated in
 [PR 157](https://github.com/ucdavis/rampp/pull/157).

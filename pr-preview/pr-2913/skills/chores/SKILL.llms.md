@@ -17,7 +17,7 @@ A PR is in scope when **either** of these holds:
 - Its author is one of the dependency bots this skill exists for, matched in the exact login form the source returns: `app/dependabot`, `dependabot[bot]`, `app/renovate`, `renovate[bot]`. An explicit `chores` call names that population, which is what admits those two bots and no other author.
 - It looks like a chore — the title starts with `chore(` (e.g. `chore(actions):`, `chore(submodule):`, `chore(deps):`), or the labels include `dependencies` — **and** it passes `memories/reviewing-prs.md`’s scope test for the invoking user: authored by the GitHub Actions app (`github-actions`, which opens `chore(submodule):` bumps) or by the invoking user or one of their aliases, assigned to one of them, or one the user explicitly asked this run to work on (a mention such as “do not touch” followed by a number is not a request).
 
-Human-authored feature PRs are **out of scope** — those go through `ardia` / `gia` (review-to-clean), not this skill — and so is a chore-titled or `dependencies`-labelled PR whose author is another lab member or another bot, unless the invoking user is assigned to it.
+Human-authored feature PRs are **out of scope** — those go through `ardia` / `gia` (review-to-clean), not this skill — and so is a chore-titled or `dependencies`-labelled PR whose author is another lab member or another bot, unless the invoking user is assigned to it or explicitly asked this run to work on it.
 
 ## Procedure
 

@@ -75,9 +75,11 @@ standing yes (see `preferences.md`).
   and a repository that does not require an up-to-date branch merges without it otherwise.
   When it fails on a direct merge, `gh pr update-branch "<N>" -R "<owner>/<repo>"` (or `update_pull_request_branch` remotely),
   wait until `headRefOid` changes (the update answers `202 Accepted` before the merge lands),
-  rerun the base-currency check on the new head,
-  and then rerun the whole clean gate on it.
-  Recheck currency again once the gate passes, immediately before the merge command, and repeat the cycle if the base moved during the gate.
+  record that SHA,
+  rerun the base-currency check on it,
+  and then rerun the whole clean gate pinned to it.
+  Immediately before the merge command, check that the live head is still that SHA and that the base tip is unchanged,
+  and repeat the cycle if either moved during the gate (a concurrent push can pass a currency-only recheck while the gate covered the earlier head).
   A cycle that repeats more than once means the base outruns the gate.
   Merge through a queue or strict up-to-date protection instead, per `fully-clean.md`.
 - Default to **squash** for a feature branch with many small iteration commits

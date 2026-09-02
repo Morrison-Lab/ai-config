@@ -59,10 +59,12 @@ without asking confirmation before every merge.
   required checks cover the whole clean gate on `merge_group`.
   On a direct merge a stale merge-base means `gh pr update-branch`,
   a wait until `headRefOid` changes (the update is asynchronous),
-  a currency check on the new head,
-  a full re-run of the gate on it,
-  then a currency recheck immediately before the merge command,
-  repeating the cycle when the base moved during the gate.
+  recording that SHA,
+  a currency check on it,
+  a full re-run of the gate pinned to it,
+  then a check immediately before the merge command that the live head
+  is still that SHA and the base tip is unchanged,
+  repeating the cycle when either moved during the gate.
   A cycle that repeats more than once means the base outruns the gate:
   merge through a queue or strict up-to-date protection instead, per
   [`fully-clean`](../../shared/workflow/fully-clean.md).

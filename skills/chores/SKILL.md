@@ -183,6 +183,12 @@ Dashboard) — `@dependabot` comment commands do nothing on Renovate PRs.
 ### 4. Safe bumps (patch / minor / submodule + green) → merge
 
 Run the base-currency check from [`fully-clean`](../../shared/workflow/fully-clean.md)'s stale-base rule first (the Do bullets beginning "for a direct merge"), since a green head can still break the base when the base gained a check after the head's CI ran.
+When it is stale, the bot-bump recovery is to update the branch,
+wait for the new head SHA,
+rerun the CI and conflict checks this skill gates on against that SHA (review stays skipped on bot PRs),
+and recheck currency and that the head is still that SHA immediately before merging.
+`gh pr update-branch "$N" --repo "$REPO"` merges the base in.
+`@dependabot rebase` rewrites the head onto it and also clears a conflict.
 Then merge directly.
 Dependabot deletes its own branch on merge.
 

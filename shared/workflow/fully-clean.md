@@ -1187,6 +1187,8 @@ A clean-gate check the queue cannot block on is a check the queue does not run a
 
 The rule splits by merge mode: a direct merge from a session with `git` and `gh`, a direct merge from a remote session without `git`, and a merge queue.
 It binds every direct-merge path, including the dependency-bump merges in [`chores`](../../skills/chores/SKILL.md), not only `mwc` and `merge-it`.
+For a bot bump, the gate to rerun after an update is CI plus conflict state, which is what those PRs are gated on, since `@claude` review is skipped on them by design.
+`chores` states that form.
 A deferred merge (`gh pr merge --auto`, or a `@dependabot` merge command) runs after any check made before the command, so it is safe only where the base requires an up-to-date branch or a correctly configured queue tests the merge.
 Elsewhere merge synchronously, right after the check.
 
@@ -1204,8 +1206,9 @@ Elsewhere merge synchronously, right after the check.
 - **Do:** when the merge-base is not that tip and the merge is direct, `gh pr update-branch "<N>" -R "<owner>/<repo>"` (or `update_pull_request_branch` remotely), then rerun the whole clean gate on the new head, review included, before merging.
   The update is a new head, so a clean verdict on the old one no longer counts, per [`sync-with-main`](sync-with-main.md).
   The update is asynchronous: the REST endpoint answers `202 Accepted` while the merge is still in progress, and the MCP tool reports that answer as success, so a gate rerun started at once can read the old head.
-  Poll `headRefOid` until it changes, rerun the base-currency check on the new head, and only then rerun the gate.
-  The gate itself takes minutes, so the base can advance again while it runs: recheck currency after the gate passes and immediately before the merge command, and repeat the update-and-gate cycle when it is stale again.
+  Poll `headRefOid` until it changes, record that SHA, rerun the base-currency check on it, and only then rerun the gate, pinned to that SHA.
+  The gate itself takes minutes, so the base can advance again while it runs, and so can the head: a concurrent push that already contains the current base passes a currency-only recheck while the gate's verdict belongs to the earlier SHA ([`github`](../../memories/github.md) records that unpinned-head race).
+  So immediately before the merge command, check both that the live `headRefOid` still equals the pinned SHA and that the base tip is unchanged, and repeat the update-and-gate cycle when either moved.
   That leaves the smallest window the sequence allows, the seconds between the recheck and the merge, rather than none.
   When the cycle repeats more than once the base is advancing faster than the gate runs, which [`batch-merge-and-resolve`](batch-merge-and-resolve.md) measures.
   Stop chasing and merge through a queue or under strict up-to-date protection, or batch the pending merges per that fragment.

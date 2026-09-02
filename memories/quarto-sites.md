@@ -297,19 +297,23 @@ The name tracks the *colliding* document --- the one inheriting both formats ---
 Measured on Quarto 1.9.36 / macOS in a three-page project where `index.qmd` alone declares no `format:` of its own: the render reports `[1/3] docs/design-decisions.md`, `[2/3] index.qmd`, `[3/3] aaa.qmd`, and the error names `index.html`, which is neither first nor last.
 Which stage picks the reported path was not established, and is not needed: the name identifies the document that collided, which is the one to go and fix.
 
-**A green CI check here was not weak evidence that the block was fine --- it was no evidence either way.**
-The `build` check passed on the commit carrying that top-level block, and the reason is that it never rendered revealjs at all.
-`Morrison-Lab/gha`'s `preview.yml@v2` derives its format list from PR labels, and with none of them set it falls to a legacy branch that renders exactly one: `quarto render . --to html --output-dir _site`.
-A single-format render cannot produce a two-format filename collision, so the check could not have failed for this reason whatever the config said.
-So read a green render check by asking which formats it rendered, not by asking which platform or Quarto version it ran on.
-The "Verify a redirect on a site build, not on a single-file render" bullet above says the same thing about a local single-file render.
-A `--to`-driven CI render is that blind spot wearing a remote runner.
+**A green CI check did not reproduce it, and why is still undetermined --- but the Quarto version is ruled out.**
+The `build` check passed on the commits carrying that top-level block, whose `index.qmd` and `docs/design-decisions.md` declare no `format:` of their own, and one of those runs rendered the project's revealjs and docx outputs without hitting the collision.
+The obvious explanation is that CI ran Quarto 1.10.18 on Linux while the failing render was 1.9.36 on macOS.
+That is two variables at once, and one of them is cheap to hold constant, so hold it: installing 1.10.18 and re-running the reduced reproducer on macOS collides exactly as 1.9.36 does.
+Version eliminated, what remains is the platform or something in the real project that the reduced reproducer does not carry.
+Say that, rather than naming a cause.
+
+The transferable half is the method, not the answer.
+A divergence between two observations differing in more than one variable licenses no causal claim at all, and the reflex to name the most salient difference --- here a version bump --- is what produces a confident wrong one.
+Vary one variable, and report the eliminated candidate as the finding when the cause is still open.
 Nobody read the deployed preview here, so whether it would have shown the partial site is untested;
 the `pr-preview/pr-<N>/` recipe the bullet above cites is the cheap way to find out before concluding a green check means anything.
 
 - **Do:** put a single document's extra format in that document's own front matter, with an explicit `output-file:`.
 - **Do:** render the project locally before trusting CI on a `_quarto.yml` `format:` change.
-- **Do:** read a green render check by asking which formats it rendered, and treat a single-format run as silent on any collision between formats.
+- **Do:** hold one variable constant before attributing a local-versus-CI divergence to any of them;
+  a green remote render and a red local one usually differ in several ways at once.
 - **Do:** compare the error's source path against the document the format was added for;
   a different path means the entry is reaching documents you did not intend.
 - **Don't:** add a format to the top-level `format:` key for one document's benefit.

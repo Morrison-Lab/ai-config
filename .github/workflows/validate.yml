@@ -61,6 +61,12 @@ jobs:
         run: python3 scripts/check-tui-alloc-readme.py
       - name: Run skills-validator tests
         run: python3 scripts/test_validate_skills.py
+      - name: Check the hooks-only skills-directory plugin is in sync
+        run: python3 scripts/gen-hooks-plugin.py --check
+      - name: Run gen-hooks-plugin tests
+        run: python3 scripts/test_gen_hooks_plugin.py
+      - name: Run run-hook.sh tests
+        run: python3 scripts/test_run_hook.py
       - name: Validate OAICopilot model-template policy
         run: python3 scripts/test_oaicopilot_models_template.py
       - name: Check for unpinned git fixtures

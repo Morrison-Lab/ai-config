@@ -118,3 +118,20 @@ Measured 2026-08 against Claude Code v2.1 CLI runtime (v2.1.236):
 - **Subagent forks (`context: fork`)**:
   Skills specifying `context: fork` automatically spawn a subagent
   rather than expanding inline into the current conversation turn.
+
+## A guard that reads `enabledPlugins` must resolve scope, not grep one file
+
+Measured 2026-09-01 on `skills/ai-config-hooks/run-hook.sh` (ai-config#2004):
+the first draft decided "is the marketplace plugin enabled" by grepping
+`~/.claude/settings.json` alone, the lowest-precedence scope.
+The adversarial review caught both failure directions this file already
+describes: a `false` in `.claude/settings.local.json` over a user-scope
+`true` would have silenced every hook, and a project-scope `true` with no
+user entry would have fired every hook twice.
+The corrected runner walks local, then project, then user settings and
+lets the first file that names an `ai-config@*` entry decide.
+
+- **Do:** walk the scopes in precedence order and stop at the first file
+  that names the plugin, honouring an explicit `false` there.
+- **Don't:** read one settings file as the answer, or union truthy names
+  across files.

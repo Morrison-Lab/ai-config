@@ -251,7 +251,7 @@ Three consequences for driving a PR to fully clean:
 - **Keep re-requesting each round anyway.** A quota resets on its own schedule, so a reviewer that refused a few pushes ago can come back mid-session --- which is exactly what criterion 2's "re-check availability right before declaring clean" is for.
   Say so explicitly when reporting a PR ready: name which reviewer's verdict the clean call rests on, and which one never weighed in at this head.
 
-The mechanics of detecting a refusal (it arrives as a posted review, not an API error, so the request call's success proves nothing) are in [`memories/github-mcp-tools.md`](../../memories/github-mcp-tools.md).
+The mechanics of detecting a refusal (it arrives as a posted review, not an API error, so the request call's success proves nothing) are in [`memories/copilot-reviews.md`](../../memories/copilot-reviews.md).
 
 **The same reviewer has a third state, and it is worse for a reader than the refusal: the check goes green and no review is posted at all.**
 A refusal at least leaves a record.

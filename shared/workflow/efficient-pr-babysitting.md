@@ -69,7 +69,7 @@ That default is about the fix and not about the fact, so where a declined note a
 Keep the Copilot observation separate, and do not attribute it to your own pushes.
 Copilot's no-findings state has been observed in two shapes.
 Through August 2026 it posted no formal review when it found nothing, so `copilot-pull-request-reviewer` could complete `success` with `get_reviews` empty even on a stable, single-push head -- the silent-reviewer state [`review-verdict-pitfalls`](review-verdict-pitfalls.md) owns.
-On 2026-09-01 it posted a formal review whose body opens `### 🟢 Approval recommended` with zero generated comments, on [#2976](https://github.com/Morrison-Lab/ai-config/pull/2976) and [#2983](https://github.com/Morrison-Lab/ai-config/pull/2983).
+On 2026-09-01 and 2026-09-02 (Pacific) it posted a formal review whose body opens `### 🟢 Approval recommended` with zero generated comments, on [#2983](https://github.com/Morrison-Lab/ai-config/pull/2983) and [#2976](https://github.com/Morrison-Lab/ai-config/pull/2976) respectively.
 Two PRs are a sample, so expect either shape until more is measured.
 A green Copilot check is therefore not a verdict.
 Read `get_reviews`, treat an empty result as "no findings posted", and treat the approval body as the clean verdict, neither of them as something a trickled push caused.

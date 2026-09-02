@@ -1172,8 +1172,9 @@ Under a merge queue the queue's speculative merge test covers this, and [`merge-
 There the `merge_group` checks are the gate.
 
 - **Do:** before merging, fetch and resolve the default branch, then confirm the merge-base with it is its current tip:
-  `git fetch origin && d=$(git symbolic-ref --short refs/remotes/origin/HEAD | cut -d/ -f2-) && [ "$(git merge-base origin/$d <head>)" = "$(git rev-parse origin/$d)" ]`.
+  `git fetch origin && d=$(git remote show origin | sed -n 's/.*HEAD branch: //p') && [ "$(git merge-base origin/$d <head>)" = "$(git rev-parse origin/$d)" ]`.
   A remote-tracking ref is current only after a fetch, and the default branch is not always `main`.
+  `git remote show origin` answers in clones where `refs/remotes/origin/HEAD` is unset, which [`challenge-the-assignment.cases.md`](challenge-the-assignment.cases.md) records for the clones this corpus is developed in.
 - **Do:** when it is not and the merge is direct, `gh pr update-branch` and let CI re-run at the new base before merging.
 - **Do:** under a merge queue, rely on the `merge_group` checks rather than a manual update.
 - **Don't:** read a head-only FULLY CLEAN verdict as a merge-safe verdict when the base has advanced.

@@ -195,5 +195,37 @@ _ok = _proc.returncode == 0 and not _proc.stdout.strip()
 wrong += not _ok
 print(f"{'silent' if _ok else 'WARN':<7} unparseable stdin fails open")
 
+# An unreadable-but-present transcript exercises the OSError branch, which the
+# missing-transcript case above cannot reach: `os.path.isfile` returns False
+# there, so that case returns early and never enters the `try`.
+_fd, _unreadable = tempfile.mkstemp(suffix=".jsonl")
+os.write(_fd, b"{}\n")
+os.close(_fd)
+os.chmod(_unreadable, 0o000)
+if os.access(_unreadable, os.R_OK):
+    # Running as root, or on a filesystem ignoring the mode bits. Skipping
+    # silently would print a pass for a case that never ran.
+    os.chmod(_unreadable, 0o600)
+    os.unlink(_unreadable)
+    sys.exit(
+        "FATAL: could not make a file unreadable, so the OSError fail-open "
+        "branch cannot be exercised. Do not report a pass for it."
+    )
+try:
+    _proc = subprocess.run(
+        [sys.executable, HOOK],
+        input=json.dumps({"tool_name": "Bash",
+                          "tool_input": {"command": "git diff main...pr-98"},
+                          "transcript_path": _unreadable}),
+        capture_output=True, text=True,
+    )
+finally:
+    os.chmod(_unreadable, 0o600)
+    os.unlink(_unreadable)
+total += 1
+_ok = _proc.returncode == 0 and not _proc.stdout.strip()
+wrong += not _ok
+print(f"{'silent' if _ok else 'WARN':<7} an unreadable transcript fails open")
+
 print(f"\n{total - wrong}/{total} correct")
 sys.exit(1 if wrong else 0)

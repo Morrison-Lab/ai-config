@@ -2,6 +2,9 @@
 
 Quick-reference index of common failure patterns observed in agent sessions, with cross-references to their canonical enforcement rules and deep treatments.
 
+Pattern numbers are checked by `scripts/check-mistake-patterns.py` (run in `validate.yml`): each `## Pattern N:` heading is unique and the integers run 1..K in file order, with a lettered sub-pattern (`5b`, `34b`) filed directly under its base.
+When a new entry lands after `main` has appended one of its own, take the next number from the merged file rather than from the branch ([#2946](https://github.com/Morrison-Lab/ai-config/issues/2946)).
+
 ## Pattern 1: Assumption Over Verification
 - **Mistake**: Assume an action succeeded without verifying the result from tool output or repository state.
 - **Example**: Assuming `gh pr create` succeeded without checking URL / output or verifying the open PR exists.
@@ -660,7 +663,7 @@ A clean automated review from every available provider evaluating the current HE
 - **Canonical Rule**: [`fact-check-code-logic.md`](../shared/coding/fact-check-code-logic.md) ("A subsumption proof over raw text must account for every transformation before claiming a disjunct is dead").
 - **Fix**: Construct adversarial test fixtures with escaped, decoded, or transformed representations to test whether raw text matching and structured value matching can diverge before deleting extraction logic.
 
-## Pattern 36: Unbounded Subset Overlap in Fuzzy Matching Defeating Negative Controls
+## Pattern 34b: Unbounded Subset Overlap in Fuzzy Matching Defeating Negative Controls
 - **Do**: When implementing fuzzy or token-overlap matching to tolerate subtitles or minor variations, enforce length and density proportionality (e.g. bounded character/token length ratio or Jaccard similarity threshold) alongside token containment.
 - **Don't**: Accept full subset containment (`overlap_coef == 1.0`) of a short needle in a long haystack without bounding the relative lengths or densities;
   a short 2-token title (e.g. "Causal Inference") is a 100% token subset of an arbitrarily long, unrelated review title (e.g. "A Review of Causal Inference Methods in Epidemiology and Public Health Policy"), defeating the tool's fabrication-detection purpose.

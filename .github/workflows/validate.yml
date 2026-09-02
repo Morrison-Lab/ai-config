@@ -33,6 +33,12 @@ jobs:
         run: python3 scripts/check-ascii-punctuation.py
       - name: Run check-ascii-punctuation tests
         run: python3 scripts/test_check_ascii_punctuation.py
+      - name: Check mistake-pattern numbering
+        # ai-config#2946: `## Pattern N:` headings unique and sequential; the
+        # test below dogfoods the live file, so this step names the defect.
+        run: python3 scripts/check-mistake-patterns.py
+      - name: Run check-mistake-patterns tests
+        run: python3 scripts/test_check_mistake_patterns.py
       - name: Check Jules mention-dispatch wrap
         # ai-config#2280: a uses: step with GITHUB_EVENT_NAME in env looks
         # like a wrap and is a no-op. This gate fails if the mention path

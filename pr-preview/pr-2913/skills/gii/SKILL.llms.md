@@ -56,6 +56,13 @@ Hitting the max is a **wave boundary**. Wrap up one wave of PRs before starting 
 - **Don’t:** start the next wave on your own judgment once the current one is fully finished.
 - **Don’t:** read the boundary as forbidding parallel PRs *within* a wave.
 
+**A UMS pass is not a new wave, and neither is the PR it opens.** The boundary above counts *issue grabs*: a wave is the set of issues taken from the repo’s backlog and the PRs that ship them. A UMS pass records what the wave taught, in `ai-config` or the repo’s own docs, and it is owed at the wave’s clean verdicts and merges by [`run-ums-proactively`](../../shared/workflow/run-ums-proactively.md) — so a “finish the wave, no new wave” instruction still includes it, and holding it back until the user says go is the deferral that fragment rules out. The near-miss is reading “don’t start a new wave” as “open no more PRs”: a UMS PR is not a grab from the backlog, and treating it as one strands the wave’s learnings in the conversation.
+
+- **Do:** run the owed UMS pass, and open its PR, after a “finish the wave, no new wave” instruction.
+- **Don’t:** count a UMS pass or its PR as a grab, or hold it until the next wave is authorized.
+
+(User directive, 2026-09-01: “cai: ums don’t count as a new wave”, given while a GIA run was wrapping its wave under a “finish the current wave but don’t start a new one” instruction and a UMS top-up sat deferred behind it.)
+
 #### e. Recurse
 
 Go back to step (a) with the next issue.

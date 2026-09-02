@@ -116,6 +116,14 @@ Not wanting another PR is a preference, and a preference does not license the an
 - **Don't:** defer a pass to keep the open-PR count down, or until an unrelated PR merges.
 - **Don't:** treat "I will write it once #N lands" as a commitment --- it is the announced-and-never-run failure with a due date attached.
 
+**"Don't start a new wave" is the same deferral wearing an instruction, and the instruction does not say what it is read to say.**
+A `gii`/`gia` wave boundary, or a "finish the current wave but don't start a new one" from the user, caps *issue grabs*.
+A UMS pass is not a grab: it records what the wave taught, and it is owed at the wave's own clean verdicts and merges by the bullets above.
+So the pass runs, and its PR opens, inside the cap --- see [`gii`](../../skills/gii/SKILL.md)'s "A UMS pass is not a new wave" paragraph, which carries the user's directive.
+
+- **Do:** run the owed pass under a no-new-wave instruction, exactly as under no instruction.
+- **Don't:** hold the pass until the next wave is authorized, on the reading that its PR would be a new wave.
+
 **Correcting your own understanding of a technical issue is itself a trigger, and it fires immediately rather than at the next checkpoint.**
 Every trigger above is an event in the *work*: a verdict lands, a PR merges, a poll reports a merge, a stopping point gets proposed.
 This one is an event in what you *believe*, and it leaves no artifact behind.

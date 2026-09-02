@@ -36,18 +36,18 @@ If an open PR already covers it and passes `memories/reviewing-prs.md`’s scope
     **GitHub:**
 
     ``` bash
-    gh pr list --state open --limit 100 --json number,title,body \
-      --jq '.[] | select((.body // "") | test("(Closes|Fixes|Resolves) #<N>\\b"; "i")) | "#\(.number) \(.title)"'   # LIST_PRS
+    gh pr list --state open --limit 100 --json number,title,body,author,assignees \
+      --jq '.[] | select((.body // "") | test("(Closes|Fixes|Resolves) #<N>\\b"; "i")) | "#\(.number) \(.title) [\(.author.login); assignees: \([.assignees[].login] | join(","))]"'   # LIST_PRS
     ```
 
     **GitLab:**
 
     ``` bash
     glab mr list --state opened --per-page=50 --output json 2>/dev/null \
-      | jq -r '.[] | select((.description // "") | test("(Closes|Fixes|Resolves) #<N>\\b"; "i")) | "!\(.iid) \(.title)"'
+      | jq -r '.[] | select((.description // "") | test("(Closes|Fixes|Resolves) #<N>\\b"; "i")) | "!\(.iid) \(.title) [\(.author.username); assignees: \([.assignees[].username] | join(","))]"'
     ```
 
-    If an open PR already covers the issue, apply the scope test above: **review or extend it** when it passes, and leave it untouched (reporting it to the user) when it fails. Either way, do not open a competing one. This catches *in-flight* work; the merged/closed history below catches *settled* decisions.
+    If an open PR already covers the issue, apply the scope test above to the author and assignee logins the listing prints: **review or extend it** when it passes, and leave it untouched (reporting it to the user) when it fails. Either way, do not open a competing one. This catches *in-flight* work; the merged/closed history below catches *settled* decisions.
 
 1.  **List recent merged MRs** touching the same area:
 

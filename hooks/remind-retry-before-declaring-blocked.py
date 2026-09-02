@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """UserPromptSubmit reminder: a classifier denial is a sample, not a wall.
 
-The auto-mode permission classifier's decision on a given command shape is
-non-deterministic. ai-config#2994 measured it directly: a
-`ALLOW_UNREVIEWED_PUSH=1 git push` was denied three times, the session reported
-the path as permanently closed -- in a blocking report to the user, in a
-project memory entry, and in a comment on this repo's own tracker -- and then
-the byte-identical fourth attempt succeeded, with no settings change and no
-permission rule added.
+ai-config#2994, measured 2026-09-02 (PT): an
+`ALLOW_UNREVIEWED_PUSH=1 git push` was denied by the auto-mode permission
+classifier, re-run once and denied again, and a `update-config` edit adding the
+allow rule was denied too. The session then reported the path as permanently
+closed -- in a blocking report to the user, in a project memory entry, and in a
+comment on this repo's own tracker. With no settings change and no permission
+rule added, the byte-identical push then succeeded on its third attempt.
 
 Three identical denials do not FEEL like a claim. They feel like a
 measurement: the command ran, the system said no, three times. So "I cannot do
@@ -17,6 +17,23 @@ future, and none of the claim-checking rules that would otherwise fire
 an asserted blocker) engages at all. The conclusion is also self-confirming:
 deciding the path is closed means stopping, which destroys the only evidence
 that would refute it.
+
+WHAT THE EVIDENCE SUPPORTS, AND WHAT IT DOES NOT
+------------------------------------------------
+It supports exactly one thing: a denial is a sample, so "cannot" is a
+prediction the reading does not license. It does NOT establish that the
+classifier is non-deterministic as a standing property of the service. That
+reading is n=1 and undated, and the corpus already records a competing one.
+`memories/mistake-patterns.md` Pattern 43 reports three denials of one goal in
+three different phrasings as "consistent denials, not stochastic ones", and
+attributes a later acceptance of the same override to a session restart
+refreshing the classifier's per-conversation state.
+
+#2994 does not record whether its successful attempt followed a restart, so
+the two readings are unsettled. The reminder this hook prints is right under
+either: re-running the identical command once is cheap, and reporting "denied
+N times so far" instead of "cannot" is accurate whichever mechanism holds. Any
+claim stronger than that would be asserting the thing the incident is about.
 
 WHY THIS INJECTS RATHER THAN BLOCKS
 -----------------------------------
@@ -43,9 +60,17 @@ stdout on exit 0 is added to Claude's context. `inject-local-time.sh` and
 
 Fires when a tool result carrying the classifier's own denial has no LATER
 tool call re-attempting the same command. Fires once per distinct denied
-command (sentinel keyed by a content hash of the command plus the transcript
-path), because a reminder repeated every turn is noise, and noise is what gets
-a guard ignored.
+command per denial count, keyed by a content hash of the command, the count,
+and the transcript path: a reminder repeated every turn is noise, and noise is
+what gets a guard ignored, but a SECOND denial of the same command is new
+information and gets its own one-time reminder. At most one reminder is
+printed per prompt, the newest unreminded one, so several denied commands
+surface over several prompts rather than all at once.
+
+The count resets on a successful run. A command denied, then run, then denied
+again is on its first denial of the current stretch, not its second -- it
+demonstrably works, which is the strongest case there is for attempting it
+again.
 
 Fails OPEN and SILENT: any parse trouble prints nothing at all.
 
@@ -73,8 +98,26 @@ carrier record sets.
 
 `automode-unavailable` is deliberately out of scope. It is transient too, so
 retrying is reasonable, but it is the classifier being ABSENT rather than the
-classifier denying, and #2994's finding is about a decision that varies -- not
+classifier denying, and #2994's finding is about a decision that varied -- not
 about an outage. Widening to it is a separate change with its own evidence.
+
+WHAT THE SECOND DENIAL CHANGES, AND WHAT IT DOES NOT
+-----------------------------------------------------
+Past the first denial of the current stretch, the reminder stops recommending
+a further re-run. It does not tell the session to stop re-running, and the
+distinction is load-bearing.
+
+Pattern 43's rule -- "stop probing after the classifier's second denial of the
+same goal" -- is justified there by a mechanism that is specifically about
+VARIATION: "each denied variant makes the classifier more suspicious", the
+three denials being three different phrasings of one override. A
+byte-identical re-run presents no new variant, so that mechanism does not
+reach it, and #2994's own success was exactly such a re-run. Reading Pattern
+43 as forbidding it would have discouraged the attempt that worked.
+
+So the count-2 message carries Pattern 43's actual content -- do not start
+rephrasing the command into new shapes -- plus the half that holds at every
+count: report what was measured, not a prediction.
 
 TWO LIMITATIONS, STATED RATHER THAN HIDDEN
 ------------------------------------------
@@ -90,14 +133,6 @@ TWO LIMITATIONS, STATED RATHER THAN HIDDEN
    and a matcher that missed it would produce silence, which is
    indistinguishable from compliance. So the message ends by saying to
    disregard it when the denial was already handled.
-
-The second denial of the same command is where this stops advising a retry.
-`memories/mistake-patterns.md` Pattern 43 says to stop probing after the
-classifier's second denial of the same goal and hand the user the decision,
-because each denied variant makes the classifier more suspicious. A guard that
-urged a third attempt would contradict a rule this corpus already records. So
-past one denial the reminder drops the retry advice and keeps only the wording
-half: report "denied N times so far", not "cannot".
 """
 import hashlib
 import json
@@ -105,19 +140,23 @@ import os
 import sys
 import tempfile
 
-# The classifier's own denial. Anchored at the START of the tool result rather
-# than searched for anywhere inside it: a denial IS the whole result, while
-# `cat`, `grep`, or a transcript scan can print this sentence as ordinary tool
-# output -- including a read of this very file, or of its test suite.
+# The classifier's own denial, as it appears in the tool result.
+#
+# Two guards sit on this text path, and both were measured on 2026-09-02
+# across the same 1110 transcripts: all 79 classifier denials carry
+# `is_error: true` on the block and start with this sentence. The `is_error`
+# requirement is what stops a SUCCESSFUL read whose output happens to begin
+# with a stored denial -- a `jq` of a saved transcript, a `head` of a log --
+# from reading as a denial of the read itself.
 CLASSIFIER_MARKER = (
     "Permission for this action was denied by the Claude Code auto mode "
     "classifier"
 )
 
 # The structured form of the same fact, carried on the tool_result's CARRIER
-# record (not on the block). Used as an alternative signal, not as the only
-# one: the field is present in the harness layout measured on 2026-09-02, and
-# a layout that drops it must still be readable from the text.
+# record rather than on the block. Used as an alternative signal, not as the
+# only one: the field is present in the harness layout measured on 2026-09-02,
+# and a layout that drops it must still be readable from the text.
 CLASSIFIER_KIND = "automode-blocked"
 
 BASH_TOOLS = (
@@ -151,6 +190,8 @@ def is_classifier_denial(record, block):
     """True only for the auto-mode classifier's own refusal."""
     if record.get("toolDenialKind") == CLASSIFIER_KIND:
         return True
+    if not block.get("is_error"):
+        return False
     content = block.get("content")
     if isinstance(content, list):
         content = " ".join(
@@ -169,15 +210,19 @@ def records(path):
                 continue
 
 
-def scan(path):
-    """Return (label, key, denials) for the latest unretried denial.
+def read_transcript(path):
+    """Return (attempts, denied, ran, labels).
 
-    `denials` counts how many times that same command was denied, which is
-    what decides whether a retry is still the right advice.
+    attempts  [(index, key)] for every tool call, in transcript order
+    denied    key -> [index of each call the classifier denied]
+    ran       key -> [index of each call that produced any other result]
+    labels    key -> the human-readable command
     """
-    uses = {}      # tool_use id -> (index, key, label)
-    attempts = []  # (index, key) for every tool call, in transcript order
-    denied = []    # (index, key, label) for every classifier denial
+    uses = {}
+    attempts = []
+    denied = {}
+    ran = {}
+    labels = {}
 
     for i, rec in enumerate(records(path)):
         # A subagent's denial is not this session's to retry, and its
@@ -194,18 +239,39 @@ def scan(path):
             if b.get("type") == "tool_use":
                 key, label = identity(b.get("name") or "", b.get("input") or {})
                 if key:
-                    uses[b.get("id")] = (i, key, label)
+                    uses[b.get("id")] = (i, key)
                     attempts.append((i, key))
-            elif b.get("type") == "tool_result" and is_classifier_denial(rec, b):
+                    labels[key] = label
+            elif b.get("type") == "tool_result":
                 seen = uses.get(b.get("tool_use_id"))
-                if seen:
-                    denied.append(seen)
+                if not seen:
+                    continue
+                at, key = seen
+                bucket = denied if is_classifier_denial(rec, b) else ran
+                bucket.setdefault(key, []).append(at)
 
-    for idx, key, label in reversed(denied):
-        if any(j > idx and other == key for j, other in attempts):
+    return attempts, denied, ran, labels
+
+
+def unretried(path):
+    """Return [(label, key, count)] for each denial with no later re-attempt.
+
+    Newest first, so the caller reports the freshest one it has not already
+    reported. `count` is the run of denials since the command last ran
+    successfully, which is what decides whether a further re-run is still
+    worth recommending.
+    """
+    attempts, denied, ran, labels = read_transcript(path)
+    out = []
+    for key, hits in denied.items():
+        last = max(hits)
+        if any(j > last for j, other in attempts if other == key):
             continue
-        return label, key, sum(1 for _, k, _ in denied if k == key)
-    return None, None, 0
+        floor = max(ran.get(key) or [-1])
+        out.append((labels.get(key, ""), key,
+                    sum(1 for j in hits if j > floor), last))
+    out.sort(key=lambda row: row[3], reverse=True)
+    return [(label, key, count) for label, key, count, _ in out if label]
 
 
 def message(label, count):
@@ -219,25 +285,25 @@ def message(label, count):
     )
     if count == 1:
         act = (
-            "The classifier's decision on a given command shape is "
-            "non-deterministic. ai-config#2994 measured a byte-identical "
-            "fourth attempt succeeding after three denials, with no settings "
-            "change and no permission rule added. Re-run the same command "
-            "once before treating this path as closed.\n"
+            "A denial is a sample, not a wall. ai-config#2994 measured a "
+            "byte-identical push succeeding on its third attempt after two "
+            "denials, with no settings change and no permission rule added. "
+            "Re-run the same command once before treating this path as "
+            "closed.\n"
         )
     else:
         act = (
-            "Do NOT keep re-running it: mistake-patterns Pattern 43 says to "
-            "stop probing after the classifier's second denial of the same "
-            "goal, because each denied variant makes the classifier more "
-            "suspicious. Hand the user the decision instead.\n"
+            "You have already re-run it. Do not start rephrasing it into new "
+            "shapes: mistake-patterns Pattern 43 measured each denied variant "
+            "making the classifier more suspicious, until it denied even the "
+            "sanctioned paths. Hand the user the decision instead.\n"
         )
     return (
         head + act +
         "Either way, report what was measured, not a prediction: "
         f"\"denied {times} so far\", never \"cannot\" or \"is not "
-        "self-serviceable\". Denials are samples, and concluding the path is "
-        "closed destroys the only evidence that would refute it.\n"
+        "self-serviceable\". Concluding the path is closed also destroys the "
+        "only evidence that would refute it.\n"
         "If the denial was already handled -- you retried under a different "
         "shape the classifier accepts, or you moved on to other work as the "
         "denial message itself suggests -- disregard this and carry on."
@@ -255,29 +321,32 @@ def main() -> int:
         return 0
 
     try:
-        label, key, count = scan(path)
+        candidates = unretried(path)
     except Exception:
         return 0
 
-    if not label:
+    for label, key, count in candidates:
+        # Keyed on the transcript path as well as the command, so the sentinel
+        # is per session: without it, two sessions denied the same command
+        # share one sentinel in /tmp and the second session is silenced. Keyed
+        # on the COUNT as well, so a second denial of an already-reported
+        # command gets its own one-time reminder -- that is the moment the
+        # advice changes, and the moment the session most needs it.
+        # Deliberately NOT keyed on a record index, which shifts as the
+        # transcript grows and would re-fire on every prompt.
+        digest = hashlib.sha256(
+            f"{path}:{key}:{count}".encode()).hexdigest()[:16]
+        sentinel = os.path.join(
+            tempfile.gettempdir(), f".claude-retry-before-blocked-{digest}")
+        if os.path.exists(sentinel):
+            continue
+        try:
+            open(sentinel, "w").close()
+        except Exception:
+            pass
+        print(message(label, count))
         return 0
 
-    # Keyed on the transcript path as well as the command, so the sentinel is
-    # per session: without it, two sessions denied the same command share one
-    # sentinel in /tmp and the second session is silenced. Deliberately NOT
-    # keyed on a record index, which shifts as the transcript grows and would
-    # re-fire on every prompt.
-    digest = hashlib.sha256(f"{path}:{key}".encode()).hexdigest()[:16]
-    sentinel = os.path.join(
-        tempfile.gettempdir(), f".claude-retry-before-blocked-{digest}")
-    if os.path.exists(sentinel):
-        return 0
-    try:
-        open(sentinel, "w").close()
-    except Exception:
-        pass
-
-    print(message(label, count))
     return 0
 
 

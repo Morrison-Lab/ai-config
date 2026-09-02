@@ -242,6 +242,7 @@ A scope correction sent mid-run had the subagent discard the out-of-scope findin
 Note which check would have caught it and which would not.
 A session-start freshness pass per [`keep-checkouts-fresh`](keep-checkouts-fresh.md) had no bearing, since the staleness accrued afterwards.
 The forge cross-check would have: `gh pr view 98 --json changedFiles,additions,deletions` reported 14 and 1584 against head `9446e72`, and the derived 53 and 2999 disagree loudly.
-Re-run later it returns different figures, because the pull request's head moves; compare against the head you actually diffed.
+Re-run later it returns different figures, because the pull request's head moves;
+compare against the head you actually diffed.
 
 Tracked as [ai-config#3013](https://github.com/Morrison-Lab/ai-config/issues/3013).

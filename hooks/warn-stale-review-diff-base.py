@@ -214,11 +214,10 @@ when it is not.
 A base that is BEHIND its remote widens the diff, so a review runs on
 already-merged work by other people and returns findings against code this
 branch never touched. A base carrying local commits the remote lacks --- ahead,
-or diverged --- where the head branch also carries them, narrows it, so part
-of the change is never reviewed at all and
-the verdict comes back clean. Neither is announced: a 53-file diff and a
-14-file diff look equally plausible, and every finding either produces is
-individually well-formed.
+or diverged --- where the head branch also carries them, narrows it, so part of
+the change is never reviewed at all and the verdict comes back clean. Neither
+is announced: a 53-file diff and a 14-file diff look equally plausible, and
+every finding either produces is individually well-formed.
 
 Resolve the base from a remote-tracking ref, after fetching that remote:
 

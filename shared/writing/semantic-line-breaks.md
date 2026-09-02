@@ -212,8 +212,8 @@ lesson, until review consolidated it here instead.
   After #2085, `--write` splits what `classify_line` flags.
   It still is not the diff-scoped CI job.
 
-**Until [ai-config#1730](https://github.com/Morrison-Lab/ai-config/issues/1730) gated the job, a green check run named for this gate could never have run it, and both runs
-carry the same name.**
+**Until [ai-config#1730](https://github.com/Morrison-Lab/ai-config/issues/1730) gated the job, a green check run named for this gate might not have run it, and both runs
+carried the same name.**
 The reformatter trap above is about the wrong *tool*.
 This is about the right tool reporting success without measuring anything, and
 it is harder to catch because there is nothing to notice: the check run is

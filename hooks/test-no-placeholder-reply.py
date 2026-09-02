@@ -78,10 +78,27 @@ CASES = [
         {"source": "MODEL", "type": "PLANNER_RESPONSE", "tool_calls": [{"name": "run_command", "args": {"CommandLine": "git status"}}]},
         {"source": "MODEL", "type": "PLANNER_RESPONSE", "content": "Merged #1578; branch re-cut from main at 0b7b6a6c."}
     ], False, "antigravity non-placeholder does not block"),
+    # Thinking block format with placeholder text block
+    ([
+        {"type": "assistant", "message": {"content": [
+            {"type": "thinking", "thinking": "Let me see if any response is needed."},
+            {"type": "text", "text": "No response requested."}
+        ]}}
+    ], True, "thinking block + placeholder text block blocks"),
+    # Thinking block format with substantive text block
+    ([
+        {"type": "assistant", "message": {"content": [
+            {"type": "thinking", "thinking": "Let me see if any response is needed."},
+            {"type": "text", "text": "Completed task successfully."}
+        ]}}
+    ], False, "thinking block + substantive text block does not block"),
+    # String content assistant message
+    ([{"type": "assistant", "content": "No response requested."}], True,
+     "assistant string content placeholder blocks"),
 ]
 
 
-def run(events):
+def run(events, key_name="transcript_path"):
     fd, path = tempfile.mkstemp(suffix=".jsonl")
     with os.fdopen(fd, "w") as fh:
         for e in events:
@@ -91,7 +108,7 @@ def run(events):
         # make later cases silently pass.
         env = dict(os.environ, TMPDIR=tempfile.mkdtemp())
         out = subprocess.run(
-            [sys.executable, HOOK], input=json.dumps({"transcript_path": path}),
+            [sys.executable, HOOK], input=json.dumps({key_name: path}),
             capture_output=True, text=True, env=env,
         ).stdout
         return '"decision": "block"' in out or '"decision":"block"' in out
@@ -99,10 +116,46 @@ def run(events):
         os.unlink(path)
 
 
+def run_direct_payload(payload):
+    env = dict(os.environ, TMPDIR=tempfile.mkdtemp())
+    out = subprocess.run(
+        [sys.executable, HOOK], input=json.dumps(payload),
+        capture_output=True, text=True, env=env,
+    ).stdout
+    return '"decision": "block"' in out or '"decision":"block"' in out
+
+
 def main():
     passes = failures = 0
     for events, expected, label in CASES:
         got = run(events)
+        if got == expected:
+            print(f"PASS: {label}")
+            passes += 1
+        else:
+            print(f"FAIL: {label} (expected block={expected}, got {got})")
+            failures += 1
+
+    # Alternative transcript payload keys (transcriptPath, transcript, history_file)
+    for key in ("transcriptPath", "transcript", "history_file"):
+        got = run([say("No response requested.")], key_name=key)
+        if got:
+            print(f"PASS: payload key '{key}' resolves transcript correctly")
+            passes += 1
+        else:
+            print(f"FAIL: payload key '{key}' failed to trigger block")
+            failures += 1
+
+    # Direct payload fields without transcript file
+    direct_cases = [
+        ({"reply": "No response requested."}, True, "direct reply field blocks"),
+        ({"last_assistant_message": "No response requested."}, True, "direct last_assistant_message field blocks"),
+        ({"message": {"content": [{"type": "text", "text": "No response requested."}]}}, True, "direct message object blocks"),
+        ({"content": "No response requested."}, True, "direct content string blocks"),
+        ({"reply": "Completed wave-1 review and tests passed."}, False, "direct reply substantive does not block"),
+    ]
+    for payload, expected, label in direct_cases:
+        got = run_direct_payload(payload)
         if got == expected:
             print(f"PASS: {label}")
             passes += 1

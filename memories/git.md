@@ -575,8 +575,9 @@ sibling module.
 When that import fails, the guard cannot parse the command.
 It was observed from a worktree where the guard's error path showed it running from `<worktree>/.claude/hooks/`, a copy with no sibling beside it.
 Which registration selected that copy, and whether `CLAUDE_PLUGIN_ROOT` resolved there, is what [ai-config#2981](https://github.com/Morrison-Lab/ai-config/issues/2981) leaves open.
-The guard then falls back to a narrow regex over the raw command text,
-which matches a `git ... push` invocation and denies the command.
+The guard then degrades to a narrow heuristic regex over the raw command text.
+That regex is not a substitute push parser.
+The hook uses it only to decide whether to report the broken installation and deny the command when the text looks like a `git ... push` invocation.
 The regex is deliberately narrow:
 `grep push` and `git commit -m "push the button"` do not trip it,
 and the hook's own suite pins that.
@@ -590,8 +591,9 @@ and again while posting the correction to that issue.
 Tracked as [ai-config#2981](https://github.com/Morrison-Lab/ai-config/issues/2981).
 
 - **Do:** write a comment or issue body that quotes a push command to a file
-  with the Write tool, then post it with `--body-file` (or `-F body=@file`),
-  rather than composing it inside a Bash heredoc.
+  with your harness's file-writing tool (Claude Code's `Write`, or its
+  equivalent elsewhere), then post it with `--body-file` (or
+  `-F body=@file`), rather than composing it inside a Bash heredoc.
 - **Do:** reserve `ALLOW_UNREVIEWED_PUSH=1` for the one command that is an
   actual `git push`, and state why in the same turn.
 - **Don't:** read the guard's block on a body-writing command as a real

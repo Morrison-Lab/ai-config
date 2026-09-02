@@ -1794,6 +1794,18 @@ must itself contain a backslash escape.
 - **Don't:** trust a green suite after writing a regex through a heredoc; read
   the emitted line back.
 
+**Knowing this rule does not stop you tripping it, so add a check rather than trusting recall.**
+Measured 2026-09-01: this section was loaded and had just been read
+when a heredoc'd Python edit wrote `'\\n\\n'` into a file,
+which arrived as the literal text `\n` and corrupted the script it was patching.
+`ast.parse` caught it immediately, and the fix was the `chr(92)` placeholder this entry prescribes.
+So the remedy works; what fails is noticing that the moment has arrived,
+because nothing about typing an escape sequence announces itself as the trigger.
+Run a parse or round-trip check after any heredoc'd edit that writes escape sequences.
+
+- **Do:** parse-check (or read back) a file a heredoc just wrote with escapes in it.
+- **Don't:** treat having read this section as the check --- it was, and the collapse happened anyway.
+
 (Measured 2026-08-22; tracked as
 [ai-config#1923](https://github.com/Morrison-Lab/ai-config/issues/1923).
 Cost three identical failed patch attempts before the cause was visible, then

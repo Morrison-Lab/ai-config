@@ -94,6 +94,6 @@ Within either phase, a single PR’s own round can still delegate lightweight si
 - ❌ Running Phase 2 unbounded — keep GII’s wave boundary.
 - ❌ Starting the next wave on your own once the current one is fully finished — stop and ask, with a recommendation, per “Stopping conditions”.
 - ❌ Grabbing an issue a pending Phase-1 PR already closes.
-- ❌ Driving, reviewing, or editing a PR that was not opened by the user, not assigned to the user, not explicitly requested by name, and not authored by the Actions app — “every open PR” means every one of the user’s.
+- ❌ Driving, reviewing, or editing a PR that was not opened by the user, not assigned to the user, not explicitly requested by name, and not authored by the Actions app — “every open PR” means every PR that passes the filter.
 
 Back to top

@@ -617,6 +617,8 @@ One to three sentences is enough.
 The trailing marker is required, per the section above: this comment paraphrases the user in the user's own voice under the user's own login, which is the shape most easily read as their own writing.
 Don't quote verbatim — paraphrase so it reads naturally in the PR thread.
 Skip trivial acknowledgments or conversational exchanges with nothing to act on.
+Post it only on a PR that passes `memories/reviewing-prs.md`'s scope test.
+Feedback about an out-of-scope PR, such as a request not to touch it, stays in chat and the session notebook rather than on that PR.
 
 This makes context visible to future @claude sessions, other reviewers, and contributors who only see the PR thread.
 

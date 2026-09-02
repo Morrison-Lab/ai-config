@@ -15,13 +15,11 @@ Run:  python3 hooks/test-warn-stale-review-diff-base.py \
           hooks/warn-stale-review-diff-base.py
 """
 
-import io
 import json
 import os
 import shutil
 import subprocess
 import sys
-import time
 import tempfile
 
 if len(sys.argv) < 2:
@@ -295,7 +293,6 @@ for prompt, desc, want in ((BRIEF_WARN[0], BRIEF_WARN[1], "WARN"),
 # The command-position pattern once admitted 2^N parses over N option tokens
 # when the overall match failed: n=34 took 8.4s against a 10s timeout.
 #
-# Time the PATTERN, in this process, rather than a hook subprocess. The
 # Run the probe in a SUBPROCESS under a timeout. Timing it in-process cannot
 # work: under the regression the search itself blocks for minutes, so the guard
 # would hang rather than fail -- which is the very defect it exists to catch,
@@ -304,9 +301,9 @@ for prompt, desc, want in ((BRIEF_WARN[0], BRIEF_WARN[1], "WARN"),
 # `git remote`, itself under a 5s timeout, from being misread as backtracking.
 _PROBE = (
     "import re, sys, time\n"
-    "ns = {}\n"
+    "ns = {'__name__': '_probe'}\n"
     "exec(compile(open(sys.argv[1], encoding='utf-8').read(), sys.argv[1],"
-    " 'exec'), {'__name__': '_probe'}, ns)\n"
+    " 'exec'), ns)\n"
     "probe = 'git ' + '-a ' * 40 + 'nope main...HEAD'\n"
     "t = time.time()\n"
     "ns['RX_GIT_RANGE_CMD_SHELL'].search(probe)\n"
@@ -336,6 +333,26 @@ _ok = _verdict != "TIMEOUT"
 wrong += not _ok
 print(f"{'ok' if _ok else 'FAIL':<7} the same command completes end to end "
       "within 20s")
+
+# `remote_prefix` resolves longest-first. Alphabetical order is NOT equivalent:
+# with remotes {"my", "my/remote"}, `my/remote/main` resolves to branch `main`
+# under longest-first (so `main..my/remote/main` is the exempt freshness idiom)
+# and to `remote/main` under alphabetical (so the same command warns). Git
+# permits a `/` in a remote name, so the collision is constructible.
+_hook_ns = {"__name__": "_prefix_probe"}
+exec(compile(open(HOOK, encoding="utf-8").read(), HOOK, "exec"), _hook_ns)
+_remotes = {"my", "my/remote"}
+for _token, _want, _desc in (
+    ("my/remote/main", "main", "the longer remote name wins"),
+    ("my/main", "main", "the shorter one still resolves"),
+    ("refs/remotes/my/remote/main", "main", "and inside a refs/remotes/ spelling"),
+):
+    _got = _hook_ns["remote_tracking_branch"](_token, _remotes)
+    total += 1
+    _ok = _got == _want
+    wrong += not _ok
+    print(f"{'ok' if _ok else 'FAIL':<7} a remote name containing `/`: "
+          f"{_token} -> {_got!r} ({_desc})")
 
 print("\n--- fail-open and environment")
 # A type-confused `cwd` reaches `os.path.join` inside `main()` and is the

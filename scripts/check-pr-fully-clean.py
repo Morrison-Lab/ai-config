@@ -2320,7 +2320,10 @@ _REVIEW_STRUCTURE_HEADING = re.compile(
 def _blank_fences_and_spans(body: str) -> str:
     """Blank fenced code blocks and code spans to spaces, preserving length."""
     fenced_lines, _, _ = find_fence_spans(body, swallow_unclosed=True)
-    mask = _citation_mask(body, min_backticks=1)
+    mask = bytearray(len(body))
+    for m in CODE_SPAN_RE.finditer(body):
+        b, e = m.span()
+        mask[b:e] = b"\x01" * (e - b)
     lines = body.split("\n")
     out = []
     line_offset = 0

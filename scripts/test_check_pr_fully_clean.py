@@ -4709,6 +4709,18 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         ),
     )
     check(
+        "_is_structured_review_body: multi-line double-backtick span quoting report headings is NOT structured body (#2525)",
+        not checker._is_structured_review_body(
+            "Discussion of format:\n``\n## Verdict\nReviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\n``\nCasual prose."
+        ),
+    )
+    check(
+        "_is_structured_review_body: multi-line double-backtick span with prose on delimiter lines is NOT structured body (#2525)",
+        not checker._is_structured_review_body(
+            "Ready for merge ... template for reference: ``\n### Verdict\nAll clear\nReviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\n`` (that's usually what it looks like)"
+        ),
+    )
+    check(
         "_is_structured_review_body: stray unclosed backtick in prose does NOT hide genuine headings (#2525)",
         checker._is_structured_review_body(
             "Here is some commentary with a stray ` backtick.\nMore prose.\n\n## Verdict\n\nReviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\nClean"

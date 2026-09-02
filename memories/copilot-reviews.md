@@ -138,14 +138,17 @@ ai-config#2969 (ai-config#694 pattern) to keep both files well under the
   The helpers from #2976 landed inline before this was checked and are
   tracked in
   [#2990](https://github.com/Morrison-Lab/ai-config/issues/2990).
-  - **Do:** rebut only by the rule's own carve-out (short, closely related
-    helpers), citing the fragment, or move a substantial new function into
-    its own module.
+  - **Do:** rebut only by the rule's own carve-out (a two-liner grouped
+    with closely related functions), citing the fragment, or move any
+    larger new function into its own module.
   - **Don't:** call the rule R-only, or cite a file's existing shape as if
     the fragment did not already address that case.
-- **Outside a `review_on_push` ruleset, Copilot does not re-review after
-  a push until it is re-requested, and a re-requested round can repeat a
-  finding the previous round already answered.**
+- **On a repository without a `review_on_push` ruleset, Copilot was not
+  observed to re-review after a push until re-requested, and a
+  re-requested round can repeat a finding the previous round already
+  answered.**
+  This is the measured shape on one PR; the per-push behaviour recorded
+  earlier in this file is "not guaranteed", not "never".
   Measured on [#2976](https://github.com/Morrison-Lab/ai-config/pull/2976):
   a finding rebutted in one ARD comment was restated in the next review
   body's `Suppressed comments` section, in different words, while the

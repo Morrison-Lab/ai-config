@@ -78,7 +78,8 @@ Read `get_reviews`, treat an empty result as "no findings posted", and treat the
 - **Do:** report ready when a clean verdict stands over only a note the reviewer declined to raise as a finding.
 - **Do:** read a Copilot verdict from `get_reviews`, never from the check run's color.
 - **Don't:** treat an explicitly-declined optional note as an open item and spend a round on it -- per [`ardi`](../../skills/ardi/SKILL.md)'s Stopping conditions, a review with no raised findings is a stop.
-- **Don't:** read an empty `get_reviews` under a green Copilot check as approval or as self-inflicted; it is Copilot's no-findings behavior.
+- **Don't:** read an empty `get_reviews` under a green Copilot check as approval, as self-inflicted, or as evidence Copilot found nothing.
+  It is a silent state with no verdict in it.
 
 **A caveat reporting that the reviewer *could not check* is not a declined note, and the two call for opposite responses.**
 The rule above governs a note the reviewer weighed and ranked low.

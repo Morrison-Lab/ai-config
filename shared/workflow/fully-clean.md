@@ -1168,15 +1168,17 @@ a GIA session merged it under `mwc`,
 and `validate` on `main` went red at `da1a2d03` until [#2983](https://github.com/Morrison-Lab/ai-config/pull/2983) regenerated the manifest.
 The head-only verdict cannot see this, and no path diff can prove the base gained no check through a script or a reusable workflow,
 so for a direct merge the rule is the one [`sync-with-main`](sync-with-main.md) already states: a stale merge-base means update first.
-Under a merge queue the queue's speculative merge test covers this, and [`merge-queue`](merge-queue.md) forbids the manual update loop.
+Under a merge queue whose required workflows listen for `merge_group`, the queue's speculative merge test covers this, and [`merge-queue`](merge-queue.md) forbids the manual update loop.
 There the `merge_group` checks are the gate.
+A `pull_request`-only workflow added to the base does not run on the queue's branch, so that precondition has to hold before the manual update is skipped.
 
 - **Do:** before merging, fetch and resolve the default branch, then confirm the merge-base with it is its current tip:
   `git fetch origin && d=$(git remote show origin | sed -n 's/.*HEAD branch: //p') && [ -n "$d" ] && mb=$(git merge-base "origin/$d" <head>) && tip=$(git rev-parse --verify "origin/$d") && [ "$mb" = "$tip" ]`.
   Each result is assigned inside the `&&` chain so an unresolved branch or a failed command fails the check rather than comparing two empty strings as equal.
   A remote-tracking ref is current only after a fetch, and the default branch is not always `main`.
   `git remote show origin` answers in clones where `refs/remotes/origin/HEAD` is unset, which [`challenge-the-assignment.cases.md`](challenge-the-assignment.cases.md) records for the clones this corpus is developed in.
-- **Do:** when it is not and the merge is direct, `gh pr update-branch` and let CI re-run at the new base before merging.
+- **Do:** when it is not and the merge is direct, `gh pr update-branch <N> -R <owner>/<repo>`, then rerun the whole clean gate on the new head, review included, before merging.
+  The update is a new head, so a clean verdict on the old one no longer counts, per [`sync-with-main`](sync-with-main.md).
 - **Do:** under a merge queue, rely on the `merge_group` checks rather than a manual update.
 - **Don't:** read a head-only FULLY CLEAN verdict as a merge-safe verdict when the base has advanced.
 - **Don't:** substitute a path diff of `.github/workflows/` for the update.

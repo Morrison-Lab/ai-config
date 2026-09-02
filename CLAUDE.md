@@ -192,7 +192,7 @@ computer.
 When hosted quota is unavailable, report the blocker or use
 deterministic checks instead of starting a local inference runtime.
 `agy` (Google Antigravity)'s **API** route was retired for dispatched work on 2026-08-20 (ai-config#1776), and its status has not been re-verified since.
-The `agy --print` CLI is a separate path and was never affected --- it is confirmed back in service on Windows as of 2026-09-02 via a fresh install from the official `antigravity-cli` GitHub release (user directives that day: "start using agy as a subagent where feasible", "use agy cli for it").
+The `agy --print` CLI is a separate path and was never affected --- it is confirmed working on Windows as of 2026-09-02 via a fresh install from the official `antigravity-cli` GitHub release (user directives that day: "start using agy as a subagent where feasible", "use agy cli for it").
 Route dispatchable subagent work to it accordingly.
 The interactive subscription/extension was never affected and was never at quota.
 `memories/delegation.md` carries the rule, the usage-window semantics across `opencode`, `codex`, and `agy`, the prepaid-balance details, and the Windows install/mechanics writeup.

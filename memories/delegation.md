@@ -7,10 +7,11 @@ this section is self-contained.
 ## Delegate heavy work to another CLI first --- codex, agy, opencode, and openrouter
 
 > [!IMPORTANT]
-> **`agy` (Google Antigravity) is back in service as a dispatchable subagent** (user directives, 2026-09-02: "start using agy as a subagent where feasible", "use agy cli for it").
-> The 2026-08-20 API-dispatch outage (`429: prepayment credits depleted`, user directive that day, scope corrected 2026-08-23) stays on record as history --- it explains why an earlier version of this banner said "out of service" --- but it no longer describes the CLI, which the 2026-08-25 clarification already carved out as a separate, unaffected path.
+> **`agy` (Google Antigravity) is confirmed usable as a dispatchable subagent, effective 2026-09-02** (user directives that day: "start using agy as a subagent where feasible", "use agy cli for it").
+> The 2026-08-20 API-dispatch outage (`429: prepayment credits depleted`, user directive that day, scope corrected 2026-08-23) stays on record as history --- it explains why an earlier version of this banner said "out of service" --- but it never described the CLI, which the 2026-08-25 clarification already carved out as a separate, unaffected path.
 > **A fresh Windows install on 2026-09-02, from the official `google-antigravity/antigravity-cli` GitHub release, confirms the CLI works end to end**: `agy --version` reports 1.1.24, `agy models` lists a real roster, and a headless smoke test returned the expected output in about 5 seconds.
-> See this file's "agy on Windows" section below for the install steps and `memories/preferences.md`'s "agy on Windows" section for the parallel write-up kept there for discoverability.
+> See this file's "agy on Windows" section below for the install steps;
+> `memories/preferences.md` points here for the same writeup rather than duplicating it.
 > Route dispatchable subagent work to the `agy` CLI accordingly, per the ladder below --- after `opencode`'s free tier on cost, alongside `codex` on capability.
 > The interactive subscription/extension was never affected and was never at quota.
 > Tracked as ai-config#1776.
@@ -245,7 +246,7 @@ It authenticated with no extra step, reusing the Antigravity IDE's own login.
 `agy --version` reports `1.1.24`.
 
 **`agy models` lists a real roster**, unquoted here since a model roster is exactly the kind of fact a vendor changes without notice --- run the command rather than trusting a pasted list.
-As of 2026-09-02 it included several `gemini-3.x-flash-{high,medium,low}` tiers, `gemini-3.1-pro-{high,low}`, `claude-sonnet-4-6`, `claude-opus-4-6-thinking`, and `gpt-oss-120b-medium`.
+As of 2026-09-02 it included `gemini-3.8-flash-{high,medium,low}`, `gemini-3.7-flash-{high,medium,low}`, `gemini-3.6-flash-{high,medium,low}`, `gemini-3.1-pro-{high,low}`, `claude-sonnet-4-6`, `claude-opus-4-6-thinking`, and `gpt-oss-120b-medium`.
 
 **A headless smoke test confirms the print path works end to end:**
 

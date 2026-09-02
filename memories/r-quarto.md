@@ -1043,9 +1043,9 @@ See [`metacognitive-monitoring`](../shared/workflow/metacognitive-monitoring.md)
 **A third, adjacent trap in the same package-loading machinery: `load_all()` and `library()` produce differently-locked bindings, and a patch or mutation harness that patches a package's own functions is sensitive to which one it got.**
 Built a throwaway one-function package and loaded it with `pkgload::load_all(export_all = FALSE)`:
 
-```r
+```
 ns.locked = TRUE    attached.locked = FALSE    identical(ns, attached) = FALSE
-assign("fmt", mutant, envir = as.environment("package:tstpkg"))   #> SUCCEEDED
+assign("fmt", mutant, envir = as.environment("package:tstpkg"))   -> SUCCEEDED
 ```
 
 Installed packages loaded with `library()` lock **both** environments.
@@ -1058,13 +1058,15 @@ Three consequences, in descending order of how long they stay useful:
    A dead harness reports every mutation as undetected, which is indistinguishable from a suite that genuinely catches nothing.
    So a harness must assert liveness on every path it runs on --- development and `R CMD check` --- not only the one it was authored against: an invocation counter, or a mutation known to be caught, run in the same invocation.
 2. **`unlockBinding()` against the attached environment is a no-op under `load_all()`**, because that binding was never locked there.
-   It is load-bearing only against the namespace.
+   It is load-bearing only against the namespace --- which is the environment a `load_all()`-based harness least needs to patch, since the suite resolves the attached copy.
+   So the ceremony and the effective target sit in different environments, and a harness can perform all of the former against none of the latter.
 3. **When comparing the two environments, take an exported name.**
    `ls(asNamespace(pkg))[1]` returns internal symbols that are absent from the attached environment, which produces spurious skips rather than a real comparison.
    The peer hit exactly this and reported five bogus SKIPs before switching to exported names.
 
 - **Do:** assert a mutation harness is live (an invocation counter, or a known-caught mutation) in every environment it runs in, not only the one it was authored against.
-- **Do:** unlock (or patch) the namespace binding, not the attached one, when the target might be running under `load_all()`.
+- **Do:** patch the environment the tests actually resolve from, and prove which one that is with an invocation counter rather than reasoning about it.
+  Under `load_all()` that was the **attached** environment: a namespace-only patch of the same mutation left the suite at 31 pass / 0 fail with the patched function called zero times, while a patch reaching the attached environment gave 27 / 4.
 - **Do:** compare `ns`/`attached` locking (or membership) using an exported name, never `ls(asNamespace(pkg))[1]`.
 - **Don't:** trust a mutation-testing harness's "all mutations caught" verdict without confirming it ran the same way under `load_all()` and under an installed package.
 

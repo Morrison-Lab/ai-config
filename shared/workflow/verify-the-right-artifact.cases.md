@@ -206,3 +206,35 @@ A wrong claim about *which artifact* was defective sat inside an otherwise corre
 An adversarial review of that same PR then caught a second instance of the same substitution one level up.
 The fix had been swept across `CLAUDE.md` and `shared/workflow/check-before-pushing.md` but not `AGENTS.md`, which `CLAUDE.md:3-5` names as the authoritative cross-agent contract and which carried a near-verbatim twin of the edited paragraph.
 The sweep had been keyed on the file that prompted the work rather than on the population carrying the claim.
+
+## A stale local base that tripled a review diff
+
+Measured 2026-09-02 while reviewing [ucdavis/matt.contracts#98](https://github.com/ucdavis/matt.contracts/pull/98).
+
+The PR head was fetched as a local branch `pr-98`, and an `adversarial-reviewer` subagent was dispatched with the instruction to review `git diff main...pr-98`.
+That `main` was the worktree's local branch, two commits behind the remote:
+
+| ref | commit |
+| --- | --- |
+| local `main` | `43d59cc` |
+| `github/main` | `7ec49fe` |
+
+The merge-base moved accordingly, and so did the diff:
+
+| base | files | insertions |
+| --- | --- | --- |
+| stale local `main` | 53 | 2999 |
+| true merge-base `6345e92` | 14 | 1584 |
+
+The 39 extra files were already-merged work from other pull requests --- among them an unrelated `.Rbuildignore` template-name cleanup and a `foodwebr`-to-`covr` swap in `Suggests`.
+
+**The detection was accidental, which is the part worth recording.**
+No finding looked wrong, because none were: every one quoted a real line and applied a real rule.
+What surfaced it was running `git diff` on `DESCRIPTION` out of curiosity and recognizing changes that belonged to other pull requests.
+A scope correction sent mid-run had the subagent discard the out-of-scope findings.
+
+Note which check would have caught it and which would not.
+A session-start freshness pass per [`keep-checkouts-fresh`](keep-checkouts-fresh.md) had no bearing, since the staleness accrued afterwards.
+The forge cross-check would have: `gh pr view 98 --json changedFiles,additions,deletions` reports 14 and 1584, and the derived 53 and 2999 disagree loudly.
+
+Tracked as [ai-config#3013](https://github.com/Morrison-Lab/ai-config/issues/3013).

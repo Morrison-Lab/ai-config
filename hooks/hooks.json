@@ -454,6 +454,22 @@
             "timeout": 15,
             "script": "warn-new-line-breaks-on-push.py",
             "why": "memories/mistake-patterns.md Pattern 25, ai-config#2590 (2026-08-29): warns, never blocks, before a `git push` carrying newly-added Markdown lines that violate semantic line breaks against the default base branch (e.g. origin/main)."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-stale-review-diff-base.py\"",
+            "timeout": 10,
+            "script": "warn-stale-review-diff-base.py",
+            "why": "verify-the-right-artifact 'A comparison's base is an artifact too' -- a bare local branch as a diff's base only ever widens the range, so a review runs on already-merged work and every finding is individually well-formed; this names the base and the remote-tracking form when no fetch ran earlier.",
+            "_note_warn_only": [
+              "Reminder only: emits hookSpecificOutput.additionalContext and never a",
+              "decision. The hook cannot tell a review diff from an ordinary local",
+              "comparison, and a bare local base is correct for plenty of those, so a",
+              "block would refuse correct commands on a heuristic. It also fires on",
+              "Agent/Task/SendMessage because the measured failure was a brief handed",
+              "to a subagent, which cannot check a premise about the author's own",
+              "environment."
+            ]
           }
         ]
       },
@@ -705,6 +721,69 @@
             "timeout": 10,
             "script": "flag-cd-into-main-checkout.py",
             "why": "Warns when a worktree-rooted session cd's into the MAIN checkout of its own repo -- a real path on a different branch, where every edit and every check silently succeeds against somebody else's tree."
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-stale-review-diff-base.py\"",
+            "timeout": 10,
+            "script": "warn-stale-review-diff-base.py",
+            "why": "verify-the-right-artifact 'A comparison's base is an artifact too' -- a bare local branch as a diff's base only ever widens the range, so a review runs on already-merged work and every finding is individually well-formed; this names the base and the remote-tracking form when no fetch ran earlier.",
+            "_note_warn_only": [
+              "Reminder only: emits hookSpecificOutput.additionalContext and never a",
+              "decision. The hook cannot tell a review diff from an ordinary local",
+              "comparison, and a bare local base is correct for plenty of those, so a",
+              "block would refuse correct commands on a heuristic. It also fires on",
+              "Agent/Task/SendMessage because the measured failure was a brief handed",
+              "to a subagent, which cannot check a premise about the author's own",
+              "environment."
+            ]
+          }
+        ]
+      },
+      {
+        "matcher": "Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-stale-review-diff-base.py\"",
+            "timeout": 10,
+            "script": "warn-stale-review-diff-base.py",
+            "why": "verify-the-right-artifact 'A comparison's base is an artifact too' -- a bare local branch as a diff's base only ever widens the range, so a review runs on already-merged work and every finding is individually well-formed; this names the base and the remote-tracking form when no fetch ran earlier.",
+            "_note_warn_only": [
+              "Reminder only: emits hookSpecificOutput.additionalContext and never a",
+              "decision. The hook cannot tell a review diff from an ordinary local",
+              "comparison, and a bare local base is correct for plenty of those, so a",
+              "block would refuse correct commands on a heuristic. It also fires on",
+              "Agent/Task/SendMessage because the measured failure was a brief handed",
+              "to a subagent, which cannot check a premise about the author's own",
+              "environment."
+            ]
+          }
+        ]
+      },
+      {
+        "matcher": "SendMessage",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-stale-review-diff-base.py\"",
+            "timeout": 10,
+            "script": "warn-stale-review-diff-base.py",
+            "why": "verify-the-right-artifact 'A comparison's base is an artifact too' -- a bare local branch as a diff's base only ever widens the range, so a review runs on already-merged work and every finding is individually well-formed; this names the base and the remote-tracking form when no fetch ran earlier.",
+            "_note_warn_only": [
+              "Reminder only: emits hookSpecificOutput.additionalContext and never a",
+              "decision. The hook cannot tell a review diff from an ordinary local",
+              "comparison, and a bare local base is correct for plenty of those, so a",
+              "block would refuse correct commands on a heuristic. It also fires on",
+              "Agent/Task/SendMessage because the measured failure was a brief handed",
+              "to a subagent, which cannot check a premise about the author's own",
+              "environment."
+            ]
           }
         ]
       }

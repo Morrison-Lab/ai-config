@@ -208,9 +208,17 @@ Give it the base ref, the paths, the standards that apply, and the question.
 Where the change's own reasoning matters, it is in the diff --- a comment, a docstring, a fragment --- and the reviewer should be reading it there, where a later reader will.
 Scope is not rationale: which branch, which base, where the tests live, and what is out of scope are facts the reviewer cannot derive and must be told.
 
+**`<base>` is a claim, and it is the one nobody checks.**
+The sentence above names the base as a fact the reviewer must be told, and stops there.
+A base you resolve from a *local* branch name silently widens the diff whenever that branch is behind, so the reviewer spends its attention on already-merged work and returns findings against code this change never touched.
+Resolve it from a remote-tracking ref after fetching that remote, and state the merge-base SHA and the file and insertion counts in the brief so the scope is checkable rather than asserted.
+[`verify-the-right-artifact`](verify-the-right-artifact.md)'s "A comparison's base is an artifact too" carries the direction of the error and the forge cross-check that settles it.
+
 - **Do:** hand over `git diff <base>...HEAD`, the applicable rules, and the question.
+- **Do:** resolve `<base>` from a fetched remote-tracking ref, and state the merge-base SHA and the diff's counts alongside it.
 - **Don't:** hand over the case for the change.
   If it is not persuasive from the diff alone, that is the finding.
+- **Don't:** name a bare local branch as `<base>` --- a stale one only ever makes the diff bigger, and every finding it produces is individually well-formed.
 
 ### The PR's own review history is rationale you cannot withhold
 

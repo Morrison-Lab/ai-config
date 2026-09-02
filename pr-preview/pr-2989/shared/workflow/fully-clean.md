@@ -1171,9 +1171,10 @@ and `validate` on `main` went red at `da1a2d03` until [#2983](https://github.com
 The head-only verdict cannot see this, and no path diff can prove the base gained no check through a script or a reusable workflow,
 so for a direct merge the rule is the one [`sync-with-main`](sync-with-main.md) already states: a stale merge-base means update first.
 Under a merge queue where every clean-gate check both executes for `merge_group` and is required (or aggregated behind a required check),
-the queue's speculative merge test covers this,
-and [`merge-queue`](merge-queue.md) forbids the manual update loop.
-There the `merge_group` checks are the gate.
+the queue's speculative merge test will cover this once [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030) defines the queue form of the gate,
+and [`merge-queue`](merge-queue.md) forbids the manual update loop there.
+Until then a base that requires a merge queue stops the merge.
+The conditions below are what that form has to prove.
 A `pull_request`-only workflow added to the base does not run on the queue's branch,
 and a workflow that lists `merge_group` can still carry a job or step whose `if:` skips that event,
 which branch protection then counts as passing.
@@ -1185,10 +1186,10 @@ every clean-gate check executes for `merge_group`, job and step conditions inclu
 and every clean-gate check is a required status check on the base, or is aggregated behind one that is.
 A clean-gate check the queue cannot block on is a check the queue does not run as a gate.
 Neither condition is readable from `gh pr checks`, which reports state and not requiredness ([`gh-cli`](../../memories/gh-cli.md) records the rulesets query that does).
-Until [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) supplies an instrument, verify both by hand before relying on the queue: the required checks from `gh api --paginate "repos/<owner>/<repo>/rules/branches/<base-encoded>"` (encode the base name as one path segment, `jq -rn --arg b "<base>" '$b|@uri'`, since `release/1.x` would otherwise split into two, and paginate, since the first page can omit rules), and each clean-gate workflow's `on:` block and job and step `if:` conditions for `merge_group`.
-Without that verification the exception is unavailable: take the direct path, or stop.
+Those two conditions are the specification the queue form of this gate has to prove ([#3030](https://github.com/Morrison-Lab/ai-config/issues/3030)), and until it lands the exception is unavailable: a base that requires a merge queue stops the merge, since a required check supplied by a GitHub App cannot be verified from workflow files at all.
+The proof will read the required checks from `gh api --paginate "repos/<owner>/<repo>/rules/branches/<base-encoded>"` (encode the base name as one path segment, `jq -rn --arg b "<base>" '$b|@uri'`, since `release/1.x` would otherwise split into two, and paginate, since the first page can omit rules), and each clean-gate workflow's `on:` block and job and step `if:` conditions for `merge_group`.
 
-The rule splits by merge mode: a direct merge from a session with `git` and `gh`, a direct merge from a remote session without `git`, and a merge queue.
+The rule splits by merge mode: a direct merge from a session with `git` and `gh`, a direct merge from a remote session without `git`, and, once [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030) lands, a merge queue.
 It is GitHub-specific as written (`headRefOid`, `gh`, the compare endpoint, the update-branch and merge pins), so a GitLab merge has no equivalent gate until [#3021](https://github.com/Morrison-Lab/ai-config/issues/3021) supplies one, and `merge-it`, `mwc`, and `chores` inherit that scope.
 It binds every direct-merge path, including the dependency-bump merges in [`chores`](../../skills/chores/SKILL.md), not only `mwc` and `merge-it`.
 For a bot bump, the gate to rerun after an update is CI plus conflict state, which is what those PRs are gated on, since `@claude` review is skipped on them by design.
@@ -1235,12 +1236,9 @@ Merge synchronously, right after the check, with the merge command pinned.
   The pin closes only the head side: no merge API pins the base, so the base can still advance between that read and the merge, and a direct merge on a base without an up-to-date-branch requirement keeps that window open.
   Where the base must be stable, only a server-side gate closes it, a merge queue or the up-to-date-branch requirement (with every clean-gate check required or aggregated, per the exception above), and the direct-merge entry points say so.
   The cycle repeats for either ref, so a repeat says which one to look at rather than which remedy applies.
-  When the base moved twice it is advancing faster than the gate runs, which [`batch-merge-and-resolve`](batch-merge-and-resolve.md) measures: stop chasing and merge through a queue or under strict up-to-date protection, or batch the pending merges per that fragment.
+  When the base moved twice it is advancing faster than the gate runs, which [`batch-merge-and-resolve`](batch-merge-and-resolve.md) measures: stop chasing and merge under strict up-to-date protection (or through a merge queue once [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030) lands), or batch the pending merges per that fragment.
   When the head moved, another writer is pushing to the branch, and no queue or protection setting stabilizes that: find the writer per [`claim-pr`](claim-pr.md) and settle who owns the branch before rerunning.
-- **Do:** under a merge queue whose required checks cover the whole clean gate on `merge_group`, rely on those checks and skip the two direct-merge checks above.
-  The queue's speculative merge is the base-currency test there.
-- **Don't:** rely on a queue while any clean-gate check is non-required, since such a check can run on `merge_group` and still not block the merge.
-- **Don't:** rely on a queue while any clean-gate check is `pull_request`-only either: a non-required one never runs on the queue branch, and a required one holds the queue until it times out waiting for a result that never arrives.
+- **Do:** on a base that requires a merge queue, stop and report rather than merging: the queue form of this gate (the coverage proof, a retarget check before enqueue, and the asynchronous enrollment state machine) is [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030), and until it lands no agent path in this corpus merges through a queue.
   A manual update repairs neither case, since it cannot make a check block or make a workflow run on `merge_group`.
   Make every clean-gate check required (or aggregated behind one) and `merge_group`-triggered, or merge directly where the repository permits it, with the direct-merge checks above.
 - **Don't:** read a head-only FULLY CLEAN verdict as a merge-safe verdict when the base has advanced.

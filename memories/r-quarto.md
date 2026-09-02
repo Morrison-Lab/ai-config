@@ -881,7 +881,9 @@ readLines("")                                           #> character(0), with on
 
 `file.path()` is the one that produces a wrong answer rather than an empty one: an empty first component makes the result **absolute**, so a lookup meant to land inside the installed package retargets the filesystem root.
 That is a POSIX-shaped claim --- the separator is `/` on Windows too, but whether a leading `/` reads as the root depends on the consumer.
-`readLines("")` returns `character(0)` and emits a warning rather than an error, so an analysis over zero rows proceeds and looks like a real result.
+`readLines("")` returns `character(0)` and emits a warning rather than an error.
+Whether that becomes a silent wrong answer depends on the consumer: one that rejects empty input fails loudly and harmlessly, while one that tolerates it --- a `for` loop, a `vapply` over the result, a summary that reports zero rows --- proceeds and looks like a real result.
+The hazard is that class of consumer, not the `character(0)` itself.
 Its warning names nothing about the lookup that failed --- it reads `file("") only supports open = "w+" and open = "w+b": using the former` --- so grepping the log for the missing filename finds nothing.
 `file.exists()` is the only one whose return value answers the question it was asked, and even it says "the file is not there" rather than "the package lookup failed".
 

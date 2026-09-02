@@ -184,9 +184,11 @@ CONFIG_LIKE_INDETERMINATE_FLAGS = (
 # the two push forms that re-head nothing, and is already tested there. A second
 # hand-rolled detector would be a DRW finding and would diverge silently
 # (ai-config#1920) -- an earlier revision of this file wrote one as a "fallback"
-# and it did diverge, on all three of those points. So there is no fallback: if
-# the sibling cannot be loaded this guard says so and denies, rather than
-# quietly grading pushes with a worse parser.
+# and it did diverge, on all three of those points. So there is no fallback
+# parser: if the sibling cannot be loaded this guard never grades pushes with
+# a worse one. It applies only the narrow degraded-mode heuristic further down
+# to decide whether to report the broken installation and deny a command
+# whose text looks like a push (ai-config#2981).
 
 def _load_sibling():
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "no-unreviewed-pr.py")

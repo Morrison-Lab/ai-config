@@ -590,7 +590,7 @@
   Measured 2026-09-02 on [#2979](https://github.com/Morrison-Lab/ai-config/pull/2979):
   five Copilot rounds were read and answered while the Claude review repeated the same docstring finding five times unread,
   because each poll read only the verdict line of `check-pr-fully-clean.py` and the Copilot inline comments.
-  The checker prints one blocker bullet per selected review.
+  The checker prints one or more blocker bullets per selected review (a review state such as `CHANGES_REQUESTED` and a body finding each get one).
   For a structured review payload that bullet carries the first finding's file and message.
   For free-text prose it names only the regex pattern that matched.
   In neither case is it the full findings list.

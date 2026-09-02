@@ -1180,7 +1180,8 @@ which branch protection then counts as passing.
 This corpus's clean gate counts every check, not only the required ones,
 so every clean-gate check has to execute for `merge_group`, job and step conditions included, before the manual update is skipped.
 
-- **Do:** before merging, fetch the PR's configured base and confirm the merge-base with the live PR head is that base's current tip:
+- **Do:** before merging, fetch the PR's configured base and confirm the merge-base with the live PR head is that base's current tip.
+  Until [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) wires this into `check-pr-fully-clean.py` and the `mwc` and `merge-it` entry points, it is a manual step that runs after the checker and before the merge command:
   `url=$(gh repo view <owner>/<repo> --json url -q .url) && b=$(gh pr view <N> -R <owner>/<repo> --json baseRefName -q .baseRefName) && [ -n "$url" ] && [ -n "$b" ] && git fetch "$url" "$b" && tip=$(git rev-parse --verify FETCH_HEAD) && git fetch "$url" "refs/pull/<N>/head" && head=$(git rev-parse --verify FETCH_HEAD) && [ "$(git merge-base "$tip" "$head")" = "$tip" ]`.
   Both fetches name the repository the `-R` reads came from, not the checkout's `origin`, which in a fork or another checkout can be a different repository whose same-numbered PR would let the gate compare unrelated commits.
   Each result is assigned inside the `&&` chain so an unresolved branch or a failed command fails the check rather than comparing two empty strings as equal.

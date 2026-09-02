@@ -560,16 +560,16 @@ This grants no merge authority: the strict merge policy below still applies.
 
 ## Only work PRs the user opened, is assigned to, asked for, or the Actions app authored
 
-Before pushing to, editing, resolving threads on, or dispatching a paid
-review of any PR, resolve the invoking user and read the PR's author and
-assignees.
+Before pushing to, editing, commenting on, reviewing, resolving threads on,
+dispatching a paid review of, or merging any PR, resolve the invoking user
+and read the PR's author and assignees.
 Proceed only when the author is that user (or an alias
 `memories/reviewing-prs.md` lists for that same user), the user is among the assignees, the user
 explicitly asked for work on that PR by name, or the author is the GitHub
 Actions app (`github-actions`).
-A mention such as "do not touch #N" is not a request, a claim comment confers
-no scope, and a sweep skill's "every open PR" means every PR that passes this
-test.
+A mention such as "do not touch" followed by a PR number is not a request, a
+claim comment confers no scope, and a sweep skill's "every open PR" means
+every PR that passes this test.
 An out-of-scope PR is reported to the user and left untouched.
 When no identity operation is available, fail closed the way `ardia` does:
 leave the author and assignee arms unevaluated, act only on PRs the user

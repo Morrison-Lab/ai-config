@@ -45,7 +45,7 @@ mutates a PR stays serial.
      Keep the full listing for the stack detection in step 3, so an in-scope PR based on an out-of-scope PR's branch is still recognised as stacked (it is synced against that base as it stands;
      the base itself is left to its author).
      "Every open PR" anywhere in this skill means every PR that survives this filter.
-     A PR by another lab member, or by any other bot (Dependabot, a Copilot agent), is not driven, reviewed, or edited, however clean it looks (see `memories/reviewing-prs.md`, "Only work PRs I opened, am assigned to, or asked for by name, or the Actions app authored";
+     An out-of-scope PR (one that fails this test: another lab member's, or any other bot's, such as Dependabot's or a Copilot agent's) is not driven, reviewed, or edited, however clean it looks (see `memories/reviewing-prs.md`, "Only work PRs I opened, am assigned to, or asked for by name, or the Actions app authored";
      measured on `UCD-SERG/serodynamics` 2026-09-01, where the sweep drove four other authors' PRs before the correction arrived).
    - **Include drafts** (`isDraft: true`) unless another agent is actively driving one.
      A draft is the corpus's own in-flight claim signal ---

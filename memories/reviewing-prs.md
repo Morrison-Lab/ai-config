@@ -89,10 +89,10 @@ The rule therefore narrows the directive's "workflow-opened" on purpose, because
 - **Do (inferred):** when no identity operation is available (no `gh`, no `mcp__github__get_me`, no `glab`), fail closed:
   leave the author and assignee arms unevaluated, keep only the PRs the user explicitly asked for or the Actions app authored, and say so in the report.
   `skills/ardia/SKILL.md` step 1 and `AGENTS.md` state the same fallback.
-- **Don't:** push commits to, rewrite the title or body of, dispatch a paid review on, or resolve threads on a PR that fails the test.
+- **Don't:** push commits to, rewrite the title or body of, comment on, review, dispatch a paid review on, resolve threads on, or merge a PR that fails the test.
 - **Don't:** read a skill's "drive every open PR" as a scope grant that overrides this --- "every" means every PR that is mine.
 - **Don't:** treat a PR from a bot other than the repository's workflows (a Dependabot PR, a Copilot-agent PR) as mine by default;
-  such a PR needs the assignment like any other.
+  such a PR needs an assignment or an explicit request like any other.
   An explicit `chores` invocation names the Dependabot/Renovate population, which is the named-in-request arm.
 - **Don't:** stand down from a PR the `github-actions` app authored on the ground that a bot opened it --- that is the over-correction the second directive reversed.
 

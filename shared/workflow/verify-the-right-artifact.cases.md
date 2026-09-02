@@ -212,7 +212,7 @@ The sweep had been keyed on the file that prompted the work rather than on the p
 Measured 2026-09-02 while reviewing [ucdavis/matt.contracts#98](https://github.com/ucdavis/matt.contracts/pull/98).
 
 The PR head was fetched as a local branch `pr-98`, and an `adversarial-reviewer` subagent was dispatched with the instruction to review `git diff main...pr-98`.
-That `main` was the worktree's local branch, two commits behind the remote:
+That `main` was the worktree's local branch, 128 commits behind the remote (`git rev-list --count 43d59cc..7ec49fe`), or 28 by first-parent (`--first-parent`), and 0 ahead (`git rev-list --count 7ec49fe..43d59cc`):
 
 | ref | commit |
 | --- | --- |

@@ -13,8 +13,9 @@ WHAT HAPPENED
 Measured 2026-09-02 while reviewing ucdavis/matt.contracts#98.
 The PR head was fetched as a local branch `pr-98`, and an adversarial reviewer
 was dispatched against `git diff main...pr-98` using the worktree's local
-`main`, 128 commits behind the remote (28 by first-parent, and 0 ahead:
-`git rev-list --count 43d59cc..7ec49fe`):
+`main`, 128 commits behind the remote --- `git rev-list --count
+43d59cc..7ec49fe`, or 28 with `--first-parent`, and 0 ahead by the reversed
+range:
 
     base                     files  insertions
     stale local `main`          53        2999
@@ -105,13 +106,20 @@ _GIT_RANGE_CMD = (
 # inside the strings the anchor exists to exclude. `$(` is admitted explicitly,
 # since a command substitution really is a command position.
 #
-# This anchor UNDER-approximates on purpose. It misses a backtick substitution,
-# and it recognizes only the wrapper words listed here, so `bash -c "git diff
-# main...HEAD"` and any wrapper not in the list stay silent. A missed reminder
-# costs a review round; a reminder fired on quoted prose trains everyone to
-# ignore it, which is the failure README calls worse than a missing hook.
+# The same reasoning excludes a bare backtick and a bare `then`/`do`. A
+# backtick code span is how this corpus writes a command inside a comment body,
+# and "fetch first, then git diff main...pr-98" is ordinary English --- so
+# admitting either re-arms the pattern inside exactly the strings this anchor
+# exists to exclude. The loop keywords are recognized only where a shell would
+# treat them as such, immediately after a separator.
+#
+# This anchor UNDER-approximates on purpose. `bash -c "git diff main...HEAD"`,
+# a backtick substitution, and any wrapper word outside the list below stay
+# silent. A missed reminder costs a review round; a reminder fired on quoted
+# prose trains everyone to ignore it, which is the failure README calls worse
+# than a missing hook.
 RX_GIT_RANGE_CMD_SHELL = re.compile(
-    r"(?:\A|[\n;|&`]|&&|\|\||\$\(|\bthen\b|\bdo\b)\s*"
+    r"(?:\A|[\n;|&]|&&|\|\||\$\()\s*(?:(?:then|do)\s+)?"
     r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
     r"(?:(?:sudo|env|time|nohup|xargs|command)\s+"
     r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*)*"
@@ -139,15 +147,20 @@ SYMBOLIC = {
 RX_SHA = re.compile(r"\A[0-9a-f]{7,40}\Z")
 # A tag is immutable, so it cannot go stale the way a branch does. But a tag
 # and a branch are lexically indistinguishable, so this exempts only the two
-# unambiguous forms: a `v`-prefixed version, and a dotted version of at least
-# two components. Both admit a pre-release suffix (`v1.2.0-rc1`).
+# unambiguous form: a dotted version of at least two components, with or
+# without a `v` prefix, optionally carrying a pre-release suffix (`v1.2.0-rc1`)
+# or build metadata.
 #
 # Deliberately NOT exempted: a bare integer or integer-dash form. `123-fix`,
 # `2261-ums`, and `2026-08-01` are all far likelier to be branches --- issue
 # numbers are the commonest branch prefix in this corpus --- and a warn-only
 # reminder should take the false positive over the missed base.
-RX_TAG = re.compile(r"\A(?:[vV]\d+(?:\.\d+)*|\d+(?:\.\d+)+)"
-                    r"(?:[-+][0-9A-Za-z][0-9A-Za-z.]*)?\Z")
+# The suffix is a recognized pre-release or build-metadata form, not any word:
+# a bare `-[0-9A-Za-z]+` exempted `v2-rewrite` and `v3-api`, which are feature
+# branches. A dot is required throughout, so a bare `v1` warns too.
+RX_TAG = re.compile(r"\A[vV]?\d+(?:\.\d+)+"
+                    r"(?:-(?:rc|alpha|beta|pre|dev|snapshot)[0-9.]*)?"
+                    r"(?:\+[0-9A-Za-z][0-9A-Za-z.]*)?\Z")
 # `[^\n]*` after the delimiter is load-bearing: `cat <<'EOF' > f.md` puts a
 # redirection between the delimiter and the newline, and a pattern anchored
 # straight to `\n` misses exactly the form used to write a file.
@@ -207,14 +220,17 @@ def strip_heredocs(command):
 
 def remote_names(cwd):
     """Remote names for `cwd`, falling back to a small set on any failure."""
-    # An unusable cwd falls back rather than running `git remote` wherever the
-    # hook process sits: that would read a third repository's remote list and
-    # report it as this one's.
-    if not cwd or not os.path.isdir(cwd):
-        return FALLBACK_REMOTES
+    # No `os.path.isdir` pre-check: `subprocess.run` on a missing cwd raises
+    # `FileNotFoundError`, an `OSError`, which the handler below already answers
+    # with the same fallback. A guard whose deletion changes no behaviour is one
+    # the suite cannot pin, so it is not written.
+    #
+    # `cwd=None` is never passed: that would run `git remote` wherever the hook
+    # process happens to sit and report a third repository's remotes as this
+    # one's.
     try:
         proc = subprocess.run(
-            ["git", "remote"], cwd=cwd,
+            ["git", "remote"], cwd=cwd or os.curdir,
             capture_output=True, text=True, timeout=5,
         )
     except (OSError, subprocess.SubprocessError):
@@ -285,13 +301,18 @@ def target_repo(command, default):
     Without this, a `git -C /other/repo diff feature/x...HEAD` is classified
     against the SESSION's remote list rather than that repository's --- which
     is this fragment's own substitution, committed by its own instrument.
+
+    `--git-dir=` is NOT handled: it names a git directory rather than a working
+    tree, so recovering the repository from it is a second lookup. Such a
+    command is classified against the session repository, which is the
+    unresolved half of this function.
     """
     if not isinstance(command, str):
         return default
     match = RX_DASH_C.search(command)
     if not match:
         return default
-    path = match.group(1).strip("'\"")
+    path = os.path.expanduser(match.group(1).strip("'\""))
     if not os.path.isabs(path):
         # Relative to the SESSION's cwd, not to wherever the hook process
         # happens to sit --- resolving it against the latter would classify

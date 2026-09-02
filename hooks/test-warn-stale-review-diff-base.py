@@ -108,6 +108,10 @@ WARN_CASES = [
      "this corpus, and a bare-integer tag exemption would swallow it"),
     ("git diff 2026-08-01...HEAD",
      "a date-shaped name is likelier a branch than a tag"),
+    ("git diff v2-rewrite...HEAD",
+     "`v` plus an integer plus a word is a feature branch, not a version"),
+    ("git diff v1...HEAD",
+     "a version with no dot is not unambiguously a tag"),
     ("echo hi && git diff main...pr-98",
      "a command after `&&` is at a command position"),
     ("for b in x; do git diff main...pr-98; done",
@@ -130,8 +134,6 @@ SILENT_CASES = [
      "a raw SHA names one commit, not a moving branch"),
     ("git diff v1.2.0...v1.3.0",
      "version tags are immutable"),
-    ("git diff v1.2.0-rc1...HEAD",
-     "a pre-release tag is immutable too"),
     ("git diff 1.2.0...HEAD",
      "a dotted version needs no `v` prefix to be unambiguous"),
     ("git diff --cached",
@@ -156,6 +158,17 @@ SILENT_CASES = [
      "the comment a session writes when reporting this very rule"),
     ("git commit -m \"fix scope (git diff main...HEAD was wrong)\"",
      "same, in a commit message"),
+    ("gh pr comment 98 --body \"fetch first, then git diff main...pr-98\"",
+     "`then` in ordinary English must not re-arm the anchor"),
+    ("gh issue comment 1 --body \"for each PR, do git diff main...HEAD\"",
+     "nor `do`"),
+    ("gh pr comment 98 --body \"run `git diff main...pr-98` to reproduce\"",
+     "nor a backtick code span, which is how this corpus writes a command "
+     "inside a comment body"),
+    ("git commit -m 'see `git diff main...HEAD` for scope'",
+     "same, in a commit message"),
+    ("git diff v1.2.0-rc1...HEAD",
+     "a recognized pre-release suffix is still a tag"),
     ("git diff origin/main...HEAD -- a.b..c.d",
      "a pathspec after `--` is not a range, and the base here is already right"),
     ("git log --grep=main...HEAD",
@@ -209,11 +222,12 @@ _ok = _proc.returncode == 0 and not _proc.stdout.strip()
 wrong += not _ok
 print(f"{'silent' if _ok else 'WARN':<7} unparseable stdin fails open")
 
-# A cwd that is not a directory must fall back to FALLBACK_REMOTES rather than
-# running `git remote` wherever the hook process sits. `origin` is in the
+# A cwd that is not a directory falls back to FALLBACK_REMOTES, by way of the
+# `FileNotFoundError` that `subprocess.run` raises for it. `origin` is in the
 # fallback set, so it is exempt; `hc2-gitlab` is not, so it warns. Asserting
-# both directions is what distinguishes a real fallback from an ambient read --
-# a base of `main` would warn under any remote set and pin nothing.
+# both directions is what distinguishes a real fallback from an ambient read of
+# whatever repository the hook process sits in -- a base of `main` would warn
+# under any remote set and pin nothing.
 for _base, _want in (("origin/main", "silent"), ("hc2-gitlab/main", "WARN")):
     _proc = subprocess.run(
         [sys.executable, HOOK],
@@ -255,6 +269,10 @@ try:
     subprocess.run(["git", "-C", _scratch, "remote", "add", "hc2-gitlab",
                     "https://example.invalid/r.git"], check=True,
                    capture_output=True)
+
+    # The same repository reachable as `~/repo`, for the expanduser case.
+    _home = tempfile.mkdtemp()
+    os.symlink(_scratch, os.path.join(_home, "repo"))
     _proc = subprocess.run(
         [sys.executable, HOOK],
         input=json.dumps({"tool_name": "Bash",
@@ -306,6 +324,23 @@ try:
     print(f"{'WARN' if _ok else 'silent':<7} a quoted `-C` path containing "
           "spaces still matches")
 
+    # `~` must be expanded before the path is tested, or the command is
+    # classified against the session repository instead.
+    _proc = subprocess.run(
+        [sys.executable, HOOK],
+        input=json.dumps({"tool_name": "Bash",
+                          "tool_input": {"command":
+                                         "git -C ~/repo diff "
+                                         "hc2-gitlab/main...HEAD"},
+                          "cwd": REPO_ROOT}),
+        capture_output=True, text=True,
+        env=dict(os.environ, HOME=_home),
+    )
+    total += 1
+    _ok = _proc.returncode == 0 and not _proc.stdout.strip()
+    wrong += not _ok
+    print(f"{'silent' if _ok else 'WARN':<7} a `~` in a `-C` path is expanded")
+
     # A relative `-C` path resolves against the SESSION cwd, not the hook
     # process's. `hc2-gitlab` is exempt only if the right repo was read.
     _proc = subprocess.run(
@@ -324,6 +359,7 @@ try:
           "against the session cwd")
 finally:
     shutil.rmtree(_scratch, ignore_errors=True)
+    shutil.rmtree(_home, ignore_errors=True)
 
 print(f"\n{total - wrong}/{total} correct")
 sys.exit(1 if wrong else 0)

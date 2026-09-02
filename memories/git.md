@@ -573,14 +573,16 @@ without `-b main`, filed for tracking (ai-config#2740).
 `hooks/no-push-without-self-review.py` imports `no-unreviewed-pr.py` as a
 sibling module.
 When that import fails, the guard cannot parse the command.
-It was observed from a worktree whose registration resolved `CLAUDE_PLUGIN_ROOT` to `<worktree>/.claude` instead of the checkout's real root.
+It was observed from a worktree where the guard's error path showed it running from `<worktree>/.claude/hooks/`, a copy with no sibling beside it.
+Which registration selected that copy, and whether `CLAUDE_PLUGIN_ROOT` resolved there, is what [ai-config#2981](https://github.com/Morrison-Lab/ai-config/issues/2981) leaves open.
 The guard then falls back to a narrow regex over the raw command text,
 which matches a `git ... push` invocation and denies the command.
 The regex is deliberately narrow:
 `grep push` and `git commit -m "push the button"` do not trip it,
 and the hook's own suite pins that.
 It reads the whole command string, though,
-so a heredoc body that quotes a literal `git push -u origin <branch>` line matches exactly as a real push would.
+so a heredoc body that quotes a literal `git push -u origin <branch>` line is read as command text.
+It then matches exactly as a real push would.
 A `printf` body matches only when the character before `git` is not a quote (a backtick, in the measured case).
 `printf '%s' 'git push ...'` passes.
 Measured 2026-09-01 while writing an issue body,

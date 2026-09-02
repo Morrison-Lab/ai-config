@@ -571,7 +571,9 @@
   and its clean/not-clean verdict patterns so Copilot reviews are tracked as part of the automated review gate.
 
   **Now that Copilot is live again, the 201-then-empty `requested_reviewers` signature above still holds, and the fix is to poll `reviews`, not `reviewRequests`.**
-  On the PRs below, `gh api repos/<owner>/<repo>/pulls/<N>/requested_reviewers -X POST -f 'reviewers[]=copilot-pull-request-reviewer[bot]'` returned HTTP 201 each time (the section above records 422 and refusal as other outcomes), and `gh pr view --json reviewRequests` stayed empty.
+  On the PRs below, `gh api repos/<owner>/<repo>/pulls/<N>/requested_reviewers -X POST -f 'reviewers[]=copilot-pull-request-reviewer[bot]'` returned HTTP 201 each time.
+  The section above records 422 and refusal as other outcomes.
+  `gh pr view --json reviewRequests` stayed empty each time.
   On those same requests the review then landed within about a minute, visible under `gh pr view --json reviews` with author login `copilot-pull-request-reviewer`, which `startswith("copilot")` matches.
   That is an observation of those PRs, not a guarantee: the empty request list stays inconclusive (see the 201-then-empty section above), and the posted review is the only evidence of arrival.
   The inline comments of that review (`gh api repos/<owner>/<repo>/pulls/<N>/comments`) carry `user.login` `Copilot` instead, so a query over comments needs a case-insensitive test (`test("copilot"; "i")`) while a query over reviews does not.
@@ -588,7 +590,10 @@
   Measured 2026-09-02 on [#2979](https://github.com/Morrison-Lab/ai-config/pull/2979):
   five Copilot rounds were read and answered while the Claude review repeated the same docstring finding five times unread,
   because each poll read only the verdict line of `check-pr-fully-clean.py` and the Copilot inline comments.
-  The checker prints one blocker bullet per selected review, quoting the first matched finding, not every finding.
+  The checker prints one blocker bullet per selected review.
+  For a structured review payload that bullet carries the first finding's file and message.
+  For free-text prose it names only the regex pattern that matched.
+  In neither case is it the full findings list.
   Those bullets say which review still blocks.
   The findings themselves are in that review's body, and each reviewer's set has to be read after every push.
   - **Do:** after each push, read the checker's blocker bullets, then the Claude `### Findings` section and the Copilot review body and comments they point at.

@@ -1158,7 +1158,9 @@ before reporting a PR ready, not just trust the last green run.
 A PR without a clean review verdict on the latest commit is not merge-ready.
 
 **A head green on its own branch can turn `main` red on merge, when the base gained a new CI check after the PR's latest CI run.**
-A `pull_request` run uses the workflow definition current at that run, so the gap opens when `main` gains a check afterwards and no new PR event re-runs CI.
+A `pull_request` run uses the workflow definition current at that run,
+so the gap opens when `main` gains a check afterwards
+and no new PR event re-runs CI.
 A check added to `main` after that run never fires on the PR until a new PR event synthesizes a fresh `refs/pull/N/merge`,
 so there is nothing red to see: the check simply never ran.
 Measured on [#2965](https://github.com/Morrison-Lab/ai-config/pull/2965).
@@ -1168,9 +1170,13 @@ a GIA session merged it under `mwc`,
 and `validate` on `main` went red at `da1a2d03` until [#2983](https://github.com/Morrison-Lab/ai-config/pull/2983) regenerated the manifest.
 The head-only verdict cannot see this, and no path diff can prove the base gained no check through a script or a reusable workflow,
 so for a direct merge the rule is the one [`sync-with-main`](sync-with-main.md) already states: a stale merge-base means update first.
-Under a merge queue whose required workflows listen for `merge_group`, the queue's speculative merge test covers this, and [`merge-queue`](merge-queue.md) forbids the manual update loop.
+Under a merge queue where every workflow in the clean gate listens for `merge_group`,
+the queue's speculative merge test covers this,
+and [`merge-queue`](merge-queue.md) forbids the manual update loop.
 There the `merge_group` checks are the gate.
-A `pull_request`-only workflow added to the base does not run on the queue's branch, so that precondition has to hold before the manual update is skipped.
+A `pull_request`-only workflow added to the base does not run on the queue's branch,
+and this corpus's clean gate counts every check, not only the required ones,
+so that precondition has to hold for all of them before the manual update is skipped.
 
 - **Do:** before merging, fetch and resolve the default branch, then confirm the merge-base with it is its current tip:
   `d=$(git remote show origin | sed -n 's/.*HEAD branch: //p') && [ -n "$d" ] && git fetch origin "$d" && tip=$(git rev-parse --verify FETCH_HEAD) && mb=$(git merge-base FETCH_HEAD <head>) && [ "$mb" = "$tip" ]`.
@@ -1178,7 +1184,7 @@ A `pull_request`-only workflow added to the base does not run on the queue's bra
   Comparing against `FETCH_HEAD` reads the tip the fetch just returned and writes no remote-tracking ref, so it holds in a single-branch clone (where a bare `git fetch origin` leaves `origin/$d` stale) and under `fetch.prune=true` (where an explicit `branch:refs/remotes/origin/branch` refspec was measured to delete the ref and fail `rev-parse` on its first run).
   The default branch is not always `main`.
   `git remote show origin` answers in clones where `refs/remotes/origin/HEAD` is unset, which [`challenge-the-assignment.cases.md`](challenge-the-assignment.cases.md) records for the clones this corpus is developed in.
-- **Do:** when it is not and the merge is direct, `gh pr update-branch <N> -R <owner>/<repo>`, then rerun the whole clean gate on the new head, review included, before merging.
+- **Do:** when the merge-base is not that tip and the merge is direct, `gh pr update-branch <N> -R <owner>/<repo>`, then rerun the whole clean gate on the new head, review included, before merging.
   The update is a new head, so a clean verdict on the old one no longer counts, per [`sync-with-main`](sync-with-main.md).
 - **Do:** under a merge queue, rely on the `merge_group` checks rather than a manual update.
 - **Don't:** read a head-only FULLY CLEAN verdict as a merge-safe verdict when the base has advanced.

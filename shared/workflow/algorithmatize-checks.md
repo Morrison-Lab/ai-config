@@ -1383,9 +1383,12 @@ The check is two steps, and the **second** is the one that decides:
 ```bash
 uptime                                   # step 1: load average (Windows: Get-Counter)
 for i in 1 2 3 4 5; do                   # step 2: the one that decides
-  /usr/bin/time -f %e <the command>      # elapsed seconds, one line per run
-done
+  { TIMEFORMAT=%R; time <the command> >/dev/null; } 2>&1
+done                                     # -> one elapsed-seconds figure per run
 ```
+
+The loop uses the shell's **builtin** `time` rather than `/usr/bin/time -f %e`, which is the form that first suggested itself and does not run: the binary is absent from this corpus's own remote containers (`exit 127`, measured), and `-f` is GNU-only where it is present, so the step the prose calls decisive would have printed nothing and left the reader holding only the load average.
+The builtin needs no package, and the `2>&1` is load-bearing --- `time` writes to stderr, so a `| tee` without it captures an empty file.
 
 Read `uptime` first, but do not stop there.
 Its figures are 1-, 5- and 15-minute *decaying* averages, so a burst that inflated
@@ -1409,8 +1412,10 @@ It compares against a figure chosen earlier, so it is the case those sections go
 
 A **watchdog** asks whether the code finishes at all, and that is a question about elapsed time by construction, so it stays wall-clock.
 This repo's own catastrophic-backtracking checker is exactly that shape: [`scripts/check_regex_patterns.py`](../../scripts/check_regex_patterns.py) arms `signal.setitimer(signal.ITIMER_REAL, timeout)` against a `DEFAULT_TIMEOUT` of 0.25 seconds, with a thread-join fallback, and `validate.yml` gates on it.
-A backtracking probe is therefore not the exception that proves a `process_time` rule;
-it is the other question, and the carve-out above already covers it --- keep a wall-clock ceiling where the measured code can actually block or run away.
+A backtracking probe is therefore not the exception that proves a `process_time` rule.
+It is a **second** exception, and it needs its own reason rather than the blocking one's, which does not reach it: that carve-out is stated as "keep a wall-clock ceiling **only** where the measured code can actually block", and its rationale is that "the one thing CPU time cannot see is a span that blocks on I/O instead of burning cycles".
+A runaway regex burns cycles, so CPU time sees it perfectly well and the blocking carve-out excludes it by construction.
+What justifies wall-clock here is different and narrower: a watchdog has to *interrupt*, the practical in-process interrupt for a CPU runaway is `ITIMER_REAL`, and a termination budget is a real-time quantity by definition.
 
 So ask which question the assertion asks before reaching for either repair.
 The `< 1.0s` probe that prompted this entry was a *regression guard shaped like a watchdog*, which is why it was ambiguous and why it could flake.

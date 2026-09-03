@@ -895,6 +895,67 @@ Tracked as [#1794](https://github.com/Morrison-Lab/ai-config/issues/1794), and c
 This section's own first draft then committed the same error: it opened by describing "the two sections above", carrying that framing over from its neighbour, when the section directly above it argues the opposite of what the sentence attributed to it.
 The reviewer on [#1795](https://github.com/Morrison-Lab/ai-config/pull/1795) caught it, which is worth recording as evidence about the remedy rather than about the author --- naming a target beats counting to it, exactly as [`forward-references`](forward-references.md) says, and the count was wrong here because an unrelated section had been inserted between the two being counted.)
 
+## A number in a commit message is an assertion nobody re-derives
+
+The section on your own PR descriptions above names the commit message as a
+surface this checklist covers.
+What it does not say is that the commit message is the surface where an
+unmeasured figure most reliably survives.
+Every other place a figure appears has a reader with a reason to check it:
+a PR body gets read against the diff,
+prose gets read against the file it describes,
+a changelog line gets read against the behaviour it announces.
+A commit message is read for its subject line and skimmed for its body,
+so a number inside one is asserted into permanent history and re-derived by nobody.
+
+**A figure about state the commit did not touch is an assertion the commit has no standing to make.**
+This is the mirror of
+[`An insertion asserts something about the whole file, not just the added lines`](#an-insertion-asserts-something-about-the-whole-file-not-just-the-added-lines)
+above.
+That section says an insertion claims for the whole file;
+this one says a commit message may claim only for what the commit changed.
+A `git show --stat` settles the boundary in one command,
+and it is the command nobody runs before writing the sentence,
+because describing what you just did feels like reporting rather than measuring.
+
+**The remedy is usually to delete the number, not to correct it.**
+Ask what the figure is load-bearing for.
+Where a formatting change is being explained, the answer is nothing:
+the reader needs to know the change was a split at a clause boundary,
+and the character counts on either side of it decide nothing the reader will do.
+A wrong figure then costs an amend --- or several --- to repair a sentence that was carrying no information to begin with.
+Where a figure genuinely is load-bearing, measure it,
+and re-derive it rather than inheriting it, per
+[`address-every-comment`](../workflow/address-every-comment.md)'s
+"a figure inherited from the tracking issue is both the copy git keeps and the copy nobody verified".
+
+- **Do:** state what the change did, and leave the change's measurements out of the message unless a reader has to act on them.
+- **Do:** run `git show --stat` before writing any count into a commit message, and confine the claim to the lines it reports as changed.
+- **Do:** re-derive a load-bearing figure from the artifact at the moment of writing the message.
+- **Don't:** quantify a formatting change --- a range, a character count, a line count --- to make the message sound measured.
+- **Don't:** state a measurement of a neighbouring line the commit left alone,
+  however natural it is to characterize the result rather than the edit ---
+  rationale about untouched code is ordinary and welcome, and a count of it is the claim this rules out.
+- **Don't:** treat an amend as the cheap remedy for a figure you could have omitted;
+  [`address-every-comment`](../workflow/address-every-comment.md) recommends the amend for a **wrong** figure in an unmerged message,
+  and this bullet is about not writing the figure at all.
+
+(Morrison-Lab/ai-config#3060, 2026-09-03.
+One message said a re-wrap brought a line "into the corpus's 60-to-80 range"
+when the three resulting lines measured 54, 84 and 81, none of them in range.
+Its replacement said the split "replaced a 143-character line with three of 54, 84 and 81"
+when it produced two, the third having pre-existed --- `git show --stat` on `f9068299` reporting 2 insertions and 1 deletion.
+Both wrong figures described the line the commit did not touch,
+and each cost a message-only amend to repair.
+The amends are why this record cites the quoted messages rather than counting the rounds:
+rewriting a message destroys the copy a later reader would check,
+so a count of them is a figure this section's own rule would refuse.
+The reviewer's closing judgement is the transferable half:
+the figures were load-bearing for nothing,
+the paragraph's content was "split at the clause boundary",
+and the honest form carries no numbers at all.
+Tracked as [#3158](https://github.com/Morrison-Lab/ai-config/issues/3158).)
+
 ## An elapsed-time claim is a computation, not a memory
 
 The section on claims inherited from upstream discussion covers a figure you

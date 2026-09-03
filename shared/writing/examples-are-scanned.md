@@ -92,3 +92,52 @@ trigger is recurrence rather than a first occurrence.
 - **Don't:** let a later cleanup pass normalize the deliberate spelling back.
 
 See [`examples-are-scanned.cases.md`](examples-are-scanned.cases.md).
+
+## A negation is not an escape either
+
+Everything above is about the *example* ---
+a quoted instance of the pattern, which a line-oriented scanner reads as bytes.
+A negated sentence is a second way to write the pattern without meaning it,
+and it is easier to miss because nothing about it looks like an example.
+A sentence beginning "no issue is worth filing" contains the assertion a declarative-claim detector exists to catch,
+and the word that reverses its meaning is a word the detector cannot read.
+
+The two are not the same case, and the difference decides the remedy.
+Rendering is a property of the *text*, so a structure-aware checker strips it once and covers every example anyone writes later.
+Negation is a property of the *meaning*, so nothing a code-region stripper does reaches it:
+it has to be modelled explicitly, cue by cue, and each cue is a fresh guess about how the sentence will be phrased.
+That is why the parent section's first remedy applies to one and not the other.
+`hooks/no-unfiled-finding.py` is worth reading here as the worked instance:
+it strips fenced blocks, blockquote lines, and inline code spans before matching,
+so backticking the phrase above really does shield it ---
+and no rendering choice whatever changes what it makes of the bare negated sentence.
+GitHub's own parser is the opposite corner,
+closing an issue on `KEYWORD #N` inside a sentence written to say the keyword is not being used ---
+see [`issue-first`](../workflow/issue-first.md)'s
+"A closing keyword plus #N closes #N even when the sentence negates it".
+
+**Which direction it fails in decides how much it is worth, and "safe direction" is not the same as "cheap".**
+GitHub's parser fails destructively and invisibly:
+it closes somebody's live work, and the sentence's author gets no signal at all.
+`no-unfiled-finding.py` fails in the safe direction and still `block`s the reply,
+so the cost is a stalled turn plus a dupe-check the session should arguably have run anyway ---
+recoverable, unlike a closed issue, and not free either.
+Rank the fix from both axes rather than from the direction alone:
+a blocking guard that fires on a negation is worth fixing sooner than a warning one,
+even though both fail safely.
+Settle which you have by reading the value the hook emits,
+since a guard's severity is the one property nothing about its subject matter implies.
+
+- **Do:** read the checker for whether it strips code regions, and treat that answer as settling rendering only.
+- **Do:** check whether the sentence you are writing contains the literal pattern a detector matches, independently of whether the sentence asserts it.
+- **Do:** classify a negation-blind detector by its failure direction *and* by whether it warns or blocks, before ranking the fix.
+- **Do:** read the guard's emitted decision value to settle that, rather than assuming a false positive merely warns.
+- **Don't:** expect a negation to be read as one --- it is the case no rendering remedy reaches,
+  and the case a matcher covers only for the cues someone thought to enumerate.
+- **Don't:** generalize a line-oriented checker's blindness to every checker,
+  since this file's own opening says which you face is a fact to look up.
+- **Don't:** rewrite a true sentence into a vaguer one to dodge a safe-direction false positive --- absorb it, or fix the detector.
+
+(Measured 2026-09-03: a `Stop` hook fired on a negated sentence declining to file an issue,
+reading it as the assertion it guards against.
+Recorded on [#2988](https://github.com/Morrison-Lab/ai-config/issues/2988).)

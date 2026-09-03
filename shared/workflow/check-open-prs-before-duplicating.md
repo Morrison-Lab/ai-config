@@ -137,3 +137,10 @@ The predicted-name half is from the immediate sequel: a second check for
 `refs/heads/ums/liveness-filter-blindspot` also returned nothing, because the
 agent had used `ums/liveness-filtered-queries`, and only a filesystem
 collision on its worktree path revealed the branch at all.)
+
+When the dupe-check comes back positive --- the work is already done, or in
+flight and further along --- what to do with your own branch is a separate
+question from whether to keep building.
+[`salvage-superseded-work`](salvage-superseded-work.md) covers it: the winning
+fix discharges the bug, but whether it carries a regression guard is a distinct
+question, and that part can outlive the supersession.

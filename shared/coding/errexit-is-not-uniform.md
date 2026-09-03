@@ -521,6 +521,49 @@ Both called it through `< <(...)`, so the refusal was inert; the shape was
 caught in review before it shipped, and the empty-array consequence was
 reproduced directly rather than reasoned about.)
 
+## A `trap ... EXIT` installed inside a function fires when a SUBSHELL exits
+
+`errexit` is the file's subject, and it is one instance of a wider property: a construct you read as "the script" is frequently two shells, and the second one has its own lifetime.
+A cleanup trap is the case where that costs you data rather than a status.
+
+A function that installs its own `trap ... EXIT` is installing it in whatever shell is running the function.
+Call the function normally and that is the script's shell, so the trap fires at script exit, which is what you wanted.
+Capture the function in a command substitution and it runs in a subshell --- so the subshell's exit, one line into the script, fires the cleanup:
+
+```bash
+set -euo pipefail
+f=$(mktemp); echo hi > "$f"
+gather() { trap 'rm -f "$f"' EXIT; echo out; }
+out=$(gather)      # subshell exits here -- the trap runs
+cat "$f"           # gone
+```
+
+Note which case does *not* bite, because assuming the wrong one sends the diagnosis somewhere unproductive.
+A trap installed in the parent **before** the substitution is reset to default in the subshell and does not fire, and neither an `exit` inside the substituted function nor a failing command in it reaches a parent-installed trap.
+Only a trap installed *within* the subshell fires there.
+So the shape to look for is a self-cleaning helper, not a script-level cleanup.
+
+The failure presents far from its cause.
+Nothing errors at the substitution;
+the next several readers of the file get empty input, and each reports its own unrelated-looking failure.
+
+Guard the trap on the shell it was meant for:
+
+```bash
+gather() { trap '[[ $BASHPID == $$ ]] && rm -f "$f"' EXIT; echo out; }
+```
+
+`$$` is the script's PID and stays fixed across subshells, while `BASHPID` is the current shell's, so the comparison is false in every subshell and true only in the shell that installed the trap.
+
+- **Do:** guard a function-installed `EXIT` trap with `[[ $BASHPID == $$ ]]` when the function may be called in a command substitution.
+- **Do:** install cleanup at the script's top level, where its lifetime is unambiguous, when nothing requires it to be per-function.
+- **Don't:** conclude a temp file was never written when several consumers report empty input --- check whether anything between the write and the read ran in a subshell.
+- **Don't:** assume a parent's trap is the one that fired;
+  the subshell resets inherited traps, so the culprit is a trap set inside it.
+
+(Measured 2026-09-03, bash 5.3.15: `out=$(run_gather ...)` deleted the temp file the next line read, and five downstream checks failed with empty input.
+Reproduced and both forms confirmed on the same shell --- the naive form deletes, the `BASHPID`-guarded form survives the substitution and still cleans up at script exit.)
+
 ## In review
 
 Flag a pipeline or command under `set -e` whose left-hand side routinely

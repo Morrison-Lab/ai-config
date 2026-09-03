@@ -75,6 +75,8 @@ jobs:
         run: python3 scripts/test_check_unpinned_git_fixtures.py
       - name: Run check-pr-fully-clean tests
         run: python3 scripts/test_check_pr_fully_clean.py
+      - name: Run check-review-body tests
+        run: python3 scripts/test_check_review_body.py
       - name: Check regex patterns for catastrophic backtracking
         run: python3 scripts/check_regex_patterns.py
       - name: Run regex pattern check tests

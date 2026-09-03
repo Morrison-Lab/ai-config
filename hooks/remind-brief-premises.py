@@ -101,9 +101,17 @@ Clause C instead uses the token this corpus emits itself. Every adversarial
 review ends with a bare `[FINDINGS_COUNT: <N>]` line, so when a brief asserts
 an aggregate over findings or rounds, the addends are already in the transcript
 and "was anything run that reads them back" is decidable. It fires only when
-two or more such values are present, the brief states a count of one of
-AGGREGATE_NOUNS, and no counting or arithmetic command ran after the first
-value or sits beside the claim in the brief.
+two or more such values came back from this session's own `Agent`/`Task` calls,
+the brief states a count of one of AGGREGATE_NOUNS that is NOT equal to one of
+those values, and no command naming `FINDINGS_COUNT` ran after the first value
+or sits beside the claim in the brief.
+
+Both halves of that are narrower than they first read, and deliberately. The
+claim must not merely be a count while two values happen to exist: a numeral
+equal to a printed value is a per-round figure quoted off a review ("the three
+findings from the last round"), and a brief that writes the addends out carries
+its own derivation. And the discharge must NAME the token, so an unrelated
+`wc -l` cannot switch the clause off for the rest of a session.
 
 PRECISION, MEASURED
 -------------------
@@ -265,8 +273,7 @@ IMPERATIVE = re.compile(
         |look|cite|link|see|follow|use|keep|make|fix|apply|review|load
         |consult|avoid|skip|ignore|prefer|push|commit|stage|file|land|ship
         |do|don't|do\s+not|touch|copy|paste|extend|split|merge|refresh
-        |regenerate|rebuild|report|start|stop|leave|hold|drop|pick
-        |count|sum|tally|total)\b""",
+        |regenerate|rebuild|report|start|stop|leave|hold|drop|pick)\b""",
     re.I | re.X,
 )
 
@@ -297,27 +304,80 @@ IMPERATIVE = re.compile(
 #
 # So this fires ONLY when all of these hold, which is why it is narrow enough
 # to keep the guard trusted:
-#   - two or more `FINDINGS_COUNT` values are present in the transcript (one
-#     value is not an aggregate),
-#   - the brief states a count of one of AGGREGATE_NOUNS,
-#   - no command that counts or does arithmetic ran after the first value, and
-#     none is pasted beside the claim in the brief itself.
-FINDINGS_VALUE = re.compile(r"FINDINGS_COUNT\s*:\s*\d+")
+#   - two or more `FINDINGS_COUNT` values came back from this session's own
+#     `Agent`/`Task` calls (one value is not an aggregate, and a value read out
+#     of some other PR's review comments is not this session's history),
+#   - the brief states a count of one of AGGREGATE_NOUNS, in a clause about
+#     what happened rather than what is wanted or still pending,
+#   - that count is not itself one of the printed values, and the brief does
+#     not write the addends out,
+#   - no command naming `FINDINGS_COUNT` ran after the first value, and none is
+#     pasted beside the claim in the brief itself.
+FINDINGS_VALUE = re.compile(r"FINDINGS_COUNT\s*:\s*(\d+)")
 
 # Kept to the nouns the `FINDINGS_COUNT` token is actually about. "runs",
 # "checks", "commits" and the rest stay out on purpose: their values are not
 # in the transcript in a form this hook can point at, so a reminder about them
 # would be the pathless-count misfire above rather than this narrow case.
+#
+# The noun alone does not scope the claim to this session's review history --
+# "reviews" and "findings" both have ordinary uses the printed values say
+# nothing about -- so AGG_INTENT and AGG_NOT_YET below carry the rest of it.
 AGGREGATE_NOUNS = {"findings", "rounds", "reviews"}
 
-# Commands that read the values back or add them up. `FINDINGS_COUNT` itself
-# counts, because any command naming the token is going back to the values
-# rather than to memory.
-DERIVE_AGGREGATE = re.compile(
-    r"FINDINGS_COUNT"
-    r"|\bawk(?![-\w])|\bbc(?![-\w])|\bexpr(?![-\w])|\bpaste\s+-s"
-    r"|\$\(\(|\bsum\s*\(|\bnumsum\b",
+# The command that discharges clause C must NAME the token, exactly as
+# clause A's discharge must name the claimed path. An earlier revision
+# accepted any counting or arithmetic command -- `wc -l`, `grep -c`, a bare
+# `awk` -- so one unrelated `find . -name '*.jsonl' | wc -l` switched the
+# whole clause off for the rest of the session. That is the
+# over-broad-discharge failure this file's docstring names, and it landed
+# in the one population the clause was built for: a five-round ARDI session
+# runs counting commands constantly, so the detector would have been silent
+# exactly where it was needed.
+DERIVE_AGGREGATE = re.compile(r"FINDINGS_COUNT")
+
+# The values may only come back from a dispatched agent. Any other tool
+# result carrying the token is somebody else's review history -- see
+# `transcript_derivations`.
+AGENT_TOOLS = {"Agent", "Task", "agent", "task", "dispatch_agent",
+               "run_agent"}
+
+# Clause C's own imperative list. The generic IMPERATIVE above is NOT
+# widened with these: `count`, `sum`, `tally` and `total` head a noun
+# phrase far more often than they open a command, and adding them there
+# silently killed path-anchored claims that clause A had always caught --
+# "Sum of the three sections in `shared/workflow/ardi.md` is wrong."
+# stopped firing. The lookahead keeps the noun reading out here too.
+AGG_IMPERATIVE = re.compile(
+    r"""^[\s>*+#-]*(?:\d+[.)]\s*)?(?:then\s+|first\s+|also\s+|next\s+)?
+        (count|sum|tally|total|recount)\b
+        (?!\s+(?:of|is|are|was|were)\b)""",
+    re.I | re.X,
 )
+
+# Clause C counts review history that ALREADY HAPPENED, so a brief stating
+# an intention or describing work not yet done is not making the claim this
+# clause is about. Without these, "I want two reviews of this before we
+# merge." and "There are three reviews pending on the stack." both fired,
+# and the appended note then asserted a false premise about each.
+AGG_INTENT = re.compile(
+    r"\b(?:want|wants|need|needs|plan|plans|expect|expects|intend|intends"
+    r"|require|requires|request|requests|would\s+like|await|awaiting)\b",
+    re.I,
+)
+AGG_NOT_YET = re.compile(
+    r"^\s*(?:[A-Za-z][\w'-]*\s+){0,2}?"
+    r"(?:pending|outstanding|queued|remaining|expected|planned|scheduled)\b",
+    re.I,
+)
+
+# Word forms `COUNT` accepts, so a claim's numeral can be compared against
+# the values the transcript actually printed.
+WORD_NUMBER = {
+    "zero": 0, "no": 0, "one": 1, "two": 2, "three": 3, "four": 4,
+    "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+    "eleven": 11, "twelve": 12,
+}
 
 FENCE = re.compile(r"```.*?```", re.S)
 # `[ \t]*`, never `\s*`: `\s` matches a newline, so a blockquote preceded by
@@ -411,7 +471,7 @@ def segment_start(text, pos, clauses=True):
     return best
 
 
-def imperative_governs(text, pos, upto):
+def imperative_governs(text, pos, upto, pattern=None):
     """True when an imperative verb governs the claim starting at `pos`.
 
     Two windows, because one alone gets a real case wrong in each direction.
@@ -454,11 +514,15 @@ def imperative_governs(text, pos, upto):
     Stating a behaviour no test pinned is the exact failure this hook exists
     to flag, so the examples above are now cases rather than prose.
     """
+    # Resolved at call time, never as a default argument: the test suite's
+    # mutant harness swaps the module global, which a def-time default would
+    # have already captured.
+    pat = pattern or IMPERATIVE
     seg = segment_start(text, pos)
-    if IMPERATIVE.match(text[seg:upto]):
+    if pat.match(text[seg:upto]):
         return True
     sent = segment_start(text, pos, clauses=False)
-    m = IMPERATIVE.match(text[sent:upto])
+    m = pat.match(text[sent:upto])
     return bool(m and text[sent + m.end():sent + m.end() + 1] == ",")
 
 
@@ -473,6 +537,14 @@ def plural_after(text, start, span=90):
             continue
         return m.group(0)
     return None
+
+
+def numeral(tok):
+    """The integer a COUNT token denotes, or None."""
+    t = tok.lower().replace(",", "")
+    if t.isdigit():
+        return int(t)
+    return WORD_NUMBER.get(t)
 
 
 def claims(prompt):
@@ -535,16 +607,26 @@ def claims(prompt):
 
 
 def aggregate_claims(prompt):
-    """Return [(kind, quoted_claim, line)] per pathless review-history count.
+    """Return [(kind, quoted_claim, value, line)] per review-history count.
 
     Clause C. Deliberately does NOT require a path, which is the whole point,
     and is therefore gated on the transcript actually carrying `FINDINGS_COUNT`
     values -- see `evaluate`. Without that gate this is exactly the pathless
     count matcher the clause-C comment argues against.
 
-    The imperative guard applies here for the same reason it applies above: a
-    brief that says "count the findings across the five rounds" has already
-    asked for the derivation this hook would ask for.
+    Three suppressions, each closing a measured misfire:
+
+    - The imperative guard, for the same reason it applies to clause A: a brief
+      that says "count the findings across the five rounds" has already asked
+      for the derivation this hook would ask for. It uses AGG_IMPERATIVE
+      rather than widening IMPERATIVE, which regressed clauses A and B.
+    - AGG_INTENT, because "I want two reviews of this before we merge." states
+      an intention rather than a count of anything that happened.
+    - AGG_NOT_YET, because "There are three reviews pending on the stack."
+      counts work not yet done, which no `FINDINGS_COUNT` value is about.
+
+    `value` is the integer the claim states, carried out so `evaluate` can
+    tell an aggregate from a per-round figure quoted straight off a review.
     """
     text = visible_prose(prompt)
     found, seen = [], set()
@@ -556,11 +638,19 @@ def aggregate_claims(prompt):
             continue
         if imperative_governs(text, m.start(), m.end()):
             continue
+        if imperative_governs(text, m.start(), m.end(), AGG_IMPERATIVE):
+            continue
+        clause = text[segment_start(text, m.start()):m.start()]
+        if AGG_INTENT.search(clause):
+            continue
+        if AGG_NOT_YET.match(text[m.end():m.end() + 60]):
+            continue
         quote = " ".join(m.group(0).split())
         if quote.lower() in seen:
             continue
         seen.add(quote.lower())
-        found.append(("aggregate", quote, text.count("\n", 0, m.start())))
+        found.append(("aggregate", quote, numeral(m.group(1)),
+                      text.count("\n", 0, m.start())))
     return found
 
 
@@ -611,13 +701,36 @@ def derivations(prompt):
 
 
 def aggregate_derivations(prompt):
-    """Lines where the brief itself counts or adds up the values.
+    """Lines where the brief itself reads the `FINDINGS_COUNT` values back.
 
     Same code-span rule as `derivations`: a brief's prose is not a derivation,
-    however arithmetic its vocabulary is.
+    however arithmetic its vocabulary is. Same anchor as the transcript
+    discharge, too -- a generic counting command pasted near the claim counts
+    something, but nothing says it counted these.
     """
     return [n for n, seg in code_segments(prompt)
-            if DERIVE_AGGREGATE.search(seg) or DERIVE_COUNT.search(seg)]
+            if DERIVE_AGGREGATE.search(seg)]
+
+
+def enumerates(text, values):
+    """True when the brief pastes at least two of the transcript's own values.
+
+    A brief that writes out "the five rounds returned 2, 3, 3, 1 and 0
+    findings" carries its own derivation: the addends are in front of the
+    reader, so telling it to go derive them is noise.
+
+    Digits only. The word forms `COUNT` accepts are ordinary English -- "no",
+    "one", "two" -- so matching them would let unrelated prose discharge the
+    clause wholesale.
+    """
+    pool = list(values)
+    hits = 0
+    for tok in re.findall(r"\b\d[\d,]*\b", text):
+        n = numeral(tok)
+        if n in pool:
+            pool.remove(n)
+            hits += 1
+    return hits >= 2
 
 
 def near(table, base, line):
@@ -628,19 +741,27 @@ def transcript_derivations(path):
     """What this session derived earlier, with output present.
 
     Returns `(any_paths, count_paths, aggregate)`, where `aggregate` is
-    `(values_seen, derived)`: how many `FINDINGS_COUNT` values the transcript
-    has printed, and whether a counting or arithmetic command ran AFTER the
+    `(values, derived)`: the `FINDINGS_COUNT` values this session's reviews
+    printed, in order, and whether a command naming that token ran AFTER the
     first of them. The ordering matters -- a command that ran before the values
-    existed cannot have added them up -- and it is what makes "with no
-    arithmetic command between the values and the claim" decidable.
+    existed cannot have read them back -- and it is what makes "with no
+    deriving command between the values and the claim" decidable.
+
+    The values are taken ONLY from `Agent`/`Task` results, which is where a
+    review returns one. Scanning every tool result armed the clause off other
+    people's PRs: `scripts/check-pr-fully-clean.py` writes `[FINDINGS_COUNT: N]`
+    into review comment BODIES, so one `gh pr view <other-PR> --json comments`
+    carrying two of them was enough to make this session's brief answer for a
+    review history it had no part in.
     """
     any_p, count_p = set(), set()
-    agg_values, agg_derived = 0, False
+    agg_vals, agg_derived = [], False
+    agent_ids = set()
     pending = {}
     try:
         fh = open(path, errors="ignore")
     except Exception:
-        return any_p, count_p, (agg_values, agg_derived)
+        return any_p, count_p, (agg_vals, agg_derived)
 
     with fh:
         for line in fh:
@@ -685,7 +806,9 @@ def transcript_derivations(path):
                     if not isinstance(inp, dict):
                         continue
                     bname = b.get("name") or ""
-                    if bname in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
+                    if bname in AGENT_TOOLS:
+                        agent_ids.add(b.get("id"))
+                    elif bname in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
                         cmd_str = str(inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or "")
                         pending[b.get("id")] = cmd_str
                     elif bname in ("Read", "Grep", "Glob", "view_file", "read_file", "grep_search", "find_by_name"):
@@ -699,12 +822,12 @@ def transcript_derivations(path):
                     if not isinstance(b, dict) or b.get("type") != "tool_result":
                         continue
                     out = str(b.get("content") or "")
-                    # Counted BEFORE the `pending` lookup below: a review's
+                    # Read BEFORE the `pending` lookup below: a review's
                     # `[FINDINGS_COUNT: N]` comes back from an `Agent` call,
                     # which has no pending command, so a result scanned only
                     # after that lookup is one this clause never sees.
-                    if not b.get("is_error"):
-                        agg_values += len(FINDINGS_VALUE.findall(out))
+                    if not b.get("is_error") and b.get("tool_use_id") in agent_ids:
+                        agg_vals += [int(v) for v in FINDINGS_VALUE.findall(out)]
                     cmd = pending.pop(b.get("tool_use_id"), None)
                     if cmd is None or b.get("is_error"):
                         continue
@@ -713,7 +836,7 @@ def transcript_derivations(path):
                     if not out.strip():
                         continue
                     counts = bool(DERIVE_COUNT.search(cmd))
-                    if agg_values and (counts or DERIVE_AGGREGATE.search(cmd)):
+                    if agg_vals and DERIVE_AGGREGATE.search(cmd):
                         agg_derived = True
                     if not counts and not DERIVE_ANY.search(cmd):
                         continue
@@ -723,7 +846,7 @@ def transcript_derivations(path):
                             count_p.add(k)
                         any_p.add(k)
 
-    return any_p, count_p, (agg_values, agg_derived)
+    return any_p, count_p, (agg_vals, agg_derived)
 
 
 NOTE = (
@@ -741,11 +864,13 @@ NOTE = (
 # Appended only when an `aggregate` claim is among them, so an ordinary
 # path-anchored reminder does not carry advice about a token it is not about.
 AGGREGATE_NOTE = (
-    "\n\nOne of these aggregates values this session has already printed: "
-    "the reviews returned `[FINDINGS_COUNT: N]` lines, and nothing has read "
-    "them back since. Add or count those values with a command "
-    "(`grep -c FINDINGS_COUNT`, or sum the printed numbers) rather than from "
-    "memory, and put the result in the brief."
+    "\n\nThis session's reviews printed `[FINDINGS_COUNT: N]` values, and no "
+    "command has read them back since. If a count above aggregates those "
+    "values, derive it rather than recalling it. They are in this session's "
+    "transcript under `~/.claude/projects`:\n"
+    "  grep -o 'FINDINGS_COUNT: [0-9]*' \"$T\" | awk '{s+=$2} END {print s}'\n"
+    "sums the findings, and `grep -c FINDINGS_COUNT \"$T\"` counts the rounds. "
+    "Put the derived figure in the brief."
 )
 
 
@@ -765,9 +890,9 @@ def evaluate(prompt, tpath=""):
 
     in_any, in_count = derivations(prompt)
     if tpath and os.path.isfile(tpath):
-        t_any, t_count, (agg_values, agg_derived) = transcript_derivations(tpath)
+        t_any, t_count, (agg_vals, agg_derived) = transcript_derivations(tpath)
     else:
-        t_any, t_count, (agg_values, agg_derived) = set(), set(), (0, False)
+        t_any, t_count, (agg_vals, agg_derived) = set(), set(), ([], False)
 
     undischarged = []
     for kind, quote, path, line in found:
@@ -780,17 +905,28 @@ def evaluate(prompt, tpath=""):
         undischarged.append((kind, quote))
 
     # Clause C fires only against a transcript that carries the addends. Two
-    # values, not one: a single `FINDINGS_COUNT` is a value to quote, not an
-    # aggregate to compute, and firing on it would make this the pathless
+    # values, not one: with a single `FINDINGS_COUNT` in the session there is
+    # nothing to aggregate, and firing on it would make this the pathless
     # count matcher the clause-C comment argues against.
-    if agg_found and agg_values >= 2 and not agg_derived:
+    if agg_found and len(agg_vals) >= 2 and not agg_derived and not (
+            enumerates(visible_prose(prompt), agg_vals)):
         in_agg = aggregate_derivations(prompt)
         # A count clause A already anchored to a file is that clause's claim,
         # discharged by that clause's rule. Re-reporting it here would list it
         # twice, and worse, would re-fire one a counting command had cleared.
         anchored = [q.lower() for _, q, _, _ in found]
-        for kind, quote, line in agg_found:
+        seen_vals = set(agg_vals)
+        for kind, quote, value, line in agg_found:
             if any(quote.lower() in q for q in anchored):
+                continue
+            # The gate above counts values in the TRANSCRIPT; this one asks
+            # whether the CLAIM aggregates them. A numeral equal to one of the
+            # printed values is a figure read straight off a review -- "the
+            # three findings from the last round", "round 5 came back clean
+            # with 0 findings" -- not a total anybody had to compute. Without
+            # this, every brief written from round two onward fired, which is
+            # the misfire `README.md` warns gets the whole guard switched off.
+            if value is not None and value in seen_vals:
                 continue
             if any(abs(n - line) <= NEAR_LINES for n in in_agg):
                 continue

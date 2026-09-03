@@ -123,16 +123,34 @@ def review(n, tid):
 
 ROUNDS = (review(2, "a1") + review(3, "a2") + review(3, "a3")
           + review(1, "a4") + review(0, "a5"))
-# Two discharges, kept separate on purpose. `grep -c` is already a
-# DERIVE_COUNT command, so a transcript summed that way cannot isolate clause
-# C's own discharge; the arithmetic one can, and the mutant below uses it.
+# Both discharges NAME the token, which is the whole of the rule: a command
+# that counts something else counted something else. The command the appended
+# note actually prescribes is the summing one.
 ROUNDS_SUMMED = ROUNDS + [
-    tool("Bash", {"command": "awk '{s+=$2} END {print s}' /tmp/rounds.txt"}, "b9"),
+    tool("Bash", {"command": "grep -o 'FINDINGS_COUNT: [0-9]*' t.jsonl "
+                             "| awk '{s+=$2} END {print s}'"}, "b9"),
     result("9", "b9"),
 ]
 ROUNDS_COUNTED = ROUNDS + [
     tool("Bash", {"command": "grep -c FINDINGS_COUNT /tmp/rounds.txt"}, "b9"),
     result("5", "b9"),
+]
+# An unrelated counting command, run after the values, that counted something
+# else entirely. It must NOT discharge: `wc -l` on a `find` is quoted verbatim
+# in the hook's own PRECISION docstring, so it is what a real ARDI session runs
+# constantly, and accepting it left the clause silent in exactly the population
+# it was built for.
+ROUNDS_UNRELATED = ROUNDS + [
+    tool("Bash", {"command": "find . -name '*.jsonl' | wc -l"}, "b9"),
+    result("77", "b9"),
+]
+# `[FINDINGS_COUNT: N]` also appears in PR review comment BODIES, which
+# `scripts/check-pr-fully-clean.py` writes, so reading another PR's comments
+# must not arm a clause about THIS session's review history.
+FOREIGN_PR = [
+    tool("Bash", {"command": "gh pr view 4242 -R o/r --json comments"}, "g1"),
+    result("**Claude finished**\n[FINDINGS_COUNT: 4]\n---\n[FINDINGS_COUNT: 3]",
+           "g1"),
 ]
 # One value is a number to quote, not an aggregate to compute.
 ONE_ROUND = review(2, "a1")
@@ -205,6 +223,19 @@ REMIND = [
      "#3117 verbatim: an aggregate over FINDINGS_COUNT values nothing summed"),
     ("The PR took 5 rounds and closed 10 findings.", ROUNDS,
      "#3117: the same aggregate written in numerals"),
+    # The discharge must name the token. Without this the whole clause went
+    # silent after one unrelated counting command, which is the population it
+    # was built for -- and the suite could not see it, because both discharge
+    # cases named the review log and so passed under either rule.
+    (AGGREGATE_BRIEF, ROUNDS_UNRELATED,
+     "C: an unrelated counting command counted something else"),
+    # Clause A's own coverage, which widening IMPERATIVE with `sum`/`tally`
+    # silently removed: those words head a noun phrase far more often than
+    # they open a command, so clause C now carries its own verb list.
+    ("Sum of the three sections in `shared/workflow/ardi.md` is wrong.", None,
+     "clause A: `Sum of` is a noun phrase, not an imperative"),
+    ("Tally `CLAUDE.md` has five quota mentions.", None,
+     "clause A: a leading `Tally` must not suppress a path-anchored count"),
 ]
 
 SILENT = [
@@ -293,6 +324,25 @@ SILENT = [
      [tool("Bash", {"command": "grep -c Address shared/workflow/ardi.md"}, "b8"),
       result("3", "b8")] + ROUNDS,
      "C: a count clause A anchored stays clause A's, and its discharge holds"),
+
+    # The gate is on the CLAIM, not on how many values the transcript holds.
+    # These are the commonest sentences an ARDI orchestrator writes, and every
+    # one of them fired once two rounds had run: the numeral was read straight
+    # off a review rather than computed from several.
+    ("Address the three findings from the last round.", ROUNDS,
+     "C: a per-round figure quoted off a review is not an aggregate"),
+    ("Round 5 came back clean with 0 findings.", ROUNDS,
+     "C: a zero count that is one of the printed values"),
+    ("The five rounds returned 2, 3, 3, 1 and 0 findings.", ROUNDS,
+     "C: a brief that writes the addends out carries its own derivation"),
+
+    # The noun alone does not scope a claim to this session's review history.
+    ("I want two reviews of this before we merge.", ROUNDS,
+     "C: an intention, not a count of anything that happened"),
+    ("There are eleven reviews pending on the stack.", ROUNDS,
+     "C: work not yet done, which no FINDINGS_COUNT value is about"),
+    ("Address the eleven findings on that other PR.", FOREIGN_PR,
+     "C: values read out of another PR's comments are not this session's"),
 ]
 
 # ------------------------------------------------------------------- runner
@@ -572,7 +622,7 @@ MUTANTS = [
     # the R1 compound-sentence case is asserted above under `REMIND`.
     ("an aside between an imperative and its object still suppresses",
      "imperative_governs",
-     staticmethod(lambda text, pos, upto: bool(
+     staticmethod(lambda text, pos, upto, pattern=None: bool(
          hook.IMPERATIVE.match(text[hook.segment_start(text, pos):upto]))),
      lambda: fires("Verify, before merging, that `CLAUDE.md` carries the rule."),
      False, True),
@@ -596,9 +646,51 @@ MUTANTS = [
      lambda: fires(AGGREGATE_BRIEF, ROUNDS),
      True, False),
 
-    ("clause C discharge: arithmetic after the values clears it",
+    ("clause C discharge: a command naming the token clears it",
      "DERIVE_AGGREGATE", re.compile(r"zzz-never-matches"),
      lambda: fires("The PR closed ten findings.", ROUNDS_SUMMED),
+     False, True),
+
+    # The discharge half, isolated in the other direction. Widening it back to
+    # any counting command is what the suite could not see, because both
+    # discharge cases above name the review log and so pass under either rule.
+    ("clause C discharge: it must NAME the token, not merely count",
+     "DERIVE_AGGREGATE", re.compile(r"FINDINGS_COUNT|wc|grep -c"),
+     lambda: fires(AGGREGATE_BRIEF, ROUNDS_UNRELATED),
+     True, False),
+
+    # The claim-side gate, isolated. Accepting any count while two values
+    # exist is what made every quoted per-round figure fire.
+    ("clause C: the claim's numeral must not be one of the printed values",
+     "numeral", staticmethod(lambda tok: None),
+     lambda: fires("Address the three findings from the last round.", ROUNDS),
+     False, True),
+
+    ("clause C: a brief listing the addends carries its own derivation",
+     "enumerates", staticmethod(lambda text, values: False),
+     lambda: fires("The five rounds returned 2, 3, 3, 1 and 0 findings.",
+                   ROUNDS),
+     False, True),
+
+    ("clause C: an intention is not a count of what happened",
+     "AGG_INTENT", re.compile(r"zzz-never-matches"),
+     lambda: fires("I want eleven reviews of this before we merge.", ROUNDS),
+     False, True),
+
+    ("clause C: only this session's own agent results arm it",
+     "AGENT_TOOLS", {"Agent", "Task", "Bash"},
+     lambda: fires("Address the eleven findings on that other PR.", FOREIGN_PR),
+     False, True),
+
+    ("clause C: a not-yet count is not a review-history count",
+     "AGG_NOT_YET", re.compile(r"zzz-never-matches"),
+     lambda: fires("There are eleven reviews pending on the stack.", ROUNDS),
+     False, True),
+
+    ("clause C imperative: its own verb list, not the general one",
+     "AGG_IMPERATIVE", re.compile(r"zzz-never-matches"),
+     lambda: fires("Count the eleven findings yourself before writing.",
+                   ROUNDS),
      False, True),
 
     ("tool_result must carry output",

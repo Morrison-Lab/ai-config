@@ -123,7 +123,11 @@ def check_repo_nlb(
     git_root: str, base_ref: str, checker_path: str, timeout: int = 10
 ) -> list[dict[str, str | int]]:
     """Run the checker against base_ref and return parsed violations."""
-    env = {**os.environ, "NLB_BASE_REF": base_ref, "NLB_FAIL": "false"}
+    # NLB_SCOPE=committed pins the checker to what CI will see (gha#826 made
+    # the default "auto", which widens to the working tree when it is dirty);
+    # this hook exists to predict the CI check on the pushed commits, not to
+    # audit uncommitted edits.
+    env = {**os.environ, "NLB_BASE_REF": base_ref, "NLB_FAIL": "false", "NLB_SCOPE": "committed"}
     try:
         proc = subprocess.run(
             [sys.executable, checker_path],

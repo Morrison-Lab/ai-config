@@ -64,6 +64,11 @@ DELETE_REPLY = (
 )
 
 WARN_CASES = [
+    ("Wipe them with `rm -rf ~/.claude*`.", (),
+     "a glob suffix is a common spelling of exactly what this catches; a "
+     "bare path-or-space boundary exempted it"),
+    ("Reset with `rm -rf ${HOME}/.config`.", (),
+     "the braced ${HOME} form, which existed for .claude only"),
     ("Reset it with `git clean -fdx ~/.claude`.", (),
      "git clean as a STANDALONE verb over a config root: narrowing the rm "
      "branch to option-tokens-only silently dropped this form"),
@@ -82,6 +87,14 @@ WARN_CASES = [
 ]
 
 SILENT_CASES = [
+    ("Delete the scratch notes: `rm -rf ~/.config-notes`.", (),
+     "a root must end at a boundary -- `~/.config` must not match inside "
+     "`~/.config-notes`, or an unrelated file would discharge the guard"),
+    ("Preview it first with `git clean -n ~/.claude`.", (),
+     "a dry run is non-destructive and IS the look-before-you-delete step "
+     "this guard promotes: warning here fires while the author complies"),
+    ("Check with `git clean --dry-run ~/.claude` before deciding.", (),
+     "the long spelling of the same dry run"),
     ("Run `rm -rf /tmp/build` before you look at ~/.config/app.yml.", (),
      "an unrelated rm and a later config mention in one sentence: only OPTION "
      "tokens may sit between the verb and its operand"),

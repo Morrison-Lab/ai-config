@@ -24,7 +24,8 @@ UNDER: `unlink`, `trash`, `mv <root> /tmp`, `ls <root> | xargs rm`, a path held
 in a variable, an already-expanded absolute path, and a `find` split across a
 line continuation all miss. Several are as likely as the matched form; each
 would need a construct-specific clause, and a warn-only reminder is not worth
-that surface.
+that surface. A `git clean` dry run is excluded deliberately rather than
+missed --- see its branch.
 OVER: the guard cannot tell a recommendation from a mention, so a reply that
 QUOTES a destructive command in order to warn against it still fires --- this
 file's own message text included. The sentinel bounds that to one warning per
@@ -41,15 +42,23 @@ import tempfile
 # Configuration roots whose files are typically referenced by a manifest rather
 # than discovered by scanning. Deleting one here unregisters behaviour.
 CONFIG_ROOTS = (
-    r"~/[.]claude", r"[$]HOME/[.]claude", r"[$]{HOME}/[.]claude",
-    r"~/[.]config", r"[$]HOME/[.]config",
-    r"~/[.]codex", r"[$]HOME/[.]codex",
-    r"~/[.]gemini", r"[$]HOME/[.]gemini",
-    r"~/[.]cursor", r"[$]HOME/[.]cursor",
+    "claude", "config", "codex", "gemini", "cursor",
+)
+# Each root in its three spellings. Writing them out by hand had `${HOME}` for
+# `.claude` only, so `rm -rf ${HOME}/.config` missed -- an asymmetry that reads
+# as an oversight rather than one of the deliberate limits below.
+_PREFIXES = (r"~", r"[$]HOME", r"[$]{HOME}")
+_ROOT_ALTS = tuple(
+    "{0}/[.]{1}".format(prefix, name)
+    for name in CONFIG_ROOTS for prefix in _PREFIXES
 )
 # The trailing lookahead stops `~/.config` matching inside `~/.config-notes`,
-# which would otherwise let an unrelated file discharge the guard.
-_ROOTS = "(?:" + "|".join(CONFIG_ROOTS) + r")(?=[/\"'`.,;)\]]|\s|$)"
+# which would otherwise let an unrelated file discharge the guard. The class
+# includes `*`, `>` and `&` because `rm -rf ~/.claude*` is a common spelling of
+# exactly what this guard exists to catch; a bare path-or-space boundary
+# exempted it. `~/.config-notes` and `~/.claudex` still miss, which is the
+# point.
+_ROOTS = "(?:" + "|".join(_ROOT_ALTS) + r")(?=[/\"'`.,;)\]*&>|]|\s|$)"
 
 # A destructive verb applied to a path under one of those roots. `find` puts
 # the verb AFTER the path and `rm` before it, so both orders are matched.
@@ -66,7 +75,11 @@ _DESTRUCTIVE_PARTS = [
     # branch to option-tokens-only dropped it, which silently lost
     # `git clean -fdx ~/.claude` -- a real destructive recommendation the
     # first draft caught.
-    r"\bgit[ ]+clean\b(?:[ ]+-[-A-Za-z0-9]+)*[ ]+[\"']?" + _ROOTS,
+    # `-n`/`--dry-run` is excluded: a dry run is non-destructive and is the
+    # very look-before-you-delete step this guard promotes, so warning there
+    # fires at the moment the author is complying.
+    r"\bgit[ ]+clean\b(?![^\n]{0,40}?(?:[ ]-[A-Za-z]*n|--dry-run))"
+    r"(?:[ ]+-[-A-Za-z0-9]+)*[ ]+[\"']?" + _ROOTS,
 ]
 RX_DESTRUCTIVE = re.compile("(?:" + "|".join(_DESTRUCTIVE_PARTS) + ")")
 

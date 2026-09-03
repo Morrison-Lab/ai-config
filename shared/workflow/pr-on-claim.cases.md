@@ -5,7 +5,7 @@ Worked-example case records for the rules in
 auto-loaded `CLAUDE.md` context.
 Each heading names the rule the record supports.
 
-## Run the reviewer POST as the sole (or last) command
+## Run the reviewer POST as the sole command
 
 (Morrison-Lab/rpt#181, 2026-08-03: the POST was chained ahead of `gh pr view`/`gh pr checks` in one call across six turns, so the hook re-fired every Stop;
 running the POST bare discharged it.

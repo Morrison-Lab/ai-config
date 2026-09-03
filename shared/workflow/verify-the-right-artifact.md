@@ -919,9 +919,10 @@ The docstring was still uncorrected on that branch as this was written.)
 
 **A twelfth: a pull request's check-run names, standing in for the branch's own workflow definitions.**
 
-The seventh shape above is already a substitution across time, so what is new here is the direction and the awareness.
-That one reads a **future** state for the present one, knowingly, because the future state is the one being worked toward.
-This one reads a **past** state for the present one, unknowingly, because the artifact carries no signal that it is a past state at all.
+The seventh and eleventh shapes above are both substitutions across time, so what is new here is the **unawareness**.
+The seventh reads a future state for the present one knowingly, because the future state is the one being worked toward.
+The eleventh reads a stale past one, and arrives with a citation attached, so what carries it is misplaced trust in the artifact.
+This one reads a past state unknowingly, because the artifact carries no signal that it is a past state at all --- there is no citation to distrust and no staleness to notice.
 A pull request's check runs are current, complete, and correct.
 What they describe is the workflow definitions **in force when each run executed** --- resolved from the pushed commit for a `push` run, and from the head-into-base merge for a `pull_request` one.
 Neither of those is the default branch as of now, and the name carries no trace of which moment or which resolution produced it.

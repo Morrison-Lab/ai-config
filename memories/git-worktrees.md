@@ -978,8 +978,8 @@ from a diff.)
 The rule above says `ListAgents` silence means "not tracked here" rather than "does not exist".
 That is right, and it leaves you with no way to say who *is* there.
 Git history does.
-A remote session's commits carried a `Claude-Session:` trailer holding that session's own URL in every case observed here, so where the trailer is present, comparing it against your own settles authorship instead of suggesting it.
-The trailer can be suppressed, which is why its ABSENCE settles nothing --- the third signature below is exactly that case.
+A remote session's commits carried a `Claude-Session:` trailer holding that session's own URL in the one case observed here, so where the trailer is present, comparing it against your own settles authorship instead of suggesting it.
+The trailer may be absent, which is why its ABSENCE settles nothing --- the third signature below is exactly that case.
 
 ```bash
 git log -1 --format='author=%an <%ae>%n%b' origin/<branch> \

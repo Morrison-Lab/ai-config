@@ -445,7 +445,7 @@ from the tested one, and a command in provenance position is a stronger claim
 than the bullets above cover.**
 Those bullets name a manual restatement: you ran one command and typed a
 tidier one.
-Two measured instances in one session show a mechanism neither bullet names,
+Two measured instances in one session show a mechanism none of them names,
 and a failure shape worse than an ordinary broken example.
 
 The mechanism is a reflow or lint pass that runs *after* verification, as a

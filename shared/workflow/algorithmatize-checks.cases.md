@@ -194,8 +194,8 @@ one physical line as part of the same commit, turning `\` + newline into
 `\` + space, so the shipped text would have passed the shell an argument
 named `" --jq"` rather than the option.
 Caught by Copilot's second review round on `afc8eb4d6` and fixed by
-`c8ca3dd65`, which moved the command into a fenced code block, a region the
-reflow leaves alone.
+`c8ca3dd65` (merged as `54f39a17e`), which moved the command into a fenced
+code block, a region the reflow leaves alone.
 
 Instance 2, [#3044](https://github.com/Morrison-Lab/ai-config/pull/3044),
 `shared/writing/semantic-line-breaks.md`.
@@ -207,8 +207,15 @@ api` accepts exactly one endpoint --- `cobra.ExactArgs(1)`, confirmed by
 running it, which reports `accepts 1 arg(s), received 3` --- so the command
 as written could not have produced the cited findings, and had never been
 run at all.
-Caught by the `@claude` review bot and fixed by `e0ba7b63c`, which replaced
-it with a loop over the three endpoints.
+Caught by Copilot, whose review body names it directly --- "a `gh api`
+command that is not runnable as written (brace expansion into multiple
+endpoints ...)" --- and fixed by `e0ba7b63c` (merged as `9aeeb5fc7`), which
+replaced it with a loop over the three endpoints.
+The `@claude` bot's own round on that PR was about a different defect
+entirely, and its later round verified the already-pushed fix rather than
+finding it;
+attributing the catch to whoever pushed the fix is the error this very entry
+warns against, committed inside it and caught in review.
 
 Both commands sat in provenance position, "here is how this finding was
 obtained," which is where a non-runnable command is most misleading: it

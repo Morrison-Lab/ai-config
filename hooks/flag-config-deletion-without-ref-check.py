@@ -29,7 +29,26 @@ missed --- see its branch.
 OVER: the guard cannot tell a recommendation from a mention, so a reply that
 QUOTES a destructive command in order to warn against it still fires --- this
 file's own message text included. The sentinel bounds that to one warning per
-message.
+message. A quoted search pattern that spells a full manifest path discharges
+even though it opens nothing, for the same lack of argument-position parsing.
+That one is the residue of a lexical approach: a regex has no notion of
+argument position, so each narrowing trades one boundary case for another.
+Parsing the command with `shlex` and asking whether a read verb's argv holds
+a manifest under a targeted root would make the whole class structurally
+impossible; it is filed as ai-config#3126 rather than done here.
+
+DISCHARGE: a real manifest read can fail to clear the guard, which warns while
+the author is complying. A verb outside the read list (`tail`, `wc`), an
+already-expanded absolute path (`/Users/me/.claude/settings.json`), a `cd` into
+a SUBdirectory then `../settings.json`, a verb-to-path gap over 120 characters,
+a separator character (`|`, `;`, `&`) inside a QUOTED argument before the path,
+since the gap excludes them lexically and `jq -r '.hooks|keys[]'` is the
+idiomatic way to inspect a manifest, and --- most likely in this harness --- a
+manifest opened with the Read tool rather than Bash, since only Bash commands
+are scanned.
+A command reading two manifests at once credits only the first, so a two-root
+deletion needs two reads. Each is a warning to
+answer in one sentence, not a block.
 Fires once per distinct message (sentinel keyed by content hash).
 """
 import hashlib
@@ -59,6 +78,8 @@ _ROOT_ALTS = tuple(
 # path-or-space boundary
 # exempted it. `~/.config-notes` and `~/.claudex` still miss, which is the
 # point.
+RX_ROOT_NAME = re.compile(r"(?:~|[$]HOME|[$]{HOME})/[.](" +
+                          "|".join(CONFIG_ROOTS) + r")(?=[/\"'`.,;)\]*&>|]|\s|$)")
 _ROOTS = "(?:" + "|".join(_ROOT_ALTS) + r")(?=[/\"'`.,;)\]*&>|]|\s|$)"
 
 # A destructive verb applied to a path under one of those roots. `find` puts
@@ -91,12 +112,58 @@ RX_DESTRUCTIVE = re.compile("(?:" + "|".join(_DESTRUCTIVE_PARTS) + ")")
 # earlier draft matched any mention of `settings.json`, so
 # `grep -rn 'settings.json' README.md` -- which opens no config file at all --
 # discharged the guard for the rest of the session.
-RX_REF_CHECK = re.compile(
-    r"(?:grep|rg|jq|cat|sed|awk|python3?|head|less)[^\n]{0,200}?" + _ROOTS +
-    r"[^\n]{0,120}?(?:settings[.]json|config[.]toml|config[.]json|[.]mcp[.]json)"
-    r"|(?:grep|rg|jq|cat|sed|awk|python3?)[^\n]{0,200}?"
-    r"(?:settings[.]json|config[.]toml|config[.]json|[.]mcp[.]json)[^\n]{0,120}?" + _ROOTS,
-)
+# Front-anchored like `_MANIFEST`: unanchored, `locate` and `duplicate`
+# contain `cat` and `sbatch` contains `bat`, so each discharged the guard
+# while opening nothing.
+_READ = (r"(?<![-\w.])(?:grep|rg|jq|cat|sed|awk|python3?|head|less|bat"
+         r"|xxd)\b")
+
+# Front-anchored, so `tsconfig.json`, `webpack.config.json` and
+# `jest.config.json` are not manifests.
+_MANIFEST = (r"(?<![-\w.])(?:settings[.]json|config[.]toml|config[.]json"
+             r"|[.]?mcp[.]json)")
+
+# The discharge aims at "a read whose OPERAND is a manifest under the root",
+# rather than "a read, a root and a manifest name loose in the same command".
+# It gets there lexically, which is an approximation: a QUOTED search pattern
+# spelling a full path --- `grep -rn '~/.claude/settings.json' README.md` ---
+# still discharges, because telling a quoted pattern from a quoted operand
+# needs argument-position parsing this guard does not do. Named in the limits
+# above rather than chased with a wider pattern, which is what produced the
+# gaps this design replaced.
+#
+# Earlier drafts allowed an arbitrary 200/120-character gap between the three,
+# which let commands that open no manifest discharge the guard:
+# `grep -rn 'settings.json' ~/.claude/hooks/` searches .py files FOR the
+# string, `find ~/.claude ... -delete && cat config.json` is the deletion
+# itself, and `grep -rn '~/.claude' ~/.codex/config.toml` reads a different
+# root's manifest. Each paired a root with a manifest NAME rather than with a
+# manifest READ.
+#
+# Two shapes, and nothing looser (modulo the quoted-pattern limit above):
+#   1. the manifest path carries the root -- `<read> ... ~/.claude/settings.json`
+#      with only path characters between them, so the root and the manifest are
+#      one operand rather than two words in a line;
+#   2. `cd <root> && <read> <manifest>`, where the shell supplies the prefix.
+_PATHCHARS = r"[\w./~${}-]*"
+# The root is CAPTURED, not merely matched. Reading it back off the whole match
+# credited the wrong root whenever another root appeared earlier in the command
+# --- `grep -rn '~/.claude' ~/.codex/config.toml` reads codex's manifest while
+# mentioning claude as the search pattern.
+_ROOTS_CAP_A = _ROOTS.replace("(?:", "(?P<root_a>", 1)
+_ROOTS_CAP_B = _ROOTS.replace("(?:", "(?P<root_b>", 1)
+_REF_ORDERS = [
+    # No `&&`, `;` or `|` in the gap: the verb and the operand must be one
+    # command. Spanning a separator let `grep -rn foo README.md && rm -f
+    # ~/.claude/settings.json` discharge --- a command that DELETES the
+    # manifest, the mirror of the `find ... -delete && cat config.json` case
+    # the suite already pins.
+    _READ + r"[^\n&;|]{0,120}?" + _ROOTS_CAP_A + r"/" + _PATHCHARS + _MANIFEST,
+    r"\bcd\b[ ]+[\"']?" + _ROOTS_CAP_B + r"/?[\"']?[ ]*(?:&&|;)[ ]*" + _READ
+    + r"[^\n]{0,80}?" + _MANIFEST,
+]
+RX_REF_CHECK = re.compile("(?:" + "|".join(_REF_ORDERS) + ")")
+
 
 def transcript_records(path):
     try:
@@ -113,8 +180,58 @@ def transcript_records(path):
         return
 
 
-def ref_check_ran(path):
-    """True when some earlier Bash command read a config manifest."""
+def roots_in(text):
+    """The config-root names a string mentions, as a set."""
+    return {m.group(1) for m in RX_ROOT_NAME.finditer(text or "")}
+
+
+def read_roots(command):
+    """The roots whose manifest a command actually READS.
+
+    Scoped to each `RX_REF_CHECK` match rather than the whole command, for the
+    same reason `targeted_roots` is scoped to the deletions: in
+    `grep -rn '~/.claude' ~/.codex/config.toml` the `~/.claude` is the search
+    PATTERN and `~/.codex` is the file opened, so a whole-command scan credits
+    the read to the wrong root and discharges a `~/.claude` deletion.
+    """
+    found = set()
+    for match in RX_REF_CHECK.finditer(command or ""):
+        for group in ("root_a", "root_b"):
+            hit = match.group(group)
+            if hit:
+                found |= roots_in(hit)
+    return found
+
+
+def targeted_roots(text):
+    """The roots the DESTRUCTIVE commands name, not every root mentioned.
+
+    Scoping this to the whole reply was wrong: a message that proposes deleting
+    under `~/.claude` and merely mentions `~/.codex` in passing --- which this
+    hook's own message text does --- widened the set to both, so a read under
+    `~/.codex` discharged it. Only the matched deletions count.
+    """
+    found = set()
+    for match in RX_DESTRUCTIVE.finditer(text or ""):
+        found |= roots_in(match.group(0))
+    return found
+
+
+def ref_check_ran(path, wanted=None):
+    """True when an earlier Bash command read a manifest under a wanted root.
+
+    `wanted` is the set of roots the matched DELETIONS target. A read under a
+    different root does not discharge: `jq . ~/.codex/config.toml` says nothing
+    about what references `~/.claude/hooks`, and accepting it would clear the
+    guard on evidence about an unrelated tree.
+
+    EVERY targeted root needs evidence, not just one --- a reply proposing
+    deletions under two roots is only half examined when one manifest was read,
+    and the unread half is exactly the case this guard exists for. Coverage
+    accumulates across commands, so two separate reads discharge a two-root
+    reply.
+    """
+    covered = set()
     for record in transcript_records(path):
         if record.get("type") != "assistant":
             continue
@@ -124,7 +241,12 @@ def ref_check_ran(path):
             if block.get("name") not in {"Bash", "bash", "run_command"}:
                 continue
             command = str((block.get("input") or {}).get("command") or "")
-            if RX_REF_CHECK.search(command):
+            if not RX_REF_CHECK.search(command):
+                continue
+            if not wanted:
+                return True
+            covered |= read_roots(command) & wanted
+            if wanted <= covered:
                 return True
     return False
 
@@ -181,7 +303,7 @@ def main():
     text = last_assistant_text(path)
     if not text or not RX_DESTRUCTIVE.search(text):
         return
-    if ref_check_ran(path):
+    if ref_check_ran(path, targeted_roots(text)):
         return
     key = hashlib.sha256(text.encode()).hexdigest()[:16]
     sentinel = os.path.join(

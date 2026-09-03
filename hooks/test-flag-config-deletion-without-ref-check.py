@@ -4,8 +4,10 @@
 Run:  python3 hooks/test-flag-config-deletion-without-ref-check.py \\
           hooks/flag-config-deletion-without-ref-check.py
 """
+import atexit
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -13,6 +15,19 @@ import tempfile
 if len(sys.argv) < 2:
     sys.exit("Usage: python3 %s <path-to-hook>" % sys.argv[0])
 HOOK = os.path.abspath(sys.argv[1])
+
+# Every mkdtemp here is recorded and removed at exit, via atexit rather than a
+# line at the end of the module: `run()` calls `sys.exit` on a FATAL hook exit
+# and asserts on a bad payload shape, and both bypass module-level cleanup.
+_TEMP_DIRS = []
+
+
+def _cleanup_temp_dirs():
+    for _d in _TEMP_DIRS:
+        shutil.rmtree(_d, ignore_errors=True)
+
+
+atexit.register(_cleanup_temp_dirs)
 
 
 def run(reply, prior_commands=()):
@@ -39,6 +54,7 @@ def run(reply, prior_commands=()):
         # second would read as silent because the first wrote the sentinel.
         env = dict(os.environ)
         sentinel_dir = tempfile.mkdtemp()
+        _TEMP_DIRS.append(sentinel_dir)
         env["TMPDIR"] = sentinel_dir
         proc = subprocess.run(
             [sys.executable, HOOK],
@@ -64,6 +80,34 @@ DELETE_REPLY = (
 )
 
 WARN_CASES = [
+    (DELETE_REPLY, ("locate ~/.claude/settings.json",),
+     "`locate` contains `cat`: the read verb is front-anchored like the "
+     "manifest name, or a command that opens nothing discharges"),
+    (DELETE_REPLY, ("grep -rn 'foo' README.md && rm -f ~/.claude/settings.json",),
+     "the verb and the operand must be ONE command -- this DELETES the "
+     "manifest, the mirror of the find-then-cat case above"),
+    (DELETE_REPLY, ("grep -rn 'settings.json' ~/.claude/hooks/",),
+     "a grep FOR the string over .py files opens no manifest: the read's "
+     "OPERAND must be the manifest, not a root elsewhere on the line"),
+    (DELETE_REPLY, ("cat ~/.claude/hooks/no-empty-promise.py && cat ./app/config.json",),
+     "reading a hook file plus an unrelated config is not a manifest read"),
+    (DELETE_REPLY, ("grep -rn '~/.claude' ~/.codex/config.toml",),
+     "this DOES read a manifest, but codex's -- the claude here is the search "
+     "PATTERN, so it must not discharge a ~/.claude deletion"),
+    (DELETE_REPLY, ("cd ~/.claude && cat webpack.config.json",),
+     "the manifest name is front-anchored: `webpack.config.json` is not "
+     "`config.json`, and without the lookbehind it discharges"),
+    (DELETE_REPLY, ("find ~/.claude -name '*.py' -delete && cat config.json",),
+     "a root mention that is NOT a read must not pair with a later unrelated "
+     "read -- this is the DELETION discharging the warning about itself"),
+    (DELETE_REPLY, ("ls -la ~/.claude/hooks && cat ./app/config.json",),
+     "listing plus one unrelated read is still not a reference check"),
+    (DELETE_REPLY, ("du -sh ~/.claude; jq . tsconfig.json",),
+     "`tsconfig.json` is not a manifest: the name must not match as a "
+     "substring of an unrelated config file"),
+    (DELETE_REPLY, ("jq . ~/.codex/config.toml",),
+     "a read under a DIFFERENT root says nothing about what references "
+     "`~/.claude/hooks`, so it must not discharge"),
     ("Nuke it: `git clean -fdx ~/.claude`; preview with -n if unsure.", (),
      "a destructive git clean whose PROSE mentions -n: the dry-run exemption "
      "must scan the option run, not 40 characters of arbitrary trailing text"),
@@ -90,6 +134,16 @@ WARN_CASES = [
 ]
 
 SILENT_CASES = [
+    ("Remove them with `rm -rf ~/.cursor/rules`.", ("cat ~/.cursor/mcp.json",),
+     "cursor's real manifest is `mcp.json` with no leading dot: per-root "
+     "coverage made this permanently un-dischargeable, warning an author who "
+     "had read exactly the right file"),
+    (DELETE_REPLY, ("cd ~/.claude/ && cat settings.json",),
+     "a trailing slash is what tab-completion produces, so the cd form must "
+     "accept it"),
+    (DELETE_REPLY, ("cd ~/.claude && cat settings.json",),
+     "root BEFORE the read verb: the natural spelling, which the docstring "
+     "claimed was accepted and the regex rejected"),
     ("Preview with `git clean -nd ~/.claude` first.", (),
      "the n may sit anywhere in the flag cluster, not only at its end"),
     ("Try `cd ~/.claude && git clean -n` to see what would go.", (),
@@ -138,6 +192,7 @@ for reply, prior, desc in SILENT_CASES:
 # guard cannot loop. Every case above gets a fresh TMPDIR, which deliberately
 # hides this; here one TMPDIR is shared across two identical replies.
 _shared = tempfile.mkdtemp()
+_TEMP_DIRS.append(_shared)
 _fd, _tpath = tempfile.mkstemp(suffix=".jsonl")
 os.close(_fd)
 with open(_tpath, "w", encoding="utf-8") as _stream:
@@ -181,11 +236,17 @@ exec(compile(_src, HOOK, "exec"), _ns)
 # literal and never enters a quantifier -- it would pass against an
 # arbitrarily explosive pattern. Probe each branch through its own verb.
 _worst = 0.0
-for _prefix in ("find ~/.claude ", "rm -rf ~/.claude ", "cd ~/.claude ",
-                "git clean -fdx ~/.claude "):
+for _rx, _prefix in (("RX_DESTRUCTIVE", "find ~/.claude "),
+                     ("RX_DESTRUCTIVE", "rm -rf ~/.claude "),
+                     ("RX_DESTRUCTIVE", "cd ~/.claude "),
+                     ("RX_DESTRUCTIVE", "git clean -fdx ~/.claude "),
+                     # RX_REF_CHECK carries two ordered alternatives of lazy pairs and
+                     # is the regex this round changed, so it is timed too.
+                     ("RX_REF_CHECK", "cat ~/.claude "),
+                     ("RX_REF_CHECK", "cd ~/.claude && cat ")):
     _probe = _prefix + "a" * 40000
     _t0 = _time.time()
-    _ns["RX_DESTRUCTIVE"].search(_probe)
+    _ns[_rx].search(_probe)
     _worst = max(_worst, _time.time() - _t0)
 total += 1
 _ok = _worst < 0.5

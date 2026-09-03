@@ -280,6 +280,15 @@ jobs:
         run: python3 scripts/check-hook-output-shape.py
       - name: Run hook-output-shape check tests
         run: python3 scripts/test_check_hook_output_shape.py
+      - name: Report hook tests whose PATH shim ignores argv (advisory)
+        # Advisory, unlike the output-shape gate above. The condition is
+        # decidable -- a suite that installs an executable stub and never reads
+        # sys.argv in it cannot constrain what the hook asked (ai-config#2458)
+        # -- but a stub that legitimately needs no argv exists, so a finding is
+        # a prompt to read the suite rather than a proven defect.
+        run: python3 scripts/check-hook-test-argv.py
+      - name: Run hook-test-argv check tests
+        run: python3 scripts/test_check_hook_test_argv.py
       - name: Run pre-push-review tool tests
         # pre-push-review.py executes local adversarial AI code reviews using
         # workstation subscription CLIs. Unit tests mock the CLI/subprocess boundaries

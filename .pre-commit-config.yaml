@@ -134,6 +134,18 @@ repos:
         language: python
         pass_filenames: false
         always_run: true
+      - id: hook-test-argv
+        name: hook test argv (a PATH shim must read its own argv)
+        entry: python scripts/check-hook-test-argv.py
+        language: python
+        pass_filenames: false
+        always_run: true
+      - id: hook-test-argv-tests
+        name: hook-test-argv check tests
+        entry: python scripts/test_check_hook_test_argv.py
+        language: python
+        pass_filenames: false
+        always_run: true
       - id: check-pr-body-figures-tests
         name: check-pr-body-figures check tests
         entry: python scripts/test_check_pr_body_figures.py

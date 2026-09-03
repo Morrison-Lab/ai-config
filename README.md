@@ -487,6 +487,36 @@ warn-only hooks never emit `reason` alone, that warn-only `Stop` hooks emit
 `systemMessage`, and that their test suites inspect the payload shape rather than
 checking non-empty output.
 
+### Stubbing a command: the shim must read its own argv
+
+A hook test that stubs `gh`, `glab`, or `git` on `PATH` can assert the hook's
+decision and still constrain nothing about *what the hook asked*.
+When the stub returns the same fixture whatever it is handed,
+mutating the query changes no assertion and the suite stays green:
+swapping `headRefName` for `baseRefName` names a different branch entirely,
+and dropping `--base` from a list query widens it,
+and neither shows up
+([#2447](https://github.com/Morrison-Lab/ai-config/pull/2447)).
+A comment naming the thing the case fails to check makes it worse rather than better,
+since it satisfies the reader who would otherwise have looked at the assertion.
+
+So a stub records the argv it was called with,
+and the suite asserts on that log alongside the decision ---
+`hooks/test-no-delete-branch-under-stacked-pr.py` is the worked example.
+
+- **Do:** log `sys.argv` from the stub and assert the query the hook issued,
+  not only the decision it reached.
+- **Don't:** return one fixture regardless of arguments and read a green suite
+  as evidence the query is right.
+
+`scripts/check-hook-test-argv.py` reports this per suite.
+It is advisory rather than gating,
+because a stub whose only job is to exist on `PATH` legitimately needs no argv,
+so a finding is a prompt to read the suite rather than a proven defect;
+`--strict` exits non-zero on any finding.
+The report names how many suites installed a stub alongside how many were flagged,
+since zero findings over zero stubs is indistinguishable from a detector that never ran.
+
 Every hook must ship a companion `test-<name>.py` beside it in the same change before pushing;
 `scripts/test_hooks.py` runs
 every such suite (pairing each with its subject) and also checks the reverse

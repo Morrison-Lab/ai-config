@@ -1130,7 +1130,7 @@ boundary, restoring both to 1200.)
 
 Both instruments are described at length above, and what matters here is how little of a line's shape they look at.
 The gate asks two questions: does this line hold more than one sentence, and does an 80-plus-character line carry a mid-line semicolon.
-The second is a within-sentence placement rule, and it is the *only* interior position either instrument examines --- `MD013`, which would notice a column boundary directly, is the rule this repo disables, as noted near the top of this file.
+The second is a within-sentence placement rule, and it is the only interior *break* position either instrument examines --- `MD013`, which would notice a column boundary directly, is the rule this repo disables, as noted near the top of this file.
 
 The blindness turns on the **operation**, not on the input, and getting that backwards is what made two review rounds contradict each other.
 A **line-wise** fill --- wrapping each source line separately --- merges no sentences and adds no semicolon, so it passes cleanly.
@@ -1143,6 +1143,9 @@ Measured on [ai-config#3103](https://github.com/Morrison-Lab/ai-config/pull/3103
 | line-wise fill to 80 | `2d3e18fcf` | 440 | 0 | 0 | 84 | 83 | 36 |
 | clause-boundary reflow | `ba265b546` | 362 | 0 | 0 | 184 | 31 | 0 |
 | paragraph refill of the original | constructed | 336 | 82 | 1 | --- | --- | --- |
+
+The fourth row is built from `02cbf00d8`'s added lines against the same base: contiguous non-blank runs rejoined into paragraphs, then `textwrap.wrap(width=80)` at Python's defaults, then classified the same way.
+Its line count is sensitive to that construction --- `break_on_hyphens=False` gives 342, `fmt -w 80` gives 343 --- while the sentence-flag count stays near 82 throughout, and the flag count is the figure the row is making a claim about.
 
 The first three rows are states the PR actually had, and the gate cannot separate them.
 The fourth is a construction, included because a reviewer produced it while trying to reproduce this measurement and reported its 83 flags as a refutation --- a correct measurement of a tree that never existed.

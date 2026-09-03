@@ -208,9 +208,19 @@ Give it the base ref, the paths, the standards that apply, and the question.
 Where the change's own reasoning matters, it is in the diff --- a comment, a docstring, a fragment --- and the reviewer should be reading it there, where a later reader will.
 Scope is not rationale: which branch, which base, where the tests live, and what is out of scope are facts the reviewer cannot derive and must be told.
 
+**`<base>` is a claim, and it is the one nobody checks.**
+The sentence above names the base as a fact the reviewer must be told, and stops there.
+A base you resolve from a *local* branch name silently widens the diff whenever that branch is behind, so the reviewer spends its attention on already-merged work and returns findings against code this change never touched.
+Resolve it from a remote-tracking ref after fetching that remote, and state the merge-base SHA and the file and insertion counts in the brief so the scope is checkable rather than asserted.
+[`verify-the-right-artifact`](verify-the-right-artifact.md)'s "A comparison's base is an artifact too" carries the direction of the error and the forge cross-check that settles it.
+
 - **Do:** hand over `git diff <base>...HEAD`, the applicable rules, and the question.
+- **Do:** resolve `<base>` from a fetched remote-tracking ref, and state the merge-base SHA and the diff's counts alongside it.
 - **Don't:** hand over the case for the change.
   If it is not persuasive from the diff alone, that is the finding.
+- **Don't:** name a bare local branch as `<base>` --- one behind its remote widens the diff so the reviewer works on already-merged code, and one that is ahead of or diverged from its remote in commits the head branch also carries narrows it so part of the change is never reviewed.
+- **Don't:** read a clean verdict as covering the whole change when the base was local;
+  the narrowing direction produces exactly that.
 
 ### The PR's own review history is rationale you cannot withhold
 
@@ -258,7 +268,9 @@ one sentence per line, plus a clause rule for a long line with a mid-line semico
 and the directional-word grep the [`fix-forward-references`](../../skills/fix-forward-references/SKILL.md) skill runs.
 An ambiguous pronoun has no detector, per [`ambiguous-reference`](../writing/ambiguous-reference.md),
 so that class stays with the reviewer,
-though a grep for sentence-initial pronouns narrows where to look.
+though a grep for a pronoun that opens a clause after a comma or a conjunction,
+the positional heuristic that fragment names,
+narrows where to look.
 Each instrument is cheap and deterministic,
 and each runs in seconds.
 That speed is not a reason to skip the adversarial round.

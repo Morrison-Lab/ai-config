@@ -298,11 +298,20 @@ CASES = {
         "Bash", "gh", False,
     ),
     "S13": (
-        "a path that merely STARTS with `rulesets` is not the endpoint",
-        # `rulesets-backup` and `rulesetsimports` are not gh api endpoints.
-        # Raised by the repo's own review bot on #3137.
+        "a HYPHEN after `rulesets` does not make it the endpoint",
+        # `rulesets-backup` is not a gh api endpoint. Raised by the repo's own
+        # review bot on #3137.
         "Bash",
         "gh api -X PUT repos/o/r/rulesets-backup/1 --input rs.json",
+        False,
+    ),
+    "S14": (
+        "a WORD CHARACTER after `rulesets` does not either",
+        # The other half of `(?![\w-])`. Without it, weakening the lookahead
+        # to `(?!-)` passes S13 and every other case while `rulesetsimports`
+        # silently warns again -- the exact regression the boundary fixes.
+        "Bash",
+        "gh api -X PUT repos/o/r/rulesetsimports --input rs.json",
         False,
     ),
     "S7": (
@@ -740,12 +749,20 @@ MUTATIONS = {
         "only ruleset / branch-protection endpoints are in scope",
         [("        if not RX_PROTECTION_ENDPOINT.search(segment):\n"
           "            continue\n", "")],
-        {"S3", "S13"},
+        {"S3", "S13", "S14"},
     ),
-    "endpoint_rulesets_boundary": (
-        "`rulesets` needs a trailing boundary, or it matches as a substring",
-        [("rulesets(?![\\w-])", "rulesets")],
+    "endpoint_rulesets_hyphen": (
+        "the boundary must reject a following hyphen",
+        [("rulesets(?![\\w-])", "rulesets(?![\\w])")],
         {"S13"},
+    ),
+    "endpoint_rulesets_word": (
+        "the boundary must reject a following word character",
+        # Split from the hyphen half deliberately. An all-or-nothing reversion
+        # cannot tell a full lookahead from a partial one, so `(?!-)` would
+        # have passed while reintroducing the substring match.
+        [("rulesets(?![\\w-])", "rulesets(?![-])")],
+        {"S14"},
     ),
     "endpoint_orgs": (
         "organization rulesets are in scope, not only repository ones",

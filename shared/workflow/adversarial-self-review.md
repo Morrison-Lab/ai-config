@@ -408,8 +408,8 @@ pushing branch A afterward compares its shipped commit `X` against the held `Y`,
 - **Don't:** read that refusal as a defect in branch A's review;
   the guard has no notion of "branch" to be defective about, and the SHA comparison is doing exactly what it is built to do.
 
-**The harness appends an `agentId:` trailer to a subagent's report, USUALLY as its own block and rarely concatenated onto the last line.**
-The frequency is the point, and an earlier draft of this section got it backwards by generalizing from the two dispatches it happened to watch.
+**The harness appends an `agentId:` trailer to a subagent's report, sometimes as its own block and sometimes concatenated onto the last line.**
+Which of those is common is the question this section could not settle, and an earlier draft asserted an answer to it by generalizing from the two dispatches it happened to watch.
 
 Measured 2026-09-02 over 565 session transcripts matching `~/.claude/projects/*/*.jsonl`.
 That glob is the flat session files only;
@@ -423,24 +423,43 @@ trailer concatenated onto text   :   0
 
 An independent re-run over the recursive set returned that same zero.
 
-**Read the zero as a failed positive control, not as a confirmation**, which is the opposite of how it first reads.
-The concatenated form is known to exist --- it was seen directly, twice, within one session, and here it is:
+The concatenated form is known to exist.
+It was seen directly, twice, within one session --- and the captured line is this:
 
 ```
 --- end of report ---agentId: ae8726223279fc9e8 (use SendMessage with to: '...')
 ```
 
-A detector reporting zero over a shape known to occur is impeached by that miss rather than corroborated by it.
-[`verify-the-right-artifact`](verify-the-right-artifact.md) states the general form --- "running the thing and seeing no complaint feels like a test", and is not one, because a surface that silently ignores what it cannot see is quiet for the same reason a working one is.
-Here the known instance below *is* the paired input that should have been refused, and the sweep stayed quiet over it.
+**Note what that exhibit is: the trailer landing on a sentinel line, which is the safe case**, and the one this section goes on to prescribe.
+No capture exists of the shape the hazard is actually about, which would be a fingerprint line with the trailer glued to it:
+
+```
+Reviewed-Commit: <sha>agentId: ae8726223279fc9e8 (use SendMessage with to: '...')
+```
+
+That second block is constructed to show the shape, not captured.
+It is what the truncation table below analyses.
+
+**The zero and the sightings are about different artifacts, and that is what has to be settled before either number means anything.**
+The sweep read **stored** transcript JSONL.
+The two sightings were **in-context renders**.
+Three explanations fit, and only the third is checkable from here:
+
+1. The sweep's matcher cannot see the concatenated shape.
+2. Those transcripts sit outside the tree it walked.
+3. The concatenation is a render artifact that never reaches storage at all.
+
+If the third holds, the zero is a **true** negative and the hazard does not reach the guard, because the guard reads storage: `read_latest_review` opens the transcript file and `_result_text` flattens its stored content blocks.
+Under the first two the zero is uninformative, and reading it as confirmation would be the failure [`verify-the-right-artifact`](verify-the-right-artifact.md) names --- "running the thing and seeing no complaint feels like a test", and is not one, because a surface that silently ignores what it cannot see is quiet for the same reason a working one is.
+
 So the two counts carry different weight.
-The **334** is a real observation and establishes that the own-block form is the common one.
-The **0** establishes nothing about the concatenated form's rate, because the sweep did not find an instance that certainly happened --- either its matcher cannot see that shape, or those transcripts are outside the tree it walked, and this section does not know which.
-The word "rarely" above therefore rests on two direct sightings and on no other sighting turning up, rather than on the sweep, and should be re-derived if the sweep is ever repaired.
+The **334** establishes that the own-block form is common **in stored transcripts**, which is a lower bound rather than a ratio.
+The **0** settles nothing on its own, since which of the three explanations holds decides whether it is evidence or an artifact.
+Whoever next touches this section should settle that first: it is one grep of a stored transcript for a `Reviewed-Commit:` line with a non-hex suffix, and it decides whether the rest of this section describes a live hazard or a rendering quirk.
 
 In the prevailing shape the trailer is a separate content block, and `_result_text` joins blocks with a newline, so the fingerprint line is untouched and nothing below arises at all.
 
-**Two conditions have to hold together before any of this can bite, and a conforming report fails the first.**
+**Two conditions have to hold together before any of this can bite, and a conforming report fails the second.**
 The trailer must concatenate rather than arrive as its own block, AND the fingerprint must be the report's last line.
 This file's own contract puts the JSON payload last, and [`.claude/agents/adversarial-reviewer.md`](../../.claude/agents/adversarial-reviewer.md) says to emit nothing after its closing marker --- so a conforming report ends with the payload, the trailer lands on that, and the fingerprint is never exposed.
 The sighting that prompted this section was a report that put the verdict and fingerprint AFTER the payload, which is the ordering this file's "Structured review data" section rules out.
@@ -465,7 +484,7 @@ A wrong sha refuses the push with "the clean verdict is for commit X, but this p
 The remedy costs one line either way, and is cheap insurance rather than a fix for a demonstrated break at 40 characters.
 The block below is a report's TAIL, not a whole report.
 It shows the REORDERED ordering described above --- verdict and fingerprint after the payload --- which is the shape the sentinel exists for and the shape this file's "Structured review data" section rules out.
-So read the block as the mitigation for that reordering, not as a template to copy: a conforming report ends on the payload, its fingerprint is never the final line, and the sentinel buys it nothing.
+So read the block as the mitigation for that reordering, not as a template to copy.
 What [#3050](https://github.com/Morrison-Lab/ai-config/issues/3050) has to settle is which of the two orderings a brief should mandate, not whether a conforming report needs a sentinel.
 
 ```
@@ -484,7 +503,7 @@ The concatenation has been observed on Claude Code's `Agent` tool and nowhere el
 And the **reordering** is what sits in tension with [`.claude/agents/adversarial-reviewer.md`](../../.claude/agents/adversarial-reviewer.md)'s own instruction to emit nothing after the JSON payload's closing `-->`.
 The sentinel is not the source of that tension and does not add to it: a brief that puts the verdict and the fingerprint after the payload has already overridden the emit-nothing instruction, and the sentinel then joins a tail that exists either way.
 The ordering the guard parsed successfully was that reordered one --- which is a statement about the guard, not an endorsement, since the same ordering fails this file's payload-last contract.
-Which of the two orderings a brief should mandate is the open decision filed as [ai-config#3050](https://github.com/Morrison-Lab/ai-config/issues/3050), consistent with the scope named above, rather than something to settle inside a review brief.
+That decision is #3050's, named above, rather than something to settle inside a review brief.
 It is adjacent to [#2483](https://github.com/Morrison-Lab/ai-config/issues/2483) and not the same item: that issue is about verdicts arriving via background task notifications going unregistered.
 
 - **Do:** state the fingerprint as the **full 40-character** sha, which is what actually protects it.

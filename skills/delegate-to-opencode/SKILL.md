@@ -58,6 +58,24 @@ The first two transfer from `delegate-to-codex`, but for a reason that skill doe
 There, work shape and model capability were independent.
 Here they point the same way: authoring and judgment work is exactly what the free tier is worst at.
 
+## The one measured exception: authoring work a mechanical test can accept
+
+The exclusion above rests on the **detection** cost --- a wrong answer from a small model costs more to catch than the quota it saved --- rather than on the shape of the work.
+So it stops applying wherever a deterministic check settles correctness without anyone reading the returned diff.
+
+Measured 2026-08-28 on opencode CLI 1.18.15 (macOS), during a Morrison-Lab/gha#682 delegated multi-file R refactor.
+Given a detailed brief --- exact file list, exact new-file content, per-file candidate paths, explicit constraints --- and four independent Rscript suites standing as the acceptance test, `opencode/nemotron-3-ultra-free` completed a five-file R test-harness refactor correctly on the first try: all four suites passed, nothing outside the named files changed, and call-site argument updates were included unprompted.
+
+That is one model id, on one task, on one date.
+What licenses the delegation is the validation step and not the model's confidence: the result was accepted because the suites passed, not because the diff read well.
+The two failures from the same session bound the claim rather than contradicting it --- the free-tier `UnknownError` under Troubleshooting, and the empty Glob results under step 2 --- and [`memories/delegation.md`](../../memories/delegation.md) carries all three together under "opencode free tier: a full authoring task, validated mechanically".
+
+- **Do:** delegate authoring work to a free-tier model when a mechanical acceptance test --- a test suite, a linter, a byte comparison --- decides correctness on its own.
+- **Do:** pair that brief with literal paths and exact expected content, per step 2;
+  this run's brief carried both.
+- **Don't:** delegate authoring work to a free-tier model with no deterministic check, and don't let your own reading of the returned diff stand in for one.
+- **Don't:** read this run as a capability claim about hosted-free models generally.
+
 ## Hosted-only routing rule
 
 [`delegate-to-codex`](../delegate-to-codex/SKILL.md)'s "Data sensitivity is a second trigger" section says a repo can route work to codex because of **what the work reads**, that this trigger overrides the shape exceptions, and that when codex is busy the work waits rather than falling back.

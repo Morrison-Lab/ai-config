@@ -116,6 +116,8 @@ committed pass.
      and just as easily in a `shared/` fragment or a skill:
      `grep -ril "<keywords>" shared/ memories/ skills/ scripts/ hooks/ CLAUDE.md`,
      the same query [`skill-builder`](../skill-builder/SKILL.md) step 0 runs.
+     Those paths are ai-config's layout, and `grep` exits 2 in a repo that lacks them, so run the query from an ai-config checkout --- step 0 gets there with `cd "${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/skill-builder rev-parse --show-toplevel 2>/dev/null || pwd)}"`.
+     When step 2 routed the item to another repo, substitute that repo's own doc paths as well, per the cross-repo bullet below.
      Stopping at `memories/` is the commonest way this check runs to
      completion and still misses: the destination is a memory file, so every
      later instruction reads as relative to `memories/`, and a `shared/`

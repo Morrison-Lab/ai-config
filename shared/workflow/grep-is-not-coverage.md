@@ -215,7 +215,8 @@ where [`ums`](../../skills/ums/SKILL.md) step 3 long read "the whole `memories/`
 (Recorded 2026-09-03 on [ai-config#3060](https://github.com/Morrison-Lab/ai-config/pull/3060), where a markdownlint entry was added to `memories/markdownlint.md` while `shared/writing/semantic-line-breaks.md` already carried the same collision in three places, one of them a full section.
 The checkable part is what the wider grep would have done.
 `grep -ril "issue reference" memories/` returns three files at `origin/main`, and none of them is the owner, because the owner is `shared/writing/semantic-line-breaks.md` and no search of `memories/` can reach it.
-The ref matters and is this section's own rule: the same query returns four at ai-config#3060's head, where the duplicate entry this record is about supplies the fourth hit.
+The ref matters and is this section's own rule: the same query returns four at `eb0cf15e`, the commit that added the duplicate entry, whose `memories/markdownlint.md` is the fourth hit.
+At ai-config#3060's head (`5f2dab94`) the count is still four, but that fourth hit is the cross-link `1732000a` put in the duplicate's place --- so the number outlived the thing it was measuring.
 So this is not the old step 3 merely going unfollowed: following it exactly, over the whole of `memories/`, still misses.
 Note also why this section's own `Do` could not have caught it.
 It reads "grep the ai-config corpus as well as the destination repo's docs, **whenever step 2 routes an item anywhere other than ai-config**", and this item was routed to ai-config, so its trigger never fires.)
@@ -394,21 +395,27 @@ conclusion that the count needed a ref rather than a correction.
 The fix stated the ref and the flags and changed no number.)
 
 **A false MISSING while verifying a merge lands its duplicate in the merge commit, whose patch `git log -p` omits by default, and that scope is what this adds.**
-[`memories/debugging.md`](../../memories/debugging.md)'s "An empty grep for one spelling is not evidence the concept is absent" already owns the mechanism and the consequence, in as many words: "'missing' leads you to *add* a second copy alongside the broken one, which is worse than the defect you started with".
+This section owns the axis that a result is relative to the query that produced it and the ref it ran against;
+this subsection points that axis at a presence check rather than at a count, and at a query run mid-merge.
+[`memories/debugging.md`](../../memories/debugging.md)'s "An empty grep for one spelling is not evidence the concept is absent" already owns the mechanism and the consequence, in as many words:
+
+> "missing" leads you to *add* a second copy alongside the broken one, which is worse than the defect you started with
+
 This fragment already delegates both of its mechanisms there, near the top.
 So read that first;
 one thing it leaves open is worth adding.
 
 That part is **where the resulting duplicate lands**, and only for one kind of check.
-A verification-time miss can land in an ordinary commit, fully in review's path --- `UCD-SERG/serocalculator#605`'s README paragraph and `ai-config#771`'s dangling-citation report both would have.
+A verification-time miss can land in an ordinary commit, fully in review's path --- `UCD-SERG/serocalculator#605`'s README paragraph would have.
 The case this adds is a check run *inside a merge*.
-The moment is already covered: both of that section's named cases are checking searches --- a README grepped "to check whether it linked the development docs", a citation "checked before citing it" and one step from being reported as dangling --- so verification is where it was written from, not a gap in it.
+The moment is already covered: the two case records that state a search's purpose are both checking searches --- a README grepped "to check whether it linked the development docs", a citation "checked before citing it" and one step from being reported as dangling --- so verification is where it was written from, not a gap in it.
 What it does not say is where the second copy ends up, or who reads that.
 An authoring-time duplicate arrives as a new block in an ordinary diff, which is what review looks at.
 A re-add made while resolving a merge arrives in the merge commit.
-The PR's three-dot diff does show it: measured 2026-09-03, `git diff main...feature` over a merge that re-added a paragraph listed the re-add as an added line.
-`git log -p` does not, because it omits merge patches unless given `-m` or `--diff-merges`, so a reviewer reading the branch commit by commit is never shown it.
-A merge verified string by string is exactly where a mistyped pattern produces such a re-add, and whether review sees it depends on which of those two reads review does.
+Which read shows it is decided by the command, measured 2026-09-03 in a scratch repo over a merge whose conflict resolution re-added a paragraph already present on `main`.
+`git diff main...feature` listed the re-add as an added line, and `git show <merge-sha>` and `git log --cc main..feature` showed it too, as a `++` line of the merge's combined diff, which both of those default to.
+`git log -p main..feature` did not: it printed the merge commit's message with no patch at all, so a reviewer reading the branch commit by commit is never shown the re-add.
+A merge verified string by string is exactly where a mistyped pattern produces such a re-add, and whether review sees it depends on which of those reads review does.
 
 Measured 2026-09-03: two consecutive false MISSING readings while verifying that a merge preserved earlier work, both from the pattern rather than the file.
 A trailing space in `demotes ` did not match the bolded `` demotes** `time` `` in the target, and a case-sensitive `keep the content` did not match `Keep the content`.
@@ -420,7 +427,7 @@ Both were caught before acting, and either repair would have re-added text alrea
 
 (The first draft of this entry opened "nothing above covers" this.
 A review pointed at `debugging.md`, which covered most of it, and at this fragment's own delegation to that file.
-That is the second gap claim in one branch that the corpus already filled, and the dupe check behind both stopped at a single file --- which is the defect the sibling commit here exists to prevent.)
+The wrong-*directory* section above --- "The same failure has a same-repo sibling that needs no second repo at all" --- is this PR's other record of the same defect: a dupe check that ran to completion over too narrow a corpus.)
 
 ## A claim that nothing exists owes its deriving command, even when no search ran
 

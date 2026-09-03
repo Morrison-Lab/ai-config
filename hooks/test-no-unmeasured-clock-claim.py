@@ -38,6 +38,31 @@ CHAINED_DATE = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "input": {
         "command": "git log -1 && TZ=America/Los_Angeles date '+%H:%M %Z'"}}]}}
 
+# ai-config#2991's incident shape, verbatim: the reading goes into a variable
+# and from there into a notebook heading, so it never reaches the transcript.
+CAPTURED_DATE = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_cap", "input": {
+        "command": "t=$(TZ=America/Los_Angeles date \"+%H:%M %Z\"); "
+                   "cat >> notebook.md <<EOF\n## $t --- checkpoint\nEOF"}}]}}
+# The same capture, with the value echoed as well -- printing it makes it
+# quotable, which is all this guard asks for.
+CAPTURED_ECHOED = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_echo", "input": {
+        "command": "t=$(TZ=America/Los_Angeles date \"+%H:%M %Z\"); "
+                   "echo \"$t\"; cat >> notebook.md <<EOF\n## $t\nEOF"}}]}}
+# A capture alongside a second read that does print.
+CAPTURED_AND_PRINTED = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_both", "input": {
+        "command": "stamp=$(date +%s); "
+                   "TZ=America/Los_Angeles date '+%H:%M %Z'"}}]}}
+
+
+def result(tool_use_id, content):
+    """The output of a tool call, as a transcript records it."""
+    return {"type": "user", "message": {"content": [
+        {"type": "tool_result", "tool_use_id": tool_use_id,
+         "content": content}]}}
+
 # The harness's own injected reading, which arrives as a bare-string user turn.
 HOOK_CLOCK = {"type": "user", "content":
               "UserPromptSubmit hook success: Current time -- local: "
@@ -275,6 +300,35 @@ CASES = [
     ([{"type": "assistant", "content": "The current local time is: 2026-08-21T18:55:51-07:00 according to my check."},
       say("Recap: as of 23:59 PDT")], True,
      "#2661: assistant message containing ISO time string does not discharge guard for unmeasured claim"),
+
+    # --- ai-config#2991: a reading captured into a variable and never printed
+    #     The four recaps of 2026-09-02 each sat in a turn that really did run
+    #     `date` -- into a `$(...)` whose value went straight to a file. The
+    #     session never saw the value, so the stated time was still typed from
+    #     a sense of elapsed work, and the guard stayed silent.
+    ([CAPTURED_DATE, result("call_cap", ""), say("Recap: 01:07 PDT")], True,
+     "#2991: a date captured into a variable, with no output in its result, "
+     "does not discharge"),
+    ([CAPTURED_DATE, say("Recap: 01:07 PDT")], True,
+     "#2991: a capture whose output never appears in the transcript is not a "
+     "reading either"),
+    ([CAPTURED_DATE, result("call_cap", "00:59 PDT"), say("Recap: 00:59 PDT")],
+     False,
+     "#2991: the same capture discharges once its output does reach the "
+     "transcript"),
+    ([CAPTURED_DATE,
+      result("call_cap", [{"type": "text", "text": "Wed Sep 3 00:59:12 PDT 2026"}]),
+      say("Recap: 00:59 PDT")], False,
+     "#2991: a result carrying its text in blocks is read the same way"),
+    ([CAPTURED_DATE, result("call_cap", 42), say("Recap: 00:59 PDT")], False,
+     "#2991: a result whose content cannot be read fails open"),
+    ([CAPTURED_ECHOED, say("Recap: 00:59 PDT")], False,
+     "#2991: echoing the captured value prints it, so the read discharges"),
+    ([CAPTURED_AND_PRINTED, say("Recap: 00:59 PDT")], False,
+     "#2991: a second read in the same command does print, so it discharges"),
+    ([CAPTURED_DATE, result("call_other", "00:59 PDT"),
+      say("Recap: 00:59 PDT")], True,
+     "#2991: another call's output is not this read's output"),
 ]
 
 

@@ -891,7 +891,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unmeasured-clock-claim.py\"",
             "timeout": 10,
             "script": "no-unmeasured-clock-claim.py",
-            "why": "CLAUDE.md 'Timestamp recaps in local time' -- warns when a reply states a Pacific clock time and no clock read appears since the previous message, so an extrapolated time is not reported as measured."
+            "why": "CLAUDE.md 'Timestamp recaps in local time' -- warns when a reply states a Pacific clock time and no clock read appears since the previous message, so an extrapolated time is not reported as measured. A read whose output is only ever captured (`t=$(TZ=... date ...)` writing into a file) does not discharge it: the value never reaches the transcript, so the session could not have quoted it (ai-config#2991)."
           },
           {
             "type": "command",

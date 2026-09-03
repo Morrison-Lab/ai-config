@@ -47,11 +47,28 @@ running AHEAD of the last measurement cannot have been observed, and one far
 behind it has expired. Quoting the reading, which the rule prescribes, stays
 correct and stays silent.
 
-A `date` invocation discharges unconditionally, because this guard reads the
-transcript's tool *calls* and not their output, so no measured value exists to
-compare against. That is the honest limit rather than an oversight: the rule's
-remedy is to run the clock in the same message, and a session that just did so
-is the case the guard is not for.
+A `date` invocation that PRINTS discharges by position, because this guard
+reads the transcript's tool *calls* rather than their output, so no measured
+value exists to compare against. That is the honest limit rather than an
+oversight: the rule's remedy is to run the clock in the same message, and a
+session that just did so is the case the guard is not for.
+
+A `date` whose output is only ever CAPTURED does not discharge, and that
+distinction is the whole of ai-config#2991. A command of the shape
+`t=$(TZ=... date ...); cat >> notebook.md <<EOF ... EOF` reads the clock and
+puts the value in a file, so the value never reaches the transcript and the
+session never sees it -- which is exactly how four recaps came to be stamped
+from a sense of elapsed work while a real `date` sat in each of those turns.
+A reading you cannot quote is not a reading. So a capture-only invocation is
+held pending its own `tool_result`: a result carrying a clock-shaped time
+discharges it, a result whose content cannot be parsed discharges it too (fail
+open on shape), and a readable result with no time in it leaves the claim
+unmeasured. A result that never appears at all leaves it unmeasured as well,
+which is not a fail-open case but the definition -- output absent from the
+transcript is output the session could not have quoted. Correlating by
+`tool_use_id` keeps this narrow: only the output of a command already
+identified as a clock read is consulted, so an ordinary `Read` of a file full
+of timestamps still supplies nothing.
 
 Fails OPEN on any parse trouble, and fires at most once per distinct message,
 so it cannot wedge a session.
@@ -98,6 +115,19 @@ RX_CLOCK_READ = re.compile(
     r"|\[DateTime\]::UtcNow",
     re.I,
 )
+
+# A clock-shaped time anywhere in a `date` command's own output. Deliberately
+# looser than RX_CLAIM: `date` prints in many formats, and the only question
+# here is whether SOMETHING the session could have quoted reached the
+# transcript. It is applied to the result of a command already identified as a
+# clock read, never to arbitrary tool output.
+RX_VISIBLE_TIME = re.compile(r"\b(?:[01]?\d|2[0-3]):[0-5]\d\b")
+
+# A command substitution, in either spelling.
+RX_SUBSTITUTION = re.compile(r"\$\([^()]*\)|`[^`]*`")
+
+# `VAR=$(...)` / ``VAR=`...` `` -- the shape that hides a reading in a variable.
+RX_CAPTURE_ASSIGN = re.compile(r"([A-Za-z_]\w*)=(\$\([^()]*\)|`[^`]*`)")
 
 # The harness's own injected reading. Quoting this is correct, so it counts as
 # a measurement -- otherwise the guard would fire on the one case the rule
@@ -169,6 +199,44 @@ def _skew(claimed, measured):
     return diff - 1440 if diff > 720 else diff
 
 
+def _capture_only(command):
+    """True when every clock read in `command` is captured and never printed.
+
+    The target is `t=$(TZ=... date ...)` followed by a redirect into a file: the
+    reading happens, and nothing about it reaches the transcript. A second,
+    bare read elsewhere in the same command still prints, and so does an
+    `echo`/`printf` of the captured variable -- either one makes the value
+    quotable, which is all this guard asks for.
+    """
+    captured = set()
+    for m in RX_CAPTURE_ASSIGN.finditer(command):
+        if RX_CLOCK_READ.search(m.group(2)):
+            captured.add(m.group(1))
+    if not captured:
+        return False
+    remainder = RX_SUBSTITUTION.sub(" ", command)
+    if RX_CLOCK_READ.search(remainder):
+        return False
+    for var in captured:
+        printed = re.compile(
+            r"\b(?:echo|printf|print)\b[^;&|\n]*\$\{?" + re.escape(var) + r"\b")
+        if printed.search(remainder):
+            return False
+    return True
+
+
+def _result_text(block):
+    """Best-effort text of a `tool_result`, or None when it cannot be read."""
+    content = block.get("content")
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = [p.get("text") for p in content
+                 if isinstance(p, dict) and isinstance(p.get("text"), str)]
+        return "\n".join(parts)
+    return None
+
+
 def scan(path):
     """Return (opaque_clock_idx, turn_start_idx, text, measured_minutes).
 
@@ -191,12 +259,16 @@ def scan(path):
     the harness delivers it. A `tool_result` quoting the same marker is ignored
     entirely -- neither a value nor a position -- because this file and its
     tests both quote it, so an ordinary `Read` of either would otherwise
-    discharge the guard or inject a fabricated reading.
+    discharge the guard or inject a fabricated reading. The one exception is a
+    `tool_result` belonging to a capture-only clock read, tracked by
+    `tool_use_id` in `pending`: that output is the reading itself, and nothing
+    a file happens to contain can reach it.
     """
     last_clock = -1
     turn_start = -1
     measured = None
     text = ""
+    pending = {}
     i = 0
     with open(path, errors="ignore") as fh:
         for line in fh:
@@ -269,16 +341,34 @@ def scan(path):
                     continue
                 btype = b.get("type")
                 if btype == "tool_use":
-                    blob = (b.get("name") or "") + " " + json.dumps(
-                        b.get("input") or {})
+                    inp = b.get("input") or {}
+                    blob = (b.get("name") or "") + " " + json.dumps(inp)
                     if RX_CLOCK_READ.search(blob):
-                        last_clock = i
+                        command = inp.get("command")
+                        command = command if isinstance(command, str) else ""
+                        if command and _capture_only(command):
+                            # The value went into a variable and never into the
+                            # transcript. Only this call's own output can
+                            # discharge it, so hold it pending (#2991).
+                            if b.get("id"):
+                                pending[b["id"]] = i
+                        else:
+                            last_clock = i
                 # A tool_result is deliberately not scanned for the injected
                 # marker at all, by value or by position. File content echoed
                 # into one is not a reading of the clock, whatever it quotes,
                 # and this file and its tests both quote it -- so counting it
                 # would let an ordinary `Read` of this hook discharge the guard.
-                # A real `date` run is still caught, on its tool_use above.
+                # A real `date` run is still caught, on its tool_use above --
+                # except for the capture-only shape, whose own result is
+                # consulted here and nowhere else.
+                elif btype == "tool_result":
+                    tid = b.get("tool_use_id")
+                    if tid in pending:
+                        out = _result_text(b)
+                        if out is None or RX_VISIBLE_TIME.search(out):
+                            last_clock = i
+                        pending.pop(tid, None)
                 elif btype == "text":
                     if role == "assistant" and b.get("text", "").strip():
                         text = b["text"]

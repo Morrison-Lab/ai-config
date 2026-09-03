@@ -285,8 +285,15 @@ The next real reading, taken when a PR head commit's timestamp was needed, came 
 The brief that dispatched this entry itself asserted that `claim-pr` inserts the timestamp, which the skill's templates do not do.
 The review caught it, and it is the same class of unmeasured claim.)
 
+**Run the clock so its value lands in the transcript, not only in a file.**
+A command of the shape `t=$(TZ=America/Los_Angeles date "+%H:%M %Z")` followed by a heredoc writing `$t` into a notebook does read the clock, and you still never see the reading --- so the next stamp you type comes from a sense of elapsed work exactly as if no command had run.
+A reading you cannot quote is not a reading, however honestly it was measured.
+
 - **Do:** run the clock command again immediately before typing a time into a forge comment, exactly as before a chat recap or a file edit.
+- **Do:** print the reading --- run the clock command on its own, so the value comes back in a tool result you can read and quote.
 - **Don't:** infer a clock time from the number of tool calls or actions taken since the last real reading.
+- **Don't:** capture the reading into a shell variable whose only destination is a file ---
+  that is a measurement the session never observes.
 
 Two hooks are this rule's mechanism, one per surface.
 `hooks/no-unmeasured-clock-claim.py` reads the reply at `Stop`.

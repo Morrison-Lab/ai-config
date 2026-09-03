@@ -442,8 +442,14 @@ Waves 3 and 4 are held until 1 and 2 finish, two workflows at a time rather than
 since four at once is what spent the limit in an hour.
 The Workflow tool refused the persisted script paths for waves 2 to 4 as unreadable;
 a copy under the scratchpad resumed with the same run id.
-Open PRs on the repo are all peer sessions' (#3137, #3101, #3060); none of this session's remain open.
+Open PRs on the repo are all peer sessions' (#3137, #3101, #3060);
+none of this session's remain open.
 Check-in re-armed for 14:58 PDT.
 
 User directive at 14:13 PDT: keep to 5 subagents max.
 Two resumed workflows run 2 agents each on this 4-CPU container, so one of the two single agents (the UMS writer) is stopped until a wave finishes, and waves 3 and 4 wait their turn.
+
+The git-memory UMS agent finished before it could be stopped:
+`ums/2026-09-03-merge-visibility` carries the merge-visibility entry in `memories/git-diffing.md` (which owns diff-range selection, so not `git.md`) and the `refs/pull/N/head` classifier in `memories/git.md`.
+Its reproduction gives `git log -p -m` a count of 3 where the 12:38 entry in part 2 said 2, a repo-specific figure, so that entry's "wants promotion" note is discharged and its count is not a general one.
+It waits for a verdict and a push under the five-subagent cap.

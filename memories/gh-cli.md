@@ -911,9 +911,9 @@ one update-plus-rerun cycle each.)
 - **Don't:** batch-update the whole queue without a merge queue --- every PR but the next one
   goes `BEHIND` again before its turn, and its re-run is wasted.
 
-## `gh pr merge` can succeed while printing nothing at all
+## `gh pr merge` can land with no output surfaced at all
 
-Measured 2026-09-03 on `Morrison-Lab/ai-config` through the Claude Code Bash tool: `gh pr merge <N> --squash --delete-branch` produced no stdout, no stderr, and no error, and the merge had in fact landed.
+Measured 2026-09-03 on `Morrison-Lab/ai-config` through the Claude Code Bash tool: `gh pr merge <N> --squash --delete-branch` came back with no stdout, no stderr, and no error surfaced, and the merge had in fact landed.
 
 One observation cannot separate `gh` printing nothing from the harness surfacing nothing, since the two are identical from here.
 So the durable claim is about the *reading* rather than about which layer swallowed the output, and it covers any forge command whose effect is separately checkable --- [`claude-code.md`](claude-code.md) already draws the sibling line for a bounded probe, that empty output is not evidence it did nothing.

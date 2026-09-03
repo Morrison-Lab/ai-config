@@ -297,12 +297,12 @@ a dated constant is the one payload for which *not reaching the session* is not 
 
 - **Do:** gate the re-arm on a freshness signal from outside the snapshot --- the pinned rev in `~/.claude/plugins/installed_plugins.json`, or a network read --- and keep suppressing when that signal is unavailable.
   A corpus file the guard reads at runtime is not such a signal, since it is frozen in the same snapshot the constant is.
-- **Do:** prefer the env flag's explicitness over a dated constant when no such signal is reachable, which reverses the earlier pair for that case;
-  a switch somebody has to remember to clear beats one that clears itself on a frozen clock.
 - **Do:** check the loaded copy's constant, not the checkout's, when a guard demands something a standing directive forbids --- that demand is a freshness symptom before it is a policy question.
 - **Don't:** read "the guard re-armed" as evidence the suppression period actually ended.
 - **Don't:** treat a dated constant as carrying the same risk as a stale flag or threshold;
   a wrong flag waits for a case to reach it, and a wrong date fires on its own.
+- **Don't:** answer this by moving the switch into the environment;
+  the pair above refuses that for a separate reason --- an env-readable clock or kill flag is a one-variable bypass of the guard in production --- and that refusal is untouched here.
 
 (Measured 2026-09-03, tracked as [#3141](https://github.com/Morrison-Lab/ai-config/issues/3141) with the two proposals above, and recorded in [#3156](https://github.com/Morrison-Lab/ai-config/issues/3156).
 `hooks/no-unreviewed-pr.py` demanded a Copilot review on two PRs while the all-repos moratorium ran to `MORATORIUM_END = 2026-12-01` ([#3078](https://github.com/Morrison-Lab/ai-config/pull/3078));

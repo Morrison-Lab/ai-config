@@ -92,3 +92,13 @@ a `[text](topic.cases.md)` markdown link matches neither, so its target is never
 Relocating worked-example case records from a fragment into a `[...](<name>.cases.md)` sibling thus drops them from every session's always-loaded set while keeping them one click away.
 Run the script before and after to confirm: the file count is unchanged (the sibling never joins the closure, the parent stays imported) while the byte total falls by the relocated content.
 This is the concrete form of the section's "demoting a fragment to on-demand" lever, bounded by the lab-manual constraint above --- apply it only to ai-config-only fragments, since a markdown-linked sibling is invisible to the manual's whole-file `include`. (Tracked in Morrison-Lab/ai-config#1193.)
+
+## A new skill can fail validate-skills.py on the listing budget alone (2026-09-03)
+
+`scripts/validate-skills.py` sums `name + description + 8` over every skill and errors past 9,000 chars.
+At 202 skills the pool sat within 60 chars of the cap, so adding `triage` with a 44-char description failed it even though the skill itself was valid.
+The over-budget line looks like `check-context-closure.py`'s advisory output and was misread as one; it is an error, and the review round caught it.
+The fix that fits is to trim the longest existing descriptions (the error names the top five), not the new one alone, and to keep each trimmed description accurate to the skill body (a second round caught "Detect and" dropped from `prune-dead-code`).
+
+- **Do:** run `validate-skills.py` and read its exit status before dispatching review when adding a skill; trim the longest descriptions it names.
+- **Don't:** read the over-budget line as advisory, or shorten a description past what the skill body says it does.

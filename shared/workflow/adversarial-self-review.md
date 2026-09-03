@@ -441,7 +441,7 @@ It is what the truncation table below analyses.
 
 **The zero and the sightings are about different artifacts, and that is what has to be settled before either number means anything.**
 The sweep read **stored** transcript JSONL.
-Every direct sighting, the captured fingerprint line included, was an **in-context render**.
+The two sightings were **in-context renders**.
 Three explanations fit, and only the third is checkable from here:
 
 1. The sweep's matcher cannot see the concatenated shape.
@@ -456,7 +456,7 @@ The **334** establishes that the own-block form is common **in stored transcript
 The **0** settles nothing on its own, since which of the three explanations holds decides whether it is evidence or an artifact.
 Whoever next touches this section should settle that first, and the query has to be chosen carefully, because the obvious one cannot decide it.
 Grepping a stored transcript for a `Reviewed-Commit:` line with a non-hex suffix cannot fire on a **conforming** report, which never puts the fingerprint last, so nothing can be glued to it.
-That reason quantifies over conforming reports only, and this section is about **reordered** ones --- so it does not establish the null it appears to, and a zero from it stays uninformative either way.
+That reason quantifies over conforming reports only, and this section is about **reordered** ones --- so the reason does not establish the null it appears to, and a zero from the grep stays uninformative either way.
 The right *criterion* is whether `agentId:` ever appears in stored content **preceded by other text on the same line**.
 The right *instrument* is not the sweep, and this is the part that is easy to get wrong: re-running the sweep's own matcher has no power against explanation 1, which says precisely that this matcher cannot see the shape --- under that explanation it returns zero whatever it is pointed at.
 It is also already spent against the other two, since the counts above are that query, run twice, over both the flat set and the recursive superset.
@@ -471,6 +471,7 @@ In the own-block shape the trailer is a separate content block, and `_result_tex
 The trailer must concatenate rather than arrive as its own block, AND the fingerprint must be the report's last line.
 This file's own contract puts the JSON payload last, and [`.claude/agents/adversarial-reviewer.md`](../../.claude/agents/adversarial-reviewer.md) says to emit nothing after its closing marker --- so a conforming report ends with the payload, the trailer lands on that, and the fingerprint is never exposed.
 The sighting that prompted this section was a report that put the verdict and fingerprint AFTER the payload, which is the ordering this file's "Structured review data" section rules out.
+Whether the two sightings were two such reports or one report read twice is not recorded, so treat the shape as attested and its rate as unmeasured.
 
 So read the rest of this section as what happens when a brief reorders the tail, not as a hazard of ordinary dispatch.
 

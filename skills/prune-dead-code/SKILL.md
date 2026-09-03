@@ -1,6 +1,6 @@
 ---
 name: prune-dead-code
-description: "Remove dead code, orphaned configs, stale docs."
+description: "Detect and remove dead code, orphaned configs, stale docs."
 user-invocable: true
 allowed-tools:
   - Bash

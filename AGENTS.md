@@ -168,6 +168,13 @@ The full rule, including the Do/Don't pair, is
 Questioning alone does not owe a pass: the check has to show the claim
 was wrong.
 
+## Help your subagents improve over time
+
+An orchestrator owns the three things that set a dispatched agent's mistake rate: its brief, the memory it can read, and the loop that feeds findings back to it.
+Correcting each output as it arrives leaves that rate unchanged.
+Keep a per-agent mistake ledger in your own memory and prepend it to every brief, change the brief or the loop after every fix round, measure rounds-to-clean, and promote what holds into the delegation skill and hooks.
+The full rule, including the Do/Don't pairs, is [`shared/workflow/improve-your-subagents.md`](shared/workflow/improve-your-subagents.md).
+
 ## Treat user profanity and frustration as urgent defect signals
 
 Profanity, exasperation, or intense frustration from the user is a high-priority signal that a mistake, regression, broken assumption, or workflow failure occurred.

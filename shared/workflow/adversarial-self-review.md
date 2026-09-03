@@ -258,7 +258,9 @@ one sentence per line, plus a clause rule for a long line with a mid-line semico
 and the directional-word grep the [`fix-forward-references`](../../skills/fix-forward-references/SKILL.md) skill runs.
 An ambiguous pronoun has no detector, per [`ambiguous-reference`](../writing/ambiguous-reference.md),
 so that class stays with the reviewer,
-though a grep for sentence-initial pronouns narrows where to look.
+though a grep for a pronoun that opens a clause after a comma or a conjunction,
+the positional heuristic that fragment names,
+narrows where to look.
 Each instrument is cheap and deterministic,
 and each runs in seconds.
 That speed is not a reason to skip the adversarial round.

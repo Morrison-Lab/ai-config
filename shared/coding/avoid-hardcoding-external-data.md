@@ -212,7 +212,7 @@ A comment with no number would have prompted nothing.
 **The diagnosis that follows is where this compounds**, because the count is a plausible-looking anchor and invites an explanation for the discrepancy rather than a check of the premise.
 Any difference between the two runs will do --- a different checkout, a different working directory --- and such an explanation is unfalsifiable from the numbers alone.
 So the written count first manufactures a regression and then supplies a wrong cause for it.
-`753 passed, 1 failed` out of the same 754 is a flake, and the way to see that is the failing test's **name**, which the total conceals by construction.
+A run one short of a written total is a flake until shown otherwise, and the way to see that is the failing test's **name**, which a total conceals by construction.
 
 **Assert the property, not the number.**
 "Every case still passes with the helper neutered" is checkable, cannot go stale, and says what the observation was for.
@@ -234,15 +234,18 @@ What this section rules out is the forward form: a count written as what a futur
 
 (Measured on [Morrison-Lab/ai-config#3100](https://github.com/Morrison-Lab/ai-config/pull/3100), merged 2026-09-03.
 A comment in `scripts/test_check_review_body.py` read "754 pass with the helper neutered", and the same figure went into a commit message.
-The 754 counts a *different* file's suite, `scripts/test_check_pr_fully_clean.py`, which is the point of the anecdote: the number was written where nothing regenerates it.
+The figure counted a *different* file's suite, `scripts/test_check_pr_fully_clean.py`, which is half the point: the number was written where nothing regenerates it and nothing names what it counts.
 That suite carries wall-clock assertions that intermittently miss a one-second budget
-([#3127](https://github.com/Morrison-Lab/ai-config/issues/3127)),
-so a run reports `753 passed, 1 failed` out of the same 754.
+([#3127](https://github.com/Morrison-Lab/ai-config/issues/3127)), so a run comes back one short.
 The baked count had that flake read as a regression.
-The revision after it then misattributed the flake to the checkout, saying in effect that both readings were right because the worktree reported 754 and a scratch copy of it reported 753.
-Both report 754, and that explanation was itself retracted a revision later.
-The text that shipped gives no count as an expectation, and says why.
-It does quote the `753`/`754` pair, as the observation it is warning about.)
+The revision after it then misattributed the flake to the checkout, saying in effect that both readings were right because the worktree and a scratch copy of it disagreed by one.
+They did not.
+The flake was the same in either location, and that explanation was retracted a revision later.
+
+The other half of the point is what a later reader finds.
+Run from a pristine `git archive` of `origin/main` on 2026-09-04, `python3 scripts/test_check_pr_fully_clean.py` reports `753 passed, 0 failed`, and `git show --numstat 32a760c32` shows that #3100 never touched that file.
+So the written 754 does not reproduce on any tree the record points at, and no sha or command was published beside it that would let anyone say when it did.
+The text that shipped gives no count as an expectation, and says why.)
 
 ## Where the rule stops: text that records what was observed
 

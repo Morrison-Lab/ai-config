@@ -1145,7 +1145,7 @@ Measured on [ai-config#3103](https://github.com/Morrison-Lab/ai-config/pull/3103
 | paragraph refill of the original | constructed | 336 | 82 | 1 | --- | --- | --- |
 
 The fourth row is built from `02cbf00d8`'s added lines against the same base: contiguous non-blank runs rejoined into paragraphs, then `textwrap.wrap(width=80)` at Python's defaults, then classified the same way.
-Its line count is sensitive to that construction --- `break_on_hyphens=False` gives 342, `fmt -w 80` gives 343 --- while the sentence-flag count stays near 82 throughout, and the flag count is the figure the row is making a claim about.
+Its line count is sensitive to that construction --- passing `break_on_hyphens=False` at the same width gives 342 --- while the sentence-flag count holds at 82 across both, and the flag count is the figure the row is making a claim about.
 
 The first three rows are states the PR actually had, and the gate cannot separate them.
 The fourth is a construction, included because a reviewer produced it while trying to reproduce this measurement and reported its 83 flags as a refutation --- a correct measurement of a tree that never existed.

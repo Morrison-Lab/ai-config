@@ -888,7 +888,7 @@ Knowing a distinction well enough to write the rule about it did not stop the
 same entry from breaking it while composing the evidence for it --- the
 sharper, self-referential form of "a rule is consulted at read time and
 broken at composition time" already stated in
-[`fully-clean.cases.md`](fully-clean.cases.md), `no-empty-promises.md`, and
+[`fully-clean.cases.md`](fully-clean.cases.md), [`no-empty-promises.md`](no-empty-promises.md), and
 [`learn-from-review-findings.md`](learn-from-review-findings.md).
 
 - **Do:** read a case record's own account of a distinction as no more

@@ -1327,8 +1327,11 @@ a different state.
 Its own justification (a formal review's finding can live outside the
 thread population) covered the bot review exactly, and did not name either
 excluded attribute.
-Filed as [`ucdavis/bcs#901`](https://github.com/ucdavis/bcs/issues/901) to
-widen the source rule's wording.)
+The source rule is this repo's own [`CLAUDE.md`](../../CLAUDE.md), so the fix
+belongs here: filed as
+[`ai-config#3121`](https://github.com/Morrison-Lab/ai-config/issues/3121),
+with [`ucdavis/bcs#901`](https://github.com/ucdavis/bcs/issues/901) covering
+that repo's copy of the same wording.)
 
 ## A story that fits the evidence is not a finding
 

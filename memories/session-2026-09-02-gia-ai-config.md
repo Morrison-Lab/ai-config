@@ -105,3 +105,30 @@ That is half right and the wrong half is load-bearing.
 So a run over an uncommitted reformat compares committed line numbers against reformatted content and can report clean spuriously.
 Measured here: CI failed 22 lines on #3070's commit, a `--write` reformat then reported clean while uncommitted, and only the post-commit re-run was trustworthy.
 Commit, then re-run --- the rule survives, but "it sees nothing uncommitted" is not why.
+
+## Account session limit hit, 2026-09-02 20:14 PDT
+
+`claude-code-review` on #3070 posted the graceful-skip notice: "You've hit your session limit, resets 4:50am (UTC)" --- the mid-run 429 shape (gha#520), not a credential defect.
+Reset is 04:50Z, which is 21:50 PDT.
+
+What this does and does not invalidate, stated carefully because the distinction decides whether three merges may proceed:
+
+- It does NOT retract a verdict already posted.
+  #3058, #3014 and #3044 each carry a clean verdict on a head that has not moved since, obtained before the limit.
+  Those PRs remain fully clean at head.
+- It DOES mean any NEW review round is skipped.
+  So #3070's newest head, #3024's `1152b26`, and anything I push to #3023 will get no external verdict until reset.
+- `require-review` grays rather than reddens on this path, so a skipped round is not a red check to chase.
+
+Consequence for the sweep: merging the three already-verified PRs is still correct, and opening NEW work (Phase 2) would produce PRs that cannot be reviewed for the next hour and a half.
+The fallback is `shared/workflow/self-review-fallback.md` --- post a self-review at the bot's own standard --- but the adversarial-reviewer subagent runs on this same account, so it may be subject to the same limit.
+That is worth measuring rather than assuming, since it decides whether the fallback is even available.
+
+**Measured rather than assumed: the two quotas are separate pools.**
+A one-word `haiku` subagent probe returned immediately while `claude-code-review` was refusing with a session limit.
+So the limit is on the credential the CI workflow authenticates with, not on this session's own budget, and the adversarial-reviewer fallback stays available throughout the outage.
+Worth knowing because the natural inference --- "the account is limited, so every Claude call is limited" --- is wrong, and acting on it would have stalled the sweep for ninety minutes for no reason.
+The probe costs one cheap call and settles it.
+
+- **Do:** probe with a trivial subagent call before concluding a quota outage reaches this session.
+- **Don't:** infer from a CI review skip that self-review is unavailable too.

@@ -106,7 +106,12 @@ def analyse(body, mod):
     verdict = mod.classify_verdict(body)
     finding = mod._unresolved_finding_pattern(body)
     structured = bool(mod._is_structured_review_body(body))
-    notice = bool(mod.is_non_review_notice(body))
+    # The checker skips this BEFORE it reaches `is_non_review_notice`
+    # (check-pr-fully-clean.py:2555). Every ARD round posts one of these, per
+    # skills/ard/SKILL.md, so a driving session's own summary must not read as
+    # a verdict.
+    ard_summary = "ard review disposition summary" in body.lower()
+    notice = ard_summary or bool(mod.is_non_review_notice(body))
 
     result = {
         "is_non_review_notice": notice,
@@ -115,16 +120,28 @@ def analyse(body, mod):
         "unresolved_finding_pattern": finding,
     }
 
-    # Order taken from the checker's ADMISSION branches, not invented here. A
-    # previous version gated first on `has_review_body_marker`, which reads
-    # like the right question and is not: that helper's only caller in the
-    # classifier is `is_non_review_notice`, where it is a reason to KEEP a body
-    # rather than to drop one. Nothing in `check_review_comments` or
-    # `check_latest_verdict` consults it. The cost was 28 measured marker-free
-    # bodies carrying a real signal, every one reported IGNORED while the
-    # checker admits them from any author through its fail-closed not-clean
-    # branch. Re-deriving one gate was enough to reproduce the whole class of
-    # error this tool exists to remove -- the third time in this file.
+    # Ordering follows `check_review_comments`'s admission branches. WHAT IS
+    # AND IS NOT MODELLED, stated precisely, because an earlier version of this
+    # comment claimed the order was complete and it was not -- which is the
+    # worst possible place to overclaim, since a reader checking for a
+    # re-derived gate is told by the code itself that none remains.
+    #
+    # Modelled: the ARD-disposition skip, the notice skip, the fail-closed
+    # not-clean branch (admitted from ANY author), and the structure gate.
+    #
+    # NOT modelled, because they need the comment's metadata rather than its
+    # body: whether the author is a bot, and `_reviewer_identity`. The
+    # structure gate is therefore applied unconditionally here while the
+    # checker applies it only on the non-bot clean branch -- so an UNSTRUCTURED
+    # clean body from a bot reads IGNORED here and CLEAN there. That
+    # disagreement is deliberate and conservative: this tool is for drafting a
+    # body before posting it, where assuming bot privileges you may not have is
+    # the direction that misleads.
+    #
+    # Three gates were re-derived across three rounds before this list existed
+    # -- `has_review_body_marker` (not in the admission path at all), the
+    # missing `unreadable` state, and the ARD skip. Naming the boundary is what
+    # makes the next one findable.
     if notice:
         result["verdict"] = "IGNORED"
         result["why"] = "a non-review notice, which the checker skips"

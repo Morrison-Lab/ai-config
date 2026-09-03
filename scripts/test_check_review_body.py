@@ -182,6 +182,14 @@ check("a review that merely mentions a notice is still a review", verdict(
     f"Verdict: Ready for merge\n{FINGERPRINT}\n"),
     "CLEAN")
 
+# The gate that runs BEFORE the notice skip. Every ARD round posts a
+# disposition summary, so a driving session's own round-up must not be read as
+# a verdict on its own PR.
+check("an ARD disposition summary is skipped, not classified", verdict(
+    f"## ARD Review Disposition Summary\n\n## Summary\n\nAll findings "
+    f"addressed.\n\n## Verdict\n\nVerdict: Ready for merge\n{FINGERPRINT}\n"),
+    "IGNORED")
+
 if failures:
     print("FAILED:")
     for line in failures:

@@ -453,7 +453,8 @@ A wrong sha refuses the push with "the clean verdict is for commit X, but this p
 The remedy costs one line either way, and is cheap insurance rather than a fix for a demonstrated break at 40 characters.
 The block below is a report's TAIL, not a whole report.
 It shows the REORDERED ordering described above --- verdict and fingerprint after the payload --- which is the shape the sentinel exists for and the shape this file's "Structured review data" section rules out.
-A conforming report puts the payload last, needs no sentinel, and is what [#3050](https://github.com/Morrison-Lab/ai-config/issues/3050) has to settle:
+So read the block as the mitigation for that reordering, not as a template to copy: a conforming report ends on the payload, its fingerprint is never the final line, and the sentinel buys it nothing.
+What [#3050](https://github.com/Morrison-Lab/ai-config/issues/3050) has to settle is which of the two orderings a brief should mandate, not whether a conforming report needs a sentinel.
 
 ```
 Verdict: <phrase>
@@ -471,11 +472,13 @@ Reconciling the two contracts is its own open decision, filed as [ai-config#3050
 It is adjacent to [#2483](https://github.com/Morrison-Lab/ai-config/issues/2483) and not the same item: that issue is about verdicts arriving via background task notifications going unregistered.
 
 - **Do:** state the fingerprint as the **full 40-character** sha, which is what actually protects it.
-- **Do:** add the sentinel line after it, as cheap insurance against a truncated or reformatted fingerprint.
+- **Do:** add the sentinel line after it *when a brief reorders the tail so the fingerprint is last*, as cheap insurance against a truncated or reformatted fingerprint.
 - **Do:** read a "verdict is for commit X, but this push would ship Y" refusal as possibly a *misparsed* fingerprint rather than only a stale one --- print what the guard captured before concluding.
 - **Don't:** claim the suffix breaks a 40-character fingerprint;
   run `REVIEWED_COMMIT` over the line before asserting either way.
 - **Don't:** abbreviate the sha in a review brief's template, which is the input that turns the suffix into a silently wrong parse.
+- **Don't:** read the sentinel as part of the payload-last contract.
+  It is a mitigation for the ordering that contract rules out, so a conforming report needs none.
 
 ## Structured review data (JSON payload)
 

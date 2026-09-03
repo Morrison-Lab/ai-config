@@ -252,9 +252,9 @@ Re-queried rather than recalled, per the state-claim rule.
 | [#3084](https://github.com/Morrison-Lab/ai-config/pull/3084) | `bf558244` | pushed, 14 checks success and 1 skipped (a superseded `new-line-breaks` run), `review / require-clean-verdict` success, both threads resolved |
 | [#3060](https://github.com/Morrison-Lab/ai-config/pull/3060) | remote `c851d68f`, local `0daed144` | round 6 committed, unpushed, awaiting a push-gate verdict |
 | [#3023](https://github.com/Morrison-Lab/ai-config/pull/3023) | `6aa021b5` | open, the peer's |
-| [#3089](https://github.com/Morrison-Lab/ai-config/pull/3089) | `8f1ca761` | **merged 06:51Z**, not by me (`merged_by` is the shared login, so the API cannot say by whom) |
-| [#3100](https://github.com/Morrison-Lab/ai-config/pull/3100) | `3acc79bd` | new since the last sweep, the peer's |
-| [#3101](https://github.com/Morrison-Lab/ai-config/pull/3101) | `d8c88486` | new since the last sweep, the peer's |
+| [#3089](https://github.com/Morrison-Lab/ai-config/pull/3089) | `8f1ca761` | **merged 06:51Z**, agent-authored, not mine (`merged_by` is the shared login) |
+| [#3100](https://github.com/Morrison-Lab/ai-config/pull/3100) | `3acc79bd` | new since the last sweep, agent-authored, not mine |
+| [#3101](https://github.com/Morrison-Lab/ai-config/pull/3101) | `d8c88486` | new since the last sweep, agent-authored, not mine |
 
 Two things the re-derivation changed.
 
@@ -288,3 +288,38 @@ The gate requires "the **author-dispatched** cross-model, cross-harness reviewer
 
 So #3084 is finished except for a gate no reachable reviewer can satisfy, and it waits.
 The standing ai-config `mwc` grant does not help, because the gate is a condition on the *verdict*, not on authorization.
+
+## 02:06 PDT --- #3060 pushed at `ae58121f`, and what four rounds cost
+
+The table above is a snapshot of 01:28 and stays one;
+PR #3060 is now pushed at `ae58121f`, five commits past the head that table records.
+
+Four review rounds landed in that stretch, and the shape worth keeping is that **each round's findings were about the previous round's fix**, not about the original change.
+
+| round | reviewer | findings | what they were about |
+|---|---|---|---|
+| 6 | adversarial subagent | 0, plus an out-of-scope note | a line the note said was pre-existing, which the diff carried as an addition |
+| 7 | CI `@claude` | 1 | a claim billed as measured that does not reproduce where a `time` binary exists |
+| 8 | adversarial subagent | 7 | a false gap claim, a spliced list, and four claims billed as measured that were inferred |
+| 9 | adversarial subagent | 1 | a hedge applied to one instance of a claim and not to its two siblings |
+
+Three lessons, each of which cost a round.
+
+**An out-of-scope note is a scope claim, and one `git diff` query settles it.**
+Round 6's note was correct about the defect and wrong about whose it was, because the reviewer located the line by reading the file at `HEAD` and read untouched surrounding text as provenance.
+Banked in `address-every-comment.md`, and the entry had to be rewritten in round 8 because that file already carried the rule --- my dupe-check grepped `out of scope` spaced where the rule writes `out-of-scope` hyphenated.
+A phrase grep decided a coverage question, which is what `grep-is-not-coverage` says never to let it do.
+
+**Two reviewers can measure the same command and disagree, and the mechanism is the only durable record.**
+CI got exit 0 with `TIMEFORMAT` ignored;
+this container gets `time: command not found`.
+Both are right: an assignment prefix demotes `time` from reserved word to a command word, so a `PATH` lookup follows, and the symptom depends on whether a `time` binary is installed.
+The one-command check --- put an executable named `time` on `PATH` and compare the bare and prefix forms --- is now in the entry, so the next reader settles it locally rather than trusting either report.
+
+**A hedge is an incomplete sweep by default.**
+Round 9 found the same claim in three places, one hedged in prose and two left flatly asserted in a table.
+The prose fix reads as complete from the inside precisely because it is the instance you were thinking about.
+
+`markdownlint-cli2` runs here via `npx` at CI's pinned version in seconds, which would have caught the MD018 failure before the push and now catches the recurrences I keep producing: three separate occurrences in this session, every one of them after the rule was written and while it was loaded.
+That ratio is the argument for the check over the rule.
+Recorded in `memories/markdownlint.md` alongside the rule itself.

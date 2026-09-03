@@ -498,3 +498,15 @@ Lesson for the fold: a reviewer's count is a measurement under the reviewer's ow
 
 The pre-push verdict for #3154's local head `cc5e0f7d` went into the slot the round-2 reviewer freed;
 waves 1 and 2 were still running (four live agents) at the reading above.
+
+## 16:20 PDT --- #3154 round 10: two fixes, one deferral
+
+The verdict for `cc5e0f7d` returned three findings.
+Two are applied at `cee70344`:
+the Anti-patterns entry in `skills/ums/SKILL.md` still summarized step 3 as grepping the whole target file,
+and the Don't bullet in `grep-is-not-coverage.md` quoted step 3's retired wording without the `3935bfff` pin the earlier quotation carries.
+The third, that `skills/memorize/SKILL.md` step 3 keeps the file-scoped dupe check, is deferred to [#3161](https://github.com/Morrison-Lab/ai-config/issues/3161) and named in the PR body under a Deferred heading,
+per `issue-first`'s deferral rule and the shrink-the-diff lesson from rounds 5 to 9.
+CI on the remote head `94244eb5` is green across all 21 check runs;
+`git merge-tree --write-tree origin/main HEAD` exits 0 at `2156b439`, five commits ahead of the merge base, with no main-side change to either file.
+The verdict for `cee70344` is running in the one free slot.

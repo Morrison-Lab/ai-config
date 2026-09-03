@@ -701,7 +701,8 @@
   The expiry is deliberate rather than incidental: re-verify the quota at the end date and re-enable the per-round request, rather than letting the moratorium become permanent by default (`shared/writing/timestamp-volatile-claims.md`).
 
   **Extended 2026-09-02 to December 2026, on the directive "stop using copilot reviews".**
-  The September expiry arrived and did exactly what it was designed to do: the guard re-armed on 2026-09-01, resumed demanding a Copilot request, and a session complied through four PRs before the user stopped it.
+  The September expiry arrived and did exactly what it was designed to do: the guard re-armed on 2026-09-01, resumed demanding a Copilot request, and a session complied before the user stopped it.
+  Derived rather than recalled, by counting `review_requested` events for Copilot across that session's PRs: six PRs received requests (`#3004`, `#3007`, `#3016`, `#3036`, `#3044`, `#3076`), nine request events in total, and only the PR carrying this extension received none.
   That is the mechanism working, not failing --- a date that re-arms is the whole reason the switch is a date and not an env flag --- but it does show the cost of a short window, since the re-arm lands mid-session with no announcement.
   So the new window is three months rather than a fortnight, far enough from the day-to-day that its expiry is unlikely to surprise an active session.
 
@@ -710,8 +711,16 @@
 
   **Its test file derives every clock from that constant, and must keep doing so.**
   Before this extension the tests pinned literal dates --- an `AFTER` of `2026-09-02`, and a boundary pair of `2026-08-31`/`2026-09-01`.
-  Moving the end date to December put all three inside the new window, where the guard is inert, so 179 cases would have passed for the wrong reason and the boundary pair stopped straddling any boundary at all.
-  One case failed loudly and exposed it; the rest would have gone quiet.
+  Moving the end date to December puts all three inside the new window, where `main()` returns at its first line.
+  Measured by reverting the literals and running them against the December constant: **92 passed, 88 failed**.
+  The split is the point rather than the totals.
+  Every case expecting a block fails loudly, because an inert guard blocks nothing;
+  every true-negative case passes vacuously, because "no block" is what it expected anyway.
+  So half the suite goes quiet while the other half screams --- loud enough to notice, and the passing half still means nothing.
+
+  An earlier draft of this paragraph claimed the whole file would pass vacuously, citing "179 cases".
+  That number came from a run with the fix already half-applied, generalized to the unfixed case without rerunning it, and labelled "measured".
+  It is recorded here rather than quietly replaced, because the correction is the same overclaim-from-one-observation this file's neighbours keep catching.
 
   - **Do:** edit the constant and this paragraph in the same commit.
   - **Do:** derive any date a test needs from `MORATORIUM_END`, never write one out.

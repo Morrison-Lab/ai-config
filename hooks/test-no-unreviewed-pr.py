@@ -52,12 +52,22 @@ sys.exit(m.main())
 # are about anything else.
 #
 # DERIVED from the subject's own constant rather than written out. A literal
-# date here silently expires: extending `MORATORIUM_END` past it would put
-# every case below back inside the moratorium, where the guard is inert and
-# each one passes for the wrong reason --- which is precisely the vacuous
-# pass the comment above warns about, reintroduced by the fix for it.
-# Measured 2026-09-02: the literal was `2026-09-02`, and extending the
-# moratorium to December would have made this whole file vacuous.
+# date here expires when `MORATORIUM_END` moves past it, putting every case
+# below back inside the moratorium, where the guard returns at the first line
+# of `main()`.
+#
+# Measured 2026-09-02, by reverting the literals and running them against the
+# December constant: 92 passed, 88 failed. NOT a silent whole-file vacuum ---
+# the split is what matters. Every case expecting a block FAILS loudly, since
+# an inert guard blocks nothing; every true-negative case PASSES vacuously,
+# for the wrong reason. So the hazard is half the suite going quiet while the
+# other half screams, which is noisy enough to notice but leaves the passing
+# half meaning nothing.
+#
+# An earlier version of this comment claimed the whole file would pass
+# vacuously, on an unrun inference from a partially-fixed run. Deriving the
+# date is the right fix either way; the reason it was needed is smaller and
+# differently shaped than that claim said.
 def _moratorium_end():
     spec = importlib.util.spec_from_file_location("_subject_const", HOOK)
     mod = importlib.util.module_from_spec(spec)

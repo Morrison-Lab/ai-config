@@ -216,6 +216,28 @@ then every time your work or your claims are questioned,
 then the worked example that questioning triggers UMS if the claim was wrong.
 Tracked as [ai-config#2261](https://github.com/Morrison-Lab/ai-config/issues/2261).)
 
+**Every pause is a UMS trigger, whatever the session is waiting for.**
+Every trigger above names something that *happened*: a verdict landed, a PR merged, a claim turned out to be false, a review arrived.
+A pause names nothing that happened, so no event-shaped rule fires on it, and the pass is not so much skipped as never raised.
+Pushing a branch and arming a timer for CI, waiting out a review round, and posing a question and stopping for the answer all end a turn with the session's learnings held only in conversation state.
+
+The wait is where that state is most exposed.
+Its length is not knowable when it begins --- a review round can take minutes or days --- and it is the likeliest point for compaction, a `/clear`, an interruption, or a session nobody resumes.
+So read the pause as the general rule, and the triggers above as the cases where the pass is owed even though no pause is coming.
+[`flag-session-boundaries`](flag-session-boundaries.md)'s "Arm resumption before every non-clean pause" section already obliges a wake mechanism at that same moment;
+this obliges the pass alongside it.
+
+The near-miss is the wait that looks too short to be a boundary, or that is waiting on the very trigger a rule above names --- a CI run whose verdict will itself be a checkpoint.
+Deferring the pass to the moment the wait ends is the announced-and-never-run failure with a due date attached, since the resumption may land in a different session or never come at all.
+
+- **Do:** run the pass before ending a turn to wait on CI, a review, or an answer from the user.
+- **Do:** shrink the pass to the learnings that would not survive the gap, when the wait looks short.
+- **Don't:** defer the pass to the moment the wait ends, on the reading that the resumption will carry it.
+- **Don't:** treat a routine-looking wait as too small to be a boundary --- its length is not knowable when it begins.
+
+(Directive from the user, filed 2026-09-01 as [ai-config#2905](https://github.com/Morrison-Lab/ai-config/issues/2905):
+"if you're about to pause and wait for external triggers (CI, reviews, user input), always run ums first".)
+
 **Folding or pruning a finished record is a step of the pass, and which records are outstanding is a link-graph fact rather than something you remember.**
 `CLAUDE.md`'s ["Keep a running on-disk session lab notebook"](../../CLAUDE.md) section already names the moment: fold a finished notebook into durable memory, or prune it, during UMS once its content is captured elsewhere.
 It names no way to find the ones you have forgotten, so the set is left to recollection --- and recollection covers this session's notebook and nothing else.

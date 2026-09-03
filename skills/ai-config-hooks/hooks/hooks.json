@@ -804,6 +804,18 @@
             "_note_see_bash_entry": "Design notes live on this hook's Bash entry, per this file's precedent (require-agent-disclosure.py, warn-stale-issue-edit.py). Repeating them per matcher guarantees sibling divergence on the next correction."
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-underived-required-check.py\"'",
+            "timeout": 10,
+            "script": "no-underived-required-check.py",
+            "why": "Warns when a `gh api` command sets required status checks on a repository or organization ruleset, or on classic branch protection. A context string is matched against a check-run name exactly, so one no workflow emits sits as `Expected` forever and blocks every merge, silently. Detects lexical shapes only -- a write assembled across variables, or reached through a wrapper it does not know, is silent -- so its silence is never evidence that contexts were derived. Carries no discharge condition by design: every candidate was satisfiable by a pull request's own run, or by typing the string."
+          }
+        ]
       }
     ],
     "Stop": [

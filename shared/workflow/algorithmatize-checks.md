@@ -1345,6 +1345,49 @@ Where it does not enter both measurements with the same magnitude, the ratio amp
 - **Don't:** assume min-of-N filters two measurements equally when one is much longer than the other.
 - **Don't:** read a ratio's stability on an idle machine as evidence that it is load-independent.
 
+## A slow wall-clock reading is a claim about the machine before it is a finding about the code
+
+The two sections above govern a timing **bound written into a test** --- which clock it uses, and whether a ratio cancels the noise it is meant to cancel.
+Neither reaches the reading you take **once**, by hand, in the middle of diagnosing something, and then report as a defect.
+No assertion is being authored there and no threshold is being chosen, so nothing about the moment resembles the situation those sections describe.
+
+**The reading is self-authenticating in a way a wrong value is not**, and that is the whole of the trap.
+A number you computed incorrectly still looks like a number you might have computed incorrectly.
+A stopwatch reading feels like a measurement rather than a guess, so it goes into a report as an observation instead of as a hypothesis --- and the question of what else was running on the machine is never posed, because posing it requires first noticing that the reading has a second input.
+
+**The session iterating fastest is the session most likely to have saturated its own machine**, which inverts the intuition that a busy machine is somebody else's problem.
+Background test runs, a re-invoked suite that was never reaped, several agents dispatched at once: each is a normal artifact of working quickly, and together they are the load that makes the next reading meaningless.
+So the readings likeliest to be wrong are the ones taken during exactly the kind of session that generates a lot of them.
+
+Measured: an end-to-end hook run took **8.0s** against a declared 10s timeout, which read as a serious performance defect worth filing.
+Profiling the internals put them under **0.6s** in total, which is the discrepancy that prompted looking further.
+`uptime` then reported a load average of **376**, most of it this session's own stacked background runs --- including five redundant copies of the same test suite left behind by repeated re-invocations.
+Re-running the identical command varied between **0.59s and 8.0s** with nothing about the code changed.
+
+The check is one command and it settles the question, so run it rather than reasoning about whether the machine seems busy:
+
+```bash
+uptime                       # load average; on Windows, Get-Counter or Task Manager
+```
+
+Then re-run the timed command a few times and report the spread rather than a single figure.
+A reading you cannot reproduce is not a measurement of the code, and a spread that spans an order of magnitude names its own cause.
+
+**The second-order case is a timing assertion used as a regression guard**, which the sections above already cover for the choice of clock and do not cover for this exposure.
+A wall-clock bound is sometimes the only available instrument --- a catastrophic-backtracking probe is a real example, since the failure it guards against *is* elapsed time.
+Where one is genuinely necessary, give it headroom wide enough to survive the load a busy session generates, and say in the test that it is load-sensitive so a red result is read as a question rather than as a regression.
+
+- **Do:** read the load average before reporting a timing observation as a finding.
+- **Do:** re-run a timed command several times and report the spread, so a reading that cannot be reproduced is visible as one.
+- **Do:** reap your own background runs before timing anything, since they are the likeliest cause of the load you are about to measure through.
+- **Don't:** treat a stopwatch reading as evidence about the code merely because it was measured rather than guessed.
+- **Don't:** assume a fast-moving session is running on an idle machine --- it is the session most likely to have loaded it.
+
+(Measured 2026-09-03, during a nine-round adversarial hook iteration.
+The same session's PR carried a `< 1.0s` wall-clock assertion as a backtracking regression guard, which under that load could have flaked;
+that is the second-order case above.
+Filed as [ai-config#3059](https://github.com/Morrison-Lab/ai-config/issues/3059).)
+
 ## Reading an instrument's PROSE instead of its exit status, generalized past the PR checker
 
 [`fully-clean`](fully-clean.md)'s "Calling the checker is not consuming it"

@@ -252,6 +252,31 @@ That is [`learn-from-review-findings`](learn-from-review-findings.md)'s converge
 - **Don't:** count a verdict that cites prior rounds in its justification as a fully independent round;
   that much of it is a re-reading of the rounds it names, however hard the rest of it worked.
 
+### Tell it to RUN the repo's validation, not only to read the diff
+
+The rule above says which facts a brief must carry.
+It does not say what the reviewer should **do** with the checkout, and the default answer --- read the diff against the standards --- is what every round does when the brief does not say otherwise.
+Reading is the wrong instrument for a whole class of defect, because a diff-reading round can only find what is visible in the changed lines, and a registration gap, a broken import path, or a check that fails on files the diff never touched are all invisible there by construction.
+
+So name the commands in the brief.
+The repo's own checkers, its test suite, and whatever `check-install`-shaped verification exists are the ones that matter, and they are cheap for a reviewer already holding the checkout.
+
+Measured 2026-09-03, on a hook that took nine adversarial rounds.
+Eight rounds read the diff and returned findings about it.
+The ninth was briefed to run the repository's own local validation, and it found **two red CI gates that all eight prior rounds had missed** --- one of which would have shipped the hook completely **inert to plugin-path consumers** while every test in the suite passed.
+Nothing in the diff showed it: the hook's code was correct, and what was missing was an entry in a second registration file the diff did not touch.
+
+Note what this is not.
+It is not the rule directly below, which says *you* run the style instruments before dispatching so the reviewer never spends attention on them.
+That rule keeps mechanical noise out of the round.
+This one puts a different instrument *into* the round, because the author's pre-dispatch run and the reviewer's own run answer different questions --- yours confirms the diff is clean, and the reviewer's confirms the repo is.
+
+- **Do:** name the repo's checkers and test command in the brief, and ask for their output rather than a judgement about them.
+- **Do:** ask specifically whether the change is *reachable* --- registered, imported, wired into the path a consumer actually takes --- since that is the gap a diff read cannot show.
+- **Don't:** assume a reviewer holding the checkout will run anything it was not asked to run.
+- **Don't:** read a run of diff-reading rounds as having covered the repo;
+  they covered the changed lines, which is a different population.
+
 ## Run every mechanical style instrument before dispatching, not after
 
 The rule above is about what the reviewer sees.
@@ -733,3 +758,26 @@ The companion half of that session --- concluding a silent subagent had
 stalled when it was alive and twelve rounds ahead --- is recorded in
 [`git-worktrees`](../../memories/git-worktrees.md), "A quiet worktree is not
 evidence the session working it has stopped".)
+
+### Ask it whether ANOTHER ROUND earns its place, which is a different question
+
+The section above retires the **work**.
+This one retires the **loop** while keeping the work, and the two need separating because a reviewer asked only the ship-or-drop question has no way to say "keep it, and stop iterating".
+
+That gap matters most exactly where the loop is longest.
+[`learn-from-review-findings`](learn-from-review-findings.md)'s "A later round can find a defect in the FIX" section documents rounds that each introduce the defect the next one finds, and gives a mechanical tell for one shape of it --- consecutive fixes turning the same knob.
+It does not say when a series that is *genuinely* fixing different things should end, and nothing else does either: each round is individually justified by the finding it answers, so the series has no natural terminus and stopping always looks like giving up one round early.
+
+So put the question to the reviewer in its own sentence, alongside the findings: **does another round have positive expected value, or is the remaining risk smaller than the risk a further fix introduces?**
+A reviewer holding the round's own findings can weigh their severity against the observed rate at which fixes on this change have introduced new defects, which is a judgement the author cannot make about their own series.
+
+Measured 2026-09-03, across nine rounds on one hook.
+Rounds 6, 7 and 8 each introduced a defect the next round found;
+only round 9 introduced none.
+What ended the series was asking that question directly, rather than a round happening to come back empty --- which, per the convergence rule, would not have been evidence it was finished anyway.
+
+- **Do:** ask for a continue-or-stop judgement once several rounds have each fixed something real, separately from the ship-or-drop question.
+- **Do:** give the reviewer the rate at which this change's own fixes have introduced new defects, since that is the term it cannot derive from the diff.
+- **Don't:** collapse the two questions --- "should this exist" and "should this iterate further" have different right answers, and a work worth shipping is the usual case for the second.
+- **Don't:** treat an empty round as the answer to either question;
+  a converging series narrows its own search space, so the empty round is the least informative one.

@@ -387,6 +387,37 @@ still failed.)
 
 **A flagged item that came in via a `main`-sync merge, not your own diff, is still a Defer --- just one where the follow-up is fixing it on `main` directly, not filing a per-PR issue.** This is not the ARD skill's "Acknowledge" disposition: `skills/ard/SKILL.md` reserves Acknowledge for praise or a no-ask observation, and explicitly warns against stretching it to dodge a real finding --- a redundant config line a reviewer flags is a real finding with an implied fix request, so it needs a real disposition, not a label that means "no change requested." When a reviewer flags something (a redundant config line, a stale pattern) inside a file your branch only touches because you merged `main` in to resolve a conflict, check provenance before fixing it: `git log`/`git blame` the flagged line, or just compare against `origin/main`'s current content. If it's identical to `main`, "fixing" it on your branch alone doesn't fix anything --- it just makes your branch disagree with `main` on unrelated content the next person to touch that file will have to reconcile again. Reply agreeing the finding is correct but out of scope for this PR, and leave it for whoever owns that file's actual content to fix on `main` directly --- no follow-up issue needed, since the fix target is `main` itself, not this PR's own change.
 
+**The mirror of that provenance check is the one nothing prompts: a reviewer's own "out of scope" note is a scope claim, and it has to be derived from the diff before you accept it.**
+The paragraph above governs checking provenance before *fixing* a flagged line.
+Checking before *not* fixing one has no rule pointed at it, and it is the direction that fails silently.
+Skipping the check before a fix costs a redundant edit, which the next reader can see and undo.
+Skipping it before a skip ships a defect inside your own diff, and nothing reports that: the note reads as scope discipline, the reviewer sounds careful, and the PR merges with the finding parked.
+
+The instrument is the same one pointed the other way, and it is one command:
+
+```bash
+git diff origin/<default-branch>..HEAD -- <file> | grep -n '<the flagged text>'
+```
+
+A `+` line means the branch added it, so [`dont-incur-technical-debt`](../principles/dont-incur-technical-debt.md)'s question answers itself and the fix is yours now.
+
+The mistake that produces the wrong note is worth naming, because it is not carelessness.
+The reviewer locates the flagged line by reading the file at `HEAD` --- `sed -n`, an editor, a `grep` over the checkout --- sees it sitting in surrounding text the diff never touched, and reads that context as provenance.
+That is [`verify-the-right-artifact`](verify-the-right-artifact.md)'s substitution of a checkout for the change, and the checkout answers a different question.
+A file shows what is there;
+only the diff shows who put it there.
+
+- **Do:** run the diff query on every finding a reviewer marks out of scope, before parking it.
+- **Do:** treat a `+` line as settling the question --- an in-diff defect is fixed now, whatever the note said.
+- **Don't:** accept a scope claim because the reviewer read the file and the line looked pre-existing.
+- **Don't:** read "out of scope" as the cheaper disposition;
+  it is the one whose error is invisible.
+
+(Measured 2026-09-03 on [ai-config#3060](https://github.com/Morrison-Lab/ai-config/pull/3060).
+An adversarial round returned PASS and appended an out-of-scope note about an overclaiming line in `shared/workflow/adversarial-self-review.md`.
+The diff query returned that line as a `+` line added by the same branch.
+Asked to check its own scope claim rather than to accept the correction, the reviewer confirmed the error and named its cause: it had located the line with `sed -n '760,800p'` over the checkout, rather than asking the diff whether the branch had added it.)
+
 **This generalizes to a skill's own inline restatement of a fragment it
 links to.** A `SKILL.md` that links a backing `shared/` fragment for the
 full detail often *also* restates the fragment's approach or word list

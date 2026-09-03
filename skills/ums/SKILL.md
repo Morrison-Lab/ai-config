@@ -111,30 +111,13 @@ committed pass.
      runs to hundreds or a thousand-plus lines, so an existing entry on the
      same subject can sit far away in an unrelated cluster and never enter
      your view.
-     Grep the whole corpus rather than one file, and rather than only
-     `memories/` -- a fact can sit in either of two adjacent topical files,
-     and just as easily in a `shared/` fragment or a skill:
-     `grep -ril "<keywords>" skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md`,
-     the same query [`skill-builder`](../skill-builder/SKILL.md) step 0 runs.
-     Those paths are ai-config's layout,
-     and `grep` exits 2 in a repo that lacks them,
-     so run the query from an ai-config checkout.
-     Prefer your own worktree when you are in one,
-     since the shared checkout may sit on another session's branch;
-     reading the shared checkout is otherwise fine,
-     because step 4's prohibition is scoped to writing
-     ("never `cd` straight into the shared checkout itself to make a change"),
-     and step 4's own note calls discovering that path
-     "read-only -- discovering the path doesn't touch the shared working directory".
-     A session working in another repo reaches ai-config
-     through the same `${CLAUDE_PLUGIN_ROOT:-...}` expression step 4 uses to discover it.
-     When step 2 routed the item to another repo,
-     also run it over that repo's own doc paths,
-     per the cross-repo bullet below.
-     Stopping at `memories/` is how this check runs to
-     completion and still misses: the destination is a memory file, so a
-     later instruction reads as relative to `memories/`, and a `shared/`
-     fragment owning the same idea stays outside the paths searched.
+     Grep the whole corpus rather than one file, and rather than only `memories/`:
+     `repo="${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/ums rev-parse --show-toplevel 2>/dev/null || pwd)}"`
+     `git -C "$repo" grep -ril "<keywords>" origin/main -- skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md`
+     The path list is the one skill-builder step 0 runs;
+     pinning to `origin/main` keeps the result independent of whichever branch the checkout sits on.
+     A rule can be owned by a `shared/` fragment or a skill as easily as by a memory,
+     and a `memories/`-only grep stays outside those paths.
      When one exists, extend it in place; don't add a second bullet.
      (ai-config#689: a `list_workflow_runs` cost bullet went in next to the
      related `get_check_runs` guidance while an entry on the same tool already
@@ -156,8 +139,8 @@ committed pass.
      `shared/workflow/review-verdict-pitfalls.md` ai-config#811).
    - **When step 2 routed the item to a repo other than ai-config, grep both
      corpora.**
-     The query above runs from an ai-config checkout,
-     so add the destination repo's own doc paths ---
+     The query above is pinned to ai-config's `origin/main`,
+     so add the destination repo's own doc paths, run in that repo ---
      a repo-local entry can otherwise duplicate or contradict a fragment
      nobody thought to search from that repo.
      See

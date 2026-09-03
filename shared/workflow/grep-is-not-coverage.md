@@ -158,8 +158,8 @@ Deciding where a learning belongs is a real step ---
 or to the owning repo's own agent docs --- and once an item is routed to a repo
 we own, every later instruction reads as relative to *that* repo.
 Step 3 read "the whole `memories/` directory" at `3935bfff`, which meant the destination's,
-so the dupe check ran to completion, found nothing,
-and never looked at ai-config at all.
+so the dupe check runs to completion, finds nothing,
+and never looks at ai-config at all.
 
 The asymmetry is why this needs naming separately from the null-result case.
 A repo-local memory in some other repo is precisely the place nobody thinks to
@@ -196,28 +196,8 @@ Morrison-Lab/ai-config#1174.)
 
 ### The same failure has a same-repo sibling: the wrong directory
 
-**The same failure has a same-repo sibling that needs no second repo at all: the wrong *directory*.**
-The rule above turns on a routing decision between repos,
-so it reads as a cross-repo rule and is filed under one.
-The mechanism does not require two repos.
-It needs some earlier decision to have fixed a location,
-after which a later instruction is read relative to it.
-Routing an item to a memory file does exactly that:
-the destination is under `memories/`, so the dupe check searches `memories/`,
-and a `shared/` fragment or a skill owning the same idea stays outside the paths searched.
-The check runs to completion and returns hits that cannot include the owner,
-which is the unenumerated-hits failure this fragment names below ("A non-null result has the same defect, when the hits go unenumerated").
-
-It is worth separating because the remedy differs.
-The cross-repo case is fixed by adding a corpus;
-this one is fixed by widening within the corpus you are already in,
-which care about *which repo* does not prompt.
-The corpus already owns the right query, in the sibling procedure ---
-[`skill-builder`](../../skills/skill-builder/SKILL.md) step 0 greps `skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md`,
-where [`ums`](../../skills/ums/SKILL.md) step 3 read "the whole `memories/` directory" at `3935bfff` and stopped there.
-`CLAUDE.md`'s pointer to this fragment names them as one trigger
-("Fires wherever a search decides whether to author something new --- `skill-builder`'s step 0, `ums`'s step 3, and `find-overlap`"),
-and their queries differed.
+The section above routes between repos;
+the same miss happens inside one repo when the dupe check is scoped to a directory the owner is not in.
 
 - **Do:** grep the directories the corpus spans --- `skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md` --- not the one the destination sits in.
 - **Don't:** read "the whole `memories/` directory" as thorough --- the word doing the damage is `memories/`, not "whole".
@@ -239,15 +219,12 @@ What skill-builder's corpus-wide query would have done is checkable too:
 `git grep -ril "issue reference" 3935bfff -- skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md` returns eight files at that ref ---
 `hooks/test-no-unauthorized-merge.py`, `hooks/warn-stale-issue-edit.py`, `memories/github.md`, `memories/preferences.md`, `memories/r-quarto.md`, `shared/workflow/address-every-comment.md`, `shared/writing/semantic-line-breaks.md` and `skills/promote-memory/SKILL.md` ---
 with the owner among them.
-That the ref matters is this fragment's own rule below ("A published count needs the ref and the flags it was measured with"):
-the `memories/` query returns four at `eb0cf15e`, the commit that added the duplicate entry,
-whose `memories/markdownlint.md` is the fourth hit.
+The same `memories/` query returns four at `eb0cf15e`:
+the three above plus `memories/markdownlint.md`, the file the duplicate entry was added to.
 At `5f2dab94`, #3060's head when this was measured, the count is still four,
-but that fourth hit is now a stub whose body `1732000a` replaced with a cross-link ---
+but that file's MD018 bullet is now a cross-link, its body replaced by `1732000a` ---
 so the number outlived the thing it was measuring.
-So this is not the old step 3 merely going unfollowed:
-following it exactly, over the whole of `memories/`, still misses.
-Note also why this section's own `Do` could not have caught it.
+Note also why the wrong-corpus section's `Do` could not have caught it.
 It reads "grep the ai-config corpus as well as the destination repo's docs,
 **whenever step 2 routes an item anywhere other than ai-config**",
 and this item was routed to ai-config, so its trigger did not fire.)

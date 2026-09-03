@@ -157,7 +157,7 @@ conflict-resolution re-add is invisible to review.*
 the tip rather than a walk of commits,
 so it carries whatever the merge commit put in the tree.
 Merging `main` in makes `main` an ancestor of the branch,
-so the merge base becomes `main`'s tip
+so the merge base moves up to the merged `main` commit --- `main`'s tip, until `main` advances again ---
 and the three-dot range reports the branch's whole net effect,
 merge resolution included.
 That form is the corpus's own review read
@@ -173,7 +173,7 @@ re-adding a second copy of that paragraph inside the merge commit:
 ```bash
 git diff main...feature                    | grep -c '^+SHARED'  # 1  shows it
 git log -p main..feature                   | grep -c '^+SHARED'  # 0  hides it
-git log -p -m main..feature                | grep -c '^+SHARED'  # 3  once per parent
+git log -p -m main..feature                | grep -c '^+SHARED'  # 3  one diff per parent: 2 hits vs the feature parent, 1 vs main
 git log -p --diff-merges=on main..feature  | grep -c '^+SHARED'  # 3  same as -m
 git show <merge>                           | grep -c '^+SHARED'  # 0  see below
 git log --cc main..feature                 | grep -c '^+SHARED'  # 0  see below
@@ -183,7 +183,7 @@ Three mechanics behind those numbers.
 
 `git log -p` defaults to `--diff-merges=off`,
 so it prints the merge commit's message with no patch at all;
-`cmp` reports the two outputs byte-identical.
+`cmp` reports `git log -p` and `git log -p --diff-merges=off` byte-identical.
 `-m` and `--diff-merges=on` restore the patch and are byte-identical to each
 other.
 A bare `--diff-merges` is rejected, because it swallows the next argument as
@@ -216,10 +216,9 @@ genuine conflict.
 (Refs [ai-config#3129](https://github.com/Morrison-Lab/ai-config/pull/3129),
 whose adversarial review caught the false belief on 2026-09-03.)
 
-
 ## A `git diff` self-check is blind to untracked files, whatever range you pick
 
-The section above chooses between `..`, `...`, and the bare worktree form.
+The "Picking the diff range" section above chooses between `..`, `...`, and the bare worktree form.
 None of the three sees a file git is not tracking yet.
 So a self-check driven by `git diff` skips a PR's brand-new file entirely, and a new file is usually the one carrying the most unreviewed added lines.
 `git add -N <path>` (or a plain `git add`) is what makes it visible;

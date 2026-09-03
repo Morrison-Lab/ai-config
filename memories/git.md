@@ -166,6 +166,9 @@ $ git ls-remote origin refs/pull/3095/head
 ```
 
 **Test the output, not the exit status.**
+An empty result means **not a PR**, which for a reference you know exists means an issue;
+a number that exists as neither also comes back empty (`refs/pull/999999/head`, empty, exit 0),
+so confirm the number is real before writing the `/issues/` path.
 Both calls above exit 0.
 `ls-remote` reports "no such ref" as an empty result rather than as a failure,
 so `if git ls-remote ...; then` classifies every number as a PR.
@@ -207,7 +210,6 @@ qualify as `owner/repo#NNNN` per those before choosing a path.
 (Refs [ai-config#3129](https://github.com/Morrison-Lab/ai-config/pull/3129),
 the source PR;
 the classification was derived while linking that PR's bare references.)
-
 
 ## Git branch create/reset (`git switch -C`)
 - `git switch -C "$BRANCH"` is already safe against flag-shaped branch names: `$BRANCH` is the argument *to* `-C`, so a value like `--weird` fails cleanly as `fatal: '--weird' is not a valid branch name` rather than being parsed as an option.

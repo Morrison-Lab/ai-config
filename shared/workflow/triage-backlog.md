@@ -47,11 +47,13 @@ Anything else that looks unlikely to be scheduled gets `P3` rather than a close,
 A hook or checker with a stream of near-identical defects gets one tracking issue with a checklist, not one issue per symptom.
 `check-pr-fully-clean` accumulated 72 issues in ten weeks, 24 of them still open at the measurement above, and 22 issues lifetime were about a memory file approaching its line cap.
 Under [`report-mistakes-proactively`](report-mistakes-proactively.md)'s dupe-check step, a new symptom of a tracked defect family is a comment on the family's issue, not a new issue.
-A bare directive ("less is more", "question everything") is a preference, and its home is a memory entry; it is filed as an issue only when it names a concrete change.
+A bare directive ("less is more", "question everything") is a preference, and its home is a memory entry.
+It is filed as an issue only when it names a concrete change.
 
 - **Do:** run the pass weekly, label every open issue, and close the bare, junk, and duplicate ones as not-planned with a one-line reason.
 - **Do:** append a new symptom to the owning tracking issue when one exists.
 - **Do:** read every P1 and every proposed close before applying the plan.
 - **Don't:** leave an open issue unlabelled after the pass.
-- **Don't:** close an actionable-but-unlikely item as not-planned; label it P3 and leave the call to the maintainer.
+- **Don't:** close an actionable-but-unlikely item as not-planned.
+  Label it P3 and leave the call to the maintainer.
 - **Don't:** file an aphorism as an issue; record it in memory.

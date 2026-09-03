@@ -356,12 +356,49 @@ What is self-reported and leaves no artifact: two further occurrences afterwards
 A reader can verify the first and has only my word for the other two, which is worth saying in a sentence that would otherwise read as evidence.
 Recorded in `memories/markdownlint.md` alongside the rule itself.
 
-## 12:20 PDT --- Phase 2 wave launched under "go all out until 1pm"
+## 12:20 PDT --- Phase 2 wave launched under the go-all-out-until-1pm directive
 
-User: quota at 74% of weekly, resets 13:00 PDT; "until 1pm pacific, go all out with subagent workflows; grab a bunch of new issues and drive PRs".
-Model switched to Fable 5.1; every `agent()` call passes `model: 'opus'` (never Fable, per CLAUDE.md).
-Workflow `wf_7e364ea6-880` (7 issues, disjoint files): #3095, #3068, #3086, #3062, #3117, #3102, #3113.
-Each: implement in `scratchpad/wt-<N>` on `fix/<N>-<slug>` off `origin/main` -> two Opus refuters -> fix -> recheck.
+User: quota at 74% of weekly, resetting 13:00 PDT.
+Directive, verbatim: "until 1pm pacific, go all out with subagent workflows;
+grab a bunch of new issues and drive PRs".
+Model switched to Fable 5.1.
+Every `agent()` call passes `model: 'opus'`.
+Not Fable, which CLAUDE.md forbids for a subagent without explicit per-launch permission.
+Not the cheap tier either, which `when-to-orchestrate` prescribes for mechanical work, because implementing an issue and refuting an implementation are judgment-heavy.
+The quota cost of at least twenty-one Opus dispatches was accepted on the reset at 13:00.
+One workflow run over seven issues, each with one primary target file, all seven distinct.
+That set was derived from the issue bodies rather than from worktree file sets, which did not exist yet, so re-derive it with `scripts/pr-overlap.py` once the PRs are open:
+
+- #3095 `scripts/sync-nlb-checker.py`
+- #3068 `hooks/flag-cd-into-main-checkout.py`
+- #3086 `hooks/no-unreviewed-pr.py`
+- #3062 `plugins/ai-config/enforce-mwc-review-gate.py`
+- #3117 `hooks/remind-brief-premises.py`
+- #3102 `scripts/check-memory-file-size.py`
+- #3113 `scripts/check-pr-fully-clean.py`
+
+Each issue: implement in a worktree on `fix/<N>-<slug>` off `origin/main`, then two Opus refuters, a fix round, and a recheck.
 Claims posted on all seven issues at 12:20 PDT.
-Still awaiting verdict agent `af3e90096a953a239` on `0d402416` (#3123) and `d87eaf06` (Refs #2465); push both once it lands.
-Next: push each verified branch serially (fresh `ls-remote` first), open PR, request Copilot + Jules.
+The two unpushed branches, `fix/ums-step3-corpus-scope` (#3123) and `fix/2465-rollup-cause` (Refs #2465), wait on an adversarial verdict.
+Push both branches once that verdict lands.
+
+## 12:35 PDT --- two corrections to earlier entries, and a corrected belief
+
+**#3084 merged, and the 02:06 entry never said so.**
+That entry's last word on #3084 was that it waits on a gate no reachable reviewer can satisfy.
+It merged at 2026-09-03T16:25:36Z under the shared login, before three of this branch's commits, and got the same never-revisited treatment the 01:28 entry records for #3089.
+Whether the cross-model gate was satisfied for that merge is not derived here.
+The fix it merged without is tracked as #3109, closed by #3115.
+
+**A corrected belief, recorded at the correction.**
+Belief: a squash-merging repo's three-dot diff excludes a merge commit's content, so a re-add made while resolving a merge is invisible to review.
+Fact: `git diff main...feature` is a merge-base-to-tip tree diff and lists the re-add as an added line.
+What omits the merge patch is `git log -p`, unless given `-m` or `--diff-merges`.
+The query that settles it, run 2026-09-03 on git 2.43.0 in a scratch repo whose merge resolution re-added a paragraph:
+`git diff main...feature | grep '^+SHARED'` printed the line,
+`git log -p main..feature | grep -c '^+SHARED'` printed 0,
+and the same `git log` with `-m` printed 2.
+The false version had been written into `fix/ums-step3-corpus-scope`.
+The round-one adversarial verdict on the two held branches caught it, alongside five other findings: an n=2 "most", a bare `#605` resolving to the wrong repository, a bullet list coalescing with its host section's list, and a case record asserting an underived cause inside the subsection that forbids exactly that.
+All six are fixed on the two branches, and a round-two verdict is running.
+Wants promotion to `memories/git.md` when this notebook is folded.

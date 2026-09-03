@@ -556,3 +556,14 @@ Filed as [#3162](https://github.com/Morrison-Lab/ai-config/issues/3162) with thr
 a PreToolUse hook denying `git config --global`/`--system` writes of `user.*`, a brief line prescribing `git -c user.name=... -c user.email=...` for scratch repositories, and a pre-push author check.
 The wave-1 fix-loop brief already carries the prohibition and the author check.
 Lesson for the fold: "work only inside the worktree" does not cover a command typed inside the worktree that writes outside it, and `restore-global-state` reads as a rule about functions rather than about shells.
+
+## 16:49 PDT --- #3154 round 12: one finding, and two observations filed
+
+The verdict for `16c78e66` left one finding: the round-11 rewrite of the cross-repo bullet supplied a verb and dropped the noun,
+so "that repo" took "an ai-config checkout" as its nearest antecedent and the bullet read as a second pass over the repo already searched.
+The noun is restored at `a0922b12` ("in the destination repo, over that repo's own doc paths"), and its verdict is running.
+Two observations the reviewer placed outside the diff are filed rather than folded in:
+[#3163](https://github.com/Morrison-Lab/ai-config/issues/3163), `skill-builder` step 0's copy of the recipe lacks `-I`, the checkout guard, and the subshell;
+[#3164](https://github.com/Morrison-Lab/ai-config/issues/3164), the `ums` anti-patterns entry quotes a "check existing notes" step that belongs to `record-learnings`, and `consolidate-memory` carries the same phrase.
+Lesson for the fold: replacing a pronoun's anchor noun while fixing a different defect in the same sentence is how an `ambiguous-reference` regression arrives dressed as a fix;
+re-read every pronoun in a rewritten sentence against its new nearest antecedent.

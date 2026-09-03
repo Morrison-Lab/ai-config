@@ -1009,7 +1009,7 @@ Every agent does its job correctly on the list it was given, so the items that a
 
 ## Help your subagents improve over time
 
-[shared/workflow/improve-your-subagents.md](shared/workflow/improve-your-subagents.md)
+[`shared/workflow/improve-your-subagents.md`](shared/workflow/improve-your-subagents.md)
 
 The brief, the memory a dispatched agent can read, and the loop that feeds findings back to it are the orchestrator's, so the agent's mistake rate is too.
 `AGENTS.md` carries the rule;

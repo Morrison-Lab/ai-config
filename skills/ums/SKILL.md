@@ -115,9 +115,10 @@ committed pass.
      ```bash
      repo="${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/ums rev-parse --show-toplevel 2>/dev/null || pwd)}"
      test -f "$repo/CLAUDE.md" && test -d "$repo/shared" || { echo "not an ai-config checkout: $repo" >&2; exit 1; }
-     (cd "$repo" && grep -ril "<keywords>" skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md)
+     (cd "$repo" && grep -rilI --exclude-dir=__pycache__ "<keywords>" skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md)
      ```
-     The path list is the one skill-builder step 0 runs, over the files on disk,
+     The path list is the one skill-builder step 0 runs, over the files on disk;
+     `-I` skips binary files and `--exclude-dir` skips bytecode caches, which a plain `grep -r` would otherwise report as hits,
      so an entry that exists only on a branch not checked out there is out of reach (see the unmerged-PR section of [`grep-is-not-coverage`](../../shared/workflow/grep-is-not-coverage.md)).
      A rule can be owned by a `shared/` fragment or a skill as easily as by a memory,
      and a `memories/`-only grep stays outside those paths.

@@ -1332,7 +1332,8 @@ Committing costs one command and settles it.
 - **Do:** tidy or reshape that output in a separate call afterwards, when you want it readable.
 - **Do:** ask whether a disagreeing check is reading the artifact you changed, before diagnosing the check.
 - **Don't:** reshape the output of a command whose *text* is the evidence --- `--jq`, a downstream pipe, a formatting flag --- or chain anything after a command whose *position* is.
-- **Don't:** read those as alternatives; one guard commonly consults all three, so establishing that position matters says nothing about whether the body is inert.
+- **Don't:** read those as alternatives;
+  one guard commonly consults all three, so establishing that position matters says nothing about whether the body is inert.
 - **Don't:** conclude a guard is defective from the fact that the underlying action worked --- the guard measures the record, not the effect.
 
 ## Measure CPU time, not wall clock, when the assertion is about work done

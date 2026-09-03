@@ -11,6 +11,7 @@ from __future__ import annotations
 import contextlib
 import importlib.util
 import io
+import json
 import os
 import subprocess
 import sys
@@ -139,7 +140,7 @@ check("a missing file exits 2",
       subprocess.run([sys.executable, TOOL, "/nonexistent/draft.md"],
                      capture_output=True, text=True, timeout=60).returncode, 2)
 check("--json emits parseable JSON",
-      __import__("json").loads(run(_clean, "--json").stdout)["verdict"], "CLEAN")
+      json.loads(run(_clean, "--json").stdout)["verdict"], "CLEAN")
 
 # --- the anti-drift property --------------------------------------------
 # The whole point is that this reads the checker's OWN symbols. If it ever
@@ -222,10 +223,7 @@ check("the same finding inside an ADMITTED clean body does block", verdict(
 # the user's own OWNER account. The label stays UNREADABLE -- this tool models
 # a non-bot author on purpose -- but the explanation has to say so.
 _marked = "**Claude finished review**\n\n## Nits\n\n- a small thing\n"
-import importlib.util as _ilu
-_spec = _ilu.spec_from_file_location("crb2", TOOL)
-_crb = _ilu.module_from_spec(_spec); _spec.loader.exec_module(_crb)
-_r = _crb.analyse(_marked, MOD)
+_r = crb.analyse(_marked, MOD)
 check("a marker-carrying finding body is still labelled UNREADABLE",
       _r["verdict"], "UNREADABLE")
 check("but its explanation does not claim it blocks nothing",
@@ -238,7 +236,7 @@ check("and it names the finding that would block",
 # -- so the NO-VERDICT caveat was unpinned and could be flattened back to the
 # false claim with a green suite. Second time in two commits that a case
 # exercised the right feature and never isolated the clause under test.
-_bare = _crb.analyse("## Nits\n\n- a small thing\n", MOD)
+_bare = crb.analyse("## Nits\n\n- a small thing\n", MOD)
 check("a marker-free finding body is NO-VERDICT", _bare["verdict"], "NO-VERDICT")
 check("and its explanation carries the caveat too",
       "UNLESS posted under a bot identity" in _bare["why"], True)
@@ -257,12 +255,12 @@ check("a clean body with a finding but no fingerprint is not admitted", verdict(
 # The `else` arms of both caveat ternaries. Cheap, and without them an
 # unconditional caveat emits "the finding None is a standing not-clean" on a
 # finding-free body with the suite green.
-_plain_unreadable = _crb.analyse(
+_plain_unreadable = crb.analyse(
     "**Claude finished review**\n\n## Summary\n\nSome notes.\n"
     f"{FINGERPRINT}\n", MOD)
 check("a finding-free UNREADABLE body says blocks nothing, plainly",
       _plain_unreadable["why"].endswith("blocks nothing"), True)
-_plain_noverdict = _crb.analyse("## Summary\n\nSome notes on the diff.\n", MOD)
+_plain_noverdict = crb.analyse("## Summary\n\nSome notes on the diff.\n", MOD)
 check("a finding-free NO-VERDICT body says blocks nothing, plainly",
       _plain_noverdict["why"].endswith("blocks nothing"), True)
 
@@ -279,7 +277,7 @@ check("a STRUCTURED agent body with a finding and no readable verdict",
       verdict(_structured_unreadable), "UNREADABLE")
 check("and its caveat arm fires on a structured body too",
       "UNLESS posted under a bot identity"
-      in _crb.analyse(_structured_unreadable, MOD)["why"], True)
+      in crb.analyse(_structured_unreadable, MOD)["why"], True)
 
 # --- the call site, which the extraction alone does not cover ------------
 # The deleted `ast` guard caught one thing the extraction does not: whether
@@ -291,9 +289,12 @@ check("and its caveat arm fires on a structured body too",
 # admits an ARD summary fails, and any refactor that preserves the skip
 # passes.
 #
-# The checker's OWN suite still does not cover this (754 pass with the helper
-# neutered). Filed as Morrison-Lab/ai-config#3122 rather than fixed there,
-# since the gap pre-dates this PR.
+# The checker's OWN suite still does not cover this: it stays fully green with
+# the helper neutered to `return False`. No count is given, deliberately --
+# the total differs between this worktree and a scratch copy of it (754 vs
+# 753), and an earlier revision baked one in and had it read as a regression.
+# Filed as Morrison-Lab/ai-config#3122 rather than fixed there, since the gap
+# pre-dates this PR.
 
 class _FakeComment:
     def __init__(self, body, login="someuser", assoc="OWNER"):

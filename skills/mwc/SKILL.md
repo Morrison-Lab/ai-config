@@ -48,6 +48,53 @@ without asking confirmation before every merge.
   [`fully-clean`](../../shared/workflow/fully-clean.md) for the payload keys.
   A later all-clear from a different reviewer does not supersede a standing
   not-clean; only a later clean from the same reviewer does.
+  On GitHub (a GitLab MR has no equivalent gate until
+  [#3021](https://github.com/Morrison-Lab/ai-config/issues/3021)),
+  record `headRefOid` and `baseRefName` before the instrument runs and
+  require both live values to equal them immediately before every direct
+  merge, so a retarget at the same tip cannot pass with an old verdict and a
+  concurrent push that already contains the base cannot ride a
+  currency-only check past a verdict it never received.
+  After the instrument passes, run the base-currency check that
+  [`fully-clean`](../../shared/workflow/fully-clean.md) states in its stale-base rule
+  (the Do bullets beginning "for a direct merge") before the merge command,
+  by merge mode: the `git merge-base` form in a local session,
+  the compare endpoint's `behind_by` in a remote session without `git`,
+  no merge at all from a session that can run neither until
+  [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) wires it
+  into the instrument, and a stop on a base that requires a merge
+  queue until [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030)
+  lands.
+  On a direct merge a stale merge-base means an update pinned to the
+  recorded head (`PUT .../pulls/<N>/update-branch` with
+  `expected_head_sha`, or the MCP tool's `expectedHeadSha`; a `422`
+  whose message names an expected-head mismatch (match on the substring `expected head sha`, since the live text carries a curly apostrophe and a trailing period that this ASCII rendering cannot show)
+  means another writer moved the head, so settle ownership instead,
+  and any other `422` is a failed update to stop on),
+  a wait of a few minutes at most until `headRefOid` changes (the update is
+  asynchronous; expiry is a failed update to stop on and report),
+  recording that SHA,
+  a currency check on it,
+  a full re-run of the gate pinned to it,
+  then a check immediately before the merge command that the live head
+  is still that SHA, `baseRefName` is unchanged, and the base tip
+  still equals the `<pinned-tip>` the currency check printed (recorded
+  before the gate reran), repeating the cycle when any moved during the
+  gate,
+  and `--match-head-commit "<pinned-sha>"` (or `expectedHeadSha` on the
+  MCP merge tool) on the merge command itself, so the API refuses a
+  push that lands after the read.
+  No merge API pins the base, so on a repository without a merge queue
+  or an up-to-date-branch requirement the base can still move between
+  that read and the merge; where that must not happen, the server-side
+  gate is the only closure, per
+  [`fully-clean`](../../shared/workflow/fully-clean.md).
+  A repeat names the moving ref: when the base moved twice it outruns
+  the gate, so merge under strict up-to-date protection instead (or
+  through a merge queue once [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030)
+  lands), and when the head moved another writer is on the branch, so
+  settle ownership per [`claim-pr`](../claim-pr/SKILL.md) before
+  rerunning, per [`fully-clean`](../../shared/workflow/fully-clean.md).
 - **Session Duration**: The grant expires automatically when the session ends
   or when explicitly revoked via `/mwc revoke` or `disable-mwc`.
 
@@ -281,7 +328,10 @@ When the user gives an MWC grant (e.g. `/mwc` or "merge when confident"):
    two sides resolved different ids, which is exactly what ai-config#1279 was.
 2. Proceed with the task (e.g. driving PRs to clean via `ardi`).
 3. When a PR reaches 100% clean state, merge it immediately
-   (default: squash merge via `gh pr merge <number> --squash --delete-branch`),
+   (default: `gh pr merge "<number>" -R "<owner>/<repo>" --squash --delete-branch --match-head-commit "<pinned-sha>"`,
+   the pin being the `headRefOid` recorded before the instrument ran;
+   on a base that requires a merge queue, stop and report instead, per
+   [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030)),
    verify the merge landed on GitHub/GitLab,
    and run the post-merge skill (`post-merge` / `ums`).
 4. If the user revokes the grant, run `skills/session-lock/scripts/ai-session.sh disable-mwc` immediately.

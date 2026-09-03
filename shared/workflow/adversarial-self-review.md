@@ -276,6 +276,42 @@ An instrument with no such result is a finding on its own terms, per [`verify-th
 Five adversarial rounds each found real defects against a fully green suite, and three of the five found them in the verification tooling rather than in the change: a parity metric that could not fail, a negative control patching a function that had moved off the execution path, and an assertion comparing a function against itself.
 The last of those had let a previously-rejected design pass 299 tests.)
 
+## Give a docs-only diff describing an instrument a full round
+
+The section above says a diff's verification artifacts are the least-guarded part of it.
+Its limit case is a diff carrying no code at all: documentation describing how an instrument behaves.
+That reads as the safest change available: nothing executes, no suite can break, and the round feels like a copy-edit.
+Treat that reading as the risk rather than as a fact about relative rates --- one case cannot establish which diffs get cut short most often, and it does not have to, because the instruction is the same either way: review it at full depth.
+
+The defect it carries is not new here.
+[`fact-check-prose`](../writing/fact-check-prose.md)'s "Prose that distills code is a code claim, checked like code" already owns it, names the same psychology, and prescribes the same remedy;
+its "condensation of the code that builds it" section extends the rule to a written-out command, and its fenced-block section to program output.
+Read those for what the check is.
+What this section adds is the **review-side** consequence, which none of them states: that a docs-only diff about instruments invites an early stop, and that the findings cluster rather than scatter when the round runs to depth.
+
+The measured shape is worth carrying because it tells a reviewer where to aim.
+The findings cluster, rather than scattering: a consumer described as reading one field when it falls back to another, a format called unparseable when the parser accepts it, a value called rejected when nothing validates it, a set of accepted forms given as two when the code accepts three.
+None reads as a guess afterwards, because each is a claim about a file in the same repository, and knowing roughly what that file does feels like having read it.
+Where the claim is about which branch fires, read the branch.
+A negative claim --- *this form does not parse*, *nothing accepts this* --- is the one to execute rather than reason about.
+Reading can settle it, when the parser is small and you read all of it;
+what reading cannot tell you is whether you read all of it, and every refuted negative claim in this measurement was made by someone who believed they had.
+
+- **Do:** run each consumer named in the prose against the input the prose describes, before writing the sentence about it.
+- **Do:** treat a negative claim about a parser, guard, or matcher as owing an execution, not an argument.
+- **Do:** let the round count be decided by whether findings are still landing --- the rule the section above already gives --- rather than by the diff's size or its lack of code.
+- **Don't:** read "no code changed" as "nothing here can be wrong" --- the claims changed, and they have no suite.
+- **Don't:** describe a fallback, a precedence rule, or an accepted-form list from the shape of the code;
+  enumerate it from the code.
+
+(Measured 2026-09-02 on [ai-config#3010](https://github.com/Morrison-Lab/ai-config/pull/3010), a documentation-only change carrying 52 insertions and 1 deletion across four files, of which 34 insertions are to this file.
+Twelve adversarial rounds are recoverable from the session: 7, 8, 4, 3, 3, 3, 1, 1, 0, then 4, 1, 0 after the scope reopened.
+Nine of those 35 findings were the one shape above, and five of the nine are recoverable, each a claim the named consumer disproves once read or run: that the three payload consumers read the payload and nothing else, when they fall back to prose;
+that a bolded verdict phrase does not parse, when it does;
+that demoting a disclosure marker changes `_reviewer_identity()`, when the Claude Code footer is deliberately excluded from `REVIEW_AGENT_MARKERS`;
+that a non-conforming payload is rejected, when nothing validates it;
+and that the pre-push guard accepts two verdict phrasings, when it accepts three.)
+
 ## Require detailed and holistic review passes
 
 Reviewers must independently assess both detailed, evidence-backed implementation defects and the whole change:
@@ -412,6 +448,34 @@ pushing branch A afterward compares its shipped commit `X` against the held `Y`,
 
 Every reviewer emits two representations of one verdict: the human-readable Markdown report, then a machine-readable JSON payload in a trailing HTML comment.
 
+**"Every reviewer" means every review you post, not only one a dispatched persona wrote.**
+The paragraphs around this section are mostly about a review dispatched to the [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md) persona before a push,
+so the requirement reads as that persona's rather than as a rule about reviews.
+It binds every review you post or produce: a forge comment, a local report, a review composed in-transcript.
+The one you are likeliest to write without a payload is the review nobody dispatched and no push follows --- a review-only request on somebody else's PR --- since neither the persona nor the pre-push guard is in play there.
+
+Nothing goes red when the payload is omitted, which is why this needs stating rather than more care.
+Such a review still yields a verdict its consumers read, since Markdown parsing is every one of their fallbacks when no payload is present.
+What a missing payload loses is the per-finding records, which no prose pattern recovers.
+The near-miss is a thorough report --- findings reproduced, locations cited, the disclosure marker appended --- where every standard a human reader can see is met and the machine-readable half is the one absent.
+
+The Markdown half owes a verdict line the consumers' own patterns match, and the forms are not interchangeable.
+Measured 2026-09-02 against the three consumers, on `Ready for merge`:
+
+| form | `check-pr-fully-clean.py` | `parse_report` | `enforce-mwc-review-gate.py` |
+| --- | --- | --- | --- |
+| `Verdict: <phrase>` | reads | reads | **no verdict** |
+| `### Verdict` then `**<phrase>**` | reads | **no verdict** | reads |
+| `### Verdict: <phrase>` | reads | reads | reads |
+
+So write `### Verdict: Ready for merge` or `### Verdict: Needs more work` --- the heading and the phrase on one line, which is the only form all three read.
+The phrase matters as much as the form: the pre-push guard accepts `Ready for merge`, `Needs more work`, and `Needs work` and nothing else, so `Verdict: Clean`, `Verdict: Approved`, and `Verdict: Ready` return no verdict there while `check-pr-fully-clean.py` accepts all of them.
+
+- **Do:** append the payload to any review you post or produce, including one nobody dispatched and one no push follows.
+- **Don't:** read this section as binding the persona alone --- the persona is where it is already implemented, not where it applies.
+- **Don't:** treat a thorough, well-cited, correctly-disclosed report as complete without it;
+  that combination is exactly what the omission looks like from the inside.
+
 ```html
 Reviewed-Commit: <sha>
 
@@ -429,9 +493,15 @@ Reviewed-Commit: <sha>
 For a not-clean verdict, set `"verdict": "NOT_CLEAN"` and give `"findings"` one object per finding, each with the four keys `file`, `line`, `category`, and `message`.
 State those keys in any brief you write, rather than only asking for "finding objects" --- a reviewer that guesses the key names produces `structured finding in unknown: ` as the reported blocking reason.
 
+Name the target repository's schema version in that same brief when it differs from the template above, and its required fields with it --- a version string alone still leaves the reviewer emitting a payload that does not conform to the target's contract, which nothing there validates and so nothing there catches.
+A review you compose yourself has no brief to carry that, so read the target's own reviewer prompt before copying the template: `Morrison-Lab/gha`'s asks for `1.1` and two fields this template does not have.
+Nothing here reads `schema_version`, and this corpus emits `1.0` --- in that template, in both `adversarial-reviewer` persona files, and in `pre-push-review.py` --- while `Morrison-Lab/gha`'s reviewer prompt requires `1.1` with `detailed_assessment` and `holistic_assessment` fields (measured 2026-09-02, [ai-config#3006](https://github.com/Morrison-Lab/ai-config/issues/3006)).
+A reviewer left to copy the template emits `1.0` into a repository asking for `1.1`.
+
 Three rules govern how the payload is read, and each exists because its absence inverted a verdict:
 
 - **The payload must be last, and the last one wins.**
+  Last among `review-data` blocks, that is --- [`disclose-agent-authorship`](disclose-agent-authorship.md) still ends a posted comment with its marker, and the two do not conflict: `extract_structured_review` reads a payload the marker follows (verified 2026-09-02), and [`pre-push-review.py`](../../scripts/pre-push-review.py) already emits the report in that order.
   The authoritative payload follows the verdict and the `Reviewed-Commit` fingerprint.
   A reviewer who quotes the template above (it hardcodes `"verdict": "CLEAN"`) before writing its own would otherwise publish a `NOT_CLEAN` review that scored clean.
 - **A payload inside a code region does not count.**

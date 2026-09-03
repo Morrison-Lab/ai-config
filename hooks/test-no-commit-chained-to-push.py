@@ -91,6 +91,23 @@ check("&& chained", fires("git commit -m x && git push"), True)
 check("semicolon separated", fires("git commit -m x; git push"), True)
 check("newline separated", fires("git commit -m x\ngit push"), True)
 
+# The rest of the OPENER's line is not body. A heredoc redirection is one word
+# of a command that can carry more after it, and discarding everything from
+# the opener to the body's first newline discarded a real chained push --- a
+# BYPASS, measured as `allow` before the fix.
+check("a push chained on the heredoc opener's own line still fires",
+      fires("git commit -F - <<'EOF' && git push -u origin b\nmsg\nEOF\n"),
+      True)
+check("same, separated by a semicolon",
+      fires("git commit -F - <<'EOF'; git push\nmsg\nEOF\n"), True)
+# Nothing may follow the terminator. Verified against bash directly: a body
+# line `EOF  ` does not close the heredoc, the body continues past it. Reading
+# it as the terminator parsed the remaining body as live commands and refused
+# a harmless call.
+check("a body line with trailing whitespace does not close the heredoc",
+      fires("cat <<'EOF' > f.md\nEOF  \ngit commit -m x && git push\nEOF\n"),
+      False)
+
 # Heredoc delimiters are ordinary shell words, not `\w+`, and the terminator
 # is anchored. Both were false-DENY sources: an unrecognized opener left the
 # body as live text, and a loosely-matched terminator closed the heredoc

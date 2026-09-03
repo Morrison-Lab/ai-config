@@ -61,9 +61,19 @@ check("unbalanced quote is a parse error",
 # the module docstring and both fail toward `None` or toward a mangled
 # ARGUMENT rather than toward a wrong command boundary. Pinned so a later
 # quote-aware rewrite is a visible change rather than a silent one.
-check("a `<<` inside a quoted argument can unbalance the quote and fail open",
+# The SYMPTOM here changed when `_heredoc_free` stopped discarding the rest of
+# the opener's line, and this case exists to make that visible rather than
+# silent. It used to swallow the closing quote too, so `shlex` raised and the
+# result was `None`; now the quote survives, the argument parses, and what is
+# lost is the text after the unterminated pseudo-heredoc. The DIRECTION is
+# unchanged and is the property that matters: both spellings fail OPEN, and
+# the hook allows this call either way. Re-pinned rather than restored,
+# because restoring it would mean re-introducing the bypass that dropping the
+# opener's line caused for a REAL heredoc.
+check("a `<<` inside a quoted argument still fails open, now as a mangled "
+      "argument rather than a parse error",
       shellcmd.simple_commands("git commit -m 'fix a << b'\nb=1\ngit push"),
-      None)
+      [["git", "commit", "-m", "fix a  << "]])
 check("a newline inside a quoted argument arrives in the token as a semicolon",
       shellcmd.simple_commands("git commit -m 'line1\nline2'"),
       [["git", "commit", "-m", "line1;line2"]])

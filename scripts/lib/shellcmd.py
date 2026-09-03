@@ -211,9 +211,23 @@ def _heredoc_free(command):
         dash, delim = m.group(1), m.group(3)
         body_start = command.find("\n", m.end())
         if body_start == -1:
+            out.append(command[m.end():])
             return "".join(out)
+        # THE REST OF THE OPENER'S LINE IS NOT BODY, and dropping it was a
+        # bypass. A heredoc redirection is one word of a command that can
+        # carry more after it --- `git commit -F - <<'EOF' && git push` runs
+        # the push, and discarding everything from the opener to the body's
+        # first newline discarded that push, so the guard went silent on a
+        # real chain. Keep it; only the BODY is blanked.
+        out.append(command[m.end():body_start])
+        out.append("\n")
         indent = r"[\t]*" if dash else ""
-        term = re.compile(r"^" + indent + re.escape(delim) + r"[ \t]*$", re.M)
+        # Nothing may follow the delimiter. Bash requires the terminator line
+        # to match exactly --- verified directly: a body line `EOF  ` does not
+        # close the heredoc, the body continues past it. Accepting trailing
+        # whitespace read such a line as the terminator, so the rest of the
+        # body was parsed as live commands and a harmless call was refused.
+        term = re.compile(r"^" + indent + re.escape(delim) + r"$", re.M)
         hit = term.search(command, body_start + 1)
         if hit is None:
             return "".join(out)

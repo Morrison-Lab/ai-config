@@ -91,6 +91,38 @@ check("&& chained", fires("git commit -m x && git push"), True)
 check("semicolon separated", fires("git commit -m x; git push"), True)
 check("newline separated", fires("git commit -m x\ngit push"), True)
 
+# Heredoc delimiters are ordinary shell words, not `\w+`, and the terminator
+# is anchored. Both were false-DENY sources: an unrecognized opener left the
+# body as live text, and a loosely-matched terminator closed the heredoc
+# early so the rest of the body was parsed as commands. A false DENY on a
+# harmless call is the direction README calls worse than a missing hook.
+check("a hyphenated heredoc delimiter does not leave its body live",
+      fires("cat <<'END-MSG' > f.md\ngit commit -m x && git push\nEND-MSG\n"),
+      False)
+check("a dotted heredoc delimiter does not leave its body live",
+      fires("cat <<'EOF.1' > f.md\ngit commit -m x && git push\nEOF.1\n"),
+      False)
+check("an indented terminator inside a `<<` body does not close it early",
+      fires("cat <<'EOF' > f.md\n  EOF\ngit commit -m x && git push\nEOF\n"),
+      False)
+check("`<<-` accepts a tab-indented terminator",
+      fires("cat <<-'EOF' > f.md\ngit commit -m x && git push\n\tEOF\n"),
+      False)
+check("`<<-` does not accept a SPACE-indented terminator",
+      fires("cat <<-'EOF' > f.md\n  EOF\ngit commit -m x && git push\nEOF\n"),
+      False)
+check("an unterminated heredoc runs to the end, as the shell reads it",
+      fires("cat <<'EOF' > f.md\ngit commit -m x && git push\n"), False)
+# The positives that keep the widened delimiter class from swallowing real
+# commands: a chain AFTER a closed heredoc must still be refused, including
+# after two of them, which the single-regex form could not span.
+check("a real chain after a hyphenated heredoc still fires",
+      fires("cat <<'END-MSG' > f.md\ntext\nEND-MSG\n"
+            "git commit -m x && git push\n"), True)
+check("a real chain after two heredocs still fires",
+      fires("cat <<'A' > f\ntext\nA\ncat <<'B' > g\ntext\nB\n"
+            "git commit -m x && git push\n"), True)
+
 # An override authorizes THAT COMMAND, not the rest of the call. `evaluate`
 # used to `return None` on the first overridden commit or push, abandoning the
 # scan, so an override anywhere disarmed the guard for every later command --
@@ -753,7 +785,12 @@ def _fuse_heredoc(m):
     def split(command):
         import shellcmd as sc
         patched = _re.sub(r"\\\r?\n", " ", command)
-        patched = sc.RX_HEREDOC.sub("<<", patched).replace("\n", ";")
+        # `_heredoc_free` emits `" << "`; collapsing the spaces is exactly the
+        # defect this mutation restores. Reconstructed through the real
+        # function rather than a private regex, so the mutation keeps working
+        # when the heredoc scanner changes shape.
+        patched = sc._heredoc_free(patched).replace(" << ", "<<")
+        patched = patched.replace("\n", ";")
         return real_split(patched)
     m.simple_commands = split
 

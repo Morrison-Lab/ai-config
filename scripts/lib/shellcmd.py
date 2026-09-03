@@ -48,7 +48,7 @@ State that here rather than letting the argv-split argument imply otherwise --
 this docstring is the contract ai-config#2993 will migrate eight live guards
 onto, two of which can refuse.
 
-  * `RX_HEREDOC` is QUOTE-BLIND. A `<<` inside a quoted argument -- a commit
+  * `RX_HEREDOC_OPEN` is QUOTE-BLIND. A `<<` inside a quoted argument -- a commit
     message that mentions a heredoc, say -- can be treated as a real operator,
     and consuming up to a delimiter then unbalances the quote. `shlex` raises
     `ValueError` and `simple_commands` returns `None`. Measured, writing LF
@@ -120,7 +120,15 @@ import shlex
 # `<<WORD`, `<<'WORD'`, `<<-"WORD"`, then the body up to a terminator that `<<-`
 # allows to be tab-indented. The NEWLINE AFTER the terminator is deliberately
 # outside the match -- see `_heredoc_free`.
-RX_HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1.*?\n[ \t]*\2\b", re.S)
+# The OPENER only. Finding the terminator needs the `-` flag, which a single
+# pattern cannot branch on, so `_heredoc_free` scans for it.
+#
+# The delimiter class is not `\w+`. A shell delimiter is an ordinary word, so
+# `END-MSG` and `EOF.1` are legal and common, and `\w` matches neither --- the
+# opener then went unrecognized, the body was left as live text, and a heredoc
+# merely CONTAINING `git commit && git push` was refused. A false DENY on a
+# harmless call is the direction README calls worse than a missing hook.
+RX_HEREDOC_OPEN = re.compile(r"<<(-?)\s*(['\"]?)([^\s'\"<>&|;()`$]+)\2")
 
 # No `export` alternative here on purpose. `shlex` splits `export FOO=1` into
 # TWO tokens, so an `export`-prefixed assignment never reaches this pattern as
@@ -180,8 +188,36 @@ def _heredoc_free(command):
 
     Two commands read as one. Adding `<` to `_SHELL_OPS` is the wrong repair:
     it would split `sort x > out` into two commands as well.
+
+    THE TERMINATOR IS ANCHORED, and loosely matching it was a false-DENY
+    source. The old pattern accepted `[ \t]*<delim>` anywhere, so an indented
+    `EOF` INSIDE a body closed the heredoc early and the rest of the body was
+    parsed as live commands. The shell is stricter: `<<` requires the
+    terminator at column 0, and only `<<-` strips indentation, tabs alone.
+    Both spellings are honoured here.
+
+    An unterminated heredoc runs to the end of the input, as the shell reads
+    it, so everything after the opener is body.
     """
-    return RX_HEREDOC.sub(" << ", command)
+    out = []
+    pos = 0
+    while True:
+        m = RX_HEREDOC_OPEN.search(command, pos)
+        if m is None:
+            out.append(command[pos:])
+            return "".join(out)
+        out.append(command[pos:m.start()])
+        out.append(" << ")
+        dash, delim = m.group(1), m.group(3)
+        body_start = command.find("\n", m.end())
+        if body_start == -1:
+            return "".join(out)
+        indent = r"[\t]*" if dash else ""
+        term = re.compile(r"^" + indent + re.escape(delim) + r"[ \t]*$", re.M)
+        hit = term.search(command, body_start + 1)
+        if hit is None:
+            return "".join(out)
+        pos = hit.end()
 
 
 def _comment_free(command):
@@ -255,7 +291,7 @@ def simple_commands(command):
     """
     # ORDER MATTERS, and the natural order is wrong. Joining continuations
     # first lets a heredoc BODY line ending in a backslash eat its own
-    # terminator, after which `RX_HEREDOC` closes at some later occurrence of
+    # terminator, after which `_heredoc_free` closes at some later occurrence of
     # the delimiter word -- or never -- and everything between is swallowed.
     # Measured: `git commit -F - <<EOF / a \\ / EOF / git push` lost the push
     # entirely, so the guard went silent. A heredoc body is literal text and a
@@ -294,8 +330,11 @@ def strip_env(argv):
     `{ git commit -m x; }`, and `sudo -u me git push` all resolve to a `git`
     first token, as they do for the guard this one is paired against.
 
-    `env` is the list of assignment TOKENS, in order, including any `export`
-    prefix.
+    `env` is the list of assignment TOKENS, in order. It never contains an
+    `export` word: the loop below consumes that token separately, because
+    `shlex` splits `export FOO=1` into two. `env_value`'s docstring says the
+    same, and this one used to claim the opposite --- a caller trusting it
+    would strip a prefix that cannot be present.
     """
     rest, env, after_wrapper = list(argv), [], False
     while rest:

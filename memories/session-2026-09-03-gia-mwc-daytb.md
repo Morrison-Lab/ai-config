@@ -249,7 +249,7 @@ Re-queried rather than recalled, per the state-claim rule.
 
 | PR | head | state |
 |---|---|---|
-| [#3084](https://github.com/Morrison-Lab/ai-config/pull/3084) | `bf558244` | pushed, 15/15 checks green, `review / require-clean-verdict` success, both threads resolved |
+| [#3084](https://github.com/Morrison-Lab/ai-config/pull/3084) | `bf558244` | pushed, 14 checks success and 1 skipped (a superseded `new-line-breaks` run), `review / require-clean-verdict` success, both threads resolved |
 | [#3060](https://github.com/Morrison-Lab/ai-config/pull/3060) | remote `c851d68f`, local `0daed144` | round 6 committed, unpushed, awaiting a push-gate verdict |
 | [#3023](https://github.com/Morrison-Lab/ai-config/pull/3023) | `6aa021b5` | open, the peer's |
 | [#3089](https://github.com/Morrison-Lab/ai-config/pull/3089) | `8f1ca761` | **merged 06:51Z by the peer**, not by me |
@@ -266,8 +266,11 @@ So the instrument that reported an absence about lines it never examined now rep
 That is the session's recurring pattern getting an instrument rather than a rule, and someone else built it.
 
 **The peer's PR count grew by two while this session was compacting.**
-`ListAgents` reported no peers all session and still does;
-the forge's `updated_at` is the only instrument here that works.
+`ListAgents` reported no peers all session and still does.
+The instrument that actually settles it is the commit trailer, not `updated_at`, which cannot separate a peer from any other actor pushing under the same login:
+the tip of #3023 carries a `Claude-Session:` URL differing from this session's, which is decisive;
+the tips of #3089, #3100 and #3101 carry no trailer, the human's authorship, and a `Co-Authored-By: Claude ...` line, which is the signature of a *local* session rather than of a person.
+Banked as a rule in `memories/git-worktrees.md` on #3060's branch.
 
 ## The merge gate, re-probed rather than recalled
 
@@ -277,8 +280,11 @@ and says plainly that where none is reachable "the merge waits --- 'blocked on r
 
 Re-probed at 01:28 PDT: `codex`, `opencode`, `agy`, `cursor`, `cursor-agent`, `gemini`, `aider`, `crush` all absent from `PATH`,
 and no provider API key is set in the environment.
-The CI `claude-review` job does not close the gap:
-it differs in harness and not in model, and the gate requires both.
+The CI `claude-review` job does not close the gap, and my first statement of why was asserted rather than derived.
+I wrote that it "differs in harness and not in model".
+Nothing reachable establishes that: `.github/workflows/claude-review.yml` passes no `model:` input, and the reusable workflow it calls documents that input as empty by default, falling through to `claude-code-action`'s own default, which no memory file here pins.
+The derivable reason does not need the model at all.
+The gate requires "the **author-dispatched** cross-model, cross-harness reviewer's 100% all-clear adversarial verdict at the shipping head", and a workflow triggered by the push is not author-dispatched whatever model it runs.
 
 So #3084 is finished except for a gate no reachable reviewer can satisfy, and it waits.
 The standing ai-config `mwc` grant does not help, because the gate is a condition on the *verdict*, not on authorization.

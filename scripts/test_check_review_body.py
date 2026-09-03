@@ -146,6 +146,14 @@ for sym in ("classify_verdict", "_unresolved_finding_pattern",
             "_is_structured_review_body", "is_non_review_notice"):
     check(f"classifier exposes {sym}", hasattr(MOD, sym), True)
 
+# The docstring states this count in prose, twice. Pinned rather than
+# timestamped, because `FINDING_PATTERNS` is edited whenever a new not-clean
+# shape is added and nothing else would notice the prose going stale.
+check("the finding-pattern count the docstring states",
+      len(MOD.FINDING_PATTERNS), 18)
+check("the findings heading is one of them",
+      MOD._FINDINGS_HEADING_PATTERN in MOD.FINDING_PATTERNS, True)
+
 # --- the two the delegating version still got wrong ----------------------
 # Both were the SAME error as the four before them: a gate re-derived here
 # rather than taken from the checker.
@@ -157,7 +165,10 @@ check("an agent body the classifier cannot parse is not clean", verdict(
     f"**Claude finished review**\n\n## Summary\n\nSome notes.\n\n{FINGERPRINT}\n"),
     "UNREADABLE")
 
-# `has_review_body_marker` is not in the checker's admission path at all. A
+# `has_review_body_marker` is not a branch in `check_review_comments`. It is
+# still reached during admission, inside `is_non_review_notice`, and this tool
+# does not compute it either way -- the point of the case below is the second
+# half of that sentence. A
 # marker-free body carrying a real not-clean signal is admitted from any
 # author through the fail-closed branch, and became a standing veto.
 check("a marker-free body with a real finding is still not-clean", verdict(
@@ -265,6 +276,65 @@ check("a STRUCTURED agent body with a finding and no readable verdict",
 check("and its caveat arm fires on a structured body too",
       "UNLESS posted under a bot identity"
       in _crb.analyse(_structured_unreadable, MOD)["why"], True)
+
+# --- the two skip reasons, reported apart as well as together -----------
+# A conflated boolean says a body is ignored without saying which remedy
+# applies, so both halves are pinned in isolation. Each case must be positive
+# for exactly ONE of them: a pair of assertions that only ever moved together
+# would pass under a version that never split them.
+
+def skips(body):
+    r = crb.analyse(body, MOD)
+    return (r["ard_disposition_summary"], r["checker_non_review_notice"],
+            r["is_non_review_notice"])
+
+
+_ARD = (f"## ARD Review Disposition Summary\n\n## Summary\n\nAll findings "
+        f"addressed.\n\n## Verdict\n\nVerdict: Ready for merge\n{FINGERPRINT}\n")
+_NOTICE = ("Claude Review Dispatched\n\nThe review workflow has started; "
+           "no verdict yet.\n")
+
+check("an ARD summary is the ARD skip alone", skips(_ARD), (True, False, True))
+check("a workflow notice is the checker skip alone", skips(_NOTICE),
+      (False, True, True))
+check("an ordinary review is neither skip", skips(
+    f"## Summary\n\n`[FINDINGS_COUNT: 0]`\n\n## Verdict\n\n"
+    f"Verdict: Ready for merge\n{FINGERPRINT}\n"),
+    (False, False, False))
+
+# What a drafter actually reads is `render`'s output, and the assertions above
+# pin only the dict. Swapping the two labels behind their values inverts the
+# whole diagnostic -- pointing an ARD-heading problem at the notice test --
+# and left the suite green, so the rendered lines are pinned too.
+check("the ARD sub-line renders under its own label",
+      "ARD disposition summary : True" in crb.render(crb.analyse(_ARD, MOD)),
+      True)
+check("the notice sub-line does not claim the ARD skip fired",
+      "ARD disposition summary : False" in crb.render(crb.analyse(_NOTICE, MOD)),
+      True)
+check("the notice sub-line renders under its own label",
+      "checker notice          : True" in crb.render(crb.analyse(_NOTICE, MOD)),
+      True)
+
+# The `why` distinguishes them too, since that string is what a drafter reads.
+check("the ARD skip names the phrase in its reason",
+      "ARD-disposition phrase" in crb.analyse(_ARD, MOD)["why"], True)
+check("the ARD reason does not assert the body IS one",
+      "is an ARD" in crb.analyse(_ARD, MOD)["why"], False)
+check("the notice skip does not mention the ARD skip at all",
+      "ARD" in crb.analyse(_NOTICE, MOD)["why"], False)
+
+# The positionless match, stated in the code comment and unasserted until now.
+# A review that merely QUOTES the phrase is skipped as well, unlike a review
+# that quotes a workflow notice -- which is a real trap for this corpus, whose
+# reviews discuss the phrase routinely.
+_QUOTES_ARD = (f"## Summary\n\nThe checker skips any body containing "
+               f"\"ARD Review Disposition Summary\" outright.\n\n"
+               f"## Verdict\n\nVerdict: Ready for merge\n{FINGERPRINT}\n")
+check("a review that merely quotes the ARD phrase is skipped too",
+      verdict(_QUOTES_ARD), "IGNORED")
+check("and its reason does not tell the drafter to rename a heading",
+      "heading" in crb.analyse(_QUOTES_ARD, MOD)["why"], False)
 
 if failures:
     print("FAILED:")

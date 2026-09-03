@@ -31,13 +31,41 @@ rules it would have answered for free.
 
 WHAT IT REPORTS
 ---------------
-The four questions that decide a body's fate, each answered from
+The four body-level facts that decide a body's fate, each computed by
 `check-pr-fully-clean.py`'s OWN code rather than a copy:
 
-  * does it carry a review marker at all;
-  * is it structurally a report (heading plus fingerprint);
-  * does anything match the findings-heading pattern;
-  * which not-clean patterns match, quoted.
+  * whether the checker skips it outright -- an ARD disposition summary, or a
+    workflow notice `is_non_review_notice` recognises. The two are reported
+    separately as well as combined, because they are different mistakes to
+    have made and the combined boolean alone does not say which one fired;
+  * whether `_is_structured_review_body` reads it as a report -- a report
+    heading AND a `Reviewed-Commit:` fingerprint;
+  * what `classify_verdict` makes of it: clean, not-clean, unreadable, or no
+    verdict at all;
+  * which pattern `_unresolved_finding_pattern` matches, quoted.
+
+Those four decide the predicted classification, reported on the
+`would classify as` line together with the reason that settled it.
+
+An earlier version of this list named a review-marker check and a
+findings-heading pattern instead. Neither is computed here, and the
+findings heading is one of the patterns `_unresolved_finding_pattern` folds
+together, so neither could be reported separately.
+
+Note what is NOT being said about the marker check, because an earlier
+revision of THIS paragraph said it and it is false. `has_review_body_marker`
+is not a branch in `check_review_comments`, and it is reached during
+admission all the same: `is_non_review_notice` calls it
+(`check-pr-fully-clean.py:451`) as a precedence guard, and it decides the
+case. Measured -- `Claude Review Dispatched` followed by
+`Verdict: Ready for merge` is admitted, the same notice without the verdict
+line is skipped, and the marker function is the only difference. So the
+reason it is absent here is that this tool does not compute it, not that the
+checker does not consult it.
+
+Documenting a debugging tool as reporting something it does not is the one
+docstring error that costs a reader an hour -- and asserting a gate is
+unreachable when it decides the case is the one that costs them two.
 
 It reports on the BODY alone. Quorum, identity, per-reviewer supersession and
 head-SHA matching are the caller's business and are deliberately out of scope
@@ -50,11 +78,13 @@ USAGE
     python3 scripts/check-review-body.py --json draft.md
     cat draft.md | python3 scripts/check-review-body.py -
 
-Exit status: 0 when the body would classify CLEAN, 1 when it would classify
-not-clean or be ignored, 2 when the file cannot be read or the classifier
-cannot be imported. The three are distinct because "would be ignored" and
-"would be read as not-clean" need different fixes, and both differ from the
-check having failed to answer.
+Exit status: 0 when the body would classify CLEAN; 1 for every other
+classification -- NOT-CLEAN, IGNORED, NO-VERDICT and UNREADABLE alike; 2 when
+the file cannot be read or the classifier cannot be imported. Only the last is
+distinguished, because failing to answer differs in kind from answering "not
+clean". The four non-clean outcomes need different fixes from each other and
+the exit status does not separate them, so read the `would classify as` line
+(or the `verdict` key under `--json`) rather than branching on 1.
 """
 from __future__ import annotations
 
@@ -125,9 +155,23 @@ def analyse(body, mod):
     # skills/ard/SKILL.md, so a driving session's own summary must not read as
     # a verdict.
     ard_summary = "ard review disposition summary" in body.lower()
-    notice = ard_summary or bool(mod.is_non_review_notice(body))
+    checker_notice = bool(mod.is_non_review_notice(body))
+    # Reported separately as well as combined. They are two different skips
+    # with two different remedies, and a single conflated boolean tells a
+    # drafter their body is ignored without saying which to fix.
+    #
+    # Note the asymmetry between them. `is_non_review_notice` carries a
+    # precedence guard, so a real review DISCUSSING a notice stays a review.
+    # The ARD test has none: it is a bare substring match over the whole
+    # lowercased body, with no heading, position or fence test, so a review
+    # that merely QUOTES the phrase is skipped too. That is the checker's
+    # behaviour rather than this tool's, and it is why the reason string below
+    # says the body contains the phrase rather than that it is one.
+    notice = ard_summary or checker_notice
 
     result = {
+        "ard_disposition_summary": ard_summary,
+        "checker_non_review_notice": checker_notice,
         "is_non_review_notice": notice,
         "is_structured_review_body": structured,
         "classifier_verdict": verdict or "none",
@@ -176,12 +220,17 @@ def analyse(body, mod):
     # second time.
     #
     # Three gates were re-derived across three rounds before this list existed
-    # -- `has_review_body_marker` (not in the admission path at all), the
+    # -- `has_review_body_marker` (not a branch here, though the checker does
+    # reach it inside `is_non_review_notice`), the
     # missing `unreadable` state, and the ARD skip. Naming the boundary is what
     # makes the next one findable.
     if notice:
         result["verdict"] = "IGNORED"
-        result["why"] = "a non-review notice, which the checker skips"
+        result["why"] = (
+            "it contains the ARD-disposition phrase, which the checker "
+            "skips on a positionless substring match, before it reaches the "
+            "notice test" if ard_summary else
+            "a non-review notice, which the checker skips")
     elif verdict == "not-clean":
         # `not-clean` admits from ANY author, fail-closed, so this needs no
         # structure test.
@@ -227,7 +276,9 @@ def analyse(body, mod):
 
 def render(r):
     lines = [
-        f"  non-review notice       : {r['is_non_review_notice']}",
+        f"  skipped as a notice     : {r['is_non_review_notice']}",
+        f"    ARD disposition summary : {r['ard_disposition_summary']}",
+        f"    checker notice          : {r['checker_non_review_notice']}",
         f"  structured report       : {r['is_structured_review_body']}",
         f"  classifier verdict      : {r['classifier_verdict']}",
         f"  unresolved finding      : {r['unresolved_finding_pattern'] or 'none'}",

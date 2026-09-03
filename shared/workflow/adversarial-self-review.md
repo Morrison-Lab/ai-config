@@ -422,34 +422,22 @@ trailer concatenated onto text   :   0
 
 An independent re-run over the recursive set returned that same zero.
 
-The concatenated form is known to exist, in two shapes, both captured.
-Agent ids are redacted as `<id>` throughout;
-nothing else in either exhibit is altered.
-
-**Landing on a sentinel line**, seen twice within one session --- the safe shape, and the one this section goes on to prescribe:
+The concatenated form is known to exist.
+It was seen directly, twice, within one session --- and the captured line is this:
 
 ```
---- end of report ---agentId: <id> (use SendMessage with to: '<id>')
+--- end of report ---agentId: <id> (use SendMessage with to: '...')
 ```
 
-**Landing on the fingerprint line**, which is the shape the truncation table below analyses.
-A third observation, distinct from the two above: the trailer concatenates onto a report's *last* line, so a report ending on a sentinel cannot also carry it on a fingerprint.
-Recorded 2026-09-03 in [ai-config#3084](https://github.com/Morrison-Lab/ai-config/pull/3084)'s own description, from a foreground review of an earlier head of that branch:
+**Note what that exhibit is: the trailer landing on a sentinel line, which is the safe case**, and the one this section goes on to prescribe.
+The shape the hazard is actually about is a fingerprint line with the trailer glued to it:
 
 ```
-Reviewed-Commit: 6f10014883ccb4256250204fe9af216d7c3b775fagentId: <id> (use SendMessage with to: '<id>')
+Reviewed-Commit: <sha>agentId: <id> (use SendMessage with to: '...')
 ```
 
-That sha resolves to a real commit on the branch, so the fingerprint value is not invented.
-The **concatenation** rests on the recorded capture and on nothing further, which is the weaker of the two claims and the one the exhibit is actually for.
-
-**What this second capture does not settle is more interesting than what it shows, and it is easy to bank as either a scare or an all-clear.**
-It is an **in-context render**, so it says nothing about the storage question raised below.
-The push it belonged to also went through --- and that is not evidence either, because the guard reads storage, so the outcome is identical under all three explanations below.
-Under the one where the concatenation never reaches storage, the guard never saw a suffix at all.
-
-What the exhibit does supply is the **shape**, which is what the truncation table needs: a full 40-character fingerprint with `agentId` glued to it.
-Truncate that sha to 39 and the same line yields a plausible wrong sha.
+That second block is constructed to show the shape, not captured.
+It is what the truncation table below analyses.
 
 **The zero and the sightings are about different artifacts, and that is what has to be settled before either number means anything.**
 The sweep read **stored** transcript JSONL.
@@ -467,9 +455,8 @@ So the two counts carry different weight.
 The **334** establishes that the own-block form is common **in stored transcripts**, which is a lower bound rather than a ratio.
 The **0** settles nothing on its own, since which of the three explanations holds decides whether it is evidence or an artifact.
 Whoever next touches this section should settle that first, and the query has to be chosen carefully, because the obvious one cannot decide it.
-Grepping a stored transcript for a `Reviewed-Commit:` line with a non-hex suffix is nearly null and not quite: it cannot fire on a **conforming** report, which never puts the fingerprint last, so nothing can be glued to it.
-It could fire on a stored copy of the reordered report captured above, if explanation 1 holds and the concatenation reaches storage while the sweep's matcher misses it.
-So run it --- but read a zero from it as uninformative, since a conforming corpus produces that zero whether or not the hazard is real.
+Grepping a stored transcript for a `Reviewed-Commit:` line with a non-hex suffix cannot fire on a **conforming** report, which never puts the fingerprint last, so nothing can be glued to it.
+That reason quantifies over conforming reports only, and this section is about **reordered** ones --- so it does not establish the null it appears to, and a zero from it stays uninformative either way.
 The right *criterion* is whether `agentId:` ever appears in stored content **preceded by other text on the same line**.
 The right *instrument* is not the sweep, and this is the part that is easy to get wrong: re-running the sweep's own matcher has no power against explanation 1, which says precisely that this matcher cannot see the shape --- under that explanation it returns zero whatever it is pointed at.
 It is also already spent against the other two, since the counts above are that query, run twice, over both the flat set and the recursive superset.

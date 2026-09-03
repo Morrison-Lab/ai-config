@@ -398,8 +398,17 @@ Skipping it before a skip ships a defect inside your own diff, and nothing repor
 The instrument is one command:
 
 ```bash
-git diff origin/<default-branch>..HEAD -- <file> | grep -n '<the flagged text>'
+git diff origin/<default-branch>...HEAD -- <file> | grep -n '<the flagged text>'
 ```
+
+Three dots, not two.
+Two dots compares the two tips rather than diffing from the merge base, and it fails in both directions.
+A line the base DELETED after you branched shows as a `+`, so you claim a finding that is not yours and pay a redundant edit --- the cheaper failure, since the next reader can see and undo it.
+The costly one is the reverse: when the base independently ADDS the same line, both tips carry it, two dots emits no `+` at all, and the check reports a line your branch really did add as not-yours.
+That is the silent skip this section is about, arrived at through the instrument meant to prevent it.
+Both are measured.
+On a line the base deleted, `main..HEAD` reported `+removed-later-on-main` beside the real addition, where `main...HEAD` reported only the real one.
+On a line both sides added, `main..HEAD` reported 0 added lines against `main...HEAD`'s 1.
 
 A `+` line means the branch added it, so [`dont-incur-technical-debt`](../principles/dont-incur-technical-debt.md)'s question answers itself and the fix is yours now.
 

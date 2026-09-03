@@ -1610,6 +1610,40 @@ def _review_query_null_safe():
     return [c["sha"] for c in got.get("copilot", [])] == ["22222222"]
 
 
+def _no_attribution_overclaim():
+    """The block must not claim the exit status BELONGS to the later command.
+
+    It does not, in either direction. `false && <request> && gh pr view`
+    leaves the status with `false`; `<request> && gh pr view` where the
+    request fails leaves it with the request. The only sound claim is the
+    negative one -- the combined status cannot be attributed to the request
+    -- and the paragraph's own later hedge ("a `&&` chain may have
+    short-circuited before it ran at all") contradicted the unconditional
+    attribution it opened with (Copilot on ai-config#3024, round 4).
+
+    Checked over BOTH the chained paragraph and the always-rendered recovery
+    paragraph, since the overclaim appeared in three places and a needle over
+    only one of them would pass while the others still asserted it.
+    """
+    chained = reason_of(create("c") + [
+        bash(REQ_CMD_Q + " && gh pr view 1038 --json reviews", tid="q"),
+        res("q", OK), say("Requested.")])
+    two = reason_of([
+        bash("gh pr create --base main --title x --body y --reviewer "
+             "copilot-pull-request-reviewer[bot] && gh pr view", tid="d1"),
+        res("d1", URL),
+        bash("gh pr create --base main --title y --body z --reviewer "
+             "copilot-pull-request-reviewer[bot] && gh pr view", tid="d2"),
+        res("d2", "https://github.com/o/r/pull/2222\n"),
+        say("Two creates, each chained.")])
+    plain = reason_of(create("c") + [say("Opened it.")])
+    banned = "belongs to that later command"
+    return (banned not in chained and banned not in two and banned not in plain
+            and "cannot be attributed to the request" in chained
+            and "cannot be attributed to any one of them" in two
+            and "cannot be attributed to it" in plain)
+
+
 def _redaction_wording():
     """The block text must NAME the redaction deferral and both escapes.
 
@@ -1816,6 +1850,14 @@ def main():
     else:
         print("FAIL: the block text does not distinguish a chained request "
               "from no request")
+        failures += 1
+
+    if _no_attribution_overclaim():
+        print("PASS: the block does not claim the exit status belongs "
+              "to the later command")
+        passes += 1
+    else:
+        print("FAIL: the block overclaims exit-status attribution")
         failures += 1
 
     if _review_query_null_safe():

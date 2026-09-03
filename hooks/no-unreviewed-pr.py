@@ -1852,8 +1852,12 @@ def scan(path):
                 if requested and not opened:
                     pending[tid] = (rnum, rrepo, rlast)
                 if requested and not rlast:
-                    # The request was made and will NOT discharge, because its
-                    # exit status belongs to a later command in the chain. That
+                    # A request APPEARS in the chain and will NOT discharge:
+                    # it is followed by another simple command, so the status
+                    # the discharge reads is that chain's combined status and
+                    # cannot be attributed to the request. Whether it ran at
+                    # all is unknown here -- an earlier failure in a `&&`
+                    # chain short-circuits it away. That is
                     # is indistinguishable, from inside the turn, from a request
                     # that failed -- the POST returns 200, the reviewer may even
                     # review -- and the block message otherwise names only
@@ -2002,18 +2006,20 @@ def main() -> int:
     names = ", ".join("#" + n for n in flagged)
     chained = ((
         "A reviewer request for %s appears in the transcript and was not "
-        "credited: it was chained AHEAD of another command, so the exit "
-        "status the discharge reads belongs to that later command rather "
-        "than to the request. What the request itself did is therefore "
+        "credited: it was chained AHEAD of another command, so the "
+        "discharge reads a combined exit status that cannot be "
+        "attributed to the request. What the request itself did is "
+        "therefore "
         "unknown from here -- it may have returned 200 with a review "
         "landing, it may have failed, and a `&&` chain may have "
         "short-circuited before it ran at all. That is why this looks "
         "identical to a request that failed.\n\n" % names
     ) if len(flagged) == 1 else (
         "Reviewer requests for %s appear in the transcript and none was "
-        "credited: each was chained AHEAD of another command, so the exit "
-        "status the discharge reads belongs to that later command rather "
-        "than to the request. What each request did is therefore unknown "
+        "credited: each was chained AHEAD of another command, so the "
+        "discharge reads a combined exit status that cannot be "
+        "attributed to any one of them. What each request did is "
+        "therefore unknown "
         "from here -- one may have returned 200 with a review landing, one "
         "may have failed, and a `&&` chain may have short-circuited before "
         "it ran at all. That is why this looks identical to requests that "
@@ -2027,8 +2033,9 @@ def main() -> int:
             + chained +
             "Request it now, as the only command in this call. If it is "
             "chained ahead of anything else, including the verification "
-            "below, its exit status belongs to that later command and the "
-            "request is not credited. Quote every placeholder -- "
+            "below, the exit status the discharge reads cannot be "
+            "attributed to it, and the request is not credited. Quote "
+            "every placeholder -- "
             "an unquoted `<` is a shell redirect:\n\n"
             "    gh api \"repos/<owner>/<repo>/pulls/<N>/requested_reviewers\" "
             "\\\n      -X POST -f "

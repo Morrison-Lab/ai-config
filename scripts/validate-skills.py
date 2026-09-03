@@ -72,7 +72,15 @@ MARKETPLACE_DESCRIPTION_LIMIT = 1024
 # directories are the obvious candidates, being a second listing entry apiece
 # for a skill already listed; ai-config#1852 tracks that work. If routing
 # quality degrades before then, this number comes back down rather than up.
-SKILL_LISTING_BUDGET_CHARS = 9_000
+#
+# Stepped again 2026-09-03 (ai-config#2928). The 9,000 step lasted about two
+# weeks: the catalog reached 7 characters of headroom, so the next skill added
+# anywhere in the repo was blocked with nothing wrong in it -- the same failure
+# the 8,000 cap produced. 9,400 is the same deliberately modest step, restoring
+# about nine entries of runway rather than a comfortable cushion, so the
+# catalog's growth stays visible. It buys time again and still does not fix the
+# cause; #1852 remains the lever that scales.
+SKILL_LISTING_BUDGET_CHARS = 9_400
 LISTING_ENTRY_OVERHEAD_CHARS = 8
 
 # How close to the cap counts as "nearly spent", expressed in ENTRIES rather

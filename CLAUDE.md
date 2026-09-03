@@ -325,6 +325,15 @@ Read a bare "do as you think best" as `daytb`, not as `away` -- the session-wide
 It resolves the pending item like `daytb`, raises the decide-vs-ask threshold for the rest of the session like `away`'s judgment-call test, and -- unlike either -- writes the correction down as a memory entry so it doesn't have to be re-taught next session.
 See [`dmmhyh`](skills/dmmhyh/SKILL.md).
 
+### Orchestration commands
+
+`fw` ("finish the current wave but don't start a new one", longhand `finish-wave`) caps an orchestration run at the wave already in flight.
+It bounds *issue grabs* only, so the review rounds, fixes, and the owed UMS pass that finish the wave's PRs all run under it.
+See [`finish-wave`](skills/finish-wave/SKILL.md).
+
+- **Do:** read a bare "finish the current wave" as `fw`, hold every new grab, and drive the wave's open PRs to a terminal state.
+- **Don't:** read it as "open no more PRs" --- a UMS PR or a follow-up issue is not a grab from the backlog.
+
 ## Link PRs in tables
 
 When listing PRs in a table (or anywhere they could be clickable), make each PR number a markdown link to the PR URL — `[#237](https://github.com/<owner>/<repo>/pull/237)`.

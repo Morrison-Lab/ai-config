@@ -1288,6 +1288,35 @@ Two newer hooks each re-derived a weaker version instead of reusing it.
 - **Don't:** treat a command-position anchor as covering quoted text;
   strip heredoc bodies first.
 
+**When every candidate discharge is satisfiable by typing the right characters, ship the guard with no discharge at all.**
+The section above assumes the discharge can be anchored well enough to be sound, and asks for the same care the trigger gets.
+Some obligations have no such matcher.
+The design question there is whether to write a discharge at all.
+
+The recognizable case is an obligation to have **derived** something, where every observable trace of the derivation is a string.
+A guard warning that a required status-check context was set without deriving it from the default branch has no honest discharge: a run-jobs read names no branch, so it cannot show which branch was consulted;
+`gh run list --branch <name>` accepts any branch, so its presence proves only that a branch was named;
+and any transcript scan for the derived context string is satisfied by typing that string in a comment.
+Each candidate is a check the obligation's own subject can write by hand, so it fails open in [`fail-fast`](../principles/fail-fast.md)'s sense --- "a precondition that can never fire is indistinguishable from one that fires correctly and finds nothing".
+
+A guard with no discharge warns every time.
+That is a real cost and it is the *right* one for a warning-only guard, because the alternative is not a quieter guard but a silent one --- and by the argument above, silence is indistinguishable from compliance.
+The asymmetry decides it: a repeated warning is visible and annoying, while a typable discharge is invisible and permanent.
+Note the boundary with the reminder-guard pattern, which does need a discharge because its obligation (run UMS, post a review) leaves a durable artifact a scan can anchor to.
+The distinction is whether the obligation's satisfaction is *observable outside the transcript*, not whether the guard is a reminder.
+
+- **Do:** enumerate the candidate discharges explicitly, and say in the guard which ones were rejected and why.
+- **Do:** ship no discharge when every candidate is satisfiable by typing, and keep the guard warning-only so the cost stays a note rather than a block.
+- **Don't:** add a weak discharge to reduce noise --- it converts a visible cost into an invisible one.
+- **Don't:** read "this guard has no discharge" as an unfinished design;
+  for an obligation with no artifact outside the transcript, it is the design.
+
+(ai-config#3039 proposes such a guard, on ruleset and branch-protection writes.
+Read as of 2026-09-03, its filed body carries a discharge this section would reject: the guard fires only when the transcript contains no default-branch job-name derivation, given as `gh run list ... --branch <default>` followed by `actions/runs/<id>/jobs`, "or an equivalent".
+Both halves are strings a session can type, and neither names a workflow definition or the branch a run's job names came from, so the pair is the third candidate above wearing two commands.
+The issue is open and no hook file exists on `main`, so this section is the argument that its discharge should be dropped rather than a description of a shipped file;
+a comment recording that argument was posted on the issue on 2026-09-03.)
+
 ## Measure CPU time, not wall clock, when the assertion is about work done
 
 A performance regression test asserts something about the *code*.
@@ -1344,6 +1373,121 @@ Where it does not enter both measurements with the same magnitude, the ratio amp
 - **Do:** fix the instrument when the noise is instrument-borne, rather than building a statistic that tolerates it.
 - **Don't:** assume min-of-N filters two measurements equally when one is much longer than the other.
 - **Don't:** read a ratio's stability on an idle machine as evidence that it is load-independent.
+
+## A slow wall-clock reading is a claim about the machine before it is a finding about the code
+
+The two sections above govern a timing **bound written into a test** --- which clock it uses, and whether a ratio cancels the noise it is meant to cancel.
+Neither reaches the reading you take **once**, by hand, in the middle of diagnosing something, and then report as a defect.
+No assertion is being authored there and no threshold is being chosen, so nothing about the moment resembles the situation those sections describe.
+
+**The reading is self-authenticating in a way a wrong value is not**, and that is the whole of the trap.
+A number you computed incorrectly still looks like a number you might have computed incorrectly.
+A stopwatch reading feels like a measurement rather than a guess, so it goes into a report as an observation instead of as a hypothesis --- and the question of what else was running on the machine is never posed, because posing it requires first noticing that the reading has a second input.
+
+**The session iterating fastest is the session most likely to have saturated its own machine**, which inverts the intuition that a busy machine is somebody else's problem.
+Background test runs, a re-invoked suite that was never reaped, several agents dispatched at once: each is a normal artifact of working quickly, and together they are the load that makes the next reading meaningless.
+So the readings likeliest to be wrong are the ones taken during exactly the kind of session that generates a lot of them.
+
+The figures below are reported from
+[ai-config#3059](https://github.com/Morrison-Lab/ai-config/issues/3059), which is
+the filed record of the session that took them.
+They name no hook, command, or machine, so treat them as an illustration of the
+spread's *shape* rather than as a magnitude to cite --- which is itself the
+lesson, since a reading with no provenance is the one most easily quoted back as
+established.
+
+An end-to-end hook run took **8.0s** against a declared 10s timeout, which read as
+a serious performance defect worth filing.
+Profiling the internals put them under **0.6s** in total, which is the discrepancy
+that prompted looking further.
+`uptime` then reported a load average of **376**, attributed in that record to the
+session's own stacked background runs.
+Re-running the identical command varied between **0.59s and 8.0s** with nothing
+about the code changed.
+That last figure is the load-bearing one: a range spanning more than an order of
+magnitude on unchanged code needs no attribution to make its point.
+
+The check is two steps, and the **second** is the one that decides:
+
+```bash
+uptime                                   # step 1: load average
+for i in 1 2 3 4 5; do                   # step 2: the one that decides
+  ( TIMEFORMAT=%R; time <the command> >/dev/null 2>/dev/null \
+      || echo "  ^ FAILED (exit $?)"; ) 2>&1
+done                                     # -> one elapsed-seconds figure per run
+```
+
+The loop uses the shell's **reserved word** `time` rather than `/usr/bin/time -f %e`, which is the form that first suggested itself and does not run: the binary is absent from this corpus's own remote containers (`exit 127`, measured), and `-f` is GNU-only where it is present, so the step the prose calls decisive would have printed nothing and left the reader holding only the load average.
+
+Four details in that one construct, each measured rather than reasoned:
+
+- **Reserved word, not a builtin**, which is worth getting right because the misnomer invites the natural prefix form and that form does not do what it looks like:
+  `type -t time` reports `keyword` and `compgen -b` does not list it.
+  An assignment prefix **demotes** `time` from reserved word to an ordinary command word, so `TIMEFORMAT=%R time <cmd>` stops invoking the shell construct and looks `time` up on `PATH` instead.
+  What you then see depends on the machine, which is why the symptom alone is the wrong thing to record:
+  where no `time` binary is installed --- this corpus's own remote containers, as above --- it dies with `time: command not found`;
+  where a `time` binary is installed, that binary runs instead and ignores `TIMEFORMAT`, which it has never read --- measured not here but by the reviewer who raised this, on a runner carrying `/usr/bin/time`.
+  The mechanism is the transferable half and the demotion is directly checkable:
+  put an executable named `time` on `PATH`, and the prefix form runs it while the bare form still prints `%R`.
+  Note what this rules out --- the reserved word does not "take precedence and merely fail to apply `TIMEFORMAT`";
+  a different program is running, which is why the variable goes unused.
+- **Parentheses rather than braces**, because a brace group is not a subshell and `TIMEFORMAT` would leak into the calling shell, silently reformatting every later `time` in that session.
+  Measured: the brace form leaves `TIMEFORMAT=%R` set afterwards, the paren form leaves it unset.
+- **`2>&1` is load-bearing**, since `time` writes to stderr.
+  With it, `| tee` captured `0.202`;
+  without it, `tee` captured an empty file.
+- **Both streams discarded, and a failure still announced.**
+  The construct writes to stderr, so a timed command that warns on stderr interleaves its warnings with the elapsed figures and the spread stops being readable --- measured, a `stderr warning` line landed above every timing line until `2>/dev/null` was added.
+  But discarding both streams leaves nothing to distinguish a fast command from one that never ran: measured, a nonexistent command reported `0.007 / 0.003 / 0.003`, a tight and entirely plausible spread.
+  That is this section's own thesis inverted --- a reading that cannot return false --- and it is the live case here, since `/usr/bin/time` is absent from this corpus's own containers, so the shell reports 127.
+  Hence the `|| echo`: silent on success, and on failure it prints the exit status under the figure.
+
+Read `uptime` first, but do not stop there.
+Its figures are 1-, 5- and 15-minute *decaying* averages, so a burst that inflated
+the run you care about can be gone from the 1-minute figure by the time you look,
+and a high reading persists for minutes after the load has cleared.
+A low number therefore does not clear the run, and a high one does not tell you
+the run overlapped it.
+
+So re-run the timed command several times and report the **spread**.
+That is what settles it, because it measures the interval you actually care about
+rather than a decaying average over a window you did not choose.
+A reading you cannot reproduce is not a measurement of the code, and a spread that
+spans an order of magnitude names its own cause.
+
+**A timing assertion written as a regression guard is the same exposure, and the two sections above answer it** --- they are about exactly this, a busy machine inflating a wall-clock reading.
+What those sections do not separate, and what a session that has just learned its own machine was loaded most needs, is **which question the assertion asks**.
+
+A **regression bound** asks whether the code got slower.
+It compares against a figure chosen earlier, so it is the case those sections govern, and widening it under load is the wrong repair --- [`hooks/test-no-unauthorized-merge.py`](../../hooks/test-no-unauthorized-merge.py) states why in its own comment: "Any bound tight enough to catch a regression sits inside that spread, so it goes red on PRs that never touched this hook, which is how a gating check stops being read."
+`process_time` is the repair there, and the section above measures it at 3.96--4.31x under load against `perf_counter`'s 2.18--4.58x --- reproducible across machines and load rather than immune to either.
+
+A **watchdog** asks whether the code finishes at all, and that is a question about elapsed time by construction, so it stays wall-clock.
+This repo's own catastrophic-backtracking checker is exactly that shape: [`scripts/check_regex_patterns.py`](../../scripts/check_regex_patterns.py) arms `signal.setitimer(signal.ITIMER_REAL, timeout)` against a `DEFAULT_TIMEOUT` of 0.25 seconds, with a thread-join fallback, and `validate.yml` gates on it.
+A backtracking probe is therefore not the exception that proves a `process_time` rule.
+It is a **second** exception, and it needs its own reason rather than the blocking one's, which does not reach it: that carve-out is stated as "keep a wall-clock ceiling only where the measured code can actually block", and its rationale is that "the one thing CPU time cannot see is a span that blocks on I/O instead of burning cycles".
+A runaway regex burns cycles, so CPU time sees it perfectly well and the blocking carve-out excludes it by construction.
+What justifies wall-clock here is different and narrower, and it is not availability: a CPU-time interval timer interrupts a runaway regex perfectly well (`ITIMER_VIRTUAL` fires on the same catastrophic pattern in 0.253s against `ITIMER_REAL`'s 0.250s, measured), so the choice is not forced by what exists.
+It is forced by what is being budgeted.
+A watchdog spends a **termination budget**, which is a real-time quantity by definition --- the question it answers is "has this taken too long", and too long is measured on the clock the caller is waiting on.
+
+So ask which question the assertion asks before reaching for either repair.
+The `< 1.0s` probe that prompted this entry was a *regression guard shaped like a watchdog*, which is why it was ambiguous and why it could flake.
+
+- **Do:** read the load average before reporting a timing observation as a finding.
+- **Do:** re-run a timed command several times and report the spread, so a reading that cannot be reproduced is visible as one.
+- **Do:** reap your own background runs before timing anything, since they are the likeliest cause of the load you are about to measure through.
+- **Do:** ask whether a timing assertion is a regression bound or a watchdog before repairing it --- the first wants `process_time`, the second stays wall-clock.
+- **Don't:** treat a stopwatch reading as evidence about the code merely because it was measured rather than guessed.
+- **Don't:** assume a fast-moving session is running on an idle machine --- it is the session most likely to have loaded it.
+
+(Recorded 2026-09-03 from
+[ai-config#3059](https://github.com/Morrison-Lab/ai-config/issues/3059), during a
+nine-round adversarial hook iteration.
+That session's PR also carried a `< 1.0s` wall-clock assertion as a
+backtracking regression guard, which under the same load could have flaked ---
+the case the paragraph on regression guards above answers, and the reason it
+answers it with `process_time` rather than with a wider bound.)
 
 ## Reading an instrument's PROSE instead of its exit status, generalized past the PR checker
 

@@ -427,6 +427,38 @@ def _detect_review_agent(body: str) -> Optional[str]:
     return best_name
 
 
+ARD_DISPOSITION_PHRASE = "ard review disposition summary"
+
+
+def is_ard_disposition_summary(body: str) -> bool:
+    """Is this an ARD round's own disposition summary?
+
+    An ARD round posts a disposition summary (`skills/ard/SKILL.md` requires
+    the summary; the heading matched here is this checker's own convention,
+    written nowhere else in the corpus). A driving session's round-up quotes
+    the verdict it is disposing of, so without this skip it reads as a
+    standing verdict on the session's own PR. `check_review_comments` applies
+    it before it reaches `is_non_review_notice`.
+
+    A bare substring test over the whole lowercased body, deliberately
+    unlike `is_non_review_notice`: there is no heading, position, or
+    review-agent precedence guard, so a review that merely QUOTES the phrase
+    is skipped too.
+
+    Extracted from `check_review_comments`, where it was inlined, so that
+    `check-review-body.py` can call it instead of duplicating the phrase. A
+    duplicated literal drifts silently the moment either side changes, and
+    the AST guard written to detect that drift was narrowed across three
+    review rounds and still had escapes.
+
+    What the extraction closes is the literal-drift problem, and only that.
+    Whether the CALL still sits ahead of admission is a property of
+    `check_review_comments`, not of this function, and is covered by a
+    behavioural test rather than by anything here.
+    """
+    return ARD_DISPOSITION_PHRASE in body.lower()
+
+
 def is_non_review_notice(body: str) -> bool:
     """True when *body* is a workflow status notice rather than a review.
 
@@ -2549,10 +2581,9 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
     all_items = []
     for c in comments:
         body = c.get("body", "")
-        body_lower = body.lower()
         author_login = (c.get("author") or {}).get("login", "")
 
-        if "ard review disposition summary" in body_lower:
+        if is_ard_disposition_summary(body):
             continue
 
         # A workflow status notice is not a review, whoever posted it.

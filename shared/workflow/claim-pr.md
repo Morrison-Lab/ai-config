@@ -360,12 +360,13 @@ the listing cannot tell you which case you are in.
 
 **Sixth occurrence, 2026-09-03 --- what is new is the unit of comparison, not the idea of keeping both sides.**
 Keeping both sides is this file's oldest lesson: the second occurrence above, on ai-config#2185, measured each side holding a fix the other lacked and prescribes merging them.
-The three readings the fifth occurrence offers are narrower than that, because each runs **branch against branch** and terminates in a verdict on one of them --- better, equivalent, or missing something you then contribute back onto the peer's tip.
-Read against #2185 the gap in the third reading is visible: its wording assumes the peer's branch is the base you rebuild on, which is exactly the assumption that hides your own unique fix, so it reaches the union only when the comparison happens to be run in both directions.
+The three readings the fifth occurrence offers are narrower than that, because each is a **whole-branch verdict** --- theirs is better, theirs is equivalent, or theirs is missing something you contribute back.
+The three are mutually exclusive, so the case where each side is better on a *different* defect fits none of them: theirs is not better, not equivalent, and not merely missing something, since yours is missing something too.
+The third reading gets closest and still asks which branch is the base, which is a question the case has no answer to.
 
 Two independent drivers do not produce a verdict on a branch.
 They produce two overlapping sets of fixes, and the region that decides the merge is the **symmetric difference**: what each one caught that the other did not.
-Measured on [ai-config#3023](https://github.com/Morrison-Lab/ai-config/pull/3023), 2026-09-03, whose head carries both sessions' work as two contiguous author blocks --- eleven `d-morrison` commits on 2026-09-02, then seven `claude` commits on 2026-09-03 (`gh pr view 3023 --json commits` separates them): both sides had fixed the same defects, and each had fixed one the other missed.
+Measured on [ai-config#3023](https://github.com/Morrison-Lab/ai-config/pull/3023), whose head carries both sessions' work as two contiguous author blocks, all on 2026-09-02 Pacific --- eleven `d-morrison` commits from 02:11 to 06:18, then seven `claude` commits from 20:01 to 23:34 (`gh pr view 3023 --json commits` separates them, reporting UTC, so convert before reading the dates): both sides had fixed the same defects, and each had fixed one the other missed.
 Discarding either would have dropped a real fix.
 The resolution took the peer's `redact()` helper (`0c58c6a3`) over the local env-stripping approach, a review having shown env-stripping rendered `timeout 60 git push` as `git push` --- a remedy line that would not run --- and kept the local heredoc scanner.
 

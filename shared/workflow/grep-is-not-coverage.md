@@ -223,7 +223,7 @@ This section is about the *search* half, which that passage does not reach: the 
 - **Don't:** read a complete-looking enumeration of a symptom as an enumeration of its cause.
 - **Don't:** treat a red drift check as the only cost --- the silent restoration on the next regeneration is the one that survives review.
 
-(Measured 2026-09-03 on `Morrison-Lab/ai-config`.
+(Measured 2026-09-02/03 on `Morrison-Lab/ai-config`.
 A sweep for a `git commit && git push` prescription scoped to `*.md` found the row in [`tool-mappings.md`](../../tool-mappings.md) and it was hand-edited out.
 That file's own header says it is generated from [`tool-mappings.yml`](../../tool-mappings.yml) by `scripts/sync-codex-skill-wrappers.py`, and the YAML still carried the prescription, so `scripts/validate-skills.py` --- which shells out to that generator's `--check` mode at line 435 --- went red, and the next regeneration would have restored the exact shape the same PR's own hook was being written to deny.)
 

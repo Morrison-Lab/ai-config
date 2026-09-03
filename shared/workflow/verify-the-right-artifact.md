@@ -312,7 +312,7 @@ The summary's wording is written to be representative, so it matches readily, an
 the real reply's wording is what the matcher will actually meet in production, and it need not match at all.
 Nothing distinguishes the two outcomes, because both are "the pattern fired on the text I tested it against".
 
-Measured 2026-09-03 while drafting the `no-unverified-approval-claim` Stop hook on `Morrison-Lab/ai-config` (branch `hook/no-unverified-approval-claim`, unpushed at the time of writing, so there is no PR to cite): the matcher was designed and validated against a context-window summary of the session's own reply.
+Measured 2026-09-02/03 while drafting the `no-unverified-approval-claim` Stop hook on `Morrison-Lab/ai-config` (branch `hook/no-unverified-approval-claim`, unpushed at the time of writing, so there is no PR to cite): the matcher was designed and validated against a context-window summary of the session's own reply.
 The summary's phrasing matched and the reply's phrasing did not, so the design read as validated by its own measurement while not firing on the one case that motivated it.
 
 - **Do:** pull the verbatim text out of the raw transcript when a matcher is being fitted to it, per [`get-under-the-hood`](../principles/get-under-the-hood.md)'s raw-log practice.
@@ -879,8 +879,8 @@ So the issue can never settle the question, and only the code can.
 - **Don't:** treat an open issue as a live measurement;
   its state is bookkeeping, not behaviour.
 
-(Measured 2026-09-03.
-`hooks/flag-background-review-dispatch.py` --- authored on `Morrison-Lab/ai-config`'s unmerged branch `hook/flag-background-review`, commit `9009e787a`, so it is reachable only by `git log --all -S'2483' -- hooks/` --- carried a docstring asserting that [`no-push-without-self-review.py`](../../hooks/no-push-without-self-review.py) does not register verdicts arriving via background task notifications, citing [ai-config#2483](https://github.com/Morrison-Lab/ai-config/issues/2483), which was --- and as of 2026-09-03 still is --- open.
+(Measured 2026-09-02, and re-checked 2026-09-03.
+`hooks/flag-background-review-dispatch.py` --- authored at commit `9009e787a` on the local `ai-config` branch `hook/flag-background-review`, which `git ls-remote --heads origin hook/flag-background-review` confirms is unpushed, so neither the commit nor the file is reachable from any clone but the author's --- carried a docstring asserting that [`no-push-without-self-review.py`](../../hooks/no-push-without-self-review.py) does not register verdicts arriving via background task notifications, citing [ai-config#2483](https://github.com/Morrison-Lab/ai-config/issues/2483), which was --- and as of 2026-09-03 still is --- open.
 The fix had landed on 2026-09-01 in [#2820](https://github.com/Morrison-Lab/ai-config/pull/2820) (`0d78e04c`), whose `is_task_notification` branch sits at `hooks/no-push-without-self-review.py:1400-1417` and is covered by a passing test.
 `git log -L 1400,1417:hooks/no-push-without-self-review.py` names that commit in one command;
 no such command was run, because an open issue looked like the answer.

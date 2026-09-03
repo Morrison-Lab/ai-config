@@ -22,6 +22,12 @@ CI stays green because it never ran anything meant to notice, and the PR/MR simp
 Check for this once per repo, right after the first push, rather than waiting to notice its absence: grep the repo's own CI config for the review job or template it would come from (a GitHub Actions workflow file, or a GitLab `.gitlab-ci.yml`'s `include:` list) rather than assuming a sibling or template repo's setup carried over.
 Treat "not configured" the same as the other two failure modes: self-review immediately, held to the same fact-check rigor "A fallback self-review is prone to being shallow, so hold it to the same bar as the bot it stands in for" requires (fact-check-prose, the cause check, the cited-source rule).
 Because a genuine config gap is a standing property of the repo rather than a one-off outage, also file a tracking issue on it per [`report-mistakes-proactively`](report-mistakes-proactively.md) --- wiring up review coverage is worth fixing, not just working around on every push.
+**Repository configuration defect (unusable API credential) is a fourth failure mode.**
+The pre-flight credential shape check in `Morrison-Lab/gha` (`run-claude-review-attempt`, gha#543) detects when every configured API credential (`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`) contains internal whitespace, newlines, or multi-line formatting (such as a pasted PEM block, JSON credential, or wrapped terminal copy).
+Because HTTP `Authorization` headers reject internal whitespace, the workflow aborts before making an API call and posts a `> [!CAUTION] Claude review did not run: the configured API credential is unusable.` PR comment.
+`review / require-review` and `review / require-clean-verdict` fail red, and no money is spent.
+Unlike a transient network failure or timeout, this is a deterministic repository defect: re-running the job without repairing the secret fails identically.
+Treat this the same as other verdict-blocking failures: perform a fallback adversarial self-review to keep the PR moving, but recognize that the PR is **not** externally clean and the required check remains red until a repository admin updates the secret under **Settings -> Secrets and variables -> Actions** to a single-line value without whitespace (e.g. from `claude setup-token`).
 
 **Post the self-review before doing anything else --- don't stall the PR waiting for the bot.
 Then, before writing the check off as permanently broken, try one manual re-run of the failed job --- even after the workflow's own built-in same-run retry (e.g. gha#185's stub-retry) also stubbed.**

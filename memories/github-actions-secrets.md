@@ -223,3 +223,19 @@ the value belongs on stdin rather than in `argv`.
   never through a session-visible shell.
 - **Don't:** paste a token into a chat,
   or into a command line an agent reads.
+
+## Unusable credential secrets: whitespace from multi-line pastes or wrapped tokens
+
+GitHub Actions secrets passed in HTTP `Authorization` headers to the Anthropic API (like `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`) must not contain whitespace.
+A pasted multi-line block (a PEM key, a JSON credential file, or a wrapped terminal copy) introduces spaces or newlines that cause HTTP clients to reject the header before making the request.
+
+`Morrison-Lab/gha` (`run-claude-review-attempt`, gha#543) runs a pre-flight credential shape check that detects internal whitespace in configured review secrets.
+When every configured secret contains whitespace, the step exits 0 without calling the API (spending zero tokens) and posts a `[!CAUTION]` comment indicating that the configured API credential is unusable.
+The downstream `require-review` gate then fails red.
+
+Because this is a repository configuration defect rather than an intermittent flake or diff error, re-running the workflow fails identically until the secret is repaired.
+A repository admin fixes it under **Settings -> Secrets and variables -> Actions** by re-setting the secret to a single-line token with no spaces or line breaks (e.g. copied from `claude setup-token`).
+
+- **Do:** ensure API credential secrets are strictly single-line values without whitespace or trailing newlines when configuring them via web UI or `gh secret set`.
+- **Don't:** re-run a review job that failed the pre-flight credential shape check expecting it to pass --- repair the secret first.
+

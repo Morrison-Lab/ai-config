@@ -575,3 +575,12 @@ Answered with the state: nothing new has been claimed or started since the direc
 the running workflows rework branches implemented before it, and the five issues are filed, not claimed.
 Asked which of filing noticed defects or resuming the parked wave 4 should also stop;
 the answer was neither, so "grab" keeps its `gi` meaning (claim and implement), filing under the file-every-noticed-issue rule continues, and wave 4 resumes when slots allow.
+
+## 16:57 PDT --- release claims on issues never started
+
+User directive: all issues claimed but not started are to be released.
+The set was derived rather than recalled: an issue search for the session id in comments returns exactly 40 open issues, the four waves' 40;
+39 have implementation commits in their worktrees and one, #2513, has none, because the wave-4 implementer found the fix already on `main` in #2514 (merged 2026-08-28, `Refs #2513`) and skipped it.
+Released #2513 with an unclaiming comment and closed it as completed after reading #2514.
+Every one of the 40 claims is older than `claim-pr`'s two-hour expiry, so the 39 active ones are stale by the corpus's own rule and get re-posted when each branch's work resumes or pushes;
+the user's "started" was read as "implementation exists", consistent with the answer given minutes earlier that parked wave 4 is not to be released.

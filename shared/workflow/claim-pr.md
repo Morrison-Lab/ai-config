@@ -358,6 +358,82 @@ the listing cannot tell you which case you are in.
 - **Don't:** re-land your own commit because it was written first --- that is
   the one input that says nothing about which version is better.
 
+**Sixth occurrence, 2026-09-03 --- what is new is the unit of comparison,
+not the idea of keeping both sides.**
+Keeping both sides is this file's oldest lesson: the second occurrence above,
+on ai-config#2185,
+measured each side holding a fix the other lacked and prescribes merging them.
+The three readings the fifth occurrence offers are narrower than that,
+because each is a **whole-branch verdict** --- theirs is better,
+theirs is equivalent, or theirs is missing something you contribute back.
+The three are mutually exclusive,
+so the case where each side is better on a *different* defect fits none of them:
+theirs is not better, not equivalent, and not merely missing something,
+since yours is missing something too.
+The third reading gets closest and still asks which branch is the base,
+which is a question the case has no answer to.
+
+Two independent drivers do not produce a verdict on a branch.
+They produce two overlapping sets of fixes,
+and the region that decides the merge is the **symmetric difference**:
+what each one caught that the other did not.
+Measured on [ai-config#3023](https://github.com/Morrison-Lab/ai-config/pull/3023),
+whose head carries both sessions' work as two contiguous author blocks.
+As of 2026-09-02, that was eleven `d-morrison` commits from 02:11 to 06:18 Pacific,
+then seven `claude` commits from 20:01 to 23:34
+(`gh pr view 3023 --json commits` separates them, reporting UTC,
+so convert before reading the dates):
+both sides had fixed the same defects, and each had fixed one the other missed.
+Discarding either would have dropped a real fix.
+The resolution took the peer's `redact()` helper (`0c58c6a3`) over the local env-stripping approach,
+a review having shown env-stripping rendered `timeout 60 git push` as `git push` ---
+a remedy line that would not run --- and kept the local heredoc scanner.
+
+Read those counts as a snapshot rather than as the PR's state.
+The branch was still live when they were taken,
+and by the next morning it carried twenty-one commits.
+What survives re-derivation is the SHAPE --- two contiguous author blocks,
+which is what makes the collision visible at all.
+The totals are the half a reader is likeliest to quote
+and the half likeliest to be wrong by the time they quote it.
+
+So diff the two heads against their merge base and enumerate the fixes on each side before deciding,
+rather than judging the branches.
+The unit of comparison is the fix, not the branch.
+
+- **Do:** enumerate each side's fixes against the merge base,
+  and take the union.
+- **Do:** compare fix by fix when both sides addressed the same defect ---
+  one remedy is often measurably better,
+  and the peer's is as likely to be it as yours.
+- **Don't:** read "who is ahead" as "whose branch to keep";
+  commit count is not coverage.
+
+**A genuine design disagreement inside such a merge is a prompt to find the discriminator,
+not to trade.**
+When both positions are right about their own evidence,
+the two sides are describing different cases and neither has noticed it,
+so trading --- taking one and conceding the other ---
+throws away a case that was correctly handled.
+On #3023 the disagreement was over what to do with an unterminated heredoc,
+and it dissolved once the evidence was sorted rather than weighed:
+every command-hiding case had an **unquoted** delimiter,
+and the peer's counter-case had a quoted one.
+Naming the property is what ended the argument,
+and it is not the same as shipping the partition.
+`_heredoc_free` on that PR's head (`6aa021b5`) still returns uniformly on any unterminated heredoc and never branches on `RX_HEREDOC_OPEN`'s captured quote character,
+so the discriminator is recorded here as a resolution of the *disagreement* rather than as a merged behaviour ---
+the unquoted gap is what a Copilot thread on `scripts/lib/shellcmd.py:131` names with `cat <<< text`.
+That distinction is worth carrying:
+agreeing on which property separates the cases is what makes a partition designable,
+and treating the agreement as the fix is how a case set gets discussed and then left uniform.
+
+- **Do:** when two positions each survive their own evidence,
+  sort the cases and look for the property that partitions them.
+- **Don't:** resolve such a disagreement by preference, seniority,
+  or splitting the difference ---
+  all three discard a correctly-handled case without noticing.
+
 **Handing off mid-task to another agent, on user request ("finish what you're
 doing, then relinquish holds; I'll put another agent on them"):** don't just
 stop --- leave the next agent a clean starting point. On each claimed PR/issue:

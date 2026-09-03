@@ -377,10 +377,18 @@ Two independent drivers do not produce a verdict on a branch.
 They produce two overlapping sets of fixes,
 and the region that decides the merge is the **symmetric difference**:
 what each one caught that the other did not.
-Measured on [ai-config#3023](https://github.com/Morrison-Lab/ai-config/pull/3023), whose head carries both sessions' work as two contiguous author blocks,
-all on 2026-09-02 Pacific --- eleven `d-morrison` commits from 02:11 to 06:18,
-then seven `claude` commits from 20:01 to 23:34 (`gh pr view 3023 --json commits` separates them,
-reporting UTC, so convert before reading the dates):
+Measured on [ai-config#3023](https://github.com/Morrison-Lab/ai-config/pull/3023),
+whose head carries both sessions' work as two contiguous author blocks.
+As of 2026-09-02, that was eleven `d-morrison` commits from 02:11 to 06:18 Pacific,
+then seven `claude` commits from 20:01 to 23:34
+(`gh pr view 3023 --json commits` separates them, reporting UTC,
+so convert before reading the dates).
+Read the counts as a snapshot rather than as the PR's state:
+the branch was still live when this was written,
+and by the next morning it carried twenty-one commits.
+What survives re-derivation is the SHAPE --- two contiguous author blocks,
+which is what makes the collision visible at all ---
+and not the totals, which is the half a reader is likeliest to quote.
 both sides had fixed the same defects, and each had fixed one the other missed.
 Discarding either would have dropped a real fix.
 The resolution took the peer's `redact()` helper (`0c58c6a3`) over the local env-stripping approach,

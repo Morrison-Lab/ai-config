@@ -268,6 +268,70 @@ discovers a project's documented conventions --- self-apply them first.
 See [`ardi.cases.md`](ardi.cases.md), "A review round surfacing five findings
 your own conventions already covered".
 
+**Three or more rounds without a consensus of clean verdicts is a question
+about the process, not about the PR.**
+When a PR has been through three review rounds and the reviewers still do not
+agree that it is clean, ask whether the way you are working the PR is wrong,
+and act on the answer inside the same round.
+
+This is not the round-count stopping guard, which
+[`ardi`](../../skills/ardi/SKILL.md)'s "Stopping conditions" bans and which
+stays banned.
+That guard asks the *user* whether to accept the current state, which hands
+triage back and stops the loop.
+This asks *you* whether the procedure that produced three finding-bearing
+rounds should change, and the loop keeps running either way.
+So the deliverable is a changed procedure, never a stop, and never a sentence
+ending "shall we accept the current state?".
+
+"Reflect on the process" decides nothing on its own, so examine three specific
+things:
+
+- **The local checks.**
+  Name the check that would have caught this round's findings before the push,
+  and run it from now on.
+  The pre-push checklist below is the standing list;
+  a repo's own documented checks (its `CONTRIBUTING.md`, its CI steps run
+  locally) are the ones most often left to the reviewer to discover.
+- **The approach.**
+  Ask whether the diff itself is the problem rather than its defects --- too
+  large to review as a unit, built on a design that was never settled, or
+  solving a problem the repo solves elsewhere.
+  A round-three finding that contradicts a round-one fix is evidence for this
+  rather than for another fix.
+- **The order of reviewers.**
+  A forge review round is the most expensive reviewer available, so route a
+  preliminary round through a cheap or free model on a CLI first ---
+  [`pre-push-review`](../../skills/pre-push-review/SKILL.md),
+  [`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md), or
+  [`delegate-to-opencode`](../../skills/delegate-to-opencode/SKILL.md) ---
+  and spend the forge round on what survives it.
+
+Read the three rounds' findings together rather than round by round, because
+the classes are the evidence and no single round carries them.
+Three rounds of one class points at a missing local check.
+Three rounds of unrelated classes points at the approach.
+
+- **Do:** at the third round without consensus, name the check, the reviewer,
+  or the change of approach that would have caught this round's findings
+  before the push, and apply it in the same round.
+- **Do:** run a cheap or free CLI review before spending another forge round,
+  once forge rounds are what the loop is spending.
+- **Don't:** turn the count into a question to the user about whether to
+  accept unaddressed findings --- that is the stopping guard, and it is still
+  banned.
+- **Don't:** report having considered the process when nothing about the next
+  round changed;
+  the round count is a prompt to change something, not a step to record.
+
+(Directive from the user, 2026-09-03: "if a PR has gone through three or more
+reviews without reaching a consensus of clean review verdicts, consider if
+we're doing something wrong", asking whether more local checks belong before
+the push, whether the whole approach is wrong, and whether cheap or free
+models run through CLIs could give a rough preliminary review before a more
+expensive forge review.
+Tracked as ai-config#3110.)
+
 ### Pre-push checklist
 
 **Pause point: after committing, before `git push`.**

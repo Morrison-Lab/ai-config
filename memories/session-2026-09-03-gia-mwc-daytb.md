@@ -302,18 +302,24 @@ The second --- that the branch never stopped growing, so every round found defec
 
 There is no single shape, because the four rounds split into two:
 
-- **Rounds 6 and 7 found content the previous round had already looked at and passed.**
-  Derived rather than recalled: `git show c851d68f:shared/workflow/algorithmatize-checks.md | grep 'command not found'` returns the line round 7 flagged, and `git show c851d68f:shared/workflow/adversarial-self-review.md | grep 'What ended the series'` returns the line round 6 flagged.
-  Both were present at the head the round *before* them reviewed and passed clean.
-- **Rounds 8 and 9 found material that did not exist at the previous round's head.**
+- **Rounds 6 and 7 found content that was already in the tree an earlier round had reviewed.**
+  Derived: `git show c851d68f:shared/workflow/algorithmatize-checks.md | grep -F 'command not found'` returns the line round 7 flagged, and the same query over `adversarial-self-review.md` for `What ended the series` returns the line round 6 flagged.
+  Note the weaker claim that supports: `c851d68f` is not the immediate predecessor head for either round --- eight commits separate it from round 7's head --- so what is established is that the passages predate an earlier review of their own files, not that the round immediately before each one read those lines.
+  That earlier CI round was itself `NOT_CLEAN`, so "passed clean over them" is wrong twice over;
+  it returned a finding elsewhere and said nothing about these.
+- **Round 8 found material that did not exist at the previous round's head.**
+  Derived: every file its fixes touched postdates round 7's head `b94767dd` --- `git show b94767dd:memories/git-worktrees.md | grep -c Claude-Session` returns 0 against 7 afterwards, and the `address-every-comment.md`, `markdownlint.md` and `algorithmatize-checks.md` entries all arrive later.
+  **Round 9's half rests on recollection, not derivation**, and cannot be checked: rounds 8 and 9 were two passes whose fixes squashed into one commit, so no intermediate head exists to query.
 
 So the transferable statement is not about pace or about fix quality.
-It is that **a round's clean verdict was never evidence about the material it did not flag** --- twice here, a passage sat through a round that examined its own file and was flagged by the next one.
-That says convergence is not a stopping signal, which is the opposite of what an empty round feels like.
+It is that **a verdict is not evidence about the material it did not flag** --- twice here, a passage sat in a file a round had in front of it and was flagged only later.
+Two instances cannot support "never", and the weaker form is the useful one anyway: it says convergence is not a stopping signal, which is the opposite of what an empty round feels like.
 
-The query that settles which case a finding is: `git show <previous-round-head>:<file> | grep '<flagged text>'`.
-Present means the earlier round passed over it;
-absent means it was added since.
+A query goes some of the way and it is worth stating what it does not settle: `git show <previous-round-head>:<file> | grep -F '<flagged text>'`.
+Present means the text predates that head.
+**Absent does not mean it was added since**, which is what I first wrote here and this branch's own history refutes --- `What ended the series` is absent at `b94767dd` because the commit *named* for rewording it removed the phrase, not because it arrived later.
+In a converging series that is the commoner cause, since each round's fix rewrites the text the next round would have searched for.
+Use `-F`, too: flagged prose here routinely carries `#3059`, `){0,12}` and `<cmd>`, which a regex reads as syntax.
 
 | round | reviewer | findings | what they were about |
 |---|---|---|---|

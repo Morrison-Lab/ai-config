@@ -116,9 +116,15 @@ committed pass.
      and just as easily in a `shared/` fragment or a skill:
      `grep -ril "<keywords>" skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md`,
      the same query [`skill-builder`](../skill-builder/SKILL.md) step 0 runs.
-     Those paths are ai-config's layout, and `grep` exits 2 in a repo that lacks them, so run the query from an ai-config checkout --- step 0 gets there with `cd "${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/skill-builder rev-parse --show-toplevel 2>/dev/null || pwd)}"`.
-     When step 2 routed the item to another repo, also run it over that repo's own doc paths, per the cross-repo bullet below.
-     Stopping at `memories/` is the commonest way this check runs to
+     Those paths are ai-config's layout,
+     and `grep` exits 2 in a repo that lacks them,
+     so run the query from the ai-config checkout you are working in ---
+     your own worktree in a worktree session,
+     never the main checkout that skill-builder's `cd` expression resolves to.
+     When step 2 routed the item to another repo,
+     also run it over that repo's own doc paths,
+     per the cross-repo bullet below.
+     Stopping at `memories/` is how this check runs to
      completion and still misses: the destination is a memory file, so every
      later instruction reads as relative to `memories/`, and a `shared/`
      fragment owning the same idea never enters view.
@@ -141,9 +147,12 @@ committed pass.
      +5-line append reddened `validate`.
      Prior: `shared/writing/semantic-line-breaks.md` ai-config#1291;
      `shared/workflow/review-verdict-pitfalls.md` ai-config#811).
-   - **When step 2 routed the item to a repo other than ai-config, grep the
-     ai-config corpus too.**
-     The query above runs from an ai-config checkout, so add the destination repo's own doc paths --- a repo-local entry can otherwise duplicate or contradict a fragment nobody thought to search from that repo.
+   - **When step 2 routed the item to a repo other than ai-config, grep both
+     corpora.**
+     The query above runs from an ai-config checkout,
+     so add the destination repo's own doc paths ---
+     a repo-local entry can otherwise duplicate or contradict a fragment
+     nobody thought to search from that repo.
      See
      [`grep-is-not-coverage`](../../shared/workflow/grep-is-not-coverage.md)'s
      "Searching the wrong corpus is the same error with no grep in it".

@@ -534,3 +534,15 @@ found by a grep over `skills/*/SKILL.md` for a search verb near a destination no
 [#3161](https://github.com/Morrison-Lab/ai-config/issues/3161) is widened to the four with the query recorded, and the PR body's Deferred section names them.
 Lesson for the fold: a deferral is a scope claim, so derive its population before filing, per `derive-dont-enumerate`.
 The verdict for `16c78e66` is running.
+
+## 16:43 PDT --- wave 1 finished unverified; a placeholder git identity on six branches
+
+Wave 1 (run `wf_7e364ea6-880`) completed with all seven branches at two commits and none verified:
+after the fix round, the recheck left 4 to 6 findings on each (#3095, #3068, #3086, #3062, #3117, #3102, #3113).
+Six of the seven were authored `t <t@t.t>`, a placeholder no config in this session sets;
+the branches were unpushed, so each was rebased onto its merge base with `--exec 'git commit --amend --no-edit --reset-author'`,
+which gave them the configured identity and new SHAs (#3095 `77f819aa`, #3068 `6d26ba15`, #3086 `7f0718d9`, #3062 `90a305ad`, #3117 `f67e64bc`, #3102 `59e90525`).
+Three wave-2 worktrees (`wt-3038`, `wt-3105`, `wt-3121`) show the same author and are left alone until that run finishes.
+Wave 3 (`wf_cfdb8ea7-276`) was resumed into the two freed slots.
+The seven wave-1 branches need further fix-and-recheck rounds before any push;
+a serial loop is being written for them so it fits one subagent slot.

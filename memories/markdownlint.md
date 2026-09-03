@@ -15,13 +15,8 @@ Split out of [`tools.md`](tools.md) on 2026-09-01 when that file crossed the 125
   **Don't:** write a regex-style alternation containing `|` in a table cell and trust the backticks to shield it -- MD056 reads raw text, not rendered Markdown.
   (Morrison-Lab/ai-config#2906, 2026-09-01.)
 - **A line that begins with an issue reference is parsed as a heading (MD018).**
-  `no-missing-space-atx` fires on a line whose first character is `#` with no following space, so a bare `#3059` at column 1 is read as a malformed ATX heading rather than as an issue number.
-  This is a direct collision between two of this repo's own conventions: semantic line breaks put a sentence on its own line, and issue references are written bare.
-  Neither rule is wrong, and their intersection is invisible until CI reports it, because the sentence reads correctly and renders correctly everywhere except markdownlint.
-  Same shape as the MD056 entry above --- the linter reads raw text, and the meaning a human takes from the character is not available to it.
-  **Do:** start the line with any other word and put the reference inside it, as in `Two things ended the series, per #3059:`.
-  **Don't:** begin a semantically-broken line with a bare issue reference;
-  the sweep `grep -rn --include='*.md' '^#[0-9]' .` finds every instance.
+  Covered in full by [`semantic-line-breaks`](../shared/writing/semantic-line-breaks.md)'s MD018 section, which owns the rule, the collision with bare references, and both remedies (link the reference, or reword so the line does not open with it).
+  Recorded here only for the sweep, since this file is where the linter's rule numbers are indexed: `grep -rn --include='*.md' '^#[0-9]' .` finds every instance.
   (Morrison-Lab/ai-config#3060, 2026-09-03.)
 - **markdownlint-cli2 runs locally with no install step, at CI's exact version.**
   `npx --yes markdownlint-cli2@<version>` reads `.markdownlint-cli2.jsonc` and lints the whole repo in seconds;

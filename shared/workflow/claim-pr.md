@@ -358,16 +358,16 @@ the listing cannot tell you which case you are in.
 - **Don't:** re-land your own commit because it was written first --- that is
   the one input that says nothing about which version is better.
 
-**Sixth occurrence, 2026-09-03 --- the merge was better than either branch, which is a fourth reading the three above do not offer.**
-The third of them --- theirs is missing something, so rebuild on their tip and contribute the missing part --- already prescribes a union, so the novelty here is narrower than "take both" and worth stating precisely.
-What all three share is that the comparison runs **branch against branch** and terminates in a verdict on one of them.
+**Sixth occurrence, 2026-09-03 --- what is new is the unit of comparison, not the idea of keeping both sides.**
+Keeping both sides is this file's oldest lesson: the second occurrence above, on ai-config#2185, measured each side holding a fix the other lacked and prescribes merging them.
+The three readings the fifth occurrence offers are narrower than that, because each runs **branch against branch** and terminates in a verdict on one of them --- better, equivalent, or missing something you then contribute back onto the peer's tip.
+Read against #2185 the gap in the third reading is visible: its wording assumes the peer's branch is the base you rebuild on, which is exactly the assumption that hides your own unique fix, so it reaches the union only when the comparison happens to be run in both directions.
 
-Two independent drivers do not produce that.
-They produce two overlapping sets, and the interesting region is the **symmetric difference**: what each one caught that the other did not.
-Measured on one PR, a peer session reached 20 commits ahead while this one accumulated 5;
-both had fixed the same two defects, and each had fixed one the other missed.
-Discarding either branch would have dropped a real fix.
-The "better" and "equivalent" readings cannot surface that at all, and the third reading gets there only if you happen to run the comparison in both directions --- its wording assumes the peer's branch is the base you rebuild on, which is the assumption that hides your own unique fix.
+Two independent drivers do not produce a verdict on a branch.
+They produce two overlapping sets of fixes, and the region that decides the merge is the **symmetric difference**: what each one caught that the other did not.
+Measured on [ai-config#3023](https://github.com/Morrison-Lab/ai-config/pull/3023), 2026-09-03, whose head carries both sessions' commits interleaved (`gh pr view 3023 --json commits` separates them by author): both sides had fixed the same defects, and each had fixed one the other missed.
+Discarding either would have dropped a real fix.
+The resolution took the peer's `redact()` helper (`0c58c6a3`) over the local env-stripping approach, a review having shown env-stripping rendered `timeout 60 git push` as `git push` --- a remedy line that would not run --- and kept the local heredoc scanner.
 
 So diff the two heads against their merge base and enumerate the fixes on each side before deciding, rather than judging the branches.
 The unit of comparison is the fix, not the branch.
@@ -379,7 +379,7 @@ The unit of comparison is the fix, not the branch.
 
 **A genuine design disagreement inside such a merge is a prompt to find the discriminator, not to trade.**
 When both positions are right about their own evidence, the two sides are describing different cases and neither has noticed it, so trading --- taking one and conceding the other --- throws away a case that was correctly handled.
-On the same PR the disagreement was over what to do with an unterminated heredoc, and it dissolved once the evidence was sorted rather than weighed: every command-hiding case had an **unquoted** delimiter, and the peer's counter-case had a quoted one.
+On #3023 the disagreement was over what to do with an unterminated heredoc, and it dissolved once the evidence was sorted rather than weighed: every command-hiding case had an **unquoted** delimiter, and the peer's counter-case had a quoted one.
 The rule that satisfied both was available only after the property separating the case sets was named.
 
 - **Do:** when two positions each survive their own evidence, sort the cases and look for the property that partitions them.

@@ -658,7 +658,7 @@ All three survive the "does it read as coverage" glance precisely because the as
 - **Don't:** trust an assertion over captured text without checking whether the harness captured one stream or two.
 - **Don't:** read a specific, named, anchored expected value as evidence the assertion is discriminating --- specificity of the needle says nothing about the haystack.
 
-(Measured 2026-09-03 over nine review rounds on one PR, several of which found a real defect in the previous round's fix.
+(Measured 2026-09-03 on [ai-config#3023](https://github.com/Morrison-Lab/ai-config/pull/3023), whose own body records "Nine adversarial rounds, 34 findings", several rounds finding a real defect in the previous round's fix.
 The three shapes above account for three of the four occasions on that PR where a suite passed against deliberately broken code.
 The fourth --- asserting a value is PRESENT on the failure path without asserting it ABSENT on the success path --- is the positive-fixture-without-negative-control case that "A predicate a fix adds needs mutation in both directions" above already covers, and is recorded as a recurrence of that entry rather than written again here.)
 

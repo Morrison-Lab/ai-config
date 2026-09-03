@@ -117,11 +117,12 @@ Re-attempting the blocked command costs a full cycle each time, produces the ide
 
 Two measured shapes, both from 2026-09-03:
 
-- **The remedy sentence names a mode you are not in.**
+- **The remedy sentence names the simplest discharge and gets read as scenery.**
   [`no-push-without-self-review.py`](../../hooks/no-push-without-self-review.py)'s refusal says to dispatch `adversarial-reviewer` **in the foreground**.
   That sentence was read six times across four blocked pushes and registered as boilerplate;
-  six reviews were dispatched with `run_in_background: true`, none of them consumable, and the loop was misdiagnosed as a stale-fingerprint bug.
-  The word doing the work was in the message the whole time.
+  six reviews were dispatched with `run_in_background: true`, none of the six produced a verdict the push could consume, and the loop was misdiagnosed as a stale-fingerprint bug until a foreground dispatch cleared it on the first try.
+  Read the failure as evidence about those six dispatches rather than about the mode: the hook does credit a background dispatch whose task notification lands and whose task id matches, per [`mistake-patterns.md`](../../memories/mistake-patterns.md) Pattern 43 and the `is_task_notification` branch #2820 added.
+  What the message offered was the path with the fewest ways to go wrong, and skipping to the command example is what cost four cycles.
 - **The remedy sentence carries a structural condition that reads as an aside.**
   [`no-unreviewed-pr.py`](../../hooks/no-unreviewed-pr.py) credits a reviewer request only when it is the **last simple command** in the Bash call, because otherwise the call's exit status belongs to some later command.
   Six attempts were made and five failed on that condition alone --- three piped to `head`, two with a trailing `; echo "EXIT=$?"` --- while every request had genuinely succeeded.

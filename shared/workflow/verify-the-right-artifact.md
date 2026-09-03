@@ -312,8 +312,8 @@ The summary's wording is written to be representative, so it matches readily, an
 the real reply's wording is what the matcher will actually meet in production, and it need not match at all.
 Nothing distinguishes the two outcomes, because both are "the pattern fired on the text I tested it against".
 
-Measured 2026-09-03: a hook was designed and validated against a context-window summary of the session's own reply.
-The summary's phrasing matched the matcher and the reply's phrasing did not, so the design read as validated by its own measurement while not firing on the one case that motivated it.
+Measured 2026-09-03 while drafting the `no-unverified-approval-claim` Stop hook on `Morrison-Lab/ai-config` (branch `hook/no-unverified-approval-claim`, unpushed at the time of writing, so there is no PR to cite): the matcher was designed and validated against a context-window summary of the session's own reply.
+The summary's phrasing matched and the reply's phrasing did not, so the design read as validated by its own measurement while not firing on the one case that motivated it.
 
 - **Do:** pull the verbatim text out of the raw transcript when a matcher is being fitted to it, per [`get-under-the-hood`](../principles/get-under-the-hood.md)'s raw-log practice.
 - **Do:** treat "the pattern matched my test string" as a claim about the test string until you can say where that string came from.

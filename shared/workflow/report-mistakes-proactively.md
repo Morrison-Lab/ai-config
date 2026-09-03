@@ -343,6 +343,77 @@ The exception is a trivial fix in a file the current work already touches
 Severity doesn't gate the rule: a nit gets tracked too — severity affects
 the issue's priority, not whether it's recorded.
 
+## The site list in an issue you file is a scope claim, and filing is when it goes underived
+
+An issue naming where a defect occurs asserts a **population**, and
+[`metacognitive-monitoring`](metacognitive-monitoring.md) already says a scope
+claim gets checked against that population rather than recalled.
+Filing is where the rule does not fire, for a reason specific to filing: the
+enumeration reads as the *finding* rather than as a claim about it.
+You have just seen two occurrences, the issue is about those two, and listing
+them feels like reporting what you found instead of asserting that it is all
+there is.
+
+The cost lands on someone else and lands late.
+Whoever picks the issue up fixes exactly the sites it names, closes it, and the
+remaining ones survive with a **closed issue standing over them** --- which is
+worse than no issue, because a closed tracker entry is evidence the class was
+handled.
+That is the same trap [`issue-first`](issue-first.md) records for `Closes #N`
+over a wider issue, arriving from the other end: there the diff is narrower
+than the issue, here the issue is narrower than the defect.
+
+The check is one command and it is the same one you will run when you start the
+fix, so filing without it only defers the work past the point where it would
+have been cheap.
+Derive the set from the **pattern**, not from the paths you remember:
+
+```bash
+grep -rn 'select(\.\(author\|user\)\.login *|' --include=*.md --include=*.py .
+```
+
+Report what the sweep examined alongside what it found, so a later reader can
+tell a complete population from a partial one --- the habit
+[`derive-dont-enumerate`](derive-dont-enumerate.md) asks of a sweep, applied to
+the issue that starts one.
+
+**A site the sweep finds and you deliberately exclude belongs in the issue
+too**, with its reason.
+Silence there is indistinguishable from not having looked, and the next reader
+re-derives the same set and re-opens the same question.
+
+- **Do:** run the deriving query before filing, and state the population it
+  examined.
+- **Do:** name the sites you found and excluded, with why --- a quoted past
+  attempt is history rather than a defect.
+- **Do:** treat "another open PR already deletes it" as a reason to WATCH
+  rather than to exclude.
+  It is a claim about a merge that has not happened, so it expires the moment
+  that PR closes unmerged, and the site is live on the default branch the whole
+  time --- record it as pending on that PR rather than as handled.
+- **Do:** correct the issue in the open when the sweep at fix time finds more
+  than the issue named, rather than quietly fixing the wider set.
+- **Don't:** enumerate the occurrences you happened to see and let the count
+  read as the finding.
+- **Don't:** leave a closing PR to cover a population the issue understated ---
+  the issue closes, and what it missed keeps a closed entry standing over it.
+
+(Morrison-Lab/ai-config#3069, 2026-09-02: filed naming **two** sites of an
+unguarded `jq` filter that aborts on a deleted review author.
+The sweep run at fix time found **five**.
+One was a third prescribed command the issue never mentioned and #3081 fixed.
+One was a quoted record of a past failed attempt and was correctly left alone.
+One was excluded as "deleted outright by an open PR", which was the wrong
+disposition: #3024 replaces that line with a guarded form, but #3024 is
+**still open**, so the unguarded filter is live on `main` at
+`hooks/no-unreviewed-pr.py:1912` as this is written.
+ai-config#3081's own body carried the caveat --- "that fix rides entirely on #3024
+merging" --- and the first draft of THIS entry dropped it and reported the
+outcome as accomplished, which is the same expiring-state claim the section
+above is about, made inside the section about it.
+Had the fix covered only the two the issue named, `Closes #3069` would have
+shut it with three sites unexamined.)
+
 ## Relationship to existing rules
 
 - [`issue-first`](issue-first.md) governs work you're about to **start**;
@@ -358,6 +429,19 @@ the issue's priority, not whether it's recorded.
 - [`ardi`](ardi.md)'s Defer step already tracks out-of-scope **review
   findings**; this rule generalizes the same habit to any mistake noticed
   in any task.
+- [`metacognitive-monitoring`](metacognitive-monitoring.md)'s **Scope** claim
+  type is the umbrella rule the site-list section above is an instance of.
+  What that file supplies is the check --- read the population, do not recall
+  it --- and what the section adds is the one moment the check reliably does
+  not fire, because at filing time an enumeration reads as the finding rather
+  than as a claim about it.
+- [`derive-dont-enumerate`](derive-dont-enumerate.md)'s "A closed population
+  inside one file still needs deriving, not guessing" is the nearest existing
+  parallel, and the mechanic is the same one level narrower: searching for the
+  members a sweep expects rather than deriving the whole set.
+  The section above is that habit applied to an issue BODY, which is where it
+  costs a later reader rather than the author --- the enumeration ships, and
+  whoever fixes it inherits the undercount.
 - [`flag-practice-slippage`](flag-practice-slippage.md) is the same habit
   aimed at **practice** rather than at an artifact --- how the work is being
   done, including the user's own conduct.

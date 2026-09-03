@@ -1301,7 +1301,7 @@ The reliable tell is that the first conclusion is always *the guard is broken*, 
 
 Two shapes, measured in one session, and they break different things:
 
-- `gh pr view --json state` piped through `--jq` to pretty-print flattened `"state":"MERGED"` into `state=MERGED`, so the hook's exemption regex, written against the JSON, could not match.
+- `gh pr view --json state` narrowed with `--jq` to pretty-print flattened `"state":"MERGED"` into `state=MERGED`, so the hook's exemption regex, written against the JSON, could not match.
   What the guard reads is the output's **spelling**, and reshaping it is what destroys the record.
 - A `requested_reviewers` POST written as `... ; echo rc=$?` and as `... | head` moved out of last-command position, so its exit status could no longer be attributed to it.
   What that guard needs there is the **position**, which is what makes the status attributable.
@@ -1309,8 +1309,8 @@ Two shapes, measured in one session, and they break different things:
 The distinction decides the remedy, and getting it wrong forbids the right shape.
 `pr-on-claim` recommends narrowing that POST's response "with a flag on the POST itself rather than a downstream pipe".
 That is safe, and the reason is worth stating rather than assuming: the same hook does read the request's body --- a `"status":4xx` shape marks a failed request --- but a genuinely failed `gh api` also exits non-zero, so a projection cannot manufacture a false success by itself.
-The `gh pr view` above had no such second signal.
-Its exemption regex was the only reader, it was written against the JSON spelling, and `--jq` rewrote exactly that.
+The `gh pr view` above had no such second signal *for the fact in question*.
+Exit status distinguishes a failed read from a successful one and cannot distinguish MERGED from OPEN, so the terminal state has exactly one reader --- a regex written against the JSON spelling, which `--jq` rewrote.
 
 So ask what the guard reads, and expect the answer to name more than one thing.
 `no-unreviewed-pr.py` alone consults the output's text, the command's position, and its exit status, which is why "the position is what matters here" is not a licence to reshape the body.

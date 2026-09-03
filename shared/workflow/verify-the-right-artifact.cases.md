@@ -311,13 +311,17 @@ applied to the live ruleset with
 `gh api -X PUT repos/ucdavis/rampp/rulesets/3889405`, which now carries
 `Spellcheck` and `Check Changelog Action` among its required contexts.
 Neither is emitted by any workflow on `main`, and nothing turns red to say so.
-The reach is narrower than it first looks and ends in the same place:
-a pull request whose head predates the migration still publishes the old names
-and passes on them --- `ucdavis/rampp#154` reports both `SUCCESS`, measured
-2026-09-03 --- but the same ruleset sets
-`strict_required_status_checks_policy: true`, so every such pull request must
-update against `main` before merging, and after that update neither context is
-published again.
+The reach looks narrower than it is, because open pull requests keep the check
+runs they already have.
+`ucdavis/rampp#154` reports both contexts `SUCCESS`, which reads as current and
+is not: those two check runs started at `2026-08-27T23:42:10Z` and
+`23:42:12Z`, six days before the migration landed, and the pull request has
+published nothing since.
+Its next run will resolve the workflow file through the current `main` and
+publish `check / spellcheck` instead, after which the bare requirement can
+never be met.
+Reading that rollup as evidence about present behaviour is this case record's
+own subject, committed while writing it up.
 The correcting write was then refused by the permission classifier, leaving the
 repository in that state pending the user.
 

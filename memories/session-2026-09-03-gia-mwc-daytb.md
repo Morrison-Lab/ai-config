@@ -53,3 +53,52 @@ verdict rather than assumed.
 - **#3060 still has an empty diff (0 files changed)**, exactly as yesterday's notebook recorded.
   A draft opened per `pr-on-claim` and never filled in.
   It needs a decision, not an ARDI round.
+
+## Phase 1 --- what each open PR needed
+
+Survey dispatched read-only and cross-checked rather than trusted.
+**The survey reported one unresolved review thread on #3023; the live query showed all six resolved.**
+Worth recording as a subagent-report miss: the number was wrong in the direction that would have created work, not skipped it, but a report of PR state is exactly the kind of claim `metacognitive-monitoring` says to re-query rather than accept.
+
+- **#3024** --- clean at head `14817d4b` (round 6 of 6), 19 checks green, `mergeable_state: clean`.
+  Two items still standing, both dispositioned:
+  - The `request_ident()` first-match gap --- **Defer** to #3071, thread replied to and resolved.
+  - Round 5's non-blocking nit claiming a duplicated word (`That is\nis indistinguishable`) --- **Rebut**.
+    The file at head reads `# ... it away. That` / `# is indistinguishable, ...`, i.e. one correctly-placed `is` across a line break.
+    **The reviewer misread the wrap.**
+    Acting on the nit would have *introduced* the duplication it described, which is the sharpest form of why a nit gets verified against the bytes rather than trusted.
+- 2026-09-02 23:41 PDT --- **MERGED #3024** (squash, `462de02b`), under the standing ai-config `mwc` grant plus the peer-PR path (announced intent, held five minutes, `ListAgents` reached no peer).
+- **#3023** --- announced merge intent at 23:36 PT on head `64c4e97`; **re-checked before acting and the head had moved to `6aa021b5`.**
+  A peer merged `origin/main` in (`ced93f69`) and dropped the report-trailer case record as superseded by #3084 (`6aa021b5`), at 06:38Z --- minutes into my own five-minute hold.
+  A push resets the clean clock, so the round-5 verdict no longer covers the head.
+  Withdrew the intent on the PR and left the PR to its peer.
+  **This is the third consecutive session in which the pre-merge re-check caught a peer collision** (#3037 and #3024 yesterday, #3023 today).
+  The rule is not ceremony on this repo; it fires roughly every time.
+- **#3084** --- Claude verdict clean on head `6f10014`, but a **Copilot review landed an hour later** with a real finding the Claude round never saw.
+  That ordering is the case `CLAUDE.md`'s "Re-check for latest review findings" section exists for: the newest *Claude* comment read clean while a newer *Copilot* review sat open.
+  Finding confirmed by reading the passage: line 456 said "A conforming report puts the payload last, needs no sentinel, and is what #3050 has to settle:" and then introduced a **sentinel-bearing** block with that colon.
+  Fixed in `92304aeb` --- split the sentence, name what the block is before showing it, scope the unconditional `Do:` bullet to the reordered tail, and add the paired `Don't`.
+- **#3060** --- the empty draft turned out to be a fully-specified UMS pass (#3059) that yesterday's session opened and never wrote.
+  Written in `e3d3646e`: three entries across `algorithmatize-checks.md`, `adversarial-self-review.md` (two subsections) and `address-every-comment.md`.
+  **One part of #3059 was deliberately not written**: its item 2 also described rounds each introducing the next round's defect, which `learn-from-review-findings.md` already covers at length under "A later round can find a defect in the FIX".
+  Only the missing half --- an instrument for deciding when to *stop* --- was added.
+
+## Collision matrix, re-derived on current heads
+
+The first derivation is already stale, which is the point of re-deriving it.
+After #3023's drop commit its net diff no longer touches `adversarial-self-review.md` at all, so the #3023 x #3084 collision **dissolved without anyone resolving it**.
+Meanwhile #3060 gained that same file, creating a pair the first matrix could not have shown.
+
+Sizes `{3089: 4, 3084: 1, 3060: 3, 3023: 11}`; 6 pairs examined, 1 collided (#3023 x #3089, on `.github/workflows/validate.yml`).
+
+**A file-set intersection is not a conflict**, so the pairs were simulated --- with a **positive control built for the purpose**, since a zero matrix and a detector that never ran look identical:
+
+```
+POSITIVE CONTROL ctl-A x ctl-B exit=1   (two throwaway branches editing README.md's only line)
+3060 x 3084                    exit=0
+3023 x 3089                    exit=0
+```
+
+So the detector demonstrably fires, and neither real pair conflicts.
+No merge-order constraint from conflicts.
+Checked separately for *dependency* (one PR asserting what another makes true), which no intersection can see: `main` does not carry the report-trailer section and #3084 is the only open PR adding it, so #3023 dropping it loses nothing whichever order they land in.

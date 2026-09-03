@@ -293,13 +293,27 @@ The standing ai-config `mwc` grant does not help, because the gate is a conditio
 
 The table above is a snapshot of 01:28 and stays one;
 PR #3060 is now pushed at `ae58121f`, six commits past the local head that table records, and thirteen past the remote one.
-`git rev-list --count` settles which, and is why the figure is not hand-typed this time.
+`git rev-list --count` is where both figures come from, rather than a count typed from memory.
 
 Four review rounds landed in that stretch.
-The shape I first wrote down --- that each round's findings were about the previous round's *fix* --- is false, and the table below refutes it: it holds for round 9 alone.
-Round 7's one finding was about original branch content, round 6's note was about original branch content, and four of round 8's seven were about a brand-new entry no prior round had prompted.
-What is actually true is less tidy and more useful: **the branch never stopped growing, so every round found defects in material added since the last one.**
-That is a statement about pace rather than about fix quality, and it points at a different remedy --- stop adding while converging.
+Two generalisations about them were written here and both were false, which is worth more than either would have been.
+The first --- that each round's findings were about the previous round's *fix* --- was refuted by the table printed directly beneath it.
+The second --- that the branch never stopped growing, so every round found defects in material added since the last one --- was not on the page and took one query per row to refute.
+
+There is no single shape, because the four rounds split into two:
+
+- **Rounds 6 and 7 found content the previous round had already looked at and passed.**
+  Derived rather than recalled: `git show c851d68f:shared/workflow/algorithmatize-checks.md | grep 'command not found'` returns the line round 7 flagged, and `git show c851d68f:shared/workflow/adversarial-self-review.md | grep 'What ended the series'` returns the line round 6 flagged.
+  Both were present at the head the round *before* them reviewed and passed clean.
+- **Rounds 8 and 9 found material that did not exist at the previous round's head.**
+
+So the transferable statement is not about pace or about fix quality.
+It is that **a round's clean verdict was never evidence about the material it did not flag** --- twice here, a passage sat through a round that examined its own file and was flagged by the next one.
+That says convergence is not a stopping signal, which is the opposite of what an empty round feels like.
+
+The query that settles which case a finding is: `git show <previous-round-head>:<file> | grep '<flagged text>'`.
+Present means the earlier round passed over it;
+absent means it was added since.
 
 | round | reviewer | findings | what they were about |
 |---|---|---|---|

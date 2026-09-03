@@ -1313,7 +1313,7 @@ The `gh pr view` above had no such second signal *for the fact in question*.
 Exit status distinguishes a failed read from a successful one and cannot distinguish MERGED from OPEN, so the terminal state has exactly one reader --- a regex written against the JSON spelling, which `--jq` rewrote.
 
 So ask what the guard reads, and expect the answer to name more than one thing.
-`no-unreviewed-pr.py` alone consults the output's text, the command's position, and its exit status, which is why "the position is what matters here" is not a licence to reshape the body.
+`no-unreviewed-pr.py` consults the output's text, the command's position, and its exit status, all three in one discharge, which is why "the position is what matters here" is not a licence to reshape the body.
 
 What the two shapes share is the moment.
 `--jq`, a trailing `echo`, and a pipe are each applied for readability, while composing the command, with no thought of the guard --- and each is applied to the very thing that was going to serve as the record.
@@ -1333,7 +1333,7 @@ Committing costs one command and settles it.
 - **Do:** ask whether a disagreeing check is reading the artifact you changed, before diagnosing the check.
 - **Don't:** reshape the output of a command whose *text* is the evidence --- `--jq`, a downstream pipe, a formatting flag --- or chain anything after a command whose *position* is.
 - **Don't:** read those as alternatives;
-  one guard commonly consults all three, so establishing that position matters says nothing about whether the body is inert.
+  a single guard can consult all three at once, so establishing that position matters says nothing about whether the body is inert.
 - **Don't:** conclude a guard is defective from the fact that the underlying action worked --- the guard measures the record, not the effect.
 
 ## Measure CPU time, not wall clock, when the assertion is about work done

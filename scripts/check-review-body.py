@@ -9,21 +9,25 @@ A body can carry `Verdict: Ready for merge`, be posted by the right account,
 and still be ignored entirely -- or, worse, be read as NOT clean.
 
 Measured 2026-09-03 on ucdavis/hac.sap#37. Three self-reviews were posted
-before one was counted:
+before one counted:
 
-  1. Headings, a verdict, no `Reviewed-Commit` line. IGNORED. For a non-bot
+  1. Headings, a verdict, no `Reviewed-Commit` line. IGNORED -- for a non-bot
      author a clean body must pass `_is_structured_review_body`, which needs a
      report heading AND a fingerprint. The stale `Needs work` from hours
-     earlier kept standing, and the PR read not-clean with nothing explaining
-     why.
-  2. Fingerprint added. COUNTED, and classified NOT CLEAN -- because the body
-     had a `## Findings` heading, which `_FINDINGS_HEADING_PATTERN` matches
-     whatever the section says beneath it. The section said zero findings.
-  3. Heading dropped, `[FINDINGS_COUNT: 0]` used instead. Counted, clean.
+     earlier kept standing, and the PR read not-clean with nothing saying why.
+  2. Fingerprint added. Still not counted as clean.
+  3. Restructured around `[FINDINGS_COUNT: 0]`. Counted, clean.
 
-Each round cost a comment on a real PR and a re-query. The classifier was two
-imports away the whole time, which is `deterministic-tools.md`'s case exactly:
-never spend a guess on what an algorithm already decides.
+Note what is NOT claimed about round 2. An earlier version of this docstring
+said a `## Findings` heading forced not-clean regardless of its contents. That
+is false: `_findings_section_resolves_empty` exists precisely to exempt a
+heading whose section says none, and the classifier reads that round-2 body as
+CLEAN. The round-2 rejection had another cause, and rather than guess at it a
+second time this tool now just asks the classifier.
+
+That is the actual lesson, and it is `deterministic-tools.md`'s: the classifier
+was two imports away throughout, and three comments were spent guessing at
+rules it would have answered for free.
 
 WHAT IT REPORTS
 ---------------
@@ -82,76 +86,76 @@ def load_classifier(path=_CLASSIFIER):
 
 
 def analyse(body, mod):
-    """The four body-level questions, plus the verdict they imply."""
-    not_clean = []
-    for pat in getattr(mod, "VERDICT_NOT_CLEAN_PATTERNS", []):
-        if not isinstance(pat, str):
-            continue
-        m = re.search(pat, body, re.I)
-        if m:
-            not_clean.append({"pattern": pat, "matched": m.group(0).strip()})
+    """Ask the classifier itself, rather than re-deriving its precedence.
 
-    findings_pat = getattr(mod, "_FINDINGS_HEADING_PATTERN", None)
-    findings_m = re.search(findings_pat, body) if findings_pat else None
+    An earlier version reimplemented the decision from the classifier's parts
+    -- the pattern lists, the findings-heading regex, the structure test -- and
+    got the precedence wrong in four ways, each saying CLEAN where the real
+    checker does not. It missed the structured `review-data` payload the
+    classifier consults FIRST and the adversarial-reviewer persona is required
+    to emit; it modelled neither the clean-qualifier gate (`Ready for merge
+    once the tests pass` records NO verdict, so it supersedes nothing) nor the
+    bare-pattern marking gate; and it checked one of eighteen finding patterns,
+    so a `## Nits` heading -- which vetoes merge under fully-clean.md -- read
+    as clean.
 
-    clean_hit = any(
-        re.search(p, body, re.I)
-        for p in getattr(mod, "VERDICT_CLEAN_PATTERNS", [])
-        if isinstance(p, str)
-    )
+    Every one of those is a `check-purpose-before-reusing` failure: the parts
+    were reused correctly and the thing they compose was not. Calling
+    `classify_verdict` and `_unresolved_finding_pattern` is both correct and
+    smaller, and it cannot drift from the checker because it IS the checker.
+    """
+    verdict = mod.classify_verdict(body)
+    finding = mod._unresolved_finding_pattern(body)
+    structured = bool(mod._is_structured_review_body(body))
+    marker = bool(mod.has_review_body_marker(body))
 
     result = {
-        "has_review_marker": bool(mod.has_review_body_marker(body)),
-        "is_structured_review_body": bool(mod._is_structured_review_body(body)),
-        "findings_heading": findings_m.group(0) if findings_m else None,
-        "not_clean_matches": not_clean,
-        "clean_phrase_present": clean_hit,
+        "has_review_marker": marker,
+        "is_structured_review_body": structured,
+        "classifier_verdict": verdict or "none",
+        "unresolved_finding_pattern": finding,
     }
 
-    # The order mirrors the checker's own precedence: a body with no marker is
-    # never examined; findings and not-clean patterns win over a clean phrase;
-    # and a non-bot clean needs the structure the fingerprint provides.
-    if not result["has_review_marker"]:
+    # Mirrors the checker's own precedence at its verdict-scan loop: a body it
+    # never examines, then findings-win-over-clean, then the structure gate
+    # that a non-bot clean must pass.
+    if not marker:
         result["verdict"] = "IGNORED"
         result["why"] = "no review marker, so the scanner never examines it"
-    elif not_clean or findings_m:
+    elif verdict == "not-clean" or finding:
         result["verdict"] = "NOT-CLEAN"
         result["why"] = (
-            "a findings heading matches" if findings_m and not not_clean
-            else "a not-clean pattern matches")
-    elif not clean_hit:
+            f"an unresolved finding pattern matches: {finding}" if finding
+            else "the classifier reads this as not-clean")
+    elif not verdict:
         result["verdict"] = "NO-VERDICT"
-        result["why"] = "no clean phrase, so it neither clears nor blocks"
-    elif not result["is_structured_review_body"]:
+        result["why"] = (
+            "the classifier states no verdict, so this neither clears nor "
+            "blocks -- an earlier not-clean would keep standing")
+    elif not structured:
         result["verdict"] = "IGNORED"
         result["why"] = (
             "clean, but not structured: a non-bot clean body needs a report "
             "heading AND a `Reviewed-Commit:` line")
     else:
         result["verdict"] = "CLEAN"
-        result["why"] = "structured, clean, and nothing matches not-clean"
+        result["why"] = "structured, and the classifier reads it as clean"
     return result
 
 
 def render(r):
     lines = [
-        f"  review marker present : {r['has_review_marker']}",
-        f"  structured report     : {r['is_structured_review_body']}",
-        f"  findings heading      : {r['findings_heading'] or 'none'}",
-        f"  clean phrase present  : {r['clean_phrase_present']}",
+        f"  review marker present   : {r['has_review_marker']}",
+        f"  structured report       : {r['is_structured_review_body']}",
+        f"  classifier verdict      : {r['classifier_verdict']}",
+        f"  unresolved finding      : {r['unresolved_finding_pattern'] or 'none'}",
+        "",
+        f"  would classify as       : {r['verdict']} -- {r['why']}",
+        "",
+        "  Body-level only. Quorum, reviewer identity and head-SHA matching",
+        "  are not checked here; a CLEAN body can still leave a PR not fully",
+        "  clean.",
     ]
-    if r["not_clean_matches"]:
-        lines.append("  not-clean matches     :")
-        for m in r["not_clean_matches"]:
-            lines.append(f"      {m['matched']!r}  (pattern {m['pattern']})")
-    else:
-        lines.append("  not-clean matches     : none")
-    lines.append("")
-    lines.append(f"  would classify as     : {r['verdict']} -- {r['why']}")
-    lines.append("")
-    lines.append("  Body-level only. Quorum, reviewer identity and head-SHA")
-    lines.append("  matching are not checked here; a CLEAN body can still")
-    lines.append("  leave a PR not fully clean.")
     return "\n".join(lines)
 
 

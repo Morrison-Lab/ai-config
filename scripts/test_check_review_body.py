@@ -35,27 +35,52 @@ def verdict(body):
 
 FINGERPRINT = "Reviewed-Commit: 78c3eb0d0e0bb23165225166cfabdb3393876d01"
 
-# --- the three real bodies, in the order they were posted ----------------
+# --- the real sequence, and the premise that turned out false -----------
 
-# 1. Headings and a verdict, no fingerprint. Was IGNORED, and the stale
-#    not-clean from hours earlier kept standing.
-check("round 1: no fingerprint is ignored", verdict(
+# Round 1: headings and a verdict, no fingerprint. IGNORED -- a non-bot clean
+# body must pass `_is_structured_review_body`, which needs heading AND
+# fingerprint. This is the round that let a stale not-clean keep standing.
+check("no fingerprint is ignored", verdict(
     "## Self-review\n\nAll good here.\n\n**Verdict: Ready for merge.**\n"),
     "IGNORED")
 
-# 2. Fingerprint added, but a `## Findings` heading saying zero findings.
-#    Was COUNTED and classified NOT-CLEAN -- the heading matches whatever
-#    the section says beneath it.
-check("round 2: a Findings heading reads as not-clean", verdict(
-    f"## Summary\n\nfine\n\n## Findings\n\nNone. Zero findings.\n\n"
-    f"## Verdict\n\nVerdict: Ready for merge\n{FINGERPRINT}\n"),
-    "NOT-CLEAN")
+# Round 2 is NOT asserted as not-clean, because it is not. An earlier version
+# of this suite pinned that, on the theory that a `## Findings` heading forces
+# not-clean whatever its section says. `_findings_section_resolves_empty`
+# exists precisely to exempt that shape, and the classifier reads this body as
+# clean. Pinned in the true direction so the false premise cannot come back.
+check("a Findings heading whose section resolves empty is not a finding",
+      verdict(f"## Summary\n\nfine\n\n## Findings\n\nNone. Zero findings.\n\n"
+              f"## Verdict\n\nVerdict: Ready for merge\n{FINGERPRINT}\n"),
+      "CLEAN")
 
-# 3. Heading dropped, `[FINDINGS_COUNT: 0]` instead. Counted, clean.
-check("round 3: no Findings heading classifies clean", verdict(
+# Round 3: the body that actually landed.
+check("a structured clean body with a zero count classifies clean", verdict(
     f"## Summary\n\nNo actionable items. `[FINDINGS_COUNT: 0]`\n\n"
     f"## Verdict\n\nVerdict: Ready for merge\n{FINGERPRINT}\n"),
     "CLEAN")
+
+# --- the four the first implementation got wrong, all toward CLEAN -------
+# Each was measured against the classifier: predictor said CLEAN, checker did
+# not. They are the reason this delegates instead of re-deriving precedence.
+
+check("a review-data payload with findings is not clean", verdict(
+    f"## Summary\n\nfine\n\n## Verdict\n\nVerdict: Ready for merge\n{FINGERPRINT}\n\n"
+    '<!-- review-data:\n{"schema_version":"1.0","reviewer":"adversarial-reviewer",'
+    '"commit_sha":"78c3eb0d","verdict":"NOT_CLEAN","findings":[{"file":"a.py",'
+    '"line":1,"category":"bug","message":"m"}]}\n-->\n'),
+    "NOT-CLEAN")
+check("a conditional sign-off states no verdict", verdict(
+    f"## Summary\n\nfine\n\n## Verdict\n\n"
+    f"Verdict: Ready for merge once the tests pass\n{FINGERPRINT}\n"),
+    "NO-VERDICT")
+check("bare prose is not a verdict", verdict(
+    f"## Summary\n\nI think this is ready for merge, honestly.\n{FINGERPRINT}\n"),
+    "IGNORED")
+check("a Nits heading with real items vetoes", verdict(
+    f"## Summary\n\nfine\n\n## Nits\n\n- a small thing\n\n## Verdict\n\n"
+    f"Verdict: Ready for merge\n{FINGERPRINT}\n"),
+    "NOT-CLEAN")
 
 # --- edges ---------------------------------------------------------------
 
@@ -64,10 +89,19 @@ check("a body with no marker at all is ignored",
 check("a genuine not-clean is not-clean", verdict(
     f"## Summary\n\ntrouble\n\n## Verdict\n\nVerdict: Needs work\n{FINGERPRINT}\n"),
     "NOT-CLEAN")
-check("a nonzero FINDINGS_COUNT is not-clean", verdict(
-    f"## Summary\n\n`[FINDINGS_COUNT: 3]`\n\n## Verdict\n\n"
+# Both spellings, because the classifier blanks code spans before scanning and
+# the difference is invisible from the rendered comment. My first version of
+# this case asserted NOT-CLEAN for the backticked form and was wrong -- the
+# predictor was right and the test was not, which is worth pinning in both
+# directions so neither can drift back.
+check("a bare nonzero FINDINGS_COUNT is not-clean", verdict(
+    f"## Summary\n\n[FINDINGS_COUNT: 3]\n\n## Verdict\n\n"
     f"Verdict: Ready for merge\n{FINGERPRINT}\n"),
     "NOT-CLEAN")
+check("the same count inside a code span is blanked, so it is clean", verdict(
+    f"## Summary\n\n`[FINDINGS_COUNT: 3]`\n\n## Verdict\n\n"
+    f"Verdict: Ready for merge\n{FINGERPRINT}\n"),
+    "CLEAN")
 check("a marker but no verdict phrase yields NO-VERDICT", verdict(
     f"## Summary\n\nSome notes on the diff.\n\nverdict: pending\n{FINGERPRINT}\n"),
     "NO-VERDICT")
@@ -104,9 +138,8 @@ check("--json emits parseable JSON",
 # --- the anti-drift property --------------------------------------------
 # The whole point is that this reads the checker's OWN symbols. If it ever
 # reimplements them, this fails.
-for sym in ("VERDICT_NOT_CLEAN_PATTERNS", "VERDICT_CLEAN_PATTERNS",
-            "_FINDINGS_HEADING_PATTERN", "_is_structured_review_body",
-            "has_review_body_marker"):
+for sym in ("classify_verdict", "_unresolved_finding_pattern",
+            "_is_structured_review_body", "has_review_body_marker"):
     check(f"classifier exposes {sym}", hasattr(MOD, sym), True)
 
 if failures:

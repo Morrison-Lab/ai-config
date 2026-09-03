@@ -479,3 +479,22 @@ and Jules was re-requested.
 Its second item, that `git grep` with a hardcoded path list fails when a directory is removed, was rebutted with a measurement on git 2.43.0: a missing pathspec is a silent miss (exit 1), not an error.
 Lesson for the fold: the same note on #3135 passed Jules earlier today, so the trigger is the wording, not the practice;
 keep squash-body guidance in the merge step, not in the PR body.
+
+## 16:10 PDT --- resumed after a compaction; #3160 filed; UMS branch through round 2
+
+Filed [#3160](https://github.com/Morrison-Lab/ai-config/issues/3160): `scripts/check-pr-fully-clean.py`'s `classify_verdict()` returns no verdict for Jules's `VERDICT: approve` (its pattern needs `Approved`) and its marker table knows only `verdict: block`,
+so a superseded block stands as that reviewer's latest verdict;
+the reprex is in the issue.
+The claude-review run on #3154 at `94244eb5` had found the same gap and left it unfiled because that session was review-only.
+
+Round 2 on `ums/2026-09-03-merge-visibility` returned four findings, each re-measured before applying:
+`git ls-remote` exits 128 with empty output for an unreachable host and for a repository the credentials cannot read, so the classifier now stops on a non-zero exit;
+the quoted `batch-merge-and-resolve` command carries `-c`, restored;
+the combined-diff anchor `^[ +-]*\+` matched whichever column is last, so on the rebuilt scratch merge it counted the copy `main` already had, and it is a quantifier under GNU BRE, where `grep -c '^[ +-]*\+SHARED'` gives 2 while the review reported 1 (an ERE reading), so the entry now anchors on `^[+][+]` and states both counts;
+the `refs/pull/N/head` premise now points at the `git-branches.md` section that owns it.
+Committed as `3011644c` with every gate green;
+round 3 is queued behind the five-subagent cap.
+Lesson for the fold: a reviewer's count is a measurement under the reviewer's own tool, so re-run it with the tool the entry names before writing the number down.
+
+The pre-push verdict for #3154's local head `cc5e0f7d` went into the slot the round-2 reviewer freed;
+waves 1 and 2 were still running (four live agents) at the reading above.

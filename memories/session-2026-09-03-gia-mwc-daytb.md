@@ -305,8 +305,8 @@ There is no single shape, because the four rounds split into two:
 - **Rounds 6 and 7 found content that was already in the tree an earlier round had reviewed.**
   Derived: `git show c851d68f:shared/workflow/algorithmatize-checks.md | grep -F 'command not found'` returns the line round 7 flagged, and the same query over `adversarial-self-review.md` for `What ended the series` returns the line round 6 flagged.
   Note the weaker claim that supports: `c851d68f` is not round 7's immediate predecessor head, since eight commits separate it from `b94767dd`.
-Round 6's reviewing head is not derivable at all --- it was a local dispatch that left no artifact --- so that half rests on recollection, like round 9's below.
-What is established is that the passages predate an earlier review of their own files, not that the round immediately before each one read those lines.
+  Round 6's reviewing head is not derivable at all --- it was a local dispatch that left no artifact --- so that half rests on recollection, like round 9's.
+  What is established is that the passages predate an earlier review of their own files, not that the round immediately before each one read those lines.
   That earlier CI round was itself `NOT_CLEAN`, so "passed clean over them" is wrong twice over;
   it returned a finding elsewhere and said nothing about these.
 - **Round 8 found material that did not exist at the previous round's head.**

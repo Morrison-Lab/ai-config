@@ -85,10 +85,10 @@ The enforcement half was measured on #1226's own first push, which failed
 `validate` at **step 12, "Run memory-file-size check tests"** --- not at the
 later step named "Check for oversized memory files (advisory)", which runs
 `scripts/check-memory-file-size.py` with no `--strict` and exits 0 by design.
-What gates is `scripts/test_check_memory_file_size.py:127-132`, whose comment
-reads "The real corpus must stay under the shipped default, or the check ships
-red", calling `cmfs.oversized_files("memories", cmfs.DEFAULT_MAX_LINES)` and
-exiting 1 on any finding.
+What gates is the assertion in `scripts/test_check_memory_file_size.py` whose
+comment reads "The real corpus must stay under the shipped default, or the
+check ships red", calling `cmfs.oversized_files` over the tracked memory files
+and exiting 1 on any finding.
 So the cap is hard and is enforced from the check's test suite rather than from
 the check.
 Two sibling files were already at the gate when this was found:

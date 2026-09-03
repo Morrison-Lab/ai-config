@@ -143,29 +143,38 @@ def section_sizes(lines: list[str]) -> list[tuple[str, int]]:
 
 
 def oversized_files(
-    directory: str, max_lines: int
+    measured: list[tuple[str, list[str]]], max_lines: int
 ) -> list[tuple[str, int, list[tuple[str, int]]]]:
-    """(path, line-count, largest sections) for each file over `max_lines`."""
+    """(path, line-count, largest sections) for each file over `max_lines`.
+
+    Takes an already-measured list rather than a directory so one run reads
+    the corpus once: the breach report and the warning band partition a
+    single measurement, so re-reading every file for the second half would
+    also let a mid-run edit put the two halves on different line counts.
+    """
     findings = [
         (rel_path, len(lines), section_sizes(lines)[:5])
-        for rel_path, lines in measured_files(directory)
+        for rel_path, lines in measured
         if len(lines) > max_lines
     ]
     return sorted(findings, key=lambda f: -f[1])
 
 
 def approaching_files(
-    directory: str, max_lines: int, warn_lines: int
+    measured: list[tuple[str, list[str]]], max_lines: int, warn_lines: int
 ) -> list[tuple[str, int, int]]:
     """(path, line-count, headroom) for each file in the warning band.
 
     The band is `warn_lines <= n <= max_lines`, so it is disjoint from
     `oversized_files`, which fires strictly above `max_lines`. A file at
     exactly the cap therefore appears here, with a headroom of 0.
+
+    Takes the same already-measured list `oversized_files` does, for the
+    reason given there.
     """
     findings = [
         (rel_path, len(lines), max_lines - len(lines))
-        for rel_path, lines in measured_files(directory)
+        for rel_path, lines in measured
         if warn_lines <= len(lines) <= max_lines
     ]
     return sorted(findings, key=lambda f: -f[1])
@@ -241,8 +250,9 @@ def main() -> None:
         parser.error("--warn-fraction must be strictly between 0 and 1")
 
     warn_lines = warn_line_threshold(args.max_lines, args.warn_fraction)
-    findings = oversized_files(args.directory, args.max_lines)
-    approaching = approaching_files(args.directory, args.max_lines, warn_lines)
+    measured = measured_files(args.directory)
+    findings = oversized_files(measured, args.max_lines)
+    approaching = approaching_files(measured, args.max_lines, warn_lines)
 
     if not findings:
         print(f"No memory file exceeds {args.max_lines} lines.")

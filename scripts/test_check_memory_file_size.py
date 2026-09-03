@@ -52,8 +52,16 @@ def make_repo(tmpdir: Path) -> Path:
     # default warn threshold is round(100 * 0.92) == 92. Under the cap, so it
     # must never appear as a breach.
     near = "# Near\n" + "z\n" * 94
+    # 92 and 91 lines: the two files straddling that same warn threshold, so
+    # the band's lower edge is pinned. Without them an off-by-one there --
+    # `warn_lines < len(lines)` instead of `<=` -- silently drops the file
+    # sitting exactly at the threshold and no assertion notices.
+    edge = "# Edge\n" + "z\n" * 91
+    under = "# Under\n" + "z\n" * 90
     (memories / "small.md").write_text(small, encoding="utf-8")
     (memories / "near.md").write_text(near, encoding="utf-8")
+    (memories / "edge.md").write_text(edge, encoding="utf-8")
+    (memories / "under.md").write_text(under, encoding="utf-8")
     (memories / "big.md").write_text(big, encoding="utf-8")
     (memories / "MEMORY.md").write_text("# index\n" + "row\n" * 200, encoding="utf-8")
     (memories / "session" / "notes.md").write_text("# s\n" + "n\n" * 200, "utf-8")
@@ -113,6 +121,14 @@ with tempfile.TemporaryDirectory() as tmp:
     check(
         "the approaching file is not reported as a breach",
         "near.md: 95 lines\n" not in out,
+    )
+    check(
+        "warns on a file at exactly the warn threshold",
+        "memories/edge.md: 92 lines (8 lines of headroom)" in out,
+    )
+    check(
+        "leaves the file one line below the warn threshold alone",
+        "under.md" not in out,
     )
 
     out, code = run_check(repo, "--max-lines", "122")
@@ -186,12 +202,28 @@ with tempfile.TemporaryDirectory() as tmp:
     )
 
 check(
-    "warn threshold rounds the fraction of the cap",
+    "warn threshold applies the fraction of the cap",
     cmfs.warn_line_threshold(1250, 0.92) == 1150,
+)
+# The default's product is exactly 1150.0, so the assertion above holds under
+# truncation, flooring and ceiling alike and says nothing about the rounding.
+# These two inputs are where those disagree: 1250 * 0.9207 is 1150.875, which
+# truncates to 1150 and rounds to 1151; 100 * 0.925 is exactly 92.5, which
+# ceils to 93 and rounds to 92 under Python's round-half-to-even. Together
+# they pin `round` against each neighbouring rule a later edit might reach for.
+check(
+    "warn threshold rounds a non-integral product up, not down",
+    cmfs.warn_line_threshold(1250, 0.9207) == 1151,
+)
+check(
+    "warn threshold rounds a .5 product half-to-even",
+    cmfs.warn_line_threshold(100, 0.925) == 92,
 )
 
 # The real corpus must stay under the shipped default, or the check ships red.
-findings = cmfs.oversized_files("memories", cmfs.DEFAULT_MAX_LINES)
+findings = cmfs.oversized_files(
+    cmfs.measured_files("memories"), cmfs.DEFAULT_MAX_LINES
+)
 check(
     f"this repo's own memories/ is under the {cmfs.DEFAULT_MAX_LINES}-line default",
     not findings,

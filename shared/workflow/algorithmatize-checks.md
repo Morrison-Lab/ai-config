@@ -1383,12 +1383,17 @@ The check is two steps, and the **second** is the one that decides:
 ```bash
 uptime                                   # step 1: load average (Windows: Get-Counter)
 for i in 1 2 3 4 5; do                   # step 2: the one that decides
-  { TIMEFORMAT=%R; time <the command> >/dev/null; } 2>&1
+  ( TIMEFORMAT=%R; time <the command> >/dev/null; ) 2>&1
 done                                     # -> one elapsed-seconds figure per run
 ```
 
-The loop uses the shell's **builtin** `time` rather than `/usr/bin/time -f %e`, which is the form that first suggested itself and does not run: the binary is absent from this corpus's own remote containers (`exit 127`, measured), and `-f` is GNU-only where it is present, so the step the prose calls decisive would have printed nothing and left the reader holding only the load average.
-The builtin needs no package, and the `2>&1` is load-bearing --- `time` writes to stderr, so a `| tee` without it captures an empty file.
+The loop uses the shell's **reserved word** `time` rather than `/usr/bin/time -f %e`, which is the form that first suggested itself and does not run: the binary is absent from this corpus's own remote containers (`exit 127`, measured), and `-f` is GNU-only where it is present, so the step the prose calls decisive would have printed nothing and left the reader holding only the load average.
+
+Three details in that one line, each measured rather than reasoned:
+
+- **Reserved word, not a builtin**, which is worth getting right because the misnomer invites the natural prefix form and that form fails the same way the binary did: `type -t time` reports `keyword`, `compgen -b` does not list it, and `TIMEFORMAT=%R time <cmd>` dies with `time: command not found`.
+- **Parentheses rather than braces**, because a brace group is not a subshell and `TIMEFORMAT` would leak into the calling shell, silently reformatting every later `time` in that session. Measured: the brace form leaves `TIMEFORMAT=%R` set afterwards, the paren form leaves it unset.
+- **`2>&1` is load-bearing**, since `time` writes to stderr. With it, `| tee` captured `0.202`; without it, `tee` captured an empty file.
 
 Read `uptime` first, but do not stop there.
 Its figures are 1-, 5- and 15-minute *decaying* averages, so a burst that inflated
@@ -1415,7 +1420,9 @@ This repo's own catastrophic-backtracking checker is exactly that shape: [`scrip
 A backtracking probe is therefore not the exception that proves a `process_time` rule.
 It is a **second** exception, and it needs its own reason rather than the blocking one's, which does not reach it: that carve-out is stated as "keep a wall-clock ceiling **only** where the measured code can actually block", and its rationale is that "the one thing CPU time cannot see is a span that blocks on I/O instead of burning cycles".
 A runaway regex burns cycles, so CPU time sees it perfectly well and the blocking carve-out excludes it by construction.
-What justifies wall-clock here is different and narrower: a watchdog has to *interrupt*, the practical in-process interrupt for a CPU runaway is `ITIMER_REAL`, and a termination budget is a real-time quantity by definition.
+What justifies wall-clock here is different and narrower, and it is not availability: a CPU-time interval timer interrupts a runaway regex perfectly well (`ITIMER_VIRTUAL` fires on the same catastrophic pattern in 0.253s against `ITIMER_REAL`'s 0.250s, measured), so the choice is not forced by what exists.
+It is forced by what is being budgeted.
+A watchdog spends a **termination budget**, which is a real-time quantity by definition --- the question it answers is "has this taken too long", and too long is measured on the clock the caller is waiting on.
 
 So ask which question the assertion asks before reaching for either repair.
 The `< 1.0s` probe that prompted this entry was a *regression guard shaped like a watchdog*, which is why it was ambiguous and why it could flake.

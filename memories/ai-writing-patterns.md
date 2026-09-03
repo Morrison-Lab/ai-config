@@ -88,6 +88,29 @@ the diagnostic signal lies in clustering and mechanical repetition.
   to simulate profound analysis without verifiable substance
   (e.g., "...thereby highlighting the importance of X", "...ensuring seamless alignment", "...paving the way for future growth").
   *Fix:* Cut the participle clause or split into a concrete second sentence.
+- **Formulaic sentence openers:**
+  Fronting a declarative with a bare demonstrative
+  ("This is", "That is", "These are", "Those are"),
+  a wh-word ("What makes it work is..."),
+  or a partitive quantifier ("Some of the", "Many of the", "None of the").
+  *Fix:* Name the noun the demonstrative stands for,
+  or front the subject and drop the copula.
+- **Contrastive closes and stock metaphors:**
+  Ending a claim by default with "rather than" or "not the same as";
+  "carries"/"carry" and "tells"/"doesn't tell" standing in for a plain verb;
+  "load-bearing" standing in for "essential".
+  *Fix:* State the claim positively, and use the plain verb.
+  Judge these by density, since each is ordinary English at one or two hits.
+- **Sentence-complexity metrics (measuring convoluted nesting):**
+  Readability formulas score word and sentence length only
+  (Flesch-Kincaid grade level, Kincaid et al. 1975; Gunning fog, Gunning 1952),
+  so they proxy clause nesting instead of measuring it.
+  Parse-tree depth measures the nesting itself
+  (Yngve depth, Yngve 1960, or a plain count of embedded clauses).
+  Mean dependency distance (Liu 2008) measures head-to-dependent span:
+  a working-memory proxy that correlates with nesting
+  without being the same quantity,
+  and one a flat coordinated list inflates at zero nesting depth.
 - **Hedging stacks:**
   Layering epistemic modals ("may potentially help to", "can arguably to some extent").
   *Fix:* Make the direct claim or drop it.
@@ -123,6 +146,13 @@ the diagnostic signal lies in clustering and mechanical repetition.
 - **Thin punctuation:**
   Over-reliance on commas and additive conjunctions ("and")
   while avoiding semicolons, colons, parentheses, or mid-thought periods.
+  The Economist ("How to spot AI writing", August 2026)
+  compared 55,940 sentences and 1.2 million words of its own copy
+  against ChatGPT, Claude, Gemini, and Grok rewrites of the same articles,
+  and found sparse punctuation a better marker than the em-dash.
+  Only Claude used em-dashes more often than the human writers did,
+  so read the em-dash baselines below per model
+  and re-check them as models change.
 - **Em-dash density:**
   Overusing em-dashes as an all-purpose glue for clause attachment
   (human baseline is ~3.2 per 1,000 words;

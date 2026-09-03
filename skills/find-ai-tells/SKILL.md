@@ -104,6 +104,35 @@ grep -rniE "\b($tells)\b" <target>       # no ripgrep — same pattern, via grep
 - **The negation-reversal antithesis** — the single biggest tell:
   "It's not just X, it's Y" / "It isn't about X; it's about Y" / "This isn't
   merely X — it's Z". Grep: `rg -niE "(it'?s|this is) not (just|only|merely|about)"`.
+- **Formulaic sentence openers** --- a declarative fronted by a bare
+  demonstrative ("This is", "That is", "These are", "Those are"), a wh-word
+  ("What makes it work is the lease"), or a partitive quantifier ("Some of
+  the", "Many of the", "All of the", "None of the").
+  Split on sentence-final punctuation before matching; a line-start grep sees
+  only the sentences that happen to begin a line:
+  `tr '.!?' '\n' < <target> | grep -icE "^ *(this|that|these|those) (is|are)\b"`.
+  Fix: name the noun the demonstrative stands for, or front the subject and
+  drop the copula.
+- **Contrastive closes and stock metaphors** --- "rather than" and "not the same
+  as" ending a claim by default, "carries"/"carry" and "tells"/"doesn't
+  tell"/"does not tell" standing in for a plain verb, "load-bearing" standing
+  in for "essential".
+  Each is ordinary English at one or two hits, so count density instead of
+  banning them:
+  `grep -icoE "rather than|not the same as|load-bearing|carr(y|ies)|does(n't| not) tell" <target>`.
+- **Convoluted sentences** --- clause nesting the reader must hold open across
+  two or more embedded clauses.
+  Cue: the ~25-word bar `use-preferred-style` step 2 sets, or three or more
+  commas plus a subordinator ("which", "whose", "because", "while",
+  "so that").
+  Fix: split at the outermost clause boundary.
+- **Thin punctuation** --- long sentences glued with "and", while commas,
+  semicolons, colons, and parentheses stay rarer than a human writer's.
+  Count them per 1,000 words and count "and" against them.
+  (The Economist, "How to spot AI writing", August 2026: across 55,940
+  sentences, sparse punctuation beat the em-dash as a marker, and only Claude
+  used em-dashes more often than the human writers did --- so judge the em-dash
+  tell below per model, and re-check it as models change.)
 - **Rule of three, mechanically** — triadic lists everywhere ("fast, reliable,
   and scalable"; "discover, explore, and master"). One triad is rhetoric; a
   triad in every sentence is a tell.
@@ -171,6 +200,10 @@ vs. *"One stray 'delve'; otherwise clean."*
   the underlying research catalog (20 core empirical patterns synthesized from
   community research, statistical detection metrics including burstiness and TTR,
   and multi-tier anti-slop architectures).
+- **[`shared/writing/ai-tells.md`](../../shared/writing/ai-tells.md)** --- the
+  condensed always-loaded statement of this catalog.
+  Keep the two in step: a tell added there belongs here too, with the grep
+  that finds it.
 - **`simplify` / `tidy`** — the code-side analogues (cut dead code / cruft);
   this skill is the prose-side analogue (cut filler / reflexes).
 - **`grade-work`** — when reviewing a deliverable, fold an AI-tells pass into

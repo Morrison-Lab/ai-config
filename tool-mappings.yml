@@ -50,6 +50,16 @@ models:
 # instead of silently redirecting. scripts/validate-skills.py enforces this by
 # testing the effect -- any `<` outside quotes in a command field -- rather
 # than by matching particular command spellings.
+#
+# Never chain a commit into a push inside one cli value. A PreToolUse deny
+# rejects the whole Bash invocation, so a refused push discards the commit
+# along with it, and hooks/no-commit-chained-to-push.py refuses that shape
+# outright. This registry is the one place a model copies a command from
+# verbatim, so a chained example here becomes a chained call there.
+#   Do: stop the cli value at the commit and reach for the PUSH operation
+#       as a separate call.
+#   Don't: join a commit to a push with `&&` in a cli value, however
+#       convenient the one-liner reads.
 operations:
   - id: VIEW_PR
     description: Read a pull request's details and metadata.
@@ -258,8 +268,14 @@ operations:
     cli: git log "<branch>" (or gh api "repos/<owner>/<repo>/commits" -f "sha=<branch>")
     github_mcp: mcp__github__list_commits
   - id: WRITE_FILE
-    description: Create or update file(s) on a branch in a single commit.
-    cli: git add "<path>" && git commit -m "..." && git push
+    description: >-
+      Create or update file(s) on a branch. The MCP tools do it in one call;
+      the CLI path is two Bash calls, never one --- stage and commit here,
+      then run the PUSH operation separately.
+      hooks/no-commit-chained-to-push.py refuses the two chained into one
+      call, because a PreToolUse deny rejects the whole invocation, so a
+      refused push discards the commit along with it.
+    cli: git add "<path>" && git commit -m "..." (then PUSH, as a separate call)
     github_mcp: mcp__github__create_or_update_file (one file) / mcp__github__push_files (multiple)
   - id: LIST_SECRETS
     description: >-

@@ -440,6 +440,50 @@ The section above closes on "publish the command", and that rule is right.
 - **Don't:** read "I published a command" as discharging the rule above; that
   rule is discharged by publishing *that* command.
 
+**A formatter you run yourself is a second way the shipped command can differ
+from the tested one, and a command in provenance position is a stronger claim
+than the bullets above cover.**
+Those bullets name a manual restatement: you ran one command and typed a
+tidier one.
+Two measured instances in one session show a mechanism neither bullet names,
+and a failure shape worse than an ordinary broken example.
+
+The mechanism is a reflow or lint pass that runs *after* verification, as a
+routine part of the same commit, and rewrites the shipped text without
+rewriting its meaning by any measure the pass itself applies.
+A shell line continuation --- backslash, then newline --- is one command to a
+human and to the shell that ran it.
+A prose reformatter has no shell semantics, so a pass built to join short
+lines turns `\` + newline into `\` + space: a whitespace-only edit to the
+reformatter, and a corrupted argument to the shell.
+The command that was genuinely run and the command that shipped are then two
+different artifacts, and having run the first certifies nothing about the
+second.
+
+The failure shape is a command sitting in provenance position ---
+"read from `<command>`", "found via `<command>`" --- which is not only a
+recipe but a claim that the command was run and produced the cited result.
+A command that cannot run falsifies that claim outright, independent of
+whether the underlying finding is otherwise true.
+An ordinary broken example is merely useless; a broken provenance command is
+a false statement about how a conclusion was reached.
+
+- **Do:** run the command in the exact form that will ship --- after any
+  formatter, linter, or `--write` pass the commit also runs has touched the
+  file --- rather than the form you tested before it.
+- **Do:** treat a command in provenance or citation position as a claim that
+  it was run and produced the stated result, and confirm it can run before
+  publishing it in that position.
+- **Don't:** trust that a formatter preserves a command's meaning because it
+  only touches whitespace; a whitespace-only edit to prose can still change
+  what a shell parses out of the result.
+- **Don't:** treat one passing run of a prescribed command as covering every
+  later pass (a reflow, a lint `--write`, a squash) the file goes through
+  before it ships.
+
+See [`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md),
+"Publishing a command is not enough; it has to be the command you ran".
+
 ## An instrument's own exit code is not the gate; find what CI actually runs
 
 The two sections above govern the command you publish.

@@ -393,20 +393,22 @@ FIRE-condition addition", so both parties held the evidence and neither drew the
 conclusion that the count needed a ref rather than a correction.
 The fix stated the ref and the flags and changed no number.)
 
-**A false MISSING while verifying a merge lands its duplicate where the diff cannot show it, and that scope is what this adds.**
+**A false MISSING while verifying a merge lands its duplicate in the merge commit, whose patch `git log -p` omits by default, and that scope is what this adds.**
 [`memories/debugging.md`](../../memories/debugging.md)'s "An empty grep for one spelling is not evidence the concept is absent" already owns the mechanism and the consequence, in as many words: "'missing' leads you to *add* a second copy alongside the broken one, which is worse than the defect you started with".
 This fragment already delegates both of its mechanisms there, near the top.
 So read that first;
 one thing it leaves open is worth adding.
 
 That part is **where the resulting duplicate lands**, and only for one kind of check.
-Most verification-time misses land in an ordinary commit, fully in review's path --- `#605`'s README paragraph and `#771`'s dangling-citation report both would have.
-The exception is a check run *inside a merge*, and it is the exception this adds.
+A verification-time miss can land in an ordinary commit, fully in review's path --- `UCD-SERG/serocalculator#605`'s README paragraph and `ai-config#771`'s dangling-citation report both would have.
+The case this adds is a check run *inside a merge*.
 The moment is already covered: both of that section's named cases are checking searches --- a README grepped "to check whether it linked the development docs", a citation "checked before citing it" and one step from being reported as dangling --- so verification is where it was written from, not a gap in it.
 What it does not say is where the second copy ends up, or who reads that.
 An authoring-time duplicate arrives as a new block in an ordinary diff, which is what review looks at.
-A re-add made while resolving a merge arrives in the merge commit, whose content a squash-merging repo's three-dot diff excludes by construction --- so it is not that review is careless, it is that review is not shown it.
-So the more careful the surrounding process, the worse this gets: a merge verified string by string is exactly where a mistyped pattern turns into a silent duplication.
+A re-add made while resolving a merge arrives in the merge commit.
+The PR's three-dot diff does show it: measured 2026-09-03, `git diff main...feature` over a merge that re-added a paragraph listed the re-add as an added line.
+`git log -p` does not, because it omits merge patches unless given `-m` or `--diff-merges`, so a reviewer reading the branch commit by commit is never shown it.
+A merge verified string by string is exactly where a mistyped pattern produces such a re-add, and whether review sees it depends on which of those two reads review does.
 
 Measured 2026-09-03: two consecutive false MISSING readings while verifying that a merge preserved earlier work, both from the pattern rather than the file.
 A trailing space in `demotes ` did not match the bolded `` demotes** `time` `` in the target, and a case-sensitive `keep the content` did not match `Keep the content`.

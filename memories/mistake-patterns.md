@@ -956,7 +956,10 @@ A clean automated review from every available provider evaluating the current HE
   a private repository whose link resolves only with access:
   A fallback script `altdoc/scripts/format-sap-table.R` claimed to mirror `ucdavis/hac.sap`, but its guard test compared only `names(formals())`.
   The non-DOCX branch of `format_charter_table` diverged materially (emitting two boxed tables and omitting prompt questions and bullet points rather than a single merged table), while the guard passed 24/24 tests.
-  Simultaneously, reformatting the SAP into the HAC template dropped the blinding procedure, multiplicity policy, error-free reference standard caveat, and variable cluster size caveats, and inverted document heading levels by placing `## References` over a document rooted at `###`.
+  Simultaneously, reformatting the SAP into the HAC template dropped the blinding procedure,
+  multiplicity policy, error-free reference standard caveat, and variable cluster size caveats,
+  inverted document heading levels by placing `## References` over a document rooted at `###`,
+  and `format_milestones_table` discarded column identifiers by replacing `Month 1`..`Month 8` with `rep("Month", ...)`.
 - **Canonical Rule**: [`fail-fast.md`](../shared/principles/fail-fast.md) and
   [`preferences.md`](preferences.md) (verify outputs, not assumptions).
 - **Fix**: Write regression tests that verify output equivalence (rendered HTML / OpenXML) and full `formals()` matching.

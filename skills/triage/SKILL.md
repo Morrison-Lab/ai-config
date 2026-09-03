@@ -1,6 +1,6 @@
 ---
 name: triage
-description: "Label every open issue P1/P2/P3; close junk."
+description: "Triage backlog: P1/P2/P3 or close."
 user-invocable: true
 allowed-tools:
   - Bash

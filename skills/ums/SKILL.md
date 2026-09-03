@@ -199,6 +199,15 @@ committed pass.
    `NLB_BASE_REF=origin/main python3 scripts/vendor/gha-check-new-line-breaks.py`,
    `python3 scripts/check-links.py`, and `markdownlint` on the changed files.
 
+   **Read that check's warning band before choosing where an entry goes, not
+   only its pass/fail line.**
+   It also names every memory file within 100 lines of the 1250-line cap and
+   how many lines each has left (ai-config#3102), so a file with almost no
+   headroom is knowable *before* the append rather than by tripping the gate
+   after it.
+   Append elsewhere or split first when the file you were about to write to
+   is on that list.
+
    **If a push is rejected non-fast-forward:** fetch first and diff before
    assuming a real conflict -- the branch may have picked up another
    session's commit that needs separating out (`git revert <their-commit>`)

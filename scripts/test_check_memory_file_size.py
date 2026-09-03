@@ -48,7 +48,12 @@ def make_repo(tmpdir: Path) -> Path:
     # 122 lines: the "Huge" section is the clear outlier, so it should head
     # the report's per-file section list.
     big = "# Big\n\n" + "## Tiny\n" + "x\n" * 19 + "## Huge\n" + "y\n" * 99
+    # 95 lines: inside the warning band for `--max-lines 100`, whose
+    # default warn threshold is round(100 * 0.92) == 92. Under the cap, so it
+    # must never appear as a breach.
+    near = "# Near\n" + "z\n" * 94
     (memories / "small.md").write_text(small, encoding="utf-8")
+    (memories / "near.md").write_text(near, encoding="utf-8")
     (memories / "big.md").write_text(big, encoding="utf-8")
     (memories / "MEMORY.md").write_text("# index\n" + "row\n" * 200, encoding="utf-8")
     (memories / "session" / "notes.md").write_text("# s\n" + "n\n" * 200, "utf-8")
@@ -92,6 +97,62 @@ with tempfile.TemporaryDirectory() as tmp:
     check("clean corpus reports no findings", "No memory file exceeds" in out)
     check("clean corpus exits 0", code == 0)
 
+    # The warning band (ai-config#3102). Reporting only the breach is what
+    # made the check arrive too late to act on, so the band has to print in
+    # the clean case too -- that is the case the old output could not
+    # distinguish from an empty corpus.
+    out, code = run_check(repo, "--max-lines", "100")
+    check(
+        "warns on a file approaching the cap",
+        "memories/near.md: 95 lines" in out,
+    )
+    check("reports the remaining headroom", "(5 lines of headroom)" in out)
+    # The breach format is "<path>: <n> lines" with nothing after it, so the
+    # absence of that line is what proves the warned file was not also
+    # reported as over the cap.
+    check(
+        "the approaching file is not reported as a breach",
+        "near.md: 95 lines\n" not in out,
+    )
+
+    out, code = run_check(repo, "--max-lines", "122")
+    check(
+        "warns even when nothing breached",
+        "No memory file exceeds" in out
+        and "memories/big.md: 122 lines" in out,
+    )
+    check("a warning alone still exits 0", code == 0)
+
+    # A file AT the cap warns rather than breaching: the failure fires
+    # strictly above --max-lines, and that file is exactly the one that
+    # cannot take another line.
+    check(
+        "a file at exactly the cap warns with 0 headroom",
+        "memories/big.md: 122 lines (0 lines of headroom)" in out,
+    )
+
+    _, code = run_check(repo, "--max-lines", "122", "--strict")
+    check("a warning alone exits 0 under --strict", code == 0)
+
+    out, _ = run_check(repo, "--max-lines", "500", "--warn-fraction", "0.99")
+    check(
+        "--warn-fraction moves the band",
+        "No memory file is within 5 lines of the cap." in out,
+    )
+
+    # An over-cap file is past the cap, not near it, so the empty-band line
+    # would read as contradicting the breach printed directly above it.
+    out, _ = run_check(repo, "--max-lines", "100", "--warn-fraction", "0.99")
+    check(
+        "no empty-band line alongside a breach",
+        "memories/big.md: 122 lines" in out and "is within" not in out,
+    )
+
+    _, code = run_check(repo, "--max-lines", "100", "--warn-fraction", "1")
+    check("rejects a --warn-fraction of 1", code == 2)
+    _, code = run_check(repo, "--max-lines", "100", "--warn-fraction", "0")
+    check("rejects a --warn-fraction of 0", code == 2)
+
     # MEMORY.md (the index) and session/ notes are both over any threshold
     # used above, so their absence from the findings proves the exclusions
     # apply. Match the "<path>: <n> lines" finding format specifically --
@@ -123,6 +184,11 @@ with tempfile.TemporaryDirectory() as tmp:
         ":(glob) magic is what stops * from matching /",
         "memories/session/notes.md" not in globbed,
     )
+
+check(
+    "warn threshold rounds the fraction of the cap",
+    cmfs.warn_line_threshold(1250, 0.92) == 1150,
+)
 
 # The real corpus must stay under the shipped default, or the check ships red.
 findings = cmfs.oversized_files("memories", cmfs.DEFAULT_MAX_LINES)

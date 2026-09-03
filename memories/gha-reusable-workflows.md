@@ -266,7 +266,11 @@ Generic Actions-authoring material stays there.
 it counts top-level `def`s in every file the diff touches,
 not only in files the diff adds.
   `check-new-line-breaks/check-new-line-breaks.py` in gha carried 18 top-level `def`s on `main` (`grep -c '^def '`) before [gha#826](https://github.com/Morrison-Lab/gha/pull/826) touched it for an unrelated working-tree-scope fix, and the touch alone was enough to fail the check.
-  The remedy is the opt-out marker the check itself names: `# check-one-function-per-file: allow-multiple` on the line after the shebang.
+  The remedy is the opt-out marker the check itself names, `# check-one-function-per-file: allow-multiple`,
+  placed "near the top" in the check's own words:
+  gha#826 put it on the line after the shebang,
+  and gha's `check-one-function-per-file.py` carries it on line 19, after its module docstring,
+  and the check accepts both placements.
   `check-one-function-per-file/check-one-function-per-file.py` in gha carries that same marker on itself,
 so the pattern is load-bearing rather than a workaround invented for this PR.
   - **Do:** when a gha PR touches a pre-existing multi-function script, add the marker in the same PR and say so in the PR body.

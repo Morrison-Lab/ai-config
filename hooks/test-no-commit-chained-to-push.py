@@ -18,6 +18,7 @@ import json
 import os
 import subprocess
 import sys
+import types
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 HOOK = os.path.join(HERE, "no-commit-chained-to-push.py")
@@ -422,22 +423,32 @@ check("an override on an earlier unrelated push does not clear it",
 check("an override on a later commit does not clear an already-matched chain",
       fires("git commit -m a && git push origin x; "
             "ALLOW_COMMIT_AND_PUSH=1 git commit -m b"), True)
+# The same shape with the overridden commit BETWEEN the matched commit and the
+# push, which is the position ai-config#3003 asked for and the one no case
+# here covered. It is a BEHAVIOURAL pin rather than a mutation probe: it
+# cannot separate a mutant that only drops `and commit_argv is None` (see the
+# block below), but it does go silent under the compound regression of
+# dropping that clause AND restoring the overridden commit's `return None`,
+# which is a shape this hook has shipped before. Measured on this branch.
+check("an override on a middle commit does not clear the first-matched chain",
+      fires("git commit -m a && ALLOW_COMMIT_AND_PUSH=1 git commit -m b "
+            "&& git push"), True)
 
 # WHICH commit gets matched, which is what `commit_argv is None` decides: the
-# FIRST one, and a later commit never displaces it. The case above puts the
-# second commit AFTER the push, so `evaluate` returns before it and the clause
-# is never reached; the gap needs the second commit BETWEEN the commit and the
-# push (ai-config#3003).
+# FIRST one, and a later commit never displaces it. The case above the middle
+# override puts the second commit AFTER the push, so `evaluate` returns at the
+# push and the clause never sees that second commit; the gap needs the second
+# commit BETWEEN the first commit and the push (ai-config#3003).
 #
 # No `fires` assertion can close it. That issue proposed
 # `git commit -m a && ALLOW_COMMIT_AND_PUSH=1 git commit -m b && git push`
 # and reported the mutant allowing it; measured on this branch, the mutant
 # DENIES it too, because an overridden second commit takes the `continue` and
-# leaves `commit_argv` holding the first commit either way. Every chain a
-# mutant without the clause sees is one the shipped clause also refuses, so
-# the only observable difference is the commit the refusal NAMES -- and that
-# name is not decoration: the remedy lines tell the author which command to
-# split into its own call. M10 below is the matching mutation.
+# leaves `commit_argv` holding the first commit either way. The clause changes
+# only WHICH argv is stored, never whether one is, so the two modules give the
+# SAME deny/allow answer on every input. The one observable difference is the
+# commit the refusal NAMES -- the command the message identifies as the one
+# about to be lost. M10 below is the matching mutation.
 _TWO_COMMITS = hook.evaluate("git commit -m a && git commit -m b && git push") or ""
 check("the refusal names the first commit of a two-commit chain",
       "git commit -m a" in _TWO_COMMITS, True)
@@ -840,21 +851,32 @@ _mutate("fusing the heredoc marker with the separator goes silent",
 #        first-matched one. Rewritten in SOURCE rather than patched at a
 #        collaborator, because the clause is a local test inside `evaluate`
 #        with nothing to stub; and asserted on the reason TEXT rather than
-#        through `_mutate`, because both modules deny every input, so a
-#        boolean case is vacuous and `_mutate` would report it as such.
+#        through `_mutate`, because the clause changes only WHICH argv is
+#        stored, never whether one is -- so the two modules give the same
+#        deny/allow answer on every input, a boolean case is vacuous, and
+#        `_mutate` would report it as such.
 #
 #        A source anchor rots silently when the clause is reworded, which
-#        would leave this pinning nothing while still passing. So its absence
-#        is a FAILURE of the test rather than a skip.
+#        would leave this mutation pinning nothing while still passing. So a
+#        missing or duplicated anchor is a FAILURE of the test rather than a
+#        skip, and the count is asserted rather than mere presence, matching
+#        `test-no-handrolled-verdict-parse.py`'s own anchor check -- a bare
+#        `in` test plus `replace(..., 1)` would silently patch a docstring
+#        occurrence instead of the code, and this hook quotes its own source
+#        in docstrings heavily.
 _M10_CLAUSE = 'if sub == "commit" and commit_argv is None:'
-_hook_source = open(HOOK, encoding="utf-8").read()
-if _M10_CLAUSE not in _hook_source:
+with open(HOOK, encoding="utf-8") as _handle:
+    _hook_source = _handle.read()
+_M10_HITS = _hook_source.count(_M10_CLAUSE)
+if _M10_HITS != 1:
     failures.append(
         "MUTATION a displaced commit_argv names the later commit: the source "
-        "anchor " + repr(_M10_CLAUSE) + " is gone, so nothing is pinned")
+        "anchor " + repr(_M10_CLAUSE) + f" appears {_M10_HITS} times, expected "
+        "exactly 1, so this mutation no longer pins the clause -- re-anchor "
+        "it. (The two behaviour cases above still pin which commit is named.)")
 else:
-    _m10_spec = importlib.util.spec_from_file_location("mutant_first", HOOK)
-    mutant_first = importlib.util.module_from_spec(_m10_spec)
+    mutant_first = types.ModuleType("mutant_first")
+    mutant_first.__file__ = HOOK
     exec(compile(_hook_source.replace(_M10_CLAUSE, 'if sub == "commit":', 1),
                  HOOK, "exec"), mutant_first.__dict__)
     _M10_REASON = mutant_first.evaluate(

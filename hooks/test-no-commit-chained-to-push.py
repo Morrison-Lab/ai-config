@@ -90,6 +90,106 @@ check("a heredoc commit and a push joined with ;",
 check("&& chained", fires("git commit -m x && git push"), True)
 check("semicolon separated", fires("git commit -m x; git push"), True)
 check("newline separated", fires("git commit -m x\ngit push"), True)
+
+# A `#` comment used to disable the guard outright. `simple_commands` rewrites
+# a newline to `;` so a script's second line is its own command, and `shlex`'s
+# `commenters` then discarded everything from the `#` to the end of the WHOLE
+# input rather than to the end of its line -- so the push after a commented
+# commit was never seen. Measured on this branch before the fix: `allow`.
+check("a comment on the commit line does not swallow the push",
+      fires("git commit -m x # note\ngit push"), True)
+check("a comment-only line between the two does not swallow the push",
+      fires("git commit -m x\n# just a note\ngit push"), True)
+# The negatives that keep the comment stripping from eating real arguments.
+check("a `#` inside double quotes is data, not a comment",
+      fires('git commit -m "fix #123 and more"'), False)
+check("a `#` inside single quotes is data, not a comment",
+      fires("git commit -m 'fix #123'"), False)
+check("a word-internal `#` is not a comment",
+      fires("git commit -m sha#1234"), False)
+check("a quoted `#` does not hide a later real push",
+      fires('git commit -m "fix #123" && git push'), True)
+
+# Adversarial review of the first fix found three shapes it left open. Each
+# was reproduced as an ALLOW before the rewrite, and each is a fail-open on a
+# deny guard rather than a cosmetic miss.
+#
+# `shlex` starts a new token immediately after an operator, so a `#` glued to
+# one begins a comment with no whitespace anywhere. A whitespace-only rule
+# closed `x # note` and left `x &&#note` wide open.
+check("a `#` glued to `&&` does not swallow the push",
+      fires("git commit -m x &&#note\ngit push"), True)
+check("a `#` glued to `|` does not swallow the push",
+      fires("git commit -m x |#note\ngit push"), True)
+# A double-quoted `-m` message spans physical lines, which this module's own
+# docstring anticipates. Resetting quote state per line read a body line
+# beginning `#` as an unquoted comment and deleted the closing quote and the
+# push with it.
+check("a `#` opening the second line of a quoted -m message is not a comment",
+      fires('git commit -m "abc\n#def" && git push'), True)
+# Backslash escapes the NEXT character outside single quotes. Skipping only
+# the backslash let `\"` toggle quote state, and an odd number of them before
+# a `#` corrupted the balance into the same deletion.
+check("an escaped quote before a `#` does not corrupt quote state",
+      fires('git commit -m "fix \\" # 123" && git push'), True)
+
+# NOT a bypass, and asserted so the rewrite cannot "fix" it into one. A review
+# round called this a hole; bash disagrees. Verified by running it:
+#   $ bash -c 'echo COMMIT;#note; echo PUSH'
+#   COMMIT
+# The `#` begins a comment at a token start and runs to end of line, so the
+# push is commented out and never executes. There is no chain to refuse, and
+# denying here would refuse a command that does not do the thing.
+check("a `;#` comment really does comment out the rest of the line",
+      fires("git commit -m x;#note; git push"), False)
+
+# `_SECRET_NAME`'s leading character class used to consume the keyword's own
+# first letter, so the BARE names could never match while prefixed ones did.
+# The suite's only case was `MY_DEPLOY_SECRET=`, which has a prefix and so
+# passed straight over the defect -- a vacuous case, not a passing one.
+for _bare in ("TOKEN", "SECRET", "PASSWORD", "PASSWD", "API_KEY", "APIKEY",
+              "AUTH", "AUTHORIZATION", "BEARER", "COOKIE", "PAT", "KEY"):
+    _out = hook.evaluate(
+        _bare + "=abcdEFGH12345678opaque git commit -m a && git push") or ""
+    check("the denial still fires with a bare " + _bare, bool(_out), True)
+    check("the denial does not echo a bare " + _bare,
+          "abcdEFGH12345678opaque" in _out, False)
+
+# The denial renders the user's own argv back at them, into a transcript a
+# session may paste onto a PR, and Actions-style secret masking does not reach
+# it. An env-assignment prefix is where a credential rides along.
+_LEAKY = (
+    ("URL userinfo",
+     "GIT_CONFIG_VALUE_0=https://user:ghp_SECRETTOKENVALUE@x.com "
+     "git commit -m a && git push", "ghp_SECRETTOKENVALUE"),
+    ("a classic PAT",
+     "GH_TOKEN=ghp_AAAAAAAAAAAAAAAAAAAA git commit -m a && git push",
+     "ghp_AAAAAAAAAAAAAAAAAAAA"),
+    ("a modern PAT",
+     "X=github_pat_11ABCDEFG0123456789 git commit -m a && git push",
+     "github_pat_11ABCDEFG0123456789"),
+    ("an sk- key",
+     "OPENAI_API_KEY=sk-abcdefghijklmnopqrstuvwx git commit -m a && git push",
+     "sk-abcdefghijklmnopqrstuvwx"),
+    ("a slack token",
+     "S=xoxb-1234567890-abcdefghij git commit -m a && git push",
+     "xoxb-1234567890-abcdefghij"),
+    ("a secret-NAMED assignment whose value looks ordinary",
+     "MY_DEPLOY_SECRET=hunter2hunter2 git commit -m a && git push",
+     "hunter2hunter2"),
+)
+for _label, _cmd, _needle in _LEAKY:
+    _out = hook.evaluate(_cmd) or ""
+    check("the denial still fires with " + _label, bool(_out), True)
+    check("the denial does not echo " + _label, _needle in _out, False)
+
+# The over-redaction control: a benign command must come back readable, or the
+# denial stops naming the command it refused.
+_benign = hook.evaluate('git commit -m "fix the thing" && git push origin main') or ""
+check("a benign commit subject survives redaction",
+      "fix the thing" in _benign, True)
+check("benign push arguments survive redaction",
+      "origin main" in _benign, True)
 check("|| separated", fires("git commit -m x || git push"), True)
 check("add, commit, push", fires("git add -A && git commit -m x && git push -u origin b"), True)
 check("commit -F file then push",

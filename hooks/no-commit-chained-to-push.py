@@ -182,6 +182,63 @@ import re
 import shlex
 import sys
 
+# A denial renders the user's own argv back at them, and Actions-style secret
+# masking does not apply here: this text goes to the transcript and, when a
+# session pastes it, onto a PR. An env-assignment prefix is exactly where a
+# credential rides along -- `GIT_CONFIG_VALUE_0=https://user:TOKEN@host git
+# commit ... && git push` was the measured case -- so the argv is redacted
+# before it is formatted in. Erring toward over-redaction: a starred value
+# costs a reader nothing, and a published credential cannot be recalled.
+#
+# WHAT THIS CANNOT DO, stated because the natural reading of the list below
+# is that it is comprehensive and it is not. Pattern matching catches a
+# recognizable literal prefix or a recognizable NAME. An opaque value --
+# a hex or base64 blob -- assigned to a name outside the keyword list
+# (`X=`, `BLOB=`) passes through unredacted, and no pattern can tell it
+# from an ordinary argument. This reduces the exposure; it does not close
+# it. Do not read a redacted denial as proof the command carried no
+# secret.
+_REDACTIONS = (
+    # URL userinfo, the measured shape. Keeps the scheme and host readable.
+    re.compile(r"(?P<pre>[a-zA-Z][a-zA-Z0-9+.-]*://)[^/\s:@]+:[^/\s@]+@"),
+    # Common forge and cloud token shapes, whatever they are assigned to.
+    re.compile(r"\b(?:gh[pousr]_|github_pat_)[A-Za-z0-9_]{10,}"),
+    re.compile(r"\bsk-[A-Za-z0-9_-]{16,}"),
+    re.compile(r"\bxox[abposr]-[A-Za-z0-9-]{10,}"),
+)
+
+# An assignment whose NAME says secret, whatever the value looks like.
+#
+# The affix classes are `*` rather than `[A-Za-z_][A-Za-z0-9_]*`, and that is
+# the whole of the rule rather than a loosening. A mandatory leading character
+# consumes the keyword's own first letter before the alternation is tried, so
+# the BARE names -- `TOKEN=`, `SECRET=`, `PASSWORD=`, `API_KEY=` -- could never
+# match, while prefixed ones like `GH_TOKEN=` matched fine. Those bare four are
+# the commonest spellings there are, so the rule protected the rarer case and
+# left the common one leaking. The suite's original case was
+# `MY_DEPLOY_SECRET=`, which has a prefix and so passed over the defect.
+#
+# `\b` still anchors the start, so this matches a NAME rather than a substring
+# of one: `NOT_A_TOKEN_VALUE=` is still a secret-named assignment by this rule,
+# which is the safe direction, but `x.token=` is not an assignment prefix and
+# does not reach here.
+_SECRET_NAME = re.compile(
+    r"(?i)\b([A-Za-z0-9_]*"
+    r"(?:TOKEN|SECRET|PASSWORD|PASSWD|APIKEY|API_KEY|CREDENTIAL[S]?"
+    r"|AUTHORIZATION|AUTH|BEARER|COOKIE|PAT|KEY)"
+    r"[A-Za-z0-9_]*)=\S+")
+
+
+def redact(text: str) -> str:
+    """Mask credential-shaped substrings in text about to be shown or pasted."""
+    if not text:
+        return text
+    text = _REDACTIONS[0].sub(lambda m: m.group("pre") + "***:***@", text)
+    for rx in _REDACTIONS[1:]:
+        text = rx.sub("***", text)
+    return _SECRET_NAME.sub(lambda m: m.group(1) + "=***", text)
+
+
 OVERRIDE = "ALLOW_COMMIT_AND_PUSH"
 
 try:
@@ -361,8 +418,9 @@ def evaluate(command):
             # newline inside a quoted argument has already become `;` in
             # `simple_commands`, which is quote-blind about the rewrite. The
             # DENY text says so rather than inviting the paste.
-            return DENY.format(commit=shlex.join(commit_argv),
-                               push=shlex.join(argv), override=OVERRIDE)
+            return DENY.format(commit=redact(shlex.join(commit_argv)),
+                               push=redact(shlex.join(argv)),
+                               override=OVERRIDE)
     return None
 
 

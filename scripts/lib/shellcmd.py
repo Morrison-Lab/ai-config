@@ -184,6 +184,67 @@ def _heredoc_free(command):
     return RX_HEREDOC.sub(" << ", command)
 
 
+def _comment_free(command):
+    """Drop unquoted `#` comments, keeping the newlines that terminate them.
+
+    `simple_commands` turns a newline into `;` so a script's second line is
+    seen as its own command. A `#` comment must therefore be removed BEFORE
+    that rewrite: afterwards the comment's terminating newline is a `;`, and
+    `shlex` -- whose `commenters` is `#` -- discards everything from the `#`
+    to the end of the WHOLE input rather than to the end of its line.
+    Measured: `git commit -m x # note` followed by `git push` returned no
+    commands past the comment, so the guard went silent on exactly the chain
+    it exists to refuse.
+
+    THE SCAN IS OVER THE WHOLE COMMAND, NOT PER LINE, and that is the
+    correction rather than a detail. A first version reset quote state at
+    every newline, which is wrong for the input shape this module's own
+    docstring already anticipates: a double-quoted `-m` message spans
+    physical lines, so a body line beginning `#` read as an unquoted comment
+    and the rest of the command -- closing quote, `&&`, and the push -- was
+    deleted with it. That failed OPEN, since `simple_commands` then returns
+    `None` and the caller allows.
+
+    A comment begins only where a TOKEN begins: at the start, after
+    whitespace, or immediately after a shell operator character. The last is
+    not a nicety --- `shlex` starts a new token straight after `&&`, `;`, `|`
+    or `)`, so `git commit -m x &&#note` comments out the rest with no space
+    anywhere, and a whitespace-only rule leaves that spelling open while
+    closing the one beside it.
+
+    Backslash escapes the following character outside single quotes, so it
+    consumes that character rather than only itself. Skipping just the
+    backslash let `\"` toggle quote state, and an odd number of them before a
+    `#` corrupted the balance into the same fail-open deletion.
+    """
+    single = double = False
+    out = []
+    i = 0
+    n = len(command)
+    while i < n:
+        ch = command[i]
+        if ch == "\\" and not single and i + 1 < n:
+            out.append(ch)
+            out.append(command[i + 1])
+            i += 2
+            continue
+        if ch == "'" and not double:
+            single = not single
+        elif ch == '"' and not single:
+            double = not double
+        elif ch == "#" and not single and not double:
+            prev = command[i - 1] if i else ""
+            if not prev or prev.isspace() or prev in _SHELL_OPS:
+                j = command.find("\n", i)
+                if j == -1:
+                    break
+                i = j
+                continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
 def simple_commands(command):
     """Split `command` into simple-command argv lists; `None` on a parse error.
 
@@ -202,6 +263,7 @@ def simple_commands(command):
     # continuation join runs over what remains.
     command = _heredoc_free(command)
     command = re.sub(r"\\\r?\n", " ", command)
+    command = _comment_free(command)
     command = command.replace("\n", ";")
     try:
         lex = shlex.shlex(command, posix=True, punctuation_chars=True)

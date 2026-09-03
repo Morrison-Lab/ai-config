@@ -8,7 +8,6 @@ that matter; the rest guard the edges.
 """
 from __future__ import annotations
 
-import ast
 import importlib.util
 import os
 import subprocess
@@ -33,8 +32,6 @@ def check(label, got, want):
 def verdict(body):
     return crb.analyse(body, MOD)["verdict"]
 
-
-ARD_PHRASE = "ard review disposition summary"
 
 FINGERPRINT = "Reviewed-Commit: 78c3eb0d0e0bb23165225166cfabdb3393876d01"
 
@@ -146,7 +143,8 @@ check("--json emits parseable JSON",
 # The whole point is that this reads the checker's OWN symbols. If it ever
 # reimplements them, this fails.
 for sym in ("classify_verdict", "_unresolved_finding_pattern",
-            "_is_structured_review_body", "is_non_review_notice"):
+            "_is_structured_review_body", "is_non_review_notice",
+            "is_ard_disposition_summary"):
     check(f"classifier exposes {sym}", hasattr(MOD, sym), True)
 
 # `analyse`'s docstring states this count in prose -- not the module
@@ -159,89 +157,14 @@ check("the finding-pattern count the docstring states",
 # ARD test, so `analyse` duplicates the phrase -- and a duplicate that nothing
 # pins is exactly the drift `load_classifier`'s docstring forbids. Asserted
 # against the checker's SOURCE, since there is no function to call.
-# Parsed, not grepped. A raw substring search over the source passed with the
-# live test DELETED and the phrase surviving only in a historical-note comment
-# -- measured -- which is the exact silent misprediction this assertion exists
-# to catch, and preserving superseded code in a comment is this corpus's own
-# house style. `ast` cannot see a comment at all.
-def _ard_skip_is_live():
-    """Does the ARD skip still have the shape `analyse` assumes?
-
-    Deliberately narrow, and narrowed twice. The first version accepted any
-    `Compare` with the phrase anywhere in `check_review_comments`, so three
-    behaviour-breaking mutations stayed green: comparing the phrase against
-    `author_login`, keeping the expression but dropping the `continue`, and
-    adding a conjunct so the skip fires only for bots. The second pinned the
-    `if`'s shape but not its POSITION, so relocating the same block below the
-    `all_items.append` calls -- where it no longer prevents admission --
-    stayed green too, and so did hiding it in a never-called nested `def`.
-
-    So three things are required now: the `if` is a direct statement of the
-    `for c in comments` loop, it precedes the first `all_items.append` in
-    that loop, and its test is the phrase `in body_lower` with a bare
-    `continue` as the whole body.
-
-    Two refactors are accepted rather than punished, because both preserve
-    the skip. A left operand that is a module-level constant equal to the
-    phrase passes -- hoisting the literal into an importable constant is the
-    natural way to end the duplication this assertion exists to guard, and
-    an instrument that forbids its own fix is worse than none. And the test
-    may be one disjunct of an `or`, which only ever widens the skip. An
-    `and` conjunct is still refused: that narrows it, which is the drift.
-    """
-    with open(os.path.join(HERE, "check-pr-fully-clean.py"),
-              encoding="utf-8") as fh:
-        tree = ast.parse(fh.read())
-
-    consts = {t.id for n in tree.body if isinstance(n, ast.Assign)
-              for t in n.targets
-              if isinstance(t, ast.Name) and isinstance(n.value, ast.Constant)
-              and n.value.value == ARD_PHRASE}
-
-    def is_phrase(node):
-        return ((isinstance(node, ast.Constant) and node.value == ARD_PHRASE)
-                or (isinstance(node, ast.Name) and node.id in consts))
-
-    def is_skip_test(t):
-        if isinstance(t, ast.BoolOp) and isinstance(t.op, ast.Or):
-            return any(is_skip_test(v) for v in t.values)
-        return (isinstance(t, ast.Compare) and is_phrase(t.left)
-                and len(t.ops) == 1 and isinstance(t.ops[0], ast.In)
-                and len(t.comparators) == 1
-                and isinstance(t.comparators[0], ast.Name)
-                and t.comparators[0].id == "body_lower")
-
-    def admits(stmt):
-        return any(isinstance(n, ast.Attribute) and n.attr == "append"
-                   and isinstance(n.value, ast.Name) and n.value.id == "all_items"
-                   for n in ast.walk(stmt))
-
-    for fn in ast.walk(tree):
-        if not (isinstance(fn, ast.FunctionDef)
-                and fn.name == "check_review_comments"):
-            continue
-        for loop in ast.walk(fn):
-            if not (isinstance(loop, ast.For)
-                    and isinstance(loop.iter, ast.Name)
-                    and loop.iter.id == "comments"):
-                continue
-            for stmt in loop.body:
-                if admits(stmt):
-                    break
-                if (isinstance(stmt, ast.If) and len(stmt.body) == 1
-                        and isinstance(stmt.body[0], ast.Continue)
-                        and is_skip_test(stmt.test)):
-                    return True
-    return False
-
-
-# Labelled by the SHAPE it pins, not by "the phrase is gone". A refactor can
-# preserve the comparison and still fail this -- renaming the `body_lower`
-# local does -- and a label naming the phrase would send a maintainer looking
-# for a deleted comparison that is still there.
-check("the ARD skip is still `<phrase> in body_lower -> continue`, ahead of "
-      "admission in the comment loop",
-      _ard_skip_is_live(), True)
+# The duplication is gone, and with it the guard that policed it. The phrase
+# lived here as a retyped literal and an `ast` walk asserted the checker still
+# compared against it -- a predicate that took six adversarial rounds and was
+# still escapable (an `if` relocated past admission, a decoy `for c in
+# comments` loop inside a never-called nested `def`, `body_lower` rebound to a
+# non-body string). Extracting `is_ard_disposition_summary` in the checker
+# closed every one of those at once, so the anti-drift check below is now the
+# same one the other four symbols get.
 
 check("the findings heading is one of them",
       MOD._FINDINGS_HEADING_PATTERN in MOD.FINDING_PATTERNS, True)
@@ -385,6 +308,11 @@ _ARD = (f"## ARD Review Disposition Summary\n\n## Summary\n\nAll findings "
         f"addressed.\n\n## Verdict\n\nVerdict: Ready for merge\n{FINGERPRINT}\n")
 _NOTICE = ("Claude Review Dispatched\n\nThe review workflow has started; "
            "no verdict yet.\n")
+
+check("the extracted helper matches the phrase case-insensitively",
+      MOD.is_ard_disposition_summary("## ARD Review Disposition Summary"), True)
+check("and does not match an ordinary review",
+      MOD.is_ard_disposition_summary("## Summary\n\nAll good.\n"), False)
 
 check("an ARD summary is the ARD skip alone", skips(_ARD), (True, False, True))
 check("a workflow notice is the checker skip alone", skips(_NOTICE),

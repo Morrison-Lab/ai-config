@@ -38,10 +38,11 @@ The four body-level facts that decide a body's fate, each computed by
     workflow notice `is_non_review_notice` recognises. The two are reported
     separately as well as combined, because they are different mistakes to
     have made and the combined boolean alone does not say which one fired.
-    This is the one bullet with an asterisk on "OWN code": the checker inlines
-    its ARD test in `check_review_comments` and exposes no function for it, so
-    the phrase is duplicated here and a test parses the checker to confirm it
-    still compares against that phrase;
+    Both come from the checker: `is_ard_disposition_summary` and
+    `is_non_review_notice`. The first was inlined in `check_review_comments`
+    until this tool needed it, and was extracted rather than retyped here --
+    a copy drifts silently, and the AST guard written to catch that drift
+    took six adversarial rounds and still had holes;
   * whether `_is_structured_review_body` reads it as a report -- a report
     heading AND a `Reviewed-Commit:` fingerprint;
   * what `classify_verdict` makes of it: clean, not-clean, unreadable, or no
@@ -162,23 +163,18 @@ def analyse(body, mod):
     verdict = mod.classify_verdict(body)
     finding = mod._unresolved_finding_pattern(body)
     structured = bool(mod._is_structured_review_body(body))
-    # The checker skips this BEFORE it reaches `is_non_review_notice`, inline
-    # in `check_review_comments`. Every ARD round posts one of these, per
-    # skills/ard/SKILL.md, so a driving session's own summary must not read as
-    # a verdict.
-    ard_summary = "ard review disposition summary" in body.lower()
+    # The checker applies this BEFORE it reaches `is_non_review_notice`.
+    ard_summary = bool(mod.is_ard_disposition_summary(body))
     checker_notice = bool(mod.is_non_review_notice(body))
-    # The one duplicated literal in this file. `is_non_review_notice` is a
-    # function and gets called; the ARD test is inlined in
-    # `check_review_comments` and cannot be. `test_check_review_body.py`
-    # parses the checker and asserts this exact phrase is still compared
-    # against inside that function, so the drift `load_classifier`'s docstring
-    # warns about fails a test rather than silently mispredicting.
-    #
-    # Cited by function rather than by line, deliberately. An earlier revision
-    # gave `check-pr-fully-clean.py:2555` in three places -- a line number
-    # reads as the more precise citation and is the one nothing can pin, so a
-    # single line inserted above it silently invalidates all three.
+    # Called, not copied. This was the one duplicated literal in the file:
+    # the checker inlined its ARD test, so the phrase was retyped here and a
+    # test parsed the checker to detect drift. That guard took six adversarial
+    # rounds and still had holes -- an `if` relocated past admission, a decoy
+    # loop in a nested `def`, `body_lower` rebound to something that is not
+    # the body -- each of which broke the skip while the suite stayed green.
+    # Extracting `is_ard_disposition_summary` closed all of them at once and
+    # deleted the guard, which is the shape `deterministic-tools.md` asks for:
+    # dissolve the coupling rather than instrument it.
     #
     # Reported separately as well as combined. They are two different skips
     # with two different remedies, and a single conflated boolean tells a

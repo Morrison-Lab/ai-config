@@ -186,6 +186,92 @@ CASES = {
         "timeout 60 gh api -X PUT repos/o/r/rulesets/1 --input rs.json",
         True,
     ),
+    "W22": (
+        "`xargs -I {}` -- a wrapper flag whose value is a SEPARATE token",
+        "Bash",
+        "gh repo list -q .name | xargs -I {} gh api -X PUT "
+        "repos/o/{}/rulesets/1 --input rs.json",
+        True,
+    ),
+    "W23": (
+        "`timeout -k 10 60` -- a flag with a value, then a duration",
+        "Bash",
+        "timeout -k 10 60 gh api -X PUT repos/o/r/rulesets/1 --input rs.json",
+        True,
+    ),
+    "W24": (
+        "a duration carrying a unit suffix, the ordinary `timeout` spelling",
+        "Bash",
+        "timeout 60s gh api -X PUT repos/o/r/rulesets/1 --input rs.json",
+        True,
+    ),
+    "W25": (
+        "a fractional duration",
+        "Bash",
+        "timeout 1.5 gh api -X PUT repos/o/r/rulesets/1 --input rs.json",
+        True,
+    ),
+    "W26": (
+        "`-f` with NO separator, gh's concatenated pflag shorthand",
+        "Bash",
+        "gh api repos/o/r/rulesets -frequired_status_checks[][context]=lint",
+        True,
+    ),
+    "W27": (
+        "`--raw-field`, the long form's variant",
+        "Bash",
+        "gh api repos/o/r/rulesets "
+        "--raw-field 'required_status_checks[][context]=lint'",
+        True,
+    ),
+    "W28": (
+        "`env` as the wrapper",
+        "Bash",
+        "env -u FOO gh api -X PUT repos/o/r/rulesets/1 --input rs.json",
+        True,
+    ),
+    "W29": (
+        "`command` as the wrapper",
+        "Bash",
+        "command gh api -X PUT repos/o/r/rulesets/1 --input rs.json",
+        True,
+    ),
+    "W30": (
+        "`stdbuf` as the wrapper",
+        "Bash",
+        "stdbuf -oL gh api -X PUT repos/o/r/rulesets/1 --input rs.json",
+        True,
+    ),
+    "W31": (
+        "`parallel` as the wrapper",
+        "Bash",
+        "parallel gh api -X PUT repos/o/r/rulesets/1 --input rs.json",
+        True,
+    ),
+    "W32": (
+        "UNBALANCED QUOTE behind a wrapper WITH flags and a duration",
+        # Reaches the regex fallback, whose flag-skip and duration groups W20
+        # (bare `nice`) leaves untested.
+        "Bash",
+        "timeout -k 10 60 gh api -X PUT "
+        "repos/o/r/branches/main/protection/required_status_checks "
+        "-f x='unclosed",
+        True,
+    ),
+    "S7": (
+        "`--method GET` long form is a read, like `-X GET`",
+        "Bash",
+        "gh api --method GET repos/o/r/branches/main/protection/"
+        "required_status_checks -f per_page=100",
+        False,
+    ),
+    "S8": (
+        "`-XGET` with no separator is a read too",
+        "Bash",
+        "gh api -XGET repos/o/r/branches/main/protection/"
+        "required_status_checks -f per_page=100",
+        False,
+    ),
     "S6": (
         "an explicit HEAD is a read, like GET",
         "Bash",
@@ -352,7 +438,7 @@ MUTATIONS = {
           "")],
         # S5 and S6 flip too: with the gate gone, every segment is
         # scanned, so the explicit GET and HEAD reach the payload clause.
-        {"S1", "S5", "S6"},
+        {"S1", "S5", "S6", "S7", "S8"},
     ),
     "method_shorthand": (
         "`-XPUT` with no separator is a write method too",
@@ -362,15 +448,15 @@ MUTATIONS = {
     ),
     "implicit_post_f_flag": (
         "`-f`/`-F` alone makes it a write",
-        [(r'r"(?:^|\s)(?:--input\b|-[fF]\s|--(?:raw-)?field\b)"',
+        [(r'r"(?:^|\s)(?:--input\b|-[fF]|--(?:raw-)?field\b)"',
           r'r"(?:^|\s)(?:--input\b|--(?:raw-)?field\b)"')],
-        {"W14"},
+        {"W14", "W26"},
     ),
     "implicit_post_field_flag": (
         "`--field`/`--raw-field` alone makes it a write",
-        [(r'r"(?:^|\s)(?:--input\b|-[fF]\s|--(?:raw-)?field\b)"',
-          r'r"(?:^|\s)(?:--input\b|-[fF]\s)"')],
-        {"W15"},
+        [(r'r"(?:^|\s)(?:--input\b|-[fF]|--(?:raw-)?field\b)"',
+          r'r"(?:^|\s)(?:--input\b|-[fF])"')],
+        {"W15", "W27"},
     ),
     "method_patch": (
         "PATCH is an explicit write method, not only PUT",
@@ -392,24 +478,98 @@ MUTATIONS = {
         # own stripping is a separate clause (fallback_env_strip).
         {"W17"},
     ),
-    "command_wrappers": (
-        "wrappers taking a command as an argument are stripped too",
-        [('COMMAND_WRAPPERS = ("env", "command", "xargs", "timeout", "nice", "stdbuf",\n'
-          '                    "parallel")',
-          'COMMAND_WRAPPERS = ("env", "command")')],
-        {"W18", "W20", "W21"},
+    # One mutation per wrapper, so no entry can rot unnoticed. An earlier
+    # draft collapsed the tuple to ("env", "command"), which by construction
+    # could never pin those two, and left stdbuf and parallel unmeasured.
+    "wrapper_xargs": (
+        "`xargs` is a command wrapper",
+        [('"xargs", ', "")], {"W18", "W22"},
+    ),
+    "wrapper_timeout": (
+        "`timeout` is a command wrapper",
+        [('"timeout", ', "")], {"W21", "W23", "W24", "W25", "W32"},
+    ),
+    "wrapper_nice": (
+        "`nice` is a command wrapper",
+        [('"nice", ', "")], {"W20"},
+    ),
+    "wrapper_env": (
+        "`env` is a command wrapper",
+        [('COMMAND_WRAPPERS = ("env", ', 'COMMAND_WRAPPERS = (')], {"W28"},
+    ),
+    "wrapper_command": (
+        "`command` is a command wrapper",
+        [('"command", ', "")], {"W29"},
+    ),
+    "wrapper_stdbuf": (
+        "`stdbuf` is a command wrapper",
+        [('"stdbuf",\n', "\n")], {"W30"},
+    ),
+    "wrapper_parallel": (
+        "`parallel` is a command wrapper",
+        [('                    "parallel")', "                    )")],
+        {"W31"},
+    ),
+    "wrapper_flag_value_skip": (
+        "a wrapper flag's separated VALUE is consumed with the flag",
+        [('                if ("=" not in flag and tokens\n'
+          '                        and not tokens[0].startswith("-")\n'
+          '                        and tokens[0] != "gh"):\n'
+          '                    tokens.pop(0)\n', "")],
+        {"W22", "W23", "W28"},
+    ),
+    "duration_decimal": (
+        "a duration may be fractional",
+        [(r'r"^\d+(?:\.\d+)?[smhd]?$"', r'r"^\d+[smhd]?$"')],
+        {"W25"},
+    ),
+    "duration_unit": (
+        "a duration may carry a unit suffix",
+        [(r'r"^\d+(?:\.\d+)?[smhd]?$"', r'r"^\d+(?:\.\d+)?$"')],
+        {"W24"},
+    ),
+    "implicit_post_raw_field": (
+        "`--raw-field` counts as well as `--field`",
+        [(r'--(?:raw-)?field\b', r'--field\b')],
+        {"W27"},
+    ),
+    "implicit_post_f_no_separator": (
+        "`-f` needs no separator, matching gh's pflag shorthand",
+        [(r'r"(?:^|\s)(?:--input\b|-[fF]|--(?:raw-)?field\b)"',
+          r'r"(?:^|\s)(?:--input\b|-[fF]\s|--(?:raw-)?field\b)"')],
+        {"W26"},
+    ),
+    "read_method_long_form": (
+        "`--method GET` is a read, not only `-X GET`",
+        [(r'r"(?:-X|--method)[=\s]*(?:GET|HEAD)\b"',
+          r'r"(?:-X)[=\s]*(?:GET|HEAD)\b"')],
+        {"S7"},
+    ),
+    "read_method_no_separator": (
+        "`-XGET` with no separator is a read too",
+        [(r'r"(?:-X|--method)[=\s]*(?:GET|HEAD)\b"',
+          r'r"(?:-X|--method)[=\s]+(?:GET|HEAD)\b"')],
+        {"S8"},
+    ),
+    "fallback_flag_and_duration": (
+        "the regex fallback skips wrapper flags, their values, and durations",
+        [(r'r")\s+(?:-\S+\s+(?!gh\s)(?:[^-\s]\S*\s+)?)*"',
+          r'r")\s+"')],
+        {"W32"},
     ),
     "wrapper_duration_skip": (
         "a wrapper's positional duration is skipped too",
         [("            if tokens and RX_DURATION.match(tokens[0]):\n"
           "                tokens.pop(0)\n", "")],
-        {"W21"},
+        {"W21", "W23", "W24", "W25"},
     ),
     "wrapper_own_flags": (
         "a wrapper's own flags are dropped along with it",
-        [('            while tokens and tokens[0].startswith("-"):\n'
-          "                tokens.pop(0)\n", "")],
-        {"W18"},
+        # Substituted, not deleted: deleting the `while` header orphans its
+        # body and the mutant fails to COMPILE, which measures nothing.
+        [('            while tokens and tokens[0].startswith("-"):',
+          "            while False:")],
+        {"W18", "W22", "W23", "W28", "W30"},
     ),
     "fallback_env_strip": (
         "the shlex fallback strips a leading assignment",
@@ -424,25 +584,26 @@ MUTATIONS = {
         # instead of behaving differently, which measures nothing.
         [('stripped = RX_SHELL_WRAPPER_PREFIX.sub("", segment)',
           "stripped = segment")],
-        {"W20"},
+        {"W20", "W32"},
     ),
     "implicit_post": (
         "parameters alone make it a write, since gh defaults to POST",
         [("    return bool(RX_IMPLICIT_POST.search(segment))",
           "    return False")],
-        {"W4", "W5", "W8", "W14", "W15"},
+        {"W4", "W5", "W8", "W14", "W15", "W26", "W27"},
     ),
     "explicit_get_wins": (
         "an explicit GET beats the implicit-POST inference",
         [("    if RX_READ_METHOD.search(segment):\n        return False\n",
           "")],
-        {"S5", "S6"},
+        {"S5", "S6", "S7", "S8"},
     ),
     "shell_wrappers": (
         "loop and conditional keywords precede the command word",
         [('        elif tokens[0] in SHELL_WRAPPERS:\n            tokens.pop(0)\n',
           '        elif tokens[0] in ("env", "command"):\n            tokens.pop(0)\n')],
-        {"W9", "W10", "W18", "W21"},
+        {"W9", "W10", "W18", "W21", "W22", "W23", "W24", "W25", "W30",
+         "W31"},
     ),
     "shlex_fallback": (
         "an unbalanced quote falls back to anchoring on the command word",
@@ -450,7 +611,7 @@ MUTATIONS = {
           '        stripped = RX_ENV_PREFIX.sub("", stripped).lstrip()\n'
           '        return bool(re.match(r"gh\\s+api\\b", stripped))',
           "        return False")],
-        {"W11", "W19", "W20"},
+        {"W11", "W19", "W20", "W32"},
     ),
     "protection_endpoint": (
         "only ruleset / branch-protection endpoints are in scope",
@@ -475,7 +636,8 @@ MUTATIONS = {
           r'r"\bcontexts\b|--input\b"')],
         # every case whose only payload marker is the field name, whether
         # it appears as a flag value or inside the URL path
-        {"W3", "W6", "W13", "W14", "W15", "W16", "W19", "W20"},
+        {"W3", "W6", "W13", "W14", "W15", "W16", "W19", "W20", "W26",
+         "W27", "W32"},
     ),
     "payload_contexts": (
         "a `contexts` key counts even without the field name",
@@ -489,7 +651,7 @@ MUTATIONS = {
           r'r"required_status_checks|\bcontexts\b"')],
         # every case whose only payload marker is `--input`
         {"W1", "W4", "W5", "W7", "W8", "W9", "W10", "W11", "W17", "W18",
-         "W21"},
+         "W21", "W22", "W23", "W24", "W25", "W28", "W29", "W30", "W31"},
     ),
     "heredoc_stripping": (
         "heredoc bodies are dropped before the command is scanned",
@@ -504,7 +666,7 @@ MUTATIONS = {
         "the command is split on shell operators before scanning",
         [("    for segment in split_command(strip_heredocs(command)):",
           "    for segment in [strip_heredocs(command)]:")],
-        {"W7", "W9", "W10", "W18"},
+        {"W7", "W9", "W10", "W18", "W22"},
     ),
     "command_word_check": (
         "`gh api` must be the command word, not text inside an argument",
@@ -531,7 +693,13 @@ for clause, (statement, edits, expected_flips) in MUTATIONS.items():
         mutated = mutated.replace(find, replace)
 
     try:
-        mutant = load_module(mutated, clause)
+        try:
+            mutant = load_module(mutated, clause)
+        except Exception as exc:
+            # A reversion that leaves the module unable to COMPILE or import
+            # is the same non-measurement as one that raises at call time --
+            # most often a deleted block header orphaning its body.
+            raise MutantCrashed(f"{type(exc).__name__}: {exc}") from exc
         flipped = {cid for cid in CASES if verdict(mutant, cid) != EXPECTED[cid]}
     except MutantCrashed as exc:
         mutation_wrong += 1

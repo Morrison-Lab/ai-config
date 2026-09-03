@@ -72,6 +72,7 @@ as this repo's cautionary example.
 
 Fails OPEN on any parse trouble.
 """
+import functools
 import importlib.util
 import json
 import os
@@ -82,27 +83,22 @@ import sys
 _HERE = os.path.dirname(os.path.abspath(__file__))
 
 
-_PARSER_CACHE = []
-
-
+@functools.lru_cache(maxsize=None)
 def _load_shell_parser():
     """Borrow `require-gh-repo-flag.py`'s heredoc stripper and segment splitter.
 
     Reimplementing either would be a second copy of a parser this repo already
     maintains and has hardened (`shared/principles/dont-reinvent-wheel.md`).
     The module name carries hyphens, so it cannot be a plain import. Memoised
-    at module scope (`shared/coding/use-memoisation.md`): it is pure, it costs
-    an `exec` of a 575-line file, and a mutation harness calls it hundreds of
-    times per run.
+    (`shared/coding/use-memoisation.md`): it is pure, it costs an `exec` of the
+    whole parser file, and a mutation harness calls it hundreds of times per
+    run.
     """
-    if _PARSER_CACHE:
-        return _PARSER_CACHE[0]
     path = os.path.join(_HERE, "require-gh-repo-flag.py")
     spec = importlib.util.spec_from_file_location("_gh_repo_flag_parser", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    _PARSER_CACHE.append((module.strip_heredocs, module.split_command))
-    return _PARSER_CACHE[0]
+    return module.strip_heredocs, module.split_command
 
 
 # A `gh api` call that WRITES. `-X PUT`, `--method PUT` and the concatenated
@@ -120,7 +116,12 @@ RX_WRITE_METHOD = re.compile(r"(?:-X|--method)[=\s]*(?:PUT|PATCH)\b")
 # `gh api repos/{owner}/{repo}/rulesets --input file.json` with no -X. So
 # supplying parameters IS a write, and an earlier draft missed the single most
 # idiomatic way to create a ruleset.
-RX_IMPLICIT_POST = re.compile(r"(?:^|\s)(?:--input\b|-[fF]\s|--(?:raw-)?field\b)")
+# `-f`/`-F` need no separator either, for the same pflag reason `-XPUT` does
+# not: an earlier draft required one and was silent on
+# `gh api ... -frequired_status_checks[][context]=lint`. The leading
+# `(?:^|\s)` keeps `-[fF]` from matching inside `--field` or `--force`, whose
+# second character is a dash.
+RX_IMPLICIT_POST = re.compile(r"(?:^|\s)(?:--input\b|-[fF]|--(?:raw-)?field\b)")
 
 # An explicit read method beats both: `-X GET` with parameters is a query.
 RX_READ_METHOD = re.compile(r"(?:-X|--method)[=\s]*(?:GET|HEAD)\b")
@@ -223,7 +224,9 @@ SHELL_WRAPPERS = frozenset(SHELL_KEYWORDS + COMMAND_WRAPPERS)
 RX_DURATION = re.compile(r"^\d+(?:\.\d+)?[smhd]?$")
 RX_SHELL_WRAPPER_PREFIX = re.compile(
     r"^\s*(?:(?:" + "|".join(re.escape(w) for w in SHELL_WRAPPERS)
-    + r")\s+(?:-\S+\s+)*(?:\d+(?:\.\d+)?[smhd]?\s+)?)*"
+    # a flag, optionally followed by its separated value (never `gh` itself)
+    + r")\s+(?:-\S+\s+(?!gh\s)(?:[^-\s]\S*\s+)?)*"
+    + r"(?:\d+(?:\.\d+)?[smhd]?\s+)?)*"
 )
 
 
@@ -255,9 +258,16 @@ def segment_invokes_gh_api(segment):
         elif tokens[0] in SHELL_WRAPPERS:
             tokens.pop(0)
             # A command wrapper's own flags sit between it and the command,
-            # and `timeout` puts a positional duration there too.
+            # and `timeout` puts a positional duration there too. A flag's
+            # VALUE may be a separate token (`xargs -I {}`, `sudo -u ci`,
+            # `timeout -k 10`), so it is consumed with the flag -- unless it is
+            # `gh` itself, which is the command rather than a value.
             while tokens and tokens[0].startswith("-"):
-                tokens.pop(0)
+                flag = tokens.pop(0)
+                if ("=" not in flag and tokens
+                        and not tokens[0].startswith("-")
+                        and tokens[0] != "gh"):
+                    tokens.pop(0)
             if tokens and RX_DURATION.match(tokens[0]):
                 tokens.pop(0)
         else:

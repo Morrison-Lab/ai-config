@@ -570,7 +570,7 @@ So settling this needs something the section has not yet had: a **raw text scan*
 Only a hit settles anything.
 Another zero from the same matcher is the same uninformative zero, so do not read one as evidence for the rendering-quirk explanation.
 
-In the own-block shape the trailer is a separate content block, and `_result_text` joins blocks with a newline, so the fingerprint line is untouched and the concatenation hazard does not arise at all.
+In the own-block shape the trailer is a separate content block, and `_result_text` joins blocks with a newline, so the fingerprint line is untouched and the hazard does not arise at all.
 
 **Two conditions have to hold together before any of this can bite, and a conforming report fails the second.**
 The trailer must concatenate rather than arrive as its own block, AND the fingerprint must be the report's last line.

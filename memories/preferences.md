@@ -697,7 +697,9 @@
 - Some skills are platform/global --- present in the Claude Code skill registry but with NO local `skills/<name>/` directory (e.g. `deep-research`).
   Cross-references to them are valid.
   Automated reviewers (Copilot, the `@claude` bot) may wrongly flag such a reference as a "non-existent skill"; check the available-skills list presented to the agent (the Claude Code skill registry) before treating a skill cross-ref as a broken link, then rebut the false positive. (ai-config#120 flagged it 4x.)
-- **Do not request Copilot code review on any PR, in any repo, until September 2026.**
+- **Do not request Copilot code review on any PR, in any repo, while the moratorium stands.**
+  The live expiry is `MORATORIUM_END` in `hooks/no-unreviewed-pr.py`;
+  it was extended to December 2026 on 2026-09-02.
   Standing maintainer directive, restated and widened to all repos on 2026-08-19.
   It outranks `hooks/no-unreviewed-pr.py` and `shared/workflow/pr-on-claim.md`'s request-the-reviewer step.
   State the directive as the reason when a PR ships without one, and re-verify at the expiry.

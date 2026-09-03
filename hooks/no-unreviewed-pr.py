@@ -72,7 +72,7 @@ rather than inferred.
 A THIRD deferral is legitimate, and unlike the other two it suspends the
 whole guard rather than one PR's obligation: a standing user directive not to
 request the reviewer at all. As of 2026-08-19 that is live -- Copilot review is
-off across ALL repos until September 2026 (memories/gh-cli.md, "Restated and
+off across ALL repos until MORATORIUM_END below (memories/gh-cli.md, "Restated and
 widened 2026-08-19"). A user instruction outranks a hook, and every discharge
 this guard offers is the one action the directive forbids, so honoring it left
 the demand repeating on every turn -- the per-message dedup below stops one
@@ -104,7 +104,7 @@ import tempfile
 # Every discharge this guard offers is a Copilot reviewer request, so a
 # standing directive NOT to request Copilot leaves it with no satisfiable
 # demand at all. That directive is live: `memories/gh-cli.md` ("Restated and
-# widened 2026-08-19") forbids the request on ALL repos until September 2026.
+# widened 2026-08-19") forbids the request on ALL repos until MORATORIUM_END.
 # A user instruction outranks a hook, so honoring it used to mean the demand
 # simply repeated every turn, on a session that was already doing the right
 # thing.
@@ -127,9 +127,20 @@ import tempfile
 # expires. Extending the moratorium is then an edit to this constant and to
 # the memory together, rather than a silent divergence between them.
 #
-# The guard is live ON the end date: the moratorium runs up to September 2026,
+# The guard is live ON the end date: the moratorium runs up to the date named,
 # not through it.
-MORATORIUM_END = datetime.date(2026, 9, 1)
+#
+# Extended 2026-09-02 on a fresh directive ("stop using copilot reviews"),
+# given the day after the previous end date passed and the guard resumed
+# demanding the request. That expiry is what produced the demand, so the
+# recurrence is the mechanism working as designed rather than a defect --- the
+# date re-armed itself and the user turned it off again.
+#
+# The new date is longer than the last, because the previous fortnight-scale
+# window expired into an active session and cost a round of requests before
+# anyone noticed. Three months puts the re-review far from the day-to-day and
+# still refuses to become permanent by default.
+MORATORIUM_END = datetime.date(2026, 12, 1)
 
 
 def _today():

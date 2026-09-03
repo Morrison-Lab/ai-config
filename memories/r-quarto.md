@@ -1202,4 +1202,32 @@ Hit on wai#128 (byok ITPM/budget figures).
   across reports/vignettes should be standard package functions in `R/` with full
   roxygen2 documentation and unit test coverage in `tests/testthat/`, rather than
   orphan vignette scripts.
-
+- **Source for the following template-reformatting rules**:
+  [ucdavis/matt.contracts#98](https://github.com/ucdavis/matt.contracts/pull/98)
+  --- a private repository, so the link resolves only with access.
+- **Preserve foundational design statements during template reformatting**:
+  When migrating or styling an SAP into a new template (such as an institutional
+  or HAC template), audit that all core methodological design statements are
+  preserved: review blinding and model freezing procedures, multiplicity
+  adjustment policy (e.g. stating that secondary metrics are estimation targets,
+  not hypothesis tests), reference standard concordance caveats (e.g. that a
+  single human reviewer is not an error-free reference standard, and agent-only
+  flags require adjudication before calling them false positives), and variable
+  cluster-size caveats.
+- **Consistent document heading hierarchy**:
+  If a multi-format document intentionally roots its body at level 3 (`###`)
+  to set section slide boundaries,
+  ensure the entire document body follows that hierarchy consistently,
+  including terminal standard sections (`### References {.unnumbered}` rather
+  than `## References`).
+  Inconsistent heading levels produce a misleading document outline and
+  navigation hierarchy.
+- **Table formatters must preserve column identity**:
+  Table formatters that accept user tables (such as milestones schedules) must
+  preserve the caller's column names rather than discarding numeric identifiers
+  (e.g. replacing `Month 1`..`Month 8` with `rep("Month", ncol - 1)`).
+- **Fallback mirror verification**:
+  When maintaining a fallback formatting or rendering script that mirrors an
+  upstream or suggested R package, unit tests must verify full `formals()`
+  equality (both argument names and default values) and output equivalence
+  across every supported target format, rather than testing only `names(formals())`.

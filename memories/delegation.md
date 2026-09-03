@@ -282,6 +282,57 @@ This route did real tool work and two edit-only doc fixes on 2026-09-02, so it i
 - **Don't:** expect the `agentapi` transcript file to update instantly;
   it is a log a background process appends to, not a synchronous response.
 
+## agy as a cheap adversarial-review lane on macOS
+
+Measured 2026-09-02 with `agy` 1.1.22 at `~/.local/bin/agy`,
+across nine review rounds on two PRs,
+[ai-config#3061](https://github.com/Morrison-Lab/ai-config/pull/3061) and [gha#826](https://github.com/Morrison-Lab/gha/pull/826).
+Each round was one command,
+`agy --print "$(cat prompt.txt)" --output-format text </dev/null`,
+with the unified diff pasted into the prompt file.
+Headless `agy` cannot read repo files on its own,
+so the diff has to be supplied inline rather than pointed at.
+Each round returned in roughly one to three minutes,
+at no Claude quota cost.
+
+**`agy` caught real defects a Sonnet `adversarial-reviewer` round had missed:**
+an untracked-file false clean in a git-scope change,
+a count that did not add up,
+and an inaccurate quoted cross-reference.
+[`when-to-orchestrate`](../shared/workflow/when-to-orchestrate.md) argues
+that a judgment-heavy verify stage belongs with a model in a different family;
+these misses are a second data point for that argument.
+The misses were exactly the kind a same-family reviewer inherits along with the finder's blind spots.
+
+**`agy` also produced many stylistic objections stricter than this corpus's own norm,**
+which the dispatcher has to rebut rather than apply.
+Any `, and` clause written on one physical line read as a semantic-line-break violation,
+though the corpus's own gate does not flag a comma-joined line with no mid-line semicolon,
+per [`semantic-line-breaks`](../shared/writing/semantic-line-breaks.md).
+Any sentential `which` read as an antecedent defect,
+whether or not the antecedent was ambiguous.
+
+**Headless `agy` cannot write a file on macOS without a permission allow-rule.**
+Two probes, both 2026-09-02, both with `--mode accept-edits --output-format text </dev/null`, both exit 0, both writing nothing:
+a plain "create probe.txt" brief printed
+`jetski: no output produced --- a tool required the "command" permission that headless mode cannot prompt for, so it was auto-denied. Add an allow-rule under permissions.allow in settings.json (e.g. command(<target>)).`,
+and a brief forbidding shell use and asking for the native file tool printed
+`jetski: no output produced --- a tool required the "write_file" permission that headless mode cannot prompt for, so it was auto-denied. Add an allow-rule under permissions.allow in settings.json (e.g. write_file(<target>)).`.
+The settings file is `~/.gemini/antigravity-cli/settings.json`,
+which on this machine held only narrow `command(...)` rules from interactive use.
+The "agy on Windows" section above left open which escape clears a headless permission denial for a read-only review dispatch.
+These probes settle a different question, a file write rather than a review:
+`--mode accept-edits` alone reaches neither a shell-routed nor a native file write on macOS.
+
+- **Do:** dispatch `agy --print` for review-only passes on a pasted diff, on macOS as on Windows.
+- **Do:** state the corpus's actual norms in the brief
+  (the clause-join convention, when `which` is fine),
+  and check each `agy` style finding against the written convention before applying that finding.
+- **Do:** keep implementation work on a subagent that can write
+  until an `agy` allow-rule for `write_file` is measured to work.
+- **Don't:** apply an `agy` style finding as though it were a corpus rule without that check.
+- **Don't:** hand headless `agy` a task that requires reading, running, or writing anything in the repo.
+
 ## A measured lane comparison: codex, opencode, agy, and Sonnet reviewers, one real task each
 
 Measured 2026-08-27/28 PT across a 13-merge GIA sweep on Morrison-Lab/ai-config, comparing four lanes on real work rather than a benchmark.

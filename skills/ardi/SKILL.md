@@ -75,7 +75,22 @@ sits unread.
      skill's step 1 (`gh pr view <N> --comments` plus the inline-thread API).
 
      **Copilot code review doesn't post as a PR comment at all -- it's a
-     formal GitHub review**, invisible to the command above. Request it
+     formal GitHub review**, invisible to the command above.
+
+     **Do not request it while the Copilot moratorium stands.**
+     `MORATORIUM_END` in
+     [`hooks/no-unreviewed-pr.py`](../../hooks/no-unreviewed-pr.py) is the
+     live value, and `memories/gh-cli.md` carries the directive it
+     implements.
+     While that date is in the future, skip the request and read whatever
+     Copilot reviews already exist.
+     A missing Copilot verdict is then not a gap to fill but the expected
+     state, and
+     [`self-review-fallback.md`](../../shared/workflow/self-review-fallback.md)
+     governs the resulting absence exactly as it governs a quota-skipped
+     `@claude` round.
+
+     Otherwise request it
      (`REQUEST_COPILOT_REVIEW` -- abstract operation token; resolve to your
      model's tool via [`tool-mappings.md`](../../tool-mappings.md)) and check
      whether it posted a verdict *at the current head*. Finding a review

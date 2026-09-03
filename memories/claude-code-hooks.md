@@ -334,3 +334,46 @@ To keep warnings legible and avoid visual clutter:
 - **Direct message fields**: In contexts where the transcript file is omitted or piped directly, payloads may supply `reply`, `last_assistant_message`, `message`, `content`, or `text`.
 - **Remote / web session boundary**: In remote/web cloud sessions (such as `claude.ai/code`), plugin `Stop` hooks may not be dispatched by the cloud container across turn completions or context summarizations (ai-config#2943).
   Do not treat local `Stop` hook enforcement as an active safety net in remote web sessions --- follow instruction rules like "Always produce a reply" directly in model reasoning.
+
+## A non-blocking hook must write `additionalContext` on stdout, not stderr
+
+A hook that exits 0 and prints its warning to stderr is a no-op.
+Per Anthropic's
+[hooks reference](https://code.claude.com/docs/en/hooks), for exit code 0
+stderr goes to the debug log only (`--debug`), and is shown to neither Claude
+nor the user; and for `PreToolUse`, plain stdout is not surfaced either.
+The documented non-blocking channel is JSON on stdout carrying
+`hookSpecificOutput.additionalContext`.
+
+The failure is silent in both directions at once.
+The hook runs, the harness reports nothing wrong, and the transcript looks
+exactly as it would if the condition had never fired --- so the mechanism can
+sit in the corpus for as long as nobody happens to trigger it deliberately.
+
+Verified in this repo, 2026-09-01: every hook whose warning has actually
+surfaced in a live session emits `additionalContext`, and their
+`file=sys.stderr` lines are internal error reporting rather than the warning
+itself.
+`Stop` hooks are the exception --- they deliver by exiting non-zero, which is
+why a `Stop` hook written this way does surface and reads as proof the pattern
+works.
+
+- **Do:** print `{"hookSpecificOutput": {"additionalContext": "..."}}` on
+  stdout for any advisory hook that exits 0.
+- **Do:** trigger the condition deliberately once and confirm the text reaches
+  the session, rather than confirming the hook ran.
+- **Don't:** write an advisory message to stderr on a zero exit --- it reaches
+  the debug log and nothing else.
+- **Don't:** generalize a `Stop` hook's delivery to `PreToolUse`; the two use
+  different channels.
+
+(Tracked as
+[Morrison-Lab/ai-config#3068](https://github.com/Morrison-Lab/ai-config/issues/3068).
+Found while a `PreToolUse` hook was a no-op three separate ways across three
+review rounds --- the wrong mechanism, then a matcher that refused relative
+paths when every real invocation in that corpus is relative or bare, then this
+output channel.
+See
+[`incidents-dont-repeal-decisions`](../shared/workflow/incidents-dont-repeal-decisions.md)
+for the surrounding lesson: a mechanism built on a false diagnosis is worse
+than none, because it closes the question while doing nothing.)

@@ -1053,11 +1053,17 @@ diff-versus-standards rules elsewhere in this corpus rule out.
 Then say which passed and which did not, so the peer learns something about the
 shape of the problem whichever way it goes.
 
-Pinning the shapes even when they all pass is the step that looks redundant and
-is not.
-A case that passes today passes by construction of code nobody promised to
-keep;
-what the peer supplied was a *reason to care about that shape*, and that reason
-survives the measurement.
-So the deliverable is the test, not the verdict.
+Pinning a shape that already passes can be worth it --- a case passing today
+passes by construction of code nobody promised to keep, and what the peer
+supplied was a *reason to care about that shape*, which survives the
+measurement.
+
+But establish that the shape is actually uncovered first, and establish it by
+mutation.
+Reading the suite for a similar-looking case is the same self-confirmation this
+rule exists to avoid, one level down, and the measured outcome in the case
+record was that both "missing" cases were verbatim duplicates already present.
+A duplicate regression case costs review attention and buys nothing, while
+reporting a shape as newly pinned when it was already covered is a false claim
+in the record.
 

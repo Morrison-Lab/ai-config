@@ -935,13 +935,22 @@ of a similar hook, and asked whether they applied here.
 Both already passed, established across seven concrete command shapes rather
 than argued from the pattern.
 
-They were pinned anyway, because the peer was right that one of them --- a long
-`git -C <path>` prefix --- is the form this corpus tells a session to use
-against a named checkout
-([`git-worktrees`](../../memories/git-worktrees.md): "run `git -C <path>`
-against a named checkout instead of `cd`-ing to it"), and worktree paths are
-long enough for the prefix to matter.
-The existing suite pinned only short paths.
-A future narrowing of that pattern now fails a test instead of silently
-disarming the guard for every dispatched agent.
+**They were not pinned, and the reason is the more useful half of the record.**
+The first instinct was to add regression cases for both shapes.
+They turned out to be verbatim duplicates: the suite already carried a
+`git -C <path>` case, including long and space-containing paths, added by the
+very PR whose session raised the question. The added cases were reverted.
+
+Coverage was established by **mutation** rather than by reading --- breaking the
+guard turned the pre-existing cases red (78/80 and 79/80), which is what proved
+the shapes were covered. That is the transferable step: a claim that something
+is untested is a claim to check, not to act on, and checking it means breaking
+the thing and seeing what goes red.
+
+Recorded here because the issue that specified this entry asserted the opposite
+--- that the shapes "were previously pinned only with short paths" and were
+pinned in response. That assertion was written before its own session discovered
+the duplication, and this entry originally reproduced it unchecked. A review
+round caught it by observing that the diff touches no test file, so nothing it
+described could have happened.
 

@@ -804,14 +804,19 @@ Tracked as
 Every verification rule above assumes the finding was raised against **your** artifact.
 A different shape arrives when a peer session runs an adversarial pass on **its own** draft of a similar mechanism, finds edge cases there, and asks whether they apply to yours.
 Nothing in that exchange is a review of your work, so none of the machinery above fires, and the two obvious responses --- dismissing it as being about different code, or adopting it and fixing --- are both wrong.
-Run the peer's cases against your implementation as concrete inputs, report back which passed, and pin the shapes as regression cases even when all of them pass.
+Run the peer's cases against your implementation as concrete inputs, and report back which passed.
+Then check whether your suite already covers the shape before adding anything --- by breaking the guard and seeing what goes red, not by reading the suite for a case that looks similar.
 
 - **Do:** run a peer's edge cases as concrete inputs against your implementation, and report which passed.
-- **Do:** pin the shapes as regression cases even when they all pass, when the peer's reason for raising them names a form your suite does not already cover.
+- **Do:** establish coverage by mutation before adding a regression case, since the case you are about to write is often already there.
+- **Do:** pin the shape when the mutation shows it genuinely uncovered and the peer's reason names why it matters.
 - **Don't:** dismiss a finding because it was raised against different code --- whether it transfers is measurable, and measuring is cheaper than arguing.
 - **Don't:** adopt it either, or fix against it before establishing that your implementation has the defect.
 - **Don't:** settle it by reading your own pattern;
   that is the same self-confirmation dispatching a reviewer exists to avoid.
+- **Don't:** add a regression case on the strength of a claim that the shape is untested --- including your own earlier claim.
+  Mutate first;
+  duplicates are the common outcome.
 
 See [`address-every-comment.cases.md`](address-every-comment.cases.md),
 "A peer's edge cases raised against a different implementation".

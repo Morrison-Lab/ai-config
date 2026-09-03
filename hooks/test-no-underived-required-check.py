@@ -269,6 +269,34 @@ CASES = {
         "-f x='unclosed",
         True,
     ),
+    "S9": (
+        "an `=`-joined wrapper flag does not swallow the following word",
+        # `sudo --user=ci echo gh api ...` -- the flag carries its own value,
+        # so consuming a following token would eat `echo` and leave `gh api`
+        # as the command word. The real command is `echo`.
+        "Bash",
+        "sudo --user=ci echo gh api -X PUT repos/o/r/rulesets/1 "
+        "--input rs.json",
+        False,
+    ),
+    "S10": (
+        "`contexts` as a substring of a longer word is not the key",
+        "Bash",
+        "gh api -X PUT repos/o/r/rulesets/1 -f mycontextsnote=hello",
+        False,
+    ),
+    "S11": (
+        "`--force` is not the `-f` flag",
+        # Without the leading `\s` anchor, `-[fF]` matches inside `--force`.
+        "Bash",
+        "gh api repos/o/r/branches/main/protection/required_status_checks "
+        "--force",
+        False,
+    ),
+    "S12": (
+        "a bare `gh` with no subcommand does not index past the end",
+        "Bash", "gh", False,
+    ),
     "S7": (
         "`--method GET` long form is a read, like `-X GET`",
         "Bash",
@@ -371,6 +399,12 @@ def load_module(source, label):
     return module
 
 
+# Declared flip set for a clause whose reversion CRASHES rather than changing
+# a verdict -- a guard against an IndexError, say. Distinct from an accidental
+# crash, which means the anchor broke the module and measured nothing.
+CRASH = "CRASH"
+
+
 class MutantCrashed(Exception):
     """A mutant raised rather than behaving differently."""
 
@@ -449,7 +483,7 @@ MUTATIONS = {
           "")],
         # S5 and S6 flip too: with the gate gone, every segment is
         # scanned, so the explicit GET and HEAD reach the payload clause.
-        {"S1", "S5", "S6", "S7", "S8"},
+        {"S1", "S5", "S6", "S7", "S8", "S11"},
     ),
     "method_shorthand": (
         "`-XPUT` with no separator is a write method too",
@@ -520,6 +554,32 @@ MUTATIONS = {
         "`parallel` is a command wrapper",
         [('                    "parallel")', "                    )")],
         {"W31"},
+    ),
+    "flag_value_equals_guard": (
+        "an `=`-joined flag carries its own value, so none is consumed",
+        [('"=" not in flag and tokens', "tokens")],
+        {"S9"},
+    ),
+    "contexts_word_boundaries": (
+        "`contexts` is a whole word, not a substring",
+        [(r'\bcontexts\b', r'contexts')],
+        {"S10"},
+    ),
+    "implicit_post_leading_space": (
+        "`-f` must follow whitespace, or it matches inside `--force`",
+        [(r'r"\s(?:--input\b|-[fF]|--(?:raw-)?field\b)"',
+          r'r"(?:--input\b|-[fF]|--(?:raw-)?field\b)"')],
+        {"S11"},
+    ),
+    "token_count_guard": (
+        "at least two tokens are needed before indexing them",
+        [("    return len(tokens) >= 2 and tokens[0] == \"gh\"",
+          "    return tokens[0] == \"gh\"")],
+        # This guard prevents a CRASH rather than a wrong verdict, so its
+        # reversion raises instead of flipping a case. That is still a
+        # measurement -- declared with the CRASH sentinel so the harness can
+        # tell it apart from a mutation whose anchor merely broke the module.
+        CRASH,
     ),
     "wrapper_flag_value_skip": (
         "a wrapper flag's separated VALUE is consumed with the flag",
@@ -644,7 +704,7 @@ MUTATIONS = {
         "the payload must concern required status checks",
         [("        if RX_STATUS_PAYLOAD.search(segment):\n"
           "            return True\n", "        return True\n")],
-        {"S2"},
+        {"S2", "S10"},
     ),
     "payload_field_name": (
         "the bare `required_status_checks` field name counts",
@@ -688,7 +748,7 @@ MUTATIONS = {
         "`gh api` must be the command word, not text inside an argument",
         [("        if not segment_invokes_gh_api(segment):\n"
           "            continue\n", "")],
-        {"S21", "S22", "S23"},
+        {"S21", "S22", "S23", "S9"},
     ),
 }
 
@@ -718,11 +778,21 @@ for clause, (statement, edits, expected_flips) in MUTATIONS.items():
             raise MutantCrashed(f"{type(exc).__name__}: {exc}") from exc
         flipped = {cid for cid in CASES if verdict(mutant, cid) != EXPECTED[cid]}
     except MutantCrashed as exc:
+        if expected_flips == CRASH:
+            print(f"  ok   {clause:<22} {statement}\n"
+                  f"         crashed as declared ({exc})")
+            continue
         mutation_wrong += 1
         print(f"  WRONG {clause:<22} {statement}\n"
               f"         MUTANT CRASHED ({exc}) -- the reversion broke the "
               "module rather than its behaviour; substitute the clause "
               "instead of deleting it")
+        continue
+    if expected_flips == CRASH:
+        mutation_wrong += 1
+        print(f"  WRONG {clause:<22} {statement}\n"
+              "         declared CRASH but did not crash; the guard it "
+              "reverts no longer prevents one")
         continue
     ok = flipped == expected_flips
     mutation_wrong += not ok

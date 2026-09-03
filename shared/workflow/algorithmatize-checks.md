@@ -413,7 +413,7 @@ But an instrument earns a citation by *discriminating*, and a green verdict alon
 A check that is silent on the property under repair reports clean on the fixed tree, on the broken tree, and on the untouched original, and all three readings are indistinguishable.
 The verification is then vacuous while reading as the most rigorous sentence in the reply.
 
-Two things make this the default outcome rather than a rare one.
+This is the default outcome rather than a rare one.
 A gate is often configured **lenient** on exactly the property a style fix is about, since a rule the corpus already violates at scale is the rule a repo turns off to get a green baseline --- so read a check's configuration rather than assuming the rule is on.
 And a green result invites no follow-up, so nobody asks the one question that settles it.
 
@@ -427,7 +427,7 @@ A distribution beats a pass/fail here: a property's *signature* is visible in a 
 - **Don't:** cite a green gate as evidence a fix landed --- green is the same answer it gives to no fix at all.
 - **Don't:** treat "two independent checks agree" as corroboration when neither has been shown able to disagree.
 
-See [`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md), "A cited check that could not go red, and a measurement nobody could re-run".
+See [`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md), "A citation to a check that answers the same on every tree, and two retractions of it".
 
 ## Widening an instrument invalidates every figure it produced, not only the one that exposed it
 
@@ -1414,7 +1414,6 @@ The confounder is often this session's own doing, which is what keeps it out of 
 A conductor that has fanned several reviewer subagents out across the machine is the load, so the very parallelism that made the round fast is what reddens the timing assertion, and nothing in the failure names it.
 
 The control that repetition imitates is a **clean copy**: apply the same change to a pristine `cp -a` of the tree, run it N times there, and compare.
-Two details make the comparison readable.
 Tally failures **by name** rather than by count, since the same total twice over says nothing about whether it was the same test both times, and a rotating failure is the signature of load rather than of code.
 And run the *unchanged* copy the same N times, so a green run has something to be green against.
 

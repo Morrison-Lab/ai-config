@@ -239,7 +239,8 @@ That suite carries wall-clock assertions that intermittently miss a one-second b
 ([#3127](https://github.com/Morrison-Lab/ai-config/issues/3127)),
 so a run reports `753 passed, 1 failed` out of the same 754.
 The baked count had that flake read as a regression.
-The revision after it then misattributed the flake to the checkout, asserting that "the total differs between this worktree and a scratch copy of it (754 vs 753)" --- both report 754, and that explanation was itself retracted a revision later.
+The revision after it then misattributed the flake to the checkout, saying in effect that both readings were right because the worktree reported 754 and a scratch copy of it reported 753.
+Both report 754, and that explanation was itself retracted a revision later.
 The text that shipped gives no count as an expectation, and says why.
 It does quote the `753`/`754` pair, as the observation it is warning about.)
 

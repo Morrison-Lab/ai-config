@@ -539,7 +539,7 @@ call that costs one command, and the compression each round performs ("prose
 is fine, bullets are not") is where the next counter-example gets admitted,
 since a shorter rule covers a larger population.
 
-Two practical consequences.
+That has practical consequences.
 A rule with an **AND** in it cannot be compressed to one clause without becoming false, so a summary that drops a conjunct is a rewrite rather than a simplification.
 And the inputs worth calling with are the ones near the boundary: the sibling spellings of a shape, not another example of the case you already agree about.
 
@@ -570,8 +570,9 @@ The third state dropped the compression and cited the vetoing pattern by name.
 
 The rule the code implements, read off `_findings_section_resolves_empty` in `scripts/check-pr-fully-clean.py`, is a conjunction: the first non-empty line must match the resolving-trailer pattern **and** nothing finding-shaped may follow it.
 `_SECTION_FINDING_ITEM` supplies the second conjunct.
-Read the pattern rather than an enumeration of it --- summarizing it is what went wrong three times above --- but its alternatives include a bare severity or class tag, with or without bold and bracket wrappers, a bullet or numbered item, a blockquote, a location marker, and any line opening with a bold span.
-Two consequences make "prose is fine" unsafe rather than merely imprecise.
+Read the pattern rather than an enumeration of it --- summarizing it is what went wrong three times above.
+As of 2026-09-03, on `main` after #3100 merged, its alternatives were a bare severity or class tag with optional bold and bracket wrappers, a bullet or numbered item, a location marker, a blockquote, and any line opening with a bold span.
+That makes "prose is fine" unsafe rather than merely imprecise, for two reasons.
 A line carrying a bare tag vetoes with no bullet, bold, or bracket around it, so `Defect: ...` alone is enough.
 And the pattern matches those words as ordinary line-initial English rather than as tag usage, so a sentence opening "Note that everything was re-run" vetoes too, while the same content phrased "Everything was re-run" does not.
 Each of those is one call to the function away, on inputs differing by a single line.)

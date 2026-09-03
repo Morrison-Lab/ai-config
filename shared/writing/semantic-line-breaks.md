@@ -1126,46 +1126,45 @@ each from exactly 1200 to 1201 lines, failing `validate` with no content
 change; fixed by re-wrapping the same sentences at a different clause
 boundary, restoring both to 1200.)
 
-**Neither gate can tell a clause reflow from a fill-to-column pass over the same sentences, so a green run is weak evidence that a reflow was done right.**
+**Neither gate can tell a clause reflow from a line-wise fill to 80 columns over the same sentences, so a green run is weak evidence that a reflow was done right.**
 
 Both instruments are described at length above, and what matters here is how little of a line's shape they look at.
 The gate asks two questions: does this line hold more than one sentence, and does an 80-plus-character line carry a mid-line semicolon.
-The second is a within-sentence placement rule, and it is the *only* one --- no other interior break position is examined.
-`MD013`, which would notice a column boundary directly, is disabled repo-wide in `.markdownlint-cli2.jsonc`.
+The second is a within-sentence placement rule, and it is the *only* interior position either instrument examines --- `MD013`, which would notice a column boundary directly, is the rule this repo disables, as noted near the top of this file.
 
-So a fill to 80 columns applied to prose that is already one sentence per line passes cleanly.
-It never merges two sentences, because it wraps each source line separately, and it introduces no semicolon that was not there.
-Measured on [ai-config#3103](https://github.com/Morrison-Lab/ai-config/pull/3103) against its merge base `ba9657270`, classifying every added non-blank Markdown line with the gate's own `classify_line`:
+The blindness turns on the **operation**, not on the input, and getting that backwards is what made two review rounds contradict each other.
+A **line-wise** fill --- wrapping each source line separately --- merges no sentences and adds no semicolon, so it passes cleanly.
+A **paragraph refill** --- `fmt`, `par`, an editor's fill-paragraph, which rejoins lines before wrapping --- does merge sentences, and turns the gate red on the very same input.
+Measured on [ai-config#3103](https://github.com/Morrison-Lab/ai-config/pull/3103) (merged 2026-09-03) against its merge base `ba9657270`, classifying every added non-blank Markdown line with the gate's own `classify_line`:
 
-| state | commit | added lines | sentence flags | clause flags |
-| --- | --- | ---: | ---: | ---: |
-| unreflowed original | `02cbf00d8` | 184 | 0 | 0 |
-| fill to 80 columns | `2d3e18fcf` | 440 | 0 | 0 |
-| clause-boundary reflow | `ba265b546` | 362 | 0 | 0 |
+| state | ref | added lines | sentence flags | clause flags | longest line | lines 76-80 | mid-phrase endings |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| unreflowed original | `02cbf00d8` | 184 | 0 | 0 | 630 | 7 | 0 |
+| line-wise fill to 80 | `2d3e18fcf` | 440 | 0 | 0 | 84 | 83 | 36 |
+| clause-boundary reflow | `ba265b546` | 362 | 0 | 0 | 184 | 31 | 0 |
+| paragraph refill of the original | constructed | 336 | 82 | 1 | --- | --- | --- |
 
-Three trees, one verdict, and only the third is the wanted outcome.
-Citing either instrument here is the vacuous verification
+The first three rows are states the PR actually had, and the gate cannot separate them.
+The fourth is a construction, included because a reviewer produced it while trying to reproduce this measurement and reported its 83 flags as a refutation --- a correct measurement of a tree that never existed.
+Citing the gate over the first three rows is the vacuous verification
 [`algorithmatize-checks`](../workflow/algorithmatize-checks.md)'s
 "A checker that returns the same verdict on the broken tree is not evidence the fix worked" section describes.
 
-Two things bound that result rather than weakening it.
-The commits are on a branch of an unmerged PR, so re-derive against whatever refs survive rather than assuming these resolve.
-And a fill applied to *paragraph* prose would merge sentences and turn the gate red --- so the blindness is specific to reflowing text that already had one sentence per line, which is the situation a clause reflow is always in.
+Re-derive rather than trusting those refs: #3103 squash-merged as `2ba27cc7b`, and `git branch -r --contains 02cbf00d8` returns nothing, so the three shas survive only in a local clone.
 
-Two measurements do discriminate, each one command over the diff.
+Two measurements do discriminate, both run once per state rather than once over the branch.
 
-Print the added lines' lengths and look at the **top** of the distribution.
-A fill to 80 columns leaves a hard ceiling there --- the three states above top out at 630, **84** and 184 characters respectively --- and piles lines into the 76-to-80 band, where clause-broken prose has no such edge, because clauses do not end on a column.
+The **longest added line** is the sharpest: a fill to 80 columns cannot exceed it by more than a token, so a ceiling of 84 against 630 and 184 identifies the fill immediately.
+The 76-to-80 band is a supporting ratio rather than a second test --- 83 of 440 lines against 7 of 184 and 31 of 362 --- since clause-broken prose lands in that band too, just less often.
 
 ```bash
-git diff origin/main...HEAD -- '*.md' | grep '^+[^+]' | cut -c2- |
-  awk 'length > 0 { print length }' | sort -n | tail -1          # the ceiling
-git diff origin/main...HEAD -- '*.md' | grep '^+[^+]' | cut -c2- |
-  awk 'length >= 76 && length <= 80' | wc -l                     # the pile-up
+for ref in "$BEFORE" "$AFTER"; do
+  git diff "$BASE" "$ref" -- '*.md' | grep '^+[^+]' | cut -c2- |
+    awk 'length > 0 { print length }' | sort -n | tail -1
+done
 ```
 
-Then count added prose lines that end mid-phrase --- on an article, a preposition, a conjunction, or an open bracket --- running it once per state so the pair is a pair.
-Across the three states above the counts are 0, **36** and 0, which separates the fill from both hand-broken layouts where the gate could not.
+Then count added lines that end mid-phrase --- on an article, a preposition, a conjunction, or an open bracket --- which separates the fill from both hand-broken layouts at 36 against 0 and 0.
 
 ```bash
 for ref in "$BEFORE" "$AFTER"; do
@@ -1179,8 +1178,9 @@ Both figures depend on the definition as much as on the tree, so publish the bas
 "A published count needs the ref and the flags it was measured with".
 This regex counts every added line rather than only prose lines, and the gate's own `prose_line_numbers` gives a stricter population, so a figure derived the other way will differ.
 
-- **Do:** measure the length ceiling, the 76-to-80 pile-up, and the mid-phrase count before reporting a reflow verified.
+- **Do:** compare the longest added line and the mid-phrase count across the before and after refs before reporting a reflow verified.
 - **Do:** publish the base, the refs, and the pattern with any of those figures, since none is defined by the gate.
-- **Don't:** cite the `new-line-breaks` gate or markdownlint as evidence that breaks landed at clause boundaries --- between two layouts of the same sentences, both are silent.
+- **Do:** say which fill operation you are describing, since a line-wise wrap and a paragraph refill land on opposite sides of the gate.
+- **Don't:** cite the `new-line-breaks` gate or markdownlint as evidence that breaks landed at clause boundaries --- between two hand-broken layouts of the same sentences, both are silent.
 - **Don't:** read a green gate on the reflowed tree as discriminating.
   Confirm the gate goes red on the **unreflowed** tree first, and drop the citation when it does not.

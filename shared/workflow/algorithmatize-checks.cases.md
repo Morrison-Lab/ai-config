@@ -677,7 +677,7 @@ That is a real property of paragraph prose and not of this PR, which had no such
 It was accepted, and the whole claim was retracted.
 The next round re-derived it from the PR's own commits and showed the retraction was the larger error: the original claim had been right.
 
-Three things are worth carrying.
+What carries past this instance is the following.
 
 A finding can be *correct as measured* and still be about the wrong artifact, which is
 [`verify-the-right-artifact`](../../shared/workflow/verify-the-right-artifact.md)'s substitution arriving from the reviewer's side rather than the author's.

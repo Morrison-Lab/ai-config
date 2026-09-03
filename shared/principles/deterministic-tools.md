@@ -310,7 +310,7 @@ This is a different disguise for the same thing, with a different tell: the ques
 
 The question on [#3101](https://github.com/Morrison-Lab/ai-config/pull/3101) was whether an earlier command had *read a config manifest under the root about to be deleted*.
 Answering it needs three facts about one command --- the verb, which argument is the operand, and which root that operand sits under.
-A lexical pattern gets the first of those cheaply: a front-anchored alternation over read verbs is exactly what the hook uses, and what closed the `locate` case below.
+A lexical pattern gets the first of those cheaply, and the hook does exactly that with a front-anchored alternation over read verbs.
 The other two are positional, and a pattern over raw command text has no notion of argument position, so its revisions kept closing one boundary case while leaving a neighbouring one open.
 A sample of what the rounds found, which is how [#3126](https://github.com/Morrison-Lab/ai-config/issues/3126) itself introduces the same list:
 

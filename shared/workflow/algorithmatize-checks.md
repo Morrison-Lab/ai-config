@@ -1299,16 +1299,21 @@ It cannot see the effect the command had.
 So an ordinary formatting choice can destroy the evidence while the action itself succeeds perfectly, and the two outcomes are indistinguishable from where you are sitting: the thing you wanted happened, and the guard fired anyway.
 The reliable tell is that the first conclusion is always *the guard is broken*, because the action visibly worked.
 
-Three shapes, measured in one session:
+Two shapes, measured in one session, and they break different things:
 
 - `gh pr view --json state` piped through `--jq` to pretty-print flattened `"state":"MERGED"` into `state=MERGED`, so the hook's exemption regex, written against the JSON, could not match.
-- A `requested_reviewers` POST sent to `>/dev/null` left no evidence in the transcript that it had succeeded.
-- The same POST written as `... ; echo rc=$?` and as `... | head` moved it out of last-command position, so its exit status could no longer be attributed to it.
+  What the guard reads is the output's **spelling**, and reshaping it is what destroys the record.
+- A `requested_reviewers` POST written as `... ; echo rc=$?` and as `... | head` moved out of last-command position, so its exit status could no longer be attributed to it.
+  What that guard reads is the **exit status**, and its output is not evidence at all.
 
-They share one cause.
-The transformations differ --- `--jq`, `>/dev/null`, a trailing `echo`, a pipe --- and each is applied for readability, while composing the command, with no thought of the guard.
-Each is applied to the very output that was going to serve as the record.
-So the rule is about *which* commands get formatted rather than about formatting in general: a command whose output is evidence gets run bare, alone, unchained and unredirected, and the tidying goes on a separate follow-up call.
+The distinction decides the remedy, and getting it wrong forbids the right shape.
+`pr-on-claim` recommends narrowing that POST's response "with a flag on the POST itself rather than a downstream pipe" --- `--jq` on the request is fine there, because that hook never reads the request's output.
+The same flag on the `gh pr view` above is what broke it.
+So ask what the guard actually reads before reaching for a formatting flag: its text, or the command's position and status.
+
+What the two shapes share is the moment.
+`--jq`, a trailing `echo`, and a pipe are each applied for readability, while composing the command, with no thought of the guard --- and each is applied to the very thing that was going to serve as the record.
+So the rule is about *which* commands get formatted rather than about formatting in general: a command that carries discharge evidence gets run bare, alone, and unchained, and the tidying goes on a separate follow-up call.
 
 **The mirror is a check reading a different artifact, and that failure has nothing to do with the subject's command.**
 The same session ran a CI-gate checker against the committed head while the fix sat uncommitted in the working tree.
@@ -1318,10 +1323,11 @@ That fragment covers only the first direction today ([#3130](https://github.com/
 It is named here only because it wears the same disguise: an action that visibly worked, and a check that says it did not.
 Committing costs one command and settles it.
 
-- **Do:** run a discharge-relevant command alone --- unchained, unredirected, unfiltered --- so the transcript carries its result verbatim.
+- **Do:** run a discharge-relevant command alone and unchained, so the transcript carries its result verbatim.
+- **Do:** ask what the guard reads --- the output's text, or the command's position and exit status --- before reshaping either.
 - **Do:** tidy or reshape that output in a separate call afterwards, when you want it readable.
 - **Do:** ask whether a disagreeing check is reading the artifact you changed, before diagnosing the check.
-- **Don't:** add `--jq`, `>/dev/null`, a trailing `echo`, or a pipe to a command whose output is the evidence.
+- **Don't:** reshape the output of a command whose *text* is the evidence --- `--jq`, a downstream pipe, a formatting flag --- or chain anything after a command whose *position* is.
 - **Don't:** conclude a guard is defective from the fact that the underlying action worked --- the guard measures the record, not the effect.
 
 ## Measure CPU time, not wall clock, when the assertion is about work done

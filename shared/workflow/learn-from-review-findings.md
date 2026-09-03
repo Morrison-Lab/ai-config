@@ -296,8 +296,8 @@ The first two were caught before their commit, so nothing in that PR's history r
 
 - Adding `2>/dev/null` to a timing loop fixed stderr interleaving and silenced the only remaining failure signal, so a nonexistent command reported a plausible fast spread (`0.007 / 0.003 / 0.003`).
 - Moving a hard-to-time probe in-process fixed a misattribution and made the guard hang rather than fail.
-- Narrowing a regex branch to option tokens only fixed a false positive and silently dropped `git clean -fdx <root>`, a real destructive form the previous draft caught --- the surviving comment in `hooks/flag-config-deletion-without-ref-check.py` records it.
-- Adding a not-exhaustive note to a catalog document fixed a count that had outrun its own table and severed the document's purpose statement onto the wrong sentence (`eca210dbf`), which the next round had to restore (`d8c88486f`).
+- Narrowing a regex branch to option tokens only fixed a false positive and silently dropped `git clean -fdx <root>`, a real destructive form the previous draft caught --- the surviving comment in `hooks/flag-config-deletion-without-ref-check.py` records it, on that PR's branch, which `main` did not carry at the time of writing.
+- Adding a not-exhaustive note to a catalog document fixed a count that had outrun its own table and severed the document's purpose statement onto the wrong sentence, which the next round had to restore (`eca210dbf` and `d8c88486f`, both on that same unmerged branch).
 
 Read the list by column rather than by row.
 Each fix did what it was for;

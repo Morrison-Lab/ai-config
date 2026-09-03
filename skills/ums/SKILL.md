@@ -116,12 +116,12 @@ committed pass.
      (
        repo="${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/ums rev-parse --show-toplevel 2>/dev/null || pwd)}"
        test -f "$repo/CLAUDE.md" && test -d "$repo/shared" || { echo "not an ai-config checkout: $repo" >&2; exit 1; }
-       cd "$repo" && grep -rilI --exclude-dir=__pycache__ "<keywords>" skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md
+       cd "$repo" && grep -rilI "<keywords>" skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md
      )
      ```
      The path list is the one skill-builder step 0 runs, over the files on disk,
      so an entry that exists only on a branch not checked out there is out of reach (see the unmerged-PR section of [`grep-is-not-coverage`](../../shared/workflow/grep-is-not-coverage.md)).
-     `-I` skips binary files and `--exclude-dir` skips bytecode caches, which a plain `grep -r` would otherwise report as hits.
+     `-I` skips binary files, bytecode caches included, which a plain `grep -r` would otherwise report as hits.
      A rule can be owned by a `shared/` fragment or a skill as easily as by a memory,
      and a `memories/`-only grep stays outside those paths.
      When one exists, extend it in place; don't add a second bullet.
@@ -146,7 +146,7 @@ committed pass.
    - **When step 2 routed the item to a repo other than ai-config, grep both
      corpora.**
      The query above searches an ai-config checkout,
-     so add the destination repo's own doc paths, run in that repo ---
+     so run a second pass in that repo, over its own doc paths ---
      a repo-local entry can otherwise duplicate or contradict a fragment
      nobody thought to search from that repo.
      See

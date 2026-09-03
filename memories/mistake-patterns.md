@@ -869,22 +869,19 @@ A clean automated review from every available provider evaluating the current HE
   The documented way to advance it is the plugin CLI --- `claude plugin marketplace update Morrison-Lab`, then `claude plugin update ai-config`.
   `update` is the CLI's own subcommand for an already-installed plugin (present in Claude Code 2.1.258);
   the `install` step in [`use-plugins.md`](../shared/workflow/use-plugins.md) is the first-time path and does not advance an existing pin.
+  This incident did not measure those commands: an agent updating its own active guard mid-session is the same self-modification the classifier denies, so running them is the next thing for the USER to do.
+  Verify the pinned copy in `installed_plugins.json` afterwards rather than assuming the pin moved.
+  On a post-[#2820](https://github.com/Morrison-Lab/ai-config/pull/2820) hook (verified against `main`, 2026-09-01), the fallback contract is: a dispatch whose `subagent_type` matches the general-purpose family (`general-purpose`, `general`, `reviewer`, `code-reviewer`, `research`, `self`) and whose prompt contains a review-request phrase matching the prompt gate (e.g. "adversarial pre-push review"), returning a report whose last verdict line reads `### Verdict: Ready for merge` (or `Needs more work`) followed by `Reviewed-Commit: <HEAD sha>` (the parser accepts 7-40 hex characters;
+  give the full 40).
+  A foreground dispatch is the simplest credited path and the one the hook's own refusal message recommends,
+  but background fallback dispatches, tracked `TaskOutput` reads, and task notifications are credited too, per Pattern 22.
+
   **2nd occurrence, 2026-09-03** ([#3156](https://github.com/Morrison-Lab/ai-config/issues/3156)): the same stale-cache mechanism, with a payload that fails OPEN rather than staying outdated.
   A `MORATORIUM_END` constant frozen at `2026-09-01` in the loaded copy had the guard compute the Copilot moratorium as expired and demand the forbidden review, while `main` carried `2026-12-01`.
   `git pull --ff-only` on the marketplace clone advanced it to `b0f279f` and changed nothing loaded;
   the cache's newest per-commit directory (`4140e5c25079`) matched the marketplace's pre-pull HEAD, and no `b0f279f` entry existed.
   Tracked as [#3141](https://github.com/Morrison-Lab/ai-config/issues/3141);
   see [`keep-checkouts-fresh.md`](../shared/workflow/keep-checkouts-fresh.md)'s dated-constant section for the fail-open rule this occurrence produced.
-  This incident did not measure those commands:
-  an agent updating its own active guard mid-session is the same self-modification the classifier denies, so running them is the next thing for the USER to do.
-  Verify the pinned copy in `installed_plugins.json` afterwards rather than assuming the pin moved.
-  On a post-[#2820](https://github.com/Morrison-Lab/ai-config/pull/2820) hook (verified against `main`, 2026-09-01), the fallback contract is:
-  a dispatch whose `subagent_type` matches the general-purpose family (`general-purpose`, `general`, `reviewer`, `code-reviewer`, `research`, `self`)
-  and whose prompt contains a review-request phrase matching the prompt gate (e.g. "adversarial pre-push review"),
-  returning a report whose last verdict line reads `### Verdict: Ready for merge` (or `Needs more work`)
-  followed by `Reviewed-Commit: <HEAD sha>` (the parser accepts 7-40 hex characters; give the full 40).
-  A foreground dispatch is the simplest credited path and the one the hook's own refusal message recommends,
-  but background fallback dispatches, tracked `TaskOutput` reads, and task notifications are credited too, per Pattern 22.
 - **Algorithmatizable?**
   Partially.
   [#2544](https://github.com/Morrison-Lab/ai-config/issues/2544)'s suggested fix 3 --- have the hook's refusal message name a user-approvable permission rule for the override --- would have resolved the measured session in one step, and remains open under [#2899](https://github.com/Morrison-Lab/ai-config/issues/2899).

@@ -916,7 +916,7 @@ one update-plus-rerun cycle each.)
 Measured 2026-09-03 on `Morrison-Lab/ai-config`: `gh pr merge <N> --squash --delete-branch` produced no stdout, no stderr, and no error, and the merge had in fact landed.
 
 Empty output is therefore not a signal in either direction here, and the two readings it invites are both wrong and both expensive.
-Read as a failure, it prompts a retry that either errors confusingly on an already-merged PR or --- worse on a repo with auto-delete --- runs against a branch that no longer exists, which `git ls-remote` then reports as an absence indistinguishable from a branch never pushed (see [`check-before-pushing`](../shared/workflow/check-before-pushing.md)).
+Read as a failure, it prompts a retry, which then fails on the PR's already-merged state and reads as a second, different problem.
 Read as a success, it is right by luck rather than by evidence.
 
 One query settles it, and it is cheaper than either misreading:

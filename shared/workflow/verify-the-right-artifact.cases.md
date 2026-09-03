@@ -291,7 +291,11 @@ check / spellcheck
 
 `news.yaml` has the same shape with job key `Check-Changelog` calling
 `check-news.yml@v2`, and its published context was measured rather than
-derived:
+derived.
+`news.yaml` triggers only on `pull_request`, so no run of `main` exists for it;
+the run below is `ucdavis/rampp#155`'s, on branch `copilot/fix-issue-141`,
+which postdates the migration and whose head touches three other workflow files
+but not `news.yaml` --- so it resolved that file through `main`:
 
 ```
 $ gh api repos/ucdavis/rampp/actions/runs/33727364476/jobs --jq '.jobs[].name'
@@ -316,7 +320,7 @@ runs they already have.
 `ucdavis/rampp#154` reports both contexts `SUCCESS`, which reads as current and
 is not: those two check runs started at `2026-08-27T23:42:10Z` and
 `23:42:12Z`, six days before the migration landed, and the pull request has
-published nothing since.
+had no new push since.
 Its next push will resolve the workflow file through the current `main` and
 publish `check / spellcheck` instead, after which the bare requirement cannot
 be met on that pull request.

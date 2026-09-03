@@ -480,7 +480,8 @@
   ```
   A required context naming a check no workflow emits never turns red -- it sits as `Expected`, so the mistake has no failing signal to find it by.
   (ucdavis/rampp, 2026-09-03: bare `Spellcheck` and `Check Changelog Action` were added to ruleset `3889405` on the strength of check-run names read off merged PR #157.
-  Those names were accurate for `main` when #157 merged; the move to called reusable workflows landed on `main` three hours later via #153, retiring them.
+  Those names were accurate for `main` when #157 merged.
+  The move to called reusable workflows landed on `main` three hours later via #153, retiring them.
   `main` now emits `check / spellcheck` and `Check-Changelog / Check Changelog Action`.)
 
 - **GitHub PR Reviews REST API (`POST /repos/{owner}/{repo}/pulls/{number}/reviews`) Requirements & Fallbacks**:

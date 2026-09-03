@@ -779,7 +779,8 @@ A reviewer holding the round's own findings can weigh their severity against the
 Recorded 2026-09-03 from [ai-config#3059](https://github.com/Morrison-Lab/ai-config/issues/3059), across nine rounds on one hook.
 Rounds 6, 7 and 8 each introduced a defect the next round found, which is exactly the condition above;
 only round 9 introduced none.
-What ended the series was asking that question directly, rather than a round happening to come back empty --- which, per the convergence rule, would not have been evidence it was finished anyway.
+#3059 names asking that question directly as one of two things that ended the series, the other being the validation-running round above.
+Neither was a round happening to come back empty --- which, per the convergence rule, would not have been evidence it was finished anyway.
 
 - **Do:** ask for a continue-or-stop judgement once a round's findings are about the previous round's *fix* rather than about the change, separately from the ship-or-drop question.
 - **Do:** give the reviewer the rate at which this change's own fixes have introduced new defects, since that is the term it cannot derive from the diff.

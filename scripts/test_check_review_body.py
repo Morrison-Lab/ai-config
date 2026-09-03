@@ -8,7 +8,9 @@ that matter; the rest guard the edges.
 """
 from __future__ import annotations
 
+import contextlib
 import importlib.util
+import io
 import os
 import subprocess
 import sys
@@ -327,9 +329,7 @@ _ARD_NOT_CLEAN = (
 def _checker_issues(body):
     # The checker narrates its verdict scan to stdout; silenced so the suite's
     # own output stays readable.
-    import contextlib
-    import io as _io
-    with contextlib.redirect_stdout(_io.StringIO()):
+    with contextlib.redirect_stdout(io.StringIO()):
         _, issues = MOD.check_review_comments(_FakePR([_FakeComment(body)]))
     return " | ".join(issues)
 

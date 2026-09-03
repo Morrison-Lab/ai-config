@@ -2581,6 +2581,14 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
     all_items = []
     for c in comments:
         body = c.get("body", "")
+        # Restored after being deleted as "dead". An adversarial round read
+        # the AST -- Store here, next Load only after a later Store -- and
+        # concluded nothing reads this value, and so did the verification of
+        # that finding. Both were reasoning about STATEMENT POSITIONS rather
+        # than control flow: a path reaches the read without passing the later
+        # Store, and `test_check_pr_fully_clean.py`'s #2696 case takes it.
+        # Deleting the line turned that test red (754 -> 753).
+        body_lower = body.lower()
         author_login = (c.get("author") or {}).get("login", "")
 
         if is_ard_disposition_summary(body):

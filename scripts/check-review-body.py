@@ -179,9 +179,9 @@ def analyse(body, mod):
     # still calls it, ahead of admission, is a call-site property no
     # extraction can assert. Deleting the guard traded that coverage away, so
     # `test_check_review_body.py` now drives `check_review_comments` directly
-    # and pins the outcome instead of the syntax. That is strictly stronger
-    # here -- it kills a relocation that changes behaviour and correctly
-    # ignores one that does not, where the syntactic guard failed on both.
+    # and pins the outcome instead of the syntax -- which is the property
+    # worth having, since a refactor that preserves the skip should not turn
+    # anything red.
     #
     # Reported separately as well as combined. They are two different skips
     # with two different remedies, and a single conflated boolean tells a

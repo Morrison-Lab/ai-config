@@ -108,6 +108,41 @@ GREP_N = [tool("Bash", {"command": 'grep -n "total_cost\\|num_turns" CLAUDE.md'}
           result("927:...\n931:...\n932:...\n946:...")]
 GREP_C = [tool("Bash", {"command": "grep -ci quota CLAUDE.md"}), result("6")]
 
+
+# ai-config#3117: the five review rounds as they actually arrived, each an
+# `Agent` result ending in the reviewer's own machine-readable count. The real
+# total is 2+3+3+1+0 = 9 across five rounds; the brief said ten and five.
+#
+# An `Agent` result carries no pending command, so this is also what pins the
+# ordering inside `transcript_derivations`: a scan placed after the `pending`
+# lookup never sees any of these.
+def review(n, tid):
+    return [tool("Agent", {"prompt": "review the diff"}, tid),
+            result(f"### Verdict\n**Needs work**\n\n[FINDINGS_COUNT: {n}]", tid)]
+
+
+ROUNDS = (review(2, "a1") + review(3, "a2") + review(3, "a3")
+          + review(1, "a4") + review(0, "a5"))
+# Two discharges, kept separate on purpose. `grep -c` is already a
+# DERIVE_COUNT command, so a transcript summed that way cannot isolate clause
+# C's own discharge; the arithmetic one can, and the mutant below uses it.
+ROUNDS_SUMMED = ROUNDS + [
+    tool("Bash", {"command": "awk '{s+=$2} END {print s}' /tmp/rounds.txt"}, "b9"),
+    result("9", "b9"),
+]
+ROUNDS_COUNTED = ROUNDS + [
+    tool("Bash", {"command": "grep -c FINDINGS_COUNT /tmp/rounds.txt"}, "b9"),
+    result("5", "b9"),
+]
+# One value is a number to quote, not an aggregate to compute.
+ONE_ROUND = review(2, "a1")
+
+# The brief that went out, and the commit message that followed it.
+AGGREGATE_BRIEF = (
+    "Measured on #3107: five adversarial rounds, ten findings, all addressed "
+    "before the verdict came back clean."
+)
+
 # --------------------------------------------------------------- corpus cases
 
 REMIND = [
@@ -162,6 +197,14 @@ REMIND = [
     # docstring cannot drift from the behaviour again.
     ("Verify the changelog, before merging, since `CLAUDE.md` carries X.", None,
      "R4: an imperative with a COMPLETE object does not govern a later clause"),
+
+    # ai-config#3117: clause C. The count names no file, so every clause above
+    # it is silent; what makes it decidable is that the addends are sitting in
+    # the transcript as the reviewer's own `FINDINGS_COUNT` values.
+    (AGGREGATE_BRIEF, ROUNDS,
+     "#3117 verbatim: an aggregate over FINDINGS_COUNT values nothing summed"),
+    ("The PR took 5 rounds and closed 10 findings.", ROUNDS,
+     "#3117: the same aggregate written in numerals"),
 ]
 
 SILENT = [
@@ -222,6 +265,34 @@ SILENT = [
     ("Verify, before merging, that CI passes, and `CLAUDE.md` carries a "
      "quota carve-out.", None,
      "R4: accepted residual -- an aside cannot reach across a comma-joined clause"),
+
+    # Clause C controls. The first four are what keep it from becoming the
+    # pathless count matcher its own comment argues against: without a
+    # transcript carrying the addends, a count of findings is ordinary prose.
+    (AGGREGATE_BRIEF, None,
+     "C: no transcript, so nothing pathless is being aggregated"),
+    (AGGREGATE_BRIEF, ONE_ROUND,
+     "C: one value is a number to quote, not an aggregate to compute"),
+    ("CI came back 14 success, 1 skipped, 31 check runs.", ROUNDS,
+     "C: ordinary status prose, whose nouns are not the token's"),
+    ("Two agents are running and three PRs are open.", ROUNDS,
+     "C: counts of things the transcript holds no values for"),
+    (AGGREGATE_BRIEF, ROUNDS_SUMMED,
+     "C: an arithmetic command ran after the values appeared"),
+    (AGGREGATE_BRIEF, ROUNDS_COUNTED,
+     "C: a counting command ran after the values appeared"),
+    ("The PR closed ten findings.\n"
+     "Derived just now: `grep -c FINDINGS_COUNT review-log.txt`\n", ROUNDS,
+     "C: discharged by a command pasted beside the claim"),
+    ("Count the ten findings yourself before writing the summary.", ROUNDS,
+     "C: imperative -- the brief already asks for the derivation"),
+    # The counting command sits BEFORE the values on purpose: after them it
+    # would clear clause C wholesale, and the case would pass without ever
+    # exercising the overlap rule it exists to pin.
+    ("`shared/workflow/ardi.md`'s three findings are all addressed.",
+     [tool("Bash", {"command": "grep -c Address shared/workflow/ardi.md"}, "b8"),
+      result("3", "b8")] + ROUNDS,
+     "C: a count clause A anchored stays clause A's, and its discharge holds"),
 ]
 
 # ------------------------------------------------------------------- runner
@@ -511,6 +582,24 @@ MUTANTS = [
      lambda: fires("Verify, before merging, that CI passes; "
                    "`CLAUDE.md` carries a quota carve-out."),
      True, False),
+
+    # Clause C, one mutant per half. The fire half must not be reachable
+    # without the transcript token, and the discharge half must not be
+    # "never discharge", which would pass every firing case and guard nothing.
+    ("clause C: the FINDINGS_COUNT token gates the pathless count",
+     "FINDINGS_VALUE", re.compile(r"zzz-never-matches"),
+     lambda: fires(AGGREGATE_BRIEF, ROUNDS),
+     True, False),
+
+    ("clause C: the aggregate noun set",
+     "AGGREGATE_NOUNS", {"zzz-never-matches"},
+     lambda: fires(AGGREGATE_BRIEF, ROUNDS),
+     True, False),
+
+    ("clause C discharge: arithmetic after the values clears it",
+     "DERIVE_AGGREGATE", re.compile(r"zzz-never-matches"),
+     lambda: fires("The PR closed ten findings.", ROUNDS_SUMMED),
+     False, True),
 
     ("tool_result must carry output",
      "_none_", None,

@@ -392,6 +392,27 @@ FIRE-condition addition", so both parties held the evidence and neither drew the
 conclusion that the count needed a ref rather than a correction.
 The fix stated the ref and the flags and changed no number.)
 
+**The same defect at VERIFICATION time is the dangerous direction, and it is the one nothing above covers.**
+Every case above is a false **absent** while authoring: the query misses, you conclude the corpus lacks the thing, and you write a duplicate.
+The mirror is a false **missing** while checking your own work --- confirming that content survived a merge, that a fix landed, that a line is still there.
+Both come from a query too precise for its target.
+Their consequences are not comparable.
+
+A false absent produces a *judgement* you can still revisit, and the duplicate arrives as new prose someone may notice.
+A false missing produces an *edit*.
+You re-add content that is already present, and the duplication lands inside a merge commit, which is the artifact least likely to be read line by line afterwards.
+So the more accurate the surrounding process, the worse this gets: a careful merge, verified string by string, is exactly where a mistyped pattern turns into a silent duplication.
+
+Measured 2026-09-03: two consecutive false MISSING readings while verifying that a merge preserved earlier work, both from the pattern rather than the file.
+`demotes ` did not match `demotes** \`time\``, and a case-sensitive `keep the content` did not match `Keep the content`.
+Both were caught before acting, and the repair for either would have been to re-add text already in the file.
+
+- **Do:** re-test a MISSING before acting on it, with `grep -F` on a distinctive contiguous substring, and with `-i`.
+- **Do:** prefer a substring test in the tool you are already in --- `"<text>" in path.read_text()` --- which has no pattern language to get wrong.
+- **Don't:** treat a verification query as exempt because it is checking rather than searching;
+  it is the same instrument, pointed at a target you wrote yourself and therefore expect to find.
+- **Don't:** act on a single MISSING inside a merge, where the correction is additive and nothing later re-reads it.
+
 ## A claim that nothing exists owes its deriving command, even when no search ran
 
 Every section above starts from a query that was actually run.

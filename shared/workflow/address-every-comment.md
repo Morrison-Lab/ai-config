@@ -402,7 +402,7 @@ git diff origin/<default-branch>...HEAD -- <file> | grep -nF -- '<the flagged te
 ```
 
 `-F` and `--`, not a bare `grep`.
-The flagged text is pasted from a review comment, so it carries whatever characters the passage had, and in regex mode those are operators: measured, `a.c` matches both `a.c` and `abc`, so the check reports a `+` for a line the branch never added, which is the wrong answer it was run to rule out.
+The flagged text is pasted from a review comment, so it carries the passage's own punctuation, and in regex mode a dot or a star is an operator: measured, `a.c` matches both `a.c` and `abc`, so the check reports a `+` for a line the branch never added, which is the wrong answer it was run to rule out.
 The regex case is the dangerous one, because it is the quiet one: a wrong answer arrives with no diagnostic attached to it.
 Text opening with `-` fails loudly by comparison --- `grep -n '-fast'` reads `-f ast`, writes a diagnostic to stderr and exits 2, so nothing is searched and you can see that nothing was.
 `--` is still worth having: a check that dies on a whole class of flagged text is one you stop reaching for.

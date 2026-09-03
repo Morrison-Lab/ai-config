@@ -2,7 +2,8 @@
 
 Invocation: `gia mwc daytb`.
 Grants active: `mwc` (merge when confident) and `daytb` (decide judgment calls myself).
-Remote Claude Code session; **no `gh`/`glab` CLI**, so forge work goes through the GitHub MCP tools per `tool-mappings.md`.
+Remote Claude Code session, with **no `gh`/`glab` CLI**.
+Forge work therefore goes through the GitHub MCP tools per `tool-mappings.md`.
 
 Repos in scope for this session: `Morrison-Lab/ai-config` and `UCD-SERG/serocalculator`.
 
@@ -25,10 +26,14 @@ Chose **`Morrison-Lab/ai-config`**:
 ## Continuity with 2026-09-02
 
 Yesterday's notebook (`memories/session-2026-09-02-gia-ai-config.md`) ran GIA over the same repo.
-Its Phase 1 outcome: merged #3056, #3014, #3058, #3044; pushed-and-awaiting-review #3023, #3024, #3070;
-left to a peer session #3061 and #3037; untouched #3060.
+Its Phase 1 outcome, in four groups.
+Merged: #3056, #3014, #3058, #3044.
+Pushed and awaiting review: #3023, #3024, #3070.
+Left to a peer session: #3061 and #3037.
+Untouched: #3060.
 Since then #3070, #3061 and #3037 have left the open list, so they landed.
-Still open from that run: **#3023, #3024, #3060**. New since: **#3084, #3089**.
+Still open from that run: **#3023, #3024, #3060**.
+New since: **#3084, #3089**.
 
 The account session limit that blacked out `claude-code-review` yesterday reset at 21:50 PDT.
 It is now past that, so review rounds should be obtainable again --- to be confirmed by a real
@@ -48,8 +53,8 @@ verdict rather than assumed.
   - **#3089 x #3023** --- `.github/workflows/validate.yml`
   - **#3084 x #3023** --- `shared/workflow/adversarial-self-review.md`
   Every other pair is disjoint.
-  This is a *collision* derivation only; it cannot see a dependency (one PR asserting what another makes true),
-  which needs a separate read.
+  This is a *collision* derivation only.
+  It cannot see a dependency (one PR asserting what another makes true), which needs a separate read.
 - **#3060 still has an empty diff (0 files changed)**, exactly as yesterday's notebook recorded.
   A draft opened per `pr-on-claim` and never filled in.
   It needs a decision, not an ARDI round.
@@ -57,7 +62,8 @@ verdict rather than assumed.
 ## Phase 1 --- what each open PR needed
 
 Survey dispatched read-only and cross-checked rather than trusted.
-**The survey reported one unresolved review thread on #3023; the live query showed all six resolved.**
+**The survey reported one unresolved review thread on #3023.**
+**The live query showed all six resolved.**
 Worth recording as a subagent-report miss: the number was wrong in the direction that would have created work, not skipped it, but a report of PR state is exactly the kind of claim `metacognitive-monitoring` says to re-query rather than accept.
 
 - **#3024** --- clean at head `14817d4b` (round 6 of 6), 19 checks green, `mergeable_state: clean`.
@@ -68,7 +74,8 @@ Worth recording as a subagent-report miss: the number was wrong in the direction
     **The reviewer misread the wrap.**
     Acting on the nit would have *introduced* the duplication it described, which is the sharpest form of why a nit gets verified against the bytes rather than trusted.
 - 2026-09-02 23:41 PDT --- **MERGED #3024** (squash, `462de02b`), under the standing ai-config `mwc` grant plus the peer-PR path (announced intent, held five minutes, `ListAgents` reached no peer).
-- **#3023** --- announced merge intent at 23:36 PT on head `64c4e97`; **re-checked before acting and the head had moved to `6aa021b5`.**
+- **#3023** --- announced merge intent at 23:36 PT on head `64c4e97`.
+  **Re-checked before acting, and the head had moved to `6aa021b5`.**
   A peer merged `origin/main` in (`ced93f69`) and dropped the report-trailer case record as superseded by #3084 (`6aa021b5`), at 06:38Z --- minutes into my own five-minute hold.
   A push resets the clean clock, so the round-5 verdict no longer covers the head.
   Withdrew the intent on the PR and left the PR to its peer.

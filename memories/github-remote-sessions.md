@@ -115,5 +115,6 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
   And a bot-authored comment carries `author_association: CONTRIBUTOR`, which is not in the `OWNER`/`MEMBER`/`COLLABORATOR` set `Morrison-Lab/gha`'s `claude.yml` gates its agent on, so an `@claude review` comment posted this way is skipped by design.
   `POST /actions/workflows/<file>/dispatches` is refused outright with `403 Resource not accessible by integration` --- "integration" is GitHub's word for an App, and the App's installation token carries `issues: write` and `pull_requests: write` but not `actions: write`.
   Deleting a remote branch is refused by the proxy itself (`Write access to this GitHub API path is not permitted through this proxy`), so a merged branch is tidied locally and left on the remote.
+  Merging is not similarly blocked, and the absence of `gh` does not excuse the pre-merge head pin: plain REST takes it as `sha`, per [`fully-clean`](../shared/workflow/fully-clean.md)'s merge-pin bullet, which carries the exact call and the branch-tidying caveat above.
   - **Do:** re-trigger a review by pushing with `git`, which is the one write here that carries a User identity.
   - **Don't:** reach for `workflow_dispatch` or an `@claude review` comment as the fallback --- in this session both are closed, for the two distinct reasons above.

@@ -635,6 +635,64 @@ routine work is everywhere.**
   an over-broad discharge produces the same silence as a repo full of compliant
   sessions.
 
+## Your own command's shape is part of a transcript-read discharge condition
+
+The section above is the guard author's side of a discharge: does the second
+matcher separate the obligation from adjacent routine work?
+This is the **subject's** side, and no rule in this corpus pointed at it.
+
+A guard that reads the transcript sees the text of your command and the text of
+its output --- not the effect the command had.
+So an ordinary formatting choice can destroy the evidence while the action
+itself succeeds perfectly, and the two outcomes are indistinguishable from
+where you are sitting: the thing you wanted happened, and the guard fired
+anyway.
+The reliable tell is that the first conclusion is always *the guard is broken*,
+because the action visibly worked.
+
+Four measured in one session, three of them the subject's own doing:
+
+- `gh pr view --json state` piped through `--jq` to pretty-print flattened
+  `"state":"MERGED"` into `state=MERGED`, so the hook's exemption regex, written
+  against the JSON, could not match.
+- A `requested_reviewers` POST sent to `>/dev/null` left no evidence in the
+  transcript that it had succeeded.
+- The same POST written as `... ; echo rc=$?` and as `... | head` moved it out
+  of last-command position, so its exit status could no longer be attributed to
+  it --- which is exactly the shape
+  [`pr-on-claim`](pr-on-claim.md) already forbids for that hook, arriving here
+  through output formatting rather than through folding in a second query.
+- A CI-gate checker run against the committed head while the fix sat uncommitted
+  in the working tree, which is
+  [`verify-the-right-artifact`](verify-the-right-artifact.md)'s working-directory
+  shape pointed the other way: the artifact you changed and the artifact the
+  check read were different, and the check was right.
+
+The first three share one cause.
+`--jq`, `>/dev/null`, a trailing `echo`, and a pipe are each applied for
+readability, at the moment of composing the command, with no thought of the
+guard --- and each is a transformation applied to the very output that was going
+to serve as the record.
+So the rule is about *which* commands get formatted rather than about formatting
+in general: a command whose output is evidence gets run bare, alone, unchained
+and unredirected, and the tidying goes on a separate follow-up call.
+
+The fourth is the mirror and needs the opposite move.
+When a check disagrees with something you just did, ask first whether it is
+looking at the artifact you changed, before concluding it is defective.
+Committing costs one command and settles it.
+
+- **Do:** run a discharge-relevant command alone --- unchained, unredirected,
+  unfiltered --- so the transcript carries its result verbatim.
+- **Do:** tidy or reshape that output in a separate call afterwards, when you
+  want it readable.
+- **Do:** ask whether a disagreeing check is reading the artifact you changed,
+  before diagnosing the check.
+- **Don't:** add `--jq`, `>/dev/null`, a trailing `echo`, or a pipe to a command
+  whose output is the evidence.
+- **Don't:** conclude a guard is defective from the fact that the underlying
+  action worked --- the guard measures the record, not the effect.
+
 ## A review flagging an overclaimed check is a prompt to build it, not to soften the claim
 
 The sections above are about an instrument you already decided to build.

@@ -303,6 +303,78 @@ round 11 established that neither works, because the harness delivers control ta
 The tool was inverted to report records and their provenance rather than classify authorship, which ends the sequence by removing the claim rather than narrowing it.
 Round 12 then found the coverage half.)
 
+## A flat pattern over command text has no argument positions, so widening it never converges
+
+The section above is a parse that moved from grammar to **vocabulary**.
+This is the same move to a **flat pattern**, and it is harder to see, because a
+regex plainly is a matcher rather than a parser --- so nothing about writing one
+feels like claiming to have parsed anything.
+
+The question being answered was structural: did an earlier command *read a
+config manifest under the root about to be deleted?*
+Answering it needs three facts about one command --- the verb, which argument is
+the operand, and which root that operand sits under --- and a regex over raw
+command text can see none of them, because it has no notion of argument
+position.
+So every narrowing trades one boundary case for a neighbouring one, and the
+sequence has no end.
+
+Eight rounds on [#3101](https://github.com/Morrison-Lab/ai-config/pull/3101)
+each closed a real case and opened another: a manifest *name* with no root; the
+right shape under the wrong root; the deletion command clearing its own warning;
+a `grep` **for** the manifest string over `.py` files; the root supplied as the
+search *pattern* while the manifest belonged to a different root; a quoted
+pattern spelling a whole path; `locate` matching because it contains `cat`; and
+finally a verb and an operand in two different commands, where the second one
+*deletes* the manifest.
+
+**The tell is the trade, not the count.**
+[`learn-from-review-findings`](../workflow/learn-from-review-findings.md)'s
+recurrence bar fires on the second finding of a class and is the right
+instrument for a heuristic that keeps *missing*.
+This is the adjacent shape: each fix works, and each one breaks something
+adjacent that the previous draft handled.
+Two such trades is the signal to stop asking what else the pattern should match
+and ask what question the instrument is really being asked.
+Here the answer was a parse --- `shlex` the command, then ask whether a read
+verb's argv holds a manifest under a targeted root --- and the structural rework
+was filed as
+[#3126](https://github.com/Morrison-Lab/ai-config/issues/3126) rather than
+attempted in the round that noticed it.
+
+**Then write the ceiling into the artifact.**
+The disposition that ends such a sequence is not a ninth widening and not a
+quiet retreat.
+It has three parts, and the first is the one that is actually load-bearing:
+narrow the **comment** that overclaims, so the code no longer asserts a guarantee
+it only approximates;
+add a limits section naming the residual cases in **both** directions, since a
+list of what still slips through is only half of what a later reader needs;
+and file the structural fix as its own issue so the ceiling is recorded as
+temporary rather than accepted.
+
+Note the boundary with
+[`algorithmatize-checks`](../workflow/algorithmatize-checks.md)'s "A review
+flagging an overclaimed check is a prompt to build it, not to soften the claim".
+That section rejects deleting an overclaiming sentence *in place of* building
+the instrument the finding asked for, and it still governs.
+What is permitted here is narrowing the claim to what the code does **while**
+filing the instrument, which resolves by addition on a longer clock.
+Deleting the sentence and filing nothing is the move both sections refuse.
+
+- **Do:** ask what question the instrument is really being asked, once two
+  successive fixes have each traded one boundary case for another.
+- **Do:** narrow an overclaiming comment to what the code actually does, and
+  file the structural rework as its own issue in the same round.
+- **Do:** write a limits section naming the residual cases in both directions
+  --- what still fires wrongly, and what still slips through.
+- **Don't:** widen a lexical pattern a further time when the previous widenings
+  each opened a new case; a pattern with no argument positions cannot converge
+  on a question about argument positions.
+- **Don't:** let a comment assert a guarantee the code only approximates.
+- **Don't:** read this as licence to delete the overclaim and stop --- without
+  the filed issue it is the softening `algorithmatize-checks` refuses.
+
 ## Limits
 
 Design, genuine judgment, and semantic work stay with a human or a model:

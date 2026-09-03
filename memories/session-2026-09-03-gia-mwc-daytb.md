@@ -102,3 +102,35 @@ POSITIVE CONTROL ctl-A x ctl-B exit=1   (two throwaway branches editing README.m
 So the detector demonstrably fires, and neither real pair conflicts.
 No merge-order constraint from conflicts.
 Checked separately for *dependency* (one PR asserting what another makes true), which no intersection can see: `main` does not carry the report-trailer section and #3084 is the only open PR adding it, so #3023 dropping it loses nothing whichever order they land in.
+
+## A peer session is driving this repo concurrently --- the division that settled
+
+Not inferred from `ListAgents`, which reaches only this machine and reported no peers all session.
+Inferred from the PRs themselves, which is the only channel that works here:
+
+- **#3023** gained `ced93f69` (merge of `origin/main`) and `6aa021b5` (drop the report-trailer record) at 06:38Z, *during* my own five-minute merge hold.
+- **#3089** was a draft with `validate` in progress when surveyed;
+  by 06:43Z it was **un-drafted** and its head had moved from `e1f5fd03` to `8f1ca761`.
+
+Both are live peer work, minutes old, so both stay theirs --- no pushes, no merges, no review-driving from me.
+The one thing I owed #3023 was withdrawing the merge intent I had already announced on it, which is done.
+
+**Mine to drive:** #3084 (report-trailer block), #3060 (the #3059 UMS pass), #3093 (this notebook).
+**Theirs:** #3023, #3089.
+
+The lesson is not new but it is now three-for-three: on this repo `ListAgents` is not the instrument for peer detection.
+The PR's own `updated_at` and head SHA are.
+A peer that shares the login is invisible to every agent-listing tool and visible in every forge query.
+
+## Reviews
+
+- #3084 round 2 (adversarial, on `92304aeb`) returned **5 findings, all real**, and all Addressed in `264f76f7`:
+  1. The fenced block claimed to show verdict and fingerprint *after the payload* while containing **no payload**, so the ordering was asserted over the artifact rather than visible in it.
+     Fixed by making the payload's closing marker the block's first line.
+  2. The corpus sweep's `0` was being read as confirming its own conclusion while a **known-real instance sat outside its reach** --- a failed positive control, not a corroboration.
+     Now stated as such, with what the `334` establishes separated from what the `0` does not.
+  3. The "Two caveats" paragraph gave #3050 a scope the corrected sentence fourteen lines above had already ruled out, and blamed the sentinel for a tension the *reordering* causes on its own.
+  4. A forward reference (`the same zero`) pointing across a paragraph break and a code fence at a value first shown below it.
+  5. `The measured occurrence` --- "measured" applied to the one datum the measurement did **not** find, and singular against "observed twice".
+- Finding 2 is the one worth carrying past this PR.
+  It is the same shape as this session's own merge-simulation control, arriving in prose: a zero from a detector with a known blind spot reads exactly like a zero from a working one, and the passage asserting it had itself been written to argue "measured rather than assumed".

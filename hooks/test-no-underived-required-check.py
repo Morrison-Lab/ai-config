@@ -399,14 +399,40 @@ def load_module(source, label):
     return module
 
 
-# Declared flip set for a clause whose reversion CRASHES rather than changing
-# a verdict -- a guard against an IndexError, say. Distinct from an accidental
-# crash, which means the anchor broke the module and measured nothing.
-CRASH = "CRASH"
+class Crashes:
+    """Declared outcome for a clause whose reversion RAISES at call time.
+
+    Some guards prevent a crash rather than a wrong verdict -- `len(tokens) >=
+    2` stops an `IndexError` on a bare `gh` -- so reverting one raises instead
+    of flipping a case. That is a real measurement, but it must be told apart
+    from the two ways a crash means NOTHING was measured:
+
+      * the reversion broke the module at import (a deleted block header, a
+        truncated expression), which raises `MutantLoadFailed`, never this; and
+      * the reversion raised something OTHER than the guard was preventing,
+        which the declared `exc_type` rejects.
+
+    Declaring `Crashes(IndexError)` therefore asserts a specific call-time
+    failure, not merely that something went wrong. A clause declaring it that
+    does not crash is reported WRONG, so the guard cannot quietly stop
+    guarding.
+    """
+
+    def __init__(self, exc_type, cases):
+        self.exc_type = exc_type
+        self.cases = frozenset(cases)
+
+
+class MutantLoadFailed(Exception):
+    """A mutant could not be compiled or imported -- it measured nothing."""
 
 
 class MutantCrashed(Exception):
-    """A mutant raised rather than behaving differently."""
+    """A mutant raised at CALL time rather than behaving differently."""
+
+    def __init__(self, exc):
+        super().__init__(f"{type(exc).__name__}: {exc}")
+        self.exc = exc
 
 
 def verdict(module, case_id):
@@ -417,10 +443,10 @@ def verdict(module, case_id):
     try:
         return module.evaluate(command) is not None
     except Exception as exc:
-        # A mutant that CRASHES measures nothing -- the clause it reverted is
-        # untested either way, and the traceback hides which. Surfaced as its
-        # own outcome so the anchor gets fixed rather than the run dying.
-        raise MutantCrashed(f"{type(exc).__name__}: {exc}") from exc
+        # Surfaced as its own outcome rather than killing the run: for most
+        # clauses a crash means the anchor broke the module and nothing was
+        # measured, while for a `Crashes(...)` clause it IS the measurement.
+        raise MutantCrashed(exc) from exc
 
 
 def cli_verdict(hook_path, case_id):
@@ -576,10 +602,11 @@ MUTATIONS = {
         [("    return len(tokens) >= 2 and tokens[0] == \"gh\"",
           "    return tokens[0] == \"gh\"")],
         # This guard prevents a CRASH rather than a wrong verdict, so its
-        # reversion raises instead of flipping a case. That is still a
-        # measurement -- declared with the CRASH sentinel so the harness can
-        # tell it apart from a mutation whose anchor merely broke the module.
-        CRASH,
+        # reversion raises instead of flipping a case. Declared with the
+        # expected exception TYPE and the exact cases it must raise on, so it
+        # asserts the specific failure the guard prevents rather than merely
+        # that something went wrong.
+        Crashes(IndexError, {"S12"}),
     ),
     "wrapper_flag_value_skip": (
         "a wrapper flag's separated VALUE is consumed with the flag",
@@ -769,30 +796,60 @@ for clause, (statement, edits, expected_flips) in MUTATIONS.items():
         mutated = mutated.replace(find, replace)
 
     try:
-        try:
-            mutant = load_module(mutated, clause)
-        except Exception as exc:
-            # A reversion that leaves the module unable to COMPILE or import
-            # is the same non-measurement as one that raises at call time --
-            # most often a deleted block header orphaning its body.
-            raise MutantCrashed(f"{type(exc).__name__}: {exc}") from exc
-        flipped = {cid for cid in CASES if verdict(mutant, cid) != EXPECTED[cid]}
-    except MutantCrashed as exc:
-        if expected_flips == CRASH:
-            print(f"  ok   {clause:<22} {statement}\n"
-                  f"         crashed as declared ({exc})")
-            continue
+        mutant = load_module(mutated, clause)
+    except Exception as exc:
+        # A reversion that leaves the module unable to COMPILE or import
+        # measured nothing, whatever the clause declared -- most often a
+        # deleted block header orphaning its body. Never satisfies a
+        # `Crashes(...)` declaration.
         mutation_wrong += 1
         print(f"  WRONG {clause:<22} {statement}\n"
-              f"         MUTANT CRASHED ({exc}) -- the reversion broke the "
-              "module rather than its behaviour; substitute the clause "
-              "instead of deleting it")
+              f"         MUTANT FAILED TO LOAD ({type(exc).__name__}: {exc})"
+              " -- the reversion broke the module rather than its behaviour;"
+              " substitute the clause instead of deleting it")
         continue
-    if expected_flips == CRASH:
+
+    # Every case is evaluated individually. A set comprehension would abort on
+    # the first crashing case, leaving every case ordered after it unmeasured
+    # for that clause.
+    flipped, crashes = set(), {}
+    for cid in CASES:
+        try:
+            if verdict(mutant, cid) != EXPECTED[cid]:
+                flipped.add(cid)
+        except MutantCrashed as exc:
+            crashes[cid] = exc.exc
+
+    if isinstance(expected_flips, Crashes):
+        wrong_type = {cid: e for cid, e in crashes.items()
+                      if not isinstance(e, expected_flips.exc_type)}
+        want = expected_flips.exc_type.__name__
+        if not crashes:
+            note = (f"declared {want} but nothing crashed; the guard it "
+                    "reverts no longer prevents one")
+        elif wrong_type:
+            got = ", ".join(sorted(type(e).__name__ for e in wrong_type.values()))
+            note = f"crashed with {got}, expected {want}"
+        elif set(crashes) != expected_flips.cases:
+            note = (f"crashed on {sorted(crashes)}, expected "
+                    f"{sorted(expected_flips.cases)}")
+        elif flipped:
+            note = f"also flipped {sorted(flipped)}, expected no flips"
+        else:
+            note = f"raised {want} on {sorted(crashes)}, as declared"
+        ok = note.startswith("raised ")
+        mutation_wrong += not ok
+        print(f"  {'ok  ' if ok else 'WRONG'} {clause:<22} {statement}\n"
+              f"         {note}")
+        continue
+
+    if crashes:
         mutation_wrong += 1
+        got = ", ".join(f"{cid} ({type(e).__name__})"
+                        for cid, e in sorted(crashes.items()))
         print(f"  WRONG {clause:<22} {statement}\n"
-              "         declared CRASH but did not crash; the guard it "
-              "reverts no longer prevents one")
+              f"         MUTANT CRASHED on {got} -- undeclared; if the guard "
+              "prevents a crash, declare Crashes(<ExcType>, {{...}})")
         continue
     ok = flipped == expected_flips
     mutation_wrong += not ok

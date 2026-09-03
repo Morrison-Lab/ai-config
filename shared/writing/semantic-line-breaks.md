@@ -220,17 +220,34 @@ Four PRs pushed the same day
 [#3016](https://github.com/Morrison-Lab/ai-config/pull/3016),
 [#3036](https://github.com/Morrison-Lab/ai-config/pull/3036), all merged)
 each carried a scoped `semantic-line-breaks.py` run reporting clean, and
-twice still drew a Copilot finding for clause density on a line the script
-had approved: `shared/workflow/metacognitive-monitoring.md:1057` in #3007
+**three of the four** still drew a Copilot finding citing this convention on
+a line the script had approved.
+Two of those are the clause-density case this entry is about:
+`shared/workflow/metacognitive-monitoring.md:1057` in #3007
 ("uses compound sentences as physical lines ... contrary to this corpus's
-semantic-line-break convention of one clause per line"), and
-`shared/workflow/pr-on-claim.md:275` plus `skills/daytb/SKILL.md:86` in
-#3036 ("diverges from this repo's semantic line break convention (one
-clause per line)").
-Every flagged line joined its clauses with a comma or a coordinating
-conjunction and carried no mid-line semicolon, so the gate's own clause
-rule --- the semicolon predicate documented above --- had nothing to catch
-either.
+semantic-line-break convention of one clause per line"), and, in #3036,
+`skills/daytb/SKILL.md:86`
+("diverges from this repo's semantic line break convention (one clause per
+line)") alongside `shared/workflow/pr-on-claim.md:275`, which asks for the
+same reflow in different words
+("currently written as a few very long lines ... reflow this new block into
+clause/sentence-level line breaks").
+
+The third is a **different mechanism** and is counted separately for that
+reason rather than omitted:
+`memories/r-quarto.md:1053` in #3016 flagged two *sentences* sharing one
+physical line, which is the digit/parenthesis-opener case already recorded
+at [ai-config#2127](https://github.com/Morrison-Lab/ai-config/issues/2127)
+below, not a comma-or-conjunction clause join.
+Naming that split matters because the merged commit message for #3036
+(`52d6fa57`) gets it wrong in the other direction, calling the #3016 and
+#3007 findings "the same finding" raised "twice".
+They are not, and a tally that silently drops one of them is how the
+conflation survives.
+Every line flagged for *clause* density joined its clauses with a comma or a
+coordinating conjunction and carried no mid-line semicolon, so the gate's
+own clause rule --- the semicolon predicate documented above --- had nothing
+to catch either.
 This is the narrower-by-design gap arriving as a review comment instead of
 a CI failure, which the script's own docstring already predicts but no
 prior recurrence here had measured.
@@ -268,8 +285,12 @@ script and the gate at once instead of trading one off against the other.
 
 (Morrison-Lab/ai-config, 2026-09-02.
 Copilot findings read from `gh api
-repos/Morrison-Lab/ai-config/pulls/{3007,3036}/comments`; the rejoin and
-restructure account is from the PRs' own commit messages, not inferred.
+repos/Morrison-Lab/ai-config/pulls/{3007,3016,3036}/comments` --- all three
+that drew one, since a query over only the two clause-density PRs would have
+produced the undercount this entry now warns about.
+#3004 drew none.
+The rejoin and restructure account is from the PRs' own commit messages, not
+inferred.
 Whether the reformatter should learn comma/conjunction clause boundaries
 was considered and declined: that is the
 [ai-config#2586](https://github.com/Morrison-Lab/ai-config/issues/2586)

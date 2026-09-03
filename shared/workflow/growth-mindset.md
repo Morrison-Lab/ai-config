@@ -175,6 +175,55 @@ still the right move, but it is the case where reading it does not help.
 - **Don't:** reach for installing something to get past a sandbox boundary;
   what you install inherits the boundary.
 
+## The remedy can be filed history rather than anything the tool says
+
+The two sections above both read the failing call's own output more closely
+--- the environment it names, the sentence its refusal carries.
+Sometimes there is nothing more to find there, because the remedy was never
+going to be in the tool's output at all.
+It lives in the tracker, as a closed issue recording that the exact same gap
+was hit and solved before, or beside the failing tool, as a sibling script
+built for precisely this case.
+
+`check-pr-fully-clean.py` exits 2 in a remote/web session because `gh` is not
+installed there, and its message names the missing binary and stops.
+Read closely, that message has nothing more to give: no environment
+correction fixes an absent `gh`, and no clause in the refusal points anywhere
+else.
+The natural conclusion is "this instrument is unavailable here", and the
+natural next step is to report the gap or fall back to a weaker check.
+Both skip the move that actually closes it: an all-state issue search for the
+failure turned up three closed issues recording the same collision
+(#1330, #1679, #2441), and the same directory already held the fix --
+`scripts/build-pr-payload.py`, built by #2908 specifically so this script can
+run from a JSON snapshot when `gh` cannot.
+
+What found the remedy was the search, not anything the failing command
+printed.
+The tool's own output was exhausted before the answer showed up, which is
+the tell that the remedy lives outside it: a repo this session has worked in
+before has usually hit a sharp-edged gap before, and the tracker is where
+that history is kept.
+
+- **Do:** before concluding a capability is unavailable, run an all-state
+  issue search for the failure and check the same directory for a sibling
+  script, in addition to reading the tool's own output.
+- **Do:** treat a closed issue on the exact failure as evidence the remedy
+  already shipped, not merely as evidence the gap is known.
+- **Don't:** stop at "the tool's error names no remedy" --- that rules out
+  one place the remedy could live, not every place.
+- **Don't:** let an unavailable-capability finding license skipping the check
+  the tool was supposed to run; a stranded instrument in a repo with an issue
+  tracker usually has a documented workaround one search away.
+
+(Measured 2026-09-03: `check-pr-fully-clean.py` exiting 2 for a missing `gh`
+in this same session, with the remedy found by search rather than by
+anything the script printed.
+The script-side fix --- naming `build-pr-payload.py` in the error message
+itself, so a stranded session finds it without knowing to search --- is
+tracked as Morrison-Lab/ai-config#3113; this section is the behavioural
+half, since the search habit generalizes past this one script.)
+
 ## A limitation you never tested leaves no error to diagnose
 
 The three sections above all begin with a call that was made and came back

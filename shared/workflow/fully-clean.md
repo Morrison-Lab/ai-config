@@ -32,6 +32,69 @@ Do not report a PR/MR fully clean, ready to merge, or merge it until the review 
   findings can appear in an overall review note without a resolvable discussion.
 - **Don't:** let an earlier review's green pipeline or later code push erase an unresolved finding without a reviewer-confirmed clean round.
 
+**Finding a cause for an aggregate rollup signal is not finding all of its causes, and a satisfied explanation is what stops you looking for a second one.**
+`mergeable_state: unstable` (GitHub) or a comparable aggregate integration
+signal is a single value computed from several independent inputs --- a
+pending status check, a stale branch, an unresolved review, more than one
+provider's own required-checks list.
+Chasing it down to one genuine, checkable cause (a pending third-party
+status, say) explains the value completely from the inside: the signal was
+`unstable`, a cause was found, the cause was real, and the reasoning closes.
+Nothing about that chain tests whether it was the *only* input, because a
+rollup does not report which of its several inputs are currently non-passing,
+only that at least one is.
+
+- **Do:** after explaining an aggregate signal with one confirmed cause, ask
+  what else the same rollup can mean before treating it as accounted for ---
+  and re-derive the rollup once the confirmed cause clears, rather than
+  reading its earlier `unstable` reading as now resolved.
+- **Don't:** read "I found a cause for this and it checks out" as "I found
+  the cause" for a value that is, by construction, an aggregate of several
+  independent signals.
+
+(Morrison-Lab/ai-config#3084, 2026-09-03: `mergeable_state: unstable` was
+chased to a pending `jules/review` commit status, which was real and
+correctly diagnosed.
+When that status cleared, `unstable` was treated as explained and the PR was
+merged.
+A Copilot formal review carrying a real, unaddressed finding --- posted to
+the PR's `reviews` list, not as an inline thread --- had submitted on the
+exact head that merged, 4 minutes 47 seconds earlier, and was never read: the
+pre-merge check called `get_review_comments` for threads, never `get_reviews`
+for the formal review itself, and two of those threads being resolved read as
+the review question settled.
+The defect reached `main` and needed a follow-up PR.)
+
+**The rollup trap above has an earlier form:
+naming a cause the signal never confirmed, and reporting that to a human.**
+The trap above needs a real, checked cause before it closes.
+This one needs none.
+[`metacognitive-monitoring`](metacognitive-monitoring.md)'s "Read the artifact that failed, not the one beside it" and "A story that fits the evidence is not a finding" own the mechanism and the remedy:
+proximity is not evidence,
+and a cause no experiment discriminates is reported as not established rather than as the likeliest candidate.
+One thing here is local to a rollup.
+`mergeable_state: blocked` reports that at least one input is non-passing and never which,
+so every input you can see is equally available as an explanation,
+and the field can neither confirm nor refute whichever one you pick.
+
+The other is who acts on it.
+`blocked` prompts a re-check, which costs a query.
+`blocked waiting for your approval` sends a person to approve something that needed no approval,
+and they cannot tell from the message that the cause was inferred rather than derived.
+
+- **Do:** name the field a reported cause came from --- `statusCheckRollup`, `reviewDecision`, the branch-protection endpoint --- none of which is `mergeable_state`.
+- **Don't:** put an underived cause in a sentence someone else will act on;
+  `blocked, cause not yet derived` costs them a query, where a wrong cause costs them an action.
+
+(Measured 2026-09-03 on ai-config#3115:
+a fresh reading of the PR's `mergeable_state` field returned `blocked` while every review sat at `COMMENTED` rather than `APPROVED`,
+and that was reported to the user as branch protection holding the PR for a human approving review.
+Nothing in the field said so.
+Re-queried about an hour later, with no push and no approval between,
+it returned `clean` and the PR merged on the standing grant.
+Which input was non-passing at the first reading was never derived.
+The record establishes only that nothing in the field confirmed the reported cause, which is all the argument needs.)
+
 **In a remote/web session the instrument still runs, and hand-checking the
 axes in its place is not acceptable** (user directive, 2026-08-29,
 ai-config#2441).
@@ -182,9 +245,25 @@ Worked-example case records for the rules below live in
    **Why the two surfaces disagree is unexplained, so do not assert a
    mechanism for it.**
 
+   **`commits/<sha>/status` reports the combined state of an EMPTY status set
+   as `pending`, not `success` or absence --- so a gate that tests the rollup
+   `state` alone reads every PR with no legacy commit statuses as not-clean,
+   which is most PRs in a repo that has none configured.**
+   The condition has to be on the members, not the rollup: `total_count == 0`
+   means no commit statuses exist, which is the ordinary case and not a
+   blocker, while `total_count > 0` with any member `pending` or `failure` is
+   genuinely not-clean --- name the offending `context` when it is.
+   The same `pending` state means opposite things depending on `total_count`
+   alone: `state: pending, total_count: 0, statuses: []` is silence, and
+   `state: pending, total_count: 1, jules/review -- "Jules is reviewing..."`
+   is a real in-flight reviewer.
+
    - **Do:** take the check-run half of criterion 1 from the paginated
      check-runs endpoint, and add `commits/<sha>/status` where the repo uses
      commit statuses, rather than treating either query as sufficient alone.
+   - **Do:** branch on `total_count`, not on the combined `state` alone, when
+     reading `commits/<sha>/status` --- an empty set reports `pending` and is
+     not a finding.
    - **Do:** report both counts when the endpoint and the rollup disagree, so
      the gap stays visible to whoever reads the status next.
    - **Do:** re-derive check state from that endpoint on the PR's current
@@ -199,6 +278,17 @@ Worked-example case records for the rules below live in
      --- [`ardi`](ardi.md)'s superseded-head case is a **red** wake inviting
      a needless fix, and this is its **green**-sounding mirror, inviting a
      needless merge.
+   - **Don't:** treat an empty `commits/<sha>/status` response's `pending`
+     state as a finding --- the check has to read `total_count`, not the
+     rollup, or the ordinary case (no commit statuses at all) reads as
+     blocking on every PR.
+
+   (Morrison-Lab/ai-config#3106, 2026-09-03: the issue's own suggested fix
+   proposed treating a `pending` combined state as not-clean, then a
+   follow-up comment on that same issue caught that the suggestion would
+   misfire on most PRs, an hour after it was written --- the rollup-versus-
+   population bug this section already warns about, reintroduced into the
+   proposed fix for it.)
 
    **A paginated sweep with an inconsistent page size silently skips items, and every response still reads as complete coverage.**
    `--paginate` above is the CLI answer;

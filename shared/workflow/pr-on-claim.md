@@ -23,6 +23,15 @@ cross-referenced **open PRs** --- the check `gi` runs before grabbing an issue.
 git fetch origin main -q
 git checkout -b <type>/<slug> origin/main
 git commit --allow-empty -m "start: <issue title> (closes #<N>)"
+```
+
+Then push and open the PR.
+Keep the push out of the commit's own Bash call
+(see [`check-before-pushing`](check-before-pushing.md)'s "Keep the commit in its own Bash call"):
+a `PreToolUse` deny rejects the whole invocation,
+so a refused push discards the commit with it.
+
+```bash
 git push -u origin HEAD
 gh pr create --draft --title "<title>" --body "Closes #<N>
 

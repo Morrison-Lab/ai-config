@@ -75,6 +75,8 @@ jobs:
         run: python3 scripts/test_check_unpinned_git_fixtures.py
       - name: Run check-pr-fully-clean tests
         run: python3 scripts/test_check_pr_fully_clean.py
+      - name: Run check-review-body tests
+        run: python3 scripts/test_check_review_body.py
       - name: Check regex patterns for catastrophic backtracking
         run: python3 scripts/check_regex_patterns.py
       - name: Run regex pattern check tests
@@ -151,6 +153,10 @@ jobs:
       - name: Run markdown fences library tests
         # ai-config#2540: scripts/lib/fences.py code block and code span parsing.
         run: python3 scripts/test_fences.py
+      - name: Run shell-command library tests
+        # ai-config#2992: scripts/lib/shellcmd.py argv splitting, heredoc
+        # blanking, and git-invocation classification.
+        run: python3 scripts/test_shellcmd.py
       - name: Run check-rendered-references tests
         # ai-config#2879: verify broken rendered reference checking and footnote isolation.
         run: python3 scripts/test_check_rendered_references.py

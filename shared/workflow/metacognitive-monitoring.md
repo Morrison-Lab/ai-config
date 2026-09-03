@@ -1278,6 +1278,61 @@ unrelated ternary that told every such run it had been triggered by a mention
 that did not exist.
 Three defects, one shape, one direction named.)
 
+## A rule's example is read as its scope, not as one instance of it
+
+The section above is a rule that named one *direction* and got read as
+covering every direction.
+This is the sibling failure, over a rule that named one *instance* and got
+read as bounded to that instance's incidental attribute --- a property the
+example happened to carry, which the rule's own mechanism never depended on.
+
+A rule stated as "a human's `CHANGES_REQUESTED` can be invisible to a
+comments-only scan" is really about two things that have nothing to do with
+being human: a **formal review** (an API surface separate from issue
+comments) whose finding lives in the **body or an inline comment** rather
+than as an unresolved thread.
+`CHANGES_REQUESTED` and "human" are the example's incidental attributes ---
+true of the case that prompted the rule, no part of why the blind spot
+exists.
+A bot's `COMMENTED` review with the same shape (a real finding, no open
+thread) is exactly the case the rule already covers, worded in a way that
+reads as excluding it.
+
+The tell is the same shape [`challenge-ambiguous-terminology`](challenge-ambiguous-terminology.md)
+names for a term whose meaning is unresolved, aimed at a rule instead of a
+word: read the rule's own justification, not its example, and ask which
+words in the example the justification actually depends on.
+Here the justification is "a finding can live outside the thread population
+entirely" --- nothing about *who* posted it or *what state* the review
+carries is load-bearing to that sentence, so neither belongs in the rule's
+effective scope even though both appear in its wording.
+
+- **Do:** before applying a rule illustrated by one example, name which of the
+  example's attributes the rule's own justification actually depends on, and
+  apply it to every case sharing those, not only to cases matching the
+  example verbatim.
+- **Do:** widen a rule's *wording* once an excluded case is found to fit its
+  justification, the same remedy the section above prescribes for a
+  direction --- don't just handle the one instance and leave the next reader
+  to re-derive the same gap.
+- **Don't:** read a rule narrower than its own reasoning because the example
+  that motivated it happened to carry a more specific attribute.
+
+(Morrison-Lab/ai-config#3084, 2026-09-03: a session had `CLAUDE.md`'s
+formal-review-checking section loaded in context --- worded around "a
+human's `CHANGES_REQUESTED`" --- while reading a Copilot review whose state
+was `COMMENTED`.
+The rule was not applied, on the reading that it named a human reviewer and
+a different state.
+Its own justification (a formal review's finding can live outside the
+thread population) covered the bot review exactly, and did not name either
+excluded attribute.
+The source rule is this repo's own [`CLAUDE.md`](../../CLAUDE.md), so the fix
+belongs here: filed as
+[`ai-config#3121`](https://github.com/Morrison-Lab/ai-config/issues/3121),
+with [`ucdavis/bcs#901`](https://github.com/ucdavis/bcs/issues/901) covering
+that repo's copy of the same wording.)
+
 ## A story that fits the evidence is not a finding
 
 The section above governs a cause read off the wrong artifact.
@@ -1318,3 +1373,60 @@ A controlled re-run falsified both: each checker version returned identical
 verdicts on the same inputs.
 Both stories fit every reading, and the actual cause was never established ---
 which is what the report should have said in the first round.)
+
+## Your own most recent change is a cause claim too, and self-blame is what exempts it
+
+This is a **specialization of the section directly above**, not a fourth independent rule, and saying which one is the point.
+"A story that fits the evidence is not a finding" asks what observation a rival story would not predict.
+This section is that experiment, run against one specific candidate cause: your own last change.
+
+The candidate is naming **your own** diff as what broke the thing, when the only evidence is that the defect sits inside the code you just touched.
+Proximity is doing the work, exactly as it does when a cause is read off the artifact beside the one that failed.
+A function you reworked an hour ago is the most available explanation for any defect found in that function, and availability is not evidence.
+
+What earns it a section is the second mechanism, which the rules above do not carry: the claim comes out as an **admission**.
+"That is a regression of my own fix" reads as candour, so it draws credit rather than scrutiny, and nobody --- including you --- asks the question the **cause** claim-type at the top of this fragment prescribes.
+An external attribution invites pushback, so someone argues with it;
+a self-attribution invites none, so nobody does.
+
+**That is a claim about who checks it, not about whether it survives**, and the case below is why the distinction has to be drawn carefully: there an external reviewer caught the self-attribution, and the corpus entry you are reading exists because they did.
+So the review layer works, and the claim is not that a self-attribution reaches the record --- it is that no check runs at the moment of writing, which is the only moment a lone author has.
+Read the case as evidence for the author-time check rather than against it: the cost of skipping it was a round trip and a reviewer's attention, and on work nobody reviews it would have been the whole of the error-detection budget.
+
+That mechanism is stated twice already, in this fragment's **rationale** companion rather than in the fragment itself, which is worth knowing because the sections it belongs to do not carry it.
+[`metacognitive-monitoring.rationale.md`](metacognitive-monitoring.rationale.md) gives it for a self-declared deviation --- an agent that names its own departure reads as candid, and candour reads as diligence, so the disclosure discharges the suspicion it should create --- and again for a self-directed retraction, which reads as an admission against your own interest, "the last kind of sentence anyone thinks to verify".
+Its companion section here, "Calling your own note stale is a state claim about that note", argues from something else entirely: that staleness is a convenient explanation for a failure you have not diagnosed.
+So this is the third statement of the candour mechanism and the first inside the fragment proper, which is the gap it fills.
+Read across the three, the generalization is that a claim's **direction** decides whether it gets checked, independently of its type --- which is why each claim-type needs its own self-directed case rather than inheriting one.
+
+The cost that matters is not the reputational one.
+It is that a defect **older** than your change gets filed as introduced by it, so nobody looks for how long it has been shipping or what else the same root cause reaches, and a written record now says the bug's lifetime began at your commit.
+A wrong exculpation and a wrong inculpation are the same error with the same remedy;
+only the first one feels like a claim while you are making it.
+
+The check is one command, because the counterfactual is already in the repository.
+Run the code as it stood **before** your change against the same input.
+When the old version reproduces the defect, the change did not cause it;
+when it does not, it did.
+
+```bash
+git show <parent>:<path> > /tmp/old.py   # then exercise it directly
+```
+
+**That one-file form holds only while the file is self-contained.**
+Where the same commit also changed something the file imports, or something that imports it, the extracted copy either fails to import or --- worse --- imports the **new** sibling and runs as a hybrid that is neither the real before nor the real after, returning a confident verdict either way with nothing signalling the mixture.
+Check what else the commit touched before trusting it, and check out the whole tree instead when it touched anything adjacent:
+
+```bash
+git worktree add /tmp/before <parent>    # then exercise it there
+```
+
+That reading is what "the reviewer said it predated my fix and they are right" must rest on, rather than on the reviewer's authority --- a reviewer's causal claim is a cause claim under this same rule, and deferring to it is not checking it.
+Where the routes differ but the observable defect is identical, say so: pre-existing by a different mechanism is a third answer, and it was the true one in the case this section was written from.
+
+- **Do:** run the pre-change version against the failing input before writing that your change caused something.
+- **Do:** report "pre-existing, reached by a different route" when that is what the counterfactual shows.
+- **Don't:** treat an admission as exempt from the cause check --- candour is a property of the tone, not of the evidence.
+- **Don't:** accept a reviewer's attribution, in either direction, without the same counterfactual you would demand of your own.
+
+See [`metacognitive-monitoring.cases.md`](metacognitive-monitoring.cases.md), "A defect attributed to the fix that merely sits beside it".

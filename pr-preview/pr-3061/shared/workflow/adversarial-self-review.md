@@ -248,16 +248,21 @@ The rule above is about what the reviewer sees.
 This rule is about what should never reach the reviewer:
 a defect the repo's own deterministic checker already catches.
 
-A prose diff has several mechanically checkable style classes,
-and each has an instrument:
-semantic line breaks (a checker),
-line length (an `awk` pass),
-forward references (a grep),
-and ambiguous pronouns (a scan).
-Each is cheap and deterministic,
+Some of a prose diff's style classes have an instrument and some do not.
+In this repo the instruments are
+the vendored semantic line-break checker
+(`scripts/vendor/gha-check-new-line-breaks.py`, which is what CI runs:
+one sentence per line, plus a clause rule for a long line with a mid-line semicolon),
+`markdownlint`,
+`scripts/check-links.py`,
+and the directional-word grep the [`fix-forward-references`](../../skills/fix-forward-references/SKILL.md) skill runs.
+An ambiguous pronoun has no detector, per [`ambiguous-reference`](../writing/ambiguous-reference.md),
+so that class stays with the reviewer,
+though a grep for sentence-initial pronouns narrows where to look.
+Each instrument is cheap and deterministic,
 and each runs in seconds.
 That speed is not a reason to skip the adversarial round.
-That speed is the reason the round should never be the first thing that finds a style defect,
+That speed is the reason the round should never be the first thing that finds a defect an instrument covers,
 per [`algorithmatize-checks`](algorithmatize-checks.md).
 An adversarial round costs real tokens and real time.
 Spending a round on a defect a repo script would have caught for free
@@ -273,8 +278,8 @@ down to what only judgment can catch,
 not to teach the reviewer that style is someone else's job.
 
 - **Do:** run the repo's own style checkers on the diff
-  (the semantic line-break checker, a line-length pass, the forward-reference grep,
-  an ambiguous-pronoun scan, or whatever the repo defines)
+  (the semantic line-break checker, `markdownlint`, the link checker,
+  the forward-reference grep, or whatever the repo defines)
   and fix their output before the first adversarial dispatch.
 - **Do:** brief the reviewer to report every finding in one round
   rather than holding style findings for a later pass.
@@ -288,12 +293,12 @@ a 20-line addition to `memories/reviewing-prs.md`.
 Four adversarial-reviewer rounds ran, each costing roughly 210k tokens.
 Round 1 found a misattributed citation plus word-wrapped lines.
 Round 2 found an ambiguous "It" and a forward-pointing "below".
-Round 3 found lines of 140 to 241 characters.
+Round 3 found lines that ran several clauses together.
 Round 4 was clean.
-Every style class in the first three rounds was mechanically checkable before dispatch,
-by the semantic line-break checker, an `awk` line-length pass,
-the `fix-forward-references` grep, and an ambiguous-pronoun scan.
-Running those instruments first would have collapsed the four rounds to at most two.)
+The word-wrapped and run-together lines were the semantic line-break checker's territory,
+and the forward-pointing "below" was the forward-reference grep's;
+only the citation and the pronoun needed a reader.
+Running those two instruments first would have collapsed the four rounds to at most two.)
 
 ## Its findings are findings
 

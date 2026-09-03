@@ -199,6 +199,15 @@ jobs:
         # sweep in CI would prove nothing. Its classification logic is pure
         # over the GraphQL payload shape, so the tests cover it offline.
         run: python3 scripts/test_pr_sweep.py
+      - name: Run PR-scope tests
+        # Only the tests run here. pr-scope.py's --repo mode shells out to
+        # `gh`, which a runner cannot do unauthenticated, but its predicate
+        # is pure over the PR payload shape, so the table covers every arm
+        # offline -- including the negative control, which asserts that a
+        # classifier with the exclusion veto removed lets vetoed PRs
+        # through. A table that cannot fail is indistinguishable from one
+        # that never ran.
+        run: python3 scripts/test_pr_scope.py
       - name: Run PR-overlap tests
         # Same reasoning as pr-sweep above: only the tests run here, since
         # pr-overlap.py queries the GitHub API via `gh`. Its classification,

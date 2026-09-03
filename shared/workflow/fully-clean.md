@@ -68,21 +68,29 @@ The defect reached `main` and needed a follow-up PR.)
 **The rollup trap above has an earlier form: naming a cause the signal never confirmed, and reporting that to a human.**
 The trap above needs a real, checked cause before it closes.
 This one needs none.
-[`metacognitive-monitoring`](metacognitive-monitoring.md)'s "Read the artifact that failed, not the one beside it" and "A story that fits the evidence is not a finding" own the mechanism and the remedy: proximity is not evidence, and a cause no experiment discriminates is reported as not established rather than as the likeliest candidate.
+[`metacognitive-monitoring`](metacognitive-monitoring.md)'s "Read the artifact that failed, not the one beside it" and "A story that fits the evidence is not a finding" own the mechanism and the remedy:
+proximity is not evidence,
+and a cause no experiment discriminates is reported as not established rather than as the likeliest candidate.
 One thing here is local to a rollup.
-`mergeable_state: blocked` reports that at least one input is non-passing and never which, so every input you can see is equally available as an explanation, and the field can neither confirm nor refute whichever one you pick.
+`mergeable_state: blocked` reports that at least one input is non-passing and never which,
+so every input you can see is equally available as an explanation,
+and the field can neither confirm nor refute whichever one you pick.
 
 The other is who acts on it.
 `blocked` prompts a re-check, which costs a query.
-`blocked waiting for your approval` sends a person to approve something that needed no approval, and they cannot tell from the message that the cause was inferred rather than derived.
+`blocked waiting for your approval` sends a person to approve something that needed no approval,
+and they cannot tell from the message that the cause was inferred rather than derived.
 
 - **Do:** name the field a reported cause came from --- `statusCheckRollup`, `reviewDecision`, the branch-protection endpoint --- none of which is `mergeable_state`.
 - **Don't:** put an underived cause in a sentence someone else will act on;
   `blocked, cause not yet derived` costs them a query, where a wrong cause costs them an action.
 
-(Measured 2026-09-03 on ai-config#3115: a fresh reading of the PR's `mergeable_state` field returned `blocked` while every review sat at `COMMENTED` rather than `APPROVED`, and that was reported to the user as branch protection holding the PR for a human approving review.
+(Measured 2026-09-03 on ai-config#3115:
+a fresh reading of the PR's `mergeable_state` field returned `blocked` while every review sat at `COMMENTED` rather than `APPROVED`,
+and that was reported to the user as branch protection holding the PR for a human approving review.
 Nothing in the field said so.
-Re-queried about an hour later, with no push and no approval between, it returned `clean` and the PR merged on the standing grant.
+Re-queried about an hour later, with no push and no approval between,
+it returned `clean` and the PR merged on the standing grant.
 Which input was non-passing at the first reading was never derived.
 The record establishes only that nothing in the field confirmed the reported cause, which is all the argument needs.)
 

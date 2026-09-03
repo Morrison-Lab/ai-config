@@ -173,7 +173,6 @@ print("%-7s a reply arguing AGAINST the deletion still fires (documented "
 # Linearity. An earlier draft paired two adjacent lazy stars and took 14.3s on
 # a 40,000-character line, against this hook's declared 10s timeout, on the
 # SILENT path -- a reply merely quoting config paths would have burned it.
-import re as _re
 import time as _time
 _src = open(HOOK, encoding="utf-8").read()
 _ns = {"__name__": "_probe"}

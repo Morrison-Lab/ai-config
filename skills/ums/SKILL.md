@@ -111,8 +111,15 @@ committed pass.
      runs to hundreds or a thousand-plus lines, so an existing entry on the
      same subject can sit far away in an unrelated cluster and never enter
      your view.
-     Grep the whole `memories/` directory rather than one file --
-     a fact can plausibly sit in either of two adjacent topical files.
+     Grep the whole corpus rather than one file, and rather than only
+     `memories/` -- a fact can sit in either of two adjacent topical files,
+     and just as easily in a `shared/` fragment or a skill:
+     `grep -ril "<keywords>" shared/ memories/ skills/ scripts/ hooks/ CLAUDE.md`,
+     the same query [`skill-builder`](../skill-builder/SKILL.md) step 0 runs.
+     Stopping at `memories/` is the commonest way this check runs to
+     completion and still misses: the destination is a memory file, so every
+     later instruction reads as relative to `memories/`, and a `shared/`
+     fragment owning the same idea never enters view.
      When one exists, extend it in place; don't add a second bullet.
      (ai-config#689: a `list_workflow_runs` cost bullet went in next to the
      related `get_check_runs` guidance while an entry on the same tool already
@@ -133,8 +140,8 @@ committed pass.
      Prior: `shared/writing/semantic-line-breaks.md` ai-config#1291;
      `shared/workflow/review-verdict-pitfalls.md` ai-config#811).
    - **When step 2 routed the item to a repo other than ai-config, grep the
-     ai-config corpus too** -- "the whole `memories/` directory" above means
-     the *destination's*, so a repo-local entry can duplicate or contradict a
+     ai-config corpus too** -- "the whole corpus" above
+     means the *destination's*, so a repo-local entry can duplicate or contradict a
      fragment nobody thought to search from that repo.
      See
      [`grep-is-not-coverage`](../../shared/workflow/grep-is-not-coverage.md)'s

@@ -157,9 +157,9 @@ Deciding where a learning belongs is a real step ---
 [`ums`](../../skills/ums/SKILL.md) step 2 routes each item either to ai-config
 or to the owning repo's own agent docs --- and once an item is routed to a repo
 we own, every later instruction reads as relative to *that* repo.
-Step 3's "grep the whole `memories/` directory" then means the destination's
-`memories/`, so the dupe check runs to completion, finds nothing, and never
-looked at ai-config at all.
+Step 3's "grep the whole corpus" then means the destination's,
+so the dupe check runs to completion, finds nothing,
+and never looked at ai-config at all.
 
 The asymmetry is why this needs naming separately from the null-result case.
 A repo-local memory in some other repo is precisely the place nobody thinks to
@@ -193,6 +193,31 @@ to disprove it.
 The verification half of the same incident --- attempting the base form of a
 command and generalizing to a flag never passed --- is recorded separately in
 Morrison-Lab/ai-config#1174.)
+
+**The same failure has a same-repo sibling that needs no second repo at all: the wrong *directory*.**
+Everything above turns on a routing decision between repos, so it reads as a cross-repo rule and is filed under one.
+The mechanism does not require two repos.
+It requires only that some earlier decision fixed a location, after which every later instruction is read relative to it.
+Routing an item to a memory file does exactly that: the destination is under `memories/`, so the dupe check searches `memories/`, and a `shared/` fragment or a skill owning the same idea is never in view.
+The check runs to completion and returns a clean, correctly-constructed zero.
+
+It is worth separating because the remedy differs.
+The cross-repo case is fixed by adding a corpus;
+this one is fixed by widening within the corpus you are already in, which no amount of care about *which repo* will prompt.
+The corpus already owns the right query, in the sibling procedure ---
+[`skill-builder`](../../skills/skill-builder/SKILL.md) step 0 greps `skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md`,
+where [`ums`](../../skills/ums/SKILL.md) step 3 long read "the whole `memories/` directory" and stopped there.
+`CLAUDE.md` names both procedures as the same trigger, and their queries differed.
+
+- **Do:** grep every directory the corpus spans, not the one the destination sits in.
+- **Don't:** read "the whole directory" as thorough --- the word doing the damage is the directory name, not the word "whole".
+
+(Recorded 2026-09-03 on [ai-config#3060](https://github.com/Morrison-Lab/ai-config/pull/3060), where a markdownlint entry was added to `memories/markdownlint.md` while `shared/writing/semantic-line-breaks.md` already carried the same collision in three places, one of them a full section.
+The checkable part is what the wider grep would have done.
+`grep -ril "issue reference" memories/` returns four files and none of them is the owner, because the owner is `shared/writing/semantic-line-breaks.md` and no search of `memories/` can reach it.
+So this is not the old step 3 merely going unfollowed: following it exactly, over the whole of `memories/`, still misses.
+Note also why this section's own `Do` could not have caught it.
+It reads "grep the ai-config corpus as well as the destination repo's docs, **whenever step 2 routes an item anywhere other than ai-config**", and this item was routed to ai-config, so its trigger never fires.)
 
 ## An unmerged PR is part of the corpus a citation can be corroborated against, and no default-branch search reaches it
 

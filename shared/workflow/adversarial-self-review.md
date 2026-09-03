@@ -411,7 +411,10 @@ pushing branch A afterward compares its shipped commit `X` against the held `Y`,
 **The harness appends an `agentId:` trailer to a subagent's report, USUALLY as its own block and rarely concatenated onto the last line.**
 The frequency is the point, and an earlier draft of this section got it backwards by generalizing from the two dispatches it happened to watch.
 
-Measured 2026-09-02 over this machine's whole transcript corpus, 565 files:
+Measured 2026-09-02 over 565 session transcripts matching `~/.claude/projects/*/*.jsonl`.
+That glob is the flat session files only;
+a recursive walk of the same tree also reaches each session's `subagents/*.jsonl` and roughly doubles the population.
+An independent re-run swept the recursive set and found the same zero, so the conclusion holds --- but the glob is stated because a fragment arguing "measured rather than assumed" should say what it measured:
 
 ```
 trailer as its own content block : 334
@@ -448,7 +451,9 @@ So the hazard is real and it is a **truncation** hazard rather than a suffix haz
 A wrong sha refuses the push with "the clean verdict is for commit X, but this push would ship Y" --- a message that reads as a stale verdict and is nothing of the kind.
 
 The remedy costs one line either way, and is cheap insurance rather than a fix for a demonstrated break at 40 characters.
-The block below is the TAIL of a report whose JSON payload precedes it, not a whole report --- the payload stays last under this file's own contract:
+The block below is a report's TAIL, not a whole report.
+It shows the REORDERED ordering described above --- verdict and fingerprint after the payload --- which is the shape the sentinel exists for and the shape this file's "Structured review data" section rules out.
+A conforming report puts the payload last, needs no sentinel, and is what [#3050](https://github.com/Morrison-Lab/ai-config/issues/3050) has to settle:
 
 ```
 Verdict: <phrase>

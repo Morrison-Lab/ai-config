@@ -1307,8 +1307,8 @@ That is elimination rather than measurement, and this section's own bullets say
 to report it as such.
 What it cannot establish is which reading each original run produced, because
 none was captured.
-ai-config#3022 was closed after review falsified two successive stated causes;
-#3032 was closed for that and for a guard that was a no-op at a third layer.)
+ai-config#3022 was closed after review falsified two successive stated causes,
+and ai-config#3032 for that plus a guard that was a no-op at a third layer.)
 
 **A sync-only push invalidates a clean verdict just as thoroughly as a code push, and arming auto-merge after a sync violates the HEAD review gate.**
 When `main` moves and a direct merge is refused because the branch is not up to date,

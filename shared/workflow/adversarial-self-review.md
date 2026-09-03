@@ -242,6 +242,49 @@ That is [`learn-from-review-findings`](learn-from-review-findings.md)'s converge
 - **Don't:** count a verdict that cites prior rounds in its justification as a fully independent round;
   that much of it is a re-reading of the rounds it names, however hard the rest of it worked.
 
+## Run every mechanical style instrument before dispatching, not after
+
+The rule above is about what the reviewer sees.
+This one is about what should never reach it: a defect a repo's own
+deterministic checker already catches.
+
+A prose diff has several mechanically-checkable style classes --- a semantic
+line-break checker, a line-length pass, a forward-reference grep, an
+ambiguous-pronoun scan --- each cheap, deterministic, and running in seconds.
+None of that is a reason to skip the adversarial round; it is a reason the
+round should never be the first thing that finds one of these, per
+[`algorithmatize-checks`](algorithmatize-checks.md).
+An adversarial round costs real tokens and real time, and spending a round on
+a defect a repo script would have caught for free is the same waste
+`algorithmatize-checks` names for any other check a human re-derives by hand
+--- reviewer judgment substituting for an instrument that already exists.
+
+So run every available mechanical style instrument on the diff, and fix what
+it finds, **before** the diff goes to the adversarial reviewer.
+And brief the reviewer to report every finding it has in one round, style
+findings included, rather than holding some back --- the point of running the
+instruments first is to keep the round's own findings down to what only
+judgment can catch, not to teach the reviewer that style is someone else's job.
+
+- **Do:** run the repo's own style checkers (NLB, line-length, forward
+  references, ambiguous pronouns, or whatever the repo defines) on the diff
+  and fix their output before the first adversarial dispatch.
+- **Do:** brief the reviewer to report every finding in one round rather than
+  holding style findings for a later pass.
+- **Don't:** let the adversarial reviewer be the first detector of a defect a
+  mechanical instrument already checks for.
+
+(Measured 2026-09-02 driving `Morrison-Lab/ai-config#3025`, a 24-line
+addition to `memories/reviewing-prs.md`.
+Four adversarial-reviewer rounds ran, each costing roughly 210k tokens: round
+1 found a misattributed citation plus word-wrapped lines, round 2 found an
+ambiguous "It" and a forward-pointing "below", round 3 found lines of
+140--241 characters, round 4 was clean.
+Every style class in rounds 1--3 was mechanically checkable before dispatch
+--- the NLB checker, an `awk` line-length pass, the `fix-forward-references`
+grep, and an ambiguous-pronoun scan --- and running them first would have
+collapsed the four rounds to at most two.)
+
 ## Its findings are findings
 
 [`self-review-fallback`](self-review-fallback.md) already rules out surfacing a defect in your own review and closing it on your own estimate of its blast radius.

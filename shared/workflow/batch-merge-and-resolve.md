@@ -436,6 +436,47 @@ whose pass path print the same thing is not yet a check.
 - **Don't:** report a zero matrix as "no collisions" when nothing established
   that the detector can produce a non-zero.
 
+### A merge-simulation content check needs the same control, in a different shape
+
+The section above validates a *conflict detector's* zero.
+The same gap opens one step later, when the check is not "did this pair
+conflict" but "did the merge preserve a specific correction" --- checking a
+scratch-merged result for whether an earlier fix survived, before trusting it
+enough to squash-merge a real PR on top of it.
+
+A grep for the text a correction **removed**, returning `0`, reads as "the
+correction is intact".
+That grep is not the presence check the claim actually needs.
+Absence of the old sentence is equally consistent with two very different
+merges: one where the fix survived, and one where the whole passage --- fix
+included --- was dropped or never merged in at all.
+An absence check cannot tell those apart, for the same reason a matrix of
+zeros above cannot tell a clean sweep from a detector that never ran: neither
+was ever confirmed capable of producing a non-zero.
+
+The positive control here is not a known-conflicting pair --- there is no
+conflict detector in play --- it is a grep for text the correction **added**.
+A non-zero hit on the merged result confirms the fix's replacement text is
+actually present, which the absence check alone never can.
+
+- **Do:** pair every absence grep on a merge result (for text a correction
+  removed) with a presence grep (for text that correction added), and require
+  both to read as expected before trusting the merge.
+- **Don't:** read a zero count on removed text as proof a correction survived
+  the merge --- it is equally consistent with the correction never having
+  landed at all.
+
+(Measured 2026-09-02 on `Morrison-Lab/ai-config`.
+Before squash-merging PR #3029, whose base predated #3036's mid-file
+correction to `shared/workflow/pr-on-claim.md`, a scratch worktree merged
+`origin/main` + #3010 + #3029 and grepped the result for the sentence #3036
+had removed, getting `0` and reading that as "correction intact".
+A peer session pointed out that `0` is an absence check and cannot
+distinguish "correction intact" from "whole passage dropped by the merge".
+The positive control --- a grep for "read a non-empty two-dot", the phrase
+#3036 added --- returned `1` on the same merged `main`, which is what
+actually confirmed the fix survived.)
+
 ## A `merge=union` driver makes the batch pass more necessary, not less
 
 [`configure-gitattributes`](../../skills/configure-gitattributes/SKILL.md)

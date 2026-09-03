@@ -37,7 +37,11 @@ The four body-level facts that decide a body's fate, each computed by
   * whether the checker skips it outright -- an ARD disposition summary, or a
     workflow notice `is_non_review_notice` recognises. The two are reported
     separately as well as combined, because they are different mistakes to
-    have made and the combined boolean alone does not say which one fired;
+    have made and the combined boolean alone does not say which one fired.
+    This is the one bullet with an asterisk on "OWN code": the checker inlines
+    its ARD test at `check-pr-fully-clean.py:2555` and exposes no function for
+    it, so the phrase is duplicated here and a test asserts the checker's
+    source still contains it;
   * whether `_is_structured_review_body` reads it as a report -- a report
     heading AND a `Reviewed-Commit:` fingerprint;
   * what `classify_verdict` makes of it: clean, not-clean, unreadable, or no
@@ -56,12 +60,20 @@ Note what is NOT being said about the marker check, because an earlier
 revision of THIS paragraph said it and it is false. `has_review_body_marker`
 is not a branch in `check_review_comments`, and it is reached during
 admission all the same: `is_non_review_notice` calls it
-(`check-pr-fully-clean.py:451`) as a precedence guard, and it decides the
-case. Measured -- `Claude Review Dispatched` followed by
-`Verdict: Ready for merge` is admitted, the same notice without the verdict
-line is skipped, and the marker function is the only difference. So the
-reason it is absent here is that this tool does not compute it, not that the
-checker does not consult it.
+(`check-pr-fully-clean.py:451`) as a precedence guard, and it decides that
+function's answer. Measured -- `Claude Review Dispatched` followed by
+`Verdict: Ready for merge` SURVIVES the notice skip, the same notice without
+the verdict line is skipped outright, and `has_review_body_marker` is the only
+difference to `is_non_review_notice`'s answer. So the reason the marker check
+is absent from the list above is that this tool does not compute it, not that
+the checker never consults it.
+
+Surviving the skip is not admission, and the distinction matters here rather
+than being a quibble. That body is clean and unstructured, so for the non-bot
+author this tool models it is DROPPED a few lines later at the clean branch;
+only a bot author admits it. Adding the verdict line also flips
+`classify_verdict` from nothing to clean, which is why the "only difference"
+above is scoped to one function rather than to the outcome.
 
 Documenting a debugging tool as reporting something it does not is the one
 docstring error that costs a reader an hour -- and asserting a gate is
@@ -156,6 +168,13 @@ def analyse(body, mod):
     # a verdict.
     ard_summary = "ard review disposition summary" in body.lower()
     checker_notice = bool(mod.is_non_review_notice(body))
+    # The one duplicated literal in this file. `is_non_review_notice` is a
+    # function and gets called; the ARD test is inlined at
+    # check-pr-fully-clean.py:2555 and cannot be. `test_check_review_body.py`
+    # asserts the checker's source still contains this exact phrase, so the
+    # drift `load_classifier`'s docstring warns about fails a test rather than
+    # silently mispredicting.
+    #
     # Reported separately as well as combined. They are two different skips
     # with two different remedies, and a single conflated boolean tells a
     # drafter their body is ignored without saying which to fix.

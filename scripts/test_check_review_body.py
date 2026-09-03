@@ -146,11 +146,20 @@ for sym in ("classify_verdict", "_unresolved_finding_pattern",
             "_is_structured_review_body", "is_non_review_notice"):
     check(f"classifier exposes {sym}", hasattr(MOD, sym), True)
 
-# The docstring states this count in prose, twice. Pinned rather than
+# The docstring states this count in prose. Pinned rather than
 # timestamped, because `FINDING_PATTERNS` is edited whenever a new not-clean
 # shape is added and nothing else would notice the prose going stale.
 check("the finding-pattern count the docstring states",
       len(MOD.FINDING_PATTERNS), 18)
+# The one thing this tool copies rather than calls. The checker inlines its
+# ARD test, so `analyse` duplicates the phrase -- and a duplicate that nothing
+# pins is exactly the drift `load_classifier`'s docstring forbids. Asserted
+# against the checker's SOURCE, since there is no function to call.
+_CHECKER_SRC = open(
+    os.path.join(HERE, "check-pr-fully-clean.py"), encoding="utf-8").read()
+check("the checker still inlines the ARD phrase this tool copies",
+      '"ard review disposition summary" in body_lower' in _CHECKER_SRC, True)
+
 check("the findings heading is one of them",
       MOD._FINDINGS_HEADING_PATTERN in MOD.FINDING_PATTERNS, True)
 

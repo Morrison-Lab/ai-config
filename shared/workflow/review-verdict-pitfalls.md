@@ -199,6 +199,23 @@ Trace the dispatched run and read its verdict, per [`memories/claude-bot-workflo
 (`ucdavis/bcs`, 2026-08-13: `ai-review / select-and-review` read green on two PRs while the gemini run it had dispatched failed and no verdict existed on either.
 Filed upstream as `ucdavis/bcs#619` and `#620`.)
 
+**Second occurrence of this class, and a harder one: the dispatcher can itself report `skipped`, so even the trace-the-workflow discriminator above has nothing to follow into.**
+The case above assumes the dispatcher ran and fired something, so tracing its workflow finds the run it fired.
+A dispatcher gated by its own `if:` --- a trusted-sender check, a self-edit guard, a fork or draft exclusion --- can decide not to fire at all, and then it reports `skipped` rather than `success`, with no downstream run for anything to trace into.
+That makes the review's own terminal checks --- `review / claude-review`, `require-review`, `require-clean-verdict`, or whatever names criterion 2's gate on a given repo --- not merely uninformative, they are **absent from the check-runs population entirely**, on a head where every check that did run is green.
+`gh pr checks`, or any status sweep asking only "is anything red", reads that exactly like an ordinary benign skip.
+
+That is a stronger version of the near-miss [`fully-clean.md`](fully-clean.md) names for an empty `check_runs` payload: there the whole population is empty, so the instrument refuses to score it.
+Here the population is real, complete, and fully green, and the one member that would have said "reviewed" is simply not in it.
+A question of the shape "are any checks failing" cannot see the difference, because absence and success answer it identically --- so the population itself, by name, is the only thing that discriminates them.
+
+- **Do:** derive criterion 2 from the terminal review-gate checks' presence in the check-runs population, by name, on the exact head SHA --- not from the absence of red among whatever checks happen to be there.
+- **Don't:** read a fully-green rollup as satisfying criterion 2 without confirming the review check is a *member* of it;
+  a skipped dispatcher and a passed review both leave nothing red to notice.
+
+(Second occurrence, `ucdavis/bcs`, 2026-09-03: PR #891 at head `e49d47a1d828a108a0aa01bdda7274b0ab5a05c5` carried zero `claude-code-review.yml` runs on its branch and two `ai-code-review.yml` runs, both `event: pull_request`, both `conclusion: skipped` --- so `review / claude-review`, `require-review`, and `require-clean-verdict` never existed as check runs on that head, while every check that did run was green.
+Filed upstream as `ucdavis/bcs#897`.)
+
 **A fourth case: a review job can post a syntactically valid, confidently stated verdict that is nonetheless invalid because it rests on a hallucinated premise about the PR's own state --- not a stub (no verdict) and not a misfire (guard-script/check-conclusion mismatch), but a fabricated fact baked into an otherwise well-formed review.** A reviewer that infers PR state from a commit message rather than querying the PR's actual `state`/`merged` API fields can mistake a routine `Merge remote-tracking branch 'origin/main' into <PR-branch>` commit --- pushed to resolve a sync conflict on the still-open PR branch itself --- for evidence the *PR* was merged into `main`, and confidently report "PR is closed, no action taken" while never actually reviewing the diff. This reads exactly like a legitimate all-clear (a `### Verdict` section is present, the job reports success), so the stub-detection guards described in CLAUDE.md's "Do the review yourself when the @claude workflow doesn't produce a verdict" section don't catch it. Sanity-check any surprising verdict --- especially "nothing to review" or "already merged/closed" --- against the PR's real API state before trusting it, and re-trigger for a genuine review rather than accepting a verdict-shaped comment built on a false premise.
 
 **The fourth case has a variant that hides better, because the false premise is not about the PR at all --- it is about which commits the round was reviewing.**

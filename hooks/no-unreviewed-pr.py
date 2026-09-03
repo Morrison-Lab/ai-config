@@ -695,21 +695,41 @@ def close_ident(cmd):
 
 
 def _argv_probe(argv):
-    """(is_probe, num, repo) for a read-only single-PR status read.
+    """(is_probe, num, repo) for a single-PR status read.
 
-    `gh pr view <N>` / `gh pr checks <N>`. These discharge nothing by
-    themselves -- they are only the CHANNEL through which a PR merged OUTSIDE
-    this session (by a human, or by the merge queue) becomes visible in the
-    transcript. The discharge additionally requires the result body to report a
-    terminal state, and the probe must name a PR number, so a repo-wide
-    `gh pr list` -- whose body mentions many PRs and whose first match need not
-    be the obligation's -- is deliberately NOT a probe.
+    `gh pr view <N>` / `gh pr checks <N>`, or an API call naming ONE pull --
+    `gh api repos/o/r/pulls/<N>`. These discharge nothing by themselves -- they
+    are only the CHANNEL through which a PR retired OUTSIDE this session (by a
+    human, by the merge queue, or by a REST call this hook does not model as an
+    action) becomes visible in the transcript. The discharge additionally
+    requires the result body to report a terminal state, and the probe must name
+    a PR number, so a repo-wide `gh pr list` -- whose body mentions many PRs and
+    whose first match need not be the obligation's -- is deliberately NOT a
+    probe.
+
+    The API arm covers the REST close, `gh api repos/o/r/pulls/<N> -X PATCH -f
+    state=closed`, which is neither a `gh pr` verb nor a structured tool and so
+    reached no other path: the guard stayed armed on a PR the session had just
+    closed (ai-config#3086 review). Method is deliberately NOT constrained here,
+    unlike _argv_request's POST requirement, because reading and writing the
+    state both return the state -- and the discharge is gated on the RESULT
+    reporting a terminal one, so a GET against a still-open PR clears nothing.
+    The path must name the pull ITSELF, with no sub-resource, so
+    `pulls/<N>/requested_reviewers` is not a probe.
     """
-    if not argv or argv[0] != "gh" or len(argv) < 3 or argv[1] != "pr":
+    if not argv:
         return False, None, None
-    if argv[2] in ("view", "checks"):
+    if argv[0] == "gh" and len(argv) >= 3 and argv[1] == "pr" \
+            and argv[2] in ("view", "checks"):
         num, repo = _verb_ident(argv)
         return (num is not None), num, repo
+    api = (argv[0] == "gh" and len(argv) >= 2 and argv[1] == "api") \
+        or argv[0] in ("curl", "wget")
+    if api:
+        for t in argv[1:]:
+            m = RX_CMD_PULL.search(t)
+            if m:
+                return True, m.group(3), f"{m.group(1)}/{m.group(2)}"
     return False, None, None
 
 
@@ -972,6 +992,11 @@ REQ_TOOLS = {"request_copilot_review", "mcp__github__request_copilot_review"}
 PUSH_TOOLS = {"push_files", "mcp__github__push_files",
               "create_or_update_file", "mcp__github__create_or_update_file"}
 CLOSE_TOOLS = {"merge_pull_request", "mcp__github__merge_pull_request"}
+# Structured tools that READ one PR's state. Every other structured path here
+# has an MCP twin and this one did not, so a remote/web session -- where `gh` is
+# not on PATH at all -- had no way to make an outside close visible, and the
+# guard's own prescribed remedy was unrunnable (ai-config#3086 review).
+PROBE_TOOLS = {"pull_request_read", "mcp__github__pull_request_read"}
 
 # A result body reporting that a PR has reached a terminal state -- merged or
 # closed. Tolerates the escaped quotes of a json.dumps'd tool_result, exactly as
@@ -988,12 +1013,17 @@ CLOSE_TOOLS = {"merge_pull_request", "mcp__github__merge_pull_request"}
 # GitHub answers with HTTP 200 and nobody added (ai-config#3086). `closed` is
 # true for a merged PR too, which is correct here: both states are terminal for
 # review purposes, and neither can take a reviewer that ever reviews.
+#
+# The `_?` in `merged_?At`/`closed_?At` covers the REST spellings, since the
+# same field is `mergedAt` in gh's GraphQL-backed `--json` output and
+# `merged_at` in a raw `gh api` body or an MCP `pull_request_read` result. The
+# two channels report the same fact and only one of them was matched.
 RX_TERMINAL_STATE = re.compile(
     r"\\?\"state\\?\"\s*:\s*\\?\"(?:MERGED|CLOSED)\\?\""
     r"|\\?\"merged\\?\"\s*:\s*true"
-    r"|\\?\"mergedAt\\?\"\s*:\s*\\?\"\d"
+    r"|\\?\"merged_?At\\?\"\s*:\s*\\?\"\d"
     r"|\\?\"closed\\?\"\s*:\s*true"
-    r"|\\?\"closedAt\\?\"\s*:\s*\\?\"\d",
+    r"|\\?\"closed_?At\\?\"\s*:\s*\\?\"\d",
     re.I,
 )
 
@@ -1004,6 +1034,13 @@ RX_TERMINAL_STATE = re.compile(
 # whole-string scan -- a decoy PR number chained ahead would otherwise mislabel
 # the obligation (see open_ident).
 RX_CMD_API = re.compile(r"repos/([\w.-]+)/([\w.-]+)/pulls?/(\d+)", re.I)
+
+# The same path with NOTHING after the number, used by _argv_probe to spot an
+# API call about one pull itself rather than about one of its sub-resources.
+# `pulls/1038/requested_reviewers` is a request, not a status read, and must not
+# register as a probe; `pulls/1038` and `pulls/1038?foo=1` must.
+RX_CMD_PULL = re.compile(
+    r"repos/([\w.-]+)/([\w.-]+)/pulls?/(\d+)(?:[?#]|$)", re.I)
 
 # A PR identity carried by a tool RESULT: the PR URL (owner/repo/number), gh's
 # `Pull request owner/repo#N` success line, or a bare `"number"` field.
@@ -1797,6 +1834,14 @@ def scan(path):
                     cn, cr = input_ident(inp)
                     pending_close[tid] = (cn, cr, True)
                     continue
+                if name in PROBE_TOOLS:
+                    # A read, not an action: it discharges nothing by itself.
+                    # Registered exactly like the shell probe, so the same
+                    # gate applies -- the RESULT must report a terminal state
+                    # and must not have failed. Atomic, so `last` is True.
+                    qn, qr = input_ident(inp)
+                    pending_probe[tid] = (qn, qr, True)
+                    continue
                 if name not in SHELL_TOOLS:
                     continue  # never text-match a non-shell tool
 
@@ -2080,11 +2125,17 @@ def main() -> int:
             "adds nobody, so no review ever lands and the verification above "
             "can never succeed -- the obligation is undischargeable by the "
             "means prescribed here (ai-config#3086). This guard clears a "
-            "terminal PR on its own, so seeing this means it has not observed "
-            "the transition: run a single-PR status read, on its own, to make "
-            "the state visible:\n\n"
+            "terminal PR on its own, so seeing this means it has not "
+            "CREDITED the transition -- either the transition never appeared "
+            "in this transcript at all, or the close was chained ahead of "
+            "another command or failed, so its own exit status could not be "
+            "attributed to it. Either way, make the state visible with a "
+            "single-PR status read, as the only command in its call:\n\n"
             "        gh pr view \"<N>\" -R \"<owner>/<repo>\" "
             "--json state,closed\n\n"
+            "    Where `gh` is unavailable (a remote or web session), the "
+            "MCP twin reads the same state: `pull_request_read` with "
+            "method `get`, `pullNumber` <N>, and the owner/repo.\n\n"
             "  * The PR is deliberately a DRAFT -- a draft does not trigger "
             "the review bot (see shared/workflow/pr-on-claim.md). Say so "
             "explicitly.\n"

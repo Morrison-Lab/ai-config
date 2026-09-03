@@ -1246,9 +1246,19 @@ CLOSED = ('{"state":"CLOSED","merged":false,'
 MERGED_FIELDS = '{"merged":true,"mergedAt":"2026-09-01T00:00:00Z"}'
 CLOSED_FIELDS = '{"closed":true,"closedAt":"2026-09-03T06:25:00Z"}'
 # A closed-unmerged PR read through the MERGE-side fields alone. Says nothing
-# about closure, so it must NOT discharge -- the pin that keeps the widened
-# regex from becoming "any probe discharges".
+# about closure, so it must NOT discharge. This pins the MERGE side only: it
+# contains neither `closed` nor `closedAt`, so it exercises neither alternative
+# ai-config#3086 added and constrains nothing about them.
 UNMERGED_FIELDS = '{"merged":false,"mergedAt":null}'
+# The negative control for the CLOSE side, which is the half the #3086 diff
+# widened: an OPEN PR read through the close-side fields. Without it a later
+# loosening of `"closed"\s*:\s*true` to `\w+`, or of the `closedAt` digit
+# anchor, would turn no case red (ai-config#3086 review).
+OPEN_CLOSE_FIELDS = '{"closed":false,"closedAt":null}'
+# A REST body: the raw `gh api`/MCP spellings are snake_case, and the same
+# facts in the same channel-independent shape must discharge.
+REST_CLOSED = ('{"number":1038,"state":"closed","merged":false,'
+               '"closed_at":"2026-09-03T06:25:00Z","merged_at":null}')
 
 case(create("c") + [bash("gh pr merge 1038 --squash", tid="m"), res("m", "{}"),
                     say("Merged.")], False,
@@ -1280,6 +1290,23 @@ case(create("c") + [bash("gh pr view 1038 --json closed,closedAt", tid="v"),
                     res("v", CLOSED_FIELDS), say("It closed.")], False,
      "a probe selecting the close FIELDS discharges, exactly as the merge "
      "fields do")
+# The REST close: neither a `gh pr` verb nor a structured tool, so before
+# ai-config#3086's review it reached no path at all and the guard stayed armed
+# on a PR the session had just closed. It clears as a PROBE -- the call names
+# one pull and its own result reports the new state.
+case(create("c") + [bash("gh api repos/o/r/pulls/1038 -X PATCH "
+                         "-f state=closed", tid="x"),
+                    res("x", REST_CLOSED), say("Closed it over REST.")],
+     False, "a REST close names one pull and its result reports CLOSED")
+case(create("c") + [bash('gh api "repos/o/r/pulls/1038"', tid="x"),
+                    res("x", REST_CLOSED), say("Read it over REST.")],
+     False, "a REST read of one pull is a probe too")
+# The MCP twin, which a remote/web session has instead of `gh` (ai-config#3086
+# review). Its body is the same snake_case REST shape.
+case(create("c") + [use("mcp__github__pull_request_read", tid="v", owner="o",
+                        repo="r", pullNumber=1038, method="get"),
+                    res("v", REST_CLOSED), say("Read it.")], False,
+     "the MCP single-PR read is a probe, so `gh` is not the only channel")
 
 # ... and the fail-safe direction, which must survive all of the above.
 case(create("c") + [bash("gh pr merge 1038 --squash", tid="m"),
@@ -1295,6 +1322,18 @@ case(create("c") + [bash("gh pr view 1038 --json merged,mergedAt", tid="v"),
                     res("v", UNMERGED_FIELDS), say("Not merged.")], True,
      "a probe reporting merged:false alone does not discharge -- it says "
      "nothing about closure")
+case(create("c") + [bash("gh pr view 1038 --json closed,closedAt", tid="v"),
+                    res("v", OPEN_CLOSE_FIELDS), say("Still open.")], True,
+     "a probe reporting closed:false does not discharge -- the negative "
+     "control for the widened close-side alternatives")
+case(create("c") + [bash('gh api "repos/o/r/pulls/1038/requested_reviewers"',
+                         tid="x"), res("x", REST_CLOSED),
+                    say("Read the reviewers.")], True,
+     "a sub-resource path is not a single-PR probe, whatever its body says")
+case(create("c") + [use("mcp__github__pull_request_read", tid="v", owner="o",
+                        repo="r", pullNumber=1039, method="get"),
+                    res("v", REST_CLOSED), say("Read the other PR.")], True,
+     "an MCP read of a DIFFERENT PR does not discharge this one")
 case(create("c") + [bash("gh pr list --state merged", tid="v"),
                     res("v", MERGED), say("Listed.")], True,
      "a repo-wide list naming no single PR is not a probe")
@@ -1732,22 +1771,51 @@ def _terminal_wording():
     moves were a false claim of draft status or a request that GitHub accepts
     and discards. Enumerating carve-outs as though they were exhaustive is the
     same defect point 3 of ai-config#1392 recorded for the draft-only text.
+
+    The cause wording is asserted too. A close CHAINED ahead of another command
+    is observed and deliberately not credited, so telling that reader the guard
+    "has not observed the transition" is the same misdiagnosis the `chained`
+    paragraph above already exists to prevent (ai-config#3086 review).
     """
-    fd, path = tempfile.mkstemp(suffix=".jsonl")
-    with os.fdopen(fd, "w") as fh:
-        for e in create("c") + [say("Opened it.")]:
-            fh.write(json.dumps(e) + "\n")
-    try:
-        out = subprocess.run(
-            hook_argv(), input=json.dumps({"transcript_path": path}),
-            capture_output=True, text=True,
-            env=dict(os.environ, TMPDIR=tempfile.mkdtemp())).stdout
-        reason = json.loads(out).get("reason", "") if out.strip() else ""
-        # "Two" would mean the draft and redaction pair survived unchanged.
-        return ("CLOSED" in reason and "Three legitimate reasons" in reason
-                and "Two legitimate reasons" not in reason)
-    finally:
-        os.unlink(path)
+    reason = reason_of(create("c") + [say("Opened it.")])
+    # "Two" would mean the draft and redaction pair survived unchanged.
+    return ("CLOSED" in reason and "Three legitimate reasons" in reason
+            and "Two legitimate reasons" not in reason
+            and "has not observed" not in reason
+            and "CREDITED" in reason)
+
+
+# Every `gh pr view <N>` line the block text prints. The message carries more
+# than one -- the head/reviews verification is a `gh pr view` too -- so the
+# terminal-state read is picked out by the thing it reads (`state`) rather than
+# by its position, which a reflow would move.
+RX_PRESCRIBED_READ = re.compile(r"^[ \t]*(gh pr view \"<N>\".*)$", re.M)
+
+
+def _terminal_remedy_runs():
+    """The command the message prescribes must be one the guard ACCEPTS.
+
+    This is the single point the whole exemption turns on: a session holding a
+    PR closed outside the transcript can only discharge by making the state
+    visible, and the message names exactly one way to do that. If `probe_ident`
+    does not recognise that command form, the obligation is undischargeable
+    again -- which is precisely the defect ai-config#3086 reports.
+
+    So the form is READ OUT OF THE BLOCK TEXT rather than restated here: a
+    reflow that chains a `| jq` after the read (making it non-last, so `plast`
+    is false), or an edit to `_verb_ident`'s flag handling, must turn this red
+    rather than leaving a green suite over a message nobody can act on
+    (ai-config#3086 review).
+    """
+    reason = reason_of(create("c") + [say("Opened it.")])
+    reads = [m.group(1) for m in RX_PRESCRIBED_READ.finditer(reason)
+             if "state" in m.group(1)]
+    if len(reads) != 1:
+        return False
+    cmd = reads[0].replace("<N>", "1038").replace("<owner>/<repo>", "o/r")
+    return not block_of(create("c") + [
+        bash(cmd, tid="v"), res("v", '{"state":"CLOSED","closed":true}'),
+        say("Read the state.")])
 
 
 def block_of(events):
@@ -1942,6 +2010,14 @@ def main():
         passes += 1
     else:
         print("FAIL: the block text does not name the closed/merged deferral")
+        failures += 1
+
+    if _terminal_remedy_runs():
+        print("PASS: the status read the block text prescribes discharges")
+        passes += 1
+    else:
+        print("FAIL: the status read the block text prescribes does not "
+              "discharge")
         failures += 1
 
     if _chained_request_wording():

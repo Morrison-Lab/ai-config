@@ -247,10 +247,16 @@ def quote_state_map(body):
     and there the anchor would re-arm inside exactly the string it exists to
     exclude. Dropping the newline from the class instead would blind the hook
     to every multi-line script, so the state is tracked rather than the
-    separator narrowed. This subsumes the special cases the anchor was patched
-    for one at a time: `(`, a backtick, and the words `then` and `do` were each
-    excluded because each occurs inside quoted prose, and asking whether an
-    offset is quoted answers that question directly.
+    separator narrowed.
+
+    That is a NARROWER job than keeping the anchor out of quoted prose
+    generally, and the difference is worth stating because the two are easy to
+    merge. A bare `(` and a bare backtick are handled by the separator class
+    itself --- neither is a member, per the comment above
+    `RX_GIT_RANGE_CMD_SHELL` --- so they need no quote state and are unaffected
+    by it. What this map actually protects is the constructs that ARE
+    separator-class members and still occur inside quoted prose: `$(`, and
+    `then`/`do` where a real separator precedes them.
 
     Why one pass: a per-match rescan from index 0 would be quadratic. A 44 KB
     command carrying 2000 ranges took 11.7 s against the 10 s timeout

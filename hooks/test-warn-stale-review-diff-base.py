@@ -220,6 +220,18 @@ SILENT_CASES = [
      "`then` in ordinary English must not re-arm the anchor"),
     ("gh issue comment 1 --body \"for each PR, do git diff main...HEAD\"",
      "nor `do`"),
+    # The two shapes above are protected by the separator class rather than by
+    # quote state: neither a bare `(` nor a bare backtick is a class member, so
+    # breaking `quote_state_map` leaves them silent either way. These two ARE
+    # class members occurring inside quoted prose, so they are the cases that
+    # actually pin the quote tracking -- both flip to WARN when
+    # `quote_state_map` is stubbed to all-False (adversarial review on #3014).
+    ("gh pr comment 98 --body \"note: $(git diff main...pr-98) is stale\"",
+     "`$(` IS in the separator class, so only quote state keeps a command "
+     "substitution quoted inside a comment body from re-arming the anchor"),
+    ("gh pr comment 98 --body \"run tests; then git diff main...pr-98\"",
+     "`then` preceded by a real separator is recognized as a shell keyword, "
+     "so only quote state keeps this quoted prose from re-arming it"),
     ("gh pr comment 98 --body \"run `git diff main...pr-98` to reproduce\"",
      "nor a backtick code span, which is how this corpus writes a command "
      "inside a comment body"),

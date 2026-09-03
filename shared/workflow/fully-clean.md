@@ -44,6 +44,29 @@ Nothing about that chain tests whether it was the *only* input, because a
 rollup does not report which of its several inputs are currently non-passing,
 only that at least one is.
 
+**The failure has an earlier form: naming a cause the signal never confirmed, and reporting that to a human.**
+The trap above needs a real, checked cause before it closes.
+This one needs none.
+`blocked` reports that at least one input is non-passing and never which, so any input you can see becomes an available explanation --- and the one in front of you when you look is the one you will pick.
+
+Measured 2026-09-03 on ai-config#3115: a fresh reading returned `blocked` while every review sat at `COMMENTED` rather than `APPROVED`, and that was reported to the user as branch protection holding the PR for a human approving review.
+Nothing in the field said so.
+Re-queried about an hour later, with no push and no approval between, it returned `clean` and the PR merged on the standing grant.
+The actual input was a check still running at the moment of the read.
+
+Note which safeguard this slips past.
+A *stale* reading is the documented hazard (ai-config#2465), and this reading was fresh;
+freshness makes the value trustworthy and says nothing about the cause attached to it.
+
+The asymmetry is in who acts on it.
+"Blocked" prompts a re-check, which costs a query.
+"Blocked waiting for your approval" sends a person to approve something that needed no approval, and they cannot tell from the message that the cause was inferred rather than derived.
+
+- **Do:** derive a named cause from something that names it --- `statusCheckRollup`, `reviewDecision`, the branch-protection endpoint --- before putting it in a sentence someone else will act on.
+- **Do:** report the bare value when you have not derived a cause;
+  `blocked, cause not yet derived` is short, true, and prompts the right next step.
+- **Don't:** let the input you happen to be looking at supply the explanation for a value that does not name its inputs.
+
 - **Do:** after explaining an aggregate signal with one confirmed cause, ask
   what else the same rollup can mean before treating it as accounted for ---
   and re-derive the rollup once the confirmed cause clears, rather than

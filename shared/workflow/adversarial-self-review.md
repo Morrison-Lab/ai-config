@@ -430,25 +430,32 @@ It was seen directly, twice, within one session --- and the captured line is thi
 ```
 
 **Note what that exhibit is: the trailer landing on a sentinel line, which is the safe case**, and the one this section goes on to prescribe.
-**The shape the hazard is actually about --- the trailer glued to a fingerprint line --- has also been captured**, and it is the block the truncation table below analyses:
+**The shape the hazard is actually about --- the trailer glued to a fingerprint line --- has also been captured**, and it is the block the truncation table below analyses.
+Recorded 2026-09-03 in [ai-config#3084](https://github.com/Morrison-Lab/ai-config/pull/3084)'s own description, from a foreground review of an earlier head of that branch;
+the sha resolves to a real commit on it, which is how the capture is checkable rather than merely asserted:
 
 ```
-Reviewed-Commit: 6f10014883ccb4256250204fe9af216d7c3b775fagentId: <id> (use SendMessage with to: '...')
+Reviewed-Commit: 6f10014883ccb4256250204fe9af216d7c3b775fagentId: <id> (use SendMessage with to: '<id>')
 ```
 
 Concatenated, no separator, on the fingerprint line itself.
-The agent id is redacted;
+The agent id is redacted in **both** places it appears;
 nothing else is altered.
 
-Two things about that capture are worth stating, because it is easy to bank as a scare and easy to bank as an all-clear, and it is neither.
+**How many times the shape has been seen is deliberately not totalled here**, because the record cannot settle it.
+The two sightings named above ended on a sentinel line, and this one ends on a fingerprint, so they are different reports --- but whether this capture is a third observation or one of the two, re-described, is not recorded.
+Treat the shape as attested and leave the count alone.
 
-It is an **in-context render**, like the other sighting and unlike the sweep's population, so it does not move the storage question above one way or the other.
-And the guard **accepted** it, because the fingerprint is a full 40 characters --- which is precisely what the table below predicts, so this is the remedy demonstrated rather than the hazard realized.
-Truncate that sha to 39 and the same line yields a plausible wrong one.
+Two things about the capture are worth stating, because it is easy to bank as a scare and easy to bank as an all-clear, and it is neither.
+
+It is an **in-context render**, like the sightings above and unlike the sweep's population, so it does not move the storage question raised below one way or the other.
+And the guard **accepted** it, because the fingerprint is a full 40 characters --- which is precisely what the table below predicts.
+So what this capture demonstrates is the **mandated 40-character form** holding, not the sentinel, which the captured line does not contain and which the section below is careful to call cheap insurance rather than a fix for a demonstrated break at 40 characters.
+Truncate that sha to 39 and the same line yields a plausible wrong sha.
 
 **The zero and the sightings are about different artifacts, and that is what has to be settled before either number means anything.**
 The sweep read **stored** transcript JSONL.
-The two sightings were **in-context renders**.
+Every direct sighting, the captured fingerprint line included, was an **in-context render**.
 Three explanations fit, and only the third is checkable from here:
 
 1. The sweep's matcher cannot see the concatenated shape.
@@ -477,7 +484,7 @@ In the own-block shape the trailer is a separate content block, and `_result_tex
 The trailer must concatenate rather than arrive as its own block, AND the fingerprint must be the report's last line.
 This file's own contract puts the JSON payload last, and [`.claude/agents/adversarial-reviewer.md`](../../.claude/agents/adversarial-reviewer.md) says to emit nothing after its closing marker --- so a conforming report ends with the payload, the trailer lands on that, and the fingerprint is never exposed.
 The sighting that prompted this section was a report that put the verdict and fingerprint AFTER the payload, which is the ordering this file's "Structured review data" section rules out.
-Whether the two sightings were two such reports or one report read twice is not recorded, so treat the shape as attested and its rate as unmeasured.
+The count is left alone for the reason given above, so treat the shape as attested and its rate as unmeasured.
 
 So read the rest of this section as what happens when a brief reorders the tail, not as a hazard of ordinary dispatch.
 

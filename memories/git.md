@@ -154,7 +154,10 @@ See [`git-tags.md`](git-tags.md) for tag management (force-moving/sliding tags a
 Linking a bare `#NNNN` needs the right path segment,
 and the clone can decide it without `gh` and without an API token:
 GitHub keeps a `refs/pull/NNNN/head` ref for every pull request and none for an
-issue, so the remote answers the question directly.
+issue, so the remote answers the question directly;
+[`git-branches`](git-branches.md)'s
+"GitHub keeps `refs/pull/N/head` forever" section owns that fact and the
+measurement behind it.
 Measured 2026-09-03 against `origin` = `https://github.com/Morrison-Lab/ai-config`,
 on a machine with no `gh` on `PATH`:
 
@@ -165,13 +168,19 @@ $ git ls-remote origin refs/pull/3095/head
                                                               # empty     -> issue
 ```
 
-**Test the output, not the exit status.**
+**Test the output for the classification, and the exit status for whether the query ran.**
 An empty result means **not a PR**, which for a reference you know exists means an issue;
 a number that exists as neither also comes back empty (`refs/pull/999999/head`, empty, exit 0),
 so confirm the number is real before writing the `/issues/` path.
 Both calls above exit 0.
 `ls-remote` reports "no such ref" as an empty result rather than as a failure,
 so `if git ls-remote ...; then` classifies every number as a PR.
+A non-zero exit means the query never answered:
+measured the same day, an unreachable host and a repository the credentials cannot read
+both exit 128 with empty output,
+so a classifier that reads only the output turns a network or credential failure
+into "issue" for every number.
+Stop on a non-zero exit instead of falling through.
 
 **The wrong path still resolves, which is why the distinction has to be
 derived rather than guessed.**
@@ -202,7 +211,8 @@ qualify as `owner/repo#NNNN` per those before choosing a path.
   branching on whether the output is empty.
 - **Do:** write a line-initial reference as `[#NNNN](...)`, which keeps MD018
   quiet.
-- **Don't:** branch on `ls-remote`'s exit status --- it is 0 either way.
+- **Do:** stop on a non-zero exit, which means the remote never answered.
+- **Don't:** branch on a zero exit --- it is 0 for a hit and for a miss alike.
 - **Don't:** treat a resolving link as confirmation of the path;
   GitHub redirects both ways.
 - **Don't:** rewrite a `#NNNN` that sits inside a code span.

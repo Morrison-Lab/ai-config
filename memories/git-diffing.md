@@ -196,17 +196,26 @@ byte-identical under `cmp` to `git show --cc <merge>`.
 **The last two commands do show the re-add, and the grep is what misses it.**
 A combined diff indents its `+` columns one per parent,
 so a two-parent merge emits `++SHARED paragraph.`,
-which matches `^[ +-]*\+SHARED` and not `^+SHARED`.
+which matches `^[+][+]SHARED` and not `^+SHARED`.
 [`batch-merge-and-resolve`](../shared/workflow/batch-merge-and-resolve.md)
 records the same class for `git merge-tree`,
-whose conflict markers are diff-indented so `grep '^<<<<<<<'` returns 0 on a
+whose conflict markers are diff-indented so `grep -c '^<<<<<<<'` returns 0 on a
 genuine conflict.
 
 - **Do:** read a merge commit's own content with `git diff <base>...<tip>`,
   which is what review sees.
 - **Do:** pass `-m` or `--diff-merges=on` when you want `git log -p` to print
   merge patches.
-- **Do:** anchor a grep over a combined diff as `^[ +-]*\+`, never `^+`.
+- **Do:** anchor a grep for a two-parent merge's own content as `^[+][+]`,
+  one `+` per parent, never `^+`.
+  A `+` in one column only marks a line one parent already carried
+  (`+ SHARED paragraph.` is the copy `main` had; ` +FEATURE paragraph.` is the
+  branch's own line),
+  and the wider anchor `^[ +-]*\+` counts those as the merge's:
+  on that merge's `git show`, `grep -c '^[ +-]*\+SHARED'` gives 2 under GNU
+  grep's default BRE, where `\+` is the one-or-more quantifier, and 1 under
+  `grep -E`, where it is a literal, while `grep -c '^[ +-]*\+FEATURE'` gives 1
+  for a line the merge did not add; `grep -c '^[+][+]SHARED'` gives 1 under both.
 - **Don't:** conclude that a conflict-resolution edit escapes review because
   the repo squash-merges --- the three-dot diff carries it.
 - **Don't:** read an empty `git log -p` as evidence the merge changed nothing;

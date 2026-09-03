@@ -38,8 +38,15 @@ UMS-mentioning subagent dispatch, or a `ums` invocation recorded LATER in the
 transcript than the admission clears the obligation. So a turn that admits an
 error and immediately records it is never nagged.
 
-Fires once per distinct admission (sentinel keyed by content hash), because a
-reminder repeated every turn is noise, and noise is what gets a guard ignored.
+An admission in the irrealis mood is not an admission, so a hypothetical
+("even if I misread the status") is skipped -- see `IRREALIS_LEAD`.
+
+Fires once per distinct admission PHRASE per session (sentinel keyed by
+content hash and transcript path, and NOT by record index), because a reminder
+repeated every turn is noise, and noise is what gets a guard ignored. The index
+mattered: with it in the key, explaining a misfire re-fired the reminder,
+because the explanation must name the phrase and names it at a new index
+(ai-config#2997).
 
 Fails OPEN and SILENT: any parse trouble prints nothing at all.
 """
@@ -65,7 +72,7 @@ _APOS = "['\u2019]"
 # which the docstring above says this regex must never match. Found on
 # ai-config#1752's review for the `should have` alternative, which was anchored
 # then while its six siblings were not (ai-config#1756).
-ADMISSION = re.compile(
+_ADMISSION_RE = re.compile(
     r"""(
       \bi\s+was\s+(wrong|mistaken|incorrect)
     | \bi\s+got\s+(that|this|it)\s+wrong
@@ -123,6 +130,94 @@ ADMISSION = re.compile(
     )""",
     re.I | re.X,
 )
+
+# Irrealis guard (ai-config#2997). Every alternative above is anchored on a
+# verb, and mood is invisible to a verb. So "a posted review is caught even if
+# I misread the job status" matched -- a hypothetical describing a mistake that
+# explicitly has NOT happened, in a sentence justifying the design that makes
+# it not matter. That is the opposite of an admission.
+#
+# `visible_prose()` below does not reach it: that guard strips fences,
+# blockquotes and inline code, which is where a QUOTATION of the rule lives.
+# This is ordinary prose whose grammatical mood inverts its meaning.
+#
+# Matched against the text immediately BEFORE a hit, anchored to end-of-window,
+# so only a marker introducing that very clause counts. `\b` leads the
+# alternation because "a gif I misread" would otherwise supply the `if`.
+#
+# `had` is here for subject-auxiliary inversion ("had I misread the status"),
+# which is irrealis. It cannot suppress a real "I had misread it": that phrase
+# puts `had` BETWEEN the subject and the verb, so no alternative above matches
+# it in the first place.
+#
+# Bare `if` is included, and the issue flagged that as the one debatable call
+# --- "if I was wrong, ..." is occasionally a hedged real admission. It asked
+# for the question to be settled by grepping transcripts rather than by
+# intuition, and the transcripts reachable from this container are only the
+# session that filed the issue, in which every hit is a quotation of the issue
+# text itself. So the corpus could not settle it, and the tie was broken on
+# cost: a hedged admission almost always continues into an unhedged one
+# ("... then my earlier claim was wrong"), which the alternatives above still
+# catch, whereas a false positive here is documented to cost six firings.
+#
+# The issue's suggested list also named `so that` and `to make sure`, and both
+# are deliberately absent. Neither introduces a first-person verb directly in
+# English --- the shape they actually produce is "so that if I misread ...",
+# whose `if` the alternation already covers --- so an alternative for either
+# would be a branch nothing can reach, which is the dead code
+# `shared/principles/dead-code-is-tech-debt.md` rules out.
+IRREALIS_LEAD = re.compile(
+    r"""\b(?:
+        (?:even\s+)?if
+      | unless
+      | in\s+case
+      | whether(?:\s+or\s+not)?
+      | lest
+      | supposing
+      | suppose(?:\s+that)?
+      | assuming(?:\s+that)?
+      | had
+    )\s+$""",
+    re.I | re.X,
+)
+
+# 32 characters holds the longest marker above ("whether or not ") with room
+# for the whitespace that can follow it, and is short enough that a marker
+# belonging to an earlier clause cannot reach across a sentence boundary.
+LEAD_WINDOW = 32
+
+
+class _AdmissionMatcher:
+    """`_ADMISSION_RE` with the irrealis guard applied.
+
+    Exposes `search()` and nothing else, because `search()` plus `.group(0)`
+    on what it returns is the entire surface the three consumers use
+    (`no-mistake-without-a-hook.py`, `remind-ums-on-scrutiny.py`, and this
+    module). Filtering HERE rather than at each call site is what keeps the
+    shared-import contract intact: the siblings import `ADMISSION` precisely so
+    the detectors cannot drift, and a guard applied in one consumer would
+    reintroduce exactly that drift.
+
+    A guarded hit is skipped rather than ending the search, so "even if I
+    misread the status. I was wrong about the base branch." still fires on the
+    second clause.
+    """
+
+    def __init__(self, regex, lead=IRREALIS_LEAD, window=LEAD_WINDOW):
+        self.regex = regex
+        self.lead = lead
+        self.window = window
+
+    def search(self, text, *args, **kwargs):
+        for hit in self.regex.finditer(text, *args, **kwargs):
+            before = text[max(0, hit.start() - self.window):hit.start()]
+            if self.lead.search(before):
+                continue
+            return hit
+        return None
+
+
+ADMISSION = _AdmissionMatcher(_ADMISSION_RE)
 
 # A write to any of these is a recorded learning.
 UMS_PATH = re.compile(
@@ -300,7 +395,16 @@ def main() -> int:
     # it, two sessions producing the same admission at the same record index
     # share one sentinel in /tmp, and the second session's reminder is
     # suppressed for as long as that /tmp survives.
-    key = hashlib.sha256(f"{path}:{admit_txt}:{admit_at}".encode()).hexdigest()[:16]
+    #
+    # The record index is deliberately NOT in the key (ai-config#2997). With it
+    # in, the key was per OCCURRENCE rather than per phrase, so writing about a
+    # misfire re-fired it: an explanation has to name the phrase in prose to be
+    # intelligible, that names it at a new index, and the new index is a new
+    # key. The guard therefore rewarded silence and penalized diagnosis, and
+    # the issue measured six firings from one root sentence. Per phrase per
+    # session is the right grain: a reminder already delivered for this exact
+    # phrase is noise on repeat, and noise is what gets a guard ignored.
+    key = hashlib.sha256(f"{path}:{admit_txt}".encode()).hexdigest()[:16]
     sentinel = os.path.join(tempfile.gettempdir(), f".claude-ums-after-error-{key}")
     if os.path.exists(sentinel):
         return 0
@@ -321,7 +425,10 @@ def main() -> int:
         "'Record both the pattern and the anti-pattern'. Delegate the pass to "
         "a subagent; that is pre-authorized standing sidecar work.\n"
         "If this reminder is a false positive (you were correcting someone "
-        "else's claim, or quoting the rule), disregard it and carry on."
+        "else's claim, quoting the rule, or writing a hypothetical such as "
+        "'even if I misread it'), disregard it and carry on. Writing about the "
+        "misfire will not re-fire it: this fires once per distinct phrase per "
+        "session, and a phrase wrapped in backticks is not matched at all."
     )
     return 0
 

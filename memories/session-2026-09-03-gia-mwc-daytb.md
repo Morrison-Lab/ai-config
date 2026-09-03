@@ -386,7 +386,7 @@ Push both branches once that verdict lands.
 
 **#3084 merged, and no entry since recorded it.**
 The merge-gate section's last word on #3084 was that it waits on a gate no reachable reviewer can satisfy.
-It merged at 2026-09-03T16:25:36Z under the shared login, before every commit this branch has made since, the earliest being `40f01ef1`, and got the same never-revisited treatment the 01:28 entry records for #3089.
+It merged at 2026-09-03T16:25:36Z under the shared login, and got the same never-revisited treatment the 01:28 entry records for #3089.
 Whether the cross-model gate was satisfied for that merge is not derived here.
 The three prose defects it merged ahead of are tracked as #3109, closed by #3115.
 

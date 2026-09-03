@@ -190,23 +190,65 @@ CONFIG_LIKE_INDETERMINATE_FLAGS = (
 # to decide whether to report the broken installation and deny a command
 # whose text looks like a push (ai-config#2981).
 
+SIBLING_NAME = "no-unreviewed-pr.py"
+
+
+def _sibling_candidates(here: str) -> list:
+    """Where a copy of the detector may sit, best first.
+
+    The canonical copy is beside this file. An install can run the guard from
+    a checkout's `.claude/hooks/` directory that carries the guard but not the
+    detector (ai-config#2981), so that layout gets one more candidate: the same
+    checkout's own `hooks/`, reached by dropping `.claude`.
+
+    The git root of the process cwd is deliberately NOT a candidate, though the
+    issue proposed it. It can name a different checkout from the one this file
+    was loaded from, which is the revision-skew hazard AGENTS.md states as "do
+    not import `~/.claude/hooks/`" -- a guard at one revision graded by a
+    detector at another. It would also rescue a genuinely orphaned copy whose
+    cwd happens to sit in a checkout, silently retiring the degraded mode that
+    orphan_cases() in test-no-push-without-self-review.py pins.
+    """
+    candidates = [os.path.join(here, SIBLING_NAME)]
+    parent = os.path.dirname(here)
+    if os.path.basename(here) == "hooks" and os.path.basename(parent) == ".claude":
+        candidates.append(
+            os.path.join(os.path.dirname(parent), "hooks", SIBLING_NAME))
+    return candidates
+
+
 def _load_sibling():
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "no-unreviewed-pr.py")
-    spec = importlib.util.spec_from_file_location("no_unreviewed_pr", path)
-    if spec is None or spec.loader is None:
-        raise ImportError(f"cannot load {path}")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    tried = []
+    for path in _sibling_candidates(os.path.dirname(os.path.abspath(__file__))):
+        tried.append(path)
+        if not os.path.isfile(path):
+            continue
+        spec = importlib.util.spec_from_file_location("no_unreviewed_pr", path)
+        if spec is None or spec.loader is None:
+            raise ImportError(f"cannot load {path}")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module, path
+    raise FileNotFoundError(
+        f"no `{SIBLING_NAME}` at any of: " + ", ".join(tried))
 
 
 try:
-    _SIBLING = _load_sibling()
+    _SIBLING, _SIBLING_PATH = _load_sibling()
     _SIBLING_ERROR = None
+    # Say which copy was used when it is not the canonical one beside this
+    # file, so a report of a misresolved install names the file that answered
+    # rather than only the one that did not. stderr, because a PreToolUse hook
+    # exiting 0 keeps it out of the model's context and in the debug log.
+    if _SIBLING_PATH != _sibling_candidates(
+            os.path.dirname(os.path.abspath(__file__)))[0]:
+        print("no-push-without-self-review: loaded its push detector from "
+              f"{_SIBLING_PATH}", file=sys.stderr)
 except Exception as exc:  # covered by orphan_cases() in
                           # test-no-push-without-self-review.py, which runs a
                           # copy of this file in a directory without the sibling
     _SIBLING = None
+    _SIBLING_PATH = None
     _SIBLING_ERROR = str(exc)
 
 # The walk over git's push-option grammar, its tables, and the abbreviation

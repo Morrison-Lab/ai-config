@@ -1130,6 +1130,71 @@ def orphan_cases() -> tuple[int, int]:
     return failures, ran
 
 
+def dotclaude_fallback_cases() -> tuple[int, int]:
+    """The guard installed at a checkout's `.claude/hooks/`, detector absent.
+
+    ai-config#2981: a worktree install ran the guard from
+    `<checkout>/.claude/hooks/`, where the detector does not sit, so the guard
+    went degraded and refused push-shaped text it could not grade. The fallback
+    reads the detector out of the same checkout's `hooks/`, which is the same
+    working tree and so the same revision.
+
+    The discriminator is `git push --dry-run`. The degraded heuristic's regex
+    matches it, and the real detector does not treat it as a push at all
+    because it re-heads nothing -- so letting it through is only possible with
+    the detector loaded. The third case is the negative control: strip the
+    detector out of the checkout's `hooks/` and the same command denies again,
+    which is what makes the first case evidence of the fallback rather than of
+    a test that cannot fail.
+    """
+    failures = 0
+    ran = 0
+    root = tempfile.mkdtemp(prefix="npwsr-dotclaude-")
+    try:
+        installed = os.path.join(root, ".claude", "hooks")
+        checkout_hooks = os.path.join(root, "hooks")
+        os.makedirs(installed)
+        os.makedirs(checkout_hooks)
+        guard = os.path.join(installed, "no-push-without-self-review.py")
+        shutil.copy(HOOK, guard)
+        detector = os.path.join(checkout_hooks, "no-unreviewed-pr.py")
+        shutil.copy(os.path.join(os.path.dirname(HOOK), "no-unreviewed-pr.py"),
+                    detector)
+
+        def check(label, cmd, should_deny, want_degraded):
+            nonlocal failures, ran
+            ran += 1
+            res = subprocess.run(
+                [sys.executable, guard],
+                input=json.dumps({"tool_name": "Bash",
+                                  "tool_input": {"command": cmd},
+                                  "transcript_path": ""}),
+                capture_output=True, text=True, cwd=REPO)
+            denied = '"deny"' in res.stdout
+            degraded = "could not load its push detector" in res.stdout
+            if res.returncode != 0 or denied != should_deny or degraded != want_degraded:
+                print(f"FAIL (deny={denied}, degraded={degraded}; "
+                      f"wanted {should_deny}/{want_degraded}): {label}")
+                failures += 1
+            else:
+                print(f"PASS: {label}")
+
+        check("a .claude/hooks guard loads the checkout's detector and lets a "
+              "dry-run push through", "git push --dry-run origin main",
+              False, False)
+        check("a .claude/hooks guard still denies an unreviewed real push, "
+              "and not for want of a detector", "git push origin main",
+              True, False)
+
+        os.remove(detector)
+        check("with no detector in the checkout either, the same dry-run push "
+              "goes back to the degraded deny",
+              "git push --dry-run origin main", True, True)
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+    return failures, ran
+
+
 def _isolated_git_env(default_branch: str) -> dict:
     """A git env whose init.defaultBranch cannot leak in from the user config."""
     return {
@@ -1696,7 +1761,8 @@ def main():
                    valueless_bool_cases, budget_cases,
                    fixture_branch_cases, windows_path_cases,
                    structured_payload_cases, transcript_scoping_cases,
-                   cd_tracking_cases, fallback_cases):
+                   cd_tracking_cases, fallback_cases,
+                   dotclaude_fallback_cases):
             f, r = fn()
             failed += f
             extra += r

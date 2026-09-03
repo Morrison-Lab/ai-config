@@ -406,7 +406,9 @@ Wants promotion to `memories/git.md` when this notebook is folded.
 ## 13:48 PDT --- part 2 merged; two PRs driven; the merge subsection deleted
 
 [#3129](https://github.com/Morrison-Lab/ai-config/pull/3129) merged as the squash on `main` titled "docs(memories): session notebook for 2026-09-03, part 2 (#3129)", fully clean at its final head: CI green, claude-review CLEAN, Copilot approval recommended, Jules approve, adversarial verdict.
-Five adversarial rounds and one Copilot round went into it after the 12:20 entry; every round's findings were claims one step wider than their evidence, and the round that cleared was the one that deleted the clause rather than rewording it.
+Five adversarial rounds and one Copilot round went into it after the 12:20 entry.
+Every round's findings were claims one step wider than their evidence,
+and the round that cleared was the one that deleted the clause rather than rewording it.
 This file continues here on `docs/session-notebook-2026-09-03-part3`, so the merged part stays reviewed once.
 
 [#3135](https://github.com/Morrison-Lab/ai-config/pull/3135) (`fix/2465-rollup-cause`, Refs [#2465](https://github.com/Morrison-Lab/ai-config/issues/2465)) is open: claude-review CLEAN and Jules approve on every head so far, and Copilot has asked for one change per pass across three passes (a self-contradicting clause, clause-boundary line breaks, then the bold lead-in's line break), each addressed by deletion or reflow with the token sequence unchanged.

@@ -642,3 +642,53 @@ through five, and was caught by the sixth --- established by walking that file
 through each commit.
 A rationale comment is the artifact a later reader trusts in place of re-running
 the sweep, which is why four reviews read past it.)
+
+## A repeated measurement is not a controlled one
+
+(Measured on [Morrison-Lab/ai-config#3100](https://github.com/Morrison-Lab/ai-config/pull/3100), merged 2026-09-03.
+Deleting an apparently-dead local variable turned `scripts/test_check_pr_fully_clean.py` red, and the reading `753 passed, 1 failed` came back three times consecutively.
+That was reported as a deterministic regression caused by the deletion, and the deletion was defended on it.
+
+The reading was noise.
+The suite carries wall-clock assertions --- three of them asserting that a scan "scales linearly (< 1s)", plus one on a sentence scan --- and all of them go through a `best_of_three` helper whose own docstring already says that a single sample makes the measurement flaky.
+Several reviewer subagents dispatched by this session were saturating the machine at the time, so every one of the three runs was taken under the same load.
+
+The control that settled it was a pristine `cp -a` copy of the same HEAD with the same deletion applied, which ran green 8 of 8.
+[#3127](https://github.com/Morrison-Lab/ai-config/issues/3127) tracks the underlying flakiness and reports it independently: 1 red in 20 unloaded runs against 4 red in 16 loaded ones.
+
+Note which direction the repetition pushed.
+Three identical readings did not merely fail to rule the confounder out --- they raised confidence, because reproducibility is what an attribution normally needs, and the load was as reproducible as the tree.)
+
+## Two green checks that were both blind to the property
+
+(Measured on [Morrison-Lab/ai-config#3103](https://github.com/Morrison-Lab/ai-config/pull/3103), 2026-09-03.
+Prose in a fragment was reflowed, and the reflow's correctness was reported as verified by `scripts/vendor/gha-check-new-line-breaks.py` and by markdownlint.
+
+Neither can see the property.
+The gate flags multi-sentence lines and semicolon clauses at 80 characters, and `MD013` is disabled repo-wide in `.markdownlint-cli2.jsonc`.
+Run over the added prose lines at three states of the same file --- the unreflowed original, an 80-column hard wrap, and the clause-boundary reflow --- the gate reported zero violations at each.
+Three trees, one verdict, and only one of the three is the wanted outcome.
+
+What discriminated was measuring the property directly.
+A length histogram of the added lines shows a hard cliff at exactly 80 characters for the column wrap and no such edge for the clause reflow, since clauses do not end on a column.
+Counting added prose lines that end mid-phrase separates them the same way: the column wrap splits phrases across lines in the dozens, and the clause reflow does so approximately never.
+Exact figures for that count depend on how a "prose line" is delimited and on which base the diff is taken against, so report the definition and the base alongside any number, per
+[`grep-is-not-coverage`](grep-is-not-coverage.md)'s "A published count needs the ref and the flags it was measured with".)
+
+## A relocated skip that re-parented an elif chain
+
+(Measured on [Morrison-Lab/ai-config#3100](https://github.com/Morrison-Lab/ai-config/pull/3100), merged 2026-09-03.
+A review found that a `continue` guarding a checker's admission step would stop guarding it if relocated below the appends.
+The rebuttal was a mutation: re-insert the skip after the first `all_items.append(` and see whether any test notices.
+It was run three times, at one HEAD, with two fixtures, and the resulting issues list was byte-identical before and after.
+SURVIVED was reported, and the review's finding was rebutted on that basis.
+
+The mutant was malformed.
+At loop-body indent the re-inserted block landed immediately above an existing `elif`, which re-parented that whole chain onto the relocated `if`.
+The skip therefore still ran ahead of admission, so the mutation never expressed the relocation it was built to test, and the identical output was correct for a tree that had not been changed in the intended way.
+
+Every signal available short of reading the source agreed with the rebuttal.
+The diff shows the intended insertion, the file parses, the suite is green, and repeating the run reproduces it.
+Only reading the mutated source next to the `elif` showed it.
+The review's measurement stood.
+The retraction records that a malformed mutant's "no behaviour change" is indistinguishable from a correct negative control.)

@@ -519,6 +519,56 @@ $ python3 hooks/test-no-push-without-self-review.py ./ctl-root-copy.py
 Identical to the mutant, so the 85 is the path and not the change.
 Note which direction that control runs, since the intuitive reading is backwards: it is the control **failing** that attributes the failure elsewhere, and a passing control at some *other* location would have settled nothing.)
 
+### Second occurrence: a retraction can land the OPPOSITE overclaim, and then do it again
+
+The section above treats the correction as a single event --- one overclaim,
+one underived replacement, one adversarial review that catches it.
+The recurrence adds the part that makes this expensive.
+**A retraction is itself a claim, so retracting it produces a third one**, and the sequence can run several rounds without anybody deriving anything.
+
+Each revision feels like the careful move, because each is *narrower* than the last, and narrowing is what the previous round asked for.
+What none of them is, is derived.
+The direction alternates --- too strong, then too weak, then too strong in a new place --- which is the signature of guessing rather than of converging.
+
+The sharpest form is a claim about a **classifier's own rule**, written as prose in a docstring or a review reply.
+Such a claim has an unusually cheap derivation available: the classifier
+answers it by being **called**, on inputs chosen to separate the candidate
+rules.
+So the whole sequence of revisions substitutes recollection for a function
+call that costs one command, and the compression each round performs ("prose
+is fine, bullets are not") is where the next counter-example gets admitted,
+since a shorter rule covers a larger population.
+
+Two practical consequences.
+A rule with an **AND** in it cannot be compressed to one clause without becoming false, so a summary that drops a conjunct is a rewrite rather than a simplification.
+And the inputs worth calling with are the ones near the boundary: the sibling spellings of a shape, not another example of the case you already agree about.
+
+- **Do:** call the classifier on boundary inputs and paste the outputs before
+  writing what its rule is.
+- **Do:** treat your own retraction as an unverified claim needing the same
+  derivation the retracted one needed.
+- **Do:** read an alternating sequence of narrowings as evidence that nothing
+  has been derived yet, and stop revising to go measure.
+- **Don't:** compress a conjunctive rule into a single memorable clause.
+  The dropped conjunct is the counter-example.
+- **Don't:** let a reviewer's agreement with a retraction stand in for evidence, since a correction that is merely *less wrong* still passes review.
+
+(Measured on [Morrison-Lab/ai-config#3100](https://github.com/Morrison-Lab/ai-config/pull/3100), merged 2026-09-03.
+A docstring in `scripts/check-review-body.py` described when a `## Findings` heading forces a not-clean verdict.
+It went through four states, three of them wrong, and no revision called the classifier.
+
+The original said the heading forces not-clean regardless of contents.
+The first retraction said `_findings_section_resolves_empty` exempts any section that says there are none --- which reversed the error rather than fixing it.
+The second stated the real two-part rule and then compressed it to a two-clause slogan saying prose is fine and bullets are not.
+That compression is false, because a line **opening** with a bold span re-flags.
+The third dropped the compression and cited the vetoing pattern by name.
+That commit's own message records a fourth guess that was written and never committed.
+
+The rule the code implements, read off `_findings_section_resolves_empty` in `scripts/check-pr-fully-clean.py`, is a conjunction: the first non-empty line must match the resolving-trailer pattern **and** nothing finding-shaped may follow it.
+`_SECTION_FINDING_ITEM` supplies the second conjunct, vetoing a bullet or numbered item, a blockquote, a location tag, and any line opening with a bold span.
+Untagged plain prose matches no alternative and does not veto, which is why "prose is fine" is half right and unsafe.
+Every one of those facts is one call to the function away, on inputs differing by a single line.)
+
 ## An identifier search is evidence about the identifier, not about the thing it names
 
 Every section above searches a corpus of prose for an idea, and the action a wrong null licenses there is authoring a duplicate.

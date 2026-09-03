@@ -98,6 +98,22 @@ untouched multi-line clause breaks intact (ai-config#1599).
 `MD013` is off repo-wide in `.markdownlint-cli2.jsonc`, so no width gate
 exists either.
 
+**So neither instrument can tell a column wrap from a clause reflow, and a green run from both is not evidence the reflow was done right.**
+The gate flags multi-sentence lines and semicolon clauses, and `MD013` is disabled.
+A hard 80-column wrap satisfies both, a correct clause-boundary reflow satisfies both, and the unreflowed original satisfies both.
+Three different trees, one verdict.
+Citing either after a reflow is the vacuous verification
+[`algorithmatize-checks`](../workflow/algorithmatize-checks.md)'s
+"A checker that returns the same verdict on the broken tree" section describes.
+
+Two measurements do discriminate, and both are one command:
+
+- **A length histogram of the added lines.**
+  A hard cliff at exactly 80 characters is the signature of a column wrap.
+  Clause-broken prose has no such edge, because clauses do not end on a column.
+- **A count of added prose lines ending mid-phrase**, on an article, a preposition, a conjunction, or an open bracket.
+  A column wrap produces many and a clause reflow approximately none, so the before/after pair is the number worth reporting.
+
 Measured 2026-08-15, before #2085, by copying two fragments out of
 `origin/main`, reformatting each copy with `--all`, and classifying both
 versions with the gate's own `classify_line`:

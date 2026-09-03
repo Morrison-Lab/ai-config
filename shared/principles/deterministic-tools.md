@@ -470,6 +470,63 @@ The structural count is asserted by nothing at all.
   `## Limits` above already says a bad tool is worse than the judgment it
   replaced.
 
+## A guard you keep hardening is the wrong instrument; delete the coupling instead
+
+The section above builds a choke point so a class of mistake cannot be spelled.
+This one is its complement, and it fires one level earlier.
+Sometimes the right move is not a better check but no check, because the thing being checked should not have been two things.
+
+The shape is a **drift guard** --- an assertion, a lint rule, an `ast` predicate --- that exists because one artifact retypes a value another artifact owns.
+Guarding that is reasonable, and it is also an admission that the duplication is being kept.
+So the guard inherits the duplication's whole surface: every spelling the consumer might use is a spelling the guard must recognize, and each round of review finds one more.
+
+**The tell is the second narrowing.**
+A guard tightened once is ordinary.
+A guard tightened across three review rounds and still leaking is reporting something about its own premise, and tightening it a fourth time reads as diligence while conceding the point.
+Ask instead what the guard is standing in for, and whether the consumer could simply **call** the thing it is currently retyping.
+When it can, the guard does not get better.
+It gets deleted, along with its tests and its escape hatches, and the diff is usually strongly negative.
+
+**Two limits, and the second is the one a successful extraction hides.**
+
+An instrument must not forbid its own fix.
+An assertion pinned to the duplicated spelling will refuse the refactor that ends the duplication, since hoisting the literal into an importable constant changes the spelling and the guard fires.
+Meanwhile it goes on accepting weaker rewrites that leave the duplication in place.
+A check whose green path excludes the best available repair is mis-specified, whatever else it catches.
+Sit an assertion's condition next to the repairs it should welcome, before shipping it.
+
+And an extraction closes the half it was aimed at, not the half the guard happened also to cover.
+A guard policing a retyped literal is usually *also* walking the consumer and asserting something about its call sites.
+Deleting the guard retires that silently, because nothing in the refactor's diff mentions it.
+Enumerate what the guard asserted, decide per assertion whether the extraction subsumes it, and restore the remainder **behaviourally** --- a test that fails when the call disappears --- rather than assuming structural coverage transferred.
+
+**Label an assertion by the SHAPE it pins, not by the thing it says is gone.**
+A name or message reading "the duplicated literal is gone" is a claim about the past rather than a description of the failure it now reports.
+A behaviour-preserving refactor trips it and sends a maintainer hunting for something that is still there and still fine.
+Name the invariant instead --- what must hold, in the present tense --- so the failure message describes the state the tree is in.
+
+- **Do:** read a guard narrowed twice as evidence against the coupling, rather than against the guard.
+- **Do:** extract the value or predicate so the consumer calls it, and delete the guard and its tests in the same change.
+- **Do:** enumerate every assertion a deleted guard made, and re-establish behaviourally any the extraction does not subsume.
+- **Do:** name an assertion after the invariant it pins.
+- **Don't:** ship a check that rejects the refactor which would make it unnecessary.
+- **Don't:** treat a large negative diffstat as proof the coverage was preserved --- it is proof the duplication was.
+
+(Measured on [Morrison-Lab/ai-config#3100](https://github.com/Morrison-Lab/ai-config/pull/3100), merged 2026-09-03.
+`scripts/check-review-body.py` retyped a disposition-summary phrase that `scripts/check-pr-fully-clean.py` owned, and a test guarded the copy with an `ast` predicate over the consumer's source.
+The predicate was narrowed across three review rounds --- its `ast` references growing 7, then 10, then 19 --- and still had escapes at the last of them.
+Extracting `is_ard_disposition_summary` into the checker, so the consumer calls it, deleted the guard outright: 57 lines added against 108 removed across three files.
+
+Both counterweights are from the same PR.
+An intermediate revision of the guard required the compared phrase to be an `ast.Constant`, so hoisting the literal into an importable module constant --- an `ast.Name`, and the natural way to end the duplication the guard existed for --- failed it.
+The same guard stayed green on relocating the block past the point where it could act, and on hiding it in a never-called nested function.
+That round's own commit message states it: an instrument that refuses its own fix is worse than none.
+
+And the extraction closed the literal-drift half only.
+Measured after it, removing the call from the consumer outright left both suites green, which three separate places in the PR had claimed was covered.
+Whether the checker still calls the helper, and calls it early enough to act, is a call-site property no extraction can assert.
+It was restored with a behavioural test in a later commit.)
+
 ## In review
 
 Flag these with the same weight as the other principle-level findings:

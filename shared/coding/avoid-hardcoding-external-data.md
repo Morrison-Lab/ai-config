@@ -196,6 +196,50 @@ Every number in the table had been re-derived by command before publishing;
 the sentence generalizing about it had not been checked against it at all, because it carried no number to re-derive.
 Fixed in `b02e3ff`.)
 
+### A suite's pass count is a liability twice over when written as an expectation
+
+The two sections above govern a count over something the same file enumerates.
+A **test-suite pass count** --- a total written into a comment above the helper it describes, or into a commit message --- looks like the same defect and is worse.
+It has two independent ways of going wrong, and each is mistaken for the other.
+
+The number moves with the **suite**, so any added or removed case falsifies it on a schedule nobody watches.
+That much it shares with the counts above.
+
+What makes it expensive rather than untidy is the second failure, which those counts cannot have: a suite can report a total one short of the written one **without anything having changed**, because one case flaked.
+The comment then supplies an exact expectation for the reader to miss, and the first hypothesis they form is about the code.
+A comment with no number would have prompted nothing.
+
+**The diagnosis that follows is where this compounds**, because the count is a plausible-looking anchor and invites an explanation for the discrepancy rather than a check of the premise.
+Any difference between the two runs will do --- a different checkout, a different working directory --- and such an explanation is unfalsifiable from the numbers alone.
+So the written count first manufactures a regression and then supplies a wrong cause for it.
+`753 passed, 1 failed` out of the same 754 is a flake, and the way to see that is the failing test's **name**, which the total conceals by construction.
+
+**Assert the property, not the number.**
+"Every case still passes with the helper neutered" is checkable, cannot go stale, and says what the observation was for.
+The total says only how big the suite was that day.
+Where the count is genuinely load-bearing, make it a test rather than a sentence.
+
+**The boundary below still holds and is easy to trip over here.**
+A count inside a case record is evidence about a past run and keeps its literal.
+What this section rules out is a count written **forward**, as what a future reader should expect to see.
+The tense decides it: recorded, keep it; expected, drop it.
+
+- **Do:** state the property a run demonstrated, and leave the total out of a forward-looking comment.
+- **Do:** keep an exact total inside an evidentiary record, naming the tree and the command it was measured on.
+- **Don't:** write a suite total into a comment or commit message as a baseline for someone to compare against.
+- **Don't:** read a total one short of a written expectation as a regression, before checking whether the expectation was ever a stable number.
+- **Don't:** explain a discrepancy between two totals by naming a difference between the two runs.
+  That hypothesis fits any pair of numbers and tests nothing.
+
+(Measured on [Morrison-Lab/ai-config#3100](https://github.com/Morrison-Lab/ai-config/pull/3100), merged 2026-09-03.
+A comment in `scripts/test_check_review_body.py` read "754 pass with the helper neutered", and the same figure went into a commit message.
+The suite carries wall-clock assertions that intermittently miss a one-second budget
+([#3127](https://github.com/Morrison-Lab/ai-config/issues/3127)),
+so a run reports `753 passed, 1 failed` out of the same 754.
+The baked count had that flake read as a regression.
+The revision after it then misattributed the flake to the checkout, asserting that "the total differs between this worktree and a scratch copy of it (754 vs 753)" --- both report 754, and that explanation was itself retracted a revision later.
+The text that shipped states the property and gives no count, saying why.)
+
 ## Where the rule stops: text that records what was observed
 
 Everything above pushes toward replacing a literal with whatever owns it.

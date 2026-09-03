@@ -22,6 +22,8 @@ Run: python3 hooks/test-no-unreviewed-pr.py hooks/no-unreviewed-pr.py
 import importlib.util
 import json
 import os
+import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -1600,6 +1602,77 @@ def _request_ordering_wording():
                                    "sha: .commit.oid"))
 
 
+def _no_attribution_overclaim():
+    """The ALWAYS-RENDERED recovery paragraph must not overclaim attribution.
+
+    The exit status does not belong to the later command in either direction:
+    `false && <request> && gh pr view` leaves it with `false`, and
+    `<request> && gh pr view` where the request fails leaves it with the
+    request. The only sound claim is the negative one (Copilot on
+    ai-config#3024, round 4).
+
+    Scoped to the recovery paragraph alone. The chained paragraphs carry the
+    same needles in `_chained_request_wording`, on a byte-identical fixture,
+    so asserting them here too meant a rewording had to be tracked in two
+    places and would redden a test whose name pointed at the wrong path
+    (adversarial review on the merge).
+    """
+    plain = reason_of(create("c") + [say("Opened it.")])
+    return ("belongs to that later command" not in plain
+            and "is no longer attributed to the request" in plain)
+
+
+def _review_query_null_safe():
+    """The prescribed review-check `jq` must survive a null review author.
+
+    A GitHub review author is nullable -- a deleted account reports
+    `"author": null` -- and `null | startswith(...)` is a hard `jq` error
+    rather than a false. So the unguarded filter aborts the WHOLE query
+    instead of skipping that one review, and the reader sees a jq usage error
+    where the hook promised them a way to confirm their review landed
+    (Copilot on ai-config#3024).
+
+    The guard is already in place; this pins it, because it survived a
+    mutation otherwise. Pinned two ways, since the lexical half alone would
+    pass on a filter that merely mentions the guard somewhere harmless. When
+    `jq` is on PATH the extracted filter is RUN against a fixture whose first
+    review has a null author and whose second is a real Copilot review: it
+    must not error, and must still find the Copilot one.
+    """
+    text = reason_of(create("c") + [say("Opened it.")])
+    match = re.search(r"--jq '(\{head:.*?\})'", text, re.S)
+    if not match:
+        return False
+    filt = match.group(1)
+    if "(.author.login // \"\")" not in filt:
+        return False
+
+    if not shutil.which("jq"):
+        # The lexical half above already fails without the guard, so an
+        # absent `jq` weakens this check rather than voiding it.
+        return True
+
+    fixture = json.dumps({
+        "headRefOid": "deadbeefcafe",
+        "reviews": [
+            {"author": None, "commit": {"oid": "1111111111"},
+             "submittedAt": "2026-01-01T00:00:00Z"},
+            {"author": {"login": "copilot-pull-request-reviewer"},
+             "commit": {"oid": "2222222222"},
+             "submittedAt": "2026-01-02T00:00:00Z"},
+        ],
+    })
+    proc = subprocess.run(["jq", filt], input=fixture, capture_output=True,
+                          text=True)
+    if proc.returncode != 0:
+        return False
+    try:
+        got = json.loads(proc.stdout)
+    except ValueError:
+        return False
+    return [c["sha"] for c in got.get("copilot", [])] == ["22222222"]
+
+
 def _redaction_wording():
     """The block text must NAME the redaction deferral and both escapes.
 
@@ -1789,6 +1862,22 @@ def main():
         passes += 1
     else:
         print("FAIL: the subject's default clock is not date.today()")
+        failures += 1
+
+    if _no_attribution_overclaim():
+        print("PASS: the block does not claim the exit status belongs "
+              "to the later command")
+        passes += 1
+    else:
+        print("FAIL: the block overclaims exit-status attribution")
+        failures += 1
+
+    if _review_query_null_safe():
+        print("PASS: the prescribed review query survives a null review "
+              "author")
+        passes += 1
+    else:
+        print("FAIL: the prescribed review query aborts on a null author")
         failures += 1
 
     if _redaction_wording():

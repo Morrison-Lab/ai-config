@@ -716,11 +716,11 @@ unrelated case flips and the row reports caught.
   "a guard that rejects for a second reason -- a missing file, an empty value, a
   type check -- fails the input whether or not the alternative under test
   exists."
-  This is the INPUT-side twin of "The same collision reaches the ASSERTION, not
-  only the mutation, and there it makes the whole test vacuous" above: there the
-  needle already occurs elsewhere in the unfixed artifact, here an earlier
-  rejection point keeps the input rejected --- both are a case passing for the
-  wrong reason.)
+  This is the INPUT-side twin of the ASSERTION-side collision this file records
+  separately, where the needle already occurs elsewhere in the unfixed artifact
+  so the assertion passes on that pre-existing occurrence; here an earlier
+  rejection point keeps the input rejected instead.
+  Both are a case passing for the wrong reason, by different mechanisms.)
 - **Don't:** infer coverage from a matrix whose rows all read caught; the count
   is a fact about the rows, and only the identity check makes it one about the
   clauses.

@@ -65,7 +65,8 @@ for the formal review itself, and two of those threads being resolved read as
 the review question settled.
 The defect reached `main` and needed a follow-up PR.)
 
-**The rollup trap above has an earlier form: naming a cause the signal never confirmed, and reporting that to a human.**
+**The rollup trap above has an earlier form:
+naming a cause the signal never confirmed, and reporting that to a human.**
 The trap above needs a real, checked cause before it closes.
 This one needs none.
 [`metacognitive-monitoring`](metacognitive-monitoring.md)'s "Read the artifact that failed, not the one beside it" and "A story that fits the evidence is not a finding" own the mechanism and the remedy:

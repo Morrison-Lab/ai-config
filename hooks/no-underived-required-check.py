@@ -139,7 +139,11 @@ RX_PROTECTION_ENDPOINT = re.compile(
     r"[\s\"'/](?:repos|orgs)/[^\s\"']+?"
     # No `(?:/\d+)?` after `rulesets`: under re.search an optional trailing
     # group cannot change whether a match exists, so it would be inert.
-    r"/(?:rulesets|branches/[^\s\"']+/protection)",
+    # A trailing boundary after `rulesets`: without one it matches as a bare
+    # substring, so `repos/o/r/rulesets-backup/1` warns. That can only ever
+    # produce a spurious warning and never a miss, but a guard that fires on a
+    # path no endpoint has is a guard whose warnings get skimmed past.
+    r"/(?:rulesets(?![\w-])|branches/[^\s\"']+/protection)",
 )
 
 # Payload markers: the field named inline, or a whole document supplied by

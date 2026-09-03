@@ -297,6 +297,14 @@ CASES = {
         "a bare `gh` with no subcommand does not index past the end",
         "Bash", "gh", False,
     ),
+    "S13": (
+        "a path that merely STARTS with `rulesets` is not the endpoint",
+        # `rulesets-backup` and `rulesetsimports` are not gh api endpoints.
+        # Raised by the repo's own review bot on #3137.
+        "Bash",
+        "gh api -X PUT repos/o/r/rulesets-backup/1 --input rs.json",
+        False,
+    ),
     "S7": (
         "`--method GET` long form is a read, like `-X GET`",
         "Bash",
@@ -732,7 +740,12 @@ MUTATIONS = {
         "only ruleset / branch-protection endpoints are in scope",
         [("        if not RX_PROTECTION_ENDPOINT.search(segment):\n"
           "            continue\n", "")],
-        {"S3"},
+        {"S3", "S13"},
+    ),
+    "endpoint_rulesets_boundary": (
+        "`rulesets` needs a trailing boundary, or it matches as a substring",
+        [("rulesets(?![\\w-])", "rulesets")],
+        {"S13"},
     ),
     "endpoint_orgs": (
         "organization rulesets are in scope, not only repository ones",

@@ -594,11 +594,12 @@ So the hazard is real and it is a **truncation** hazard rather than a suffix haz
 `agentId` begins with a hex character, which is what turns a short fingerprint into a plausible-looking wrong one instead of a parse failure.
 A wrong sha refuses the push with "the clean verdict is for commit X, but this push would ship Y" --- a message that reads as a stale verdict and is nothing of the kind.
 
-The remedy costs one line either way, and is cheap insurance rather than a fix for a demonstrated break at 40 characters.
+The remedy below costs one line and reads as cheap insurance rather than a fix for a demonstrated break at 40 characters, which is how it was first written up here.
 The block below is a report's TAIL, not a whole report.
 It shows the REORDERED ordering described above --- verdict and fingerprint after the payload --- which is the shape the sentinel exists for and the shape this file's "Structured review data" section rules out.
 So read the block as the mitigation for that reordering, not as a template to copy.
-What [#3050](https://github.com/Morrison-Lab/ai-config/issues/3050) has to settle is which of the two orderings a brief should mandate, not whether a conforming report needs a sentinel.
+[#3050](https://github.com/Morrison-Lab/ai-config/issues/3050) has since settled which of the two orderings a brief should mandate, and it settled it against the block below: the payload goes last, a conforming report carries no sentinel, and the fingerprint is the full sha.
+The block stays because a brief written elsewhere can still reorder the tail, and the mitigation for that shape is worth keeping legible.
 
 ```
 -->
@@ -611,17 +612,29 @@ The leading `-->` is the JSON payload's own closing marker, included so the orde
 
 The sentinel puts a non-hex line between the fingerprint and anything the harness appends, so the fingerprint's length stops mattering.
 
+It is not free, though, and its cost is what settled #3050 against it.
+[`scripts/pre-push-review.py`](../../scripts/pre-push-review.py) strips HTML comments before scanning whatever follows the last fingerprint, so a payload-last report leaves that tail empty and passes.
+What it admits there, `_TRAILING_AFTER_FINGERPRINT`, is a status banner, an `=` rule, a disclosure footer, a stopping-point line, or a restated verdict.
+`--- end of report ---` is none of those, so a sentinel fails that gate with "Reviewed-Commit fingerprint must be at the very end of the report" --- and it fails it under either ordering, since the payload is stripped either way and the sentinel still trails the fingerprint (measured 2026-09-03 against `_TRAILING_AFTER_FINGERPRINT` itself).
+So the sentinel trades a hazard the full sha already removes for a hard refusal from a different consumer.
+
 Two caveats.
 The concatenation has been observed on Claude Code's `Agent` tool and nowhere else, so it is a claim about that harness on that date rather than about subagent dispatch generally.
 And the **reordering** is what sits in tension with [`.claude/agents/adversarial-reviewer.md`](../../.claude/agents/adversarial-reviewer.md)'s own instruction to emit nothing after the JSON payload's closing `-->`.
 The sentinel is not the source of that tension and does not add to it: a brief that puts the verdict and the fingerprint after the payload has already overridden the emit-nothing instruction, and the sentinel then joins a tail that exists either way.
 The ordering the guard parsed successfully was that reordered one --- which is a statement about the guard, not an endorsement, since the same ordering fails this file's payload-last contract.
-Which of the two orderings a brief should mandate is #3050's decision, as named above, rather than something to settle inside a review brief.
+That decision is made, per #3050: a brief mandates the payload-last ordering, so a conforming report never puts the fingerprint last and the tension never arises in one.
+The parser is what makes payload-last free rather than merely tidier --- `parse_report` blanks HTML comments before both of its searches, so the payload can neither supply nor displace a verdict or a fingerprint.
+Measured 2026-09-03 by running `parse_report` over a report whose Markdown fingerprint and payload `commit_sha` named different commits;
+it returned the Markdown one.
 It is adjacent to [#2483](https://github.com/Morrison-Lab/ai-config/issues/2483) and not the same item: that issue is about verdicts arriving via background task notifications going unregistered.
 
+- **Do:** mandate the payload-last tail in every review brief you write --- verdict, then fingerprint, then payload, and nothing after it.
 - **Do:** state the fingerprint as the **full 40-character** sha, which is what actually protects it.
-- **Do:** add the sentinel line after it *when a brief reorders the tail so the fingerprint is last*, as cheap insurance against a truncated or reformatted fingerprint.
 - **Do:** read a "verdict is for commit X, but this push would ship Y" refusal as possibly a *misparsed* fingerprint rather than only a stale one --- print what the guard captured before concluding.
+- **Don't:** write a brief that puts the verdict and the fingerprint after the payload, or that asks for a trailing sentinel.
+- **Don't:** reach for the sentinel as insurance on a report [`pre-push-review.py`](../../scripts/pre-push-review.py) validates;
+  it fails that gate's trailing-content check wherever it sits after the fingerprint.
 - **Don't:** claim the suffix breaks a 40-character fingerprint;
   run `REVIEWED_COMMIT` over the line before asserting either way.
 - **Don't:** abbreviate the sha in a review brief's template, which is the input that turns the suffix into a silently wrong parse.

@@ -476,7 +476,7 @@
   gh api "repos/<o>/<r>/contents/.github/workflows/<file>?ref=<default-branch>" --jq .content | base64 -d
   ```
   A run can corroborate that those definitions compose as you read them, but **which** run is usable is the subtle half -- a `pull_request` run resolves the file from the head-into-base merge, so its base and its touched paths both matter.
-  [`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md)'s eleventh shape carries those conditions.
+  [`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md)'s twelfth shape carries those conditions.
   Do not reconstruct them from a `gh api .../jobs` line here, since a placeholder that names no branch is exactly what drops them.
   - **Do:** read the workflow file at `?ref=<default-branch>` and compose the context string from its job names.
   - **Don't:** read a required-context string off any pull request's check runs -- merged, recent, or green.

@@ -268,15 +268,32 @@ discovers a project's documented conventions --- self-apply them first.
 See [`ardi.cases.md`](ardi.cases.md), "A review round surfacing five findings
 your own conventions already covered".
 
-**Three or more rounds without a consensus of clean verdicts is a question
-about the process, not about the PR.**
-When a PR has been through three review rounds and the reviewers still do not
-agree that it is clean, ask whether the way you are working the PR is wrong,
-and act on the answer inside the same round.
+**Three or more review rounds that each returned findings is a question about
+the process, not about the PR.**
+When a PR has been through three finding-bearing rounds --- one reviewer
+returning findings three times over, or several reviewers disagreeing about
+whether it is clean --- ask whether the way you are working the PR is wrong, and
+act on the answer inside the same round.
+The issue that prompted this rule phrased the trigger as "without reaching a
+consensus of clean review verdicts".
+Read that as the reviewers agreeing the PR is clean, not as the per-item
+agreement between you and one reviewer that
+[`ardi`](../../skills/ardi/SKILL.md)'s deadlock rule calls consensus.
 
-This is not the round-count stopping guard, which
-[`ardi`](../../skills/ardi/SKILL.md)'s "Stopping conditions" bans and which
-stays banned.
+Count only the rounds that raised a finding.
+A round that reads not-clean because the reviewer's own instrument reported its
+own check pending, rather than because it raised a finding, is not one of the
+three --- see [`fully-clean`](fully-clean.md)'s ai-config#2442 record, where
+three rounds produced one nit, one nit, and then nothing while the instrument
+reported not-clean in all three.
+
+This is not the round-count stopping guard.
+[`ardi`](../../skills/ardi/SKILL.md)'s "Stopping conditions" bans that guard and
+it stays banned, and so does
+[`address-every-comment`](address-every-comment.md)'s "a round count is never a
+reason to stop".
+Neither is displaced here: the count still licenses no stop, only a changed
+procedure.
 That guard asks the *user* whether to accept the current state, which hands
 triage back and stops the loop.
 This asks *you* whether the procedure that produced three finding-bearing
@@ -288,38 +305,66 @@ ending "shall we accept the current state?".
 things:
 
 - **The local checks.**
-  Name the check that would have caught this round's findings before the push,
-  and run it from now on.
-  The pre-push checklist below is the standing list;
-  a repo's own documented checks (its `CONTRIBUTING.md`, its CI steps run
-  locally) are the ones most often left to the reviewer to discover.
+  The self-apply-your-conventions rule directly above already requires running
+  the project's own review skills against your own diff before every push.
+  The increment at round three is to name the one check that would have caught
+  *this* round's findings, and to run it from then on.
 - **The approach.**
   Ask whether the diff itself is the problem rather than its defects --- too
-  large to review as a unit, built on a design that was never settled, or
-  solving a problem the repo solves elsewhere.
+  large to review as a unit
+  ([`split-concerns`](../../skills/split-concerns/SKILL.md), sequenced with
+  [`stack-prs`](../../skills/stack-prs/SKILL.md)), built on a design that was
+  never settled ([`brainstorm`](../../skills/brainstorm/SKILL.md)), or solving a
+  problem the repo solves elsewhere
+  ([`prefer-upstream`](../../skills/prefer-upstream/SKILL.md)).
   A round-three finding that contradicts a round-one fix is evidence for this
   rather than for another fix.
-- **The order of reviewers.**
-  A forge review round is the most expensive reviewer available, so route a
-  preliminary round through a cheap or free model on a CLI first ---
-  [`pre-push-review`](../../skills/pre-push-review/SKILL.md),
-  [`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md), or
-  [`delegate-to-opencode`](../../skills/delegate-to-opencode/SKILL.md) ---
-  and spend the forge round on what survives it.
+- **The independence of the reviewer.**
+  The pre-push checklist below already requires an `adversarial-reviewer`
+  subagent pass on every push, and that pass is same-family by construction.
+  The increment at round three is a *cross-family* round on top of it, never in
+  place of it.
+  A forge round is metered and slower than a local one --- the three rounds on
+  ai-config#2442 cost $4.60 between them, per
+  [`fully-clean`](fully-clean.md) --- so spend the forge round on what survives
+  the cheaper reviewer.
+  Dispatch in [`adversarial-self-review`](adversarial-self-review.md)'s
+  independence-and-availability order: the `agy` CLI or
+  [`delegate-to-opencode`](../../skills/delegate-to-opencode/SKILL.md)'s
+  unbilled hosted tier first, then
+  [`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md), which is
+  separately billed.
+  [`adv`](../../skills/adv/SKILL.md) and
+  [`pre-push-review`](../../skills/pre-push-review/SKILL.md) run this from the
+  machine, but point `--engine` at a cheap or free engine: their default `auto`
+  chain starts at `claude`, so an unqualified invocation buys neither cost nor
+  independence.
 
 Read the three rounds' findings together rather than round by round, because
 the classes are the evidence and no single round carries them.
-Three rounds of one class points at a missing local check.
-Three rounds of unrelated classes points at the approach.
+This is the loop-scale form of
+[`learn-from-review-findings`](learn-from-review-findings.md)'s "count the knob
+rather than the rounds" and of
+[`address-every-comment`](address-every-comment.md)'s growth-rate check, applied
+to the procedure that produced the rounds rather than to one finding's class.
+One recurring class is evidence for a missing local check *or* for a missing
+generalization: ai-config#1777's three rounds of one class resolved to a writing
+rule rather than to a check, per
+[`metacognitive-monitoring`](metacognitive-monitoring.md).
+Three rounds of unrelated classes point at the approach instead.
 
-- **Do:** at the third round without consensus, name the check, the reviewer,
-  or the change of approach that would have caught this round's findings
-  before the push, and apply it in the same round.
-- **Do:** run a cheap or free CLI review before spending another forge round,
-  once forge rounds are what the loop is spending.
+- **Do:** at the third finding-bearing round and at every later one, name the
+  check, the reviewer, or the change of approach that would have caught this
+  round's findings before the push, and apply it in the same round.
+- **Do:** at that round, escalate the *independence* of the pre-push review
+  already required below, dispatching a different model family through a CLI
+  rather than repeating the same-family pass.
 - **Don't:** turn the count into a question to the user about whether to
   accept unaddressed findings --- that is the stopping guard, and it is still
   banned.
+- **Don't:** read the cross-family round as where local review begins;
+  [`adversarial-self-review`](adversarial-self-review.md) requires a local pass
+  on every push, from the first.
 - **Don't:** report having considered the process when nothing about the next
   round changed;
   the round count is a prompt to change something, not a step to record.
@@ -330,7 +375,9 @@ we're doing something wrong", asking whether more local checks belong before
 the push, whether the whole approach is wrong, and whether cheap or free
 models run through CLIs could give a rough preliminary review before a more
 expensive forge review.
-Tracked as ai-config#3110.)
+Tracked as ai-config#3110, whose remaining bullet --- an audit of which
+additional standing checks belong in the pre-push checklist --- this section
+does not perform.)
 
 ### Pre-push checklist
 

@@ -57,6 +57,8 @@ state?" is the same hedging this paragraph bans, moved up from one finding to
 the whole loop --- see
 [`ardi`](../../skills/ardi/SKILL.md)'s "Stopping conditions" for why it fails
 and for the case record.
+The count does license a changed *procedure*, though never a stop --- see
+[`ardi`](ardi.md)'s "Three or more review rounds that each returned findings".
 
 **Noise is per-item, not per-round --- don't stop the whole loop over one
 recurring flag.** A long-running PR can have both real findings (worth fixing

@@ -919,7 +919,7 @@ The docstring was still uncorrected on that branch as this was written.)
 
 **A twelfth: a pull request's check-run names, standing in for the branch's own workflow definitions.**
 
-The seventh and eleventh shapes above are both substitutions across time, and both are unaware, so what is new here is that **the artifact offers nothing to date**.
+The seventh and eleventh shapes above are both substitutions across time, and the eleventh is unaware too, so what is new here is that **the artifact offers nothing to date**.
 The seventh reads a future state for the present one knowingly, because the future state is the one being worked toward.
 The eleventh reads a stale past one from a citable artifact: an issue carries a number and a timestamp, so its staleness is checkable by anyone who thinks to check, and what defeats it is that nothing prompts the read.
 A check-run **name** carries neither.

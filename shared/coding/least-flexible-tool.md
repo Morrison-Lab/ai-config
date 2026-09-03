@@ -172,12 +172,12 @@ The rule never needed the rest: what makes this the third occurrence is that fou
 
 (Dates Pacific; the commits are timestamped 2026-08-25 UTC.)
 
-**Fourth occurrence, 2026-09-02 on [ai-config#3101](https://github.com/Morrison-Lab/ai-config/pull/3101), and the one that asks what to write down when the layer change cannot land in the round that found it.**
+**Fourth occurrence, 2026-09-03 on [ai-config#3101](https://github.com/Morrison-Lab/ai-config/pull/3101), and the one that asks what to write down when the layer change cannot land in the round that found it.**
 Everything above settles when to stop and what to reach for.
 It leaves open the case where the lexer is a rework rather than a patch, so the round that diagnoses it ships a matcher it has just established cannot work.
 
 The question there was whether an earlier command had *read a config manifest under the root about to be deleted*, which needs the verb, which argument is the operand, and which root that operand sits under.
-The last two are positional, so the pattern could not decide them, and its revisions kept closing one boundary case while leaving a neighbouring one open.
+All three are positional under #3126's remedy --- `argv[0]` membership for the verb, and the argument list for the rest --- and a pattern over raw text can decide none of them, so its revisions kept closing one boundary case while leaving a neighbouring one open.
 A sample of what the rounds found, which is how [#3126](https://github.com/Morrison-Lab/ai-config/issues/3126) itself introduces the same list:
 
 - a manifest *name* supplied with no root;

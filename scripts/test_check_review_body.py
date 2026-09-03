@@ -190,6 +190,17 @@ check("an ARD disposition summary is skipped, not classified", verdict(
     f"addressed.\n\n## Verdict\n\nVerdict: Ready for merge\n{FINGERPRINT}\n"),
     "IGNORED")
 
+# A finding blocks only once the item is ADMITTED. The suite's other
+# finding-driven case has `classify_verdict == "not-clean"` directly, so it
+# never isolated the `or finding` fallback -- which is how an
+# admission-independent trigger survived four rounds.
+check("a bare finding section with no verdict is not admitted, so it blocks nothing",
+      verdict("## Nits\n\n- a small thing\n"), "NO-VERDICT")
+check("the same finding inside an ADMITTED clean body does block", verdict(
+    f"## Summary\n\nfine\n\n## Nits\n\n- a small thing\n\n## Verdict\n\n"
+    f"Verdict: Ready for merge\n{FINGERPRINT}\n"),
+    "NOT-CLEAN")
+
 if failures:
     print("FAILED:")
     for line in failures:

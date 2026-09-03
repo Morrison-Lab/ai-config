@@ -159,11 +159,19 @@ def analyse(body, mod):
     if notice:
         result["verdict"] = "IGNORED"
         result["why"] = "a non-review notice, which the checker skips"
-    elif verdict == "not-clean" or finding:
+    elif verdict == "not-clean":
+        # `not-clean` admits from ANY author, fail-closed, so this needs no
+        # structure test.
         result["verdict"] = "NOT-CLEAN"
-        result["why"] = (
-            f"an unresolved finding pattern matches: {finding}" if finding
-            else "the classifier reads this as not-clean")
+        result["why"] = "the classifier reads this as not-clean"
+    elif verdict == "clean" and structured and finding:
+        # A finding blocks only once the item is ADMITTED. An earlier version
+        # made `finding` an admission-independent trigger, so a bare
+        # `## Nits` section with no verdict and no fingerprint reported
+        # NOT-CLEAN -- while the real checker never admits it, so it never
+        # blocks. Reproduced: `printf '## Nits\n\n- a small thing\n'`.
+        result["verdict"] = "NOT-CLEAN"
+        result["why"] = f"admitted as clean, but a finding pattern matches: {finding}"
     elif verdict == "unreadable":
         # Explicit, because falling through to CLEAN is what the previous
         # version did. The checker routes this to `unreadable_items`, a NOTE

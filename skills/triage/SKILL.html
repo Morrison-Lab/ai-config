@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="description" content="Detect and remove dead code, orphaned configs, stale docs.">
+<meta name="description" content="Triage backlog: P1/P2/P3 or close.">
 
 <title>skill – ai-config</title>
 <style>
@@ -346,24 +346,20 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#prune-dead-code" id="toc-prune-dead-code" class="nav-link active" data-scroll-target="#prune-dead-code">prune-dead-code</a>
+  <li><a href="#triage" id="toc-triage" class="nav-link active" data-scroll-target="#triage">triage</a>
   <ul class="collapse">
   <li><a href="#when-this-fires" id="toc-when-this-fires" class="nav-link" data-scroll-target="#when-this-fires">When this fires</a></li>
-  <li><a href="#scope" id="toc-scope" class="nav-link" data-scroll-target="#scope">Scope</a></li>
-  <li><a href="#audit-and-elimination-procedure" id="toc-audit-and-elimination-procedure" class="nav-link" data-scroll-target="#audit-and-elimination-procedure">Audit and elimination procedure</a>
+  <li><a href="#procedure" id="toc-procedure" class="nav-link" data-scroll-target="#procedure">Procedure</a>
   <ul class="collapse">
-  <li><a href="#step-1-commented-out-code-sweep" id="toc-step-1-commented-out-code-sweep" class="nav-link" data-scroll-target="#step-1-commented-out-code-sweep">Step 1: Commented-out code sweep</a></li>
-  <li><a href="#step-2-unused-symbols-functions-and-imports" id="toc-step-2-unused-symbols-functions-and-imports" class="nav-link" data-scroll-target="#step-2-unused-symbols-functions-and-imports">Step 2: Unused symbols, functions, and imports</a></li>
-  <li><a href="#step-3-orphaned-configurations-and-scripts" id="toc-step-3-orphaned-configurations-and-scripts" class="nav-link" data-scroll-target="#step-3-orphaned-configurations-and-scripts">Step 3: Orphaned configurations and scripts</a></li>
-  <li><a href="#step-4-unreferenced-memory-entries-and-documentation" id="toc-step-4-unreferenced-memory-entries-and-documentation" class="nav-link" data-scroll-target="#step-4-unreferenced-memory-entries-and-documentation">Step 4: Unreferenced memory entries and documentation</a></li>
-  <li><a href="#step-5-verify-reachability-and-boundaries" id="toc-step-5-verify-reachability-and-boundaries" class="nav-link" data-scroll-target="#step-5-verify-reachability-and-boundaries">Step 5: Verify reachability and boundaries</a></li>
-  <li><a href="#step-6-atomic-deletion-and-dependency-cleanup" id="toc-step-6-atomic-deletion-and-dependency-cleanup" class="nav-link" data-scroll-target="#step-6-atomic-deletion-and-dependency-cleanup">Step 6: Atomic deletion and dependency cleanup</a></li>
-  <li><a href="#step-7-validation-and-verification" id="toc-step-7-validation-and-verification" class="nav-link" data-scroll-target="#step-7-validation-and-verification">Step 7: Validation and verification</a></li>
+  <li><a href="#build-the-plan" id="toc-build-the-plan" class="nav-link" data-scroll-target="#build-the-plan">1. Build the plan</a></li>
+  <li><a href="#read-the-p1-and-close-lists-in-full" id="toc-read-the-p1-and-close-lists-in-full" class="nav-link" data-scroll-target="#read-the-p1-and-close-lists-in-full">2. Read the P1 and close lists in full</a></li>
+  <li><a href="#apply" id="toc-apply" class="nav-link" data-scroll-target="#apply">3. Apply</a></li>
+  <li><a href="#report" id="toc-report" class="nav-link" data-scroll-target="#report">4. Report</a></li>
   </ul></li>
-  <li><a href="#report-format" id="toc-report-format" class="nav-link" data-scroll-target="#report-format">Report format</a></li>
+  <li><a href="#checklist" id="toc-checklist" class="nav-link" data-scroll-target="#checklist">Checklist</a></li>
   </ul></li>
   </ul>
-<div class="toc-actions"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/prune-dead-code/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/prune-dead-code/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
+<div class="toc-actions"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/triage/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/triage/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
     </div>
 <!-- main -->
 <main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"></header>
@@ -372,117 +368,51 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 
 
-<section id="prune-dead-code" class="level1">
-<h1>prune-dead-code</h1>
-<p>Audit the codebase to systematically detect and remove dead code, obsolete functions, orphaned configuration files, unreferenced memory entries, and commented-out code blocks. Operationalizes the <a href="../../shared/principles/dead-code-is-tech-debt.md">dead-code-is-tech-debt</a> principle.</p>
+<section id="triage" class="level1">
+<h1>triage</h1>
+<p>Run the backlog triage pass from <a href="../../shared/workflow/triage-backlog.md"><code>triage-backlog</code></a>: every open issue ends the pass carrying exactly one of <code>P1</code>, <code>P2</code>, <code>P3</code>, or closed.</p>
 <section id="when-this-fires" class="level2">
 <h2 class="anchored" data-anchor-id="when-this-fires">When this fires</h2>
 <ul>
-<li>User says <code>/prune-dead-code</code>, <code>/pdc</code>, “remove dead code”, “clean up unused functions”, “find commented-out code”, or “audit for dead assets”.</li>
-<li>After a major refactoring, migration, or feature consolidation.</li>
-<li>Routine repository hygiene and maintenance passes.</li>
+<li>“triage the backlog”, “triage issues”, “/triage”.</li>
+<li>The weekly triage routine.</li>
+<li><code>gi</code> / <code>gii</code> / <code>gip</code> step 2 finds more than a handful of unlabelled open issues, which means the weekly pass was missed.</li>
 </ul>
 </section>
-<section id="scope" class="level2">
-<h2 class="anchored" data-anchor-id="scope">Scope</h2>
-<p>If the user specifies a directory, file, or component, restrict the audit to that scope. Otherwise, perform a repository-wide sweep.</p>
+<section id="procedure" class="level2">
+<h2 class="anchored" data-anchor-id="procedure">Procedure</h2>
+<p>Commands are annotated with their abstract operation token; in a session without <code>gh</code>, resolve through <a href="../../tool-mappings.md"><code>tool-mappings.md</code></a>. The instrument itself needs <code>gh</code> to fetch and apply; without it, fetch the open issues through the mapped list tool into a JSON file and pass <code>--input</code>, then perform the plan’s operations through the mapped issue write tool.</p>
+<section id="build-the-plan" class="level3">
+<h3 class="anchored" data-anchor-id="build-the-plan">1. Build the plan</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode sh code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> scripts/triage-backlog.py <span class="at">-R</span> <span class="op">&lt;</span>owner<span class="op">&gt;</span>/<span class="op">&lt;</span>repo<span class="op">&gt;</span> --json <span class="op">&gt;</span> /tmp/triage-plan.json   <span class="co"># LIST_ISSUES</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> scripts/triage-backlog.py <span class="at">-R</span> <span class="op">&lt;</span>owner<span class="op">&gt;</span>/<span class="op">&lt;</span>repo<span class="op">&gt;</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The stderr summary reports <code>examined N open issues</code> and the per-bucket counts. <code>N</code> must equal the repo’s open-issue count; a smaller number means the fetch was truncated.</p>
 </section>
-<section id="audit-and-elimination-procedure" class="level2">
-<h2 class="anchored" data-anchor-id="audit-and-elimination-procedure">Audit and elimination procedure</h2>
-<p>Follow this step-by-step workflow:</p>
-<section id="step-1-commented-out-code-sweep" class="level3">
-<h3 class="anchored" data-anchor-id="step-1-commented-out-code-sweep">Step 1: Commented-out code sweep</h3>
-<p>Search for blocks of code disabled behind comment characters:</p>
+<section id="read-the-p1-and-close-lists-in-full" class="level3">
+<h3 class="anchored" data-anchor-id="read-the-p1-and-close-lists-in-full">2. Read the P1 and close lists in full</h3>
+<p>Read every proposed <code>P1</code>, <code>not-planned</code>, and <code>duplicate</code> row. The heuristic keys on title phrases, so a discussion about a deadlock can land at P1 and a defect phrased as a question can land at P3. Collect corrections as <code>--override N=P</code> arguments. Skim P2 and P3 for the same two mistakes; reading them in full is not required.</p>
+</section>
+<section id="apply" class="level3">
+<h3 class="anchored" data-anchor-id="apply">3. Apply</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode sh code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> scripts/triage-backlog.py <span class="at">-R</span> <span class="op">&lt;</span>owner<span class="op">&gt;</span>/<span class="op">&lt;</span>repo<span class="op">&gt;</span> --override N=P ... <span class="at">--apply</span> <span class="at">--dry-run</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> scripts/triage-backlog.py <span class="at">-R</span> <span class="op">&lt;</span>owner<span class="op">&gt;</span>/<span class="op">&lt;</span>repo<span class="op">&gt;</span> --override N=P ... <span class="at">--apply</span>   <span class="co"># LABEL_ISSUE, CLOSE_ISSUE</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Adding a label the repo lacks creates it with GitHub’s default colour.</p>
+</section>
+<section id="report" class="level3">
+<h3 class="anchored" data-anchor-id="report">4. Report</h3>
+<p>Post nothing to the tracker beyond the closes’ own comments. In chat, give the bucket counts, the examined count, every issue closed with its one-line reason, and the P1 list, each number linked.</p>
+</section>
+</section>
+<section id="checklist" class="level2">
+<h2 class="anchored" data-anchor-id="checklist">Checklist</h2>
+<p>Do-Confirm, at the moment the <code>--apply</code> command is about to run:</p>
 <ol type="1">
-<li>Grep for common commented code patterns:
-<ul>
-<li>Python: <code>grep -rnE '^\s*#\s*(def |class |import |from |return |if __name__)' &lt;path&gt;</code></li>
-<li>JavaScript/TypeScript: <code>grep -rnE '^\s*//\s*(function |class |import |export |const |let |var )' &lt;path&gt;</code></li>
-<li>R: <code>grep -rnE '^\s*#\s*([a-zA-Z0-9_.]+\s*&lt;-\s*function|library\(|source\()' &lt;path&gt;</code></li>
-<li>Shell: <code>grep -rnE '^\s*#\s*(function |alias |export )' &lt;path&gt;</code></li>
-</ul></li>
-<li>Distinguish informative comments (explanations, rationale, citations, constraints) from disabled code blocks.</li>
-<li>Remove disabled code blocks completely. Rely on git history as the permanent archive.</li>
+<li>Examined count equals the open-issue count.</li>
+<li>Every P1 row was read, and each is a live block, not a discussion.</li>
+<li>Every close row was read, and each is a junk title, an aphorism, or a duplicate of an older open issue.</li>
+<li>Anything unlikely-but-actionable is P3, not closed.</li>
+<li>The dry run printed the command set, and its count matches expectations.</li>
 </ol>
-</section>
-<section id="step-2-unused-symbols-functions-and-imports" class="level3">
-<h3 class="anchored" data-anchor-id="step-2-unused-symbols-functions-and-imports">Step 2: Unused symbols, functions, and imports</h3>
-<p>Detect uncalled functions, unused variables, and dangling imports using language-specific tools:</p>
-<ul>
-<li><strong>Python:</strong>
-<ul>
-<li>Run <code>ruff check --select F401,F841 &lt;path&gt;</code> or <code>flake8 --select=F401,F841 &lt;path&gt;</code> to find unused imports and variables.</li>
-<li>Run <code>vulture &lt;path&gt;</code> (if installed) or grep for defined <code>def</code> / <code>class</code> names across the repository to verify callers.</li>
-</ul></li>
-<li><strong>JavaScript / TypeScript:</strong>
-<ul>
-<li>Run <code>npx knip</code> or <code>npx ts-prune</code> to find unused exports and files.</li>
-<li>Run <code>npx eslint</code> for <code>no-unused-vars</code> / <code>@typescript-eslint/no-unused-vars</code>.</li>
-</ul></li>
-<li><strong>R:</strong>
-<ul>
-<li>Check with <code>lintr::lint(path, linters = lintr::unused_import_linter())</code>.</li>
-<li>Check test coverage with <code>covr::package_coverage()</code> to identify unexercised functions.</li>
-</ul></li>
-<li><strong>Shell / Scripts:</strong>
-<ul>
-<li>Audit function declarations in scripts: search for function names across all callers.</li>
-</ul></li>
-</ul>
-</section>
-<section id="step-3-orphaned-configurations-and-scripts" class="level3">
-<h3 class="anchored" data-anchor-id="step-3-orphaned-configurations-and-scripts">Step 3: Orphaned configurations and scripts</h3>
-<p>Identify files no longer connected to the build, test, or execution pipeline:</p>
-<ol type="1">
-<li><strong>Manifest and registration audit:</strong>
-<ul>
-<li>In <code>ai-config</code>: verify every script in <code>hooks/</code> has an entry in <code>hooks/hooks.json</code> and a test in <code>hooks/test-*.py</code>.</li>
-<li>Verify every skill in <code>skills/</code> has a valid <code>SKILL.md</code> and corresponding <code>codex-skills/</code> wrapper.</li>
-<li>Verify plugin declarations in <code>plugins/</code> match active manifests.</li>
-</ul></li>
-<li><strong>CI/CD workflows:</strong>
-<ul>
-<li>Check <code>.github/workflows/</code> for references to scripts, actions, or steps that no longer exist.</li>
-</ul></li>
-<li><strong>Orphaned dotfiles and templates:</strong>
-<ul>
-<li>Identify unused configuration files for tools no longer used in the project.</li>
-</ul></li>
-</ol>
-</section>
-<section id="step-4-unreferenced-memory-entries-and-documentation" class="level3">
-<h3 class="anchored" data-anchor-id="step-4-unreferenced-memory-entries-and-documentation">Step 4: Unreferenced memory entries and documentation</h3>
-<p>Detect stale memories and documentation orphans:</p>
-<ol type="1">
-<li>Run <code>python3 scripts/check-stale-records.py</code> to identify unreferenced memory entries and documentation files not linked from <code>memories/README.md</code> or other catalog files.</li>
-<li>Check for documentation referencing deleted CLI commands, removed options, or obsolete architecture.</li>
-<li>Run <code>python3 scripts/check-links.py</code> (or repo link checker) to ensure no broken relative links exist.</li>
-</ol>
-</section>
-<section id="step-5-verify-reachability-and-boundaries" class="level3">
-<h3 class="anchored" data-anchor-id="step-5-verify-reachability-and-boundaries">Step 5: Verify reachability and boundaries</h3>
-<p>Before deleting any symbol or file: 1. Grep for string references, dynamic lookups, reflection, CLI entry points, and environment variable dispatch. 2. For published libraries or packages, verify whether the symbol is part of the documented public API export contract. 3. If an active capability serves legitimate users and was questioned only because a default behavior was problematic, follow <a href="../../shared/principles/prefer-optionality-over-removal.md">prefer-optionality-over-removal</a> instead of deleting it.</p>
-</section>
-<section id="step-6-atomic-deletion-and-dependency-cleanup" class="level3">
-<h3 class="anchored" data-anchor-id="step-6-atomic-deletion-and-dependency-cleanup">Step 6: Atomic deletion and dependency cleanup</h3>
-<p>When removing dead code: 1. Delete the implementation. 2. Delete corresponding unit tests, integration tests, and test fixtures that only tested the dead code. 3. Delete documentation entries, manual pages, docstrings, and export declarations. 4. Delete manifest bindings, wrapper files, and build script entries.</p>
-</section>
-<section id="step-7-validation-and-verification" class="level3">
-<h3 class="anchored" data-anchor-id="step-7-validation-and-verification">Step 7: Validation and verification</h3>
-<p>Run all verification suites: 1. Execute test suites (e.g.&nbsp;<code>pytest</code>, <code>npm test</code>, <code>Rscript -e 'devtools::test()'</code>). 2. Run linters and link checkers (e.g.&nbsp;<code>python3 scripts/validate-skills.py</code>, <code>python3 scripts/check-links.py</code>, <code>npx markdownlint-cli2</code>). 3. Confirm clean test passes with zero regressions.</p>
-</section>
-</section>
-<section id="report-format" class="level2">
-<h2 class="anchored" data-anchor-id="report-format">Report format</h2>
-<p>Summarize removals clearly:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">### Dead Code Pruning Summary</span></span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Commented-out code:** <span class="dt">&lt;</span><span class="kw">N</span><span class="dt">&gt;</span> blocks removed (<span class="dt">&lt;</span><span class="kw">file</span><span class="ot"> paths</span><span class="dt">&gt;</span>)</span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Obsolete symbols/functions:** <span class="dt">&lt;</span><span class="kw">N</span><span class="dt">&gt;</span> functions removed (<span class="dt">&lt;</span><span class="kw">symbol</span><span class="ot"> names </span><span class="er">&amp;</span><span class="ot"> files</span><span class="dt">&gt;</span>)</span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Orphaned configs/scripts:** <span class="dt">&lt;</span><span class="kw">N</span><span class="dt">&gt;</span> files removed (<span class="dt">&lt;</span><span class="kw">file</span><span class="ot"> paths</span><span class="dt">&gt;</span>)</span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Unreferenced docs/memories:** <span class="dt">&lt;</span><span class="kw">N</span><span class="dt">&gt;</span> files/sections updated</span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Total lines removed:** <span class="dt">&lt;</span><span class="kw">N</span><span class="dt">&gt;</span> lines</span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Verification status:** Tests passing (<span class="dt">&lt;</span><span class="kw">test</span><span class="ot"> summary</span><span class="dt">&gt;</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 
 
 </section>
@@ -912,7 +842,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     </div>   
     <div class="nav-footer-center">
 <p>Built with <a href="https://quarto.org/">Quarto</a></p>
-<div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/prune-dead-code/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/prune-dead-code/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></div>
+<div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/triage/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/triage/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></div>
     <div class="nav-footer-right">
       &nbsp;
     </div>

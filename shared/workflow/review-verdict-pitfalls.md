@@ -219,7 +219,7 @@ On the branch: zero `claude-code-review.yml` workflow runs, and two `ai-code-rev
 On PR #891's head `e49d47a1d828a108a0aa01bdda7274b0ab5a05c5`: 31 check runs, and none of them `review / claude-review`, `require-review` or `require-clean-verdict`.
 Three of those 31 concluded something other than `success` --- `ai-review` and `redaction-gate`, the skipped jobs of the dispatcher named above, and a `copilot-pull-request-reviewer` run that concluded `cancelled`.
 None concluded `failure`, which is the point: a sweep asking whether anything is red gets "no" from a head that no reviewer had read.
-The repair was to dispatch `ai-code-review.yml` by hand at 06:42:42 UTC, run `33724497297`, which is the deliberate override that workflow's own header documents.
+The repair was to dispatch `ai-code-review.yml` by hand at 06:42:42 UTC, run `33724497297`, which reaches the review because `redaction-gate`'s own `if:` admits `workflow_dispatch` alongside a non-draft `pull_request`.
 It then selected and fired `claude-code-review.yml`, and that run produced the three missing checks, all of them clean by 06:46:20 UTC.
 Note which workflow was dispatched by hand: the dispatcher, not the review workflow beneath it, which was bot-triggered as a consequence.
 An earlier draft of this very paragraph named the wrong one, in an entry whose whole subject is telling a dispatcher apart from what it dispatches.

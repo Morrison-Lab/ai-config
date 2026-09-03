@@ -1383,13 +1383,14 @@ The check is two steps, and the **second** is the one that decides:
 ```bash
 uptime                                   # step 1: load average (Windows: Get-Counter)
 for i in 1 2 3 4 5; do                   # step 2: the one that decides
-  ( TIMEFORMAT=%R; time <the command> >/dev/null; ) 2>&1
+  ( TIMEFORMAT=%R; time <the command> >/dev/null 2>/dev/null \
+      || echo "  ^ FAILED (exit $?)"; ) 2>&1
 done                                     # -> one elapsed-seconds figure per run
 ```
 
 The loop uses the shell's **reserved word** `time` rather than `/usr/bin/time -f %e`, which is the form that first suggested itself and does not run: the binary is absent from this corpus's own remote containers (`exit 127`, measured), and `-f` is GNU-only where it is present, so the step the prose calls decisive would have printed nothing and left the reader holding only the load average.
 
-Three details in that one line, each measured rather than reasoned:
+Four details in that one construct, each measured rather than reasoned:
 
 - **Reserved word, not a builtin**, which is worth getting right because the misnomer invites the natural prefix form and that form does not do what it looks like:
   `type -t time` reports `keyword` and `compgen -b` does not list it.
@@ -1406,6 +1407,11 @@ Three details in that one line, each measured rather than reasoned:
 - **`2>&1` is load-bearing**, since `time` writes to stderr.
   With it, `| tee` captured `0.202`;
   without it, `tee` captured an empty file.
+- **Both streams discarded, and a failure still announced.**
+  The construct writes to stderr, so a timed command that warns on stderr interleaves its warnings with the elapsed figures and the spread stops being readable --- measured, a `stderr warning` line landed above every timing line until `2>/dev/null` was added.
+  But discarding both streams leaves nothing to distinguish a fast command from one that never ran: measured, a nonexistent command reported `0.007 / 0.003 / 0.003`, a tight and entirely plausible spread.
+  That is this section's own thesis inverted --- a reading that cannot return false --- and it is the live case here, since `/usr/bin/time` is absent from this corpus's own containers, so the shell reports 127.
+  Hence the `|| echo`: silent on success, and on failure it prints the exit status under the figure.
 
 Read `uptime` first, but do not stop there.
 Its figures are 1-, 5- and 15-minute *decaying* averages, so a burst that inflated

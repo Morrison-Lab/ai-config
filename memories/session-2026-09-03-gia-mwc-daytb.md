@@ -510,3 +510,11 @@ per `issue-first`'s deferral rule and the shrink-the-diff lesson from rounds 5 t
 CI on the remote head `94244eb5` is green across all 21 check runs;
 `git merge-tree --write-tree origin/main HEAD` exits 0 at `2156b439`, five commits ahead of the merge base, with no main-side change to either file.
 The verdict for `cee70344` is running in the one free slot.
+
+## 16:34 PDT --- 16:31 check-in: #3146 is a peer session's PR with half a quorum
+
+The sweep found two open PRs in ai-config: #3154 (this session) and [#3146](https://github.com/Morrison-Lab/ai-config/pull/3146), opened at 14:35 PDT from a branch this session never pushed and closing an issue (#3128) this session never claimed.
+Its head `2b735663` has green CI and a clean claude-review verdict since 14:39 PDT and no Copilot or Jules review, so it is not fully clean by the quorum bar and the standing grant does not reach it.
+`ListAgents` listed no peer session, so the `mwc` peer-PR path's message-the-owner step had nowhere to go;
+Copilot was requested and `@jules review` posted, with a status comment naming this session and the twenty-minute-plus-five-minute hold-off before any merge.
+The next check-in is armed for 16:57 PDT with that condition written into it.

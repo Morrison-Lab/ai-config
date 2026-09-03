@@ -43,9 +43,11 @@ by resolving and carries nothing item-SHAPED afterwards.
 Resist compressing that into "prose is fine, bullets are not" -- an earlier
 revision did, and it is false. `_SECTION_FINDING_ITEM` vetoes a bullet, and
 also any line OPENING with a bold span or a blockquote, and the bare severity
-tags. So a paragraph beginning `**Verified:** ...` -- a lead-in this corpus
-uses constantly -- re-flags a section that is otherwise clean. Read the
-pattern rather than a summary of it, or ask this tool.
+tags, and a `**Location:**` label anywhere on a line rather than only at its
+start. So a paragraph beginning `**Verified:** ...` -- a lead-in this corpus
+uses constantly -- re-flags a section that is otherwise clean. This sentence
+is a summary too, and summaries of that pattern are what went wrong three
+times: read `_SECTION_FINDING_ITEM` itself, or ask this tool.
 
 That is the lesson, and it is `deterministic-tools.md`'s: the classifier was
 two imports away throughout, and three comments were spent guessing at rules

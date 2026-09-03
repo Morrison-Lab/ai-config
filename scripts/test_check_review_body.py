@@ -305,9 +305,11 @@ check("a resolving line followed by bulleted items is NOT clean",
               + _R2_TAIL),
       "NOT-CLEAN")
 
-# The two boundaries either side of it, so the case above cannot pass for the
-# wrong reason -- neither "any Findings heading blocks" nor "any section that
-# says none exempts" would give all three of these.
+# The boundaries around it, so the case above cannot pass for the wrong
+# reason: neither "any Findings heading blocks" nor "any section that says
+# none exempts" gives every answer in this group. No counts here -- a fourth
+# assertion was added later and the counts this comment used to carry went
+# stale immediately.
 check("the same section without the bullets is clean",
       verdict(_R2_HEAD
               + "None. Zero findings at this head.\n\n"

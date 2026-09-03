@@ -81,9 +81,11 @@ sits unread.
      `MORATORIUM_END` in
      [`hooks/no-unreviewed-pr.py`](../../hooks/no-unreviewed-pr.py) is the
      live value, and `memories/gh-cli.md` carries the directive it
-     implements. While that date is in the future, skip the request and read
-     whatever Copilot reviews already exist; a missing Copilot verdict is
-     then not a gap to fill but the expected state, and
+     implements.
+     While that date is in the future, skip the request and read whatever
+     Copilot reviews already exist.
+     A missing Copilot verdict is then not a gap to fill but the expected
+     state, and
      [`self-review-fallback.md`](../../shared/workflow/self-review-fallback.md)
      governs the resulting absence exactly as it governs a quota-skipped
      `@claude` round.

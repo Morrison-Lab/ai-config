@@ -1381,7 +1381,7 @@ magnitude on unchanged code needs no attribution to make its point.
 The check is two steps, and the **second** is the one that decides:
 
 ```bash
-uptime                                   # step 1: load average (Windows: Get-Counter)
+uptime                                   # step 1: load average
 for i in 1 2 3 4 5; do                   # step 2: the one that decides
   ( TIMEFORMAT=%R; time <the command> >/dev/null 2>/dev/null \
       || echo "  ^ FAILED (exit $?)"; ) 2>&1

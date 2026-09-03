@@ -399,14 +399,29 @@ def evaluate(command):
         #     git commit -m a && git push origin x
         #
         # went silent. Measured. Scoping the read to `commit_argv` and to the
-        # push that triggers the return is the whole fix.
+        # push that triggers the return is half the fix; the other half is
+        # what an override does once read.
+        #
+        # It authorizes THAT COMMAND, and nothing else in the call. So an
+        # overridden commit or push is skipped as a candidate --- `continue`,
+        # never `return None`. Returning abandoned the whole scan, so an
+        # override anywhere disarmed the guard for every later command:
+        #
+        #     ALLOW_COMMIT_AND_PUSH=1 git commit -m a && git commit -m b && git push
+        #     git commit -m a && ALLOW_COMMIT_AND_PUSH=1 git push && git push origin x
+        #
+        # Both went silent, and in each the UNPROTECTED pair is exactly what
+        # the guard exists to refuse. Measured on this branch before the fix.
+        # `continue` leaves the single overridden pair allowed, because a
+        # skipped commit never becomes `commit_argv` and a push with no
+        # pending commit is not a candidate either.
         if sub == "commit" and commit_argv is None:
             if env_value(env, OVERRIDE) == "1":
-                return None
+                continue
             commit_argv = argv
         elif sub == "push" and commit_argv is not None:
             if env_value(env, OVERRIDE) == "1":
-                return None
+                continue
             # `shlex.join`, never `" ".join`. The argv is DEQUOTED, so a
             # space join re-emits `git commit -m "fix: a b; rm -rf x"` as
             # `git commit -m fix: a b; rm -rf x` -- which commits `fix:` and

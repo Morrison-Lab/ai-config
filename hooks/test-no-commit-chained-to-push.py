@@ -91,6 +91,29 @@ check("&& chained", fires("git commit -m x && git push"), True)
 check("semicolon separated", fires("git commit -m x; git push"), True)
 check("newline separated", fires("git commit -m x\ngit push"), True)
 
+# An override authorizes THAT COMMAND, not the rest of the call. `evaluate`
+# used to `return None` on the first overridden commit or push, abandoning the
+# scan, so an override anywhere disarmed the guard for every later command --
+# and the pair it then let through is unprotected, which is the whole thing
+# this guard exists to refuse. Both shapes measured as `allow` before the fix.
+check("an override on the first commit does not cover a second, unprotected one",
+      fires("ALLOW_COMMIT_AND_PUSH=1 git commit -m a && git commit -m b "
+            "&& git push"), True)
+check("an override on one push does not cover a later bare push",
+      fires("git commit -m a && ALLOW_COMMIT_AND_PUSH=1 git push "
+            "&& git push origin x"), True)
+# The negatives that keep the fix from breaking the override itself. Without
+# these, changing `continue` back to `return None` -- or dropping the override
+# read entirely -- would go unnoticed in one direction or the other.
+check("a single overridden pair is still allowed",
+      fires("ALLOW_COMMIT_AND_PUSH=1 git commit -m a && git push"), False)
+check("an override on both halves is still allowed",
+      fires("ALLOW_COMMIT_AND_PUSH=1 git commit -m a "
+            "&& ALLOW_COMMIT_AND_PUSH=1 git push"), False)
+check("an overridden commit with two pushes and no second commit is allowed",
+      fires("ALLOW_COMMIT_AND_PUSH=1 git commit -m a && git push "
+            "&& git push origin x"), False)
+
 # A `#` comment used to disable the guard outright. `simple_commands` rewrites
 # a newline to `;` so a script's second line is its own command, and `shlex`'s
 # `commenters` then discarded everything from the `#` to the end of the WHOLE

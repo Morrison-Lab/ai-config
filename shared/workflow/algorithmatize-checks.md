@@ -1290,75 +1290,39 @@ Two newer hooks each re-derived a weaker version instead of reusing it.
 
 ## Your own command's shape is part of a transcript-read discharge condition
 
-The section above is the guard author's side of a discharge: does the matcher
-separate the obligation from prose that merely quotes it?
+The section above is the guard author's side of a discharge: does the matcher separate the obligation from prose that merely quotes it?
 This is the **subject's** side.
-[`pr-on-claim`](pr-on-claim.md) already states it for one hook --- run the
-`requested_reviewers` POST as the sole or last command, and pipe it nowhere ---
-and what follows generalizes that from one hook to every transcript-read guard,
-because the reason it holds there has nothing to do with that hook.
+[`pr-on-claim`](pr-on-claim.md) already states it for one hook --- run the `requested_reviewers` POST as the sole or last command, and pipe it nowhere --- and what follows generalizes that from one hook to every transcript-read guard, because the reason it holds there has nothing to do with that hook.
 
-A guard that reads the transcript sees the text of your command and the text of
-its output.
+A guard that reads the transcript sees the text of your command and the text of its output.
 It cannot see the effect the command had.
-So an ordinary formatting choice can destroy the evidence while the action
-itself succeeds perfectly, and the two outcomes are indistinguishable from where
-you are sitting: the thing you wanted happened, and the guard fired anyway.
-The reliable tell is that the first conclusion is always *the guard is broken*,
-because the action visibly worked.
+So an ordinary formatting choice can destroy the evidence while the action itself succeeds perfectly, and the two outcomes are indistinguishable from where you are sitting: the thing you wanted happened, and the guard fired anyway.
+The reliable tell is that the first conclusion is always *the guard is broken*, because the action visibly worked.
 
 Three shapes, measured in one session:
 
-- `gh pr view --json state` piped through `--jq` to pretty-print flattened
-  `"state":"MERGED"` into `state=MERGED`, so the hook's exemption regex, written
-  against the JSON, could not match.
-- A `requested_reviewers` POST sent to `>/dev/null` left no evidence in the
-  transcript that it had succeeded.
-- The same POST written as `... ; echo rc=$?` and as `... | head` moved it out
-  of last-command position, so its exit status could no longer be attributed to
-  it.
-  That is the shape `pr-on-claim` forbids, and it forbids it in these terms
-  already: "the hook cannot tell a formatting pipe from a chained verification,
-  because the shell does not either".
-  What is new here is not the rule for that hook but its reach.
+- `gh pr view --json state` piped through `--jq` to pretty-print flattened `"state":"MERGED"` into `state=MERGED`, so the hook's exemption regex, written against the JSON, could not match.
+- A `requested_reviewers` POST sent to `>/dev/null` left no evidence in the transcript that it had succeeded.
+- The same POST written as `... ; echo rc=$?` and as `... | head` moved it out of last-command position, so its exit status could no longer be attributed to it.
 
 They share one cause.
-The transformations differ --- `--jq`, `>/dev/null`, a trailing `echo`, a pipe
---- and each is applied for readability, while composing the command, with no
-thought of the guard.
+The transformations differ --- `--jq`, `>/dev/null`, a trailing `echo`, a pipe --- and each is applied for readability, while composing the command, with no thought of the guard.
 Each is applied to the very output that was going to serve as the record.
-So the rule is about *which* commands get formatted rather than about formatting
-in general: a command whose output is evidence gets run bare, alone, unchained
-and unredirected, and the tidying goes on a separate follow-up call.
+So the rule is about *which* commands get formatted rather than about formatting in general: a command whose output is evidence gets run bare, alone, unchained and unredirected, and the tidying goes on a separate follow-up call.
 
-**The mirror is a check reading a different artifact, and that failure has
-nothing to do with the subject's command.**
-The same session ran a CI-gate checker against the committed head while the fix
-sat uncommitted in the working tree.
+**The mirror is a check reading a different artifact, and that failure has nothing to do with the subject's command.**
+The same session ran a CI-gate checker against the committed head while the fix sat uncommitted in the working tree.
 The checker was right, and the first conclusion was again that it was broken.
-That is
-[`verify-the-right-artifact`](verify-the-right-artifact.md)'s
-working-directory shape pointed the other way: there a stale checkout stands in
-for the authoritative revision, and here the authoritative revision stands in
-for the uncommitted change.
-That fragment covers only the first direction today
-([#3130](https://github.com/Morrison-Lab/ai-config/issues/3130)), so this is
-adjacent to it rather than owned by it --- and it is still not this section's
-subject, since no command shape is involved.
-It is named here only because it wears the same disguise: an action that visibly
-worked, and a check that says it did not.
+That is [`verify-the-right-artifact`](verify-the-right-artifact.md)'s working-directory shape pointed the other way: there a stale checkout stands in for the authoritative revision, and here the authoritative revision stands in for the uncommitted change.
+That fragment covers only the first direction today ([#3130](https://github.com/Morrison-Lab/ai-config/issues/3130)), so this is adjacent to it rather than owned by it --- and it is still not this section's subject, since no command shape is involved.
+It is named here only because it wears the same disguise: an action that visibly worked, and a check that says it did not.
 Committing costs one command and settles it.
 
-- **Do:** run a discharge-relevant command alone --- unchained, unredirected,
-  unfiltered --- so the transcript carries its result verbatim.
-- **Do:** tidy or reshape that output in a separate call afterwards, when you
-  want it readable.
-- **Do:** ask whether a disagreeing check is reading the artifact you changed,
-  before diagnosing the check.
-- **Don't:** add `--jq`, `>/dev/null`, a trailing `echo`, or a pipe to a command
-  whose output is the evidence.
-- **Don't:** conclude a guard is defective from the fact that the underlying
-  action worked --- the guard measures the record, not the effect.
+- **Do:** run a discharge-relevant command alone --- unchained, unredirected, unfiltered --- so the transcript carries its result verbatim.
+- **Do:** tidy or reshape that output in a separate call afterwards, when you want it readable.
+- **Do:** ask whether a disagreeing check is reading the artifact you changed, before diagnosing the check.
+- **Don't:** add `--jq`, `>/dev/null`, a trailing `echo`, or a pipe to a command whose output is the evidence.
+- **Don't:** conclude a guard is defective from the fact that the underlying action worked --- the guard measures the record, not the effect.
 
 ## Measure CPU time, not wall clock, when the assertion is about work done
 

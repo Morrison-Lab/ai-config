@@ -22,6 +22,13 @@ HOOK = os.path.abspath(sys.argv[1])
 _TEMP_DIRS = []
 
 
+def _ns_reason():
+    """The hook's REASON text, read from the hook under test."""
+    ns = {"__name__": "_reason_probe"}
+    exec(compile(open(HOOK, encoding="utf-8").read(), HOOK, "exec"), ns)
+    return ns["REASON"]
+
+
 def _cleanup_temp_dirs():
     for _d in _TEMP_DIRS:
         shutil.rmtree(_d, ignore_errors=True)
@@ -161,7 +168,7 @@ SILENT_CASES = [
      "an unrelated rm and a later config mention in one sentence: only OPTION "
      "tokens may sit between the verb and its operand"),
     (DELETE_REPLY,
-     ("grep -o 'hooks/[a-z-]*.py' ~/.claude/settings.json | sort -u",),
+     ("grep -o 'hooks/[a-z0-9-]*[.]py' ~/.claude/settings.json | sort -u",),
      "an earlier grep of settings.json discharges it"),
     ("Remove the scratch dir with `rm -rf /tmp/scratch`.", (),
      "a destructive command outside any config root"),
@@ -253,6 +260,30 @@ _ok = _worst < 0.5
 wrong += not _ok
 print("%-7s every branch stays linear on a 40,000-char line (worst %.4fs)"
       % ("ok" if _ok else "FAIL", _worst))
+
+# The discharge example and the command the hook RECOMMENDS are the same
+# string, and nothing but this assertion couples them. They drifted once
+# already --- the example missed digits and left the dot unescaped while the
+# message said `[a-z0-9-]*[.]py` --- so the next drift should fail here rather
+# than wait for a reviewer.
+_example = next(
+    (cmds[0] for _reply, cmds, _desc in SILENT_CASES
+     if cmds and cmds[0].startswith("grep -o 'hooks/")),
+    None,
+)
+_recommended = next(
+    (ln.strip() for ln in _ns_reason().splitlines()
+     if ln.strip().startswith("grep -o 'hooks/")),
+    None,
+)
+total += 1
+_ok = _example is not None and _example == _recommended
+wrong += not _ok
+print("%-7s the discharge example matches the command the hook recommends"
+      % ("ok" if _ok else "FAIL"))
+if not _ok:
+    print("          example    : %r" % (_example,))
+    print("          recommended: %r" % (_recommended,))
 
 print("\n--- fail-open")
 _proc = subprocess.run([sys.executable, HOOK], input="not json",

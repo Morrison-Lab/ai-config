@@ -41,13 +41,15 @@ def review(login, state, body=""):
 
 
 def pr(reviews=(), comments=(), checks=(), head=HEAD,
-       url="https://github.com/Lacaedemon/sparta/pull/1427"):
+       url="https://github.com/Lacaedemon/sparta/pull/1427",
+       author="pr-opener"):
     return {
         "reviews": list(reviews),
         "comments": list(comments),
         "statusCheckRollup": list(checks),
         "headRefOid": head,
         "url": url,
+        "author": {"login": author},
     }
 
 
@@ -239,6 +241,89 @@ class TestEvaluate(unittest.TestCase):
     def test_pending_review_with_approving_body_does_not_approve(self):
         state = pr(reviews=[review("d-morrison", "PENDING", "Ready for merge.")])
         self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "deny")
+
+    def test_pr_authors_own_body_approval_does_not_authorize_merge(self):
+        """The self-approval property must hold across the reviews channel
+        too: `gh pr review --comment` is an agent surface, so an approving
+        review from the PR's own author cannot authorize its merge."""
+        state = pr(
+            reviews=[review("d-morrison", "COMMENTED",
+                            "### Verdict\n\n**Ready for merge** -- no findings.")],
+            author="d-morrison",
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("its own work", decision["reason"])
+
+    def test_body_approval_from_another_human_still_allows(self):
+        """The self-approval guard is keyed on the PR author, so it must not
+        re-kill the allow-path ai-config#3062 exists to revive."""
+        state = pr(reviews=[review("d-morrison", "COMMENTED", "Ready for merge.")],
+                   author="someone-else")
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "allow")
+
+    def test_agent_disclosed_review_body_does_not_approve(self):
+        """A body declaring itself agent-written is not human approval,
+        whichever login submitted the review."""
+        body = ("### Verdict\n**Ready for merge** --- no findings.\n\n"
+                f"Reviewed commit: {HEAD}\n\n"
+                "_Posted by Claude Code (AI agent) --- not written by a human._")
+        state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "deny")
+
+    def test_body_approval_naming_a_non_head_commit_is_stale(self):
+        """GitHub never dismisses a COMMENTED review, so without a staleness
+        check an approval written before ten further pushes would stand."""
+        body = ("### Verdict\n**Ready for merge**\n\n"
+                "Reviewed commit: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+        state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "deny")
+
+    def test_conditional_approval_headline_does_not_approve(self):
+        """A human review body has no `### Verdict` structure, so its first
+        line is arbitrary prose: a substring hit cannot distinguish an
+        approval from a sentence explicitly withholding one."""
+        for body in ("Two questions before I approve.",
+                     "Who approved this design?",
+                     "I'd approve if the tests covered the empty case.",
+                     "Ready for merge once you rebase.",
+                     "Ready to merge after the NEWS bullet lands."):
+            state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+            self.assertEqual(
+                gate.evaluate(MERGE_CMD, state)["decision"], "deny", body)
+
+    def test_approving_headline_over_findings_does_not_approve(self):
+        """The bar is an approving headline with zero follow-on bullets
+        (skills/pr-status/SKILL.md); NOT_CLEAN_VERDICT_RE matches verdict
+        phrasings only, so ordinary findings prose passes it."""
+        for body in ("Ready for merge.\n\n### Minor findings\n"
+                     "- consider renaming `x`\n- the docstring drifts",
+                     "No findings.\n\n- Findings: the migration is missing "
+                     "a down-step.",
+                     "Approved.\n\nOpen items:\n- rework the parser"):
+            state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+            self.assertEqual(
+                gate.evaluate(MERGE_CMD, state)["decision"], "deny", body)
+
+    def test_later_non_approving_review_retracts_body_approval(self):
+        """A body-derived approval is the latest word, not a sticky one: no
+        DISMISSED state ever arrives for a COMMENTED review, and
+        `evaluate_verdict` reads issue comments only, so nothing else sees
+        the retraction."""
+        state = pr(reviews=[
+            review("d-morrison", "COMMENTED", "Ready for merge."),
+            review("d-morrison", "COMMENTED", "Needs more work: found a blocker."),
+        ])
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "deny")
+
+    def test_chatty_follow_up_does_not_retract_formal_approval(self):
+        """Only body-derived approvals are retractable, so follow-up prose
+        cannot clobber a formal APPROVED state."""
+        state = pr(reviews=[
+            review("d-morrison", "APPROVED"),
+            review("d-morrison", "COMMENTED", "Thanks for the quick turnaround."),
+        ])
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "allow")
 
     def test_bot_suffix_login_ignored_but_botlike_human_counts(self):
         """`talbot` is a human: their CHANGES_REQUESTED must deny even with a
@@ -483,7 +568,8 @@ class TestMain(unittest.TestCase):
         if side_effect is None:
             state = view if view is not None else pr()
             view_payload = {k: state[k] for k in
-                            ("url", "reviews", "statusCheckRollup", "headRefOid")}
+                            ("url", "author", "reviews",
+                             "statusCheckRollup", "headRefOid")}
             side_effect = [
                 gh_result(stdout=json.dumps(view_payload)),
                 gh_result(stdout=json.dumps(comments if comments is not None
@@ -644,7 +730,8 @@ class TestMain(unittest.TestCase):
     def test_comments_fetch_failure_denies(self):
         state = pr(comments=[CLEAN_VERDICT])
         view_payload = {k: state[k] for k in
-                        ("url", "reviews", "statusCheckRollup", "headRefOid")}
+                        ("url", "author", "reviews", "statusCheckRollup",
+                         "headRefOid")}
         decision, _ = self.run_main(
             self.payload(MERGE_CMD),
             side_effect=[gh_result(stdout=json.dumps(view_payload)),
@@ -665,7 +752,8 @@ class TestMain(unittest.TestCase):
         must govern."""
         state = pr()
         view_payload = {k: state[k] for k in
-                        ("url", "reviews", "statusCheckRollup", "headRefOid")}
+                        ("url", "author", "reviews", "statusCheckRollup",
+                         "headRefOid")}
         pages = (json.dumps([NEEDS_WORK_VERDICT]) + "\n"
                  + json.dumps([CLEAN_VERDICT]))
         decision, _ = self.run_main(

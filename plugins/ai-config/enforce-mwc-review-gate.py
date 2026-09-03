@@ -11,8 +11,8 @@ merged over a "Needs more work" verdict (reverted in sparta#1429):
 - the verdict comes from the latest comment carrying a `### Verdict`
   heading outside blockquotes and code fences, not from whichever bot
   comment happens to be last (on sparta that was a demo-diff snapshot);
-  a human-authored verdict counts for deny but never for allow, so an
-  agent posting under the user's login cannot approve its own merge;
+  a human-authored verdict *comment* counts for deny but never for
+  allow (only a review can carry human approval; see below);
   a standing not-clean verdict vetoes merge even beside a human
   APPROVED review (ai-config#2274);
 - only the text under `### Verdict` is classified, and negated approvals
@@ -22,7 +22,15 @@ merged over a "Needs more work" verdict (reverted in sparta#1429):
   latest state is APPROVED or its body affirmatively approves
   (ai-config#3062 -- reviewers here never submit APPROVED, so keying the
   allow-path on that state alone made it dead code), and a standing
-  CHANGES_REQUESTED denies;
+  CHANGES_REQUESTED denies. A body-derived approval is bounded so it
+  cannot become a self-approval route: it never counts from the PR's own
+  author, never from a body carrying the agent-disclosure marker, never
+  past a `Reviewed commit:` other than the head, never from a
+  conditional headline, and never over findings-shaped follow-on
+  sections; a later non-approving review from the same human retracts
+  it. Those bounds preserve the property above -- an agent posting under
+  the user's login cannot approve its own merge -- across the reviews
+  channel as well as the comments channel;
 - a verdict naming a `Reviewed commit:` other than the PR head is stale and
   denies;
 - `--admin` merges (server-rule bypass) and GraphQL mergePullRequest
@@ -76,6 +84,38 @@ NOT_CLEAN_VERDICT_RE = re.compile(
 REVIEWED_COMMIT_RE = re.compile(
     r"Reviewed[-\s]commit[:\s]+`?([0-9a-f]{7,40})`?", re.IGNORECASE
 )
+# Leading Markdown emphasis, heading, quote, and list markup, so an
+# approval headline can be anchored at the start of its own text.
+LEADING_MARKUP_RE = re.compile(r"^[\s*_~`#>+-]+")
+# A bot verdict headline sits under `### Verdict` by convention, so a
+# CLEAN_VERDICT_RE substring hit is safe there. A human review body has no
+# such structure, so its first line is arbitrary prose and a conditional or
+# interrogative sentence ("Ready for merge once you rebase", "I'd approve
+# if...") would otherwise read as an approval it explicitly withholds.
+CONDITIONAL_HEADLINE_RE = re.compile(
+    r"\?|'d\b|\b(?:if|once|after|before|unless|until|when|would|assuming"
+    r"|pending|provided|modulo)\b",
+    re.IGNORECASE,
+)
+# The clean bar (skills/pr-status/SKILL.md): an approving headline with
+# *zero* follow-on bullets under any heading. An approving headline over a
+# findings section is the sparta#1427 shape, and NOT_CLEAN_VERDICT_RE
+# matches verdict phrasings only, so ordinary findings prose passes it.
+FINDINGS_VOCAB_RE = re.compile(
+    r"\b(findings?|issues?|remaining|open items?|blockers?|non-?blocking"
+    r"|minor|nits?|nitpicks?|suggestions?|consider|could improve"
+    r"|follow-?ups?)\b",
+    re.IGNORECASE,
+)
+FINDINGS_STRUCTURE_RE = re.compile(r"^\s*(?:#{1,6}\s|[-*+]\s|\d+[.)]\s)")
+# The corpus-mandated agent-disclosure marker, plus the headers review
+# workflows post under. `gh pr review --comment` is a first-class agent
+# surface (hooks/require-agent-disclosure.py gates it), so a review body
+# declaring itself agent-written is not human approval, whoever submitted it.
+AGENT_AUTHORSHIP_RE = re.compile(
+    r"posted by\b[^\n]*\(ai agent\)|\*\*claude finished|\U0001f916",
+    re.IGNORECASE,
+)
 PR_URL_RE = re.compile(r"github\.com/([\w.-]+/[\w.-]+)/pull/(\d+)")
 # "&" also covers "&&"; "$(" and "`" catch command substitution. Substring
 # matching can over-fire on quoted bodies -- that direction fails closed.
@@ -100,7 +140,7 @@ def is_bot_login(login):
             or login.removesuffix("[bot]") in REVIEWER_BOT_LOGINS)
 
 
-def human_review_body_approves(body):
+def human_review_body_approves(body, head_oid=""):
     """Whether a human review body affirmatively approves the PR.
 
     An `APPROVED` state alone cannot carry human approval in this corpus,
@@ -120,20 +160,56 @@ def human_review_body_approves(body):
     Blockquoted and fenced regions are blanked exactly as
     `evaluate_verdict` blanks them, so a review quoting someone else's
     approval is not itself one.
+
+    Four further bounds, each closing a route by which this would be
+    looser than the `APPROVED` state it stands in for:
+
+    - a body carrying the agent-disclosure marker is not human approval,
+      whichever login submitted the review;
+    - a body whose `Reviewed commit:` is not the PR head is stale and
+      denies, exactly as `classify_verdict_body` treats a verdict comment
+      -- GitHub never dismisses a COMMENTED review, so without this an
+      approval written ten pushes ago would still stand;
+    - the headline must *begin* with an approval phrase and carry no
+      conditional or interrogative marker, so "Ready for merge once you
+      rebase" and "Two questions before I approve" do not approve;
+    - a findings-shaped follow-on section vetoes, per the zero-findings
+      bar in skills/pr-status/SKILL.md.
     """
     if not body:
         return False
     blanked = FENCE_RE.sub("", BLOCKQUOTE_LINE_RE.sub("", body))
+    if AGENT_AUTHORSHIP_RE.search(blanked):
+        return False
     if NOT_CLEAN_VERDICT_RE.search(blanked):
+        return False
+    shas = REVIEWED_COMMIT_RE.findall(blanked)
+    if shas and head_oid and not head_oid.startswith(shas[-1]):
         return False
     if VERDICT_MARKER_RE.search(blanked):
         blanked = VERDICT_MARKER_RE.split(blanked, maxsplit=1)[1]
     lines = [ln.strip() for ln in blanked.splitlines() if ln.strip()]
-    return bool(lines) and bool(CLEAN_VERDICT_RE.search(lines[0]))
+    if not lines:
+        return False
+    headline = LEADING_MARKUP_RE.sub("", lines[0])
+    if CONDITIONAL_HEADLINE_RE.search(headline):
+        return False
+    if not CLEAN_VERDICT_RE.match(headline):
+        return False
+    return not any(
+        FINDINGS_VOCAB_RE.search(line)
+        and (FINDINGS_STRUCTURE_RE.match(line) or line.endswith(":"))
+        for line in lines[1:]
+    )
 
 
-def latest_human_review_states(reviews):
-    """Latest APPROVED/CHANGES_REQUESTED standing per non-bot author.
+def latest_human_review_states(reviews, head_oid="", pr_author=""):
+    """Latest standing per non-bot author.
+
+    Values are APPROVED, CHANGES_REQUESTED, or SELF_APPROVED -- the last
+    being a body-derived approval from the PR's own author, which is
+    recorded so the caller can say why it does not authorize a merge, and
+    which never allows.
 
     PENDING never changes an author's standing, and COMMENTED changes it
     only when the review body affirmatively approves (see
@@ -145,8 +221,24 @@ def latest_human_review_states(reviews):
     CHANGES_REQUESTED: CLAUDE.md holds that only that reviewer or an
     explicit dismissal resolves one, and an inferred approval is weaker
     evidence than the formal state it would be overriding.
+
+    It is also genuinely *latest* rather than sticky: a later
+    non-approving review from the same human retracts it, since GitHub
+    never dismisses a COMMENTED review and `evaluate_verdict` reads issue
+    comments only, so nothing else would see the retraction. Only
+    body-derived approvals are tracked for retraction, so chatty
+    follow-up prose cannot clobber a formal APPROVED.
+
+    The PR author's own body-derived approval never counts. GitHub itself
+    forbids an author approving their own PR, which is why the formal
+    APPROVED fast path never needed the guard; `gh pr review --comment`
+    has no such restriction, so without this an agent running under the
+    user's login could authorize its own merge by posting its self-review
+    as a review rather than as a comment (which `evaluate_verdict`
+    already refuses).
     """
     states = {}
+    inferred = set()
     for r in reviews:
         login = r.get("author", {}).get("login", "")
         if not login or is_bot_login(login):
@@ -154,12 +246,19 @@ def latest_human_review_states(reviews):
         state = r.get("state", "")
         if state in ("APPROVED", "CHANGES_REQUESTED"):
             states[login] = state
+            inferred.discard(login)
         elif state == "DISMISSED":
             states.pop(login, None)
-        elif (state == "COMMENTED"
-              and states.get(login) != "CHANGES_REQUESTED"
-              and human_review_body_approves(r.get("body", "") or "")):
-            states[login] = "APPROVED"
+            inferred.discard(login)
+        elif state == "COMMENTED" and states.get(login) != "CHANGES_REQUESTED":
+            if human_review_body_approves(r.get("body", "") or "", head_oid):
+                states[login] = (
+                    "SELF_APPROVED" if login == pr_author else "APPROVED"
+                )
+                inferred.add(login)
+            elif login in inferred:
+                states.pop(login, None)
+                inferred.discard(login)
     return states
 
 
@@ -249,6 +348,7 @@ def evaluate(cmd, pr_data):
     reviews = pr_data.get("reviews", []) or []
     comments = pr_data.get("comments", []) or []
     head_oid = pr_data.get("headRefOid", "") or ""
+    pr_author = (pr_data.get("author") or {}).get("login", "") or ""
 
     # CI first: never merge red or incomplete checks.
     status_rollup = pr_data.get("statusCheckRollup") or []
@@ -267,7 +367,7 @@ def evaluate(cmd, pr_data):
             "CI; wait for all checks to complete."
         )
 
-    human_states = latest_human_review_states(reviews)
+    human_states = latest_human_review_states(reviews, head_oid, pr_author)
     blockers = [k for k, v in human_states.items() if v == "CHANGES_REQUESTED"]
     if blockers:
         return deny(
@@ -286,6 +386,8 @@ def evaluate(cmd, pr_data):
         return ALLOW
     if verdict == "clean":
         return ALLOW
+    if verdict == "none" and "SELF_APPROVED" in human_states.values():
+        verdict = "self-approved"
     reasons = {
         "not-clean": (
             "the latest review verdict for this PR is not clean (e.g. "
@@ -308,6 +410,14 @@ def evaluate(cmd, pr_data):
             "posting under the user's login must not approve its own "
             "work). Get a clean verdict from the review workflow, or an "
             "approving review from a human."
+        ),
+        "self-approved": (
+            "the only approving review is the PR author's own, which "
+            "cannot authorize a merge (an agent posting under the user's "
+            "login must not approve its own work -- posting the "
+            "self-review as a review rather than a comment does not "
+            "change that). Get a clean verdict from the review workflow, "
+            "or an approving review from someone else."
         ),
         "none": (
             "no review verdict and no human approval are present. You "
@@ -394,7 +504,9 @@ def fetch_pr_data(cmd, cwd):
             view_args += ["--repo", repo_match.group(1)]
 
     result = run_gh(
-        view_args + ["--json", "url,reviews,statusCheckRollup,headRefOid"], cwd
+        view_args
+        + ["--json", "url,author,reviews,statusCheckRollup,headRefOid"],
+        cwd,
     )
     if result.returncode != 0:
         return None, (

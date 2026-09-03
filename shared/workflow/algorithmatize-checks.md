@@ -1396,7 +1396,7 @@ Three details in that one line, each measured rather than reasoned:
   An assignment prefix **demotes** `time` from reserved word to an ordinary command word, so `TIMEFORMAT=%R time <cmd>` stops invoking the shell construct and looks `time` up on `PATH` instead.
   What you then see depends on the machine, which is why the symptom alone is the wrong thing to record:
   where no `time` binary is installed --- this corpus's own remote containers, as above --- it dies with `time: command not found`;
-  where GNU `time` is installed, as on a typical CI runner, that binary runs and ignores `TIMEFORMAT`, which it has never read.
+  where a `time` binary is installed, that binary runs instead and ignores `TIMEFORMAT`, which it has never read --- measured not here but by the reviewer who raised this, on a runner carrying `/usr/bin/time`.
   The mechanism is the transferable half and the demotion is directly checkable:
   put an executable named `time` on `PATH`, and the prefix form runs it while the bare form still prints `%R`.
   Note what this rules out --- the reserved word does not "take precedence and merely fail to apply `TIMEFORMAT`";

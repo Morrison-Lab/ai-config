@@ -387,13 +387,15 @@ still failed.)
 
 **A flagged item that came in via a `main`-sync merge, not your own diff, is still a Defer --- just one where the follow-up is fixing it on `main` directly, not filing a per-PR issue.** This is not the ARD skill's "Acknowledge" disposition: `skills/ard/SKILL.md` reserves Acknowledge for praise or a no-ask observation, and explicitly warns against stretching it to dodge a real finding --- a redundant config line a reviewer flags is a real finding with an implied fix request, so it needs a real disposition, not a label that means "no change requested." When a reviewer flags something (a redundant config line, a stale pattern) inside a file your branch only touches because you merged `main` in to resolve a conflict, check provenance before fixing it: `git log`/`git blame` the flagged line, or just compare against `origin/main`'s current content. If it's identical to `main`, "fixing" it on your branch alone doesn't fix anything --- it just makes your branch disagree with `main` on unrelated content the next person to touch that file will have to reconcile again. Reply agreeing the finding is correct but out of scope for this PR, and leave it for whoever owns that file's actual content to fix on `main` directly --- no follow-up issue needed, since the fix target is `main` itself, not this PR's own change.
 
-**The mirror of that provenance check is the one nothing prompts: a reviewer's own "out of scope" note is a scope claim, and it has to be derived from the diff before you accept it.**
-The paragraph above governs checking provenance before *fixing* a flagged line.
-Checking before *not* fixing one has no rule pointed at it, and it is the direction that fails silently.
+**A reviewer's own "out of scope" note is a scope claim, and one `git diff` query settles it.**
+The rule is already in this file --- "A note the reviewer declined to raise is still a claim, and so is your refutation of it" says to verify a declined, out-of-scope, or passing note against the code before either acting on it or writing it off.
+What that rule does not carry is the query, and for a scope claim specifically the query is exact rather than a judgement.
+The paragraph above governs checking provenance before *fixing* a flagged line;
+this is the same check pointed at the decision *not* to fix one, which is the direction that fails silently.
 Skipping the check before a fix costs a redundant edit, which the next reader can see and undo.
 Skipping it before a skip ships a defect inside your own diff, and nothing reports that: the note reads as scope discipline, the reviewer sounds careful, and the PR merges with the finding parked.
 
-The instrument is the same one pointed the other way, and it is one command:
+The instrument is one command:
 
 ```bash
 git diff origin/<default-branch>..HEAD -- <file> | grep -n '<the flagged text>'

@@ -355,3 +355,13 @@ What is checkable: one CI-recorded failure, job `100580631907`, which is what pr
 What is self-reported and leaves no artifact: two further occurrences afterwards, both caught by the local run before they could reach a commit.
 A reader can verify the first and has only my word for the other two, which is worth saying in a sentence that would otherwise read as evidence.
 Recorded in `memories/markdownlint.md` alongside the rule itself.
+
+## 12:20 PDT --- Phase 2 wave launched under "go all out until 1pm"
+
+User: quota at 74% of weekly, resets 13:00 PDT; "until 1pm pacific, go all out with subagent workflows; grab a bunch of new issues and drive PRs".
+Model switched to Fable 5.1; every `agent()` call passes `model: 'opus'` (never Fable, per CLAUDE.md).
+Workflow `wf_7e364ea6-880` (7 issues, disjoint files): #3095, #3068, #3086, #3062, #3117, #3102, #3113.
+Each: implement in `scratchpad/wt-<N>` on `fix/<N>-<slug>` off `origin/main` -> two Opus refuters -> fix -> recheck.
+Claims posted on all seven issues at 12:20 PDT.
+Still awaiting verdict agent `af3e90096a953a239` on `0d402416` (#3123) and `d87eaf06` (Refs #2465); push both once it lands.
+Next: push each verified branch serially (fresh `ls-remote` first), open PR, request Copilot + Jules.

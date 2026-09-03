@@ -414,7 +414,7 @@ A check that is silent on the property under repair reports clean on the fixed t
 The verification is then vacuous while reading as the most rigorous sentence in the reply.
 
 Two things make this the default outcome rather than a rare one.
-A repo's gates are usually configured **lenient** on exactly the properties a style fix is about, so the rule you are fixing is the rule most likely to be switched off.
+A gate is often configured **lenient** on exactly the property a style fix is about, since a rule the corpus already violates at scale is the rule a repo turns off to get a green baseline --- so read a check's configuration rather than assuming the rule is on.
 And a green result invites no follow-up, so nobody asks the one question that settles it.
 
 So run the check against the **unfixed** tree before citing it.

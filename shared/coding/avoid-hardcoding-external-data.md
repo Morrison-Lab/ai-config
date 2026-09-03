@@ -219,10 +219,11 @@ So the written count first manufactures a regression and then supplies a wrong c
 The total says only how big the suite was that day.
 Where the count is genuinely load-bearing, make it a test rather than a sentence.
 
-**The boundary below still holds and is easy to trip over here.**
-A count inside a case record is evidence about a past run and keeps its literal.
-What this section rules out is a count written **forward**, as what a future reader should expect to see.
-The tense decides it: recorded, keep it; expected, drop it.
+**This rules out one tense and not the other.**
+A count inside a case record is evidence about a past run and keeps its literal, which is the boundary
+[the section on text that records what was observed](#where-the-rule-stops-text-that-records-what-was-observed)
+draws with the same tense-and-mood test.
+What this section rules out is the forward form: a count written as what a future reader should expect to see.
 
 - **Do:** state the property a run demonstrated, and leave the total out of a forward-looking comment.
 - **Do:** keep an exact total inside an evidentiary record, naming the tree and the command it was measured on.
@@ -238,7 +239,8 @@ The suite carries wall-clock assertions that intermittently miss a one-second bu
 so a run reports `753 passed, 1 failed` out of the same 754.
 The baked count had that flake read as a regression.
 The revision after it then misattributed the flake to the checkout, asserting that "the total differs between this worktree and a scratch copy of it (754 vs 753)" --- both report 754, and that explanation was itself retracted a revision later.
-The text that shipped states the property and gives no count, saying why.)
+The text that shipped gives no count as an expectation, and says why.
+It does quote the `753`/`754` pair, as the observation it is warning about.)
 
 ## Where the rule stops: text that records what was observed
 

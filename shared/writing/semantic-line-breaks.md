@@ -98,22 +98,6 @@ untouched multi-line clause breaks intact (ai-config#1599).
 `MD013` is off repo-wide in `.markdownlint-cli2.jsonc`, so no width gate
 exists either.
 
-**So neither instrument can tell a column wrap from a clause reflow, and a green run from both is not evidence the reflow was done right.**
-The gate flags multi-sentence lines and semicolon clauses, and `MD013` is disabled.
-A hard 80-column wrap satisfies both, a correct clause-boundary reflow satisfies both, and the unreflowed original satisfies both.
-Three different trees, one verdict.
-Citing either after a reflow is the vacuous verification
-[`algorithmatize-checks`](../workflow/algorithmatize-checks.md)'s
-"A checker that returns the same verdict on the broken tree" section describes.
-
-Two measurements do discriminate, and both are one command:
-
-- **A length histogram of the added lines.**
-  A hard cliff at exactly 80 characters is the signature of a column wrap.
-  Clause-broken prose has no such edge, because clauses do not end on a column.
-- **A count of added prose lines ending mid-phrase**, on an article, a preposition, a conjunction, or an open bracket.
-  A column wrap produces many and a clause reflow approximately none, so the before/after pair is the number worth reporting.
-
 Measured 2026-08-15, before #2085, by copying two fragments out of
 `origin/main`, reformatting each copy with `--all`, and classifying both
 versions with the gate's own `classify_line`:
@@ -1141,3 +1125,42 @@ word of content changed.
 each from exactly 1200 to 1201 lines, failing `validate` with no content
 change; fixed by re-wrapping the same sentences at a different clause
 boundary, restoring both to 1200.)
+
+### Neither instrument can tell a column wrap from a clause reflow
+
+The two gates named above bracket a whole class of reflow error without touching it.
+A hard 80-column wrap satisfies both, a correct clause-boundary reflow satisfies both, and the unreflowed original satisfies both.
+Three different trees, one verdict.
+So citing either after a reflow is the vacuous verification
+[`algorithmatize-checks`](../workflow/algorithmatize-checks.md)'s
+"A checker that returns the same verdict on the broken tree is not evidence the fix worked" section describes.
+The reason is visible in the predicates: the sentence rule asks how many sentences a line holds, the clause rule asks about a mid-line semicolon, and a column wrap introduces neither.
+
+Two measurements do discriminate, each one command over the diff.
+
+Print the added lines' lengths and look for a hard cliff at exactly 80, which is the signature of a column wrap.
+Clause-broken prose has no such edge, because clauses do not end on a column.
+
+```bash
+git diff origin/main -- '*.md' | grep '^+[^+]' | cut -c2- |
+  awk 'length > 0 { print length }' | sort -n | uniq -c | tail -20
+```
+
+Then count added prose lines that end mid-phrase --- on an article, a preposition, a conjunction, or an open bracket --- before and after.
+A column wrap leaves many, and a clause reflow leaves approximately none, so the pair is the number worth reporting.
+
+```bash
+git diff origin/main -- '*.md' | grep '^+[^+]' | cut -c2- |
+  grep -cE '\b(a|an|the|of|to|in|on|for|and|or|is|that|with|by|as|at)$|[[(]$'
+```
+
+Report the base and the line definition alongside either figure, per
+[`grep-is-not-coverage`](../workflow/grep-is-not-coverage.md)'s
+"A published count needs the ref and the flags it was measured with".
+The second command counts every added line rather than only prose lines, and the gate's own `prose_line_numbers` gives a stricter population, so the two disagree by a margin that depends on how much of the diff is fenced or tabular.
+
+- **Do:** measure the length distribution and the mid-phrase count before reporting a reflow verified.
+- **Do:** publish the base and the definition with either figure, since neither is defined by the gate.
+- **Don't:** cite the `new-line-breaks` gate or markdownlint as evidence a reflow was done at clause boundaries --- both are silent on where the breaks fell.
+- **Don't:** read a green gate on the reflowed tree as discriminating, without confirming it goes red somewhere.
+  On this property it never does.

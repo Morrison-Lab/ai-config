@@ -487,7 +487,7 @@ Ask instead what the guard is standing in for, and whether the consumer could si
 When it can, the guard does not get better.
 It gets deleted, along with its tests and its escape hatches, and the diff is usually strongly negative.
 
-**Two limits, and the second is the one a successful extraction hides.**
+**Three qualifications follow, and the second is the one a successful extraction hides.**
 
 An instrument must not forbid its own fix.
 An assertion pinned to the duplicated spelling will refuse the refactor that ends the duplication, since hoisting the literal into an importable constant changes the spelling and the guard fires.
@@ -512,9 +512,16 @@ Name the invariant instead --- what must hold, in the present tense --- so the f
 - **Don't:** ship a check that rejects the refactor which would make it unnecessary.
 - **Don't:** treat a large negative diffstat as proof the coverage was preserved --- it is proof the duplication was.
 
+[`dont-incur-technical-debt`](dont-incur-technical-debt.md)'s
+"De-duplication corrupts a test the same way, and that direction is invisible"
+is the nearest neighbour and runs one level in.
+There a DRY refactor keeps the test and quietly makes its two literals move together, so the assertion stops claiming anything.
+Here the refactor removes the guard entirely, and what goes missing is a second property it happened to assert.
+Both end in a test that no longer detects what it did, and only the second is invisible in the diff of the file the test is about.
+
 (Measured on [Morrison-Lab/ai-config#3100](https://github.com/Morrison-Lab/ai-config/pull/3100), merged 2026-09-03.
 `scripts/check-review-body.py` retyped a disposition-summary phrase that `scripts/check-pr-fully-clean.py` owned, and a test guarded the copy with an `ast` predicate over the consumer's source.
-The predicate was narrowed across three review rounds --- its `ast` references growing 7, then 10, then 19 --- and still had escapes at the last of them.
+The predicate stood across three review rounds and was narrowed twice, growing from 7 to 10 to 19 lines carrying an `ast.` reference in `scripts/test_check_review_body.py`, and it still had escapes at the last of them.
 Extracting `is_ard_disposition_summary` into the checker, so the consumer calls it, deleted the guard outright: 57 lines added against 108 removed across three files.
 
 Both counterweights are from the same PR.

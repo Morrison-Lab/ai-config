@@ -64,6 +64,20 @@ import json
 import os
 import sys
 
+# Appended to the two "blocks nothing" answers when a finding pattern IS
+# present. Those answers are right for the non-bot author this tool models and
+# wrong for a bot: the bot branch admits with no verdict and no structure test,
+# and `check_latest_verdict` then says so in its own words -- "a known-agent
+# body with ## Nits and no classifiable verdict line is a standing not-clean,
+# not a NOTE". An earlier revision asserted "blocks nothing" unconditionally,
+# which told a drafter delegating through `delegate-to-codex` or
+# `delegate-to-opencode` -- whose footers are review-agent markers, posted
+# under the user's own OWNER account -- that a body vetoing the PR was inert.
+BOT_FINDING_CAVEAT = (
+    ", and it blocks nothing UNLESS posted under a bot identity or carrying a "
+    "review-agent marker, in which case the finding {finding} is a standing "
+    "not-clean")
+
 _HERE = os.path.dirname(os.path.realpath(__file__))
 _CLASSIFIER = os.path.join(_HERE, "check-pr-fully-clean.py")
 
@@ -148,9 +162,18 @@ def analyse(body, mod):
     # Codex and OpenCode append their marker on the last line. A CLEAN answer
     # from this tool is therefore not a guarantee of admission.
     #
-    # Both halves are stated because an earlier version gave the conservative
+    # A THIRD consequence, from the same un-modelled bot gap: the bot branch
+    # admits with no verdict and no structure test, so a marker-carrying body
+    # with a finding and no readable verdict is a standing not-clean there
+    # while it reads UNREADABLE or NO-VERDICT here. The verdict LABELS stay as
+    # they are -- this tool models a non-bot author deliberately -- but the
+    # `why` strings say so rather than asserting "blocks nothing" flatly.
+    #
+    # All three are stated because an earlier version gave the conservative
     # divergence its consequence and left the unsafe one implicit -- in the one
-    # paragraph whose job is to make the next gap findable.
+    # paragraph whose job is to make the next gap findable. The third was then
+    # added by a later commit without being stated, which is the same lapse a
+    # second time.
     #
     # Three gates were re-derived across three rounds before this list existed
     # -- `has_review_body_marker` (not in the admission path at all), the
@@ -181,13 +204,16 @@ def analyse(body, mod):
         result["verdict"] = "UNREADABLE"
         result["why"] = (
             "a known review agent posted this and the classifier cannot read "
-            "its verdict: it clears nothing, blocks nothing, and counts toward "
-            "no quorum")
+            "its verdict: it clears nothing and counts toward no quorum"
+            + (BOT_FINDING_CAVEAT.format(finding=finding) if finding
+               else ", and blocks nothing"))
     elif not verdict:
         result["verdict"] = "NO-VERDICT"
         result["why"] = (
-            "the classifier states no verdict, so this neither clears nor "
-            "blocks -- an earlier not-clean would keep standing")
+            "the classifier states no verdict, so this clears nothing and an "
+            "earlier not-clean would keep standing"
+            + (BOT_FINDING_CAVEAT.format(finding=finding) if finding
+               else ", and it blocks nothing"))
     elif not structured:
         result["verdict"] = "IGNORED"
         result["why"] = (

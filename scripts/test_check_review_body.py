@@ -201,6 +201,23 @@ check("the same finding inside an ADMITTED clean body does block", verdict(
     f"Verdict: Ready for merge\n{FINGERPRINT}\n"),
     "NOT-CLEAN")
 
+# The `why` string must not claim "blocks nothing" flatly when a finding is
+# present: a marker-carrying body IS a standing not-clean in the checker, and
+# `delegate-to-codex` / `delegate-to-opencode` post exactly that shape under
+# the user's own OWNER account. The label stays UNREADABLE -- this tool models
+# a non-bot author on purpose -- but the explanation has to say so.
+_marked = "**Claude finished review**\n\n## Nits\n\n- a small thing\n"
+import importlib.util as _ilu
+_spec = _ilu.spec_from_file_location("crb2", TOOL)
+_crb = _ilu.module_from_spec(_spec); _spec.loader.exec_module(_crb)
+_r = _crb.analyse(_marked, MOD)
+check("a marker-carrying finding body is still labelled UNREADABLE",
+      _r["verdict"], "UNREADABLE")
+check("but its explanation does not claim it blocks nothing",
+      "UNLESS posted under a bot identity" in _r["why"], True)
+check("and it names the finding that would block",
+      "Nits" in _r["why"], True)
+
 if failures:
     print("FAILED:")
     for line in failures:

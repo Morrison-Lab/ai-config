@@ -868,7 +868,8 @@ See [`address-every-comment.cases.md`](address-every-comment.cases.md),
 **Softening the quantifier a finding named as unsupported is not addressing
 it, because the evidence base a reviewer measured did not change.**
 A finding of the shape "this generalizes from one instance" has an
-observation and an inference exactly like the one above, and the inference
+observation and an inference exactly like the one in **Accepting a finding
+does not verify the fix it appears to license** above, and the inference
 here is the adverb itself: "frequently", "often", "typically" all assert a
 rate, and a rate needs more than the one case the passage reports.
 The tempting fix trades the flagged word for a milder synonym --- "commonly"

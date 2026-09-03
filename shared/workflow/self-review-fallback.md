@@ -23,6 +23,20 @@ Check for this once per repo, right after the first push, rather than waiting to
 Treat "not configured" the same as the other two failure modes: self-review immediately, held to the same fact-check rigor "A fallback self-review is prone to being shallow, so hold it to the same bar as the bot it stands in for" requires (fact-check-prose, the cause check, the cited-source rule).
 Because a genuine config gap is a standing property of the repo rather than a one-off outage, also file a tracking issue on it per [`report-mistakes-proactively`](report-mistakes-proactively.md) --- wiring up review coverage is worth fixing, not just working around on every push.
 
+**Repository configuration defect (unusable API credential) is a fourth failure mode.**
+The pre-flight credential shape check in `Morrison-Lab/gha` (`check-credential-shape`, gha#686) detects when every configured API credential (`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`) carries INTERIOR whitespace --- a pasted PEM block, a JSON credential, or a wrapped terminal copy.
+Interior is the operative word: a trailing newline is trimmed and tolerated, because `gh secret set < file` writes one routinely, so stripping one is not the repair.
+Because an HTTP `Authorization` header cannot carry interior whitespace, the workflow aborts before making an API call, `review / require-review` and `review / require-clean-verdict` fail red, and no money is spent.
+The PR then carries a comment reading:
+
+```text
+> [!CAUTION]
+> **Claude review did not run: the configured API credential is unusable.**
+```
+
+Unlike a transient network failure or timeout, this is a deterministic repository defect: re-running the job without repairing the secret fails identically.
+Treat this the same as other verdict-blocking failures: perform a fallback adversarial self-review to keep the PR moving, but recognize that the PR is **not** externally clean and the required check remains red until a repository admin updates the secret under **Settings -> Secrets and variables -> Actions** to a single-line value carrying no interior whitespace (for example one from `claude setup-token`).
+
 **Post the self-review before doing anything else --- don't stall the PR waiting for the bot.
 Then, before writing the check off as permanently broken, try one manual re-run of the failed job --- even after the workflow's own built-in same-run retry (e.g. gha#185's stub-retry) also stubbed.**
 Two stubs back to back is a stronger signal than one, but it's still not conclusive: a separately-triggered re-run (`rerun_failed_jobs` via the GitHub Actions API/MCP tool, not just re-reading the same run) is an independent LLM invocation, and the failure modes behind stubs (permission-denial spirals, timing) don't always repeat.

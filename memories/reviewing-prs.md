@@ -65,6 +65,36 @@ A later request to iterate is a driving request.
 branch, not when you were asked only to read it.
 See also [`shared/workflow/ardi.md`](../shared/workflow/ardi.md).
 
+## Keep incidental CI repairs out of the feature PR
+
+When a failing check exposes a workflow defect unrelated to a PR's stated change,
+restore that PR's original diff
+and deliver the workflow repair through its own issue and PR.
+Mixing the repair into the affected feature PR obscures review scope
+and makes the feature's CI result depend on an unrelated permission or infrastructure change.
+
+The separate workflow PR can verify the repair directly;
+after it merges, re-run the original PR's checks against the corrected default-branch workflow.
+
+This is the CI-repair case of two rules already written down,
+and it belongs beside them rather than as a third statement of the same idea.
+The first is [`preferences.md`](preferences.md)'s "Keep PRs focused on a single concern" bullet,
+which already names CI and workflow infrastructure as the thing not to mix into a feature PR.
+The second is [`shared/workflow/issue-first.md`](../shared/workflow/issue-first.md)'s opening rule
+that new work gets a tracking issue before a branch or a PR,
+which is what makes the repair its own issue and PR rather than a hunk reverted and forgotten.
+(That fragment's later "Deferring a request out of the current change" section covers requests from the user
+and does not reach a defect you found yourself.)
+This CI-repair rule applies to a PR of your own as much as to one you are reviewing;
+it lives in this file because the rampp incident that produced it surfaced while driving a review round,
+and this file is where review-round lessons land.
+
+[ucdavis/rampp#155](https://github.com/ucdavis/rampp/pull/155) (a private repository, so the links resolve only for lab members), 2026-09-02:
+the Claude review job failed during its OIDC app-token exchange because the workflow granted `contents: read`.
+The temporary `contents: write` repair was reverted from rampp#155, the internal-documentation PR,
+then tracked in [issue 156](https://github.com/ucdavis/rampp/issues/156)
+and isolated in [PR 157](https://github.com/ucdavis/rampp/pull/157).
+
 ## Only work PRs I opened, am assigned to, or asked for by name, or the Actions app authored
 
 Work only on pull requests opened by me (`d-morrison` or `dem-extra1`),

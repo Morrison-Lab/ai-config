@@ -228,6 +228,29 @@ check("a marker-free finding body is NO-VERDICT", _bare["verdict"], "NO-VERDICT"
 check("and its explanation carries the caveat too",
       "UNLESS posted under a bot identity" in _bare["why"], True)
 
+# The `structured` conjunct of the admitted-finding branch, which was also
+# unpinned -- a clean verdict plus a finding but NO fingerprint. The checker
+# never admits an unstructured clean body from a non-bot author, so its finding
+# blocks nothing. Third round running that a two-part fix got a probe on one
+# part only; the reviewer found this one by mutating every branch condition,
+# which is the check worth keeping rather than the case.
+check("a clean body with a finding but no fingerprint is not admitted", verdict(
+    "## Summary\n\nfine\n\n## Nits\n\n- a small thing\n\n## Verdict\n\n"
+    "Verdict: Ready for merge\n"),
+    "IGNORED")
+
+# The `else` arms of both caveat ternaries. Cheap, and without them an
+# unconditional caveat emits "the finding None is a standing not-clean" on a
+# finding-free body with the suite green.
+_plain_unreadable = _crb.analyse(
+    "**Claude finished review**\n\n## Summary\n\nSome notes.\n"
+    f"{FINGERPRINT}\n", MOD)
+check("a finding-free UNREADABLE body says blocks nothing, plainly",
+      _plain_unreadable["why"].endswith("blocks nothing"), True)
+_plain_noverdict = _crb.analyse("## Summary\n\nSome notes on the diff.\n", MOD)
+check("a finding-free NO-VERDICT body says blocks nothing, plainly",
+      _plain_noverdict["why"].endswith("blocks nothing"), True)
+
 if failures:
     print("FAILED:")
     for line in failures:

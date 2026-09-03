@@ -199,19 +199,19 @@ The reviewer that catches it is reading the two as one artifact, which the autho
 
 ## Phase 1 outcome, and the one pattern the whole night was about
 
-Merged: #3024, #3093.
-Driven to clean and pushed: #3084 (`23933b1b`), #3060 (`c851d68f`).
-Left to the concurrent peer: #3023, #3089.
-Filed: #3098.
-Annotated out-of-diff: #3050 (carries a claim #3084 retracted), #3083 (a second symptom of the stop hook), #3089 (a fifth occurrence of the false-clean its bump fixes).
+Merged: [#3024](https://github.com/Morrison-Lab/ai-config/pull/3024), [#3093](https://github.com/Morrison-Lab/ai-config/pull/3093).
+Driven to clean and pushed: [#3084](https://github.com/Morrison-Lab/ai-config/pull/3084) (`23933b1b`), [#3060](https://github.com/Morrison-Lab/ai-config/pull/3060) (`c851d68f`).
+Left to the concurrent peer: [#3023](https://github.com/Morrison-Lab/ai-config/pull/3023), [#3089](https://github.com/Morrison-Lab/ai-config/pull/3089).
+Filed: [#3098](https://github.com/Morrison-Lab/ai-config/issues/3098).
+Annotated out-of-diff: [#3050](https://github.com/Morrison-Lab/ai-config/issues/3050) (carries a claim [#3084](https://github.com/Morrison-Lab/ai-config/pull/3084) retracted), [#3083](https://github.com/Morrison-Lab/ai-config/issues/3083) (a second symptom of the stop hook), [#3089](https://github.com/Morrison-Lab/ai-config/pull/3089) (a fifth occurrence of the false-clean its bump fixes).
 
 Findings per round, which is the number worth keeping:
 
 | PR | rounds | findings |
 |---|---|---|
-| #3084 | 6 | 1, 5, 7, 3, 2, **0** |
-| #3060 | 5 | 11, 7, 2, 3, **0** |
-| #3093 | 3 | 3, 2, **0** |
+| [#3084](https://github.com/Morrison-Lab/ai-config/pull/3084) | 6 | 1, 5, 7, 3, 2, **0** |
+| [#3060](https://github.com/Morrison-Lab/ai-config/pull/3060) | 5 | 11, 7, 2, 3, **0** |
+| [#3093](https://github.com/Morrison-Lab/ai-config/pull/3093) | 3 | 3, 2, **0** |
 
 **Every one of those was caught before the remote saw it**, because `no-push-without-self-review` held each branch until its head had a clean verdict.
 The stop hook spent that whole hour telling me to push.
@@ -237,7 +237,7 @@ In (4) I had read the rule, quoted it earlier the same hour, and broke it twice 
 
 What did work, every time, was an outside reader with the artifact in hand.
 
-### Two rules the reviews produced, already merged in #3093
+### Two rules the reviews produced, already merged in [#3093](https://github.com/Morrison-Lab/ai-config/pull/3093)
 
 - A SHA that resolves only in the authoring container is worse than no SHA in a record meant for a reader who has only the remote: it reads as checkable, invites the check, and fails it.
   Name the branch and say what gates the push.
@@ -258,7 +258,7 @@ Re-queried rather than recalled, per the state-claim rule.
 
 Two things the re-derivation changed.
 
-**#3089 merged while I was not watching, which the earlier row called "left to the peer" and never revisited.**
+**[#3089](https://github.com/Morrison-Lab/ai-config/pull/3089) merged while I was not watching, which the earlier row called "left to the peer" and never revisited.**
 It carries the fix for the dirty-tree false-clean that cost this session two of its own errors:
 the bumped checker widens `auto` scope to the working tree when tracked matching files are dirty,
 and prints `Examined N added line(s) across M file(s) (scope: ...)` ahead of its verdict.
@@ -268,9 +268,9 @@ That is the session's recurring pattern getting an instrument rather than a rule
 **The peer's PR count grew by two while this session was compacting.**
 `ListAgents` reported no peers all session and still does.
 The instrument that actually settles it is the commit trailer, not `updated_at`, which cannot separate a peer from any other actor pushing under the same login:
-the tip of #3023 carries a `Claude-Session:` URL differing from this session's, which is decisive;
-the tips of #3089, #3100 and #3101 carry no trailer, the human's authorship, and a `Co-Authored-By: Claude ...` line, which is consistent with a local session rather than with a person typing that line, and does not settle it.
-Banked as a rule in `memories/git-worktrees.md` on #3060's branch.
+the tip of [#3023](https://github.com/Morrison-Lab/ai-config/pull/3023) carries a `Claude-Session:` URL differing from this session's, which is decisive;
+the tips of [#3089](https://github.com/Morrison-Lab/ai-config/pull/3089), [#3100](https://github.com/Morrison-Lab/ai-config/pull/3100) and [#3101](https://github.com/Morrison-Lab/ai-config/pull/3101) carry no trailer, the human's authorship, and a `Co-Authored-By: Claude ...` line, which is consistent with a local session rather than with a person typing that line, and does not settle it.
+Banked as a rule in `memories/git-worktrees.md` on [#3060](https://github.com/Morrison-Lab/ai-config/pull/3060)'s branch.
 
 ## The merge gate, re-probed rather than recalled
 
@@ -286,13 +286,13 @@ Nothing reachable establishes that: `.github/workflows/claude-review.yml` passes
 The derivable reason does not need the model at all.
 The gate requires "the **author-dispatched** cross-model, cross-harness reviewer's 100% all-clear adversarial verdict at the shipping head", and a workflow triggered by the push is not author-dispatched whatever model it runs.
 
-So #3084 is finished except for a gate no reachable reviewer can satisfy, and it waits.
+So [#3084](https://github.com/Morrison-Lab/ai-config/pull/3084) is finished except for a gate no reachable reviewer can satisfy, and it waits.
 The standing ai-config `mwc` grant does not help, because the gate is a condition on the *verdict*, not on authorization.
 
-## 02:06 PDT --- #3060 pushed at `ae58121f`, and what four rounds cost
+## 02:06 PDT --- [#3060](https://github.com/Morrison-Lab/ai-config/pull/3060) pushed at `ae58121f`, and what four rounds cost
 
 The table above is a snapshot of 01:28 and stays one;
-PR #3060 is now pushed at `ae58121f`, six commits past the local head that table records, and thirteen past the remote one.
+PR [#3060](https://github.com/Morrison-Lab/ai-config/pull/3060) is now pushed at `ae58121f`, six commits past the local head that table records, and thirteen past the remote one.
 `git rev-list --count` is where both figures come from, rather than a count typed from memory.
 
 Four review rounds landed in that stretch.
@@ -369,26 +369,26 @@ The quota cost of at least twenty-one Opus dispatches was accepted on the reset 
 One workflow run over seven issues, each with one primary target file, all seven distinct.
 That set was derived from the issue bodies rather than from worktree file sets, which did not exist yet, so re-derive it with `scripts/pr-overlap.py` once the PRs are open:
 
-- #3095 `scripts/sync-nlb-checker.py`
-- #3068 `hooks/flag-cd-into-main-checkout.py`
-- #3086 `hooks/no-unreviewed-pr.py`
-- #3062 `plugins/ai-config/enforce-mwc-review-gate.py`
-- #3117 `hooks/remind-brief-premises.py`
-- #3102 `scripts/check-memory-file-size.py`
-- #3113 `scripts/check-pr-fully-clean.py`
+- [#3095](https://github.com/Morrison-Lab/ai-config/issues/3095) `scripts/sync-nlb-checker.py`
+- [#3068](https://github.com/Morrison-Lab/ai-config/issues/3068) `hooks/flag-cd-into-main-checkout.py`
+- [#3086](https://github.com/Morrison-Lab/ai-config/issues/3086) `hooks/no-unreviewed-pr.py`
+- [#3062](https://github.com/Morrison-Lab/ai-config/issues/3062) `plugins/ai-config/enforce-mwc-review-gate.py`
+- [#3117](https://github.com/Morrison-Lab/ai-config/issues/3117) `hooks/remind-brief-premises.py`
+- [#3102](https://github.com/Morrison-Lab/ai-config/issues/3102) `scripts/check-memory-file-size.py`
+- [#3113](https://github.com/Morrison-Lab/ai-config/issues/3113) `scripts/check-pr-fully-clean.py`
 
 Each issue: implement in a worktree on `fix/<N>-<slug>` off `origin/main`, then two Opus refuters, a fix round, and a recheck.
 Claims posted on all seven issues at 12:20 PDT.
-The two unpushed branches, `fix/ums-step3-corpus-scope` (#3123) and `fix/2465-rollup-cause` (Refs #2465), wait on an adversarial verdict.
+The two unpushed branches, `fix/ums-step3-corpus-scope` ([#3123](https://github.com/Morrison-Lab/ai-config/issues/3123)) and `fix/2465-rollup-cause` (Refs [#2465](https://github.com/Morrison-Lab/ai-config/issues/2465)), wait on an adversarial verdict.
 Push both branches once that verdict lands.
 
 ## 12:38 PDT --- a correction to an earlier entry, and a corrected belief
 
-**#3084 merged, and no entry since recorded it.**
-The merge-gate section's last word on #3084 was that it waits on a gate no reachable reviewer can satisfy.
-It merged at 2026-09-03T16:25:36Z under the shared login, and got the same never-revisited treatment the 01:28 entry records for #3089.
+**[#3084](https://github.com/Morrison-Lab/ai-config/pull/3084) merged, and no entry since recorded it.**
+The merge-gate section's last word on [#3084](https://github.com/Morrison-Lab/ai-config/pull/3084) was that it waits on a gate no reachable reviewer can satisfy.
+It merged at 2026-09-03T16:25:36Z under the shared login, and got the same never-revisited treatment the 01:28 entry records for [#3089](https://github.com/Morrison-Lab/ai-config/pull/3089).
 Whether the cross-model gate was satisfied for that merge is not derived here.
-The three prose defects it merged ahead of are tracked as #3109, closed by #3115.
+The three prose defects it merged ahead of are tracked as [#3109](https://github.com/Morrison-Lab/ai-config/issues/3109), closed by [#3115](https://github.com/Morrison-Lab/ai-config/pull/3115).
 
 **A corrected belief, recorded at the correction.**
 Belief: a squash-merging repo's three-dot diff excludes a merge commit's content, so a re-add made while resolving a merge is invisible to review.

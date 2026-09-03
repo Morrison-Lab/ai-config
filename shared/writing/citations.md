@@ -42,8 +42,9 @@ review.)
 were never fetched at all rather than remembered from an earlier fetch.**
 Two `github/community` discussions were cited for a GitHub Actions message ---
 `Canceling since a deadlock for concurrency group '<group>' was detected
-between 'top level workflow' and '<job>'`, whose left slot is that fixed
-literal rather than a second variable --- and neither carries it: #30708 reports
+between 'top level workflow' and '<job>'` --- where the left slot reads as a
+fixed literal in the one instance fetched, though one instance does not
+establish the template --- and neither carries it: #30708 reports
 `Canceling since a higher priority waiting request ... exists`, whose cause is
 a `github.workflow` naming collision, and #43510 is about the default two-run
 concurrency limit.
@@ -68,11 +69,10 @@ either."
 - **Don't:** treat confidence in the underlying claim as evidence about the
   URL --- a real message can be cited to two pages that do not carry it.
 
-The retraction is in `385d4f43` rather than in any later summary of it, which
-matters for anyone reading this record second-hand:
-[`verify-the-right-artifact`](../workflow/verify-the-right-artifact.md)'s
-"A summary is another shape, and the auto-loaded copy is the one you read"
-governs that hop, and already points back here.
+The retraction lives in `385d4f43`, not in any later summary of that round ---
+worth stating because a summary is the form this record is most likely to reach
+someone in, and the rule above applies to it unchanged: a URL quoted inside a
+recap has not thereby been fetched.
 
 **The other authoring-side counterpart: run the exact-substring check on your
 own quotation, not only on one a reviewer disputes.**

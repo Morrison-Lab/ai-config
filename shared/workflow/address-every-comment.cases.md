@@ -813,23 +813,26 @@ put its break on a dangling `and`, in five files, because the fix was applied
 uniformly; and a forward-reference fix reworded the pointer into two new
 forward references.
 
-A convention finding arrives *with* its instrument --- the linter, script or
-grep that produced it.
-For the forward-reference instance that instrument would have flagged the fix,
-so the omission was simply not pointing it there.
-For the line-length one it would not have: the fix broke on a dangling
-conjunction, and `scripts/semantic-line-breaks.py` says in its own header that
-it does not detect conjunction-boundary breaks.
-The corpus already says to re-run a check over your own fix, in three places
-this session did not consult --- the first two govern the forward-reference
-instance, and the third governs neither, being scoped to banned punctuation and
-multi-sentence lines:
+Only the forward-reference instance is a member of this section's class, since
+its fix reproduced the very finding it closed.
+The line-length one is the adjacent shape: the over-long line was fixed and
+stayed fixed, and the fix introduced a *different* convention violation.
+It is kept here because the remedy is identical and the class boundary is the
+part that goes unnoticed.
+
+A convention finding arrives *with* its instrument, and the corpus already says
+to re-run that instrument over your own fix, in three places this session did
+not consult.
+The first governs both instances; the second is scoped to the line-break gate,
+so it reaches the line-length one; the third governs neither, being scoped to
+banned punctuation and multi-sentence lines:
 [`ardi.cases.md`](ardi.cases.md)'s "Run the literal-verification check over
 your own fix too", which calls running the rule against the fix "the entire
 mechanism";
-[`semantic-line-breaks`](../writing/semantic-line-breaks.md), which requires
-re-running the check after committing whenever it flags lines you believe you
-already fixed;
+[`semantic-line-breaks`](../writing/semantic-line-breaks.md), whose "re-run the
+check after committing whenever it flags lines you believe you already fixed"
+is a commit-first staleness rule about which tree that gate reads, and reaches
+this only because the skipped step is the same re-run;
 and [`ardi`](ardi.md)'s own added-line scan, owed after every pass that edited
 the diff, your own reflow included.
 So this occurrence adds no new rule, only a carve-out to the chain's conclusion
@@ -844,11 +847,9 @@ Whether a fix reproduces the finding it closes is a judgment about meaning,
 not a condition decidable over a diff, so no hook can decide it.
 The 4th occurrence above carves out a narrower subclass still: a finding whose
 detector would also flag the fix.
-That held for its forward-reference instance and not for its line-length one,
-where the fix broke on a dangling conjunction and no detector in this corpus
-sees those --- `scripts/semantic-line-breaks.py` says so in its own header.
-So the carve-out is "run the check the finding came with, when that check can
-see the fix", which is a subset of a subclass rather than a general remedy.
+That held for its forward-reference instance, so the carve-out reads "run the
+check the finding came with, when that check can see the fix" --- a subset of a
+subclass rather than a general remedy.
 The procedural equivalent already exists and simply has to be run: the fix is
 "a diff nobody has read", per
 [`adversarial-self-review`](adversarial-self-review.md)'s "The review gates

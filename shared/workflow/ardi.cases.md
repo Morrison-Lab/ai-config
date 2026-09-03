@@ -925,7 +925,7 @@ under that loader proves nothing either way.
 `memories/r-quarto.md`'s "`pkgload::load_all()` cannot serve a PSOCK cluster"
 section carries the mechanism.)
 
-## Prose staled by its own fixes, three rounds running
+## Prose staled by its own fixes, round after round
 
 (`Morrison-Lab/gha#811`, 2026-09-02.
 Six adversarial pre-push review rounds returned 11, 11, 11, 6, 3 and 2
@@ -958,8 +958,12 @@ on prescribing that bool be tested before int --- an ordering the new rule makes
 meaningless.
 Both sentences had been accurate when written, and the change that falsified
 them was in a different file --- `audit_example_concurrency.py` --- so nothing
-in the code diff put either sentence in front of the author.
-The round read that diff and pushed.
+in the *code* diff put either sentence in front of the author.
+`CLAUDE.md` was not untouched, though, which is the sharper version: the same
+commit edited it, and that edit's own hunk ends three lines above the first of
+the two stale sentences.
+So the file was open and the region was on screen, and the round still pushed.
+Proximity is not the remedy; a grep for the replaced value is.
 
 What makes it recur rather than merely happen is that each round's fix creates
 the next round's stale sentence, which is what

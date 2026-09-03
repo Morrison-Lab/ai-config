@@ -307,14 +307,12 @@ of which side of it a claim sits on.**
 
 **Second occurrence, 2026-09-02 on `Morrison-Lab/gha#811`, where the disputed
 part of the attribution was an EXIT CODE.**
-The Do lines above already prescribe the remedy.
-What is new is the tell, because an exit code reads as a detail of the
-assertion rather than as an attribution claim, so the fact-checking exemption
-this section denies to comments gets granted to it silently.
-
 The Do lines above already prescribe the remedy, and the section immediately
 below governs the rest: a mutation reports whether the case flipped, so any
 status named beside it is a separate claim.
+What is new is the tell, because an exit code reads as a detail of the
+assertion rather than as an attribution claim, so the fact-checking exemption
+this section denies to comments gets granted to it silently.
 
 See [`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md),
 "A mutation rationale that named the wrong exit code".
@@ -714,13 +712,15 @@ unrelated case flips and the row reports caught.
   rejected, an earlier stage is doing the work and the case measures nothing.
 - **Don't:** accept "some case flipped" as "the case written for this clause
   flipped" --- those come apart wherever the clauses are stages.
-- **Don't:** build a negative case out of input malformed in more ways than
-  one --- each extra defect is a rejection point ahead of the clause you meant
-  to measure, and the input stays rejected with that clause gone.
   (Measured on `Morrison-Lab/gha#571` and `#574`, whose `CLAUDE.md` records it:
   "a guard that rejects for a second reason -- a missing file, an empty value, a
   type check -- fails the input whether or not the alternative under test
-  exists.")
+  exists."
+  This is the INPUT-side twin of "The same collision reaches the ASSERTION, not
+  only the mutation, and there it makes the whole test vacuous" above: there the
+  needle already occurs elsewhere in the unfixed artifact, here an earlier
+  rejection point keeps the input rejected --- both are a case passing for the
+  wrong reason.)
 - **Don't:** infer coverage from a matrix whose rows all read caught; the count
   is a fact about the rows, and only the identity check makes it one about the
   clauses.
@@ -881,9 +881,9 @@ second site is now known to exist, and the mutation matrix records
 scores rather than structure, so the finding has nowhere to live
 unless it is written down.
 
-- **Do:** name each enforcing site in a comment at the others --- the
-  same claim-bearing artifact the attribution section earlier in this
-  file requires you to verify by mutation.
+- **Do:** name each enforcing site in a comment at the others,
+  verified the way this outcome requires --- by mutating every site
+  together, since removing one is exactly what fails to flip here.
 - **Don't:** let "the other site still holds" stand as the whole
   record --- it explains the survivor and loses the structural fact
   that produced it.

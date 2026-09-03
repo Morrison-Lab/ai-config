@@ -832,8 +832,8 @@ is never in your diff --- so grep for it rather than expecting to be reminded.**
   you changed, before calling a fix complete --- after **every round's** fix on
   a PR under review, since a fix made mid-review stales prose of its own and
   the next round's fix regenerates it (see
-  [`ardi.cases.md`](ardi.cases.md), "Prose staled by its own fixes, three rounds
-  running").
+  [`ardi.cases.md`](ardi.cases.md), "Prose staled by its own fixes, round after
+  round").
 - **Do:** mark a superseded entry as history and name the change that ended it,
   rather than deleting it, when the old behaviour still explains other text.
 - **Don't:** treat a clean grep over the diff as coverage --- the stale prose is

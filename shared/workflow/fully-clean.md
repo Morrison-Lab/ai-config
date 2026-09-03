@@ -1162,8 +1162,8 @@ A PR without a clean review verdict on the latest commit is not merge-ready.
 - **Don't:** treat green CI plus a clean review as sufficient without independently re-checking merge-conflict state.
 - **Don't:** describe a PR that lacks a clean HEAD review as merge-ready, ready to merge, or "green and merge-ready."
 
-**Because it is a snapshot, a reading you took over a live PR cannot be
-re-derived later --- so capture the command and its output verbatim at the
+**Because a clean CI run and a clean review verdict are a snapshot, a reading
+you took over a live PR cannot be re-derived later --- so capture the command and its output verbatim at the
 moment a decision starts to rest on it.**
 
 The section above says the state moves; this is what that costs when you try to
@@ -1181,7 +1181,11 @@ a mis-remembered one are indistinguishable from the inside, and the reading is
 usually the whole basis for whatever was decided next.
 
 - **Do:** paste the command and its verbatim output --- exit status included ---
-  into the issue, PR, or notebook entry at the moment you act on it.
+  into the issue, PR, or notebook entry at the moment you act on it, as
+  [`algorithmatize-checks`](algorithmatize-checks.md) and
+  [`grep-is-not-coverage`](grep-is-not-coverage.md) already require for a
+  derived figure; what is new here is that a live PR makes the reading
+  unrepeatable, so the paste is the only copy there will ever be.
 - **Do:** report the cause as not established when a later re-run disagrees and
   nothing was captured, rather than naming the likeliest mechanism.
 - **Don't:** treat a re-run as reproducing an earlier reading over a live PR ---
@@ -1195,11 +1199,16 @@ usually the whole basis for whatever was decided next.
 checker.
 A controlled re-run --- the stale clone at `240650120` against a worktree at
 `origin/main` --- returned identical verdicts on all three (`#814` rc=0, `#820`
-rc=0, `#811` rc=1), refuting both.
-No reading from the original runs had been captured, so what actually differed
-between them is not recoverable.
-ai-config#3022 and #3032 were closed for resting on the false diagnosis;
-ai-config#3031 carries the verified statement.)
+rc=0, `#811` rc=1).
+That refutes the stale-checker explanation, which it holds constant and tests
+directly.
+It cannot refute the wording explanation, which is a claim about readings that
+no longer exist --- so both are left unsupported rather than both disproved,
+and the cause is not established.
+No reading from the original runs had been captured, which is what makes the
+difference unrecoverable.
+ai-config#3022 and #3032 were closed after review falsified successive stated
+causes; ai-config#3031 carries the verified statement.)
 
 **A sync-only push invalidates a clean verdict just as thoroughly as a code push, and arming auto-merge after a sync violates the HEAD review gate.**
 When `main` moves and a direct merge is refused because the branch is not up to date,

@@ -470,22 +470,18 @@
   Run `33688762211` prints `check / spellcheck`, where neither job sets `name:`, so both halves are keys.
   Run `33727364476` prints `Check-Changelog / Check Changelog Action`, where the left half is the **caller**'s job key in the repo's own `news.yaml` and the right half is the `name:` on `check-news.yml@v2`'s inner job -- whose key, also `Check-Changelog`, never appears.
   The coincidence of those two names is why this example needs spelling out: read the caller's job key for the left half, always, however the called workflow happens to key its own job.
-  Read the definitions on the default branch, and confirm the composition against a run.
-  A run of that branch where one exists;
-  for a `pull_request`-only workflow none ever does, so use a pull-request run whose head does not touch the workflow file (that run resolves it through the merge of head into base, so a head that edits it wins).
-  Run `33727364476` below is exactly that case.
+  Read the definitions on the default branch;
+  a run only corroborates that they compose the way you think, and which run is usable is not obvious, so take that half from
+  [`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md)'s eleventh shape rather than from a second copy here.
   ```bash
   gh api "repos/<o>/<r>/contents/.github/workflows?ref=<default-branch>" --jq '.[].name'
   gh api "repos/<o>/<r>/contents/.github/workflows/<file>?ref=<default-branch>" --jq .content | base64 -d
   gh api "repos/<o>/<r>/actions/runs/<run-id>/jobs" --jq '.jobs[].name'
   ```
   A required context naming a check no workflow emits never turns red -- it sits as `Expected`, so the mistake has no failing signal to find it by.
-  It spreads one PR at a time rather than all at once: an open PR keeps the check runs it already has, so one that last ran before the change still shows the old names and still passes, and its next run publishes the new ones and can never satisfy the requirement again.
-  So date the check runs in a rollup before reading a green required context as current.
   (ucdavis/rampp, 2026-09-03: bare `Spellcheck` and `Check Changelog Action` were added to ruleset `3889405` on the strength of check-run names read off merged PR #157.
   Those names were accurate for `main` when #157 merged; the move to called reusable workflows landed on `main` three hours later via #153, retiring them.
-  `main` now emits `check / spellcheck` and `Check-Changelog / Check Changelog Action`.
-  See [`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md)'s eleventh shape.)
+  `main` now emits `check / spellcheck` and `Check-Changelog / Check Changelog Action`.)
 
 - **GitHub PR Reviews REST API (`POST /repos/{owner}/{repo}/pulls/{number}/reviews`) Requirements & Fallbacks**:
   - `pull_number` MUST be an explicit integer in the URL path (e.g. `/pulls/412/reviews`), not `'current'` or branch names.

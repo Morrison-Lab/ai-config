@@ -869,8 +869,9 @@ A required context naming a check that no workflow emits does not error, does no
 It sits as `Expected`, and the only diagnosis is noticing that a check listed as required never appears at all.
 How far that spreads is a question about runs rather than about settings.
 An open pull request keeps whatever check runs it already has, so one that last ran before the workflow change still shows the old names and still looks satisfied.
-Its **next** run --- any push, any re-run --- resolves the workflow file through the current base and publishes the new names, at which point the required context can never be reported again.
-So the requirement is retired one pull request at a time, as each one next runs, and nothing about that transition is announced.
+Its next **push** re-resolves the workflow file through the current base and publishes the new names, after which the required context is unreportable on that pull request.
+A *re-run* does not do this: GitHub re-runs reuse the original event's `GITHUB_SHA` and `GITHUB_REF`, so re-running a pre-change run republishes the old names and looks like evidence that nothing changed.
+So the requirement is retired one pull request at a time, as each one is next pushed to, and nothing about that transition is announced.
 Date the check runs you are reading before describing the blast radius;
 a rollup showing a required context green may be showing a week-old run.
 
@@ -895,9 +896,10 @@ the wrong thing was simply looked up, so the reusable lesson is the query rather
 One clause on the corroborating run, because the obvious reading of it is unsatisfiable.
 The workflow definition on the default branch is the authority;
 the run is corroboration that the definition composes the string you think it does.
-A workflow triggered only by `pull_request` never produces a run whose head branch is the default branch, so for that class the corroborating run is necessarily a pull-request run.
-That run resolved the workflow file from the merge of its head into its base, so it corroborates the default branch's copy only when the head does not touch that file.
-Check that before reading it --- `gh pr diff <N> --name-only | grep '^\.github/workflows/'` settles it --- and prefer a recent run, since an older one may predate the definition you just read.
+A workflow triggered only by `pull_request` produces no run at all on an ordinary push to the default branch, so for that class the corroborating run is usually a pull-request run.
+The exception is worth taking when it exists: a pull request opened *from* the default branch into some other base has that branch as its head, and its run reads the file you want directly.
+Failing that, any pull-request run resolved the workflow file from the merge of its head into its base, so it corroborates the default branch's copy only when the head does not touch **that** file --- `gh pr diff <N> --name-only` and look for the one path, not for the directory, since a head editing some other workflow is irrelevant.
+Prefer a recent run, since an older one may predate the definition you just read.
 
 - **Do:** derive a required-context string from the default branch's workflow definitions, and use a run only to corroborate how those definitions compose.
 - **Do:** date every check-run observation by the commit its run executed, and say what has landed on the default branch since.

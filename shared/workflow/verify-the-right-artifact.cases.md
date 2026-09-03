@@ -317,9 +317,9 @@ runs they already have.
 is not: those two check runs started at `2026-08-27T23:42:10Z` and
 `23:42:12Z`, six days before the migration landed, and the pull request has
 published nothing since.
-Its next run will resolve the workflow file through the current `main` and
-publish `check / spellcheck` instead, after which the bare requirement can
-never be met.
+Its next push will resolve the workflow file through the current `main` and
+publish `check / spellcheck` instead, after which the bare requirement cannot
+be met on that pull request.
 Reading that rollup as evidence about present behaviour is this case record's
 own subject, committed while writing it up.
 The correcting write was then refused by the permission classifier, leaving the

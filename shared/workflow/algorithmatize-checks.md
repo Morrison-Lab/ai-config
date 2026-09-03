@@ -1304,9 +1304,10 @@ a run-jobs read names no branch, so it cannot show which branch was consulted;
 that a branch was named;
 and any transcript scan for the derived context string is satisfied by typing
 that string in a comment.
-Each candidate is a check the obligation's own subject can write by hand,
-which is [`fail-fast`](../principles/fail-fast.md)'s denominator move applied
-to the discharge: its passing and failing readings are indistinguishable.
+Each candidate is a check the obligation's own subject can write by hand, so
+it fails open in [`fail-fast`](../principles/fail-fast.md)'s sense --- "a
+precondition that can never fire is indistinguishable from one that fires
+correctly and finds nothing".
 
 A guard with no discharge warns every time.
 That is a real cost and it is the *right* one for a warning-only guard, because
@@ -1331,14 +1332,17 @@ the transcript*, not whether the guard is a reminder.
 
 (ai-config#3039 proposes such a guard, on ruleset and branch-protection
 writes.
-Read as of 2026-09-03, its filed body specifies the *opposite* of the argument
-above: it makes the guard fire only when the transcript carries no
-`gh run list ... --branch <default>` derivation, which is the second candidate
-here, and it is defeated by that flag accepting any branch name at all ---
-`gh run list -R <o>/<r> --branch does-not-exist-xyz` exits 0.
+Read as of 2026-09-03, its filed body carries a discharge this section would
+reject: the guard fires only when the transcript contains no default-branch
+job-name derivation, given as `gh run list ... --branch <default>` followed by
+`actions/runs/<id>/jobs`, "or an equivalent".
+Both halves are strings a session can type, and neither names a workflow
+definition or the branch a run's job names came from, so the pair is the third
+candidate above wearing two commands.
 The issue is open and no hook file exists on `main`, so this section is the
 argument that its discharge should be dropped rather than a description of a
-shipped file.)
+shipped file;
+a comment recording that argument was posted on the issue on 2026-09-03.)
 
 ## Measure CPU time, not wall clock, when the assertion is about work done
 

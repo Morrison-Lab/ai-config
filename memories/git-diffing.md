@@ -140,6 +140,83 @@ corroborating detail, and it had moved in the same commit that added the
 skills.
 The next review round retracted the finding once `main` was merged in.)
 
+## A merge commit's own content is visible to `git diff A...B` and invisible to `git log -p`
+
+The section above picks a **range**.
+This one picks a **read**, which the range does not settle:
+once a branch has merged `main` in,
+the same history is reported differently by `git diff`, `git log -p`, and the
+combined diff, and only one of the three hides what the merge commit itself
+introduced.
+
+**The belief this corrects**, written into a branch and caught by an
+adversarial review:
+*a squash-merging repo's three-dot diff excludes merge-commit content, so a
+conflict-resolution re-add is invisible to review.*
+**The fact:** `git diff A...B` is a **tree** diff between the merge base and
+the tip rather than a walk of commits,
+so it carries whatever the merge commit put in the tree.
+Merging `main` in makes `main` an ancestor of the branch,
+so the merge base becomes `main`'s tip
+and the three-dot range reports the branch's whole net effect,
+merge resolution included.
+That form is the corpus's own review read
+(`git diff origin/<default-branch>...HEAD`, per
+[`adversarial-self-review`](../shared/workflow/adversarial-self-review.md)),
+so the re-add faces review rather than escaping it.
+
+**The query that settles it.**
+Measured 2026-09-03 on git 2.43.0, in a scratch repo where `main` added a
+paragraph, a branch conflicted with it, and the conflict was resolved by
+re-adding a second copy of that paragraph inside the merge commit:
+
+```bash
+git diff main...feature                    | grep -c '^+SHARED'  # 1  shows it
+git log -p main..feature                   | grep -c '^+SHARED'  # 0  hides it
+git log -p -m main..feature                | grep -c '^+SHARED'  # 3  once per parent
+git log -p --diff-merges=on main..feature  | grep -c '^+SHARED'  # 3  same as -m
+git show <merge>                           | grep -c '^+SHARED'  # 0  see below
+git log --cc main..feature                 | grep -c '^+SHARED'  # 0  see below
+```
+
+Three mechanics behind those numbers.
+
+`git log -p` defaults to `--diff-merges=off`,
+so it prints the merge commit's message with no patch at all;
+`cmp` reports the two outputs byte-identical.
+`-m` and `--diff-merges=on` restore the patch and are byte-identical to each
+other.
+A bare `--diff-merges` is rejected, because it swallows the next argument as
+its value:
+`fatal: invalid value for '--diff-merges': 'main..feature'`.
+
+`git show <merge>` defaults to the combined diff,
+byte-identical under `cmp` to `git show --cc <merge>`.
+
+**The last two commands do show the re-add, and the grep is what misses it.**
+A combined diff indents its `+` columns one per parent,
+so a two-parent merge emits `++SHARED paragraph.`,
+which matches `^[ +-]*\+SHARED` and not `^+SHARED`.
+[`batch-merge-and-resolve`](../shared/workflow/batch-merge-and-resolve.md)
+records the same class for `git merge-tree`,
+whose conflict markers are diff-indented so `grep '^<<<<<<<'` returns 0 on a
+genuine conflict.
+
+- **Do:** read a merge commit's own content with `git diff <base>...<tip>`,
+  which is what review sees.
+- **Do:** pass `-m` or `--diff-merges=on` when you want `git log -p` to print
+  merge patches.
+- **Do:** anchor a grep over a combined diff as `^[ +-]*\+`, never `^+`.
+- **Don't:** conclude that a conflict-resolution edit escapes review because
+  the repo squash-merges --- the three-dot diff carries it.
+- **Don't:** read an empty `git log -p` as evidence the merge changed nothing;
+  that is its default, not a finding.
+- **Don't:** write a bare `--diff-merges`, which requires a value.
+
+(Refs [ai-config#3129](https://github.com/Morrison-Lab/ai-config/pull/3129),
+whose adversarial review caught the false belief on 2026-09-03.)
+
+
 ## A `git diff` self-check is blind to untracked files, whatever range you pick
 
 The section above chooses between `..`, `...`, and the bare worktree form.

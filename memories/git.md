@@ -91,8 +91,9 @@ See [`git-diffing.md`](git-diffing.md) for diff-range selection
 (`..` vs `...` vs the working tree), diff-scoped check pitfalls
 (no-op-ing on an uncommitted diff, blindness to untracked files, an
 untracked copy shadowing a tracked script), `git rev-parse <ref>:<path>`
-echoing its own input on a missing path, and the pathspec-vs-glob /
-`for-each-ref`-vs-`ls-files` matcher mismatches.
+echoing its own input on a missing path, the pathspec-vs-glob /
+`for-each-ref`-vs-`ls-files` matcher mismatches, and which reads show a merge
+commit's own content (`git diff A...B` does, `git log -p` does not).
 
 ## Git tags
 
@@ -147,6 +148,66 @@ See [`git-tags.md`](git-tags.md) for tag management (force-moving/sliding tags a
   `mcp__github__pull_request_read` with `method: get` in remote/web sessions.
 - Flagged on ai-config#186: the first draft of the harness-override instruction included
   `git branch -r` as the fallback; reviewer (claude-review bot) caught it.
+
+## Classify a bare `#NNNN` as issue or PR with `git ls-remote refs/pull/NNNN/head`
+
+Linking a bare `#NNNN` needs the right path segment,
+and the clone can decide it without `gh` and without an API token:
+GitHub keeps a `refs/pull/NNNN/head` ref for every pull request and none for an
+issue, so the remote answers the question directly.
+Measured 2026-09-03 against `origin` = `https://github.com/Morrison-Lab/ai-config`,
+on a machine with no `gh` on `PATH`:
+
+```console
+$ git ls-remote origin refs/pull/3129/head
+0137e26179d817dbc1d8af829d06f72dfc8e4760  refs/pull/3129/head   # non-empty -> PR
+$ git ls-remote origin refs/pull/3095/head
+                                                              # empty     -> issue
+```
+
+**Test the output, not the exit status.**
+Both calls above exit 0.
+`ls-remote` reports "no such ref" as an empty result rather than as a failure,
+so `if git ls-remote ...; then` classifies every number as a PR.
+
+**The wrong path still resolves, which is why the distinction has to be
+derived rather than guessed.**
+GitHub 302-redirects in **both** directions ---
+measured the same day, `/issues/3129` to `/pull/3129`
+and `/pull/3095` to `/issues/3095`.
+So a mislabeled link is undetectable by following it,
+and a link checker that only asks whether a URL resolves can never report one.
+
+Two mechanics for the rewrite itself.
+Skip any number inside a code span, which is normally a quoted literal rather
+than a citation.
+And a bare `#NNNN` at column 0 is `markdownlint`'s MD018
+(`no-missing-space-atx`, "No space after hash on atx style heading"),
+measured with `markdownlint-cli2@0.23.0`;
+the link form `[#NNNN](...)` at line start avoids it,
+since the line no longer begins with `#`.
+
+This settles the **path** only.
+Which **repository** a bare `#NNNN` belongs to is a separate question, owned by
+[`citations`](../shared/writing/citations.md)'s
+"A bare `#NNN` is repo-relative" section and
+[`ambiguous-reference`](../shared/writing/ambiguous-reference.md)'s
+"A bare `#N` takes its repo from context";
+qualify as `owner/repo#NNNN` per those before choosing a path.
+
+- **Do:** classify with `git ls-remote origin refs/pull/NNNN/head`,
+  branching on whether the output is empty.
+- **Do:** write a line-initial reference as `[#NNNN](...)`, which keeps MD018
+  quiet.
+- **Don't:** branch on `ls-remote`'s exit status --- it is 0 either way.
+- **Don't:** treat a resolving link as confirmation of the path;
+  GitHub redirects both ways.
+- **Don't:** rewrite a `#NNNN` that sits inside a code span.
+
+(Refs [ai-config#3129](https://github.com/Morrison-Lab/ai-config/pull/3129),
+the source PR;
+the classification was derived while linking that PR's bare references.)
+
 
 ## Git branch create/reset (`git switch -C`)
 - `git switch -C "$BRANCH"` is already safe against flag-shaped branch names: `$BRANCH` is the argument *to* `-C`, so a value like `--weird` fails cleanly as `fatal: '--weird' is not a valid branch name` rather than being parsed as an option.

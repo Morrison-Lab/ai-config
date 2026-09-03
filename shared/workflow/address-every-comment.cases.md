@@ -939,18 +939,21 @@ than argued from the pattern.
 The first instinct was to add regression cases for both shapes.
 They turned out to be verbatim duplicates: the suite already carried a
 `git -C <path>` case, including long and space-containing paths, added by the
-very PR whose session raised the question. The added cases were reverted.
+very PR whose session raised the question.
+The added cases were reverted.
 
 Coverage was established by **mutation** rather than by reading --- breaking the
 guard turned the pre-existing cases red (78/80 and 79/80), which is what proved
-the shapes were covered. That is the transferable step: a claim that something
-is untested is a claim to check, not to act on, and checking it means breaking
-the thing and seeing what goes red.
+the shapes were covered.
+That is the transferable step.
+A claim that something is untested is a claim to check, not to act on, and
+checking it means breaking the thing and seeing what goes red.
 
 Recorded here because the issue that specified this entry asserted the opposite
 --- that the shapes "were previously pinned only with short paths" and were
-pinned in response. That assertion was written before its own session discovered
-the duplication, and this entry originally reproduced it unchecked. A review
-round caught it by observing that the diff touches no test file, so nothing it
-described could have happened.
+pinned in response.
+That assertion was written before its own session discovered the duplication,
+and this entry originally reproduced it unchecked.
+A review round caught it by observing that the diff touches no test file, so
+nothing it described could have happened.
 

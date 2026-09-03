@@ -971,14 +971,14 @@ implementation can see that property before measuring anything.
 teach the wrong lesson.**
 Two different errors, from two different sources:
 
-- *Inherited.* The summary this entry was drafted from
+- **Inherited:** the summary this entry was drafted from
   ([ai-config#3059](https://github.com/Morrison-Lab/ai-config/issues/3059))
   says the shape "was previously pinned only with short paths" --- singular,
   about one of the two shapes.
   It was filed at 02:10Z, and the session that discovered the duplication
   started at 02:27Z, so it is an earlier session's summary superseded by a
   later session's finding, not a session contradicting itself.
-- *Invented.* The sentence a CI round actually caught --- that a future
+- **Invented:** the sentence a CI round actually caught --- that a future
   narrowing "now fails a test" --- appears nowhere in that summary.
   This entry wrote it.
   The first correction described the whole error as reproducing the summary

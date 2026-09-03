@@ -79,6 +79,14 @@ jobs:
         run: python3 scripts/check_regex_patterns.py
       - name: Run regex pattern check tests
         run: python3 scripts/test_check_regex_patterns.py
+      - name: Check Python strings for invalid escape sequences
+        # ai-config#3114: these modules quote regex source in their prose, so a
+        # docstring carrying `\s` is an invalid escape. The warning is silent
+        # on 3.11 (DeprecationWarning) and printed on 3.12+ (SyntaxWarning), so
+        # a maintainer and CI disagree; this gate keys on the message text.
+        run: python3 scripts/check-python-escapes.py
+      - name: Run invalid-escape check tests
+        run: python3 scripts/test_check_python_escapes.py
       - name: Run orchestrator tests
         # ai-config#2627: this suite existed and ran nowhere, so the
         # orchestrator's own behaviour was unpinned -- which is how a literal

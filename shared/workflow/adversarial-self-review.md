@@ -811,6 +811,45 @@ That is the same-reviewer clean the rule asks for, and it is a real re-review ra
 
 (Measured 2026-09-01 on UCD-SERG/serocalculator#668: the relayed round on `065adf0` read as `d-morrison=not-clean` two CLEAN bot verdicts later, and a fresh Sonnet adversarial review of `2aa82df`, posted with its verdict, was what flipped the instrument to exit 0.)
 
+## A reviewer handed nothing returns clean, so the brief must make an empty input an error
+
+`git diff origin/<default-branch>...HEAD` reads the **commit graph**.
+Work you have written but not committed is not in it.
+So dispatching a review while the changes sit in the working tree hands the reviewer an empty diff, and an empty diff has no defects in it --- the verdict comes back clean, on time, in the usual shape, having examined nothing.
+
+[`git-diffing`](../../memories/git-diffing.md)'s "A diff-scoped local check silently no-ops on an empty/uncommitted diff" states the same underlying fact for a **script** you run yourself, and its remedy is the same: commit first.
+What that section cannot reach is the second half here.
+A script you run reports its own zero, so the count is at least available to be read;
+a dispatched reviewer reports a verdict and no count at all, and cannot supply one, because from inside it no input and no defects are the same observation.
+That is why this case needs a fix in the **brief** rather than only in the habit.
+
+Nothing about the result says so.
+A clean review of an empty diff and a clean review of good work are the same artifact, and the second is what you were expecting, so the confirmation lands exactly where a check was supposed to be.
+[`ardi.rationale.md`](ardi.rationale.md) records the sibling case, where the branch is empty **by design** because [`pr-on-claim`](pr-on-claim.md) opens the PR from an empty commit;
+this one is worse to notice, because the work exists and you watched yourself write it.
+
+**The specific move that produces it is switching branches with the work uncommitted.**
+Git carries uncommitted changes across a checkout, so the edits follow you to whatever you switch to and the branch you meant to review keeps pointing at its old tip.
+[`git`](../../memories/git.md)'s "commit before switching branches" section is the same hazard read from the other end.
+
+Two fixes, and both are cheap enough that there is no reason to pick one.
+**Commit before dispatching**, then read the diff's own stat line rather than assuming it.
+And **tell the reviewer to refuse an empty input**: a brief that says which files the diff should touch, and that says to stop and report the emptiness rather than review, converts a silent false clean into a loud failure.
+The reviewer cannot infer this --- from inside, no input and no defects are indistinguishable --- so it has to be stated.
+
+The general form reaches past review.
+Any instrument that reports on a population will report clean over an empty one, so **a verdict is only as good as the count of things examined**, which is [`batch-merge-and-resolve`](batch-merge-and-resolve.md)'s negative-control rule --- report how many pairs were examined and not only how many collided --- restated for a reviewer rather than a sweep.
+[`algorithmatize-checks`](algorithmatize-checks.md) applies it to a combination sweep and credits that fragment as its source, which is where the wording comes from.
+Measured 2026-09-03 within one hour, on two surfaces: a repo-wide scan reported zero invalid escapes while a hand-confirmed instance sat in the tree, because it wrote to `/dev/null`, every compile raised, and a bare `except: continue` swallowed all 238 ([ai-config#3114](https://github.com/Morrison-Lab/ai-config/issues/3114));
+and an adversarial review returned clean over a branch carrying no commits ([ai-config#3118](https://github.com/Morrison-Lab/ai-config/issues/3118), which also tracks the mechanisms, since writing this rule did not prevent its second occurrence one message later).
+Different surfaces, one shape, and neither announced itself.
+
+- **Do:** commit, then confirm the diff is non-empty, before dispatching a review.
+- **Do:** name the files the diff should touch in the brief, and instruct the reviewer to report an empty or unexpected diff instead of reviewing it.
+- **Do:** read a clean verdict as a claim about a population, and ask what that population was.
+- **Don't:** dispatch against a working tree and read the result as covering it.
+- **Don't:** treat a clean result from any instrument as evidence until you know it examined something.
+
 ## Ask the reviewer plainly whether the work earns its place
 
 The sections above brief the reviewer to find defects in a change.

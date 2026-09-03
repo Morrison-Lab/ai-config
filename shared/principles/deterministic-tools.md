@@ -517,7 +517,7 @@ Name the invariant instead --- what must hold, in the present tense --- so the f
 is the nearest neighbour and runs one level in.
 There a DRY refactor keeps the test and quietly makes its two literals move together, so the assertion stops claiming anything.
 Here the refactor removes the guard entirely, and what goes missing is a second property it happened to assert.
-Both end in a test that no longer detects what it did, and only the second is invisible in the diff of the file the test is about.
+Both end in a test that no longer detects what it did, and both are invisible in the diff, which is why that section prescribes a mutation to expose its case and this one prescribes enumerating what the deleted guard asserted.
 
 (Measured on [Morrison-Lab/ai-config#3100](https://github.com/Morrison-Lab/ai-config/pull/3100), merged 2026-09-03.
 `scripts/check-review-body.py` retyped a disposition-summary phrase that `scripts/check-pr-fully-clean.py` owned, and a test guarded the copy with an `ast` predicate over the consumer's source.

@@ -198,7 +198,7 @@ Fixed in `b02e3ff`.)
 
 ### A suite's pass count is a liability twice over when written as an expectation
 
-The two sections above govern a count over something the same file enumerates.
+The sections above govern a claim about a block the same file carries --- a count of its items, or a generalization over them.
 A **test-suite pass count** --- a total written into a comment above the helper it describes, or into a commit message --- looks like the same defect and is worse.
 It has two independent ways of going wrong, and each is mistaken for the other.
 

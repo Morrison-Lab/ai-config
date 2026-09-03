@@ -556,8 +556,9 @@ And the inputs worth calling with are the ones near the boundary: the sibling sp
 (Measured on [Morrison-Lab/ai-config#3100](https://github.com/Morrison-Lab/ai-config/pull/3100), merged 2026-09-03.
 A docstring in `scripts/check-review-body.py` described when a `## Findings` heading forces a not-clean verdict.
 It went through four states, three of them wrong.
-Two of those revisions did call the classifier, and their messages report the run.
-The wrong states are the ones written without one.
+Two of those revisions did call the classifier, and their messages report the run --- so a call is not by itself the fix.
+One of those two produced a wrong state anyway, because it ran the classifier on a single body and then generalized from that one answer.
+What separates candidate rules is a *pair* of inputs differing by one line, which is the derivation the section below describes.
 
 The original said the heading forces not-clean regardless of contents.
 The first retraction said `_findings_section_resolves_empty` exempts any section that says there are none --- which reversed the error rather than fixing it.
@@ -569,8 +570,10 @@ The third state dropped the compression and cited the vetoing pattern by name.
 The rule the code implements, read off `_findings_section_resolves_empty` in `scripts/check-pr-fully-clean.py`, is a conjunction: the first non-empty line must match the resolving-trailer pattern **and** nothing finding-shaped may follow it.
 `_SECTION_FINDING_ITEM` supplies the second conjunct.
 Read the pattern rather than an enumeration of it --- summarizing it is what went wrong three times above --- but its alternatives include a bare severity or class tag, with or without bold and bracket wrappers, a bullet or numbered item, a blockquote, a location marker, and any line opening with a bold span.
-So an untagged, unbulleted line reading `Defect: ...` vetoes, and plain prose carrying none of those forms does not, which is why "prose is fine" is half right and unsafe.
-Every one of those facts is one call to the function away, on inputs differing by a single line.)
+Two consequences make "prose is fine" unsafe rather than merely imprecise.
+A line carrying a bare tag vetoes with no bullet, bold, or bracket around it, so `Defect: ...` alone is enough.
+And the pattern matches those words as ordinary line-initial English rather than as tag usage, so a sentence opening "Note that everything was re-run" vetoes too, while the same content phrased "Everything was re-run" does not.
+Each of those is one call to the function away, on inputs differing by a single line.)
 
 ## An identifier search is evidence about the identifier, not about the thing it names
 

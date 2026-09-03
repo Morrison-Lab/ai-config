@@ -650,8 +650,9 @@ Deleting an apparently-dead local variable turned `scripts/test_check_pr_fully_c
 That was reported as a deterministic regression caused by the deletion, and the deletion was defended on it.
 
 The reading was noise.
-The suite carries several wall-clock assertions, each requiring a scan to stay under a one-second budget (`grep -c 'scales linearly (< 1s)'` over the test file gives the current number, and there is a sentence-scan assertion besides).
-All of them go through a `best_of_three` helper whose own docstring already says that a single sample makes the measurement flaky.
+The suite carries several wall-clock assertions, each bounding how long a scan may take --- most at one second and at least one at two.
+They do not share a phrasing, so enumerate them by their shared machinery rather than by a phrase: every one goes through a `best_of_three` helper, whose own docstring already says that a single sample makes the measurement flaky, so the helper's call sites are the population and a search for any one assertion's wording is not.
+Measured 2026-09-03 on `main`, `grep -n 'best_of_three' scripts/test_check_pr_fully_clean.py` returns seven lines: the definition and six call sites.
 Several reviewer subagents dispatched by this session were saturating the machine at the time, so every one of the three runs was taken under the same load.
 
 The control that settled it was a pristine `cp -a` copy of the same HEAD with the same deletion applied, which ran green 8 of 8.

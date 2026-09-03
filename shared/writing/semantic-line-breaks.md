@@ -1126,15 +1126,24 @@ each from exactly 1200 to 1201 lines, failing `validate` with no content
 change; fixed by re-wrapping the same sentences at a different clause
 boundary, restoring both to 1200.)
 
-### Neither instrument can tell a column wrap from a clause reflow
+**Neither the gate nor markdownlint can tell a column wrap from a clause reflow, so a green run from both is weak evidence that a reflow was done right.**
 
-The two gates named above bracket a whole class of reflow error without touching it.
-A hard 80-column wrap satisfies both, a correct clause-boundary reflow satisfies both, and the unreflowed original satisfies both.
-Three different trees, one verdict.
-So citing either after a reflow is the vacuous verification
+Both instruments are described at length above.
+What matters here is what each does *not* look at.
+The `new-line-breaks` gate flags a line holding more than one sentence, and a line whose stripped text reaches 80 characters and carries a mid-line semicolon.
+`MD013`, the width rule that would notice a column boundary directly, is disabled repo-wide in `.markdownlint-cli2.jsonc`.
+Neither predicate asks **where** a break fell, which is the whole content of the difference between a clause reflow and a hard wrap at column 80.
+
+Measured on one fragment's added prose lines, at three states of the same file --- the unreflowed original, an 80-column hard wrap, and the clause-boundary reflow --- the gate reported zero violations at each.
+Three trees, one verdict, and only one of the three is the wanted outcome.
+Citing either instrument in that situation is the vacuous verification
 [`algorithmatize-checks`](../workflow/algorithmatize-checks.md)'s
 "A checker that returns the same verdict on the broken tree is not evidence the fix worked" section describes.
-The reason is visible in the predicates: the sentence rule asks how many sentences a line holds, the clause rule asks about a mid-line semicolon, and a column wrap introduces neither.
+
+**A column wrap is not guaranteed to pass, which is why the gate's silence has to be read as silence rather than as approval.**
+Filling to a column merges as well as splits, so a wrap that packs two short sentences onto one line trips the sentence rule and turns the gate red.
+The measurement above came back clean because that fragment's prose happened not to produce such a line.
+So the gate can catch a column wrap by accident and cannot catch one on purpose, and a green run distinguishes nothing either way.
 
 Two measurements do discriminate, each one command over the diff.
 
@@ -1161,6 +1170,6 @@ The second command counts every added line rather than only prose lines, and the
 
 - **Do:** measure the length distribution and the mid-phrase count before reporting a reflow verified.
 - **Do:** publish the base and the definition with either figure, since neither is defined by the gate.
-- **Don't:** cite the `new-line-breaks` gate or markdownlint as evidence a reflow was done at clause boundaries --- both are silent on where the breaks fell.
-- **Don't:** read a green gate on the reflowed tree as discriminating, without confirming it goes red somewhere.
-  On this property it never does.
+- **Don't:** cite the `new-line-breaks` gate or markdownlint as evidence a reflow was done at clause boundaries --- neither looks at where a break fell.
+- **Don't:** read a green gate on the reflowed tree as discriminating.
+  Confirm it goes red on the unreflowed one first, and on this property it may not.

@@ -1666,6 +1666,56 @@ def fallback_cases() -> tuple[int, int]:
     return failures, ran
 
 
+def fingerprint_guidance_cases() -> tuple[int, int]:
+    """The refusal that asks for a fingerprint must not contradict the settled
+    tail contract (ai-config#3050).
+
+    The report's tail runs verdict, then fingerprint, then payload, so a
+    refusal telling the reviewer to END its report with the fingerprint asks
+    for the one ordering the persona files forbid. The guidance is a string
+    rather than a branch, which is exactly why nothing else would catch it
+    drifting back.
+    """
+    failures = 0
+    ran = 0
+
+    def check(label, ok, detail=""):
+        nonlocal failures, ran
+        ran += 1
+        if ok:
+            print(f"PASS: {label}")
+        else:
+            print(f"FAIL: {label}{' - ' + detail if detail else ''}")
+            failures += 1
+
+    events = [
+        agent_call(call_id="fp1"),
+        agent_result("fp1", body("Ready for merge", fingerprint=False)),
+    ]
+    rc, out = run_hook(PUSH, events)
+    spec = out.get("hookSpecificOutput") or {}
+    blocked = spec.get("permissionDecision") == "deny"
+    reason = spec.get("permissionDecisionReason", "")
+    check("clean verdict with no fingerprint is refused", rc == 0 and blocked, reason[:120])
+    check(
+        "refusal does not tell the reviewer to end its report with the fingerprint",
+        "end its report with" not in reason,
+        reason[:200],
+    )
+    check(
+        "refusal states the fingerprint goes immediately after the verdict",
+        "immediately after the verdict" in reason,
+        reason[:200],
+    )
+    check(
+        "refusal says the payload may follow the fingerprint",
+        "payload may follow" in reason,
+        reason[:200],
+    )
+
+    return failures, ran
+
+
 def main():
     failed = 0
     extra = 0
@@ -1696,7 +1746,8 @@ def main():
                    valueless_bool_cases, budget_cases,
                    fixture_branch_cases, windows_path_cases,
                    structured_payload_cases, transcript_scoping_cases,
-                   cd_tracking_cases, fallback_cases):
+                   cd_tracking_cases, fallback_cases,
+                   fingerprint_guidance_cases):
             f, r = fn()
             failed += f
             extra += r

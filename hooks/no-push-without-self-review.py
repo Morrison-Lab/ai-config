@@ -1459,9 +1459,11 @@ def verify_review(transcript_path: str, directory: str | None,
     if not reviewed_commit:
         return False, (
             "The clean verdict does not say which commit it read.\n"
-            "The reviewer must end its report with `Reviewed-Commit: <sha>`, after the "
-            "verdict; without it nothing ties the verdict to what this push would ship, "
-            "and a report cut short before its fingerprint is not a verdict."
+            "The reviewer must state `Reviewed-Commit: <full sha>` on its own line "
+            "immediately after the verdict; the JSON payload may follow it, and "
+            "nothing else should. Without the line nothing ties the verdict to what "
+            "this push would ship, and a report cut short before its fingerprint is "
+            "not a verdict."
         )
 
     try:

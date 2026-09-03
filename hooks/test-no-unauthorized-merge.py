@@ -716,8 +716,8 @@ SCAN_CONTROL_SMALL = 6000
 # asserts the separation rather than arguing it.
 #
 # Subtracting a measured fixed cost was the other repair on offer. It was not
-# chosen, and not because measurement ruled it out: what an idle container can
-# measure is the INTERPRETER's fixed cost -- 0.62ms of the 6.2ms baseline for
+# chosen, and not because measurement ruled it out: what can be measured off
+# the runner is the INTERPRETER's fixed cost -- 0.62ms of the 6.2ms baseline for
 # the loop plus one zero-length `count` call, which is the shape #3098
 # proposed subtracting -- while the LOAD-induced fixed cost the repair targets
 # cannot be measured from here at all. So the distortion's shape stays a

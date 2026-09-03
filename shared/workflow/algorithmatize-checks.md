@@ -1359,7 +1359,7 @@ A compressed one reports that the control cannot discriminate, and reads as a br
 
 Two repairs are on offer, and which one fits turns on whether the distortion is additive or multiplicative.
 That is measurable rather than assumable, so measure it --- and measure it under the condition the distortion appears in, which is the step that fails quietly.
-Here it could not be: the fixed cost timeable on an idle container is 0.62ms of a 6.2ms baseline, for the loop plus one zero-length scan call, which bounds the *interpreter's* share and says nothing about a loaded runner's, since scheduler latency and a cold cache are load-dependent by construction.
+Here it could not be: the fixed cost timeable off the runner is 0.62ms of a 6.2ms baseline, for the loop plus one zero-length scan call, which bounds the *interpreter's* share and says nothing about the runner's, since scheduler latency and a cold cache are load-dependent by construction.
 So the distortion's shape stayed a hypothesis, and the repair was chosen for surviving either shape rather than for ruling one out.
 Widening the input-size gap does that, because the quadratic term outruns the bound: at a size step of `s` the reading is `s ** 2` and the halfway bound is `s ** 1.5`, so the margin is `sqrt(s)` --- 1.9x at a 4x step against 3.6-3.7x at a 16x step, measured.
 An additive fit of the runner's reading puts the nuisance cost at ~1.4x the baseline, which still clears the widened bound by 1.7x, and a 2.1x multiplicative compression clears it by 1.7x too.

@@ -60,7 +60,8 @@ Note what is NOT being said about the marker check, because an earlier
 revision of THIS paragraph said it and it is false. `has_review_body_marker`
 is not a branch in `check_review_comments`, and it is reached during
 admission all the same: `is_non_review_notice` calls it as a precedence
-guard, and it decides that function's answer. Measured -- `Claude Review Dispatched` followed by
+guard, and it decides that function's answer.
+Measured -- `Claude Review Dispatched` followed by
 `Verdict: Ready for merge` SURVIVES the notice skip, the same notice without
 the verdict line is skipped outright, and `has_review_body_marker` is the only
 difference to `is_non_review_notice`'s answer. So the reason the marker check

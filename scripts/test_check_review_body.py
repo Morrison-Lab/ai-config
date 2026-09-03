@@ -165,6 +165,21 @@ check("the finding-pattern count the docstring states",
 # to catch, and preserving superseded code in a comment is this corpus's own
 # house style. `ast` cannot see a comment at all.
 def _ard_phrase_is_live():
+    """Is the phrase still the whole test of a `continue` in the skip loop?
+
+    Deliberately narrow. An earlier version accepted any `Compare` anywhere
+    in the function whose left operand was the phrase, and three mutations
+    each broke the checker's ARD skip while leaving the suite green:
+    comparing the phrase against `author_login` instead of the body; keeping
+    the expression but dropping the `continue`; and adding a conjunct so the
+    skip fires only for bot authors. Each is a plausible refactor, and each
+    would leave this tool predicting a skip the checker no longer performs.
+
+    So the shape is pinned rather than the phrase: the phrase, `in`,
+    `body_lower`, as the ENTIRE test of an `if` whose body is a bare
+    `continue`. An added conjunct fails on purpose -- it narrows the skip,
+    which is exactly the drift that mispredicts.
+    """
     with open(os.path.join(HERE, "check-pr-fully-clean.py"),
               encoding="utf-8") as fh:
         tree = ast.parse(fh.read())
@@ -173,11 +188,21 @@ def _ard_phrase_is_live():
                 and fn.name == "check_review_comments"):
             continue
         for node in ast.walk(fn):
-            if (isinstance(node, ast.Compare)
-                    and isinstance(node.left, ast.Constant)
-                    and node.left.value == ARD_PHRASE
-                    and any(isinstance(o, ast.In) for o in node.ops)):
-                return True
+            if not isinstance(node, ast.If):
+                continue
+            if not (len(node.body) == 1
+                    and isinstance(node.body[0], ast.Continue)):
+                continue
+            t = node.test
+            if not (isinstance(t, ast.Compare)
+                    and isinstance(t.left, ast.Constant)
+                    and t.left.value == ARD_PHRASE
+                    and len(t.ops) == 1 and isinstance(t.ops[0], ast.In)
+                    and len(t.comparators) == 1
+                    and isinstance(t.comparators[0], ast.Name)
+                    and t.comparators[0].id == "body_lower"):
+                continue
+            return True
     return False
 
 

@@ -76,8 +76,18 @@ Instead, diff the whole file set and apply it fresh:
 git diff origin/main <old-branch> -- <changed-files> > /tmp/rebuild.diff
 git checkout -B <assigned-branch> origin/main
 git apply /tmp/rebuild.diff
-git add <changed-files> && git commit -m "..." && git push -u origin <assigned-branch>
+git add <changed-files> && git commit -m "..."
 ```
+
+Then push, in a **separate** call --- see
+[`check-before-pushing`](check-before-pushing.md)'s "Keep the commit in its own Bash call".
+A `PreToolUse` deny rejects the whole invocation,
+so chaining the push onto the commit loses the commit too when a guard refuses:
+
+```bash
+git push -u origin <assigned-branch>
+```
+
 (Seen on ai-config#372 → #380: the assigned branch could push, `sync-freshness-rule` could not.)
 
 **Check whether the branch's own PR merged before adding more commits to it.**

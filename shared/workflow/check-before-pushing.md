@@ -180,6 +180,38 @@ changelog fragment crediting this PR with a fix that had merged the day
 before --- the reviewer caught the misattribution in round 2 and round 3
 confirmed it fixed.)
 
+## Keep the commit in its own Bash call
+
+Never chain a `git commit` into a `git push` in one shell invocation:
+
+```
+git add -A && git commit -F msg.txt && git push -u origin my-branch
+```
+
+A `PreToolUse` guard denies the **whole invocation**, before any part of it runs.
+[`memories/claude-code-hooks.md`](../../memories/claude-code-hooks.md)'s "A hook's deny rejects the WHOLE call" section states that mechanism in general and measured it on 2026-08-17 (ai-config#1609, a `git checkout -b` lost to an unrelated deny).
+This section is its commit-and-push instance, which is worth naming separately because the two commands read as one logical step and the corpus's own examples put them next to each other.
+So when a guard refuses the push -- and both [`no-push-without-self-review.py`](../../hooks/no-push-without-self-review.py) and [`no-clobbering-push.py`](../../hooks/no-clobbering-push.py) are registered `PreToolUse` on `Bash` -- the `git add` and the `git commit` never run either.
+
+The refusal is what makes this silent rather than merely annoying.
+It speaks only about the push, so it reads as "the push was blocked", while the change is still an uncommitted working-tree edit, one `git checkout -- .` from destruction.
+Nothing in the message says the commit did not happen, and the retry then either has nothing to commit or commits a second time onto a tree the author believes is already committed.
+The reliable tell is checking whether `HEAD` actually moved -- which #1609's section already prescribes as a standing `Do:`, and which is nonetheless easy to skip after a refusal that appears to be about something else.
+
+Two calls cost one extra round trip and make the commit durable before anything can refuse the push.
+
+- **Do:** commit in one Bash call, then push in the next.
+- **Do:** check `git rev-parse HEAD` against what you expected whenever a push is refused, rather than assuming only the push was lost.
+- **Don't:** read a push refusal as a statement about the push alone when the same call carried a commit.
+- **Don't:** chain them and rely on remembering this -- [`no-commit-chained-to-push.py`](../../hooks/no-commit-chained-to-push.py) refuses the shape, because the rule is read long before the moment it is broken.
+
+The guard covers `git push` only.
+The same loss is available with any other publish step a `PreToolUse` guard can refuse, so the rule is about the commit's call boundary rather than about the push specifically.
+
+(Reported 2026-09-02, tracked as [ai-config#2992](https://github.com/Morrison-Lab/ai-config/issues/2992).
+The lost commit was caught only because an adversarial reviewer independently checked whether `HEAD` had moved.
+That issue's author states they verified the mechanism from the hook registration rather than reproducing the loss, so the mechanism is derived and the incident is a report.)
+
 ## Once pushed, add a new commit rather than amending
 
 Amending an already-pushed commit (`git commit --amend`) rewrites the commit object and mints a new SHA.

@@ -567,3 +567,11 @@ Two observations the reviewer placed outside the diff are filed rather than fold
 [#3164](https://github.com/Morrison-Lab/ai-config/issues/3164), the `ums` anti-patterns entry quotes a "check existing notes" step that belongs to `record-learnings`, and `consolidate-memory` carries the same phrase.
 Lesson for the fold: replacing a pronoun's anchor noun while fixing a different defect in the same sentence is how an `ambiguous-reference` regression arrives dressed as a fix;
 re-read every pronoun in a rewritten sentence against its new nearest antecedent.
+
+## 16:54 PDT --- the no-new-issues directive, clarified
+
+The user asked whether filing #3160 to #3164 broke the 14:19 PDT directive not to grab any more new issues.
+Answered with the state: nothing new has been claimed or started since the directive;
+the running workflows rework branches implemented before it, and the five issues are filed, not claimed.
+Asked which of filing noticed defects or resuming the parked wave 4 should also stop;
+the answer was neither, so "grab" keeps its `gi` meaning (claim and implement), filing under the file-every-noticed-issue rule continues, and wave 4 resumes when slots allow.

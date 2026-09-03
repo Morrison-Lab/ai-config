@@ -263,8 +263,8 @@ The repo's own checkers, its test suite, and whatever `check-install`-shaped ver
 
 Recorded 2026-09-03 from [ai-config#3059](https://github.com/Morrison-Lab/ai-config/issues/3059), on a hook that took nine adversarial rounds.
 Eight rounds read the diff.
-The ninth was briefed to run the repository's own local validation, and it found **two red CI gates that all eight prior rounds had missed** --- one of which would have shipped the hook completely **inert to plugin-path consumers** while every test in the suite passed.
-That is the whole of what the record says.
+The ninth ran the repository's own local validation, and found **two red CI gates that all eight prior rounds had missed** --- one of which would have shipped the hook completely **inert to plugin-path consumers** while every test in the suite passed.
+The record gives no more detail than that.
 It does not name the hook, the gates, or what was missing, so read it for the shape rather than for a mechanism --- and note that a diff-reading round cannot find a gate that fails on files the diff never touched, whatever the gate turns out to be.
 
 Note what this is not.

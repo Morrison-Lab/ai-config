@@ -936,7 +936,7 @@ A peer session ran an adversarial pass on **its own** draft of a similar hook,
 raised two edge cases from it, and asked whether they applied here --- a flag
 between `diff` and the refs, and a long `git -C <path>` prefix.
 
-Both already passed.
+Both already passed, established by mutation rather than by reading.
 Regression cases were drafted for them and then **reverted as duplicates**:
 `hooks/test-warn-stale-review-diff-base.py` already carried a case for each
 shape.

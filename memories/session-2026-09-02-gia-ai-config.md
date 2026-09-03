@@ -79,3 +79,29 @@ Remote Claude Code session;
   - Dropped its `memories/git-worktrees.md` block: superseded by the merged #3056, and it would have re-added a claim `main` now explicitly refutes ("a hook cannot enumerate live agents").
     A merge of `origin/main` is what made that visible --- worth noting, since the collision matrix flagged 3023 x 3056 on that file as a CONFLICT risk and the real risk was semantic supersession, which no file-set intersection can see.
 - Filed #3069: the same null-author jq defect in `skills/pr-status/SKILL.md` and `skills/pr-status-all/SKILL.md`, both pre-existing and outside #3024's diff.
+
+## Round 4 --- what the verdict sweep returned
+
+- #3058, #3014, #3044 all came back **Ready for merge** with structured `"findings": []`.
+  Merge intent announced on each.
+- #3024 came back **Needs more work** with four findings, and the root one is worth banking.
+  The block text asserted the exit status "belongs to that later command", and the same paragraph hedged two sentences later that a `&&` chain may have short-circuited before the request ran.
+  Both cannot be true.
+  Neither direction supports the attribution: `false && <req> && verify` leaves the status with `false`, and `<req> && verify` with a failing request leaves it with the request.
+  The sound claim is only the negative one --- the combined status cannot be attributed to the request.
+- **A self-contradicting paragraph is a detectable shape.**
+  The overclaim survived three review rounds while sitting two sentences from its own refutation, because each round read the hedge as a qualification rather than as a contradiction.
+  Worth a checker: an unconditional attribution followed by a hedge that denies it.
+- My own first fix on this PR fixed the chained paragraph and left the always-rendered recovery paragraph asserting the same thing.
+  The lesson is the one the new test encodes: when a claim appears in three places, a needle over one of them passes while the others still assert it.
+  Pin the negative claim over every paragraph that can carry it, not over the one you edited.
+- Deferred #3071 (`request_ident` resolves only the first request in a chain) rather than sweeping it in: it is a pre-existing helper outside the diff, and the reviewer graded it non-blocking.
+
+## Correction to my own earlier claim in this notebook
+
+I recorded that the diff-scoped checks "cannot see an uncommitted change".
+That is half right and the wrong half is load-bearing.
+`gha-check-new-line-breaks.py` takes ADDED LINE NUMBERS from the `base...HEAD` diff but reads CONTENT from the working tree.
+So a run over an uncommitted reformat compares committed line numbers against reformatted content and can report clean spuriously.
+Measured here: CI failed 22 lines on #3070's commit, a `--write` reformat then reported clean while uncommitted, and only the post-commit re-run was trustworthy.
+Commit, then re-run --- the rule survives, but "it sees nothing uncommitted" is not why.

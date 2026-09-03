@@ -538,6 +538,17 @@ proceed:
 - **Only NEW rounds are skipped**, and `require-review` grays rather than
   reddens on that path, so a skipped round is not a red check to chase.
 
+**An `in_progress` `claude-review` is not evidence the quota has recovered.**
+The skip is a MID-RUN 429, so the run really does start: `preempt-previous`
+and `gather-context` succeed, `claude-review` reports `in_progress`, and the
+429 arrives after that.
+Reading the in-progress state as recovery is therefore reading the shape of
+the failure as its absence.
+Measured 2026-09-02: a round that reached `in_progress` posted the identical
+skip notice about a minute later.
+Only a posted verdict settles it, which is why the re-trigger after a reset
+should be verified by getting one rather than by the clock.
+
 - **Do:** probe with a trivial subagent call before concluding a quota outage
   reaches this session.
 - **Do:** keep merging PRs whose clean verdict predates the outage and whose

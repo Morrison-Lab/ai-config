@@ -141,3 +141,25 @@ A peer that shares the login is invisible to every agent-listing tool and visibl
   5. `The measured occurrence` --- "measured" applied to the one datum the measurement did **not** find, and singular against "observed twice".
 - Finding 2 is the one worth carrying past this PR.
   It is the same shape as this session's own merge-simulation control, arriving in prose: a zero from a detector with a known blind spot reads exactly like a zero from a working one, and the passage asserting it had itself been written to argue "measured rather than assumed".
+
+## CI caught a check I ran on part of my own diff
+
+`new-line-breaks` failed on #3093's `50cf2863` with six violations, every one of them in this notebook file.
+
+The checker had been run three times that hour --- on #3084's edit, on #3060's three entries, and again after each fix --- and each run came back clean.
+None of them covered the notebook, because I ran the checker **from the branch whose corpus files I had just edited**, and the notebook lives on a different branch.
+
+So the gap is not that a check was skipped.
+It is that a check was run against a *subset* of what the session was pushing, and a clean result over that subset reads exactly like a clean result over all of it.
+That is the same shape as this session's two other control problems --- the merge-simulation zero, and the trailer sweep's zero --- arriving a third time in a different disguise: **an instrument that examined less than you think it did reports the same thing as one that found nothing.**
+
+The contributing cause is worth naming because it is not laziness.
+A lab notebook reads as *bookkeeping*, not as corpus prose, so it does not feel like the kind of file a style gate applies to.
+The gate does not draw that distinction.
+`memories/*.md` is inside the `*.md` glob, and the file is exactly the kind of hurried prose that packs two sentences onto a line.
+
+Fixed in `b439713c` --- reproduced locally with `NLB_BASE_REF=origin/main`, six lines broken, re-run to green, then pushed.
+
+- **Do:** run the repo's checkers once per branch you are about to push, not once per editing session.
+- **Do:** treat a notebook, a `.cases.md`, or any prose written in a hurry as in scope for the same gates as the corpus.
+- **Don't:** carry a clean checker result across a branch switch --- it was a measurement of the other branch.

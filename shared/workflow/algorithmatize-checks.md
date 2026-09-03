@@ -1345,6 +1345,34 @@ Where it does not enter both measurements with the same magnitude, the ratio amp
 - **Don't:** assume min-of-N filters two measurements equally when one is much longer than the other.
 - **Don't:** read a ratio's stability on an idle machine as evidence that it is load-independent.
 
+### The same ratio compresses when the nuisance cost lands in the denominator
+
+The section above measures load pushing a growth ratio *up*, and that is one of two directions it can move.
+A ratio is large over small, so a nuisance cost that lands mostly in the **denominator** compresses it instead, and a genuinely quadratic scan then reads as sub-quadratic.
+
+Measured 2026-09-03: the negative control in `hooks/test-no-unauthorized-merge.py`, a deliberately quadratic scan whose growth has to clear an 8x bound, read 14.5-15.3x over five runs on an idle container and 7.3x on a loaded GitHub runner, going red on a PR whose whole diff was two `memories/*.md` files ([#3098](https://github.com/Morrison-Lab/ai-config/issues/3098)).
+Nothing about the code differed between the two readings.
+
+The direction inverts what the failure looks like, which is why it is worth naming separately.
+An inflated ratio reports a regression that is not there, and reads as a finding about the code.
+A compressed one reports that the control cannot discriminate, and reads as a broken control --- so the instrument accuses itself, and the tempting repair is to loosen a bound that was working.
+
+Two repairs are on offer, and which one fits turns on whether the distortion is additive or multiplicative.
+That is measurable rather than assumable, so measure it.
+Subtracting a measured floor removes an additive fixed cost: timing an empty loop of the same shape cost 0.09ms against a 6.5ms baseline, 1.4% of it, which cannot account for a 2.1x compression, so subtraction would have bought nothing there.
+Widening the input-size gap is the repair that fits a multiplicative distortion, because the quadratic term outruns the bound: at a size step of `s` the reading is `s ** 2` and the halfway bound is `s ** 1.5`, so the margin is `sqrt(s)` --- 1.9x at a 4x step against 3.8x at a 16x step, measured.
+
+**Widening the gap while leaving the bound fixed is the trap**, and it hides well because the number in the bound never changes, so nothing looks edited.
+A bound of 8.0 is the halfway line for a 4x step and sits *below* the 8x a genuinely linear scan grows at an 8x step: measured, a linear scan read 7.8-8.8x there and cleared 8.0 in two runs of three.
+A widened control against the old bound would pass for either shape, which is the one thing a control exists to rule out.
+Recompute the bound at whatever step it is read against, and pin the separation with a positive control of the opposite shape rather than arguing it.
+
+- **Do:** ask which term a nuisance cost lands in, since load can push a ratio either way.
+- **Do:** measure the fixed cost before subtracting it, because an additive repair does nothing to a multiplicative distortion.
+- **Do:** recompute a bound at the size step it is read against, and pin the separation with a control of the opposite shape.
+- **Don't:** read a control's "I cannot discriminate" as evidence about the code it controls.
+- **Don't:** widen a ratio's input-size gap while leaving a bound that was derived for the old gap.
+
 ## Reading an instrument's PROSE instead of its exit status, generalized past the PR checker
 
 [`fully-clean`](fully-clean.md)'s "Calling the checker is not consuming it"

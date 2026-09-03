@@ -239,9 +239,12 @@ reason rather than omitted:
 physical line, which is the digit/parenthesis-opener case already recorded
 at [ai-config#2127](https://github.com/Morrison-Lab/ai-config/issues/2127)
 below, not a comma-or-conjunction clause join.
-Naming that split matters because the merged commit message for #3036
-(`52d6fa57`) gets it wrong in the other direction, calling the #3016 and
-#3007 findings "the same finding" raised "twice".
+Naming that split matters because the merged commit message for
+[#3036](https://github.com/Morrison-Lab/ai-config/pull/3036) (`52d6fa57`)
+gets it wrong in the other direction, calling the findings on
+[#3016](https://github.com/Morrison-Lab/ai-config/pull/3016) and
+[#3007](https://github.com/Morrison-Lab/ai-config/pull/3007)
+"the same finding" raised "twice".
 They are not, and a tally that silently drops one of them is how the
 conflation survives.
 Every line flagged for *clause* density joined its clauses with a comma or a
@@ -251,6 +254,36 @@ to catch either.
 This is the narrower-by-design gap arriving as a review comment instead of
 a CI failure, which the script's own docstring already predicts but no
 prior recurrence here had measured.
+
+**Applying this convention can itself break `lint-markdown`, and it did so
+in the commit that recorded the paragraph above.**
+Putting one sentence on its own line is exactly what puts a bare `#NNNN` at
+column 1, and markdownlint reads a line-initial `#` followed by a non-space
+character as a malformed ATX heading:
+
+```
+MD018/no-missing-space-atx No space after hash on atx style heading
+  [Context: "#3004 drew none."]
+```
+
+Two such lines went red on
+[#3044](https://github.com/Morrison-Lab/ai-config/pull/3044), both created
+by splitting a sentence out onto its own line during the fix for the
+finding above.
+So the convention and the markdown linter interact: a PR or issue reference
+is safe mid-sentence and unsafe as the first characters of a line.
+
+The remedy costs nothing and is already required elsewhere: link the
+reference.
+`[#3004](https://github.com/Morrison-Lab/ai-config/pull/3004)` opens with
+`[`, so MD018 cannot fire, and `AGENTS.md` asks for the linked form anyway.
+A bare reference that must stay bare can instead be moved off the line
+opening.
+
+- **Do:** link a PR or issue reference that lands at the start of a line, or
+  reword so the line does not open with it.
+- **Don't:** assume a sentence-per-line split is lint-neutral --- it changes
+  which token sits at column 1, which is the only thing MD018 looks at.
 
 The reformatter also worked against the fix once found, in both directions
 already named above.
@@ -288,7 +321,8 @@ Copilot findings read from `gh api
 repos/Morrison-Lab/ai-config/pulls/{3007,3016,3036}/comments` --- all three
 that drew one, since a query over only the two clause-density PRs would have
 produced the undercount this entry now warns about.
-#3004 drew none.
+No such comment appeared on
+[#3004](https://github.com/Morrison-Lab/ai-config/pull/3004).
 The rejoin and restructure account is from the PRs' own commit messages, not
 inferred.
 Whether the reformatter should learn comma/conjunction clause boundaries

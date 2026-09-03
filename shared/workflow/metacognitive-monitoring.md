@@ -1354,13 +1354,17 @@ Run the code as it stood **before** your change against the same input.
 When the old version reproduces the defect, the change did not cause it;
 when it does not, it did.
 
-    git show <parent>:<path> > /tmp/old.py # then exercise it directly
+```bash
+git show <parent>:<path> > /tmp/old.py   # then exercise it directly
+```
 
 **That one-file form holds only while the file is self-contained.**
 Where the same commit also changed something the file imports, or something that imports it, the extracted copy either fails to import or --- worse --- imports the **new** sibling and runs as a hybrid that is neither the real before nor the real after, returning a confident verdict either way with nothing signalling the mixture.
 Check what else the commit touched before trusting it, and check out the whole tree instead when it touched anything adjacent:
 
-    git worktree add /tmp/before <parent> # then exercise it there
+```bash
+git worktree add /tmp/before <parent>    # then exercise it there
+```
 
 That reading is what "the reviewer said it predated my fix and they are right" must rest on, rather than on the reviewer's authority --- a reviewer's causal claim is a cause claim under this same rule, and deferring to it is not checking it.
 Where the routes differ but the observable defect is identical, say so: pre-existing by a different mechanism is a third answer, and it was the true one in the case this section was written from.

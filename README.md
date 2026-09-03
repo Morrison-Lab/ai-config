@@ -486,8 +486,20 @@ So when adding a warn-only hook:
 
 `scripts/check-hook-output-shape.py` enforces this on every run: it verifies that
 warn-only hooks never emit `reason` alone, that warn-only `Stop` hooks emit
+`systemMessage`, that warn-only `PreToolUse` hooks emit `additionalContext` or
 `systemMessage`, and that their test suites inspect the payload shape rather than
 checking non-empty output.
+
+The `PreToolUse` half was added after `flag-cd-into-main-checkout.py` shipped
+printing its warning to stderr and exiting 0
+([#3068](https://github.com/Morrison-Lab/ai-config/issues/3068)).
+On exit 0 stderr reaches the `--debug` log alone, and `PreToolUse` plain stdout
+is not surfaced either, so the guard fired correctly and warned nobody.
+A hook with *neither* channel used to fall through both rules above: the
+`Stop` rule does not apply, and the test-side rule only inspects hooks that
+already emit one of the two.
+`UserPromptSubmit` is deliberately out of scope, since its plain stdout is
+added to the context.
 
 Every hook must ship a companion `test-<name>.py` beside it in the same change before pushing;
 `scripts/test_hooks.py` runs

@@ -46,6 +46,17 @@ not observable from the command, so a blocking guard would refuse legitimate
 work --- and per
 [`deterministic-tools.md`](../shared/principles/deterministic-tools.md) a guard
 that refuses legitimate work gets switched off, taking the real cases with it.
+
+## How the warning is delivered
+
+Through `hookSpecificOutput.additionalContext` on stdout, paired with a
+one-line `systemMessage`. It used to print to stderr and exit 0, which reaches
+the debug log and nobody else: for exit code 0 stderr is shown to neither
+Claude nor the user, and for `PreToolUse` plain stdout is not surfaced either.
+So the guard fired correctly and warned nobody, which is indistinguishable
+from a guard that never fires. `scripts/check-hook-output-shape.py` now
+refuses a warn-only `PreToolUse` hook with no such channel, so the shape
+cannot come back (ai-config#3068).
 """
 
 from __future__ import annotations
@@ -133,8 +144,21 @@ def main() -> int:
 
     cwd = payload.get("cwd") or os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
     warning = evaluate(command, str(pathlib.Path(cwd)))
-    if warning:
-        print(warning, file=sys.stderr)
+    if not warning:
+        return 0
+
+    out = {
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "additionalContext": warning,
+        },
+        "systemMessage": (
+            "This `cd` targets the MAIN checkout of this session's own "
+            "repository, not its worktree. Use `git -C <path>` or drop the "
+            "`cd`."
+        ),
+    }
+    print(json.dumps(out))
     return 0
 
 

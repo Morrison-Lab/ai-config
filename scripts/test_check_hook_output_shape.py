@@ -7,7 +7,9 @@ verifying that:
   2. A warn-only hook emitting `reason` without `decision` fails (the defect from #1566).
   3. A warn-only Stop hook that fails to emit `systemMessage` fails.
   4. A test for a warn-only hook that does not assert payload shape fails (test-side blindness).
-  5. Missing or unparseable hooks.json fails loudly with usage exit code 2.
+  5. A warn-only PreToolUse hook emitting neither additionalContext nor
+     systemMessage fails, while a blocking one does not (#3068).
+  6. Missing or unparseable hooks.json fails loudly with usage exit code 2.
   6. Unparseable Python source in a hook fails loudly with a diagnostic.
   7. The success line encodes on a cp1252 stdout (ai-config#2038).
   8. parse_string_constants does not emit ast.Str DeprecationWarning.
@@ -198,6 +200,43 @@ case(
     BLIND_PRETOOL_TEST_FILES,
     want_exit=1,
     needle="never inspects 'additionalContext' or 'systemMessage'",
+)
+
+# --- 5b. Warn-only PreToolUse hook with no delivery channel at all (#3068) ---
+# The defect: the hook printed its warning to stderr and exited 0, which
+# reaches the debug log and nobody else. Before this rule the hook fell
+# through every check, because the test-side rule only looks at hooks that
+# already emit one of the two channels.
+NO_CHANNEL_FILES = dict(CLEAN_FILES)
+NO_CHANNEL_FILES["hooks/warn-pretool.py"] = (
+    'import sys\nprint("warning", file=sys.stderr)\n'
+)
+
+case(
+    "warn-only PreToolUse hook with neither channel fails (#3068)",
+    CLEAN_HOOKS_JSON,
+    NO_CHANNEL_FILES,
+    want_exit=1,
+    needle="emits neither 'additionalContext' nor 'systemMessage'",
+)
+
+# A PreToolUse hook that BLOCKS is out of scope for the rule: its `deny`
+# carries a reason the harness does show, so it needs no advisory channel.
+BLOCKING_PRETOOL_FILES = dict(CLEAN_FILES)
+BLOCKING_PRETOOL_FILES["hooks/warn-pretool.py"] = (
+    'import json\nprint(json.dumps({"hookSpecificOutput": '
+    '{"permissionDecision": "deny", "permissionDecisionReason": "no"}}))\n'
+)
+BLOCKING_PRETOOL_FILES["hooks/test-warn-pretool.py"] = (
+    'import json\nout = \'{"hookSpecificOutput": {"permissionDecision": "deny"}}\'\n'
+    'assert "permissionDecision" in out\n'
+)
+
+case(
+    "blocking PreToolUse hook needs no advisory channel (#3068)",
+    CLEAN_HOOKS_JSON,
+    BLOCKING_PRETOOL_FILES,
+    want_exit=0,
 )
 
 # --- 6. Missing hooks.json fails loudly with usage exit 2 ---

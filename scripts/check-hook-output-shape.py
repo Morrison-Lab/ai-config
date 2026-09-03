@@ -11,7 +11,9 @@ This checks two things:
   1. Hook source output shape:
      - For every hook in `hooks/hooks.json` (and `hooks/*.py`): if its source
        never emits `"decision"` (or `permissionDecision: deny`), it must not
-       emit `"reason"` alone, and warn-only Stop hooks must emit `"systemMessage"`.
+       emit `"reason"` alone, warn-only Stop hooks must emit `"systemMessage"`,
+       and warn-only PreToolUse hooks must emit `"additionalContext"` or
+       `"systemMessage"` (ai-config#3068).
   2. Test-side payload inspection:
      - For every test suite `hooks/test-*.py` of a warn-only hook: the test must
        inspect the emitted payload shape (e.g. asserting `systemMessage` or
@@ -102,6 +104,7 @@ def check_hook_sources(
         has_decision = "decision" in constants or "permissionDecision" in constants
         has_reason = "reason" in constants
         has_system_message = "systemMessage" in constants
+        has_additional_context = "additionalContext" in constants
 
         events = [ev for ev, _ in registered.get(script, [])]
 
@@ -120,6 +123,23 @@ def check_hook_sources(
                     f"FAIL: {script} is registered as a Stop hook without a 'decision' "
                     "block emit, but does not emit 'systemMessage'. "
                     "Warn-only Stop hooks must emit 'systemMessage'."
+                )
+
+        # Rule 3: A PreToolUse hook with no block decision is warn-only, so it
+        # must emit additionalContext or systemMessage. On exit 0 stderr goes
+        # to the debug log only, and for PreToolUse plain stdout is not
+        # surfaced either -- so a hook with neither channel warns nobody while
+        # looking exactly like one whose condition never fired
+        # (ai-config#3068). UserPromptSubmit is deliberately out of scope: its
+        # plain stdout IS added to the context, so the same shape is fine there.
+        if "PreToolUse" in events and not has_decision:
+            if not (has_additional_context or has_system_message):
+                errors.append(
+                    f"FAIL: {script} is registered as a PreToolUse hook without a "
+                    "'decision' block emit, but emits neither 'additionalContext' "
+                    "nor 'systemMessage'. A warn-only PreToolUse hook must emit "
+                    "'hookSpecificOutput.additionalContext' on stdout; stderr on "
+                    "exit 0 reaches the debug log only."
                 )
 
     return errors

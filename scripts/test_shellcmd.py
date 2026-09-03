@@ -131,6 +131,35 @@ check("<<- tab-indented terminator",
 check("a heredoc body's git commands are not command positions",
       subs("cat > /tmp/b <<'EOF'\ngit commit -m x\ngit push\nEOF"), [])
 
+# ONE LINE, TWO HEREDOCS. The shell queues the bodies and reads them back to
+# back after the newline, in opener order. Scanning only the first opener and
+# emitting the rest of the line verbatim left the second body live, so its
+# text was parsed as commands.
+check("a second heredoc opened on the same line is also blanked",
+      subs("cat <<A > f1 && cat <<B > f2\nbodyA\nA\ngit commit -m x\nB\n"), [])
+check("and a git command inside that second body is not a command",
+      subs("git commit -m x <<A && git push <<B\na\nA\ngit commit -m y\nB\n"),
+      ["commit", "push"])
+# THE SAME-LINE BOUND, which is the other half of the loop and fails the other
+# way. Collecting delimiters past the opener's own line makes a LATER,
+# unrelated heredoc's delimiter queue behind this one, so the first body is
+# closed at the wrong terminator and its text goes live. Adversarial review
+# found this unpinned: dropping `m.start() < scan_end` left the whole suite
+# green while `cat <<A\ngit commit -m x\nA\ncat <<B\nbodyB\nB\n` started
+# reporting a commit --- the same false DENY the case above rules out, reached
+# from the opposite direction.
+check("two heredocs on SEPARATE lines keep their own bodies",
+      subs("cat <<A\ngit commit -m x\nA\ncat <<B\nbodyB\nB\n"), [])
+
+# A HERE-STRING carries no body. Matching its second and third `<` as an
+# opener blanked everything after it, so a chain written below one was erased
+# and the guard went silent -- a false negative, the direction that ships a
+# broken push.
+check("a here-string is not a heredoc opener",
+      subs("cat <<< word\ngit commit -m x\ngit push"), ["commit", "push"])
+check("a here-string on a git command likewise",
+      subs("git hash-object -w --stdin <<< text\ngit push"), ["hash-object", "push"])
+
 # ORDERING: heredoc blanking must run BEFORE the backslash-continuation join.
 # A heredoc body is literal text and a backslash in it continues nothing, but
 # joining first lets a body line ending in `\` eat its own terminator -- after
@@ -182,6 +211,17 @@ check("a wrapper running something else is left alone",
 check("a wrapper whose git is beyond the window is not claimed",
       subs("sudo -a -b -c -d -e -f -g git push"), [])
 
+# `export` RUNS NOTHING. It is a builtin whose arguments are names and
+# assignments, so this exports `FOO`, `git` and `push` and invokes no git ---
+# confirmed against bash, which produced no git output. Peeling the word as
+# though it were a wrapper resolved the command to `git push` and refused a
+# call that never happens.
+check("export is a stop, not a wrapper", subs("export FOO=1 git push"), [])
+check("a real env prefix on the same line is unaffected",
+      subs("FOO=1 git push"), ["push"])
+check("and a separate export statement leaves the git command alone",
+      subs("export FOO=1; git push"), ["push"])
+
 # ------------------------------------------------------ git_subcommand shape
 
 check("global -C is skipped",
@@ -217,22 +257,30 @@ check("the last assignment wins",
       shellcmd.env_value(["FOO=1", "FOO=2"], "FOO"), "2")
 check("a name that merely contains the key does not match",
       shellcmd.env_value(["MYFOO=1"], "FOO"), None)
-# `export FOO=1` reaches shlex as TWO tokens -- never one -- so `strip_env`
-# must consume both, and `env_value` must never need to strip an `export `
-# prefix from a token. Both halves are asserted, because a mutation removing
-# the (unreachable) prefix handling from `ENV_ASSIGNMENT` left the suite green.
-check("export split across two tokens leaves git as the program",
-      shellcmd.strip_env(["export", "FOO=1", "git", "push"])[1],
-      ["git", "push"])
-check("export split across two tokens still records the assignment",
+# `export FOO=1` reaches shlex as TWO tokens -- never one -- and the earlier
+# reading, that `strip_env` should consume both and carry on to the program
+# after them, was wrong about the shell. `export` is a builtin taking names
+# and assignments, so nothing after it on that simple command is a program;
+# these three cases used to assert `["git", "push"]` and a recorded `FOO=1`,
+# which is what made the guard refuse a push that never happens.
+check("export yields no program at all",
+      shellcmd.strip_env(["export", "FOO=1", "git", "push"])[1], [])
+check("and records no assignment, since none takes effect here",
       shellcmd.env_value(shellcmd.strip_env(
-          ["export", "FOO=1", "git", "push"])[0], "FOO"), "1")
-check("an export-prefixed assignment survives a real shlex round trip",
-      shellcmd.env_value(shellcmd.strip_env(
-          (shellcmd.simple_commands("export FOO=1 git push") or [[]])[0])[0],
-          "FOO"), "1")
-check("export with no assignment after it is not consumed as one",
-      shellcmd.strip_env(["export", "PATH"])[1], ["export", "PATH"])
+          ["export", "FOO=1", "git", "push"])[0], "FOO"), None)
+check("the same through a real shlex round trip",
+      shellcmd.strip_env(
+          (shellcmd.simple_commands("export FOO=1 git push") or [[]])[0])[1],
+      [])
+check("export of a bare name likewise",
+      shellcmd.strip_env(["export", "PATH"])[1], [])
+# The spelling that DOES carry a value into a git invocation, kept beside the
+# rejected one so the pair reads as a distinction rather than a blanket ban.
+check("a bare assignment prefix still resolves to git",
+      shellcmd.strip_env(["FOO=1", "git", "push"])[1], ["git", "push"])
+check("and still records its value",
+      shellcmd.env_value(shellcmd.strip_env(["FOO=1", "git", "push"])[0],
+                         "FOO"), "1")
 
 if failures:
     print("FAILED:")

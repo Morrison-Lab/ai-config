@@ -128,13 +128,25 @@ import shlex
 # opener then went unrecognized, the body was left as live text, and a heredoc
 # merely CONTAINING `git commit && git push` was refused. A false DENY on a
 # harmless call is the direction README calls worse than a missing hook.
-RX_HEREDOC_OPEN = re.compile(r"<<(-?)\s*(['\"]?)([^\s'\"<>&|;()`$]+)\2")
+# The lookbehind is what tells a heredoc from a HERE-STRING. `cat <<< word`
+# carries no body, but without the guard the pattern matched its SECOND and
+# THIRD `<` as an opener and blanked everything after it as a body -- so a
+# `git commit ... && git push` chain written after a here-string was erased
+# and the guard went silent. Measured: `cat <<< word` rendered as `cat < << `.
+#
+# The blank class is `[ \t]` rather than `\s` for grammar fidelity only: POSIX
+# lets BLANKS separate `<<` from its delimiter word, and a newline there is a
+# syntax error rather than an opener. It fixes no measured defect --- the body
+# scan below frames each line from the match's own end, so a straddling match
+# corrupts nothing --- and a mutation restoring `\s` kills no case. Read that
+# survivor as an unmotivated-by-a-bug change, not as missing coverage.
+RX_HEREDOC_OPEN = re.compile(r"(?<!<)<<(-?)[ \t]*(['\"]?)([^\s'\"<>&|;()`$]+)\2")
 
 # No `export` alternative here on purpose. `shlex` splits `export FOO=1` into
 # TWO tokens, so an `export`-prefixed assignment never reaches this pattern as
-# one word -- `strip_env` handles the two-token form instead. A
-# `(?:export\s+)?` group here was unreachable, and a mutation removing it left
-# the suite green, which is how it was found.
+# one word -- `strip_env` stops at the `export` token instead, since the
+# builtin runs no command. A `(?:export\s+)?` group here was unreachable, and a
+# mutation removing it left the suite green, which is how it was found.
 ENV_ASSIGNMENT = re.compile(r"\A[A-Za-z_][A-Za-z0-9_]*=")
 
 # Wrappers that RUN the command following them, so `git` is not argv[0] even
@@ -206,32 +218,54 @@ def _heredoc_free(command):
         if m is None:
             out.append(command[pos:])
             return "".join(out)
-        out.append(command[pos:m.start()])
-        out.append(" << ")
-        dash, delim = m.group(1), m.group(3)
-        body_start = command.find("\n", m.end())
-        if body_start == -1:
-            out.append(command[m.end():])
+        # ONE LINE MAY OPEN SEVERAL HEREDOCS, and handling only the first
+        # was a false DENY. `cat <<A > f1 && cat <<B > f2` queues two bodies;
+        # emitting the rest of the opener line verbatim without re-scanning
+        # it left B unrecognized, so B's body stayed live text and a
+        # `git commit && git push` written inside it was refused. The shell
+        # reads the queued bodies back to back after the newline, in opener
+        # order, so collect the delimiters across the whole line first and
+        # consume the bodies in that order.
+        #
+        # This predates the opener-line fix below rather than following from
+        # it, though it is easy to read the other way round. Checked against
+        # `7b54d28`, whose version dropped the opener-line remainder and so
+        # lost B's opener with it: the same input leaks the same two commands
+        # as live text. Different route, same defect.
+        line_end = command.find("\n", m.end())
+        scan_end = len(command) if line_end == -1 else line_end
+        delims = []
+        cursor = pos
+        while m is not None and m.start() < scan_end:
+            # THE REST OF THE OPENER'S LINE IS NOT BODY, and dropping it was
+            # a bypass. A heredoc redirection is one word of a command that
+            # can carry more after it --- `git commit -F - <<'EOF' && git
+            # push` runs the push, and discarding everything from the opener
+            # to the body's first newline discarded that push, so the guard
+            # went silent on a real chain. Keep it; only the BODY is blanked.
+            out.append(command[cursor:m.start()])
+            out.append(" << ")
+            delims.append((m.group(1), m.group(3)))
+            cursor = m.end()
+            m = RX_HEREDOC_OPEN.search(command, cursor)
+        out.append(command[cursor:scan_end])
+        if line_end == -1:
             return "".join(out)
-        # THE REST OF THE OPENER'S LINE IS NOT BODY, and dropping it was a
-        # bypass. A heredoc redirection is one word of a command that can
-        # carry more after it --- `git commit -F - <<'EOF' && git push` runs
-        # the push, and discarding everything from the opener to the body's
-        # first newline discarded that push, so the guard went silent on a
-        # real chain. Keep it; only the BODY is blanked.
-        out.append(command[m.end():body_start])
         out.append("\n")
-        indent = r"[\t]*" if dash else ""
-        # Nothing may follow the delimiter. Bash requires the terminator line
-        # to match exactly --- verified directly: a body line `EOF  ` does not
-        # close the heredoc, the body continues past it. Accepting trailing
-        # whitespace read such a line as the terminator, so the rest of the
-        # body was parsed as live commands and a harmless call was refused.
-        term = re.compile(r"^" + indent + re.escape(delim) + r"$", re.M)
-        hit = term.search(command, body_start + 1)
-        if hit is None:
-            return "".join(out)
-        pos = hit.end()
+        pos = line_end + 1
+        for dash, delim in delims:
+            indent = r"[\t]*" if dash else ""
+            # Nothing may follow the delimiter. Bash requires the terminator
+            # line to match exactly --- verified directly: a body line
+            # `EOF  ` does not close the heredoc, the body continues past it.
+            # Accepting trailing whitespace read such a line as the
+            # terminator, so the rest of the body was parsed as live commands
+            # and a harmless call was refused.
+            term = re.compile(r"^" + indent + re.escape(delim) + r"$", re.M)
+            hit = term.search(command, pos)
+            if hit is None:
+                return "".join(out)
+            pos = hit.end()
 
 
 def _comment_free(command):
@@ -344,11 +378,14 @@ def strip_env(argv):
     `{ git commit -m x; }`, and `sudo -u me git push` all resolve to a `git`
     first token, as they do for the guard this one is paired against.
 
-    `env` is the list of assignment TOKENS, in order. It never contains an
-    `export` word: the loop below consumes that token separately, because
-    `shlex` splits `export FOO=1` into two. `env_value`'s docstring says the
-    same, and this one used to claim the opposite --- a caller trusting it
-    would strip a prefix that cannot be present.
+    `env` is the list of assignment TOKENS, in order, and never contains an
+    `export` word --- a caller trusting otherwise would strip a prefix that
+    cannot be present.
+
+    An `export` token STOPS the scan and yields no program, because the
+    builtin runs nothing: `export FOO=1 git push` exports three names and
+    invokes no git. Peeling it as though it were a wrapper is what made this
+    return `git push` for a command that never pushes.
     """
     rest, env, after_wrapper = list(argv), [], False
     while rest:
@@ -358,9 +395,16 @@ def strip_env(argv):
             rest = rest[1:]
             after_wrapper = False
             continue
-        if tok == "export" and len(rest) > 1 and ENV_ASSIGNMENT.match(rest[1]):
-            rest = rest[1:]  # `export FOO=1` split by shlex into two tokens
-            continue
+        # `export` RUNS NOTHING, so it is a stop rather than a peel. It is a
+        # builtin whose arguments are names and assignments, so
+        # `export FOO=1 git push` exports the three names `FOO`, `git` and
+        # `push` and invokes no git at all -- verified against bash, which
+        # produced no git output for it. Peeling the word (and then the
+        # assignment after it) left `git push` as the command and refused a
+        # call that never happens. Nothing after `export` in this simple
+        # command can be a git invocation, so return no program at all.
+        if tok == "export":
+            return env, []
         if tok in COMMAND_WRAPPERS:
             after_wrapper = True
             rest = rest[1:]
@@ -393,13 +437,19 @@ def env_value(env_tokens, name):
     """The value assigned to `name` by `env_tokens`, or `None`.
 
     The LAST assignment wins, as the shell does. Tokens arrive already
-    `export`-free: `strip_env` consumes the `export` word separately, because
-    `shlex` splits `export FOO=1` into two tokens and never into one.
+    `export`-free, because `strip_env` stops at an `export` token rather than
+    peeling it.
 
-    The `export` spelling still has to WORK, since
-    `hooks/no-unauthorized-merge.py`'s `ALLOW_MERGE` anchor accepts it and an
-    escape valve that rejects its own precedent's spelling is not an escape
-    valve. `strip_env` is where that support lives.
+    That is not a gap in the `ALLOW_MERGE` escape valve, though
+    `hooks/no-unauthorized-merge.py`'s anchor does accept a
+    `(?:export\s+)?` prefix. The one-line spelling it accepts runs no command
+    at all --- `export ALLOW_MERGE=1 git merge main` exports the names
+    `git`, `merge` and `main` --- so there is nothing for an escape valve to
+    authorize. The spellings that DO carry the value into a git invocation
+    are the bare `ALLOW_MERGE=1 git merge ...` prefix, which arrives here as
+    an assignment token, and a separate `export ALLOW_MERGE=1;` statement,
+    whose effect on a later simple command is outside what a single argv can
+    show.
     """
     value = None
     for tok in env_tokens:

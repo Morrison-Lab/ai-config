@@ -83,9 +83,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../../site_libs/bootstrap/bootstrap-3e9b1289f5f353c49b617ce48ad2bc38.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../../site_libs/bootstrap/bootstrap-dark-a515e054079012129989d5397ee3c9c1.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="../../site_libs/bootstrap/bootstrap-3e9b1289f5f353c49b617ce48ad2bc38.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-e3adbaa939bcd423dddc8c8a834270b4.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-4de2da5e8af8a56ca594d71261300eb6.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-e3adbaa939bcd423dddc8c8a834270b4.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -414,6 +414,14 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li><strong>Don’t:</strong> count the warning window inside the twenty minutes, or skip it because the PR has been quiet for hours — the whole cost is five minutes, and it is paid once.</li>
 </ul>
 <p>(ai-config#2460. Measured 2026-08-27: a session driving #2433 and #2447 found #2448 — a peer’s PR fixing the very artifact blocking #2447 — at exit 0, five minutes after its clean verdict. It held, and the peer then pushed a further commit fourteen minutes later before merging the PR itself. So the counterfactual is not hypothetical: merging at the five-minute mark would have discarded a commit that did not yet exist, and nothing about the PR at that moment distinguished it from one that was finished. That is the whole argument for the interval, and for the warning step on top of it.)</p>
+<p><strong>Broadcast to every listed peer rather than guessing the owner from a branch name, and read replies for risk flags too, not only hold-offs.</strong> <code>ListAgents</code> names every peer session. Messaging only the peer whose branch name looks like a match skips the peers who are not the owner but still know something: another session tracking the same base, or one that already merged its own PR and can say so.</p>
+<ul>
+<li><strong>Do:</strong> send the merge-intent notice to every peer <code>ListAgents</code> lists, not only the branch’s apparent owner.</li>
+<li><strong>Do:</strong> read each reply for a substantive risk flag (a correction on <code>main</code> not in the PR’s base, a stale-red check from a known CI bug), not only for an explicit hold-off.</li>
+<li><strong>Don’t:</strong> message only the single peer a branch name suggests.</li>
+<li><strong>Don’t:</strong> treat a reply that names a risk as clearance because it contains no hold-off.</li>
+</ul>
+<p>(Measured 2026-09-02 on <code>Morrison-Lab/ai-config</code>. Three peer-owned PRs, <a href="https://github.com/Morrison-Lab/ai-config/pull/2999">#2999</a>, <a href="https://github.com/Morrison-Lab/ai-config/pull/3010">#3010</a>, and <a href="https://github.com/Morrison-Lab/ai-config/pull/3029">#3029</a>, had each been clean for over twenty minutes. The session posted a merge-intent comment on each PR, sent the same notice to all seven local peer sessions via <code>ListAgents</code> and <code>SendMessage</code>, and waited about five minutes. Six of the seven peers replied. Four replied inside the window: the owner of <a href="https://github.com/Morrison-Lab/ai-config/pull/2999">#2999</a> had merged that PR in the meantime, one peer owned an unrelated draft, one had nothing to add, and one flagged a real merge risk, a mid-file correction on <code>main</code> that <a href="https://github.com/Morrison-Lab/ai-config/pull/3029">#3029</a>’s base did not carry. Two replied after the merges had landed: the owner of <a href="https://github.com/Morrison-Lab/ai-config/pull/3010">#3010</a> and <a href="https://github.com/Morrison-Lab/ai-config/pull/3029">#3029</a>, with no hold-off, and a peer warning that red review checks from that afternoon’s reusable-workflow bug stay red after the fix and need a full re-run rather than a <code>--failed</code> one. Neither late reply would have changed the merge decision, and a five-minute window is expected to miss a slow reply now and then.)</p>
 </section>
 </section>
 <section id="the-standing-per-repository-grant" class="level2">

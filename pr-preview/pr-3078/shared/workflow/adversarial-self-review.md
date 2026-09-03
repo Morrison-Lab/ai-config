@@ -252,6 +252,66 @@ That is [`learn-from-review-findings`](learn-from-review-findings.md)'s converge
 - **Don't:** count a verdict that cites prior rounds in its justification as a fully independent round;
   that much of it is a re-reading of the rounds it names, however hard the rest of it worked.
 
+## Run every mechanical style instrument before dispatching, not after
+
+The rule above is about what the reviewer sees.
+This rule is about what should never reach the reviewer:
+a defect the repo's own deterministic checker already catches.
+
+Some of a prose diff's style classes have an instrument and some do not.
+In this repo the instruments are
+the vendored semantic line-break checker
+(`scripts/vendor/gha-check-new-line-breaks.py`, which is what CI runs:
+one sentence per line, plus a clause rule for a long line with a mid-line semicolon),
+`markdownlint`,
+`scripts/check-links.py`,
+and the directional-word grep the [`fix-forward-references`](../../skills/fix-forward-references/SKILL.md) skill runs.
+An ambiguous pronoun has no detector, per [`ambiguous-reference`](../writing/ambiguous-reference.md),
+so that class stays with the reviewer,
+though a grep for a pronoun that opens a clause after a comma or a conjunction,
+the positional heuristic that fragment names,
+narrows where to look.
+Each instrument is cheap and deterministic,
+and each runs in seconds.
+That speed is not a reason to skip the adversarial round.
+That speed is the reason the round should never be the first thing that finds a defect an instrument covers,
+per [`algorithmatize-checks`](algorithmatize-checks.md).
+An adversarial round costs real tokens and real time.
+Spending a round on a defect a repo script would have caught for free
+is the same waste `algorithmatize-checks` names for any check a human re-derives by hand:
+reviewer judgment substituting for an instrument that already exists.
+
+So run every available mechanical style instrument on the diff,
+fix what those instruments report,
+and only then hand the diff to the adversarial reviewer.
+Brief the reviewer to report every finding in one round, style findings included.
+The point of running the instruments first is to keep the round's own findings
+down to what only judgment can catch,
+not to teach the reviewer that style is someone else's job.
+
+- **Do:** run the repo's own style checkers on the diff
+  (the semantic line-break checker, `markdownlint`, the link checker,
+  the forward-reference grep, or whatever the repo defines)
+  and fix their output before the first adversarial dispatch.
+- **Do:** brief the reviewer to report every finding in one round
+  rather than holding style findings for a later pass.
+- **Don't:** dispatch a diff to the adversarial reviewer
+  before the repo's mechanical style checkers have run on that diff.
+- **Don't:** brief the reviewer to leave style findings for a later pass.
+
+(Measured 2026-09-02 driving
+[#3025](https://github.com/Morrison-Lab/ai-config/pull/3025),
+a 20-line addition to `memories/reviewing-prs.md`.
+Four adversarial-reviewer rounds ran, each costing roughly 210k tokens.
+Round 1 found a misattributed citation plus word-wrapped lines.
+Round 2 found an ambiguous "It" and a forward-pointing "below".
+Round 3 found lines that ran several clauses together.
+Round 4 was clean.
+The word-wrapped and run-together lines were the semantic line-break checker's territory,
+and the forward-pointing "below" was the forward-reference grep's;
+only the citation and the pronoun needed a reader.
+Running those two instruments first would have collapsed the four rounds to at most two.)
+
 ## Its findings are findings
 
 [`self-review-fallback`](self-review-fallback.md) already rules out surfacing a defect in your own review and closing it on your own estimate of its blast radius.

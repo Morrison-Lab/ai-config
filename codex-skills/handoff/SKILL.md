@@ -1,6 +1,6 @@
 ---
 name: "handoff"
-description: "Snapshot session state to memory."
+description: "Snapshot state to forge and memory."
 ---
 
 # handoff (Codex wrapper)

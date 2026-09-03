@@ -133,6 +133,15 @@ join that would fail the gate is split rather than written.
   diff-scoped to added lines, and this script is not invoked by any workflow.
 - **Don't:** expect `--write` to wrap comma-clause chains to 80 columns.
   That is #2081, not the gate, and this construction does not close it.
+- **Do:** after any `--write` reflow,
+  print the longest added line's length with
+  `git diff | grep '^+[^+]' | awk '{ if (length > m) m = length } END { print m }'`
+  and re-break by hand when that number is past about 120,
+  since the gate does not flag a long comma-joined line with no mid-line semicolon.
+- **Don't:** ship a `--write` reflow on the gate's clean verdict alone.
+  Recurred 2026-09-02 in a `/gia` session:
+  `--write` rewrapped three clause-broken prose additions into single lines up to 398 characters long,
+  and the fix was `git checkout <prior-commit> -- <files>` and re-breaking by hand.
 
 (Morrison-Lab/ai-config, 2026-08-15, measured on this machine with the gate at
 `Morrison-Lab/gha@da46419`, whose `_DEFAULT_CLAUSE_BREAKS` is `True` and

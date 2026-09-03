@@ -112,6 +112,12 @@ glab issue create --repo <owner>/<repo> \
   --description "<body>"
 ```
 
+No `ai-authored` / `model:<model-id>` labels here.
+[`issue-first`](../../shared/workflow/issue-first.md)'s labelling rule is scoped
+to repos we administrate, and an upstream project's label taxonomy is not ours
+to extend --- see
+[`label-agent-filed-issues`](../../shared/workflow/label-agent-filed-issues.md).
+
 After filing, report the issue URL back to the user.
 
 ### 3B. Open a PR (fix path)

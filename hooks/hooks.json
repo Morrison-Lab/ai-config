@@ -334,6 +334,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-unlabelled-agent-issue.py\"",
+            "timeout": 10,
+            "script": "warn-unlabelled-agent-issue.py",
+            "why": "shared/workflow/issue-first.md, 'Label an agent-filed issue with its authorship and its model'. disclose-agent-authorship.md scopes its marker line to comment BODIES and excludes an issue body, so an agent-filed issue is the one artifact that discloses nothing -- it goes out under the account holder's login as type: User. The labels close that, and the rule is consulted at read time while the omission happens at composition time. WARNS, never blocks: an unlabelled issue is fixed by one `gh issue edit --add-label` while a blocked create loses the act that makes work visible (report-mistakes-proactively.md, 'filing is not gated on approval'), the rule is scoped to repos we administrate and this hook cannot tell which repo is ours (sup files upstream with neither label), and a repo whose labels cannot be created still gets the issue. Anchored on a command position with heredoc bodies stripped, for the reason warn-pr-create-without-dupe-check.py records: this corpus quotes `gh issue create` constantly. Fails open. Tracked as #3111."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-stale-adjacent-comment.py\"",
             "timeout": 15,
             "script": "flag-stale-adjacent-comment.py",
@@ -654,6 +661,13 @@
             "timeout": 10,
             "script": "warn-pr-create-without-dupe-check.py",
             "why": "Dual-registered with the Bash entry, following no-unauthorized-merge.py's precedent. tool-mappings.md maps CREATE_PR to mcp__github__create_pull_request and CREATE_ISSUE to mcp__github__issue_write (method=create) (legacy mcp__github__create_issue still matched), and CLAUDE.md mandates that substitute in remote sessions -- so registering only under Bash let a remote session discharge the guard via MCP reads while never being able to trip it via MCP creation."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-unlabelled-agent-issue.py\"",
+            "timeout": 10,
+            "script": "warn-unlabelled-agent-issue.py",
+            "why": "shared/workflow/issue-first.md, 'Label an agent-filed issue with its authorship and its model'. disclose-agent-authorship.md scopes its marker line to comment BODIES and excludes an issue body, so an agent-filed issue is the one artifact that discloses nothing -- it goes out under the account holder's login as type: User. The labels close that, and the rule is consulted at read time while the omission happens at composition time. WARNS, never blocks: an unlabelled issue is fixed by one `gh issue edit --add-label` while a blocked create loses the act that makes work visible (report-mistakes-proactively.md, 'filing is not gated on approval'), the rule is scoped to repos we administrate and this hook cannot tell which repo is ours (sup files upstream with neither label), and a repo whose labels cannot be created still gets the issue. Anchored on a command position with heredoc bodies stripped, for the reason warn-pr-create-without-dupe-check.py records: this corpus quotes `gh issue create` constantly. Fails open. Tracked as #3111."
           },
           {
             "type": "command",

@@ -26,7 +26,7 @@ Pure praise or neutral observations with **no** requested change ("nice refactor
 |------|---------|-----------------|
 | **A** — Address | Valid and in-scope. | Fix it in this PR/MR and commit. |
 | **R** — Rebut | Incorrect, already handled, or a misunderstanding. | Explain *why*, citing concrete evidence (line, test, doc, spec). Specific enough that the reviewer can verify it without re-reading the whole PR. |
-| **D** — Defer | Valid but out of scope (new feature, broad refactor, needs design discussion). | File a follow-up issue (`CREATE_ISSUE` on GitHub — `gh issue create`; `glab issue create` on GitLab), link it, and add it to the PR/MR's **Deferred / Out-of-Scope** section. |
+| **D** --- Defer | Valid but out of scope (new feature, broad refactor, needs design discussion). | File a follow-up issue (`CREATE_ISSUE` on GitHub --- `gh issue create`; `glab issue create` on GitLab), labelled `ai-authored` and `model:<model-id>` per [`issue-first`](../../shared/workflow/issue-first.md), link it, and add it to the PR/MR's **Deferred / Out-of-Scope** section. |
 | **K** — Acknowledge | Praise or a neutral observation with no change requested. | Give it a row so it's accounted for; no code change, no rebuttal needed. Don't stretch this to dodge a real finding. |
 
 ### Decision order

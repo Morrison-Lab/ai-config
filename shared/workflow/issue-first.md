@@ -171,80 +171,20 @@ touching prose the PR had never authored.)
 
 ## Label an agent-filed issue with its authorship and its model
 
-Every issue an agent files carries two labels: `ai-authored`, saying an AI
-wrote it, and `model:<model-id>`, naming which one.
-Add both at filing time, in the same command that creates the issue.
+Every issue an agent files into a repo we administrate carries two labels: `ai-authored`, saying an AI wrote it, and `model:<model-id>`, naming which one.
+Add both in the command that creates the issue, not as a follow-up edit.
 
-**The labels exist because the issue body cannot say it.**
-[`disclose-agent-authorship`](disclose-agent-authorship.md) puts a marker line
-on every agent-posted forge *comment*, and explicitly excludes an issue body
---- so an agent-filed issue is the one artifact this corpus produces that
-discloses nothing at all.
-It is filed under the account holder's credentials, so the API reports
-`type: User` and a `MEMBER` association, and a reader who finds it later has no
-way to tell it from an issue the maintainer typed.
-A PR is already covered by the harness's generated-with footer; the issue is
-the gap.
-A label closes it without touching the body, and it is the better channel
-anyway, because `gh issue list --label ai-authored` answers the question for
-the whole tracker at once where a prose footer answers it one issue at a time.
+The labels exist because the issue body cannot say it.
+[`disclose-agent-authorship`](disclose-agent-authorship.md) puts a marker line on every agent-posted forge *comment* and explicitly excludes an issue body, so an agent-filed issue discloses nothing at all.
+It is filed under the account holder's credentials, so the API reports `type: User` and a `MEMBER` or `OWNER` association, and a reader who finds it later cannot tell it from an issue the maintainer typed.
+A label closes that without touching the body, and `gh issue list --state all --label ai-authored` then answers the question for the whole tracker at once.
+The model label is separate because it makes a second sweep possible: which model wrote an issue is what a later reader needs when one model turns out to have been systematically wrong about something.
 
-**The model label is separate from the authorship label because it answers a
-different question and decays differently.**
-Whether an agent wrote an issue is permanent, so `ai-authored` never needs
-revisiting.
-Which model wrote it is what a later reader needs to weigh the issue's claims,
-and it is what makes a sweep possible when one model turns out to have been
-systematically wrong about something.
-`gh issue list --label "model:<model-id>"` names the issues to re-check.
-Use the exact model identifier the session runs under, not a display or
-marketing name, so the label set stays one term per model rather than several
-spellings of each.
+[`label-agent-filed-issues`](label-agent-filed-issues.md) carries the mechanics: the `gh`, `glab`, and MCP forms, how to normalize the model id, creating the labels in a repo that lacks them, and what to do where you cannot.
+`hooks/warn-unlabelled-agent-issue.py` warns (never blocks) when an issue is created with no `ai-authored` label.
 
-**Neither label is guaranteed to exist yet.**
-Checked against `Morrison-Lab/ai-config` on 2026-09-03, `ai-authored` returned
-`label 'ai-authored' not found`, so create the pair once per repo rather than
-assuming they are there:
-
-```sh
-gh label create ai-authored --description "Filed by an AI agent" --color EDEDED
-gh label create "model:<model-id>" --description "Filed by <model-id>" --color EDEDED
-gh issue create --title "..." --body-file <file> \
-  --label ai-authored --label "model:<model-id>"   # CREATE_ISSUE
-```
-
-`gh issue create --label` rejects a label that does not exist, which is the
-useful failure: it tells you to create the label rather than filing an
-unlabelled issue.
-[`defer-issue`](../../skills/defer-issue/SKILL.md) already says not to
-fabricate labels for that reason.
-The MCP path behaves the opposite way on both counts, per `LABEL_ISSUE` in
-[`tool-mappings`](../../tool-mappings.md): `mcp__github__issue_write` silently
-**creates** an unknown label name instead of rejecting it, and **replaces** the
-whole label set instead of adding to it.
-So a mistyped model id there produces a second near-identical label that no
-query will ever match, and passing only these two labels drops every label the
-issue already carried.
-Pass the union of the existing labels and the new ones.
-
-**A repo where you cannot create the labels still gets the issue.**
-The issue is the durable record and the label is metadata on it, so a missing
-label is never a reason to skip filing.
-File it, then say in the same reply which label is missing and why, rather than
-dropping the label silently --- which is indistinguishable from an issue a
-human wrote.
-In a repo we do not administrate, the [upstream-issues](upstream-issues.md)
-ladder governs whether to file at all, and it decides that before any of this.
-
-- **Do:** pass `--label ai-authored --label "model:<model-id>"` on every issue
-  you file, in the creating command rather than as a follow-up edit.
-- **Do:** create the two labels in a repo that lacks them, once, before filing.
-- **Do:** use the session's exact model identifier as the label value, so one
-  model maps to one label.
+- **Do:** pass `--label ai-authored --label "model:<model-id>"` in the creating command.
+- **Do:** normalize the model id to its canonical form first, so one model maps to one label.
 - **Do:** file the issue and report the gap when the labels cannot be created.
-- **Don't:** put the disclosure in the issue body instead --- that is the one
-  place [`disclose-agent-authorship`](disclose-agent-authorship.md) rules out.
-- **Don't:** pass a bare `labels` list through the MCP path, which replaces the
-  existing set and silently creates whatever you misspell.
-- **Don't:** collapse the two into one label --- an authorship label that
-  encodes the model cannot be queried for either fact on its own.
+- **Don't:** put the disclosure in the issue body instead --- that is the one place [`disclose-agent-authorship`](disclose-agent-authorship.md) rules out.
+- **Don't:** collapse the two into one label --- a combined `ai-authored:<model-id>` answers the model question, but finding AI-authored issues at all then costs one query per model spelling.

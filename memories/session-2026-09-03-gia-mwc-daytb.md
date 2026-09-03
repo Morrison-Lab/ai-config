@@ -252,7 +252,7 @@ Re-queried rather than recalled, per the state-claim rule.
 | [#3084](https://github.com/Morrison-Lab/ai-config/pull/3084) | `bf558244` | pushed, 14 checks success and 1 skipped (a superseded `new-line-breaks` run), `review / require-clean-verdict` success, both threads resolved |
 | [#3060](https://github.com/Morrison-Lab/ai-config/pull/3060) | remote `c851d68f`, local `0daed144` | round 6 committed, unpushed, awaiting a push-gate verdict |
 | [#3023](https://github.com/Morrison-Lab/ai-config/pull/3023) | `6aa021b5` | open, the peer's |
-| [#3089](https://github.com/Morrison-Lab/ai-config/pull/3089) | `8f1ca761` | **merged 06:51Z**, agent-authored, not mine (`merged_by` is the shared login) |
+| [#3089](https://github.com/Morrison-Lab/ai-config/pull/3089) | `8f1ca761` | **merged 06:51Z**, not by me --- `merged_by` is the shared login, so the API cannot say by whom; the branch itself is agent-authored |
 | [#3100](https://github.com/Morrison-Lab/ai-config/pull/3100) | `3acc79bd` | new since the last sweep, agent-authored, not mine |
 | [#3101](https://github.com/Morrison-Lab/ai-config/pull/3101) | `d8c88486` | new since the last sweep, agent-authored, not mine |
 
@@ -292,9 +292,14 @@ The standing ai-config `mwc` grant does not help, because the gate is a conditio
 ## 02:06 PDT --- #3060 pushed at `ae58121f`, and what four rounds cost
 
 The table above is a snapshot of 01:28 and stays one;
-PR #3060 is now pushed at `ae58121f`, five commits past the head that table records.
+PR #3060 is now pushed at `ae58121f`, six commits past the local head that table records, and thirteen past the remote one.
+`git rev-list --count` settles which, and is why the figure is not hand-typed this time.
 
-Four review rounds landed in that stretch, and the shape worth keeping is that **each round's findings were about the previous round's fix**, not about the original change.
+Four review rounds landed in that stretch.
+The shape I first wrote down --- that each round's findings were about the previous round's *fix* --- is false, and the table below refutes it: it holds for round 9 alone.
+Round 7's one finding was about original branch content, round 6's note was about original branch content, and four of round 8's seven were about a brand-new entry no prior round had prompted.
+What is actually true is less tidy and more useful: **the branch never stopped growing, so every round found defects in material added since the last one.**
+That is a statement about pace rather than about fix quality, and it points at a different remedy --- stop adding while converging.
 
 | round | reviewer | findings | what they were about |
 |---|---|---|---|
@@ -320,6 +325,8 @@ The one-command check --- put an executable named `time` on `PATH` and compare t
 Round 9 found the same claim in three places, one hedged in prose and two left flatly asserted in a table.
 The prose fix reads as complete from the inside precisely because it is the instance you were thinking about.
 
-`markdownlint-cli2` runs here via `npx` at CI's pinned version in seconds, which would have caught the MD018 failure before the push and now catches the recurrences I keep producing: three separate occurrences in this session, every one of them after the rule was written and while it was loaded.
-That ratio is the argument for the check over the rule.
+`markdownlint-cli2` runs here via `npx` at CI's pinned version in seconds, which would have caught the MD018 failure before the push and now catches the recurrences I keep producing.
+What is checkable: one CI-recorded failure, job `100580631907`, which is what prompted the rule --- and note the rule and that fix landed in the same commit, `eb0cf15e`, so the occurrence predates its own rule rather than following it.
+What is self-reported and leaves no artifact: two further occurrences afterwards, both caught by the local run before they could reach a commit.
+A reader can verify the first and has only my word for the other two, which is worth saying in a sentence that would otherwise read as evidence.
 Recorded in `memories/markdownlint.md` alongside the rule itself.

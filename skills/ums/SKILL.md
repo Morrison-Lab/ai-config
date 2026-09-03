@@ -118,7 +118,7 @@ committed pass.
      git -C "$repo" grep -il "<keywords>" -- skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md
      ```
      The path list is the one skill-builder step 0 runs, over the checkout's working tree,
-     so an entry that exists only on a branch not checked out there is out of reach (see the unmerged-PR section of `shared/workflow/grep-is-not-coverage.md`).
+     so an entry that exists only on a branch not checked out there is out of reach (see the unmerged-PR section of [`grep-is-not-coverage`](../../shared/workflow/grep-is-not-coverage.md)).
      A rule can be owned by a `shared/` fragment or a skill as easily as by a memory,
      and a `memories/`-only grep stays outside those paths.
      When one exists, extend it in place; don't add a second bullet.

@@ -206,7 +206,7 @@ the same miss happens inside one repo when the dupe check is scoped to a directo
 (Recorded 2026-09-03 on [ai-config#3060](https://github.com/Morrison-Lab/ai-config/pull/3060),
 where a markdownlint entry was added to `memories/markdownlint.md`
 while `shared/writing/semantic-line-breaks.md` already mentioned the same collision in three regions,
-at `eb0cf15e` and unchanged at `3935bfff` (`origin/main` when this was measured):
+at `eb0cf15e` (the commit on #3060's branch that added the duplicate entry) and unchanged at `3935bfff` (`origin/main` when this was measured):
 `grep -n MD018` over that file returns five lines at each ref ---
 274, 288, 295, 842 and 976 at `eb0cf15e`, and 274, 288, 295, 861 and 995 at `3935bfff` ---
 of which the first three sit inside one bold-lead block with its own `Do`/`Don't` pair.
@@ -223,7 +223,7 @@ with the owner among them.
 The same `memories/` query returns four at `eb0cf15e`:
 the three above plus `memories/markdownlint.md`, the file the duplicate entry was added to.
 At `5f2dab94`, #3060's head when this was measured, the count is still four,
-but that file's MD018 bullet is now a cross-link, its body replaced by `1732000a` ---
+but that file's MD018 bullet is now a cross-link, its body replaced by `1732000a`, a later commit on the same branch ---
 so the number outlived the thing it was measuring.
 Note also why the wrong-corpus section's `Do` could not have caught it.
 It reads "grep the ai-config corpus as well as the destination repo's docs,

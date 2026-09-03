@@ -412,7 +412,7 @@ pushing branch A afterward compares its shipped commit `X` against the held `Y`,
 Which of those is common is the question this section could not settle, and an earlier draft asserted an answer to it by generalizing from the two dispatches it happened to watch.
 
 Measured 2026-09-02 over 565 stored session-transcript JSONL files, matched by a flat per-session glob.
-A recursive walk of the same tree also reaches each session's nested subagent transcripts and roughly doubles the population.
+A recursive walk of the transcript tree also reaches each session's nested subagent transcripts and roughly doubles the population.
 The scope is stated because a fragment arguing "measured rather than assumed" should say what it measured:
 
 ```
@@ -456,9 +456,13 @@ The **334** establishes that the own-block form is common **in stored transcript
 The **0** settles nothing on its own, since which of the three explanations holds decides whether it is evidence or an artifact.
 Whoever next touches this section should settle that first, and the query has to be chosen carefully, because the obvious one cannot decide it.
 Grepping a stored transcript for a `Reviewed-Commit:` line with a non-hex suffix returns nothing under **all three** explanations --- a conforming report never puts the fingerprint last, so nothing can be glued to it --- and it would not have fired on the sighted report either, whose trailer landed on the sentinel line rather than on a fingerprint.
-The discriminating query is the sweep's own: does `agentId:` ever appear in stored content **preceded by other text on the same line**?
+The right *criterion* is whether `agentId:` ever appears in stored content **preceded by other text on the same line**.
+The right *instrument* is not the sweep, and this is the part that is easy to get wrong: re-running the sweep's own matcher has no power against explanation 1, which says precisely that this matcher cannot see the shape --- under that explanation it returns zero whatever it is pointed at.
+It is also already spent against the other two, since the counts above are that query, run twice, over both the flat set and the recursive superset.
+
+So settling this needs something the section has not yet had: a **raw text scan** of the stored JSONL, written independently of the sweep, or a tree the sweep never reached.
 Only a hit settles anything.
-Another zero is the same uninformative zero, so do not read one as evidence for the rendering-quirk explanation.
+Another zero from the same matcher is the same uninformative zero, so do not read one as evidence for the rendering-quirk explanation.
 
 In the own-block shape the trailer is a separate content block, and `_result_text` joins blocks with a newline, so the fingerprint line is untouched and nothing below arises at all.
 

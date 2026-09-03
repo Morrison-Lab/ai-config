@@ -285,7 +285,8 @@ machine where the hook was firing every turn, because `hooks/hooks.json:349`
 supplied it under `${CLAUDE_PLUGIN_ROOT}`.)
 
 **The dated constant has a failure direction the pair above does not name, and it is the opposite of every other stale-hook symptom: it fails OPEN, on its own schedule, with no edit and no event.**
-The recommendation above is still right for the reason it gives, and this is the condition attached to it rather than a retraction: a dated constant is safe exactly to the extent that the copy carrying it is fresh.
+This narrows the recommendation above rather than leaving it untouched, so read the two together.
+Automatic re-arming is a real benefit and it is exactly as trustworthy as the copy carrying the date, which on a plugin install is a snapshot nobody in the session controls.
 A stale flag, threshold, or allowlist can fail in either direction too, so what distinguishes this one is not the direction but the *trigger*: those change behaviour only when the value they carry is wrong for a case someone brings to them, while a dated constant changes behaviour with no case, no edit, and no event at all.
 The clock crosses a number frozen in a snapshot, the guard computes that its own suppression has expired, and it starts demanding an action a standing directive forbids.
 Nobody edited the hook, no PR changed, no session did anything, and the guard began asserting the opposite of current policy.
@@ -294,15 +295,17 @@ That composes with this file's plugin-cache material into a worse failure than e
 Those paragraphs --- in "On the plugin path nothing else is needed", well above this section --- explain why a merged fix does not reach a running session;
 a dated constant is the one payload for which *not reaching the session* is not merely a delay but an inversion, because the stale copy does not hold the old behaviour --- it computes a new, wrong one.
 
-- **Do:** give a dated suppression a fail-safe reading, so an expired constant keeps suppressing rather than re-arming.
-  A guard cannot verify its own freshness from inside the snapshot, since a corpus file it reads at runtime is frozen in that same snapshot, so "unknown, stay suppressed" is the reading that actually holds.
+- **Do:** gate the re-arm on a freshness signal from outside the snapshot --- the pinned rev in `~/.claude/plugins/installed_plugins.json`, or a network read --- and keep suppressing when that signal is unavailable.
+  A corpus file the guard reads at runtime is not such a signal, since it is frozen in the same snapshot the constant is.
+- **Do:** prefer the env flag's explicitness over a dated constant when no such signal is reachable, which reverses the earlier pair for that case;
+  a switch somebody has to remember to clear beats one that clears itself on a frozen clock.
 - **Do:** check the loaded copy's constant, not the checkout's, when a guard demands something a standing directive forbids --- that demand is a freshness symptom before it is a policy question.
 - **Don't:** read "the guard re-armed" as evidence the suppression period actually ended.
 - **Don't:** treat a dated constant as carrying the same risk as a stale flag or threshold;
   a wrong flag waits for a case to reach it, and a wrong date fires on its own.
 
 (Measured 2026-09-03, tracked as [#3141](https://github.com/Morrison-Lab/ai-config/issues/3141) with the two proposals above, and recorded in [#3156](https://github.com/Morrison-Lab/ai-config/issues/3156).
-`hooks/no-unreviewed-pr.py` demanded a Copilot review on two PRs while the all-repos moratorium ran to `MORATORIUM_END = 2026-12-01` ([#3078](https://github.com/Morrison-Lab/ai-config/issues/3078));
+`hooks/no-unreviewed-pr.py` demanded a Copilot review on two PRs while the all-repos moratorium ran to `MORATORIUM_END = 2026-12-01` ([#3078](https://github.com/Morrison-Lab/ai-config/pull/3078));
 the loaded copy carried `2026-09-01` and had computed the moratorium as expired two days earlier.
 `git pull --ff-only` in `~/.claude/plugins/marketplaces/Morrison-Lab` --- 52 commits behind, clean tree --- advanced it to `b0f279f` carrying the correct date and changed nothing the session loaded: `~/.claude/plugins/cache/Morrison-Lab/ai-config/` held one directory per commit, its newest (`4140e5c25079`) matched the marketplace's *pre-pull* HEAD and still carried `2026-09-01`, and no entry for `b0f279f` existed at all.
 A second occurrence of the class this file's plugin-cache paragraphs and [`mistake-patterns.md`](../../memories/mistake-patterns.md) Pattern 43 both record;

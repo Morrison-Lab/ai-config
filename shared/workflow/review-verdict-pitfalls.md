@@ -199,6 +199,33 @@ Trace the dispatched run and read its verdict, per [`memories/claude-bot-workflo
 (`ucdavis/bcs`, 2026-08-13: `ai-review / select-and-review` read green on two PRs while the gemini run it had dispatched failed and no verdict existed on either.
 Filed upstream as `ucdavis/bcs#619` and `#620`.)
 
+**Second occurrence of this class, and a harder one: the dispatcher can itself report `skipped`, so even the trace-the-workflow discriminator above has nothing to follow into.**
+The case above assumes the dispatcher ran and fired something, so tracing its workflow finds the run it fired.
+A dispatcher gated by its own `if:` --- a trusted-sender check, a self-edit guard, a fork or draft exclusion --- can decide not to fire at all, and then it reports `skipped` rather than `success`, with no downstream run for anything to trace into.
+That makes the review's own terminal checks --- `review / claude-review`, `require-review`, `require-clean-verdict`, or whatever names criterion 2's gate on a given repo --- not merely uninformative, they are **absent from the check-runs population entirely**, on a head where every check that did run is green.
+`gh pr checks`, or any status sweep asking only "is anything red", reads that exactly like an ordinary benign skip.
+
+That is a stronger version of the near-miss [`fully-clean.md`](fully-clean.md) names for an empty `check_runs` payload: there the whole population is empty, so the instrument refuses to score it.
+Here the population is real, complete, and fully green, and the one member that would have said "reviewed" is simply not in it.
+A question of the shape "are any checks failing" cannot see the difference, because absence and success answer it identically --- so the population itself, by name, is the only thing that discriminates them.
+
+- **Do:** derive criterion 2 from the terminal review-gate checks' presence in the check-runs population, by name, on the exact head SHA --- not from the absence of red among whatever checks happen to be there.
+- **Don't:** read a fully-green rollup as satisfying criterion 2 without confirming the review check is a *member* of it;
+  a skipped dispatcher and a passed review both leave nothing red to notice.
+
+(Second occurrence, `ucdavis/bcs`, 2026-09-03, and the measurement carries a time because the state did not survive being found.
+Two populations, kept apart here because conflating them is how an earlier draft of this entry miscounted.
+On the branch: zero `claude-code-review.yml` workflow runs, and two `ai-code-review.yml` runs, both `event: pull_request` and both `conclusion: skipped`.
+On PR #891's head `e49d47a1d828a108a0aa01bdda7274b0ab5a05c5`: 31 check runs, and none of them `review / claude-review`, `require-review` or `require-clean-verdict`.
+Three of those 31 concluded something other than `success` --- `ai-review` and `redaction-gate`, the skipped jobs of the dispatcher named above, and a `copilot-pull-request-reviewer` run that concluded `cancelled`.
+None concluded `failure`, which is the point: a sweep asking whether anything is red gets "no" from a head that no reviewer had read.
+The repair was to dispatch `ai-code-review.yml` by hand at 06:42:42 UTC, run `33724497297`, which reaches the review because `redaction-gate`'s own `if:` admits `workflow_dispatch` alongside a non-draft `pull_request`.
+It then selected and fired `claude-code-review.yml`, and that run produced the three missing checks, all of them clean by 06:46:20 UTC.
+Note which workflow was dispatched by hand: the dispatcher, not the review workflow beneath it, which was bot-triggered as a consequence.
+An earlier draft of this very paragraph named the wrong one, in an entry whose whole subject is telling a dispatcher apart from what it dispatches.
+So a reader who queries the PR today finds those three checks green where this entry says none existed, which is the repair rather than a refutation.
+Filed upstream as `ucdavis/bcs#897` at 06:43:14 UTC, half a minute after the dispatch rather than before it.)
+
 **A fourth case: a review job can post a syntactically valid, confidently stated verdict that is nonetheless invalid because it rests on a hallucinated premise about the PR's own state --- not a stub (no verdict) and not a misfire (guard-script/check-conclusion mismatch), but a fabricated fact baked into an otherwise well-formed review.** A reviewer that infers PR state from a commit message rather than querying the PR's actual `state`/`merged` API fields can mistake a routine `Merge remote-tracking branch 'origin/main' into <PR-branch>` commit --- pushed to resolve a sync conflict on the still-open PR branch itself --- for evidence the *PR* was merged into `main`, and confidently report "PR is closed, no action taken" while never actually reviewing the diff. This reads exactly like a legitimate all-clear (a `### Verdict` section is present, the job reports success), so the stub-detection guards described in CLAUDE.md's "Do the review yourself when the @claude workflow doesn't produce a verdict" section don't catch it. Sanity-check any surprising verdict --- especially "nothing to review" or "already merged/closed" --- against the PR's real API state before trusting it, and re-trigger for a genuine review rather than accepting a verdict-shaped comment built on a false premise.
 
 **The fourth case has a variant that hides better, because the false premise is not about the PR at all --- it is about which commits the round was reviewing.**

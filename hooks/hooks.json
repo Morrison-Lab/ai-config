@@ -362,6 +362,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-commit-chained-to-push.py\"",
+            "timeout": 10,
+            "script": "no-commit-chained-to-push.py",
+            "why": "shared/workflow/check-before-pushing.md, plus ai-config#2992, which is a REPORT rather than a measurement -- its author states they verified the mechanism from the hook registration and did not reproduce the lost commit. A PreToolUse deny rejects the WHOLE Bash invocation, so a call that chains `git commit` into `git push` loses the commit when any guard refuses the push -- and no-push-without-self-review.py and no-clobbering-push.py are both registered PreToolUse on Bash. Their refusal names only the push, so it reads as \"the push was blocked\" while the change is still an uncommitted working-tree edit. Reported 2026-09-02, caught only because an adversarial reviewer checked whether HEAD had moved. Note that on a HEREDOC commit neither sibling currently sees a push at all (they carry the #2993 splitter defect this hook's library fixes), so for that shape today nothing would be lost -- a reason to fix #2993, not to exempt the shape, and the deny message is worded so it never asserts a sibling would have refused a particular call. DENIES rather than warns, unlike its warn-dupe-check-chained-to-create.py sibling of the same shape: an advisory additionalContext is attached while the call proceeds, so a sibling's deny in the same pass still discards the commit, and whether the author is even TOLD depends on unverified harness behaviour (does a non-denying hook's context survive a sibling's deny -- see the hook docstring for the ten-minute experiment that settles it). The refusal does not depend on that answer: it stops the chain reaching the siblings at all. The refusal is always satisfiable (issue the same two commands as two calls) and clearable with an `ALLOW_COMMIT_AND_PUSH=1` env-assignment prefix. Matches over an argv split (scripts/lib/shellcmd.py) rather than the raw string, so a quoted commit message, a heredoc body, and `git commit-tree`/`git commit-graph` cannot trip it. Requires commit BEFORE push: push-then-commit loses nothing. No exemption for a --dry-run or --delete command: one was written on review advice and removed when a second review measured `git push --force --delete` and `--dry-run --no-dry-run --force` going silent here while no-clobbering-push.py denied both -- a refused dry-run costs one tool call, a missed force-delete costs the commit. Fails open. Tracked as #2992; the shared splitter's heredoc defect and the eight unmigrated copies are #2993 (eight, not seven: derive the set from `grep -rlF '_SHELL_OPS = set(\"();|&\")' hooks/`, since remind-ci-crosscheck-sim-verdict.py spells its copy without the leading underscore)."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-dupe-check-chained-to-create.py\"",
             "timeout": 10,
             "script": "warn-dupe-check-chained-to-create.py",
@@ -481,6 +488,37 @@
             "timeout": 15,
             "script": "warn-new-line-breaks-on-push.py",
             "why": "memories/mistake-patterns.md Pattern 25, ai-config#2590 (2026-08-29): warns, never blocks, before a `git push` carrying newly-added Markdown lines that violate semantic line breaks against the default base branch (e.g. origin/main)."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-stale-review-diff-base.py\"",
+            "timeout": 10,
+            "script": "warn-stale-review-diff-base.py",
+            "why": "verify-the-right-artifact 'A comparison's base is an artifact too' -- a bare local branch as a diff's base widens the range when it is behind, and narrows it when it is ahead of or diverged from its remote in commits the head branch also carries, so a review runs on already-merged work or silently skips part of the change; this names the base and the remote-tracking form.",
+            "_note_warn_only": [
+              "Reminder only: emits hookSpecificOutput.additionalContext and never a",
+              "decision. The hook cannot tell a review diff from an ordinary local",
+              "comparison, and a bare local base is correct for plenty of those, so a",
+              "block would refuse correct commands on a heuristic.",
+              "No fetch-based discharge on purpose: keep-checkouts-fresh mandates a",
+              "session-start fetch, so keying on one would silence this in exactly the",
+              "sessions that follow the corpus.",
+              "The Agent|Task|SendMessage matcher is there because the measured failure",
+              "was a brief handed to a subagent, which cannot check a premise about the",
+              "author's own environment."
+            ],
+            "_note_deliberate_under_approximation": [
+              "The Bash matcher requires the git invocation to sit at a command",
+              "position, so a range merely quoted inside another command's argument",
+              "is inert -- including one inside a backtick code span, or after the",
+              "words `then` or `do` used in ordinary English.",
+              "That deliberately UNDER-approximates: a real backtick substitution,",
+              "`bash -c \"...\"`, and any wrapper word outside",
+              "sudo/env/time/nohup/xargs/command are missed. A missed reminder costs a",
+              "review round; one fired on quoted prose trains everyone to ignore it.",
+              "Agent|Task|SendMessage briefs are prose with no command structure, so",
+              "they use an unanchored pattern instead."
+            ]
           }
         ]
       },
@@ -736,6 +774,45 @@
         ]
       },
       {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-stale-review-diff-base.py\"",
+            "timeout": 10,
+            "script": "warn-stale-review-diff-base.py",
+            "why": "verify-the-right-artifact 'A comparison's base is an artifact too' -- a bare local branch as a diff's base widens the range when it is behind, and narrows it when it is ahead of or diverged from its remote in commits the head branch also carries, so a review runs on already-merged work or silently skips part of the change; this names the base and the remote-tracking form.",
+            "_note_see_bash_entry": "Design notes live on this hook's Bash entry, per this file's precedent (require-agent-disclosure.py, warn-stale-issue-edit.py). Repeating them per matcher guarantees sibling divergence on the next correction."
+          }
+        ]
+      },
+      {
+        "matcher": "Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-stale-review-diff-base.py\"",
+            "timeout": 10,
+            "script": "warn-stale-review-diff-base.py",
+            "why": "verify-the-right-artifact 'A comparison's base is an artifact too' -- a bare local branch as a diff's base widens the range when it is behind, and narrows it when it is ahead of or diverged from its remote in commits the head branch also carries, so a review runs on already-merged work or silently skips part of the change; this names the base and the remote-tracking form.",
+            "_note_see_bash_entry": "Design notes live on this hook's Bash entry, per this file's precedent (require-agent-disclosure.py, warn-stale-issue-edit.py). Repeating them per matcher guarantees sibling divergence on the next correction."
+          }
+        ]
+      },
+      {
+        "matcher": "SendMessage",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-stale-review-diff-base.py\"",
+            "timeout": 10,
+            "script": "warn-stale-review-diff-base.py",
+            "why": "verify-the-right-artifact 'A comparison's base is an artifact too' -- a bare local branch as a diff's base widens the range when it is behind, and narrows it when it is ahead of or diverged from its remote in commits the head branch also carries, so a review runs on already-merged work or silently skips part of the change; this names the base and the remote-tracking form.",
+            "_note_see_bash_entry": "Design notes live on this hook's Bash entry, per this file's precedent (require-agent-disclosure.py, warn-stale-issue-edit.py). Repeating them per matcher guarantees sibling divergence on the next correction."
+          }
+        ]
+      },
+      {
         "matcher": "Bash",
         "hooks": [
           {
@@ -791,7 +868,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unreviewed-pr.py\"",
             "timeout": 10,
             "script": "no-unreviewed-pr.py",
-            "why": "CLAUDE.md 'Open a PR for every pushed feature branch' + skills/ardi 'always request another review' -- opening a PR auto-triggers the repo's own review workflow but does NOT summon Copilot, and that auto-triggered half is what disguises the missing one. claude-review has failed on every attempted review this session (ai-config#897, which calls the cause an unconfirmed leading hypothesis); whatever the cause, an unrequested PR gets no review at all while it is down. A reviewer request is per-HEAD, so a push re-arms the obligation: without that the guard is armed once and permanently discharged by the first request, and every later round carries a review of a commit that is no longer the PR's head (ai-config#1282). A REDACTION PR is exempt, because there the reviewer's input IS the secret -- the removed side of every hunk carries it (ucdavis/bcs#610) -- so the exemption is asserted by a `no-ai-review` label or an `ALLOW_UNREVIEWED_REDACTION_PR=1` prefix rather than paid for by leaking (ai-config#1392). A standing directive forbids the Copilot request on all repos until September 2026, which leaves this guard no satisfiable demand at all, so it returns before scanning until its `MORATORIUM_END` date -- a date rather than a flag, so it re-arms itself when the quota returns, and in the script rather than in a settings registration, which a plugin install has nothing to remove from (ai-config#1709)."
+            "why": "CLAUDE.md 'Open a PR for every pushed feature branch' + skills/ardi 'always request another review' -- opening a PR auto-triggers the repo's own review workflow but does NOT summon Copilot, and that auto-triggered half is what disguises the missing one. claude-review has failed on every attempted review this session (ai-config#897, which calls the cause an unconfirmed leading hypothesis); whatever the cause, an unrequested PR gets no review at all while it is down. A reviewer request is per-HEAD, so a push re-arms the obligation: without that the guard is armed once and permanently discharged by the first request, and every later round carries a review of a commit that is no longer the PR's head (ai-config#1282). A REDACTION PR is exempt, because there the reviewer's input IS the secret -- the removed side of every hunk carries it (ucdavis/bcs#610) -- so the exemption is asserted by a `no-ai-review` label or an `ALLOW_UNREVIEWED_REDACTION_PR=1` prefix rather than paid for by leaking (ai-config#1392). A standing directive forbids the Copilot request on all repos until the `MORATORIUM_END` date in the script, which leaves this guard no satisfiable demand at all, so it returns before scanning until its `MORATORIUM_END` date -- a date rather than a flag, so it re-arms itself when the quota returns, and in the script rather than in a settings registration, which a plugin install has nothing to remove from (ai-config#1709)."
           },
           {
             "type": "command",

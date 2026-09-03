@@ -436,6 +436,53 @@ whose pass path print the same thing is not yet a check.
 - **Don't:** report a zero matrix as "no collisions" when nothing established
   that the detector can produce a non-zero.
 
+### A merge-simulation content check needs the same control, in a different shape
+
+The section above validates a *conflict detector's* zero.
+The same gap opens one step later,
+when the question is no longer "did this pair conflict"
+but "did the merge preserve a specific correction":
+a scratch-merged result is checked for whether an earlier fix survived,
+before that result is trusted enough to squash-merge a real PR.
+
+A grep for the text a correction **removed** returns `0`,
+and that `0` reads as "the correction is intact".
+That grep is not the presence check the claim needs.
+Absence of the old sentence is equally consistent with two different merges:
+one where the fix survived,
+and one where the whole passage, fix included, was dropped or never merged in.
+An absence check cannot tell those two merges apart,
+for the same reason the matrix of zeros above cannot tell a clean sweep from a detector that never ran:
+the absence check was never confirmed capable of producing a non-zero.
+
+The positive control here is not a known-conflicting pair,
+since no conflict detector is in play.
+The positive control is a grep for text the correction **added**.
+A non-zero hit on the merged result confirms the replacement text is present,
+and the absence check alone never confirms that.
+
+- **Do:** pair every absence grep on a merge result (for text a correction removed)
+  with a presence grep (for text that correction added),
+  and require both to read as expected before trusting the merge.
+- **Don't:** squash-merge on the strength of a zero count on removed text alone;
+  that zero is equally consistent with the correction never having landed.
+
+(Measured 2026-09-02 on `Morrison-Lab/ai-config`.
+[#3029](https://github.com/Morrison-Lab/ai-config/pull/3029) was about to be squash-merged,
+and its base predated the mid-file correction
+[#3036](https://github.com/Morrison-Lab/ai-config/pull/3036) had made to `shared/workflow/pr-on-claim.md`.
+A scratch worktree merged `origin/main`,
+then [#3010](https://github.com/Morrison-Lab/ai-config/pull/3010), another PR queued for merge that day,
+then [#3029](https://github.com/Morrison-Lab/ai-config/pull/3029),
+and the session grepped the result for the sentence [#3036](https://github.com/Morrison-Lab/ai-config/pull/3036) had removed.
+The count was `0`,
+and the session read that as "correction intact".
+A peer session pointed out that `0` is an absence check
+and cannot distinguish "correction intact" from "whole passage dropped by the merge".
+The positive control, a grep for "read a non-empty two-dot", the phrase [#3036](https://github.com/Morrison-Lab/ai-config/pull/3036) added,
+returned `1` on the same scratch merge result.
+That `1` is what confirmed the fix survived.)
+
 ## A `merge=union` driver makes the batch pass more necessary, not less
 
 [`configure-gitattributes`](../../skills/configure-gitattributes/SKILL.md)

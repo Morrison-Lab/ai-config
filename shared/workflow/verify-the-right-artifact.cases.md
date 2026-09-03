@@ -206,3 +206,43 @@ A wrong claim about *which artifact* was defective sat inside an otherwise corre
 An adversarial review of that same PR then caught a second instance of the same substitution one level up.
 The fix had been swept across `CLAUDE.md` and `shared/workflow/check-before-pushing.md` but not `AGENTS.md`, which `CLAUDE.md:3-5` names as the authoritative cross-agent contract and which carried a near-verbatim twin of the edited paragraph.
 The sweep had been keyed on the file that prompted the work rather than on the population carrying the claim.
+
+## A stale local base that nearly quadrupled a review diff's file count
+
+Measured 2026-09-02 while reviewing [ucdavis/matt.contracts#98](https://github.com/ucdavis/matt.contracts/pull/98).
+
+The PR head was fetched as a local branch `pr-98`, and an `adversarial-reviewer` subagent was dispatched with the instruction to review `git diff main...pr-98`.
+That `main` was the worktree's local branch, 128 commits behind the remote (`git rev-list --count 43d59cc..7ec49fe`), or 28 by first-parent (`--first-parent`), and 0 ahead (`git rev-list --count 7ec49fe..43d59cc`):
+
+| ref | commit |
+| --- | --- |
+| local `main` | `43d59cc` |
+| `github/main` | `7ec49fe` |
+
+The merge-base moved accordingly, and so did the diff:
+
+| base | files | insertions |
+| --- | --- | --- |
+| stale local `main` | 53 | 2999 |
+| true merge-base `6345e92` | 14 | 1584 |
+
+The 39 extra files were already-merged work from other pull requests.
+The contamination was not confined to whole extra files, which is the more insidious half.
+`DESCRIPTION` and `.Rbuildignore` are both among the 14 the pull request really changes, and the wide diff mixed already-merged hunks into them --- a `foodwebr`-to-`covr` swap in `Suggests`, and a template-name cleanup --- so the spurious content sat inside files the reviewer had every reason to be reading.
+
+The base was *behind*, so the diff grew.
+A base carrying local commits the remote lacks --- ahead of it, or diverged from it --- fails the other way, narrowing the diff and hiding part of the change behind a clean verdict;
+that direction was not what happened here.
+
+**The detection was accidental, which is the part worth recording.**
+No finding looked wrong, because none were: every one quoted a real line and applied a real rule.
+What surfaced it was running `git diff` on `DESCRIPTION` out of curiosity and recognizing changes that belonged to other pull requests.
+A scope correction sent mid-run had the subagent discard the out-of-scope findings.
+
+Note which check would have caught it and which would not.
+A session-start freshness pass per [`keep-checkouts-fresh`](keep-checkouts-fresh.md) had no bearing, since the staleness accrued afterwards.
+The forge cross-check would have: `gh pr view 98 --json changedFiles,additions,deletions` reported 14 and 1584 against head `9446e72`, and the derived 53 and 2999 disagree loudly.
+Re-run later it returns different figures, because the pull request's head moves;
+compare against the head you actually diffed.
+
+Tracked as [ai-config#3013](https://github.com/Morrison-Lab/ai-config/issues/3013).

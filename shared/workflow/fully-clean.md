@@ -32,6 +32,39 @@ Do not report a PR/MR fully clean, ready to merge, or merge it until the review 
   findings can appear in an overall review note without a resolvable discussion.
 - **Don't:** let an earlier review's green pipeline or later code push erase an unresolved finding without a reviewer-confirmed clean round.
 
+**Finding a cause for an aggregate rollup signal is not finding all of its causes, and a satisfied explanation is what stops you looking for a second one.**
+`mergeable_state: unstable` (GitHub) or a comparable aggregate integration
+signal is a single value computed from several independent inputs --- a
+pending status check, a stale branch, an unresolved review, more than one
+provider's own required-checks list.
+Chasing it down to one genuine, checkable cause (a pending third-party
+status, say) explains the value completely from the inside: the signal was
+`unstable`, a cause was found, the cause was real, and the reasoning closes.
+Nothing about that chain tests whether it was the *only* input, because a
+rollup does not report which of its several inputs are currently non-passing,
+only that at least one is.
+
+- **Do:** after explaining an aggregate signal with one confirmed cause, ask
+  what else the same rollup can mean before treating it as accounted for ---
+  and re-derive the rollup once the confirmed cause clears, rather than
+  reading its earlier `unstable` reading as now resolved.
+- **Don't:** read "I found a cause for this and it checks out" as "I found
+  the cause" for a value that is, by construction, an aggregate of several
+  independent signals.
+
+(Morrison-Lab/ai-config#3084, 2026-09-03: `mergeable_state: unstable` was
+chased to a pending `jules/review` commit status, which was real and
+correctly diagnosed.
+When that status cleared, `unstable` was treated as explained and the PR was
+merged.
+A Copilot formal review carrying a real, unaddressed finding --- posted to
+the PR's `reviews` list, not as an inline thread --- had submitted on the
+exact head that merged, 4 minutes 47 seconds earlier, and was never read: the
+pre-merge check called `get_review_comments` for threads, never `get_reviews`
+for the formal review itself, and two of those threads being resolved read as
+the review question settled.
+The defect reached `main` and needed a follow-up PR.)
+
 **In a remote/web session the instrument still runs, and hand-checking the
 axes in its place is not acceptable** (user directive, 2026-08-29,
 ai-config#2441).
@@ -182,9 +215,25 @@ Worked-example case records for the rules below live in
    **Why the two surfaces disagree is unexplained, so do not assert a
    mechanism for it.**
 
+   **`commits/<sha>/status` reports the combined state of an EMPTY status set
+   as `pending`, not `success` or absence --- so a gate that tests the rollup
+   `state` alone reads every PR with no legacy commit statuses as not-clean,
+   which is most PRs in a repo that has none configured.**
+   The condition has to be on the members, not the rollup: `total_count == 0`
+   means no commit statuses exist, which is the ordinary case and not a
+   blocker, while `total_count > 0` with any member `pending` or `failure` is
+   genuinely not-clean --- name the offending `context` when it is.
+   The same `pending` state means opposite things depending on `total_count`
+   alone: `state: pending, total_count: 0, statuses: []` is silence, and
+   `state: pending, total_count: 1, jules/review -- "Jules is reviewing..."`
+   is a real in-flight reviewer.
+
    - **Do:** take the check-run half of criterion 1 from the paginated
      check-runs endpoint, and add `commits/<sha>/status` where the repo uses
      commit statuses, rather than treating either query as sufficient alone.
+   - **Do:** branch on `total_count`, not on the combined `state` alone, when
+     reading `commits/<sha>/status` --- an empty set reports `pending` and is
+     not a finding.
    - **Do:** report both counts when the endpoint and the rollup disagree, so
      the gap stays visible to whoever reads the status next.
    - **Do:** re-derive check state from that endpoint on the PR's current
@@ -199,6 +248,17 @@ Worked-example case records for the rules below live in
      --- [`ardi`](ardi.md)'s superseded-head case is a **red** wake inviting
      a needless fix, and this is its **green**-sounding mirror, inviting a
      needless merge.
+   - **Don't:** treat an empty `commits/<sha>/status` response's `pending`
+     state as a finding --- the check has to read `total_count`, not the
+     rollup, or the ordinary case (no commit statuses at all) reads as
+     blocking on every PR.
+
+   (Morrison-Lab/ai-config#3106, 2026-09-03: the issue's own suggested fix
+   proposed treating a `pending` combined state as not-clean, then a
+   follow-up comment on that same issue caught that the suggestion would
+   misfire on most PRs, an hour after it was written --- the rollup-versus-
+   population bug this section already warns about, reintroduced into the
+   proposed fix for it.)
 
    **A paginated sweep with an inconsistent page size silently skips items, and every response still reads as complete coverage.**
    `--paginate` above is the CLI answer;
@@ -1236,8 +1296,25 @@ Merge synchronously, right after the check, with the merge command pinned.
   The gate itself takes minutes, so the base can advance again while it runs, and so can the head: a concurrent push that already contains the current base passes a currency-only recheck while the gate's verdict belongs to the earlier SHA ([`github`](../../memories/github.md) records that unpinned-head race).
   So immediately before the merge command, check that the live `headRefOid` still equals the pinned SHA, that `baseRefName` is still the branch the gate ran against (a retarget to another branch at the same commit would otherwise pass a tip comparison), and that the live base tip still equals `<pinned-tip>`, and repeat the update-and-gate cycle when any of them moved.
   Then make the merge itself carry the pin: `gh pr merge --match-head-commit "<pinned-sha>"` (measured 2026-09-02 (Pacific) in `gh` 2.98.0: the flag is documented as the commit SHA the head must match to allow the merge), or `expectedHeadSha` on the MCP `merge_pull_request` tool, so a push in the seconds after the read is refused by the API rather than merged.
+  A remote session's bash has neither: `gh` is absent, and the MCP tool belongs to the agent rather than to the shell.
+  The third form is plain REST, and it takes the pin as `sha`:
+  `curl -X PUT -H "Authorization: Bearer $GITHUB_TOKEN" ".../repos/<owner>/<repo>/pulls/<N>/merge" -d '{"merge_method":"squash","sha":"<pinned-sha>"}'`.
+  That `sha` is the same guarantee the other two spell differently --- the API refuses the merge when the head has moved --- so a session without `gh` is not thereby excused the pin.
+  Measured 2026-09-03 on [#3035](https://github.com/Morrison-Lab/ai-config/pull/3035) and [#3043](https://github.com/Morrison-Lab/ai-config/pull/3043), both merged this way after `gh` returned `command not found`.
+  It merges but does not tidy: `--delete-branch` has no REST counterpart here, and `DELETE /git/refs/heads/<branch>` is refused by the agent proxy itself, so the remote branch outlives the merge and only the local one can be cleaned up.
   The pre-merge read still runs first, because it is what says which ref moved.
   The pin closes only the head side: no merge API pins the base, so the base can still advance between that read and the merge, and a direct merge on a base without an up-to-date-branch requirement keeps that window open.
+  **Sync with `git` rather than `update-branch` where the review gate excludes bot senders**, since the update makes the new head *bot-authored* and the gate then skips the very verdict this rule goes on to require.
+  `Morrison-Lab/gha`'s `claude-code-review.yml` gates on `github.event.sender.type != 'Bot'`, so a head produced by the API call reports every review job `skipped` while CI stays green --- a state that reads like a review not yet started rather than one that will never run.
+  Rebasing onto the base and force-pushing (with `--force-with-lease --force-if-includes`) reaches the same base currency and triggers the review normally, because a `git` push carries a User identity where a REST write does not ([`github-remote-sessions`](../../memories/github-remote-sessions.md)).
+  Confirm the rebase preserved the change rather than assuming it: compare the tree hashes when the base did not move, and the diff against the base when it did.
+  The `expected_head_sha` machinery above still applies to the API route, which stays correct wherever the gate admits bot senders.
+- **Do:** measure the base's merge interval against one gate cycle before starting a third sync, rather than chasing.
+  `git log origin/<default-branch> --first-parent -8 --format='%ct'` gives the interval and the review run's own timestamps give the cycle;
+  when the interval is the shorter of the two, serial syncing cannot converge ([`batch-merge-and-resolve`](batch-merge-and-resolve.md)), and each attempt spends a paid review round.
+  Measured 2026-09-02 on [#3035](https://github.com/Morrison-Lab/ai-config/pull/3035): a median interval of 221s against a ~6 min cycle, three merges landing inside 30s, and four review rounds spent before the base held still long enough to merge.
+  The escape is to wait for a quiet window and sync then --- which is a real strategy rather than a stall, since the cadence is bursty --- or to raise the server-side closure with whoever owns the ruleset.
+  Read a repository's `rulesets` endpoint rather than assuming: `strict_required_status_checks_policy` false and no merge-queue rule means the closure this rule points to does not exist there, and branch protection may read `403` for the session's own token.
   Where the base must be stable, only a server-side gate closes it, a merge queue or the up-to-date-branch requirement (with every clean-gate check required or aggregated, per the exception above), and the direct-merge entry points say so.
   The cycle repeats for either ref, so a repeat says which one to look at rather than which remedy applies.
   When the base moved twice it is advancing faster than the gate runs, which [`batch-merge-and-resolve`](batch-merge-and-resolve.md) measures: stop chasing and merge under strict up-to-date protection (or through a merge queue once [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030) lands), or batch the pending merges per that fragment.
@@ -1258,6 +1335,57 @@ Tracked as [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982).
 - **Do:** report a PR as blocked on review when HEAD has no authentic clean verdict, even if GitHub says `CLEAN`.
 - **Don't:** treat green CI plus a clean review as sufficient without independently re-checking merge-conflict state.
 - **Don't:** describe a PR that lacks a clean HEAD review as merge-ready, ready to merge, or "green and merge-ready."
+
+**Because a clean CI run and a clean review verdict are a snapshot, a reading
+you took over a live PR cannot be re-derived later --- so capture the command
+and its output verbatim at the moment a decision starts to rest on it.**
+
+"A clean CI run and a clean review verdict are a snapshot" says the state
+moves; this is what that costs when you try to explain a reading afterwards.
+Re-running the command answers a question about the PR *now*, and it is
+presented in exactly the form of an answer about the PR *then*, so a
+disagreement between the two invites a hunt for a cause --- a tool version, a
+change in wording, a bug --- when the only established fact is that the PR
+moved.
+That hunt is expensive and it converges on something plausible, because
+plausible explanations for a tool disagreeing with itself are cheap.
+
+It is worse than an ordinary lost measurement because a remembered reading and
+a mis-remembered one are indistinguishable from the inside, and the reading is
+usually the whole basis for whatever was decided next.
+
+- **Do:** paste the command and its verbatim output --- exit status included ---
+  into the issue, PR, or notebook entry at the moment you act on it, as
+  [`algorithmatize-checks`](algorithmatize-checks.md) and
+  [`grep-is-not-coverage`](grep-is-not-coverage.md) already require for a
+  derived figure; what is new here is that a live PR makes the reading
+  unrepeatable, so the paste is the only copy there will ever be.
+- **Do:** report the cause as not established when a later re-run disagrees and
+  nothing was captured, rather than naming the likeliest mechanism.
+- **Don't:** treat a re-run as reproducing an earlier reading over a live PR ---
+  the input differs, so the two are separate measurements.
+- **Don't:** file or record a diagnosis whose only evidence is a reading you can
+  no longer produce.
+
+(Measured 2026-09-02 on `Morrison-Lab/ai-config`: differing
+`check-pr-fully-clean.py` readings across `Morrison-Lab/gha#811`, `#814` and
+`#820` were attributed first to a vocabulary false positive and then to a stale
+checker.
+A controlled re-run varied the checker version and held the three PRs fixed:
+the stale clone at `240650120` and a worktree at `origin/main` each returned
+`#814` rc=0, `#820` rc=0, `#811` rc=1 --- every PR the same under both
+versions.
+That is a direct test of the stale-checker explanation, and it fails.
+It is no test at all of the wording explanation, which is a claim about
+readings that no longer exist.
+What the re-run leaves is the residual --- the PRs' own state moved between the
+original runs --- which ai-config#3031 records as the remaining explanation.
+That is elimination rather than measurement, and this section's own bullets say
+to report it as such.
+What it cannot establish is which reading each original run produced, because
+none was captured.
+ai-config#3022 was closed after review falsified two successive stated causes,
+and ai-config#3032 for that plus a guard that was a no-op at a third layer.)
 
 **A sync-only push invalidates a clean verdict just as thoroughly as a code push, and arming auto-merge after a sync violates the HEAD review gate.**
 When `main` moves and a direct merge is refused because the branch is not up to date,

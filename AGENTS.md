@@ -36,6 +36,13 @@ Drafting locally while approval is pending is allowed.
 Membership or approval does not override
 a stricter repository contribution or AI-agent policy.
 
+The user grants standing authorization, across sessions and workspaces, for
+non-force `git push` operations to `ucdavis/rampp` and
+`Morrison-Lab/ai-config` after positive membership verification.
+This authorization covers pushes only;
+it does not authorize force pushes, merges,
+or any other outward repository communication.
+
 Do not infer membership from a public repository, prior contributions, a fork,
 organization membership, technical write access, available credentials,
 collaborator access elsewhere, or the ability to post.
@@ -160,6 +167,20 @@ The full rule, including the Do/Don't pair, is
 [`shared/workflow/run-ums-proactively.md`](shared/workflow/run-ums-proactively.md).
 Questioning alone does not owe a pass: the check has to show the claim
 was wrong.
+
+## Help your subagents improve over time
+
+An orchestrator owns the three things that set a dispatched agent's
+mistake rate: its brief, the memory it can read, and the loop that feeds
+findings back to it.
+Correcting each output as it arrives leaves that rate unchanged.
+Keep a per-agent mistake ledger in a committed memory file read from the
+default branch (never in the PR branch the agent is working), prepend it
+to every brief, change the brief or the loop after every fix round,
+measure rounds-to-clean, and promote what holds into the delegation
+skill and hooks.
+The full rule, including the Do/Don't pairs, is
+[`shared/workflow/improve-your-subagents.md`](shared/workflow/improve-your-subagents.md).
 
 ## Treat user profanity and frustration as urgent defect signals
 

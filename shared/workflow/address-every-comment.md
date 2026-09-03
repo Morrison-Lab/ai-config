@@ -799,3 +799,41 @@ Reverted to the wording round 4 had displaced, which was stable at all three
 seeds.
 Tracked as
 [ai-config#2028](https://github.com/Morrison-Lab/ai-config/issues/2028).)
+
+**Softening the quantifier a finding named as unsupported is not addressing
+it, because the evidence base a reviewer measured did not change.**
+A finding of the shape "this generalizes from one instance" has an
+observation and an inference exactly like the one above, and the inference
+here is the adverb itself: "frequently", "often", "typically" all assert a
+rate, and a rate needs more than the one case the passage reports.
+The tempting fix trades the flagged word for a milder synonym --- "commonly"
+for "frequently" --- and adds a hedging clause around it, with no second
+instance behind either.
+That reads as a genuine response, because the sentence changed and the
+finding named a word.
+It answers "is this word too strong" and leaves "is this claim supported"
+exactly where the reviewer found it, so a re-raise on the next round is not
+the reviewer being difficult --- it is the same finding, correctly repeated
+against the same absent evidence.
+
+The two available real fixes are to drop the generalization and state only
+what the one instance shows, or to go find and cite a second instance.
+A softened adverb is neither: it keeps asserting a rate from an evidence base
+that still has n = 1.
+
+- **Do:** when Addressing a finding that a claim over-generalizes, either
+  delete the generalizing word and state the single case plainly, or supply
+  a second instance that actually supports a rate.
+- **Don't:** answer such a finding by substituting a milder adverb or adding
+  a narrowing clause --- the evidence count is unchanged, so the claim is
+  unchanged.
+
+(Morrison-Lab/ai-config#3107, round 2 of an adversarial loop over one
+case-record parenthetical, 2026-09-03: a finding that "reporting such a
+state is frequently what ends it" generalized from a single observed
+instance was Addressed by changing "frequently" to "as they commonly do,"
+paired with a clause naming the one instance that motivated the sentence.
+The next round correctly re-raised it as "round 2's rejected 'frequently'
+wearing a smaller adverb --- same single data point, same absent evidence,"
+and the fix that finally closed it dropped the rate claim rather than
+rewording it again.)

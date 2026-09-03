@@ -19,9 +19,12 @@ import rather than by an environment variable.
 
 Run: python3 hooks/test-no-unreviewed-pr.py hooks/no-unreviewed-pr.py
 """
+import datetime
 import importlib.util
 import json
 import os
+import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -49,7 +52,32 @@ sys.exit(m.main())
 
 # One day after the moratorium ends, so the guard is live for the cases that
 # are about anything else.
-AFTER = "2026-09-02"
+#
+# DERIVED from the subject's own constant rather than written out. A literal
+# date here expires when `MORATORIUM_END` moves past it, putting every case
+# below back inside the moratorium, where the guard returns at the first line
+# of `main()`.
+#
+# Measured 2026-09-02, by reverting the literals and running them against the
+# December constant: 92 passed, 88 failed. NOT a silent whole-file vacuum ---
+# the split is what matters. Every case expecting a block FAILS loudly, since
+# an inert guard blocks nothing; every true-negative case PASSES vacuously,
+# for the wrong reason. So the hazard is half the suite going quiet while the
+# other half screams, which is noisy enough to notice but leaves the passing
+# half meaning nothing.
+#
+# An earlier version of this comment claimed the whole file would pass
+# vacuously, on an unrun inference from a partially-fixed run. Deriving the
+# date is the right fix either way; the reason it was needed is smaller and
+# differently shaped than that claim said.
+def _moratorium_end():
+    spec = importlib.util.spec_from_file_location("_subject_const", HOOK)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod.MORATORIUM_END
+
+
+AFTER = (_moratorium_end() + datetime.timedelta(days=1)).isoformat()
 
 
 def hook_argv(when=AFTER):
@@ -1364,6 +1392,284 @@ case(create("c") + [bash("ALLOW_UNREVIEWED_REDACTION_PR=0 gh pr view 1038 "
      "ALLOW_UNREVIEWED_REDACTION_PR=0 is not an assertion")
 
 
+def stdout_of(events):
+    """The hook's raw stdout for a transcript.
+
+    One run-and-capture, shared by `block_of` and `reason_of`, so a later change
+    to the sentinel isolation or the invocation cannot leave the two disagreeing
+    about what they exercise (ai-config#3017 review).
+    """
+    fd, path = tempfile.mkstemp(suffix=".jsonl")
+    with os.fdopen(fd, "w") as fh:
+        for e in events:
+            fh.write(json.dumps(e) + "\n")
+    try:
+        return subprocess.run(
+            hook_argv(), input=json.dumps({"transcript_path": path}),
+            capture_output=True, text=True,
+            env=dict(os.environ, TMPDIR=tempfile.mkdtemp())).stdout
+    finally:
+        os.unlink(path)
+
+
+def reason_of(events):
+    """The block `reason` text for a transcript, or "" when it does not block.
+
+    `block_of` answers only whether the hook blocked; a wording assertion needs
+    the text itself.
+    """
+    out = stdout_of(events)
+    return json.loads(out).get("reason", "") if out.strip() else ""
+
+
+def _chained_request_wording():
+    """A request chained AHEAD of another command must be NAMED as such.
+
+    ai-config#3017, measured on ai-config#3010: eight successive POSTs each
+    returned 200 and three Copilot reviews landed, while every call chained the
+    hook's own prescribed verification after the request -- so `rlast` was
+    False every time, nothing discharged, and the block text named only failure
+    as the cause. From inside the turn the two are indistinguishable, so the
+    reader re-issues the same shape and the guard re-fires unchanged.
+
+    The negative half is the load-bearing one: a session that made NO request
+    must not be told a request is in the transcript.
+    """
+    chained = reason_of(create("c") + [
+        bash(REQ_CMD_Q + " && gh pr view 1038 --json reviews", tid="q"),
+        res("q", OK), say("Requested.")])
+    none_made = reason_of(create("c") + [say("Opened it.")])
+    # A `gh pr create --reviewer` chained ahead of another command resolves no
+    # number on either side, so the number-matched marking cannot reach it and
+    # it needs its own path (ai-config#3017 review). Without that path this arm is
+    # the pre-fix message, naming only failure as the cause.
+    chained_create = reason_of([
+        bash("gh pr create --base main --title x --body y --reviewer "
+             "copilot-pull-request-reviewer[bot] && gh pr view 1038 "
+             "--json reviews", tid="c"),
+        res("c", URL), say("Created with a reviewer.")])
+    # The needle must be unique to the new paragraph. "chained AHEAD" is NOT:
+    # the pre-existing label-exemption text already carries that exact phrase,
+    # so a needle keyed on it matches the no-request case too and the negative
+    # half passes vacuously (caught by running it).
+    # Several PRs can be outstanding with only one carrying a chained request,
+    # so the paragraph names the flagged number rather than saying "this PR"
+    # over a mixed set (ai-config#3017 review round 4). The mixed case is the
+    # one that discriminates: aggregating with any() passes every other arm.
+    mixed = reason_of([
+        bash("gh pr create --base main --title x --body y", tid="c1"),
+        res("c1", URL),
+        bash(REQ_CMD_Q + " && gh pr view 1038 --json reviews", tid="q"),
+        res("q", OK),
+        bash("gh pr create --base main --title y --body z", tid="c2"),
+        res("c2", "https://github.com/o/r/pull/2222\n"),
+        say("Opened a second, unrequested.")])
+    needle = "A reviewer request for #1038 appears in the transcript"
+    # A request chained ahead of a ready for a DIFFERENT PR must not mark
+    # this one: the direct marking is restricted to the create form, whose
+    # request resolves no number (ai-config#3017 review round 2).
+    # A push re-arms its obligation AFTER the marking loop runs, so a call
+    # chaining a push with a non-last request must still be marked
+    # (claude-review on ai-config#3024).
+    pushed_chain = reason_of(create("c") + [bash(REQ_CMD_Q, tid="q0"),
+                                            res("q0", OK),
+                                            say("Requested.")] + [
+        bash("git push origin HEAD && " + REQ_CMD_Q
+             + " && gh pr view 1038 --json reviews", tid="p"),
+        res("p", OK), say("Pushed and requested.")])
+    # Two number-less commands naming DIFFERENT repos must not mark either.
+    # The result must RESOLVE a number, or `flagged`'s own `and o["num"]`
+    # filter drops the obligation and the needle is absent either way -- the
+    # vacuous-needle shape this suite has hit before.
+    cross_repo = reason_of([
+        bash("gh pr edit -R o/repoA --add-reviewer "
+             "copilot-pull-request-reviewer[bot] && gh pr ready -R o/repoB",
+             tid="rr"),
+        res("rr", "https://github.com/o/repoB/pull/77\n"),
+        say("Different repos.")])
+    # A `&&` chain can short-circuit before the request runs, so the paragraph
+    # must not assert it executed or returned anything (Copilot on
+    # ai-config#3024). It is still named -- the transcript cannot tell the
+    # cases apart, which is the point -- but the wording stays agnostic.
+    short_circuit = reason_of(create("c") + [
+        bash("false && " + REQ_CMD_Q + " && gh pr view 1038", tid="sc"),
+        res("sc", "", True), say("Short-circuited.")])
+    # A chained request SUPERSEDED by a credited standalone one must not mark an
+    # obligation the later push re-armed: without the seq/tid ordering the
+    # end-of-scan sweep loses, the block would blame chaining for a moved head
+    # (adversarial review on ai-config#3024).
+    superseded = reason_of(create("c") + [
+        bash(REQ_CMD_Q + " && gh pr view 1038", tid="s1"), res("s1", OK),
+        bash(REQ_CMD_Q, tid="s2"), res("s2", OK),
+        bash("git push origin HEAD", tid="s3"), res("s3", ""),
+        say("Superseded, then pushed.")])
+    # A bare `gh pr ready` backfills its number from the RESULT, which arrives
+    # after the marking site runs, so only an end-of-scan sweep sees it
+    # (Copilot on ai-config#3024).
+    backfilled = reason_of([
+        bash("gh pr ready && " + REQ_CMD_Q + " && gh pr view 1038", tid="bf"),
+        res("bf", URL), say("Readied and requested.")])
+    # The same cross-repo overclaim on the NUMBER-MATCHED path, which the
+    # cross_repo arm above cannot reach -- it pins the direct marking only
+    # (adversarial review on ai-config#3024).
+    cross_repo_numbered = reason_of([
+        bash("gh pr ready 42 -R o/repoB", tid="b"),
+        res("b", "https://github.com/o/repoB/pull/42\n"),
+        bash('gh api "repos/o/repoA/pulls/42/requested_reviewers" -X POST '
+             "-f 'reviewers[]=copilot-pull-request-reviewer[bot]' "
+             "&& gh pr view 42", tid="n"),
+        res("n", OK), say("Requested against another repo.")])
+    # `gh pr ready <N>` names a PR that need not be this branch's, so a
+    # current-branch numberless add-reviewer chained ahead of it targets a
+    # DIFFERENT PR and must not mark <N> (Copilot on ai-config#3024).
+    ready_named = reason_of([
+        bash("gh pr edit --add-reviewer copilot-pull-request-reviewer[bot] "
+             "&& gh pr ready 1038", tid="r"),
+        res("r", OK), say("Readied a named PR.")])
+    # Two flagged PRs get the plural sentence, not a singular one over a list.
+    two = reason_of([
+        bash("gh pr create --base main --title x --body y --reviewer "
+             "copilot-pull-request-reviewer[bot] && gh pr view", tid="d1"),
+        res("d1", URL),
+        bash("gh pr create --base main --title y --body z --reviewer "
+             "copilot-pull-request-reviewer[bot] && gh pr view", tid="d2"),
+        res("d2", "https://github.com/o/r/pull/2222\n"),
+        say("Two creates, each chained.")])
+    cross_pr = reason_of([
+        bash("gh api \"repos/o/r/pulls/42/requested_reviewers\" -X POST "
+             "-f 'reviewers[]=copilot-pull-request-reviewer[bot]' "
+             "&& gh pr ready 1038", tid="x"),
+        res("x", OK), say("Readied a different PR.")])
+    # The remedy sentence lives in the generic recovery paragraph, not in the
+    # chained one -- duplicating it there was dropped as redundant, so assert
+    # it where it actually is (adversarial review on ai-config#3024).
+    return (needle in chained and "only command in this call" in chained
+            and needle in chained_create
+            and none_made and needle not in none_made
+            and cross_pr and needle not in cross_pr
+            # Decisive over a mixed set: the SINGULAR branch must render, which
+            # it does only when `flagged` holds one number. Asserting the
+            # absence of a "#2222 appears" phrase decided nothing -- that
+            # phrase exists only when 2222 is flagged ALONE, a world the
+            # positive needle has already excluded (adversarial review).
+            and needle in mixed and "Reviewer requests for" not in mixed
+            and ready_named and needle not in ready_named
+            and "Reviewer requests for #1038, #2222 appear" in two
+            and needle in pushed_chain
+            and cross_repo and "#77 appears in the transcript" not in cross_repo
+            and cross_repo_numbered
+            and "#42 appears in the transcript" not in cross_repo_numbered
+            and needle in backfilled
+            and superseded and needle not in superseded
+            # The needle is the ASSERTIVE old phrasing, not the substring the
+            # new hedged sentence still contains ("it may have returned 200
+            # with a review landing"). A needle matching both tests nothing.
+            and "The POST may well have returned 200" not in chained
+            and "short-circuited before it ran" in chained
+            # The intended fact stated directly. The former disjunction drew
+            # both operands from one string literal, so it held whether or not
+            # a short-circuited chain was flagged (adversarial review).
+            and needle in short_circuit)
+
+
+def _request_ordering_wording():
+    """The recovery text must tell the reader to run the request alone.
+
+    The message used to present the request and its verification together
+    under "in this same message", which is exactly the shape `request_ident`
+    refuses to credit -- so following the instruction reproduced the block.
+    """
+    text = reason_of(create("c") + [say("Opened it.")])
+    return all(t in text for t in ("only command in this call", "SEPARATE call",
+                                   "per-PR, not per-head",
+                                   "`sha` equals `head`"))
+
+
+def _review_query_null_safe():
+    """The prescribed review-check `jq` must survive a null review author.
+
+    A GitHub review author is nullable -- a deleted account reports
+    `"author": null` -- and `null | startswith(...)` is a hard `jq` error
+    rather than a false. So the unguarded filter aborts the WHOLE query
+    instead of skipping that one review, and the reader sees a jq usage error
+    where the hook promised them a way to confirm their review landed
+    (Copilot on ai-config#3024).
+
+    The guard is already in place; this pins it, because it survived a
+    mutation otherwise. Pinned two ways, since the lexical half alone would
+    pass on a filter that merely mentions the guard somewhere harmless. When
+    `jq` is on PATH the extracted filter is RUN against a fixture whose first
+    review has a null author and whose second is a real Copilot review: it
+    must not error, and must still find the Copilot one.
+    """
+    text = reason_of(create("c") + [say("Opened it.")])
+    match = re.search(r"--jq '(\{head:.*?\})'", text, re.S)
+    if not match:
+        return False
+    filt = match.group(1)
+    if "(.author.login // \"\")" not in filt:
+        return False
+
+    if not shutil.which("jq"):
+        # The lexical half above already fails without the guard, so an
+        # absent `jq` weakens this check rather than voiding it.
+        return True
+
+    fixture = json.dumps({
+        "headRefOid": "deadbeefcafe",
+        "reviews": [
+            {"author": None, "commit": {"oid": "1111111111"},
+             "submittedAt": "2026-01-01T00:00:00Z"},
+            {"author": {"login": "copilot-pull-request-reviewer"},
+             "commit": {"oid": "2222222222"},
+             "submittedAt": "2026-01-02T00:00:00Z"},
+        ],
+    })
+    proc = subprocess.run(["jq", filt], input=fixture, capture_output=True,
+                          text=True)
+    if proc.returncode != 0:
+        return False
+    try:
+        got = json.loads(proc.stdout)
+    except ValueError:
+        return False
+    return [c["sha"] for c in got.get("copilot", [])] == ["22222222"]
+
+
+def _no_attribution_overclaim():
+    """The block must not claim the exit status BELONGS to the later command.
+
+    It does not, in either direction. `false && <request> && gh pr view`
+    leaves the status with `false`; `<request> && gh pr view` where the
+    request fails leaves it with the request. The only sound claim is the
+    negative one -- the combined status cannot be attributed to the request
+    -- and the paragraph's own later hedge ("a `&&` chain may have
+    short-circuited before it ran at all") contradicted the unconditional
+    attribution it opened with (Copilot on ai-config#3024, round 4).
+
+    Checked over BOTH the chained paragraph and the always-rendered recovery
+    paragraph, since the overclaim appeared in three places and a needle over
+    only one of them would pass while the others still asserted it.
+    """
+    chained = reason_of(create("c") + [
+        bash(REQ_CMD_Q + " && gh pr view 1038 --json reviews", tid="q"),
+        res("q", OK), say("Requested.")])
+    two = reason_of([
+        bash("gh pr create --base main --title x --body y --reviewer "
+             "copilot-pull-request-reviewer[bot] && gh pr view", tid="d1"),
+        res("d1", URL),
+        bash("gh pr create --base main --title y --body z --reviewer "
+             "copilot-pull-request-reviewer[bot] && gh pr view", tid="d2"),
+        res("d2", "https://github.com/o/r/pull/2222\n"),
+        say("Two creates, each chained.")])
+    plain = reason_of(create("c") + [say("Opened it.")])
+    banned = "belongs to that later command"
+    return (banned not in chained and banned not in two and banned not in plain
+            and "cannot be attributed to the request" in chained
+            and "cannot be attributed to any one of them" in two
+            and "cannot be attributed to it" in plain)
+
+
 def _redaction_wording():
     """The block text must NAME the redaction deferral and both escapes.
 
@@ -1388,19 +1694,8 @@ def _redaction_wording():
 
 
 def block_of(events):
-    fd, path = tempfile.mkstemp(suffix=".jsonl")
-    with os.fdopen(fd, "w") as fh:
-        for e in events:
-            fh.write(json.dumps(e) + "\n")
-    try:
-        out = subprocess.run(
-            hook_argv(), input=json.dumps({"transcript_path": path}),
-            capture_output=True, text=True,
-            env=dict(os.environ, TMPDIR=tempfile.mkdtemp()),
-        ).stdout
-        return '"decision": "block"' in out or '"decision":"block"' in out
-    finally:
-        os.unlink(path)
+    out = stdout_of(events)
+    return '"decision": "block"' in out or '"decision":"block"' in out
 
 
 def load_hook():
@@ -1472,17 +1767,7 @@ def main():
 
     # Recovery commands must be copy-pasteable: an unquoted `<` is a shell
     # redirect, so a placeholder-bearing argument has to be quoted.
-    fd, path = tempfile.mkstemp(suffix=".jsonl")
-    with os.fdopen(fd, "w") as fh:
-        for e in create("c") + [say("Opened it.")]:
-            fh.write(json.dumps(e) + "\n")
-    out = subprocess.run(
-        hook_argv(), input=json.dumps({"transcript_path": path}),
-        capture_output=True, text=True,
-        env=dict(os.environ, TMPDIR=tempfile.mkdtemp()),
-    ).stdout
-    os.unlink(path)
-    reason = json.loads(out).get("reason", "") if out.strip() else ""
+    reason = reason_of(create("c") + [say("Opened it.")])
     bad = [ln for ln in reason.splitlines()
            if ln.strip().startswith("gh ") and "<" in ln
            and '"' not in ln and "'" not in ln]
@@ -1540,11 +1825,22 @@ def main():
     # transcript, two clocks: the ONLY difference between these two is the
     # date, which is what makes the second one evidence the first is silent
     # for the moratorium's sake and not because the fixture stopped arming.
+    #
+    # Both clocks are DERIVED from the subject's constant. Written out, they
+    # drift the moment the moratorium is extended: a literal "day before" and
+    # "end date" from an earlier window both fall INSIDE the new one, the
+    # guard is inert on both, and the pair stops testing the boundary it
+    # exists for. Measured 2026-09-02, when extending the window to December
+    # turned the literals 2026-08-31 and 2026-09-01 into two dates on the
+    # same side of the line.
+    _end = _moratorium_end()
+    _during = (_end - datetime.timedelta(days=1)).isoformat()
+    _on_end = _end.isoformat()
     armed = create("c") + [say("Opened it.")]
-    if blocks_at("2026-08-31", armed):
+    if blocks_at(_during, armed):
         print("FAIL: the guard still fires during the Copilot moratorium")
         failures += 1
-    elif not blocks_at("2026-09-01", armed):
+    elif not blocks_at(_on_end, armed):
         print("FAIL: the guard stays inert on the moratorium's end date")
         failures += 1
     else:
@@ -1554,9 +1850,9 @@ def main():
     hookmod = load_hook()
     import datetime as _dt
     bounds = (
-        hookmod.moratorium_active(_dt.date(2026, 8, 31)),
+        hookmod.moratorium_active(hookmod.MORATORIUM_END - _dt.timedelta(days=1)),
         not hookmod.moratorium_active(hookmod.MORATORIUM_END),
-        not hookmod.moratorium_active(_dt.date(2027, 1, 1)),
+        not hookmod.moratorium_active(hookmod.MORATORIUM_END + _dt.timedelta(days=31)),
     )
     if all(bounds):
         print("PASS: moratorium_active is half-open -- live ON the end date")
@@ -1582,6 +1878,40 @@ def main():
         passes += 1
     else:
         print("FAIL: the block text does not name the redaction deferral")
+        failures += 1
+
+    if _chained_request_wording():
+        print("PASS: a chained request is named as chained, and a session "
+              "that made none is not")
+        passes += 1
+    else:
+        print("FAIL: the block text does not distinguish a chained request "
+              "from no request")
+        failures += 1
+
+    if _no_attribution_overclaim():
+        print("PASS: the block does not claim the exit status belongs "
+              "to the later command")
+        passes += 1
+    else:
+        print("FAIL: the block overclaims exit-status attribution")
+        failures += 1
+
+    if _review_query_null_safe():
+        print("PASS: the prescribed review query survives a null review "
+              "author")
+        passes += 1
+    else:
+        print("FAIL: the prescribed review query aborts on a null review "
+              "author")
+        failures += 1
+
+    if _request_ordering_wording():
+        print("PASS: the recovery text says to run the request alone and "
+              "verify separately")
+        passes += 1
+    else:
+        print("FAIL: the recovery text does not state the ordering rule")
         failures += 1
 
     if _push_wording():

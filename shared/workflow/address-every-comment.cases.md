@@ -803,16 +803,109 @@ session had applied minutes earlier; see
 [`fact-check-prose`](../writing/fact-check-prose.md)'s "A command written
 into documentation is a condensation of the code that builds it".
 
-This meets [`deterministic-tools`](../principles/deterministic-tools.md)'s
-third-occurrence bar and does not yield an instrument, which is worth stating
-rather than leaving as a silent omission.
+4th recorded occurrence, 2026-09-02, `Morrison-Lab/gha#811`, across six
+adversarial pre-push rounds returning 11, 11, 11, 6, 3 and 2 findings ---
+counted from the branch's own commit messages, `21751be5` through `0262c1c6`,
+rather than from recollection, which had dropped a round of eleven and read the
+last round's two prose items as zero.
+Two instances, both in fixes for **convention** findings: an over-long-line fix
+put its break on a dangling `and` in each of five files, the uniformity
+suggesting a single edit applied across them --- an inference, not something the
+commits record; and a forward-reference fix reworded the pointer into a new
+forward reference of its own, `README.md`'s "the audit described below", added
+by `a8a45881`.
+Round four's commit attributes two to that fix; only one is, since the other
+pointer was introduced a round earlier by `385d4f43`, which fixed no forward
+reference --- an over-count inherited here until it was checked against the
+tree.
+
+Only the forward-reference instance is a member of this section's class, since
+its fix reproduced the very finding it closed.
+The line-length one is the adjacent shape: the over-long line was fixed and
+stayed fixed, and the fix introduced a *different* convention violation.
+It is kept here because the remedy is identical and the class boundary is the
+part that goes unnoticed.
+
+A convention finding arrives *with* its instrument, and the corpus already says
+to re-run that instrument over your own fix ---
+[`ardi.cases.md`](ardi.cases.md)'s "Run the literal-verification check over
+your own fix too" calls running the rule against the fix "the entire
+mechanism".
+Read at that general form it covers both instances; read strictly, its subject
+is a literal-verification finding and neither of these is one, which is the
+reading that let this session pass over it.
+
+Two neighbouring rules look as though they would have caught these and do not,
+which is worth stating so nobody else goes looking there:
+[`semantic-line-breaks`](../writing/semantic-line-breaks.md) tells you to
+re-run its gate after committing, but that gate enforces two predicates only,
+multi-sentence lines and long lines carrying a mid-line semicolon.
+A break placed on a dangling conjunction trips neither, and that fragment says
+plainly why: detecting a clause boundary needs a syntactic parser the tooling
+deliberately does not have;
+and [`ardi`](ardi.md)'s added-line scan is scoped to banned punctuation and
+multi-sentence lines.
+So this occurrence adds no new rule, only a carve-out to the chain's conclusion
+and evidence about how those places get missed: the fix is authored while
+holding the convention in mind, and therefore feels exempt from it.
+
+The chain above meets
+[`deterministic-tools`](../principles/deterministic-tools.md)'s
+third-occurrence bar and does not yield an instrument *for the general class*,
+which is worth stating rather than leaving as a silent omission.
 Whether a fix reproduces the finding it closes is a judgment about meaning,
 not a condition decidable over a diff, so no hook can decide it.
+The 4th occurrence above carves out a narrower subclass still: a finding whose
+detector would also flag the fix.
+That held for its forward-reference instance, so the carve-out reads "run the
+check the finding came with, when that check can see the fix" --- a subset of a
+subclass rather than a general remedy.
 The procedural equivalent already exists and simply has to be run: the fix is
 "a diff nobody has read", per
 [`adversarial-self-review`](adversarial-self-review.md)'s "The review gates
 the push, not the work", so brief the reviewer on the **fix** commit rather
 than treating the round as closed once the finding is addressed.
+
+5th recorded occurrence, 2026-09-03, `Morrison-Lab/ai-config#3107` (merged as
+`55fd26c4`), and the count is worth stating precisely rather than
+impressionistically: four adversarial rounds carried findings against one
+closing parenthetical (2, then 3, then 3, then 1 --- nine total), each round's
+fix landing in the sentence the previous round had just corrected.
+An initial automated bot review, run in parallel against the same commits,
+returned a clean verdict throughout and caught none of the nine; the findings
+all came from a separately dispatched adversarial pass, recorded only in the
+fix commits' own messages.
+
+Two of the nine are a second, narrower shape worth naming beside the general
+one: the passage's own subject is telling a dispatcher apart from what it
+dispatches, and it misstated that exact distinction twice across its own
+revision history --- once naming `claude-code-review.yml` as the workflow
+hand-dispatched when `ai-code-review.yml` was (round 3's finding, on the
+sentence round 1's own fix had introduced), and once describing a header as
+documenting an override it does not document, conflating which workflow's
+`if:` actually admitted the manual dispatch (round 4's finding).
+Knowing a distinction well enough to write the rule about it did not stop the
+same entry from breaking it while composing the evidence for it --- the
+sharper, self-referential form of "a rule is consulted at read time and
+broken at composition time" already stated in
+[`fully-clean.cases.md`](fully-clean.cases.md), [`no-empty-promises.md`](no-empty-promises.md), and
+[`learn-from-review-findings.md`](learn-from-review-findings.md).
+
+- **Do:** read a case record's own account of a distinction as no more
+  reliable than any other claim, even when the entry's whole subject is that
+  distinction.
+- **Don't:** infer from an entry teaching a rule that its own prose already
+  follows the rule --- composing about a distinction is a separate act from
+  applying it.
+
+(A verified correction to how this occurrence first reached this file: an
+earlier account put it at five rounds and ten findings, with the fourth round
+described as deleting the wrong claim outright rather than replacing it with
+a narrower, checkable one.
+Re-derived from the branch's five commits and their messages rather than
+taken on report --- four rounds carried findings, not five, and the round
+that resolved the header claim substituted a claim about `redaction-gate`'s
+own `if:` for the wrong one rather than removing the sentence.)
 
 ## A correction added beside the flagged sentence, which survived
 

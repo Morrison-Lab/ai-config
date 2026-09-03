@@ -497,6 +497,66 @@ embedded directly in PR issue comments and formal reviews via
    verdict normalization, and contradiction checks (e.g., rejecting `CLEAN`
    verdicts that list unresolved findings).
 
+## A CI review quota outage does not reach this session's own budget
+
+When `claude-code-review` posts the mid-run 429 skip (gha#520 --- "You've hit
+your session limit, resets HH:MM (UTC)"), the natural inference is that the
+account is limited and therefore every Claude call is, including the
+adversarial-reviewer subagent that
+[`self-review-fallback`](../shared/workflow/self-review-fallback.md)
+prescribes as the substitute.
+
+That inference is wrong, and acting on it stalls a sweep for the length of the
+outage at exactly the moment the fallback is needed.
+The workflow authenticates with its own configured credential; a Claude Code
+session runs on its own budget.
+They are separate pools.
+
+Measured 2026-09-02 on `Morrison-Lab/ai-config`: while the workflow was
+refusing every new review round with a session limit, a one-word `haiku`
+subagent probe returned normally.
+The figure is the probe's own reported `duration_ms` of 3179, so it is
+checkable rather than an impression of speed --- which matters here,
+because "it felt fast" would not distinguish a working budget from a
+fast refusal.
+The fallback was available throughout.
+
+Probe rather than reason about it, since the probe costs one cheap call and
+the inference costs the whole outage:
+
+```
+Agent(model="haiku", prompt="Reply with exactly the word: ALIVE. Do not use any tools.")
+```
+
+Two further consequences of the outage itself, which decide what may still
+proceed:
+
+- **A verdict already posted is not retracted.**
+  A PR carrying a clean verdict on a head that has not moved since is still
+  fully clean at head, so merges of already-verified PRs proceed normally.
+  Re-verify the head with `git ls-remote` rather than assuming it held.
+- **Only NEW rounds are skipped**, and `require-review` grays rather than
+  reddens on that path, so a skipped round is not a red check to chase.
+
+**An `in_progress` `claude-review` is not evidence the quota has recovered.**
+The skip is a MID-RUN 429, so the run really does start: `preempt-previous`
+and `gather-context` succeed, `claude-review` reports `in_progress`, and the
+429 arrives after that.
+Reading the in-progress state as recovery is therefore reading the shape of
+the failure as its absence.
+Measured 2026-09-02: a round that reached `in_progress` posted the identical
+skip notice about a minute later.
+Only a posted verdict settles it, which is why the re-trigger after a reset
+should be verified by getting one rather than by the clock.
+
+- **Do:** probe with a trivial subagent call before concluding a quota outage
+  reaches this session.
+- **Do:** keep merging PRs whose clean verdict predates the outage and whose
+  head has not moved.
+- **Don't:** infer from a CI review skip that self-review is unavailable too.
+- **Don't:** treat a grayed `require-review` from a quota skip as a failure to
+  diagnose.
+
 ## The reviewer's sandbox is not the CI container: a check that fails there can pass in CI
 
 A review run that installs a tool in its own sandbox and re-runs a repo check

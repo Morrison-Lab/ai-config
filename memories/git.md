@@ -601,3 +601,44 @@ Tracked as [ai-config#2981](https://github.com/Morrison-Lab/ai-config/issues/298
 - **Don't:** export `ALLOW_UNREVIEWED_PUSH=1` for the whole session to work
   around the false positive; that also waives the guard for the real push.
 
+
+## `git commit --amend` after a merge amends the MERGE, and the result reads as a duplicate commit
+
+Reword a commit, then merge `main` in, then reword again, and the second `--amend` retargets the merge commit rather than the commit you meant.
+Measured 2026-09-03 on ai-config#3023.
+
+Nothing errors and nothing warns.
+The merge silently takes the fix commit's subject line, so `git log --oneline` shows two consecutive commits with the same title and no visible merge:
+
+```text
+de4e3620 fix(shellcmd): three false verdicts in the heredoc scanner and strip_env
+4cbb896b fix(shellcmd): three false verdicts in the heredoc scanner and strip_env
+```
+
+That reads as an accidental duplicate commit, which invites exactly the wrong remedy --- dropping one of them, which would drop the merge.
+`git rev-list --parents -n1 HEAD` is what tells them apart: three hashes means the top one is a merge whatever its subject says.
+
+The trap is that `--amend` is almost always used seconds after the commit it targets, so "the commit I just wrote" and "HEAD" coincide and the distinction never comes up.
+A merge lands between them here, and the habit does not notice.
+
+**The recovery is a rewrite, so prove it changed no content.**
+Reset to the real commit, amend it, and redo the merge:
+
+```bash
+TREE_BEFORE=$(git rev-parse HEAD^{tree})
+git reset --hard <fix-commit>
+git commit --amend -F /tmp/message.txt
+git merge origin/main --no-edit
+[ "$TREE_BEFORE" = "$(git rev-parse HEAD^{tree})" ] && echo "TREES IDENTICAL"
+```
+
+The tree-hash comparison is the point rather than ceremony.
+A message-only rewrite must leave the tree byte-identical, so an inequality means the reset or the redone merge lost something --- and that is a class of loss no test suite can see, since the tests run on whatever tree survives.
+Capture `TREE_BEFORE` before the reset, not after.
+
+Where the amend also changes content, the equality no longer holds and `git diff <old-head> HEAD` is the check instead: it must show your intended edit and nothing else.
+
+- **Do:** read `git rev-list --parents -n1 HEAD` before `--amend` when a merge may have landed since the commit you mean to fix.
+- **Do:** assert tree-hash equality across a message-only rewrite.
+- **Don't:** read two same-titled consecutive commits as a duplicate to drop;
+  check the parent count first.

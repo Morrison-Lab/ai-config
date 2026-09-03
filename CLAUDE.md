@@ -1007,6 +1007,14 @@ Every agent does its job correctly on the list it was given, so the items that a
 
 [`shared/workflow/derive-dont-enumerate.md`](shared/workflow/derive-dont-enumerate.md)
 
+## Help your subagents improve over time
+
+[`shared/workflow/improve-your-subagents.md`](shared/workflow/improve-your-subagents.md)
+
+The brief, the memory a dispatched agent can read, and the loop that feeds findings back to it are the orchestrator's, so the agent's mistake rate is too.
+`AGENTS.md` carries the rule;
+the fragment carries the mechanisms (a per-agent mistake ledger prepended to every brief, a loop change after every fix round, rounds-to-clean as the measure, promotion into skills and hooks).
+
 ## Subagent worktrees are assigned, and an incident never silently repeals a decision
 
 Two rules, one incident, and the second is the general form of the first.

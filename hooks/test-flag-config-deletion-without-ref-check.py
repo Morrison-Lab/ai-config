@@ -64,6 +64,9 @@ DELETE_REPLY = (
 )
 
 WARN_CASES = [
+    ("Nuke it: `git clean -fdx ~/.claude`; preview with -n if unsure.", (),
+     "a destructive git clean whose PROSE mentions -n: the dry-run exemption "
+     "must scan the option run, not 40 characters of arbitrary trailing text"),
     ("Wipe them with `rm -rf ~/.claude*`.", (),
      "a glob suffix is a common spelling of exactly what this catches; a "
      "bare path-or-space boundary exempted it"),
@@ -87,6 +90,11 @@ WARN_CASES = [
 ]
 
 SILENT_CASES = [
+    ("Preview with `git clean -nd ~/.claude` first.", (),
+     "the n may sit anywhere in the flag cluster, not only at its end"),
+    ("Try `cd ~/.claude && git clean -n` to see what would go.", (),
+     "the cd branch must exempt a dry run too -- the docstring claimed dry "
+     "runs were excluded while only the standalone branch did it"),
     ("Delete the scratch notes: `rm -rf ~/.config-notes`.", (),
      "a root must end at a boundary -- `~/.config` must not match inside "
      "`~/.config-notes`, or an unrelated file would discharge the guard"),

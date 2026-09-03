@@ -54,8 +54,9 @@ _ROOT_ALTS = tuple(
 )
 # The trailing lookahead stops `~/.config` matching inside `~/.config-notes`,
 # which would otherwise let an unrelated file discharge the guard. The class
-# includes `*`, `>` and `&` because `rm -rf ~/.claude*` is a common spelling of
-# exactly what this guard exists to catch; a bare path-or-space boundary
+# includes `*`, `>`, `&` and `|` because `rm -rf ~/.claude*` is a common
+# spelling of exactly what this guard exists to catch; a bare path-or-space
+# boundary
 # exempted it. `~/.config-notes` and `~/.claudex` still miss, which is the
 # point.
 _ROOTS = "(?:" + "|".join(_ROOT_ALTS) + r")(?=[/\"'`.,;)\]*&>|]|\s|$)"
@@ -70,7 +71,8 @@ _ROOTS = "(?:" + "|".join(_ROOT_ALTS) + r")(?=[/\"'`.,;)\]*&>|]|\s|$)"
 _DESTRUCTIVE_PARTS = [
     r"\bfind\b[ ]+[\"']?" + _ROOTS + r"[^\n]{0,200}?-(?:delete|exec[ ]+rm)",
     r"(?:\brm\b|\brmdir\b)(?:[ ]+-[-A-Za-z0-9]+)*[ ]+[\"']?" + _ROOTS,
-    r"\bcd\b[ ]+[\"']?" + _ROOTS + r"[^\n]{0,80}?&&[ ]*(?:rm\b|git[ ]+clean\b)",
+    r"\bcd\b[ ]+[\"']?" + _ROOTS + r"[^\n]{0,80}?&&[ ]*"
+    r"(?:rm\b|git[ ]+clean\b(?![ ]+(?:-[-A-Za-z0-9]+[ ]+)*?(?:-[A-Za-z]*n[A-Za-z]*\b|--dry-run\b)))",
     # `git clean -fdx <root>`. Kept as a standalone verb: narrowing the `rm`
     # branch to option-tokens-only dropped it, which silently lost
     # `git clean -fdx ~/.claude` -- a real destructive recommendation the
@@ -78,7 +80,7 @@ _DESTRUCTIVE_PARTS = [
     # `-n`/`--dry-run` is excluded: a dry run is non-destructive and is the
     # very look-before-you-delete step this guard promotes, so warning there
     # fires at the moment the author is complying.
-    r"\bgit[ ]+clean\b(?![^\n]{0,40}?(?:[ ]-[A-Za-z]*n|--dry-run))"
+    r"\bgit[ ]+clean\b(?![ ]+(?:-[-A-Za-z0-9]+[ ]+)*?(?:-[A-Za-z]*n[A-Za-z]*\b|--dry-run\b))"
     r"(?:[ ]+-[-A-Za-z0-9]+)*[ ]+[\"']?" + _ROOTS,
 ]
 RX_DESTRUCTIVE = re.compile("(?:" + "|".join(_DESTRUCTIVE_PARTS) + ")")

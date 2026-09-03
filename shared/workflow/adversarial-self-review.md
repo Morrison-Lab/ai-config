@@ -430,14 +430,21 @@ It was seen directly, twice, within one session --- and the captured line is thi
 ```
 
 **Note what that exhibit is: the trailer landing on a sentinel line, which is the safe case**, and the one this section goes on to prescribe.
-No capture exists of the shape the hazard is actually about, which would be a fingerprint line with the trailer glued to it:
+**The shape the hazard is actually about --- the trailer glued to a fingerprint line --- has also been captured**, and it is the block the truncation table below analyses:
 
 ```
-Reviewed-Commit: <sha>agentId: <id> (use SendMessage with to: '...')
+Reviewed-Commit: 6f10014883ccb4256250204fe9af216d7c3b775fagentId: <id> (use SendMessage with to: '...')
 ```
 
-That second block is constructed to show the shape, not captured.
-It is what the truncation table below analyses.
+Concatenated, no separator, on the fingerprint line itself.
+The agent id is redacted;
+nothing else is altered.
+
+Two things about that capture are worth stating, because it is easy to bank as a scare and easy to bank as an all-clear, and it is neither.
+
+It is an **in-context render**, like the other sighting and unlike the sweep's population, so it does not move the storage question above one way or the other.
+And the guard **accepted** it, because the fingerprint is a full 40 characters --- which is precisely what the table below predicts, so this is the remedy demonstrated rather than the hazard realized.
+Truncate that sha to 39 and the same line yields a plausible wrong one.
 
 **The zero and the sightings are about different artifacts, and that is what has to be settled before either number means anything.**
 The sweep read **stored** transcript JSONL.

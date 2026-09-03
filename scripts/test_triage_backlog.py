@@ -43,6 +43,8 @@ FIXTURE = [
     {"number": 9, "title": "sync-nlb-checker.py runs the sync on --help", "labels": ["bug"]},
     {"number": 10, "title": "Revisit adding a project .mcp.json", "labels": ["low-priority"]},
     {"number": 11, "title": "already triaged item", "labels": ["P2"]},
+    {"number": 12, "title": "Fix bug", "labels": []},
+    {"number": 13, "title": "no sacred cows", "labels": []},
 ]
 
 plan = tb.classify(FIXTURE, {})
@@ -60,6 +62,8 @@ check("newer same-title issue is duplicate of the older", by[8]["disposition"] =
 check("bug label without severe phrase is P2", by[9]["disposition"] == "P2")
 check("low-priority label is P3", by[10]["disposition"] == "P3")
 check("existing priority label is kept", by[11]["disposition"] == "P2" and "already" in by[11]["reason"])
+check("short title with an action verb is P2", by[12]["disposition"] == "P2")
+check("short title with no action verb is P3", by[13]["disposition"] == "P3")
 
 plan2 = tb.classify(FIXTURE, {3: "P1", 8: "P3"})
 by2 = {r["number"]: r for r in plan2}

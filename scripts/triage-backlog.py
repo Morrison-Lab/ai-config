@@ -71,6 +71,15 @@ RX_LOW_START = re.compile(
 )
 RX_LOW_ANY = re.compile(r"https?://|\?\s*$", re.I)
 
+# An imperative that names concrete work.  A short title carrying one of these
+# is an ordinary task ("Fix bug", "Update README"), not a bare directive.
+RX_ACTION_VERB = re.compile(
+    r"\b(?:fix|add|update|remove|delete|rename|split|extract|document|implement"
+    r"|support|handle|refactor|improve|move|check|warn|detect|guard|record|bank"
+    r"|promote|migrate|pin|bump|drop|replace|restore|install|register|sync)\b",
+    re.I,
+)
+
 
 def label_names(labels) -> list[str]:
     out = []
@@ -112,8 +121,12 @@ def classify_one(title: str, labels: list[str]) -> tuple[str, str]:
     if m:
         return "P3", f"directive/question/reading: {m.group(0)!r}"
     words = title.split()
-    if len(words) <= 5 and not re.search(r"[:/.]", title):
-        return "P3", "bare directive (short title, no referent)"
+    if (
+        len(words) <= 5
+        and not re.search(r"[:/.]", title)
+        and not RX_ACTION_VERB.search(title)
+    ):
+        return "P3", "bare directive (short title, no referent, no action verb)"
     return "P2", "default: actionable defect or improvement"
 
 

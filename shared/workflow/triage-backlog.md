@@ -8,7 +8,11 @@ An unlabelled open issue is untriaged, and untriaged is a state the weekly pass 
 Two standing rules each generate issues and neither declines any.
 [`report-mistakes-proactively`](report-mistakes-proactively.md) files every noticed mistake, however small.
 `no-mistake-without-a-hook.py` turns every admitted mistake into a hook, and every hook then generates its own defect stream.
-Measured 2026-09-03 across all 1,232 issues in this repo ([ai-config#3134](https://github.com/Morrison-Lab/ai-config/issues/3134)): the open count went from 15 to 410 in six weeks, 73% of the open issues were agent-tooling self-maintenance, 67% had never been commented on, and 14 issues in the repo's whole history had been closed as not-planned.
+Measured 2026-09-03 across all 1,232 issues in this repo ([ai-config#3134](https://github.com/Morrison-Lab/ai-config/issues/3134)):
+the open count went from 15 to 410 in six weeks,
+73% of the open issues were agent-tooling self-maintenance,
+67% had never been commented on,
+and 14 issues in the repo's whole history had been closed as not-planned.
 The close rate was not the problem.
 It rose roughly sevenfold over the same period.
 Filing rose faster, and nothing filed was ever declined.

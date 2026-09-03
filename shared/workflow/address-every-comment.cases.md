@@ -866,6 +866,47 @@ The procedural equivalent already exists and simply has to be run: the fix is
 the push, not the work", so brief the reviewer on the **fix** commit rather
 than treating the round as closed once the finding is addressed.
 
+5th recorded occurrence, 2026-09-03, `Morrison-Lab/ai-config#3107` (merged as
+`55fd26c4`), and the count is worth stating precisely rather than
+impressionistically: four adversarial rounds carried findings against one
+closing parenthetical (2, then 3, then 3, then 1 --- nine total), each round's
+fix landing in the sentence the previous round had just corrected.
+An initial automated bot review, run in parallel against the same commits,
+returned a clean verdict throughout and caught none of the nine; the findings
+all came from a separately dispatched adversarial pass, recorded only in the
+fix commits' own messages.
+
+Two of the nine are a second, narrower shape worth naming beside the general
+one: the passage's own subject is telling a dispatcher apart from what it
+dispatches, and it misstated that exact distinction twice across its own
+revision history --- once naming `claude-code-review.yml` as the workflow
+hand-dispatched when `ai-code-review.yml` was (round 3's finding, on the
+sentence round 1's own fix had introduced), and once describing a header as
+documenting an override it does not document, conflating which workflow's
+`if:` actually admitted the manual dispatch (round 4's finding).
+Knowing a distinction well enough to write the rule about it did not stop the
+same entry from breaking it while composing the evidence for it --- the
+sharper, self-referential form of "a rule is consulted at read time and
+broken at composition time" already stated in
+[`fully-clean.cases.md`](fully-clean.cases.md), `no-empty-promises.md`, and
+[`learn-from-review-findings.md`](learn-from-review-findings.md).
+
+- **Do:** read a case record's own account of a distinction as no more
+  reliable than any other claim, even when the entry's whole subject is that
+  distinction.
+- **Don't:** infer from an entry teaching a rule that its own prose already
+  follows the rule --- composing about a distinction is a separate act from
+  applying it.
+
+(A verified correction to how this occurrence first reached this file: an
+earlier account put it at five rounds and ten findings, with the fourth round
+described as deleting the wrong claim outright rather than replacing it with
+a narrower, checkable one.
+Re-derived from the branch's five commits and their messages rather than
+taken on report --- four rounds carried findings, not five, and the round
+that resolved the header claim substituted a claim about `redaction-gate`'s
+own `if:` for the wrong one rather than removing the sentence.)
+
 ## A correction added beside the flagged sentence, which survived
 
 (Morrison-Lab/gha#578, 2026-08-21, review round 2: a source comment overstated

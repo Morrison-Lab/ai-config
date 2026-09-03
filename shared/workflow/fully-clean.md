@@ -182,9 +182,25 @@ Worked-example case records for the rules below live in
    **Why the two surfaces disagree is unexplained, so do not assert a
    mechanism for it.**
 
+   **`commits/<sha>/status` reports the combined state of an EMPTY status set
+   as `pending`, not `success` or absence --- so a gate that tests the rollup
+   `state` alone reads every PR with no legacy commit statuses as not-clean,
+   which is most PRs in a repo that has none configured.**
+   The condition has to be on the members, not the rollup: `total_count == 0`
+   means no commit statuses exist, which is the ordinary case and not a
+   blocker, while `total_count > 0` with any member `pending` or `failure` is
+   genuinely not-clean --- name the offending `context` when it is.
+   The same `pending` state means opposite things depending on `total_count`
+   alone: `state: pending, total_count: 0, statuses: []` is silence, and
+   `state: pending, total_count: 1, jules/review -- "Jules is reviewing..."`
+   is a real in-flight reviewer.
+
    - **Do:** take the check-run half of criterion 1 from the paginated
      check-runs endpoint, and add `commits/<sha>/status` where the repo uses
      commit statuses, rather than treating either query as sufficient alone.
+   - **Do:** branch on `total_count`, not on the combined `state` alone, when
+     reading `commits/<sha>/status` --- an empty set reports `pending` and is
+     not a finding.
    - **Do:** report both counts when the endpoint and the rollup disagree, so
      the gap stays visible to whoever reads the status next.
    - **Do:** re-derive check state from that endpoint on the PR's current
@@ -199,6 +215,17 @@ Worked-example case records for the rules below live in
      --- [`ardi`](ardi.md)'s superseded-head case is a **red** wake inviting
      a needless fix, and this is its **green**-sounding mirror, inviting a
      needless merge.
+   - **Don't:** treat an empty `commits/<sha>/status` response's `pending`
+     state as a finding --- the check has to read `total_count`, not the
+     rollup, or the ordinary case (no commit statuses at all) reads as
+     blocking on every PR.
+
+   (Morrison-Lab/ai-config#3106, 2026-09-03: the issue's own suggested fix
+   proposed treating a `pending` combined state as not-clean, then a
+   follow-up comment on that same issue caught that the suggestion would
+   misfire on most PRs, an hour after it was written --- the rollup-versus-
+   population bug this section already warns about, reintroduced into the
+   proposed fix for it.)
 
    **A paginated sweep with an inconsistent page size silently skips items, and every response still reads as complete coverage.**
    `--paginate` above is the CLI answer;

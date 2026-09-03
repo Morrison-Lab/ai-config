@@ -393,15 +393,15 @@ FIRE-condition addition", so both parties held the evidence and neither drew the
 conclusion that the count needed a ref rather than a correction.
 The fix stated the ref and the flags and changed no number.)
 
-**A false MISSING while checking your own work is the same defect at a different moment, and the moment is what this adds.**
+**A false MISSING while checking your own work lands its duplicate where nobody looks, and that is what this adds.**
 [`memories/debugging.md`](../../memories/debugging.md)'s "An empty grep for one spelling is not evidence the concept is absent" already owns the mechanism and the consequence, in as many words: "'missing' leads you to *add* a second copy alongside the broken one, which is worse than the defect you started with".
 This fragment already delegates both of its mechanisms there, near the top.
 So read that first;
-what follows is only the part that section does not cover.
+one thing it leaves open is worth adding.
 
-That part is **when** the query runs.
-Every case there is a search that decides whether to author something.
-The same query also runs at the end, confirming that content survived a merge, that a fix landed, that a line is still there --- and the two differ in where the resulting duplicate lands.
+That part is **where the resulting duplicate lands**, and it is not the moment.
+The moment is already covered: that section's own worked cases are checking searches --- a README grepped "to check whether it linked the development docs", a citation "checked before citing it" and one step from being reported as dangling --- so verification is where it was written from, not a gap in it.
+What it does not say is where the second copy ends up, or who reads that.
 An authoring-time duplicate arrives as a new block in an ordinary diff, which is what review looks at.
 A verification-time re-add arrives inside a merge commit, which is the artifact least likely to be read line by line afterwards.
 So the more careful the surrounding process, the worse this gets: a merge verified string by string is exactly where a mistyped pattern turns into a silent duplication.

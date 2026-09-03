@@ -811,44 +811,6 @@ That is the same-reviewer clean the rule asks for, and it is a real re-review ra
 
 (Measured 2026-09-01 on UCD-SERG/serocalculator#668: the relayed round on `065adf0` read as `d-morrison=not-clean` two CLEAN bot verdicts later, and a fresh Sonnet adversarial review of `2aa82df`, posted with its verdict, was what flipped the instrument to exit 0.)
 
-## Ask the reviewer plainly whether the work earns its place
-
-The sections above brief the reviewer to find defects in a change.
-This one asks a question they do not: **should this exist at all?**
-
-Nothing in an ordinary round poses it.
-A reviewer handed a diff reports what is wrong with the diff, so each round
-returns a fix, the fix lands, and the next round finds the next thing --- a
-loop that converges on a polished version of something that may never have
-been worth building.
-The author cannot break that loop, because by round three the sunk effort is
-exactly what makes dropping feel like waste.
-
-So put the question to the reviewer directly, in its own sentence: say
-plainly whether this mechanism earns its place, ship or drop.
-Then honour the answer.
-A drop verdict is the cheapest finding available --- it retires the remaining
-rounds along with the work --- and defending the change against it converts a
-finished decision back into an open one.
-
-- **Do:** ask for a ship-or-drop judgement outright when a mechanism has taken
-  more than a round or two of polishing.
-- **Do:** drop on a drop verdict, and say in the report that the reviewer's
-  judgement is why.
-- **Don't:** answer a drop verdict with the case for the change --- that is
-  the rationale this fragment already rules out of a brief, arriving late.
-- **Don't:** read successive rounds finding smaller things as evidence the
-  work is converging; it is equally consistent with polishing something
-  unjustified.
-
-(Measured 2026-09-01, on a hook that had been a no-op three different ways
-across three rounds.
-Asked plainly, the reviewer said drop; dropping was right and ended the loop.
-The companion half of that session --- concluding a silent subagent had
-stalled when it was alive and twelve rounds ahead --- is recorded in
-[`git-worktrees`](../../memories/git-worktrees.md), "A quiet worktree is not
-evidence the session working it has stopped".)
-
 ## A reviewer handed nothing returns clean, so the brief must make an empty input an error
 
 `git diff origin/<default-branch>...HEAD` reads the **commit graph**.
@@ -887,3 +849,41 @@ Different surfaces, one shape, and neither announced itself.
 - **Do:** read a clean verdict as a claim about a population, and ask what that population was.
 - **Don't:** dispatch against a working tree and read the result as covering it.
 - **Don't:** treat a clean result from any instrument as evidence until you know it examined something.
+
+## Ask the reviewer plainly whether the work earns its place
+
+The sections above brief the reviewer to find defects in a change.
+This one asks a question they do not: **should this exist at all?**
+
+Nothing in an ordinary round poses it.
+A reviewer handed a diff reports what is wrong with the diff, so each round
+returns a fix, the fix lands, and the next round finds the next thing --- a
+loop that converges on a polished version of something that may never have
+been worth building.
+The author cannot break that loop, because by round three the sunk effort is
+exactly what makes dropping feel like waste.
+
+So put the question to the reviewer directly, in its own sentence: say
+plainly whether this mechanism earns its place, ship or drop.
+Then honour the answer.
+A drop verdict is the cheapest finding available --- it retires the remaining
+rounds along with the work --- and defending the change against it converts a
+finished decision back into an open one.
+
+- **Do:** ask for a ship-or-drop judgement outright when a mechanism has taken
+  more than a round or two of polishing.
+- **Do:** drop on a drop verdict, and say in the report that the reviewer's
+  judgement is why.
+- **Don't:** answer a drop verdict with the case for the change --- that is
+  the rationale this fragment already rules out of a brief, arriving late.
+- **Don't:** read successive rounds finding smaller things as evidence the
+  work is converging; it is equally consistent with polishing something
+  unjustified.
+
+(Measured 2026-09-01, on a hook that had been a no-op three different ways
+across three rounds.
+Asked plainly, the reviewer said drop; dropping was right and ended the loop.
+The companion half of that session --- concluding a silent subagent had
+stalled when it was alive and twelve rounds ahead --- is recorded in
+[`git-worktrees`](../../memories/git-worktrees.md), "A quiet worktree is not
+evidence the session working it has stopped".)

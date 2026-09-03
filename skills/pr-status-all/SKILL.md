@@ -78,7 +78,7 @@ Fill in `<N>`, `<headRefName>`, `<isDraft>`, `<owner>`, `<repo>` for each PR (re
 >      --jq '{
 >        author: .author.login,
 >        reviewRequests: [.reviewRequests[].login],
->        review: ([.comments[] | select(.author.login | startswith("claude"))] | last | {url: .url, body: .body, createdAt: .createdAt}),
+>        review: ([.comments[] | select((.author.login // "") | startswith("claude"))] | last | {url: .url, body: .body, createdAt: .createdAt}),
 >        lastCommitDate: (.commits[-1].committedDate),
 >        headRefOid: .headRefOid
 >      }'

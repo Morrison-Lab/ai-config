@@ -411,10 +411,9 @@ pushing branch A afterward compares its shipped commit `X` against the held `Y`,
 **The harness appends an `agentId:` trailer to a subagent's report, sometimes as its own block and sometimes concatenated onto the last line.**
 Which of those is common is the question this section could not settle, and an earlier draft asserted an answer to it by generalizing from the two dispatches it happened to watch.
 
-Measured 2026-09-02 over 565 session transcripts matching `~/.claude/projects/*/*.jsonl`.
-That glob is the flat session files only;
-a recursive walk of the same tree also reaches each session's `subagents/*.jsonl` and roughly doubles the population.
-The glob is stated because a fragment arguing "measured rather than assumed" should say what it measured:
+Measured 2026-09-02 over 565 stored session-transcript JSONL files, matched by a flat per-session glob.
+A recursive walk of the same tree also reaches each session's nested subagent transcripts and roughly doubles the population.
+The scope is stated because a fragment arguing "measured rather than assumed" should say what it measured:
 
 ```
 trailer as its own content block : 334
@@ -427,14 +426,14 @@ The concatenated form is known to exist.
 It was seen directly, twice, within one session --- and the captured line is this:
 
 ```
---- end of report ---agentId: ae8726223279fc9e8 (use SendMessage with to: '...')
+--- end of report ---agentId: <id> (use SendMessage with to: '...')
 ```
 
 **Note what that exhibit is: the trailer landing on a sentinel line, which is the safe case**, and the one this section goes on to prescribe.
 No capture exists of the shape the hazard is actually about, which would be a fingerprint line with the trailer glued to it:
 
 ```
-Reviewed-Commit: <sha>agentId: ae8726223279fc9e8 (use SendMessage with to: '...')
+Reviewed-Commit: <sha>agentId: <id> (use SendMessage with to: '...')
 ```
 
 That second block is constructed to show the shape, not captured.
@@ -455,9 +454,13 @@ Under the first two the zero is uninformative, and reading it as confirmation wo
 So the two counts carry different weight.
 The **334** establishes that the own-block form is common **in stored transcripts**, which is a lower bound rather than a ratio.
 The **0** settles nothing on its own, since which of the three explanations holds decides whether it is evidence or an artifact.
-Whoever next touches this section should settle that first: it is one grep of a stored transcript for a `Reviewed-Commit:` line with a non-hex suffix, and it decides whether the rest of this section describes a live hazard or a rendering quirk.
+Whoever next touches this section should settle that first, and the query has to be chosen carefully, because the obvious one cannot decide it.
+Grepping a stored transcript for a `Reviewed-Commit:` line with a non-hex suffix returns nothing under **all three** explanations --- a conforming report never puts the fingerprint last, so nothing can be glued to it --- and it would not have fired on the sighted report either, whose trailer landed on the sentinel line rather than on a fingerprint.
+The discriminating query is the sweep's own: does `agentId:` ever appear in stored content **preceded by other text on the same line**?
+Only a hit settles anything.
+Another zero is the same uninformative zero, so do not read one as evidence for the rendering-quirk explanation.
 
-In the prevailing shape the trailer is a separate content block, and `_result_text` joins blocks with a newline, so the fingerprint line is untouched and nothing below arises at all.
+In the own-block shape the trailer is a separate content block, and `_result_text` joins blocks with a newline, so the fingerprint line is untouched and nothing below arises at all.
 
 **Two conditions have to hold together before any of this can bite, and a conforming report fails the second.**
 The trailer must concatenate rather than arrive as its own block, AND the fingerprint must be the report's last line.
@@ -503,7 +506,7 @@ The concatenation has been observed on Claude Code's `Agent` tool and nowhere el
 And the **reordering** is what sits in tension with [`.claude/agents/adversarial-reviewer.md`](../../.claude/agents/adversarial-reviewer.md)'s own instruction to emit nothing after the JSON payload's closing `-->`.
 The sentinel is not the source of that tension and does not add to it: a brief that puts the verdict and the fingerprint after the payload has already overridden the emit-nothing instruction, and the sentinel then joins a tail that exists either way.
 The ordering the guard parsed successfully was that reordered one --- which is a statement about the guard, not an endorsement, since the same ordering fails this file's payload-last contract.
-That decision is #3050's, named above, rather than something to settle inside a review brief.
+Which of the two orderings a brief should mandate is #3050's decision, as named above, rather than something to settle inside a review brief.
 It is adjacent to [#2483](https://github.com/Morrison-Lab/ai-config/issues/2483) and not the same item: that issue is about verdicts arriving via background task notifications going unregistered.
 
 - **Do:** state the fingerprint as the **full 40-character** sha, which is what actually protects it.

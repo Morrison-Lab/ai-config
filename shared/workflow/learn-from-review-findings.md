@@ -292,26 +292,26 @@ An unclear finding gets a careful fix precisely because the confusion forces a p
 
 Measured while drafting [#3101](https://github.com/Morrison-Lab/ai-config/pull/3101).
 Four such fixes, each resting on a diagnosis that was correct.
-Two of them were caught before their commit and so leave no trace in that PR's history, which is why they are described rather than cited:
+The first two were caught before their commit, so nothing in that PR's history records them and they are described rather than cited:
 
 - Adding `2>/dev/null` to a timing loop fixed stderr interleaving and silenced the only remaining failure signal, so a nonexistent command reported a plausible fast spread (`0.007 / 0.003 / 0.003`).
 - Moving a hard-to-time probe in-process fixed a misattribution and made the guard hang rather than fail.
-- Narrowing a regex branch to option tokens only fixed a false positive and silently dropped `git clean -fdx <root>`, a real destructive form the previous draft caught.
-- Adding a not-exhaustive note to a catalog document fixed an underived count claim and severed the document's own purpose statement onto the wrong sentence, where the next round had to restore it.
+- Narrowing a regex branch to option tokens only fixed a false positive and silently dropped `git clean -fdx <root>`, a real destructive form the previous draft caught --- the surviving comment in `hooks/flag-config-deletion-without-ref-check.py` records it.
+- Adding a not-exhaustive note to a catalog document fixed an underived count claim and severed the document's own purpose statement onto the wrong sentence (`eca210dbf`), which the next round had to restore (`d8c88486f`).
 
 Read the list by column rather than by row.
 Each fix did what it was for;
 each also broke something the finding it answered never mentioned --- a hidden failure signal, a stranded purpose statement, a dropped destructive form, a hang in place of a failure.
-Two questions would have caught all four, and neither is the one the finding asks.
-So ask them explicitly once the edit is written: what does this fix now hide, and what does it now let through?
-Then probe that specific question before reporting the fix, rather than probing the finding again.
+Three questions cover those four, and none of the three is the question the finding asks.
+So ask them explicitly once the edit is written: what does this fix now hide, what does it now let through, and how can it now fail in a way it could not before?
+Then probe whichever one the edit exposes, before reporting the fix, rather than probing the finding again.
 
 **Re-running the original failing case is the probe this list does not otherwise ask for.**
 The far-side case the coverage rule above prescribes catches what a narrowing excluded.
 It says nothing about whether the fix still does its own job, and a fix that hides a signal can pass a far-side case while quietly failing the case that prompted it.
 The `2>/dev/null` fix is the cheapest illustration: it silenced the very failure it was added to tidy, so the original probe was the only one that could have caught it, and it was the one probe nobody thought to repeat.
 
-- **Do:** ask what a fix now hides and what it now admits, and probe that question before reporting the fix.
+- **Do:** ask what a fix now hides, what it now admits, and how it can now fail, and probe whichever of those the edit exposes before reporting the fix.
 - **Do:** re-run the original failing case after a fix, alongside the far-side case, so the fix is shown still to do its own job.
 - **Do:** ask which single change is sufficient for a finding, and ship only that one.
 - **Do:** write at least one case on the far side of any restriction you add, varying the axis the restriction acts on.

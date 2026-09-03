@@ -373,10 +373,11 @@ is wanted but is a whole rework.
   file the structural rework as its own issue in the same round.
 - **Do:** write a limits section naming the residual cases in both directions
   --- what still fires wrongly, and what still slips through.
-- **Don't:** adjust a lexical pattern a further time once its revisions have
-  each traded one boundary case for another;
+- **Don't:** adjust a lexical pattern a further time once its revisions keep
+  leaving a neighbouring boundary case open;
   a pattern with no argument positions cannot converge on a question about
-  argument positions.
+  argument positions, however few of its revisions traded one case for
+  another.
 - **Don't:** let a comment assert a guarantee the code only approximates.
 - **Don't:** narrow the overclaim and stop where the instrument is still wanted
   --- without the filed issue that is the softening `algorithmatize-checks`

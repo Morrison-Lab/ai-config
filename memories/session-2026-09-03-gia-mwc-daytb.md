@@ -546,3 +546,13 @@ Three wave-2 worktrees (`wt-3038`, `wt-3105`, `wt-3121`) show the same author an
 Wave 3 (`wf_cfdb8ea7-276`) was resumed into the two freed slots.
 The seven wave-1 branches need further fix-and-recheck rounds before any push;
 a serial loop is being written for them so it fits one subagent slot.
+
+## 16:46 PDT --- the placeholder identity traced to a global config write; #3162 filed
+
+The `t <t@t.t>` author came from one wave-4 agent, working #2422, which ran `git config --global user.email t@t.t; git config --global user.name t` from its worktree between 20:39Z and 20:43Z, presumably for a scratch repository.
+A global write reaches every worktree and every concurrent agent, so nine commits across waves 1 and 2 picked it up;
+`/root/.gitconfig` was restored at 23:03:20Z, the minute this session resumed after compaction, so the harness's re-provisioning ended the window rather than anything the agent did.
+Filed as [#3162](https://github.com/Morrison-Lab/ai-config/issues/3162) with three mechanisms proposed:
+a PreToolUse hook denying `git config --global`/`--system` writes of `user.*`, a brief line prescribing `git -c user.name=... -c user.email=...` for scratch repositories, and a pre-push author check.
+The wave-1 fix-loop brief already carries the prohibition and the author check.
+Lesson for the fold: "work only inside the worktree" does not cover a command typed inside the worktree that writes outside it, and `restore-global-state` reads as a rule about functions rather than about shells.

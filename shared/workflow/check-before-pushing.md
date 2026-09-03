@@ -26,6 +26,16 @@ The immediacy rule is what makes them rarely needed.
 A `git fetch` from earlier in the session is a reading of the remote *at that moment*, and it stopped being evidence the instant somebody else pushed.
 This is the same expiry [`CLAUDE.md`](../../CLAUDE.md)'s timestamp rule states for the clock, and it goes wrong the same way: having genuinely checked earlier is what licenses not checking now, because the memory of having consulted the remote obscures that the reading has lapsed.
 
+**A staleness reading licenses the action that immediately follows it, not a plan formed on its strength.**
+The rule above is usually read as being about *when* you check --- immediately before the push rather than earlier.
+It is really about what a measurement is *for*: a reading is evidence about the instant it was taken, and a decision made from it inherits that instant's timestamp, not the timestamp of whenever the decision gets carried out.
+"No session has touched these branches in seven hours" can be true, checked, and still be false by the time the push it justified actually runs, because deciding and acting are two different moments and only one of them was measured.
+The gap does not have to be long --- minutes are enough for a peer session to wake, push, and resolve the very thread the plan was about to push a fix for.
+
+- **Do:** treat a staleness or liveness reading as authorizing the next action taken on its strength, not a plan to act later.
+- **Do:** re-derive the reading immediately before executing a decision that was formed on an earlier one, exactly as before a bare push.
+- **Don't:** read "I checked this before deciding" as having checked it before acting, when the two are separated by any real gap.
+
 `git ls-remote` is the reading to take, not `git fetch`:
 
 ```bash

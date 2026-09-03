@@ -1278,6 +1278,61 @@ unrelated ternary that told every such run it had been triggered by a mention
 that did not exist.
 Three defects, one shape, one direction named.)
 
+## A rule's example is read as its scope, not as one instance of it
+
+The section above is a rule that named one *direction* and got read as
+covering every direction.
+This is the sibling failure, over a rule that named one *instance* and got
+read as bounded to that instance's incidental attribute --- a property the
+example happened to carry, which the rule's own mechanism never depended on.
+
+A rule stated as "a human's `CHANGES_REQUESTED` can be invisible to a
+comments-only scan" is really about two things that have nothing to do with
+being human: a **formal review** (an API surface separate from issue
+comments) whose finding lives in the **body or an inline comment** rather
+than as an unresolved thread.
+`CHANGES_REQUESTED` and "human" are the example's incidental attributes ---
+true of the case that prompted the rule, no part of why the blind spot
+exists.
+A bot's `COMMENTED` review with the same shape (a real finding, no open
+thread) is exactly the case the rule already covers, worded in a way that
+reads as excluding it.
+
+The tell is the same shape [`challenge-ambiguous-terminology`](challenge-ambiguous-terminology.md)
+names for a term whose meaning is unresolved, aimed at a rule instead of a
+word: read the rule's own justification, not its example, and ask which
+words in the example the justification actually depends on.
+Here the justification is "a finding can live outside the thread population
+entirely" --- nothing about *who* posted it or *what state* the review
+carries is load-bearing to that sentence, so neither belongs in the rule's
+effective scope even though both appear in its wording.
+
+- **Do:** before applying a rule illustrated by one example, name which of the
+  example's attributes the rule's own justification actually depends on, and
+  apply it to every case sharing those, not only to cases matching the
+  example verbatim.
+- **Do:** widen a rule's *wording* once an excluded case is found to fit its
+  justification, the same remedy the section above prescribes for a
+  direction --- don't just handle the one instance and leave the next reader
+  to re-derive the same gap.
+- **Don't:** read a rule narrower than its own reasoning because the example
+  that motivated it happened to carry a more specific attribute.
+
+(Morrison-Lab/ai-config#3084, 2026-09-03: a session had `CLAUDE.md`'s
+formal-review-checking section loaded in context --- worded around "a
+human's `CHANGES_REQUESTED`" --- while reading a Copilot review whose state
+was `COMMENTED`.
+The rule was not applied, on the reading that it named a human reviewer and
+a different state.
+Its own justification (a formal review's finding can live outside the
+thread population) covered the bot review exactly, and did not name either
+excluded attribute.
+The source rule is this repo's own [`CLAUDE.md`](../../CLAUDE.md), so the fix
+belongs here: filed as
+[`ai-config#3121`](https://github.com/Morrison-Lab/ai-config/issues/3121),
+with [`ucdavis/bcs#901`](https://github.com/ucdavis/bcs/issues/901) covering
+that repo's copy of the same wording.)
+
 ## A story that fits the evidence is not a finding
 
 The section above governs a cause read off the wrong artifact.

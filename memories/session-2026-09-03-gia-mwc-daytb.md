@@ -382,7 +382,7 @@ Claims posted on all seven issues at 12:20 PDT.
 The two unpushed branches, `fix/ums-step3-corpus-scope` (#3123) and `fix/2465-rollup-cause` (Refs #2465), wait on an adversarial verdict.
 Push both branches once that verdict lands.
 
-## 12:35 PDT --- two corrections to earlier entries, and a corrected belief
+## 12:38 PDT --- two corrections to earlier entries, and a corrected belief
 
 **#3084 merged, and the 02:06 entry never said so.**
 That entry's last word on #3084 was that it waits on a gate no reachable reviewer can satisfy.

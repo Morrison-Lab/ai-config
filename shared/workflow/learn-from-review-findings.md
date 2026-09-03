@@ -301,17 +301,18 @@ The first two were caught before their commit, so nothing in that PR's history r
 
 Read the list by column rather than by row.
 Each fix did what it was for;
-each also broke something the finding it answered never mentioned --- a hidden failure signal, a stranded purpose statement, a dropped destructive form, a hang in place of a failure.
-Three questions cover those four, and none of the three is the question the finding asks.
-So ask them explicitly once the edit is written: what does this fix now hide, what does it now let through, and how can it now fail in a way it could not before?
-Then probe whichever one the edit exposes, before reporting the fix, rather than probing the finding again.
+each also broke something the finding it answered never mentioned --- a hidden failure signal, a hang in place of a failure, a dropped destructive form, a false claim stranded in prose the edit was only passing through.
+What those four share is not a category.
+It is that none of them is about the finding, and the finding is the only thing the edit was checked against.
+So ask the general question explicitly once the edit is written --- what does this change do outside the finding it answers? --- and then whichever specific ones it suggests: what does it now hide, what does it now let through, how can it now fail, what did it alter in text it merely passed through.
+Probe those before reporting the fix, rather than probing the finding again.
 
 **Re-running the original failing case is the probe this list does not otherwise ask for.**
 The far-side case the coverage rule above prescribes catches what a narrowing excluded.
 It says nothing about whether the fix still does its own job, and a fix that hides a signal can pass a far-side case while quietly failing the case that prompted it.
 The `2>/dev/null` fix is the cheapest illustration: it silenced the very failure it was added to tidy, so the original probe was the only one that could have caught it, and it was the one probe nobody thought to repeat.
 
-- **Do:** ask what a fix now hides, what it now admits, and how it can now fail, and probe whichever of those the edit exposes before reporting the fix.
+- **Do:** ask what a fix does outside the finding it answers --- what it now hides, admits, or can newly fail at, and what it altered in passing --- and probe that before reporting the fix.
 - **Do:** re-run the original failing case after a fix, alongside the far-side case, so the fix is shown still to do its own job.
 - **Do:** ask which single change is sufficient for a finding, and ship only that one.
 - **Do:** write at least one case on the far side of any restriction you add, varying the axis the restriction acts on.

@@ -1317,9 +1317,10 @@ Three shapes, measured in one session:
 - The same POST written as `... ; echo rc=$?` and as `... | head` moved it out
   of last-command position, so its exit status could no longer be attributed to
   it.
-  That is the shape `pr-on-claim` forbids, reached through output formatting
-  rather than through folding in a second query --- which is why the rule needs
-  stating in terms of formatting and not only in terms of chained verification.
+  That is the shape `pr-on-claim` forbids, and it forbids it in these terms
+  already: "the hook cannot tell a formatting pipe from a chained verification,
+  because the shell does not either".
+  What is new here is not the rule for that hook but its reach.
 
 They share one cause.
 The transformations differ --- `--jq`, `>/dev/null`, a trailing `echo`, a pipe

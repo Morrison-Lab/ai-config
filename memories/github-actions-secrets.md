@@ -226,16 +226,30 @@ the value belongs on stdin rather than in `argv`.
 
 ## Unusable credential secrets: whitespace from multi-line pastes or wrapped tokens
 
-GitHub Actions secrets passed in HTTP `Authorization` headers to the Anthropic API (like `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`) must not contain whitespace.
-A pasted multi-line block (a PEM key, a JSON credential file, or a wrapped terminal copy) introduces spaces or newlines that cause HTTP clients to reject the header before making the request.
+A GitHub Actions secret passed in an HTTP `Authorization` header to the Anthropic API (`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`) must carry no INTERIOR whitespace.
+A pasted multi-line block (a PEM key, a JSON credential file, or a wrapped terminal copy) introduces spaces or newlines mid-value, and an HTTP client rejects such a header before making the request.
 
-`Morrison-Lab/gha` (`check-credential-shape`, gha#686) runs a pre-flight credential shape check that detects internal whitespace in configured review secrets.
-When every configured secret contains whitespace, the step exits 0 without calling the API (spending zero tokens) and posts a `[!CAUTION]` comment indicating that the configured API credential is unusable.
-The downstream `require-review` gate then fails red.
+The interior qualifier is the whole of the rule rather than a detail.
+A trailing newline is explicitly tolerated, because `gh secret set < file` produces one routinely and consumers may be running on it successfully today --- so rejecting it would turn a hardening change into an outage.
+The check trims the value's ends and flags only whitespace that survives.
 
-Because this is a repository configuration defect rather than an intermittent flake or diff error, re-running the workflow fails identically until the secret is repaired.
-A repository admin fixes it under **Settings -> Secrets and variables -> Actions** by re-setting the secret to a single-line token with no spaces or line breaks (e.g. copied from `claude setup-token`).
+`Morrison-Lab/gha` (`check-credential-shape`, gha#686) runs that pre-flight check before the review spends anything.
+Three separate places act on its result, which is worth stating because none of them does the other two's job:
 
-- **Do:** ensure API credential secrets are strictly single-line values without whitespace or trailing newlines when configuring them via web UI or `gh secret set`.
+- the pre-flight step itself exits 0, posts nothing, and only sets its `malformed`/`detail` outputs plus an annotation;
+- `claude-code-review.yml`'s "Resolve final review outcome" step reads `malformed` and exits 1, which is what reddens `require-review` --- a malformed credential is a configuration defect rather than an account condition, so it deliberately does NOT take the graceful-skip path a quota exhaustion takes;
+- the later `post-review` job posts the `[!CAUTION]` comment, keyed off the `failure_kind=bad-credential` that exit wrote.
+
+Looking for the failure at the pre-flight step therefore finds a step that succeeded.
+
+The verdict is "every configured credential is unusable", never "some credential is": which of the two secrets the action actually sends is its own precedence rule, so blocking while a well-formed alternative is configured would be a guess.
+The check also never repairs the value, since the observed case was different content entirely rather than a token with a stray newline.
+
+Because this is a repository configuration defect rather than an intermittent flake or a diff error, re-running the workflow fails identically until the secret is repaired.
+A repository admin fixes it under **Settings -> Secrets and variables -> Actions** by re-setting the secret to a single-line token (for example one copied from `claude setup-token`).
+
+- **Do:** set an API credential secret to a single-line token carrying no interior whitespace.
+- **Do:** read the failure at "Resolve final review outcome" and at the posted comment, not at the pre-flight step, which exits 0 either way.
+- **Don't:** strip a trailing newline expecting that to be the defect --- the check already trims it, and it is not what fires.
 - **Don't:** re-run a review job that failed the pre-flight credential shape check expecting it to pass --- repair the secret first.
 

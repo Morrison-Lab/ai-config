@@ -1391,7 +1391,16 @@ The loop uses the shell's **reserved word** `time` rather than `/usr/bin/time -f
 
 Three details in that one line, each measured rather than reasoned:
 
-- **Reserved word, not a builtin**, which is worth getting right because the misnomer invites the natural prefix form and that form fails the same way the binary did: `type -t time` reports `keyword`, `compgen -b` does not list it, and `TIMEFORMAT=%R time <cmd>` dies with `time: command not found`.
+- **Reserved word, not a builtin**, which is worth getting right because the misnomer invites the natural prefix form and that form does not do what it looks like:
+  `type -t time` reports `keyword` and `compgen -b` does not list it.
+  An assignment prefix **demotes** `time` from reserved word to an ordinary command word, so `TIMEFORMAT=%R time <cmd>` stops invoking the shell construct and looks `time` up on `PATH` instead.
+  What you then see depends on the machine, which is why the symptom alone is the wrong thing to record:
+  where no `time` binary is installed --- this corpus's own remote containers, as above --- it dies with `time: command not found`;
+  where GNU `time` is installed, as on a typical CI runner, that binary runs and ignores `TIMEFORMAT`, which it has never read.
+  The mechanism is the transferable half and the demotion is directly checkable:
+  put an executable named `time` on `PATH`, and the prefix form runs it while the bare form still prints `%R`.
+  Note what this rules out --- the reserved word does not "take precedence and merely fail to apply `TIMEFORMAT`";
+  a different program is running, which is why the variable goes unused.
 - **Parentheses rather than braces**, because a brace group is not a subshell and `TIMEFORMAT` would leak into the calling shell, silently reformatting every later `time` in that session.
   Measured: the brace form leaves `TIMEFORMAT=%R` set afterwards, the paren form leaves it unset.
 - **`2>&1` is load-bearing**, since `time` writes to stderr.

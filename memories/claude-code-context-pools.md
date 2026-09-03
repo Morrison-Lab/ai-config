@@ -95,12 +95,22 @@ This is the concrete form of the section's "demoting a fragment to on-demand" le
 
 ## A new skill can fail validate-skills.py on the listing budget alone (2026-09-03)
 
-`scripts/validate-skills.py` sums `name + description + 8` over every skill and errors past 9,000 chars.
-At 202 skills the pool sat within 60 chars of the cap, so adding `triage` with a 44-char description failed it even though the skill itself was valid.
-The over-budget line looks like `check-context-closure.py`'s advisory output and was misread as one.
-It is an error, and the review round caught it.
-The fix that fits is to trim the longest existing descriptions (the error names the top five), not the new one alone, and to keep each trimmed description accurate to the skill body (a second round caught "Detect and" dropped from `prune-dead-code`).
+`scripts/validate-skills.py` sums `name + description + 8` over every skill.
+It errors past 9,000 chars.
+At 202 skills the pool sat within 60 chars of the cap.
+Adding `triage` with a 44-char description therefore failed it,
+even though the skill itself was valid.
+The over-budget line looks like `check-context-closure.py`'s advisory output,
+and was misread as one.
+It is an error.
+The review round caught it.
+The fix that fits is to trim the longest existing descriptions,
+which the error names,
+rather than the new one alone.
+Each trimmed description must stay accurate to the skill body:
+a second round caught "Detect and" dropped from `prune-dead-code`.
 
 - **Do:** run `validate-skills.py` and read its exit status before dispatching review when adding a skill.
 - **Do:** trim the longest descriptions the error names, not only the new one.
-- **Don't:** read the over-budget line as advisory, or shorten a description past what the skill body says it does.
+- **Don't:** read the over-budget line as advisory.
+- **Don't:** shorten a description past what the skill body says it does.

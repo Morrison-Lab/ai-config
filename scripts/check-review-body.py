@@ -138,6 +138,20 @@ def analyse(body, mod):
     # body before posting it, where assuming bot privileges you may not have is
     # the direction that misleads.
     #
+    # The identity conjunct diverges the OTHER way, and saying so is the point
+    # of this paragraph. The checker's clean branch is a three-way conjunction
+    # of structure AND `_reviewer_identity(body, login) == login`. A structured
+    # clean body whose first or last line carries a review-agent marker, posted
+    # under a non-OWNER/MEMBER login, resolves its identity to the AGENT rather
+    # than the poster -- so it reads CLEAN here and is DROPPED there.
+    # `_reviewer_identity`'s own docstring names the shape: CLI agents like
+    # Codex and OpenCode append their marker on the last line. A CLEAN answer
+    # from this tool is therefore not a guarantee of admission.
+    #
+    # Both halves are stated because an earlier version gave the conservative
+    # divergence its consequence and left the unsafe one implicit -- in the one
+    # paragraph whose job is to make the next gap findable.
+    #
     # Three gates were re-derived across three rounds before this list existed
     # -- `has_review_body_marker` (not in the admission path at all), the
     # missing `unreadable` state, and the ARD skip. Naming the boundary is what

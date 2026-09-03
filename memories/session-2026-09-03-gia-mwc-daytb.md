@@ -382,23 +382,23 @@ Claims posted on all seven issues at 12:20 PDT.
 The two unpushed branches, `fix/ums-step3-corpus-scope` (#3123) and `fix/2465-rollup-cause` (Refs #2465), wait on an adversarial verdict.
 Push both branches once that verdict lands.
 
-## 12:38 PDT --- two corrections to earlier entries, and a corrected belief
+## 12:38 PDT --- a correction to an earlier entry, and a corrected belief
 
-**#3084 merged, and the 02:06 entry never said so.**
-That entry's last word on #3084 was that it waits on a gate no reachable reviewer can satisfy.
-It merged at 2026-09-03T16:25:36Z under the shared login, before three of this branch's commits, and got the same never-revisited treatment the 01:28 entry records for #3089.
+**#3084 merged, and no entry since recorded it.**
+The merge-gate section's last word on #3084 was that it waits on a gate no reachable reviewer can satisfy.
+It merged at 2026-09-03T16:25:36Z under the shared login, before six of this branch's commits, and got the same never-revisited treatment the 01:28 entry records for #3089.
 Whether the cross-model gate was satisfied for that merge is not derived here.
 The fix it merged without is tracked as #3109, closed by #3115.
 
 **A corrected belief, recorded at the correction.**
 Belief: a squash-merging repo's three-dot diff excludes a merge commit's content, so a re-add made while resolving a merge is invisible to review.
 Fact: `git diff main...feature` is a merge-base-to-tip tree diff and lists the re-add as an added line.
-What omits the merge patch is `git log -p`, unless given `-m` or `--diff-merges`.
+What omits the merge patch is `git log -p`, unless given `-m` or `--diff-merges=on`.
 The query that settles it, run 2026-09-03 on git 2.43.0 in a scratch repo whose merge resolution re-added a paragraph:
 `git diff main...feature | grep '^+SHARED'` printed the line,
 `git log -p main..feature | grep -c '^+SHARED'` printed 0,
 and the same `git log` with `-m` printed 2.
 The false version had been written into `fix/ums-step3-corpus-scope`.
-The round-one adversarial verdict on the two held branches caught it, alongside five other findings: an n=2 "most", a bare `#605` resolving to the wrong repository, a bullet list coalescing with its host section's list, and a case record asserting an underived cause inside the subsection that forbids exactly that.
+The round-one adversarial verdict on the two held branches caught it, alongside five other findings: a headline universal resting on that mechanism sentence, an n=2 "most", a bare `#605` resolving to the wrong repository, a bullet list coalescing with its host section's list, and a case record asserting an underived cause inside the subsection that forbids exactly that.
 All six are fixed on the two branches, and a round-two verdict is running.
 Wants promotion to `memories/git.md` when this notebook is folded.

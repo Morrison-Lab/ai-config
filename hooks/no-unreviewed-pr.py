@@ -1857,7 +1857,7 @@ def scan(path):
                     # the discharge reads is that chain's combined status and
                     # cannot be attributed to the request. Whether it ran at
                     # all is unknown here -- an earlier failure in a `&&`
-                    # chain short-circuits it away. That is
+                    # chain short-circuits it away. That
                     # is indistinguishable, from inside the turn, from a request
                     # that failed -- the POST returns 200, the reviewer may even
                     # review -- and the block message otherwise names only

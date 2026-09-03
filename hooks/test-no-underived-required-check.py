@@ -408,17 +408,29 @@ class Crashes:
     from the two ways a crash means NOTHING was measured:
 
       * the reversion broke the module at import (a deleted block header, a
-        truncated expression), which raises `MutantLoadFailed`, never this; and
+        truncated expression), which is reported as `MutantLoadFailed` and can
+        never satisfy this declaration; and
       * the reversion raised something OTHER than the guard was preventing,
         which the declared `exc_type` rejects.
 
-    Declaring `Crashes(IndexError)` therefore asserts a specific call-time
-    failure, not merely that something went wrong. A clause declaring it that
-    does not crash is reported WRONG, so the guard cannot quietly stop
-    guarding.
+    Declaring `Crashes(IndexError, {"S12"})` therefore asserts a specific
+    call-time failure on specific cases, not merely that something went wrong.
+    A clause declaring it that does not crash is reported WRONG, so the guard
+    cannot quietly stop guarding.
     """
 
     def __init__(self, exc_type, cases):
+        # `Exception` would accept ANY call-time failure -- a `NameError` from
+        # a reversion that imports fine but is broken included -- which is the
+        # same "a crash means nothing was measured" confusion one level up.
+        if exc_type in (Exception, BaseException):
+            raise ValueError(
+                "Crashes needs a specific exception type; Exception and "
+                "BaseException accept any failure and assert nothing")
+        if not cases:
+            raise ValueError(
+                "Crashes needs the cases it must raise on; an empty set "
+                "asserts nothing")
         self.exc_type = exc_type
         self.cases = frozenset(cases)
 
@@ -786,6 +798,12 @@ mutation_wrong = 0
 # `os.path.dirname(__file__)`, so a mutant anywhere else -- including a
 # subdirectory -- cannot resolve it and dies on import.
 for clause, (statement, edits, expected_flips) in MUTATIONS.items():
+    if not isinstance(expected_flips, Crashes) and not expected_flips:
+        sys.exit(f"FATAL: clause {clause} declares an empty flip set, which "
+                 "`flipped == expected_flips` satisfies trivially -- it would "
+                 "report ok while measuring nothing. Give it a case that "
+                 "isolates the clause, or delete the clause as unreachable.")
+
     mutated = SOURCE
     for find, replace in edits:
         if mutated.count(find) != 1:
@@ -796,17 +814,20 @@ for clause, (statement, edits, expected_flips) in MUTATIONS.items():
         mutated = mutated.replace(find, replace)
 
     try:
-        mutant = load_module(mutated, clause)
-    except Exception as exc:
+        try:
+            mutant = load_module(mutated, clause)
+        except Exception as exc:
+            raise MutantLoadFailed(f"{type(exc).__name__}: {exc}") from exc
+    except MutantLoadFailed as exc:
         # A reversion that leaves the module unable to COMPILE or import
         # measured nothing, whatever the clause declared -- most often a
         # deleted block header orphaning its body. Never satisfies a
         # `Crashes(...)` declaration.
         mutation_wrong += 1
         print(f"  WRONG {clause:<22} {statement}\n"
-              f"         MUTANT FAILED TO LOAD ({type(exc).__name__}: {exc})"
-              " -- the reversion broke the module rather than its behaviour;"
-              " substitute the clause instead of deleting it")
+              f"         MUTANT FAILED TO LOAD ({exc}) -- the reversion broke"
+              " the module rather than its behaviour; substitute the clause"
+              " instead of deleting it")
         continue
 
     # Every case is evaluated individually. A set comprehension would abort on
@@ -824,6 +845,12 @@ for clause, (statement, edits, expected_flips) in MUTATIONS.items():
         wrong_type = {cid: e for cid, e in crashes.items()
                       if not isinstance(e, expected_flips.exc_type)}
         want = expected_flips.exc_type.__name__
+        # `ok` is set per branch rather than recovered from the note. An
+        # earlier draft tested `note.startswith("raised ")`, so rewording any
+        # failure message would have silently turned WRONG into ok -- deriving
+        # a verdict from prose, in a harness whose whole subject is a pass
+        # that measures nothing.
+        ok = False
         if not crashes:
             note = (f"declared {want} but nothing crashed; the guard it "
                     "reverts no longer prevents one")
@@ -837,7 +864,7 @@ for clause, (statement, edits, expected_flips) in MUTATIONS.items():
             note = f"also flipped {sorted(flipped)}, expected no flips"
         else:
             note = f"raised {want} on {sorted(crashes)}, as declared"
-        ok = note.startswith("raised ")
+            ok = True
         mutation_wrong += not ok
         print(f"  {'ok  ' if ok else 'WRONG'} {clause:<22} {statement}\n"
               f"         {note}")
@@ -849,7 +876,7 @@ for clause, (statement, edits, expected_flips) in MUTATIONS.items():
                         for cid, e in sorted(crashes.items()))
         print(f"  WRONG {clause:<22} {statement}\n"
               f"         MUTANT CRASHED on {got} -- undeclared; if the guard "
-              "prevents a crash, declare Crashes(<ExcType>, {{...}})")
+              "prevents a crash, declare Crashes(<ExcType>, {...})")
         continue
     ok = flipped == expected_flips
     mutation_wrong += not ok

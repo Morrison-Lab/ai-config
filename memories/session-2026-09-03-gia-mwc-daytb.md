@@ -196,3 +196,49 @@ So the three sites now name `docs/subagent-report-trailer` and `claude/ums-load-
 Worth recording as its own small pattern: a rule written and applied in the same commit is exactly where the application gets checked least, because writing the rule *feels* like the work.
 The reviewer that catches it is reading the two as one artifact, which the author cannot.
 
+
+## Phase 1 outcome, and the one pattern the whole night was about
+
+Merged: #3024, #3093.
+Driven to clean and pushed: #3084 (`23933b1b`), #3060 (`c851d68f`).
+Left to the concurrent peer: #3023, #3089.
+Filed: #3098.
+Annotated out-of-diff: #3050 (carries a claim #3084 retracted), #3083 (a second symptom of the stop hook), #3089 (a fifth occurrence of the false-clean its bump fixes).
+
+Findings per round, which is the number worth keeping:
+
+| PR | rounds | findings |
+|---|---|---|
+| #3084 | 6 | 1, 5, 7, 3, 2, **0** |
+| #3060 | 5 | 11, 7, 2, 3, **0** |
+| #3093 | 3 | 3, 2, **0** |
+
+**Every one of those was caught before the remote saw it**, because `no-push-without-self-review` held each branch until its head had a clean verdict.
+The stop hook spent that whole hour telling me to push.
+
+### The pattern, stated once
+
+Nearly every substantive finding this session was one shape: **an instrument reported an absence, and the absence was read as a fact about the world rather than about the instrument's reach.**
+Seven instances, in the order they arrived:
+
+1. A merge-conflict matrix of zero, which needed a purpose-built positive control to distinguish from a detector that never ran.
+2. A corpus sweep returning zero concatenated trailers, read as confirming its conclusion while a known-real instance sat outside its population.
+3. My correction to (2), which called it a *failed* positive control --- also wrong, because the sighting was an in-context render and the sweep read stored JSONL.
+   Different artifacts.
+4. A line-break checker reporting clean over eight real violations, because the tree was dirty and it takes line numbers from the commit and content from the tree.
+5. A prescribed verification query that returned null under every explanation it was offered to distinguish.
+6. My fix to (5), which re-aimed *the same matcher* --- and the first explanation is precisely that this matcher is blind.
+7. A CI negative control reporting that it could not discriminate, because load compressed the ratio it measures.
+
+The recurring sub-shape is (3) and (6): **the repair reproduces the defect.**
+When the fault is "this instrument cannot see what you are asking it", the natural repair re-aims the same instrument, which changes the target and not the blindness.
+Knowing the general principle did not prevent any of these.
+In (4) I had read the rule, quoted it earlier the same hour, and broke it twice within twenty minutes.
+
+What did work, every time, was an outside reader with the artifact in hand.
+
+### Two rules the reviews produced, already merged in #3093
+
+- A SHA that resolves only in the authoring container is worse than no SHA in a record meant for a reader who has only the remote: it reads as checkable, invites the check, and fails it.
+  Name the branch and say what gates the push.
+- A rule written and applied in the same commit is where the application gets checked least, because writing the rule feels like the work.

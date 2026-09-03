@@ -153,19 +153,6 @@ for sym in ("classify_verdict", "_unresolved_finding_pattern",
 # shape is added and nothing else would notice the prose going stale.
 check("the finding-pattern count the docstring states",
       len(MOD.FINDING_PATTERNS), 18)
-# The one thing this tool copies rather than calls. The checker inlines its
-# ARD test, so `analyse` duplicates the phrase -- and a duplicate that nothing
-# pins is exactly the drift `load_classifier`'s docstring forbids. Asserted
-# against the checker's SOURCE, since there is no function to call.
-# The duplication is gone, and with it the guard that policed it. The phrase
-# lived here as a retyped literal and an `ast` walk asserted the checker still
-# compared against it -- a predicate that took six adversarial rounds and was
-# still escapable (an `if` relocated past admission, a decoy `for c in
-# comments` loop inside a never-called nested `def`, `body_lower` rebound to a
-# non-body string). Extracting `is_ard_disposition_summary` in the checker
-# closed every one of those at once, so the anti-drift check below is now the
-# same one the other four symbols get.
-
 check("the findings heading is one of them",
       MOD._FINDINGS_HEADING_PATTERN in MOD.FINDING_PATTERNS, True)
 
@@ -291,6 +278,73 @@ check("a STRUCTURED agent body with a finding and no readable verdict",
 check("and its caveat arm fires on a structured body too",
       "UNLESS posted under a bot identity"
       in _crb.analyse(_structured_unreadable, MOD)["why"], True)
+
+# --- the call site, which the extraction alone does not cover ------------
+# The deleted `ast` guard caught one thing the extraction does not: whether
+# the checker still CALLS the helper, ahead of admission. Measured after the
+# extraction, deleting the skip outright left both suites green -- so the
+# refactor closed the literal-drift problem and traded this away. Restored
+# here behaviourally, which is stronger than the guard was: it pins the
+# outcome rather than the syntax, so any relocation, gating, or removal that
+# admits an ARD summary fails, and any refactor that preserves the skip
+# passes.
+#
+# The checker's OWN suite still does not cover this (754 pass with the helper
+# neutered). Filed as Morrison-Lab/ai-config#3122 rather than fixed there,
+# since the gap pre-dates this PR.
+
+class _FakeComment:
+    def __init__(self, body, login="someuser", assoc="OWNER"):
+        self.author_login = login
+        self.created_at = "2026-09-03T00:00:00Z"
+        self.body = body
+        self.author_association = assoc
+
+
+class _FakePR:
+    def __init__(self, comments):
+        self.pr_num = "1"
+        self.head_sha = "78c3eb0d0e0bb23165225166cfabdb3393876d01"
+        self.repo = "o/r"
+        self.review_decision = ""
+        self.branch = "b"
+        self._comments = comments
+
+    def get_comments(self):
+        return self._comments
+
+    def get_reviews(self):
+        return []
+
+
+_ARD_NOT_CLEAN = (
+    "## ARD Review Disposition Summary\n\n"
+    "Addressed findings from review of 78c3eb0d.\n\n"
+    "## Verdict\n\nVerdict: Needs work\n"
+    "Reviewed-Commit: 78c3eb0d0e0bb23165225166cfabdb3393876d01\n")
+
+
+def _checker_issues(body):
+    # The checker narrates its verdict scan to stdout; silenced so the suite's
+    # own output stays readable.
+    import contextlib
+    import io as _io
+    with contextlib.redirect_stdout(_io.StringIO()):
+        _, issues = MOD.check_review_comments(_FakePR([_FakeComment(body)]))
+    return " | ".join(issues)
+
+
+# The skip working looks like the checker finding NO review at all.
+check("the checker still skips an ARD summary before admitting it",
+      "No automated review" in _checker_issues(_ARD_NOT_CLEAN), True)
+check("so its quoted verdict never becomes a standing not-clean",
+      "NOT clean" in _checker_issues(_ARD_NOT_CLEAN), False)
+# Control: the same body without the ARD heading IS admitted, which proves
+# the assertion above is reading the skip rather than an empty pipeline.
+check("control -- the same body without the ARD heading is admitted",
+      "No automated review" in _checker_issues(
+          _ARD_NOT_CLEAN.replace("## ARD Review Disposition Summary", "## Round 3")),
+      False)
 
 # --- the two skip reasons, reported apart as well as together -----------
 # A conflated boolean says a body is ignored without saying which remedy

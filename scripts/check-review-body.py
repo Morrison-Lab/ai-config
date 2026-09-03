@@ -41,8 +41,8 @@ The four body-level facts that decide a body's fate, each computed by
     Both come from the checker: `is_ard_disposition_summary` and
     `is_non_review_notice`. The first was inlined in `check_review_comments`
     until this tool needed it, and was extracted rather than retyped here --
-    a copy drifts silently, and the AST guard written to catch that drift
-    took six adversarial rounds and still had holes;
+    a copy drifts silently, and the AST guard written to catch that drift was
+    narrowed across three review rounds and still had escapes;
   * whether `_is_structured_review_body` reads it as a report -- a report
     heading AND a `Reviewed-Commit:` fingerprint;
   * what `classify_verdict` makes of it: clean, not-clean, unreadable, or no
@@ -167,14 +167,21 @@ def analyse(body, mod):
     ard_summary = bool(mod.is_ard_disposition_summary(body))
     checker_notice = bool(mod.is_non_review_notice(body))
     # Called, not copied. This was the one duplicated literal in the file:
-    # the checker inlined its ARD test, so the phrase was retyped here and a
-    # test parsed the checker to detect drift. That guard took six adversarial
-    # rounds and still had holes -- an `if` relocated past admission, a decoy
-    # loop in a nested `def`, `body_lower` rebound to something that is not
-    # the body -- each of which broke the skip while the suite stayed green.
-    # Extracting `is_ard_disposition_summary` closed all of them at once and
-    # deleted the guard, which is the shape `deterministic-tools.md` asks for:
-    # dissolve the coupling rather than instrument it.
+    # the checker inlined its ARD test, so the phrase was retyped here and an
+    # `ast` guard parsed the checker to detect drift. That guard was narrowed
+    # across three review rounds and still had escapes -- a decoy `for c in
+    # comments` loop in a never-called nested `def`, `body_lower` rebound to
+    # something that is not the body -- each breaking the skip with the suite
+    # green.
+    #
+    # Extracting `is_ard_disposition_summary` closes the LITERAL-drift half
+    # and nothing else, which is worth saying plainly: whether the checker
+    # still calls it, ahead of admission, is a call-site property no
+    # extraction can assert. Deleting the guard traded that coverage away, so
+    # `test_check_review_body.py` now drives `check_review_comments` directly
+    # and pins the outcome instead of the syntax. That is strictly stronger
+    # here -- it kills a relocation that changes behaviour and correctly
+    # ignores one that does not, where the syntactic guard failed on both.
     #
     # Reported separately as well as combined. They are two different skips
     # with two different remedies, and a single conflated boolean tells a

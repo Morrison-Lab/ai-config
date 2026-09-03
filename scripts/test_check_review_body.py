@@ -218,6 +218,16 @@ check("but its explanation does not claim it blocks nothing",
 check("and it names the finding that would block",
       "Nits" in _r["why"], True)
 
+# The NO-VERDICT branch carries the same caveat and needs its own probe. All
+# three checks above build a MARKER-carrying body, which routes to UNREADABLE
+# -- so the NO-VERDICT caveat was unpinned and could be flattened back to the
+# false claim with a green suite. Second time in two commits that a case
+# exercised the right feature and never isolated the clause under test.
+_bare = _crb.analyse("## Nits\n\n- a small thing\n", MOD)
+check("a marker-free finding body is NO-VERDICT", _bare["verdict"], "NO-VERDICT")
+check("and its explanation carries the caveat too",
+      "UNLESS posted under a bot identity" in _bare["why"], True)
+
 if failures:
     print("FAILED:")
     for line in failures:

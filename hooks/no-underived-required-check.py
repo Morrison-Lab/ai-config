@@ -82,24 +82,37 @@ import sys
 _HERE = os.path.dirname(os.path.abspath(__file__))
 
 
+_PARSER_CACHE = []
+
+
 def _load_shell_parser():
     """Borrow `require-gh-repo-flag.py`'s heredoc stripper and segment splitter.
 
     Reimplementing either would be a second copy of a parser this repo already
     maintains and has hardened (`shared/principles/dont-reinvent-wheel.md`).
-    The module name carries hyphens, so it cannot be a plain import.
+    The module name carries hyphens, so it cannot be a plain import. Memoised
+    at module scope (`shared/coding/use-memoisation.md`): it is pure, it costs
+    an `exec` of a 575-line file, and a mutation harness calls it hundreds of
+    times per run.
     """
+    if _PARSER_CACHE:
+        return _PARSER_CACHE[0]
     path = os.path.join(_HERE, "require-gh-repo-flag.py")
     spec = importlib.util.spec_from_file_location("_gh_repo_flag_parser", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    return module.strip_heredocs, module.split_command
+    _PARSER_CACHE.append((module.strip_heredocs, module.split_command))
+    return _PARSER_CACHE[0]
 
 
 # A `gh api` call that WRITES. `-X PUT`, `--method PUT` and the concatenated
 # pflag shorthand `-XPUT` are all accepted by gh, so all three count; an
 # earlier draft required a separator and missed `-XPUT`.
-RX_WRITE_METHOD = re.compile(r"(?:-X|--method)[=\s]*(?:PUT|PATCH|POST)\b")
+# PUT and PATCH only. An explicit POST is not listed because gh switches to
+# POST precisely WHEN parameters are supplied, so every POST that carries a
+# body is already caught by RX_IMPLICIT_POST below -- listing it here would be
+# an alternation no input can reach, which is dead code by another name.
+RX_WRITE_METHOD = re.compile(r"(?:-X|--method)[=\s]*(?:PUT|PATCH)\b")
 
 # ... but an explicit method is not required at all. `gh api --help`: "The
 # default HTTP request method is GET normally and POST if any parameters were
@@ -117,7 +130,9 @@ RX_READ_METHOD = re.compile(r"(?:-X|--method)[=\s]*(?:GET|HEAD)\b")
 # repository in the org.
 RX_PROTECTION_ENDPOINT = re.compile(
     r"(?:^|[\s\"'/])(?:repos|orgs)/[^\s\"']+?"
-    r"/(?:rulesets(?:/\d+)?|branches/[^\s\"']+/protection)",
+    # No `(?:/\d+)?` after `rulesets`: under re.search an optional trailing
+    # group cannot change whether a match exists, so it would be inert.
+    r"/(?:rulesets|branches/[^\s\"']+/protection)",
 )
 
 # Payload markers: the field named inline, or a whole document supplied by
@@ -151,16 +166,24 @@ A run listing is NOT a sound substitute, for the same reason. A \
 `pull_request`-only workflow has no default-branch run at all, so \
 `gh run list --branch <default>` returns `[]`; and on a mixed-trigger \
 workflow the newest default-branch run may be a `workflow_dispatch` whose job \
-set differs from the `pull_request` one under an event-gated `if:`. Read the \
-definition, and use a run only to confirm what you read:
+set differs from the `pull_request` one under an event-gated `if:`.
 
-    gh api repos/<owner>/<repo>/contents/.github/workflows \\
-        --jq '.[].name'                       # on the default branch
+Read the definitions, then confirm against a run of a PR built on current \
+`<default>`:
 
-A job's context is its `name:` when set, and its job key otherwise. A \
-reusable-workflow call (`uses:`) reports as `<caller job> / <called job>` \
-using that same rule for each half -- that pair is the string most often \
-retyped as just one of its halves.
+    git fetch origin && git show origin/<default>:.github/workflows/<file>
+    gh api repos/<owner>/<repo>/actions/runs/<id>/jobs --jq '.jobs[].name'
+
+Three rules turn a definition into a context, and the last two are where a \
+retyped string goes wrong:
+
+  * A job's context is its `name:` when set, and its job key otherwise.
+  * A MATRIX job appends its values in parentheses -- `test (ubuntu-latest, \
+    3.11)`, not `test`. Requiring the bare name requires a string no run \
+    emits.
+  * A reusable-workflow call (`uses:`) reports as `<caller job> / <called \
+    job>`, each half named by the first rule. That pair is the string most \
+    often retyped as just one of its halves.
 
 This is a warning, not a refusal -- if the contexts are already derived, \
 proceed."""
@@ -174,20 +197,33 @@ SYSTEM_MESSAGE = (
 # Leading `VAR=value` assignments precede the command word in a shell segment.
 RX_ENV_PREFIX = re.compile(r"^(?:\s*[A-Za-z_][A-Za-z0-9_]*=(?:\S*)\s+)*")
 
-# Words that can precede the real command word within one segment.
-# `split_command` emits a loop or conditional keyword as part of the segment,
-# so `for r in a b; do gh api -X PUT ...; done` arrives as `do gh api ...`.
-# Taken from `require-gh-repo-flag.py`'s own KEYWORD_PREFIX, whose parser this
-# file already borrows -- an earlier draft stripped only env/command/sudo and
-# was silent on every loop and conditional, which is the highest-blast-radius
-# shape there is (one ruleset write applied across many repositories).
-SHELL_WRAPPERS = frozenset({
-    "!", "{", "time", "nohup", "sudo", "then", "else", "do", "if", "elif",
-    "while", "until", "env", "command",
-})
+# Words that can precede the real command word within one segment. Two kinds,
+# deliberately in one set because the stripping is identical:
+#
+#   * Shell keywords. `split_command` emits these as part of the segment, so
+#     `for r in a b; do gh api -X PUT ...; done` arrives as `do gh api ...`.
+#     This half is `require-gh-repo-flag.py`'s KEYWORD_PREFIX verbatim.
+#   * Wrappers that take a command as their argument -- `xargs`, `timeout`,
+#     `nice` and friends. These are NOT in that constant; they are added here
+#     because `gh repo list | xargs -I{} gh api -X PUT repos/o/{}/rulesets/1
+#     --input rs.json` is the same one-write-across-many-repositories shape the
+#     loop form is, and an earlier draft was silent on it.
+#
+# Stripping a wrapper is approximate: its own flags are dropped along with it,
+# so `xargs -I{} gh api ...` anchors because `-I{}` precedes `gh`. `timeout`
+# additionally takes a POSITIONAL duration, which no flag rule reaches, so it
+# gets one narrow extra skip -- otherwise `timeout 60 gh api -X PUT ...` is
+# silent, and a wrapper the guard half-knows is worse than one it does not.
+SHELL_KEYWORDS = ("!", "{", "time", "nohup", "sudo", "then", "else", "do",
+                  "if", "elif", "while", "until")
+COMMAND_WRAPPERS = ("env", "command", "xargs", "timeout", "nice", "stdbuf",
+                    "parallel")
+SHELL_WRAPPERS = frozenset(SHELL_KEYWORDS + COMMAND_WRAPPERS)
+# A `timeout`/`parallel` duration: a bare number with an optional unit suffix.
+RX_DURATION = re.compile(r"^\d+(?:\.\d+)?[smhd]?$")
 RX_SHELL_WRAPPER_PREFIX = re.compile(
-    r"^\s*(?:(?:!|\{|time|nohup|sudo|then|else|do|if|elif|while|until|env"
-    r"|command)\s+)*"
+    r"^\s*(?:(?:" + "|".join(re.escape(w) for w in SHELL_WRAPPERS)
+    + r")\s+(?:-\S+\s+)*(?:\d+(?:\.\d+)?[smhd]?\s+)?)*"
 )
 
 
@@ -218,6 +254,12 @@ def segment_invokes_gh_api(segment):
             tokens.pop(0)
         elif tokens[0] in SHELL_WRAPPERS:
             tokens.pop(0)
+            # A command wrapper's own flags sit between it and the command,
+            # and `timeout` puts a positional duration there too.
+            while tokens and tokens[0].startswith("-"):
+                tokens.pop(0)
+            if tokens and RX_DURATION.match(tokens[0]):
+                tokens.pop(0)
         else:
             break
     return len(tokens) >= 2 and tokens[0] == "gh" and tokens[1] == "api"

@@ -49,11 +49,14 @@ CASES = {
     ),
     "W3": (
         "the concatenated pflag shorthand -XPUT, which gh accepts",
-        # Body on stdin, no parameter flag: otherwise the implicit-POST
-        # inference would carry this case and the shorthand would go untested.
+        # No parameter flag at all, so the implicit-POST inference cannot
+        # carry this case and the shorthand is what pins it. The payload
+        # marker is in the PATH. (An earlier draft appended `< body.json` and
+        # called it "the body on stdin"; gh reads a request body only via
+        # `--input` -- with `-` for stdin -- so a bare redirect sends nothing.)
         "Bash",
-        "gh api -XPUT repos/o/r/branches/main/protection/"
-        "required_status_checks < body.json",
+        "gh api -XPUT "
+        "repos/o/r/branches/main/protection/required_status_checks",
         True,
     ),
     "W4": (
@@ -112,15 +115,83 @@ CASES = {
         True,
     ),
     "W13": (
-        "an explicit method with the body on stdin, so no parameter flags",
-        # This is what pins RX_WRITE_METHOD. Every other write case also
-        # carries a parameter flag, so the implicit-POST inference alone would
-        # cover them -- checking the mutation anchor is what surfaced that.
+        "an explicit method with no parameter flags at all",
+        # This is what pins RX_WRITE_METHOD. Every other write case carries a
+        # parameter flag, so the implicit-POST inference alone would cover
+        # them -- checking the mutation anchor is what surfaced that.
         "Bash",
         "gh api --method PUT "
-        "repos/o/r/branches/main/protection/required_status_checks "
-        "< body.json",
+        "repos/o/r/branches/main/protection/required_status_checks",
         True,
+    ),
+    "W14": (
+        "`-f` alone, gh's documented field form, with no --input",
+        "Bash",
+        "gh api repos/o/r/rulesets "
+        "-f 'required_status_checks[][context]=lint'",
+        True,
+    ),
+    "W15": (
+        "`--field` alone, the long form of the same thing",
+        "Bash",
+        "gh api repos/o/r/rulesets "
+        "--field 'required_status_checks[][context]=lint'",
+        True,
+    ),
+    "W16": (
+        "an explicit PATCH with no parameter flags",
+        "Bash",
+        "gh api -X PATCH "
+        "repos/o/r/branches/main/protection/required_status_checks",
+        True,
+    ),
+    "W17": (
+        "a leading VAR=value assignment precedes the command word",
+        "Bash",
+        "GH_TOKEN=x gh api -X PUT repos/o/r/rulesets/1 --input rs.json",
+        True,
+    ),
+    "W18": (
+        "piped into xargs -- one write across many repositories",
+        "Bash",
+        "gh repo list -q .name | xargs -I{} gh api -X PUT "
+        "repos/o/{}/rulesets/1 --input rs.json",
+        True,
+    ),
+    "W19": (
+        "UNBALANCED QUOTE behind a leading assignment",
+        # Exercises the fallback's RX_ENV_PREFIX, which the plain
+        # unbalanced-quote case (W11) leaves untouched.
+        "Bash",
+        "GH_TOKEN=x gh api -X PUT "
+        "repos/o/r/branches/main/protection/required_status_checks "
+        "-f x='unclosed",
+        True,
+    ),
+    "W20": (
+        "UNBALANCED QUOTE behind a command wrapper",
+        # Exercises the fallback's RX_SHELL_WRAPPER_PREFIX. `nice` rather than
+        # `timeout`, whose duration is a positional argument the wrapper-flag
+        # skip does not cover -- a real limit, recorded rather than papered
+        # over.
+        "Bash",
+        "nice gh api -X PUT "
+        "repos/o/r/branches/main/protection/required_status_checks "
+        "-f x='unclosed",
+        True,
+    ),
+    "W21": (
+        "`timeout 60 gh api ...` -- a wrapper with a POSITIONAL argument",
+        "Bash",
+        "timeout 60 gh api -X PUT repos/o/r/rulesets/1 --input rs.json",
+        True,
+    ),
+    "S6": (
+        "an explicit HEAD is a read, like GET",
+        "Bash",
+        "gh api -X HEAD repos/o/r/branches/main/protection/"
+        "required_status_checks -f per_page=100",
+        False,
     ),
     "S1": (
         "a READ of the same ruleset endpoint carries no write method",
@@ -203,12 +274,22 @@ def load_module(source, label):
     return module
 
 
+class MutantCrashed(Exception):
+    """A mutant raised rather than behaving differently."""
+
+
 def verdict(module, case_id):
     """Run a loaded guard module against a case; True when it warns."""
     _, tool_name, command, _ = CASES[case_id]
     if tool_name not in BASH_TOOLS:
         return False  # main() filters these before evaluate() is reached
-    return module.evaluate(command) is not None
+    try:
+        return module.evaluate(command) is not None
+    except Exception as exc:
+        # A mutant that CRASHES measures nothing -- the clause it reverted is
+        # untested either way, and the traceback hides which. Surfaced as its
+        # own outcome so the anchor gets fixed rather than the run dying.
+        raise MutantCrashed(f"{type(exc).__name__}: {exc}") from exc
 
 
 def cli_verdict(hook_path, case_id):
@@ -263,39 +344,105 @@ MUTATIONS = {
         "an explicit -X/--method PUT|PATCH|POST is a write on its own",
         [("    if RX_WRITE_METHOD.search(segment):\n        return True\n",
           "")],
-        {"W3", "W13"},  # both writes whose body is on stdin
+        {"W3", "W13", "W16"},  # the writes carrying no parameter flag
     ),
     "is_write_gate": (
         "a segment that neither declares nor implies a write is a read",
         [("        if not segment_is_write(segment):\n            continue\n",
           "")],
-        # S5 flips too: with the gate gone, every segment is scanned, so
-        # the explicit GET reaches the payload clause and matches.
-        {"S1", "S5"},
+        # S5 and S6 flip too: with the gate gone, every segment is
+        # scanned, so the explicit GET and HEAD reach the payload clause.
+        {"S1", "S5", "S6"},
     ),
     "method_shorthand": (
         "`-XPUT` with no separator is a write method too",
-        [(r'r"(?:-X|--method)[=\s]*(?:PUT|PATCH|POST)\b"',
-          r'r"(?:-X|--method)[=\s]+(?:PUT|PATCH|POST)\b"')],
+        [(r'r"(?:-X|--method)[=\s]*(?:PUT|PATCH)\b"',
+          r'r"(?:-X|--method)[=\s]+(?:PUT|PATCH)\b"')],
         {"W3"},
+    ),
+    "implicit_post_f_flag": (
+        "`-f`/`-F` alone makes it a write",
+        [(r'r"(?:^|\s)(?:--input\b|-[fF]\s|--(?:raw-)?field\b)"',
+          r'r"(?:^|\s)(?:--input\b|--(?:raw-)?field\b)"')],
+        {"W14"},
+    ),
+    "implicit_post_field_flag": (
+        "`--field`/`--raw-field` alone makes it a write",
+        [(r'r"(?:^|\s)(?:--input\b|-[fF]\s|--(?:raw-)?field\b)"',
+          r'r"(?:^|\s)(?:--input\b|-[fF]\s)"')],
+        {"W15"},
+    ),
+    "method_patch": (
+        "PATCH is an explicit write method, not only PUT",
+        [(r'r"(?:-X|--method)[=\s]*(?:PUT|PATCH)\b"',
+          r'r"(?:-X|--method)[=\s]*(?:PUT)\b"')],
+        {"W16"},
+    ),
+    "read_method_head": (
+        "HEAD is a read method, not only GET",
+        [(r'r"(?:-X|--method)[=\s]*(?:GET|HEAD)\b"',
+          r'r"(?:-X|--method)[=\s]*(?:GET)\b"')],
+        {"S6"},
+    ),
+    "env_assignment_strip": (
+        "a leading VAR=value assignment is stripped before the command word",
+        [('        if re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", tokens[0]):\n'
+          '            tokens.pop(0)\n', "        if False:\n            pass\n")],
+        # W19 also carries an assignment but reaches the FALLBACK path, whose
+        # own stripping is a separate clause (fallback_env_strip).
+        {"W17"},
+    ),
+    "command_wrappers": (
+        "wrappers taking a command as an argument are stripped too",
+        [('COMMAND_WRAPPERS = ("env", "command", "xargs", "timeout", "nice", "stdbuf",\n'
+          '                    "parallel")',
+          'COMMAND_WRAPPERS = ("env", "command")')],
+        {"W18", "W20", "W21"},
+    ),
+    "wrapper_duration_skip": (
+        "a wrapper's positional duration is skipped too",
+        [("            if tokens and RX_DURATION.match(tokens[0]):\n"
+          "                tokens.pop(0)\n", "")],
+        {"W21"},
+    ),
+    "wrapper_own_flags": (
+        "a wrapper's own flags are dropped along with it",
+        [('            while tokens and tokens[0].startswith("-"):\n'
+          "                tokens.pop(0)\n", "")],
+        {"W18"},
+    ),
+    "fallback_env_strip": (
+        "the shlex fallback strips a leading assignment",
+        [('        stripped = RX_ENV_PREFIX.sub("", stripped).lstrip()\n',
+          "")],
+        {"W19"},
+    ),
+    "fallback_prefix_strip": (
+        "the shlex fallback strips wrappers and assignments too",
+        # Substituted, not deleted: removing the line entirely leaves the
+        # NEXT line reading an unbound `stripped`, so the mutant crashes
+        # instead of behaving differently, which measures nothing.
+        [('stripped = RX_SHELL_WRAPPER_PREFIX.sub("", segment)',
+          "stripped = segment")],
+        {"W20"},
     ),
     "implicit_post": (
         "parameters alone make it a write, since gh defaults to POST",
         [("    return bool(RX_IMPLICIT_POST.search(segment))",
           "    return False")],
-        {"W8"},
+        {"W4", "W5", "W8", "W14", "W15"},
     ),
     "explicit_get_wins": (
         "an explicit GET beats the implicit-POST inference",
         [("    if RX_READ_METHOD.search(segment):\n        return False\n",
           "")],
-        {"S5"},
+        {"S5", "S6"},
     ),
     "shell_wrappers": (
         "loop and conditional keywords precede the command word",
         [('        elif tokens[0] in SHELL_WRAPPERS:\n            tokens.pop(0)\n',
           '        elif tokens[0] in ("env", "command"):\n            tokens.pop(0)\n')],
-        {"W9", "W10"},
+        {"W9", "W10", "W18", "W21"},
     ),
     "shlex_fallback": (
         "an unbalanced quote falls back to anchoring on the command word",
@@ -303,7 +450,7 @@ MUTATIONS = {
           '        stripped = RX_ENV_PREFIX.sub("", stripped).lstrip()\n'
           '        return bool(re.match(r"gh\\s+api\\b", stripped))',
           "        return False")],
-        {"W11"},
+        {"W11", "W19", "W20"},
     ),
     "protection_endpoint": (
         "only ruleset / branch-protection endpoints are in scope",
@@ -326,7 +473,9 @@ MUTATIONS = {
         "the bare `required_status_checks` field name counts",
         [(r'r"required_status_checks|\bcontexts\b|--input\b"',
           r'r"\bcontexts\b|--input\b"')],
-        {"W3", "W6", "W13"},  # the three whose marker is the field name
+        # every case whose only payload marker is the field name, whether
+        # it appears as a flag value or inside the URL path
+        {"W3", "W6", "W13", "W14", "W15", "W16", "W19", "W20"},
     ),
     "payload_contexts": (
         "a `contexts` key counts even without the field name",
@@ -339,7 +488,8 @@ MUTATIONS = {
         [(r'r"required_status_checks|\bcontexts\b|--input\b"',
           r'r"required_status_checks|\bcontexts\b"')],
         # every case whose only payload marker is `--input`
-        {"W1", "W4", "W5", "W7", "W8", "W9", "W10", "W11"},
+        {"W1", "W4", "W5", "W7", "W8", "W9", "W10", "W11", "W17", "W18",
+         "W21"},
     ),
     "heredoc_stripping": (
         "heredoc bodies are dropped before the command is scanned",
@@ -354,7 +504,7 @@ MUTATIONS = {
         "the command is split on shell operators before scanning",
         [("    for segment in split_command(strip_heredocs(command)):",
           "    for segment in [strip_heredocs(command)]:")],
-        {"W7", "W9", "W10"},
+        {"W7", "W9", "W10", "W18"},
     ),
     "command_word_check": (
         "`gh api` must be the command word, not text inside an argument",
@@ -380,8 +530,16 @@ for clause, (statement, edits, expected_flips) in MUTATIONS.items():
                      f"anchor.\n---\n{find}\n---")
         mutated = mutated.replace(find, replace)
 
-    mutant = load_module(mutated, clause)
-    flipped = {cid for cid in CASES if verdict(mutant, cid) != EXPECTED[cid]}
+    try:
+        mutant = load_module(mutated, clause)
+        flipped = {cid for cid in CASES if verdict(mutant, cid) != EXPECTED[cid]}
+    except MutantCrashed as exc:
+        mutation_wrong += 1
+        print(f"  WRONG {clause:<22} {statement}\n"
+              f"         MUTANT CRASHED ({exc}) -- the reversion broke the "
+              "module rather than its behaviour; substitute the clause "
+              "instead of deleting it")
+        continue
     ok = flipped == expected_flips
     mutation_wrong += not ok
     if not flipped and expected_flips:

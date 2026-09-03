@@ -84,9 +84,9 @@ Worth recording as a subagent-report miss: the number was wrong in the direction
 - **#3084** --- Claude verdict clean on head `6f10014`, but a **Copilot review landed an hour later** with a real finding the Claude round never saw.
   That ordering is the case `CLAUDE.md`'s "Re-check for latest review findings" section exists for: the newest *Claude* comment read clean while a newer *Copilot* review sat open.
   Finding confirmed by reading the passage: line 456 said "A conforming report puts the payload last, needs no sentinel, and is what #3050 has to settle:" and then introduced a **sentinel-bearing** block with that colon.
-  Fixed in `92304aeb` (**local only, unpushed** --- see the note below) --- split the sentence, name what the block is before showing it, scope the unconditional `Do:` bullet to the reordered tail, and add the paired `Don't`.
+  Fixed on branch `docs/subagent-report-trailer` (**not yet pushed** at the time of writing --- see the note below): split the sentence, name what the block is before showing it, scope the unconditional `Do:` bullet to the reordered tail, and add the paired `Don't`.
 - **#3060** --- the empty draft turned out to be a fully-specified UMS pass (#3059) that yesterday's session opened and never wrote.
-  Written in `e3d3646e` (**local only, unpushed**): three entries across `algorithmatize-checks.md`, `adversarial-self-review.md` (two subsections) and `address-every-comment.md`.
+  Written on branch `claude/ums-load-adversarial-peer` (**not yet pushed** at the time of writing): three entries across `algorithmatize-checks.md`, `adversarial-self-review.md` (two subsections) and `address-every-comment.md`.
   **One part of #3059 was deliberately not written**: its item 2 also described rounds each introducing the next round's defect, which `learn-from-review-findings.md` already covers at length under "A later round can find a defect in the FIX".
   Only the missing half --- an instrument for deciding when to *stop* --- was added.
 
@@ -131,7 +131,7 @@ A peer that shares the login is invisible to every agent-listing tool and visibl
 
 ## Reviews
 
-- #3084 round 2 (adversarial, on `92304aeb`) returned **5 findings, all real**, and all Addressed in `264f76f7` (both **local only, unpushed**):
+- #3084 round 2 (adversarial) returned **5 findings, all real**, all Addressed on branch `docs/subagent-report-trailer` (**not yet pushed** at the time of writing):
   1. The fenced block claimed to show verdict and fingerprint *after the payload* while containing **no payload**, so the ordering was asserted over the artifact rather than visible in it.
      Fixed by making the payload's closing marker the block's first line.
   2. The corpus sweep's `0` was being read as confirming its own conclusion while a **known-real instance sat outside its reach** --- a failed positive control, not a corroboration.
@@ -164,7 +164,7 @@ Fixed in `b439713c` --- reproduced locally with `NLB_BASE_REF=origin/main`, six 
 - **Do:** treat a notebook, a `.cases.md`, or any prose written in a hurry as in scope for the same gates as the corpus.
 - **Don't:** carry a clean checker result across a branch switch --- it was a measurement of the other branch.
 
-## Every SHA above marked "local only" is unresolvable to anyone but this container
+## A private SHA is unresolvable to anyone but this container
 
 Caught by #3093's own review round, and it is the sharpest finding of the session because it is about the notebook's *purpose* rather than its content.
 
@@ -181,9 +181,18 @@ The push gate makes this the *normal* state rather than an unlucky one, which is
 Any session that reviews before pushing will, for the whole window between commit and push, hold work whose SHAs are private.
 A notebook written during that window cites them by default.
 
-- **Do:** mark a SHA as local-and-unpushed at the moment you write it into a durable record, and say what is gating the push.
-- **Do:** prefer naming the branch and the change over the SHA while the commit is private, since the branch name survives a rebase and resolves once pushed.
+- **Do:** name the branch and the change rather than the SHA while the commit is private, since the branch name survives a rebase and resolves the moment the branch is pushed.
+- **Do:** say the work is not yet pushed and what is gating the push, so a reader who checks and finds nothing has the explanation in hand.
 - **Don't:** write a bare SHA into a record meant for a reader who only has the remote --- it is a checkable-looking claim that fails the check.
 - **Don't:** read a reviewer's "this commit does not exist" as a fabrication finding without checking whether it is merely unpushed;
   the observation is sound either way, and the diagnosis is not.
+
+**A second round on #3093 caught that the fix above did not apply its own remedy.**
+The rule it states is to prefer the branch name over the SHA, and the first fix marked the SHAs `local only, unpushed` and kept them --- which discharges the honesty half and not the usability half.
+A marked SHA still cannot be looked up;
+a branch name can be fetched the moment the branch exists.
+So the three sites now name `docs/subagent-report-trailer` and `claude/ums-load-adversarial-peer` instead.
+
+Worth recording as its own small pattern: a rule written and applied in the same commit is exactly where the application gets checked least, because writing the rule *feels* like the work.
+The reviewer that catches it is reading the two as one artifact, which the author cannot.
 

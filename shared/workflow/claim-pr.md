@@ -382,18 +382,20 @@ whose head carries both sessions' work as two contiguous author blocks.
 As of 2026-09-02, that was eleven `d-morrison` commits from 02:11 to 06:18 Pacific,
 then seven `claude` commits from 20:01 to 23:34
 (`gh pr view 3023 --json commits` separates them, reporting UTC,
-so convert before reading the dates).
-Read the counts as a snapshot rather than as the PR's state:
-the branch was still live when this was written,
-and by the next morning it carried twenty-one commits.
-What survives re-derivation is the SHAPE --- two contiguous author blocks,
-which is what makes the collision visible at all ---
-and not the totals, which is the half a reader is likeliest to quote.
+so convert before reading the dates):
 both sides had fixed the same defects, and each had fixed one the other missed.
 Discarding either would have dropped a real fix.
 The resolution took the peer's `redact()` helper (`0c58c6a3`) over the local env-stripping approach,
 a review having shown env-stripping rendered `timeout 60 git push` as `git push` ---
 a remedy line that would not run --- and kept the local heredoc scanner.
+
+Read those counts as a snapshot rather than as the PR's state.
+The branch was still live when they were taken,
+and by the next morning it carried twenty-one commits.
+What survives re-derivation is the SHAPE --- two contiguous author blocks,
+which is what makes the collision visible at all.
+The totals are the half a reader is likeliest to quote
+and the half likeliest to be wrong by the time they quote it.
 
 So diff the two heads against their merge base and enumerate the fixes on each side before deciding,
 rather than judging the branches.

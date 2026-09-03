@@ -191,6 +191,74 @@ When a brief, an issue body, or a review finding asserts what a repository says,
 
 See [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md), "A stale branch read that produced two issues and a config edit".
 
+## A comparison's base is an artifact too, and it moves the scope in both directions
+
+Every shape above concerns an artifact you **read**.
+A diff is an artifact you **derive**, from two refs, and attention goes to the one you are interested in --- the branch under review.
+The other ref is the base, and nothing about naming it feels like making a claim.
+
+`git diff main...pr-98` reads as "the PR's changes".
+It is not.
+It is the changes since whatever commit your **local** `main` shares with `pr-98`, and a local branch is a cached copy of a remote branch, which is shape 1 exactly.
+The three-dot form is what conceals it: a merge-base is a real computation over real history, so the range feels self-correcting, and the sensation of having used the careful form stands in for having checked the ref the careful form is computed from.
+A merge-base is only ever as fresh as the ref you fed it.
+
+**The error runs in both directions, and the quieter one is the worse.**
+A base **behind** its remote moves the merge-base earlier, so the diff gets bigger.
+The extra content is commits that already merged --- other people's work, already reviewed, already landed --- and a review run on it produces findings against code the author of this PR never wrote, spending the author's time and the reviewer's credibility at once.
+A base carrying local commits the remote lacks --- **ahead** of it, or diverged from it --- where the head branch also carries those commits, moves the merge-base *later*, so the diff gets smaller.
+That is the dangerous one.
+An over-wide diff produces findings the author will dispute, so it announces itself within a round;
+an under-wide one silently omits part of the change and comes back clean, and a clean verdict is the one nobody questions.
+
+**Nothing in the output announces either direction.**
+A 53-file diff and a 14-file diff are equally plausible artifacts.
+Every finding derived from the wrong scope is individually well-formed, correctly quoted, and about a real line of real code.
+So the usual detector --- a finding that looks wrong --- never fires, because none of them do.
+
+A dispatched reviewer cannot catch it either, and [`challenge-the-assignment`](challenge-the-assignment.md) says why in the mirror: a brief must not assert what the author cannot query about the *recipient's* environment.
+This is the inversion of that.
+The brief asserts something about the author's **own** environment, which the author could have queried in one command and did not, and which the recipient cannot query at all.
+
+**The falsifying question in "The test" above disposes of it, and its answer is that the diff cannot testify about itself.**
+Ask what would have to be true for the base to be wrong, and whether the diff in hand could show it.
+It could not.
+The forge could, and it is one call:
+
+```bash
+git -C <repo> fetch -q <remote>
+BASE=$(git -C <repo> merge-base <remote>/<default-branch> <pr-ref>)
+git -C <repo> diff --shortstat "$BASE" <pr-ref>
+gh pr view <N> --json changedFiles,additions,deletions
+```
+
+The two readings must agree.
+A mismatch means one of the two refs is wrong, and the base is only the first place to look: the local copy of the *head* goes stale the same way, so a PR that has received commits since you fetched it disagrees with a perfectly correct base.
+Re-fetch the head before concluding anything about the base. (Rename detection is a smaller third cause, since `diff.renames` is on by default and the forge counts renames its own way.)
+This section is about attributing a discrepancy to the wrong artifact, so a single diagnosis for a symptom with several causes is the failure it describes rather than a shortcut past it.
+Resolve the default branch from the repo rather than assuming `main`, and note the remote is not always `origin` --- a dual-forge repo has the PR's forge under a second remote name, and the fetch has to name that one.
+
+The `fetch` is the load-bearing half, for the reason the working-directory section already gives: a remote-tracking ref is itself a cached copy, current only to the last fetch.
+A fetch at session start does not cover a review dispatched an hour later, which is [`check-before-pushing`](check-before-pushing.md)'s point about a reading of a moment that has passed, moved from the push to the dispatch.
+
+Report the base you resolved.
+A review brief, or a review comment, that states the merge-base SHA and the file and insertion counts alongside its findings is one a reader can check;
+one that says "the PR's diff" is not.
+
+- **Do:** resolve a review diff's base from a remote-tracking ref, after fetching that remote, and state the merge-base SHA and the file and insertion counts beside it.
+- **Do:** cross-check the derived counts against the forge's own (`gh pr view --json changedFiles,additions,deletions`) before dispatching, and treat any mismatch as a wrong base rather than as noise.
+- **Don't:** pass a bare local branch name as a diff's base, in your own command or in a brief you hand a subagent.
+- **Don't:** read the three-dot form as self-correcting --- it computes a merge-base from refs you supplied, and cannot know one of them is behind.
+- **Don't:** wait for an implausible finding to reveal it;
+  over-wide scope produces findings that are all individually sound.
+
+`hooks/warn-stale-review-diff-base.py` is the instrument, per [`algorithmatize-checks`](algorithmatize-checks.md).
+The rule it enforces is not "was the local ref fresh", which no hook can know, but "name a remote-tracking ref", which is lexical.
+It warns and never blocks, because a bare local base is entirely correct for an ordinary local comparison and the hook cannot tell those apart.
+It has no fetch-based discharge on purpose: [`keep-checkouts-fresh`](keep-checkouts-fresh.md) mandates a fetch at session start, so keying on one would silence the hook in exactly the sessions that follow the corpus.
+
+See [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md), "A stale local base that nearly quadrupled a review diff's file count".
+
 ## A summary is another shape, and the auto-loaded copy is the one you read
 
 [`fact-check-prose`](../writing/fact-check-prose.md)'s "any condensation

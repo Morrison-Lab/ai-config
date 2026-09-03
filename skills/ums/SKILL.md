@@ -105,17 +105,20 @@ committed pass.
 
 3. **Apply updates.** For each item:
    - Read the target file first (skill or memory) to understand current state
-   - **Grep that file for the item's specific subject** -- the tool name, the
+   - **Grep the corpus for the item's specific subject** -- the tool name, the
      API call, the error string -- before appending anything.
      Reading the region you're editing is not enough: a topical memory file
      runs to hundreds or a thousand-plus lines, so an existing entry on the
      same subject can sit far away in an unrelated cluster and never enter
      your view.
      Grep the whole corpus rather than one file, and rather than only `memories/`:
-     `repo="${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/ums rev-parse --show-toplevel 2>/dev/null || pwd)}"`
-     `git -C "$repo" grep -ril "<keywords>" origin/main -- skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md`
-     The path list is the one skill-builder step 0 runs;
-     pinning to `origin/main` keeps the result independent of whichever branch the checkout sits on.
+     ```bash
+     repo="${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/ums rev-parse --show-toplevel 2>/dev/null || pwd)}"
+     test -f "$repo/CLAUDE.md" && test -d "$repo/shared" || { echo "not an ai-config checkout: $repo" >&2; exit 1; }
+     git -C "$repo" grep -il "<keywords>" -- skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md
+     ```
+     The path list is the one skill-builder step 0 runs, over the checkout's working tree,
+     so an entry that exists only on a branch not checked out there is out of reach (see the unmerged-PR section of `shared/workflow/grep-is-not-coverage.md`).
      A rule can be owned by a `shared/` fragment or a skill as easily as by a memory,
      and a `memories/`-only grep stays outside those paths.
      When one exists, extend it in place; don't add a second bullet.
@@ -139,7 +142,7 @@ committed pass.
      `shared/workflow/review-verdict-pitfalls.md` ai-config#811).
    - **When step 2 routed the item to a repo other than ai-config, grep both
      corpora.**
-     The query above is pinned to ai-config's `origin/main`,
+     The query above searches an ai-config checkout,
      so add the destination repo's own doc paths, run in that repo ---
      a repo-local entry can otherwise duplicate or contradict a fragment
      nobody thought to search from that repo.

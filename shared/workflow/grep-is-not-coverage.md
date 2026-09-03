@@ -157,9 +157,10 @@ Deciding where a learning belongs is a real step ---
 [`ums`](../../skills/ums/SKILL.md) step 2 routes each item either to ai-config
 or to the owning repo's own agent docs --- and once an item is routed to a repo
 we own, every later instruction reads as relative to *that* repo.
-Step 3 read "the whole `memories/` directory" at `3935bfff`, which meant the destination's,
-so the dupe check runs to completion, finds nothing,
-and never looks at ai-config at all.
+Step 3 read "the whole `memories/` directory" at `3935bfff`,
+and that wording meant the destination's,
+so the dupe check ran to completion, found nothing,
+and never looked at ai-config at all.
 
 The asymmetry is why this needs naming separately from the null-result case.
 A repo-local memory in some other repo is precisely the place nobody thinks to
@@ -226,12 +227,12 @@ but that file's MD018 bullet is now a cross-link, its body replaced by `1732000a
 so the number outlived the thing it was measuring.
 Note also why the wrong-corpus section's `Do` could not have caught it.
 It reads "grep the ai-config corpus as well as the destination repo's docs,
-**whenever step 2 routes an item anywhere other than ai-config**",
+whenever step 2 routes an item anywhere other than ai-config",
 and this item was routed to ai-config, so its trigger did not fire.)
 
 ## Searching only the rendered output is the same error one layer down
 
-The wrong-corpus section above governs searching the wrong **repo**, and its last subsection the wrong **directory** within one.
+The wrong-corpus section above governs searching the wrong **repo**, and its subsection the wrong **directory** within one.
 This one governs searching the wrong **layer within the right repo**:
 a sweep whose file filter reaches the generated artifact and not the generator that produces it.
 
@@ -289,7 +290,7 @@ and the next regeneration would have restored the exact shape the same PR's own 
 
 ## An unmerged PR is part of the corpus a citation can be corroborated against, and no default-branch search reaches it
 
-The wrong-corpus section above governs searching the wrong **repo**, and its last subsection the wrong **directory** within one.
+The wrong-corpus section above governs searching the wrong **repo**, and its subsection the wrong **directory** within one.
 This one governs searching the wrong **branch state within the right repo**: a citation to content that ships only in an open PR, checked by grepping the default branch.
 
 The null result here is not merely inconclusive --- it is guaranteed whether or not the cited content is genuine.

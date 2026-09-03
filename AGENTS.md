@@ -38,8 +38,9 @@ a stricter repository contribution or AI-agent policy.
 
 The user grants standing authorization, across sessions and workspaces, for
 non-force `git push` operations to `ucdavis/rampp` and
-`Morrison-Lab/ai-config` after positive membership verification. This
-authorization covers pushes only; it does not authorize force pushes, merges,
+`Morrison-Lab/ai-config` after positive membership verification.
+This authorization covers pushes only;
+it does not authorize force pushes, merges,
 or any other outward repository communication.
 
 Do not infer membership from a public repository, prior contributions, a fork,

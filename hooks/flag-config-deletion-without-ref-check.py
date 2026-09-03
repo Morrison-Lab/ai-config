@@ -55,8 +55,8 @@ _ROOT_ALTS = tuple(
 # The trailing lookahead stops `~/.config` matching inside `~/.config-notes`,
 # which would otherwise let an unrelated file discharge the guard. The class
 # includes `*`, `>`, `&` and `|` because `rm -rf ~/.claude*` is a common
-# spelling of exactly what this guard exists to catch; a bare path-or-space
-# boundary
+# spelling of exactly what this guard exists to catch; a bare
+# path-or-space boundary
 # exempted it. `~/.config-notes` and `~/.claudex` still miss, which is the
 # point.
 _ROOTS = "(?:" + "|".join(_ROOT_ALTS) + r")(?=[/\"'`.,;)\]*&>|]|\s|$)"

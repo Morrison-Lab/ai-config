@@ -7,7 +7,9 @@ The agent was not the weak link; the briefing was.
 ## What to change, in order of payoff
 
 **Keep a per-agent mistake ledger and prepend it to every brief.**
-A numbered list of standing rules, each one a past mistake stated as the action that avoids it, kept in the orchestrator's own memory rather than in any branch, so a learning written during one PR reaches the next dispatch on another.
+A numbered list of standing rules, each one a past mistake stated as the action that avoids it.
+It lives in a committed memory file the orchestrator reads from the default branch (the consumer repo's memory directory, or this repo's `memories/` for a cross-repo agent), never in the PR branch the agent is working, so a learning written during one PR reaches the next dispatch on another.
+Session auto-memory may hold the in-flight copy, but the committed file is the home, per `CLAUDE.md`'s "Encoding reusable feedback into ai-config" and `memories/preferences.md`'s rule that memories never stay local-only.
 Append to it after every fix round.
 
 **Turn each fix round into a change to the loop.**
@@ -31,9 +33,9 @@ A cheap implementer paired with a different-vendor reviewer, per [`delegate-to-c
 A task split small enough that the agent's completeness weakness cannot reach it.
 
 **Promote what works.**
-A ledger line that has held for several sessions belongs in the agent's delegation skill as a preamble line, and a mistake that is lexically decidable belongs in a hook, so every orchestrator inherits the improvement rather than re-learning it.
+A ledger line that has held for several sessions also belongs in the agent's delegation skill as a preamble line, and a mistake that is lexically decidable belongs in a hook, so every orchestrator inherits the improvement rather than re-learning it.
 
-- **Do:** keep a mistake ledger per agent in orchestrator-owned memory and prepend it to every brief.
+- **Do:** keep a mistake ledger per agent in a committed memory file read from the default branch, and prepend it to every brief.
 - **Do:** change the brief, the tooling, or the loop after every fix round, in the same session.
 - **Do:** count rounds-to-clean and mistakes-per-dispatch, and compare against them.
 - **Do:** promote stable ledger lines into the delegation skill and hooks.

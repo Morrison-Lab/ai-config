@@ -165,29 +165,44 @@ It held, and the peer then pushed a further commit fourteen minutes later before
 So the counterfactual is not hypothetical: merging at the five-minute mark would have discarded a commit that did not yet exist, and nothing about the PR at that moment distinguished it from one that was finished.
 That is the whole argument for the interval, and for the warning step on top of it.)
 
-**Broadcast to every listed peer rather than guessing the owner from a branch
-name, and read replies for risk flags too, not only hold-offs.**
-`ListAgents` names every peer session, and messaging only the one whose
-branch name looks like a match skips the peers who are not the owner but
-still know something --- another session tracking the same base, or one that
-already merged its own PR and can say so.
+**Broadcast to every listed peer rather than guessing the owner from a branch name,
+and read replies for risk flags too, not only hold-offs.**
+`ListAgents` names every peer session.
+Messaging only the peer whose branch name looks like a match
+skips the peers who are not the owner but still know something:
+another session tracking the same base,
+or one that already merged its own PR and can say so.
 
-- **Do:** send the merge-intent notice to every peer `ListAgents` lists, not
-  just the branch's apparent owner.
-- **Do:** read each reply for a substantive risk flag (a correction on
-  `main` not in the PR's base, a stale-red check from a known CI bug), not
-  only for an explicit hold-off.
-- **Don't:** infer ownership from a branch name and message only that one peer.
+- **Do:** send the merge-intent notice to every peer `ListAgents` lists,
+  not only the branch's apparent owner.
+- **Do:** read each reply for a substantive risk flag
+  (a correction on `main` not in the PR's base, a stale-red check from a known CI bug),
+  not only for an explicit hold-off.
+- **Don't:** message only the single peer a branch name suggests.
+- **Don't:** treat a reply that names a risk as clearance because it contains no hold-off.
 
 (Measured 2026-09-02 on `Morrison-Lab/ai-config`.
-For three peer-owned PRs each clean for over twenty minutes, the session
-posted a merge-intent comment on each PR and messaged all seven local peer
-sessions via `ListAgents`/`SendMessage`, then waited about five minutes.
-Five peers replied within minutes: one had already merged its own PR, one
-identified itself as owner of a different draft, and two flagged real merge
-risks --- a mid-file correction on `main` not reflected in one PR's base, and
-a stale-red check that was a known artifact of a reusable-workflow bug rather
-than a real failure.)
+Three peer-owned PRs,
+[#2999](https://github.com/Morrison-Lab/ai-config/pull/2999),
+[#3010](https://github.com/Morrison-Lab/ai-config/pull/3010),
+and [#3029](https://github.com/Morrison-Lab/ai-config/pull/3029),
+had each been clean for over twenty minutes.
+The session posted a merge-intent comment on each PR,
+sent the same notice to all seven local peer sessions via `ListAgents` and `SendMessage`,
+and waited about five minutes.
+Six of the seven peers replied.
+Four replied inside the window:
+the owner of [#2999](https://github.com/Morrison-Lab/ai-config/pull/2999) had merged that PR in the meantime,
+one peer owned an unrelated draft,
+one had nothing to add,
+and one flagged a real merge risk,
+a mid-file correction on `main` that [#3029](https://github.com/Morrison-Lab/ai-config/pull/3029)'s base did not carry.
+Two replied after the merges had landed:
+the owner of [#3010](https://github.com/Morrison-Lab/ai-config/pull/3010) and [#3029](https://github.com/Morrison-Lab/ai-config/pull/3029), with no hold-off,
+and a peer warning that red review checks from that afternoon's reusable-workflow bug
+stay red after the fix and need a full re-run rather than a `--failed` one.
+Neither late reply would have changed the merge decision,
+and a five-minute window is expected to miss a slow reply now and then.)
 
 ## The standing per-repository grant
 

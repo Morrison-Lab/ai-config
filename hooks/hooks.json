@@ -734,6 +734,18 @@
             "why": "Warns when a worktree-rooted session cd's into the MAIN checkout of its own repo -- a real path on a different branch, where every edit and every check silently succeeds against somebody else's tree."
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-underived-required-check.py\"",
+            "timeout": 10,
+            "script": "no-underived-required-check.py",
+            "why": "Warns when a ruleset / branch-protection write sets required status checks with no default-branch job-name derivation in the session -- a context string no workflow emits blocks every merge forever, silently."
+          }
+        ]
       }
     ],
     "Stop": [

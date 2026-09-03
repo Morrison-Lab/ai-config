@@ -428,3 +428,15 @@ Squash body written by hand, because an intermediate commit message on the branc
 What the lifecycle taught: Copilot's Lite pass on prose returns one item per round, and the three rounds here were a self-contradicting clause, clause-boundary line breaks, and the bold lead-in's line break.
 The CI gate enforces sentence breaks and mid-line semicolons only, so a clause-boundary reflow pass before the first Copilot request would have saved two rounds.
 Wants a pre-request checklist line in `shared/writing/semantic-line-breaks.md` when this notebook is folded.
+
+## 14:13 PDT --- session limit hit at 13:56 PDT; resumed at 14:12 PDT
+
+The account's session limit (HTTP 429, reset 14:10 PDT) ended every in-flight subagent at once: the git-memory UMS agent, branch P's round-5 verdict, and the refuter, fix, and recheck stages of all four waves.
+All 40 implementations had already committed, and every first-round refuter that finished had refuted (2 to 7 findings each), so no wave branch reached verified state before the cut.
+The user asked to continue from where I left off.
+
+Resumed: waves 1 and 2 from their run ids (completed agents replay from cache, failed ones re-run), the UMS agent from its transcript, and a fresh round-5 verdict on branch P.
+Waves 3 and 4 are held until 1 and 2 finish, two workflows at a time rather than four, since four at once is what spent the limit in an hour.
+The Workflow tool refused the persisted script paths for waves 2 to 4 as unreadable; a copy under the scratchpad resumed with the same run id.
+Open PRs on the repo are all peer sessions' (#3137, #3101, #3060); none of this session's remain open.
+Check-in re-armed for 14:58 PDT.

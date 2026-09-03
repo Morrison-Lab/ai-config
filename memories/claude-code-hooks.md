@@ -248,13 +248,54 @@ Re-running the python part alone under `ALLOW_WHOLE_FILE_PUNCT=1` edited the fil
 Caught by `remote: error: GH013: Repository rule violations found for refs/heads/main`, not by anything local.
 Tracked as ai-config#1609.)
 
-## Hook matchers use JavaScript regular expressions, NOT shell globs
+## A hook matcher has three branches, and only the third is a regex
 
-Hook matchers in `hooks/hooks.json` containing characters outside `[A-Za-z0-9_\- ,|]` are evaluated as JavaScript regexes (`RegExp.prototype.test()`).
+Measured 2026-09-03 by reading Claude Code v2.1.42's own matcher function out of its bundled `cli.js`,
+and re-running the extracted function under `node` against a table of tool names.
+Re-verify on a harness bump rather than treating this as permanent.
 
-- **Correct syntax:** Use `"mcp__github__.*"` (JavaScript regex syntax) to match all tools from the `mcp__github__` MCP server prefix.
-- **Incorrect syntax:** Do not use `"mcp__github__*"` (shell glob syntax), which evaluates as regex matching `mcp__github` followed by 0 or more `_` characters.
-- **Catalog validator:** `scripts/check-hook-catalog.py` parses compound matcher entries (e.g. `PreToolUse (Bash, mcp__github__.*)`) using `ROW` regex matcher class `[A-Za-z0-9_.*, -]` and aggregates multiple matcher groups for the same script and event.
+```js
+if (!q || q === "*") return true;
+if (/^[a-zA-Z0-9_|]+$/.test(q)) {
+  if (q.includes("|")) return q.split("|").map((y) => y.trim()).includes(A);
+  return A === q;
+}
+try { return new RegExp(q).test(A) } catch { return false }
+```
+
+`A` is the match query (`tool_name` for `PreToolUse`) and `q` is the group's `matcher`.
+So:
+
+| matcher | evaluated as | `Edit` vs a `NotebookEdit` call |
+|---|---|---|
+| absent, empty, or `*` | fires on every call | fires |
+| a plain name, e.g. `Edit` | **exact string equality** | does **not** fire |
+| an alternation, e.g. `Write\|Edit` | exact membership of the trimmed parts | fires only on the named tools |
+| anything else, e.g. `mcp__github__.*` | an **unanchored** JavaScript regex | fires |
+
+Two consequences that were previously open questions (ai-config#2535).
+A plain name is not a substring test, so binding one script to `Write`, `Edit`, and `NotebookEdit` as three groups is three disjoint bindings rather than a triple invocation on a `NotebookEdit` call.
+And an alternation is usable rather than silently inert, so those three groups collapse into one.
+
+The fast-path character class is `[A-Za-z0-9_|]`.
+This note previously recorded it as `[A-Za-z0-9_\- ,|]`, which was wrong in the direction that matters:
+a matcher carrying `-`, a space, or a comma falls through to the **regex** branch,
+so `"Write, Edit"` is a regex that matches the literal text `Write, Edit` and therefore no tool at all.
+The comma-joined form is the README catalog's own notation for several groups, never a matcher to bind.
+
+The harness runs **every** group whose matcher fires, so one script named in two firing groups runs twice on one call.
+That is wasteful for a warn-only hook and is not benign for a blocking one.
+
+- **Do:** use `"mcp__github__.*"` (JavaScript regex) to match a whole MCP server's tools.
+- **Do:** write an alternation as one group, `"Write|Edit|NotebookEdit"`, when one hook covers several tools
+  (the table above escapes that pipe only because a bare `|` would end a markdown cell).
+- **Do:** run `python3 scripts/check-hook-catalog.py`, which reimplements the three branches and fails a script bound twice for the same event and tool.
+- **Don't:** use `"mcp__github__*"` (shell glob), which is a regex matching `mcp__github` followed by zero or more `_`.
+- **Don't:** expect a plain name to match a longer tool name --- it is compared by equality.
+- **Don't:** bind a comma-joined matcher such as `"Bash, Edit"`;
+  that is the catalog's notation, and as a matcher it fires on nothing.
+
+**Catalog validator:** `scripts/check-hook-catalog.py` parses compound matcher entries (e.g. `PreToolUse (Bash, mcp__github__.*)`) using `ROW` regex matcher class `[A-Za-z0-9_.*, -]`, plus a backslash-escaped pipe for an alternation cell, and aggregates multiple matcher groups for the same script and event.
 
 ## Complete hook lifecycle catalog (27 events)
 

@@ -23,7 +23,7 @@ rather than in anyone's periodic reading. The drift grew by one entry in the ten
 days between #1206 being filed and being fixed, which is the argument for
 gating it rather than only reconciling it once.
 
-This checks four things:
+This checks five things:
 
   1. Every hook registered in `hooks.json` has a README row.
   2. Every hook with a README row is registered in `hooks.json`, unless it is in
@@ -34,9 +34,18 @@ This checks four things:
      how a hook stays silently inert with a README row that still names a
      follow-up that will never happen (ai-config#1717 stayed allowlisted after
      it closed, until #2275 / #2294). Fail, do not warn.
+  5. No script is bound twice for the same event and the same tool. `registered`
+     folds several matcher groups for one script into a comma-joined string, so
+     a hook bound once and a hook bound twice compare equal to the same README
+     row -- the catalog was blind to a double binding by construction
+     (ai-config#2535). A double binding runs the hook twice on one call, which
+     is merely wasteful for a warn-only hook and is not benign for a blocking
+     one.
 
 Check 3 is what stops the table drifting in a way the set comparison cannot see:
 a row can name every hook correctly and still tell a reader the wrong event.
+Check 5 needs the harness's own matcher semantics, which `matcher_matches`
+reimplements; see its docstring for the measurement that settles them.
 
 When a tracker cannot be fetched (offline, timeout, or rate limit), this check
 prints `SKIP` and does not fail. That skip is the documented offline path, not
@@ -96,35 +105,132 @@ UNREGISTERED_MARKER = "not registered"
 SECTION_HEADING = "## Enforcement hooks"
 
 # | `name.py` | `Event` (Matcher) | prose |   -- matcher is optional.
+#
+# The matcher cell accepts a backslash-escaped pipe (`Write\|Edit`), which is
+# how a markdown cell has to carry an alternation matcher: a bare `|` would end
+# the cell. `documented` unescapes it before comparing against hooks.json.
+# A bare `|` is deliberately NOT accepted -- it would let the matcher group
+# swallow a cell separator and silently reparse the row.
 ROW = re.compile(
     r"^\|\s*`(?P<script>[A-Za-z0-9._-]+\.(?:py|sh))`\s*"
-    r"\|\s*`(?P<event>[A-Za-z0-9_, ]+)`\s*(?:\((?P<matcher>[A-Za-z0-9_.*, -]+)\))?\s*"
+    r"\|\s*`(?P<event>[A-Za-z0-9_, ]+)`\s*"
+    r"(?:\((?P<matcher>(?:[A-Za-z0-9_.*, -]|\\\|)+)\))?\s*"
     r"\|(?P<rest>.*)\|\s*$"
 )
 
+# How the harness decides whether a matcher applies to a tool call, measured
+# 2026-09-03 against Claude Code v2.1.42's own matcher function in
+# `cli.js`, and re-run against the extracted function under node:
+#
+#     if (!q || q === "*") return true;
+#     if (/^[a-zA-Z0-9_|]+$/.test(q)) {
+#       if (q.includes("|")) return q.split("|").map(y => y.trim()).includes(A);
+#       return A === q;
+#     }
+#     try { return new RegExp(q).test(A) } catch { return false }
+#
+# So there are three branches, and the first two are NOT regex matching:
+#
+#   plain name        exact string equality. `Edit` does not match
+#                     `NotebookEdit`, so three single-tool groups are three
+#                     disjoint bindings rather than a triple invocation.
+#   `A|B|C`           exact membership of the trimmed parts. An alternation is
+#                     usable, not inert, and is one group rather than three.
+#   anything else     an UNANCHORED JavaScript regex, which is why
+#                     `mcp__github__.*` works and `mcp__github__*` does not.
+#
+# The fast-path class is `[A-Za-z0-9_|]`, narrower than the
+# `[A-Za-z0-9_\- ,|]` that `memories/claude-code-hooks.md` recorded before
+# this was measured: a matcher carrying `-`, a space, or a comma falls through
+# to the regex branch.
+PLAIN_MATCHER = re.compile(r"^[A-Za-z0-9_|]+$")
 
-def registered():
-    """{script: (event, matcher)} for every hook bound in hooks/hooks.json."""
+# A matcher that is absent, empty, or `*` applies to every tool.
+CATCH_ALL = frozenset({"", "*"})
+
+
+def matcher_matches(tool, matcher):
+    """Whether `matcher` fires on a call to `tool`, per the semantics above.
+
+    Python's `re` is not JavaScript's, so a matcher exercising a dialect
+    difference could be read differently here than by the harness. Every
+    matcher this repo binds is a plain name, an alternation, or a prefix plus
+    `.*`, all of which mean the same thing in both dialects.
+    """
+    if matcher in CATCH_ALL:
+        return True
+    if PLAIN_MATCHER.match(matcher):
+        if "|" in matcher:
+            return tool in [part.strip() for part in matcher.split("|")]
+        return tool == matcher
+    try:
+        return re.search(matcher, tool) is not None
+    except re.error:
+        return False
+
+
+def matcher_names(matcher):
+    """Tool names a matcher names literally; empty for a regex matcher.
+
+    These are the only tool names available to compare two matchers against.
+    The harness knows the full tool list and this check does not, so the
+    vocabulary is built from what hooks.json itself spells out.
+    """
+    if matcher in CATCH_ALL or not PLAIN_MATCHER.match(matcher):
+        return frozenset()
+    return frozenset(
+        part.strip() for part in matcher.split("|") if part.strip())
+
+
+def overlapping_tools(first, second, vocabulary):
+    """Tool names both matchers fire on, as a sorted list.
+
+    Returns `["every tool"]` when either matcher is the catch-all, and names
+    the shared matcher when two identical regex matchers match nothing in the
+    vocabulary -- identical matchers overlap whatever they match.
+    """
+    if first in CATCH_ALL or second in CATCH_ALL:
+        return ["every tool"]
+    hits = sorted(tool for tool in vocabulary
+                  if matcher_matches(tool, first)
+                  and matcher_matches(tool, second))
+    if not hits and first == second:
+        return [f"whatever {first!r} matches"]
+    return hits
+
+
+def bindings():
+    """[(script, event, matcher)] -- one tuple per binding, unmerged.
+
+    `registered` folds a script's several matcher groups into one comma-joined
+    string, which is what the README row is compared against and is exactly
+    what makes a double binding invisible there. This keeps the groups apart so
+    `check_double_bindings` can see them.
+    """
     with open(HOOKS_JSON, encoding="utf-8") as fh:
         data = json.load(fh)
-    out = {}
+    out = []
     for event, groups in data["hooks"].items():
         for group in groups:
             matcher = group.get("matcher") or ""
             for entry in group.get("hooks", []):
                 script = entry.get("script")
                 if script:
-                    if script in out:
-                        prev_event, prev_matcher = out[script]
-                        if prev_event == event:
-                            matchers = [m for m in (prev_matcher, matcher) if m]
-                            out[script] = (event, ", ".join(matchers))
-                        else:
-                            events = f"{prev_event}, {event}"
-                            matchers = [m for m in (prev_matcher, matcher) if m]
-                            out[script] = (events, ", ".join(matchers))
-                    else:
-                        out[script] = (event, matcher)
+                    out.append((script, event, matcher))
+    return out
+
+
+def registered(binds=None):
+    """{script: (event, matcher)} for every hook bound in hooks/hooks.json."""
+    out = {}
+    for script, event, matcher in (bindings() if binds is None else binds):
+        if script not in out:
+            out[script] = (event, matcher)
+            continue
+        prev_event, prev_matcher = out[script]
+        events = event if prev_event == event else f"{prev_event}, {event}"
+        matchers = [m for m in (prev_matcher, matcher) if m]
+        out[script] = (events, ", ".join(matchers))
     return out
 
 
@@ -150,8 +256,11 @@ def documented():
     for ln in lines[start:end]:
         m = ROW.match(ln)
         if m:
+            # A markdown cell carries an alternation matcher as `A\|B`; the
+            # binding it is compared against spells it `A|B`.
+            matcher = (m.group("matcher") or "").replace(r"\|", "|")
             out[m.group("script")] = (
-                m.group("event"), m.group("matcher") or "", m.group("rest"))
+                m.group("event"), matcher, m.group("rest"))
     if not out:
         sys.exit(f"FAIL: parsed 0 hook rows from README's {SECTION_HEADING!r} "
                  "section; the table shape changed and this check is blind")
@@ -296,6 +405,48 @@ def check_tracker_states():
     return failures
 
 
+def _show(matcher):
+    """A matcher as it reads in a message; an absent one has no name."""
+    return repr(matcher) if matcher else "(no matcher)"
+
+
+def check_double_bindings(binds):
+    """Fail when one script is bound twice for the same event and tool.
+
+    The harness collects every matcher group whose matcher fires on the call
+    and runs all of their commands, so a script named in two firing groups runs
+    twice on one call. `registered` cannot see that: it folds the groups into
+    one comma-joined matcher, so a hook bound once and a hook bound twice both
+    compare equal to the same README row (ai-config#2535).
+
+    Returns (failure count, pairs examined). The second number is the negative
+    control: a detector that examined nothing reports the same zero failures as
+    a clean catalog, and only the count tells them apart.
+    """
+    vocabulary = {name for _, _, matcher in binds
+                  for name in matcher_names(matcher)}
+    by_key = {}
+    for script, event, matcher in binds:
+        by_key.setdefault((script, event), []).append(matcher)
+
+    failures = 0
+    examined = 0
+    for (script, event), matchers in sorted(by_key.items()):
+        for i, first in enumerate(matchers):
+            for second in matchers[i + 1:]:
+                examined += 1
+                shared = overlapping_tools(first, second, vocabulary)
+                if not shared:
+                    continue
+                print(f"FAIL: {script} is bound to {event} in two matcher "
+                      f"groups, {_show(first)} and {_show(second)}, which "
+                      f"both fire on {', '.join(shared)}; the hook then runs "
+                      "twice on one call. Merge the groups, or narrow one "
+                      "matcher so they are disjoint")
+                failures += 1
+    return failures, examined
+
+
 def check(reg, doc):
     """Compare the two catalogs. Returns the failure count."""
     failures = 0
@@ -350,14 +501,18 @@ def check(reg, doc):
 
 
 def main() -> int:
-    reg = registered()
+    binds = bindings()
+    reg = registered(binds)
     doc = documented()
     failures = check(reg, doc)
+    double_failures, examined = check_double_bindings(binds)
+    failures += double_failures
     failures += check_tracker_states()
 
     print(f"\n{len(reg)} hooks registered in hooks.json; {len(doc)} documented "
           f"in README ({len(KNOWN_UNREGISTERED)} known unregistered); "
-          f"{len(set(reg) & set(doc))} compared for event and matcher")
+          f"{len(set(reg) & set(doc))} compared for event and matcher; "
+          f"{examined} matcher pair(s) compared for a double binding")
     return 1 if failures else 0
 
 

@@ -93,7 +93,8 @@ def readme(rows, heading="## Enforcement hooks (`hooks/`)"):
     return "\n".join(body) + "\n"
 
 
-def make_repo(tmpdir, entries, rows, heading=None, allowlisted=None):
+def make_repo(tmpdir, entries, rows, heading=None, allowlisted=None,
+              hooks_text=None):
     root = Path(tmpdir)
     (root / "scripts").mkdir()
     (root / "hooks").mkdir()
@@ -107,8 +108,12 @@ def make_repo(tmpdir, entries, rows, heading=None, allowlisted=None):
         script_text = re.sub(r"KNOWN_UNREGISTERED = \{[^}]*\}", replacement, script_text)
     (root / "scripts" / "check-hook-catalog.py").write_text(
         script_text, encoding="utf-8")
+    # `hooks_json` keys groups by (event, matcher), so it cannot express two
+    # groups carrying the SAME matcher -- which is one shape of double
+    # binding. `hooks_text` writes the manifest verbatim for those cases.
     (root / "hooks" / "hooks.json").write_text(
-        hooks_json(entries), encoding="utf-8")
+        hooks_text if hooks_text is not None else hooks_json(entries),
+        encoding="utf-8")
     kwargs = {"heading": heading} if heading else {}
     (root / "README.md").write_text(readme(rows, **kwargs), encoding="utf-8")
     return root
@@ -139,9 +144,9 @@ ALLOW_ROWS = [(s, "PreToolUse", "Bash", f"**not registered ([#{issue}](u))** ---
 
 
 def case(name, entries, rows, want_fail, needle=None, heading=None,
-         allowlisted=None, issue_states="unfetchable"):
+         allowlisted=None, issue_states="unfetchable", hooks_text=None):
     with tempfile.TemporaryDirectory() as td:
-        root = make_repo(td, entries, rows, heading, allowlisted)
+        root = make_repo(td, entries, rows, heading, allowlisted, hooks_text)
         rc, out = run(root, issue_states=issue_states)
     ok = (rc != 0) if want_fail else (rc == 0)
     if ok and needle:
@@ -180,6 +185,89 @@ case("matcher mismatch fails",
      [("a.py", "PreToolUse", "Bash")],
      [("a.py", "PreToolUse", "Agent", "blocks x")] + ALLOW_ROWS,
      want_fail=True, needle="hooks.json binds PreToolUse (Bash)")
+
+# --- matcher semantics, measured against the harness (ai-config#2535) -----
+# These lock the finding that settles #2535: a plain-name matcher is compared
+# by EXACT STRING EQUALITY, not as an unanchored regex, and an alternation is
+# exact membership rather than dead. Read from Claude Code v2.1.42's own
+# matcher function in `cli.js` and re-run against the extracted function under
+# node, 2026-09-03. If a harness bump changes this, these fail rather than the
+# double-binding check quietly reporting the wrong answer.
+check("a plain-name matcher does not match a longer tool name",
+      _catalog.matcher_matches("NotebookEdit", "Edit") is False)
+check("a plain-name matcher matches its own tool",
+      _catalog.matcher_matches("Edit", "Edit") is True)
+check("an alternation matcher matches each named tool",
+      all(_catalog.matcher_matches(t, "Write|Edit|NotebookEdit")
+          for t in ("Write", "Edit", "NotebookEdit")))
+check("an alternation matcher matches nothing else",
+      _catalog.matcher_matches("Bash", "Write|Edit|NotebookEdit") is False)
+check("a non-plain matcher is an unanchored regex",
+      _catalog.matcher_matches("NotebookEdit", "Edit.*") is True
+      and _catalog.matcher_matches("mcp__github__issue_write",
+                                   "mcp__github__.*") is True)
+check("an empty or star matcher fires on every tool",
+      _catalog.matcher_matches("Bash", "") is True
+      and _catalog.matcher_matches("Bash", "*") is True)
+check("a comma-joined matcher is a regex, so it names no tools literally",
+      _catalog.matcher_names("Write, Edit") == frozenset())
+check("an alternation matcher names each of its tools literally",
+      _catalog.matcher_names("Write|Edit")
+      == frozenset({"Write", "Edit"}))
+
+# --- double binding (ai-config#2535) --------------------------------------
+# `registered` folds a script's matcher groups into one comma-joined string,
+# so a hook bound once and a hook bound twice compare equal to the same README
+# row. Each case below is a binding the old catalog reported as clean.
+case("three disjoint plain matchers are not a double binding",
+     [("a.py", "PreToolUse", "Write"), ("a.py", "PreToolUse", "Edit"),
+      ("a.py", "PreToolUse", "NotebookEdit")],
+     [("a.py", "PreToolUse", "Write, Edit, NotebookEdit", "warns")]
+     + ALLOW_ROWS,
+     want_fail=False)
+
+case("a regex matcher overlapping a plain one is a double binding",
+     [("a.py", "PreToolUse", "Edit"), ("a.py", "PreToolUse", "Edit.*")],
+     [("a.py", "PreToolUse", "Edit, Edit.*", "warns")] + ALLOW_ROWS,
+     want_fail=True, needle="runs twice on one call")
+
+case("a catch-all group beside a named group is a double binding",
+     [("a.py", "PreToolUse", ""), ("a.py", "PreToolUse", "Bash")],
+     [("a.py", "PreToolUse", "Bash", "warns")] + ALLOW_ROWS,
+     want_fail=True, needle="which both fire on every tool")
+
+# Two groups carrying the identical matcher -- the shape `hooks_json` cannot
+# build, and the one a reader is likeliest to create by appending a group
+# instead of extending one.
+_dup = json.dumps({"hooks": {"PreToolUse": [
+    {"matcher": "Bash", "hooks": [{"type": "command", "script": "a.py"}]},
+    {"matcher": "Bash", "hooks": [{"type": "command", "script": "a.py"}]},
+]}}, indent=2)
+case("the same matcher in two groups is a double binding",
+     [], [("a.py", "PreToolUse", "Bash, Bash", "warns")] + ALLOW_ROWS,
+     want_fail=True, needle="which both fire on Bash", hooks_text=_dup)
+
+case("a double binding on different events is not one",
+     [("a.py", "PreToolUse", "Bash"), ("a.py", "Stop", "")],
+     [("a.py", "PreToolUse, Stop", "Bash", "warns")] + ALLOW_ROWS,
+     want_fail=False)
+
+# --- alternation matchers in the README cell ------------------------------
+# The harness accepts `A|B|C` as one group, so the catalog has to be able to
+# say so. A markdown cell carries the pipe escaped.
+case("an escaped alternation row matches an alternation binding",
+     [("a.py", "PreToolUse", "Write|Edit|NotebookEdit")],
+     [("a.py", "PreToolUse", r"Write\|Edit\|NotebookEdit", "warns")]
+     + ALLOW_ROWS,
+     want_fail=False)
+
+# A second, well-formed row keeps the table non-empty, so this case reaches
+# the set comparison rather than short-circuiting on "parsed 0 hook rows".
+case("a bare pipe in the matcher cell does not parse as a row",
+     [("a.py", "PreToolUse", "Write|Edit"), ("b.py", "Stop", "")],
+     [("a.py", "PreToolUse", "Write|Edit", "warns"),
+      ("b.py", "Stop", "", "blocks y")] + ALLOW_ROWS,
+     want_fail=True, needle="a.py is registered")
 
 # --- allowlist hygiene, mirroring KNOWN_UNTESTED's reverse check ----------
 # Always exercised by injecting a test allowlist, ensuring these checks run

@@ -64,7 +64,7 @@ def checker_exit2(pr=None):
         {"type": "assistant", "message": {"content": [
             {"type": "tool_use", "id": call_id, "name": "Bash", "input": {"command": cmd}}]}},
         {"type": "user", "message": {"content": [
-            {"type": "tool_result", "tool_use_id": call_id, "content": "`gh` is not installed or not on PATH.\nThis script requires the GitHub CLI; -R cannot substitute for it."}]}}
+            {"type": "tool_result", "tool_use_id": call_id, "content": "`gh` is not installed or not on PATH.\n`-R` alone cannot substitute for it, but the GitHub CLI is not required: score a JSON payload instead."}]}}
     ]
 
 

@@ -12,6 +12,7 @@ import contextlib
 import importlib.util
 import io
 import json
+import os
 import re
 import time
 from unittest.mock import patch
@@ -3399,11 +3400,9 @@ def main() -> int:
               exit_code_of(lambda: checker.check_ci_runs("sha123", TEST_REPO)) == 2)
 
     # Exiting 2 is only half of it: the message a stranded session reads must
-    # name the remedy, not only the dependency (ai-config#3113). The recipe is
-    # a hardcoded string pointing at a sibling script and a flag, so it can rot
-    # away from either without anything failing -- this is what holds the three
-    # together. Asserted on stderr rather than on the source text, so a message
-    # assembled correctly but never reached would still fail.
+    # name the remedy, not only the dependency (ai-config#3113). Asserted on
+    # stderr rather than on the source text, so a message assembled correctly
+    # but never reached would still fail.
     def stderr_of_missing_binary(argv):
         buf = io.StringIO()
         with patch.object(checker, "subprocess") as missing:
@@ -3419,15 +3418,90 @@ def main() -> int:
           "build-pr-payload.py" in gh_message)
     check("a missing gh names --from-json, the flag that consumes the payload",
           "--from-json" in gh_message)
+    check("a missing gh names the token build-pr-payload.py requires",
+          "GITHUB_TOKEN" in gh_message)
 
-    # The same `die` serves every command `run_cmd` is handed, and a payload
-    # recipe answers nothing about a missing `git` -- so the recipe is gated on
-    # the binary rather than appended unconditionally.
+    # The two substring checks above establish only that the message was
+    # reached and carries the strings. They cannot see a rename of the sibling
+    # script, of `--from-json`, or of the builder's positional order, each of
+    # which would leave the printed recipe pointing at nothing while the suite
+    # stayed green. The checks below are what actually pin the recipe to the
+    # artifacts it names: they take the commands back OFF the emitted message
+    # and run them through the real parsers (ai-config#3113).
+    recipe = [
+        line.strip().split()
+        for line in gh_message.splitlines()
+        if line.startswith("  python3 ")
+    ]
+    check("the message prints a two-command recipe", len(recipe) == 2)
+    builder_argv, scorer_argv = recipe[0], recipe[1]
+
+    # `N` is the recipe's placeholder for a PR number; the builder's parser
+    # types that positional as an int, so it has to be filled before parsing.
+    def filled(argv):
+        return ["445" if token == "N" else token for token in argv[2:]]
+
+    def parsed(parse_args, argv):
+        """Run *argv* through *parse_args*, answering None when it is rejected.
+
+        argparse answers a bad argv by printing usage and raising SystemExit,
+        which would tear down the whole suite at whichever rot this block is
+        meant to REPORT -- a renamed flag or a reordered positional. Catching
+        it turns that into one FAIL beside the others. stderr is swallowed for
+        the same reason: a usage block printed mid-run reads as a crash.
+        """
+        try:
+            with contextlib.redirect_stderr(io.StringIO()):
+                return parse_args(argv)
+        except SystemExit:
+            return None
+
+    builder_path = Path(builder_argv[1])
+    check("the script the recipe names exists at the path it prints",
+          builder_path.is_file())
+    check("the recipe invokes this very script for the scoring half",
+          Path(scorer_argv[1]) == Path(checker.__file__).resolve())
+
+    if builder_path.is_file():
+        builder_spec = importlib.util.spec_from_file_location(
+            "recipe_payload_builder", builder_path
+        )
+        builder = importlib.util.module_from_spec(builder_spec)
+        builder_spec.loader.exec_module(builder)
+        built = parsed(builder.parse_args, filled(builder_argv))
+        check("the recipe's positional order matches the builder's own parser",
+              built is not None
+              and (built.owner_repo, built.pr_number, built.out_file)
+              == ("OWNER/REPO", 445, "/tmp/pr.json"))
+
+        # The token sentence is a claim about the builder's behaviour, so it is
+        # checked against the builder rather than against the message alone.
+        with patch.dict(os.environ, {}, clear=True):
+            try:
+                builder._token()
+                token_required = False
+            except builder.PayloadBuildError:
+                token_required = True
+        check("the token precondition the message names is one the builder has",
+              token_required)
+
+    scored = parsed(checker.parse_args, filled(scorer_argv))
+    check("the recipe's scoring command parses, and feeds --from-json the "
+          "file the builder wrote",
+          scored is not None
+          and (scored.pr_number, scored.repo, scored.from_json)
+          == ("445", "OWNER/REPO", "/tmp/pr.json"))
+
+    # The same `die` serves every command `run_cmd` is handed, and neither the
+    # payload recipe nor anything about the GitHub CLI answers a missing `git`
+    # -- so both are gated on the binary rather than emitted unconditionally.
     other_message = stderr_of_missing_binary(["git", "rev-parse", "HEAD"])
     check("a missing non-gh binary still reports which binary is absent",
           "`git`" in other_message)
     check("a missing non-gh binary is not offered the --from-json recipe",
           "--from-json" not in other_message)
+    check("a missing non-gh binary is not told the GitHub CLI is the dependency",
+          "GitHub CLI" not in other_message)
 
     # Test 9: -R is parsed rather than silently ignored (#1391's repro)
     args = checker.parse_args(["445", "-R", "Morrison-Lab/gha"])

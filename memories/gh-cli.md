@@ -82,8 +82,16 @@
 
   ```text
   `gh` is not installed or not on PATH.
-  This script requires the GitHub CLI; -R cannot substitute for it.
+  `-R` alone cannot substitute for it, but the GitHub CLI is not required:
+  score a JSON payload instead. `build-pr-payload.py` assembles one from
+  plain REST, and needs GITHUB_TOKEN or GH_TOKEN set:
+    python3 <scripts>/build-pr-payload.py OWNER/REPO N /tmp/pr.json
+    python3 <scripts>/check-pr-fully-clean.py N -R OWNER/REPO --from-json /tmp/pr.json
   ```
+
+  The two commands print as absolute paths derived from the script's own
+  location, so they are runnable as printed from whatever directory the
+  failing invocation used (ai-config#3113).
 
   It exits **2**, never 1 --- 1 is this script's "not clean" code, so a missing
   binary would otherwise read as a verdict rather than an environment failure.

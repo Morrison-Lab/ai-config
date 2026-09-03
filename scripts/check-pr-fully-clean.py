@@ -117,32 +117,46 @@ def run_cmd(cmd: List[str]) -> str:
         # guard fail-fast.md describes -- the guard's presence reads as the
         # hazard being handled everywhere. See Morrison-Lab/ai-config#1330 for
         # the standing dependency on `gh` itself, which this does not remove.
-        message = (
-            f"`{cmd[0]}` is not installed or not on PATH.\n"
-            "This script requires the GitHub CLI; -R cannot substitute for it."
-        )
+        message = f"`{cmd[0]}` is not installed or not on PATH."
         if cmd[0] == "gh":
-            # fail-fast.md asks a failure to name its own remedy, and the two
-            # sentences above name only the dependency: the second reads as a
-            # closed door, ruling out the one alternative it mentions and
-            # stopping. The remedy ships in this same directory
-            # (`build-pr-payload.py`, ai-config#2908) and was reachable only
+            # fail-fast.md asks a failure to name its own remedy, and the line
+            # above names only the dependency. What this used to say next --
+            # "This script requires the GitHub CLI; -R cannot substitute for
+            # it." -- read as a closed door: it ruled out the one alternative
+            # it mentioned and stopped. It was also false, because the remedy
+            # ships in this same directory (`build-pr-payload.py`,
+            # ai-config#2908) and needs no CLI. That remedy was reachable only
             # from `fully-clean.md` or that script's `--help`, both of which
             # require already suspecting it exists -- so a stranded session
             # hand-built the payload instead (ai-config#2938) or skipped the
             # check. The error message is the one surface such a session is
             # guaranteed to read (ai-config#3113).
             #
+            # Two details the recipe cannot omit and stay executable. The
+            # paths are derived from `__file__` rather than written relative
+            # to the repo root, because this script is location-independent
+            # (`get_pr_info` inserts its own parent onto sys.path) and is
+            # routinely invoked by absolute path from an unrelated cwd, where
+            # `scripts/build-pr-payload.py` resolves to nothing. And the token
+            # is named because `build-pr-payload.py`'s `_token()` dies without
+            # GITHUB_TOKEN or GH_TOKEN, so a recipe that omitted it would send
+            # the reader into a second dead end.
+            #
             # Gated on `gh` because this `die` serves every command run_cmd is
-            # handed, and `--from-json` answers nothing about any other missing
-            # binary.
+            # handed, and neither `--from-json` nor anything about the GitHub
+            # CLI answers a missing `git`.
+            here = Path(__file__).resolve()
             message += (
-                "\n\nIn a remote/web session, score a JSON payload instead --"
-                " `build-pr-payload.py` assembles one from plain REST:\n"
-                "  python3 scripts/build-pr-payload.py OWNER/REPO N /tmp/pr.json\n"
-                "  python3 scripts/check-pr-fully-clean.py N -R OWNER/REPO"
-                " --from-json /tmp/pr.json"
+                "\n`-R` alone cannot substitute for it, but the GitHub CLI is"
+                " not required: score a JSON payload instead."
+                " `build-pr-payload.py` assembles one from plain REST, and"
+                " needs GITHUB_TOKEN or GH_TOKEN set:\n"
+                f"  python3 {here.parent / 'build-pr-payload.py'}"
+                " OWNER/REPO N /tmp/pr.json\n"
+                f"  python3 {here} N -R OWNER/REPO --from-json /tmp/pr.json"
             )
+        else:
+            message += "\nInstall it, or put it on PATH, and re-run."
         die(message)
     if res.returncode != 0:
         # `stderr` is exposed to the same reader-thread decode failure as

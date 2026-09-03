@@ -279,6 +279,48 @@ check("and its caveat arm fires on a structured body too",
       "UNLESS posted under a bot identity"
       in crb.analyse(_structured_unreadable, MOD)["why"], True)
 
+# --- the round-2 boundary, which the docstring got wrong twice ----------
+# First it said a `## Findings` heading forces not-clean regardless of
+# contents; then it retracted that and said the exemption covers any section
+# that says none. Both wrong, in opposite directions, and each was a fresh
+# guess at a rule the classifier answers. Pinned so a third guess fails.
+#
+# The rule `_findings_section_resolves_empty` actually implements: the
+# section's first non-empty line must resolve, AND nothing after it may be
+# finding-SHAPED. Free prose after a resolving line is explicitly not vetoed
+# (its own docstring says so); a bulleted item is. Round 2 said "None. Zero
+# findings at this head." and then listed two bullets recounting what the
+# prior round fixed -- and those bullets are what re-flagged it.
+
+_R2_HEAD = ("**Self-review**\n\n## Summary\n\nRead the diff in full.\n\n"
+            "## Findings\n\n")
+_R2_TAIL = f"\n## Verdict\n\nVerdict: Ready for merge\n{FINGERPRINT}\n"
+
+check("a resolving line followed by bulleted items is NOT clean",
+      verdict(_R2_HEAD
+              + "None. Zero findings at this head.\n\n"
+                "The last substantive round fixed two items:\n\n"
+                "- `MR_DIFF_FILES` could carry the literal string `null`.\n"
+                "- A stale comment on case 8.\n"
+              + _R2_TAIL),
+      "NOT-CLEAN")
+
+# The two boundaries either side of it, so the case above cannot pass for the
+# wrong reason -- neither "any Findings heading blocks" nor "any section that
+# says none exempts" would give all three of these.
+check("the same section without the bullets is clean",
+      verdict(_R2_HEAD
+              + "None. Zero findings at this head.\n\n"
+                "The last substantive round fixed two items, both verified.\n"
+              + _R2_TAIL),
+      "CLEAN")
+check("and a section that does not open by resolving is NOT clean",
+      verdict(_R2_HEAD
+              + "The last substantive round fixed two items.\n\n"
+                "None outstanding at this head.\n"
+              + _R2_TAIL),
+      "NOT-CLEAN")
+
 # --- the call site, which the extraction alone does not cover ------------
 # The deleted `ast` guard caught one thing the extraction does not: whether
 # the checker still CALLS the helper, ahead of admission. Measured after the
@@ -291,8 +333,11 @@ check("and its caveat arm fires on a structured body too",
 #
 # The checker's OWN suite still does not cover this: it stays fully green with
 # the helper neutered to `return False`. No count is given, deliberately --
-# the total differs between this worktree and a scratch copy of it (754 vs
-# 753), and an earlier revision baked one in and had it read as a regression.
+# the suite carries wall-clock assertions that intermittently miss a
+# one-second budget (Morrison-Lab/ai-config#3127), so a run reports `753
+# passed, 1 failed` out of the same 754 rather than a different total. An
+# earlier revision baked a number in and had that flake read as a regression;
+# the revision after it misattributed the flake to the checkout.
 # Filed as Morrison-Lab/ai-config#3122 rather than fixed there, since the gap
 # pre-dates this PR.
 

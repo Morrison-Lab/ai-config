@@ -18,12 +18,31 @@ before one counted:
   2. Fingerprint added. Still not counted as clean.
   3. Restructured around `[FINDINGS_COUNT: 0]`. Counted, clean.
 
-Note what is NOT claimed about round 2. An earlier version of this docstring
-said a `## Findings` heading forced not-clean regardless of its contents. That
-is false: `_findings_section_resolves_empty` exists precisely to exempt a
-heading whose section says none, and the classifier reads that round-2 body as
-CLEAN. The round-2 rejection had another cause, and rather than guess at it a
-second time this tool now just asks the classifier.
+Round 2 is the one to read carefully, because this docstring got it wrong
+twice in opposite directions. The first version said a `## Findings` heading
+forces not-clean regardless of its contents. The second retracted that,
+claiming `_findings_section_resolves_empty` exempts any heading whose section
+says none and that round 2 was rejected for some other reason.
+
+Both are wrong, and the tool shipped here settles it -- run against the real
+round-2 body it reports NOT-CLEAN, `unresolved finding` matching
+`#+\s*(Actionable\s+|Detailed\s+)?Findings`.
+
+The exemption is real and did not apply, for a reason neither version guessed.
+`_findings_section_resolves_empty` needs two things: the section's first
+non-empty line must resolve, AND nothing after it may be finding-SHAPED. Free
+prose after a resolving line is explicitly NOT vetoed -- that function's own
+docstring says so. A bulleted item is. Round 2 opened `None. Zero findings at
+this head.` and then listed two bullets recounting what the prior round had
+fixed, and those bullets re-flagged it.
+
+So the heading was the cause, and the rule is narrower than the first version
+said and wider than the second: a `## Findings` section is safe when it opens
+by resolving and carries no items afterwards. Prose is fine. Bullets are not.
+
+That is the actual lesson twice over. Guessing at the rule produced a wrong
+answer, and guessing at the retraction produced the opposite wrong answer --
+while the classifier was two imports away throughout.
 
 That is the actual lesson, and it is `deterministic-tools.md`'s: the classifier
 was two imports away throughout, and three comments were spent guessing at

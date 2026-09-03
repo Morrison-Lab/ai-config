@@ -518,3 +518,19 @@ Its head `2b735663` has green CI and a clean claude-review verdict since 14:39 P
 `ListAgents` listed no peer session, so the `mwc` peer-PR path's message-the-owner step had nowhere to go;
 Copilot was requested and `@jules review` posted, with a status comment naming this session and the twenty-minute-plus-five-minute hold-off before any merge.
 The next check-in is armed for 16:57 PDT with that condition written into it.
+
+## 16:39 PDT --- #3154 round 11: an inert flag, a verb without an object, an enumerated deferral
+
+The verdict for `cee70344` returned three findings, applied at `16c78e66` or answered outside the diff.
+The `--exclude-dir=__pycache__` flag added in round 9 to stop `.pyc` hits was inert:
+measured over the recipe's own path list, `-I` alone leaves 99 files, either flag alone leaves 99, and neither leaves 117, with all 18 extra under `__pycache__`.
+A flag added to fix a measured problem still needs its own measurement against the fix already in place;
+the sentence justifying it was false, and the flag is gone.
+The cross-repo bullet's "add the destination repo's own doc paths, run in that repo" left "run" without an object;
+it now says to run a second pass in that repo.
+The deferral to #3161 had named one sibling skill where the derived population holds four:
+`memorize`, `config-ai`, `record-learnings`, and `promote-memory` each scope their dupe check to the destination,
+found by a grep over `skills/*/SKILL.md` for a search verb near a destination noun, plus one site whose verb is "read".
+[#3161](https://github.com/Morrison-Lab/ai-config/issues/3161) is widened to the four with the query recorded, and the PR body's Deferred section names them.
+Lesson for the fold: a deferral is a scope claim, so derive its population before filing, per `derive-dont-enumerate`.
+The verdict for `16c78e66` is running.

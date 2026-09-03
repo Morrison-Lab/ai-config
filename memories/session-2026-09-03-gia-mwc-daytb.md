@@ -457,3 +457,13 @@ It waits for a verdict and a push under the five-subagent cap.
 User directive at 14:19 PDT: do not grab any more new issues in this session.
 The 40 issues already claimed across waves 1 to 4 are the current wave and run to completion;
 no new claim is posted from here on, and the check-in prompt no longer resumes anything beyond those four runs.
+
+## 15:17 PDT --- branch P through eight review rounds
+
+Rounds 5 to 8 on `fix/ums-step3-corpus-scope` after the merge with `main`: 5, 8, 9, then 2 findings.
+Round 6 was answered by cutting the subsection to its heading, one orienting sentence, the case record, and the Do/Don't pair, and step 3 to the query and a two-line reason.
+Round 7 showed that round 6's own suggested fix, pinning the query to `origin/main`, would blind the dupe check to unmerged work;
+the query now searches the resolved checkout's working tree behind a fail-closed guard, in a fenced block.
+Round 8 left two convention items, both applied by hand with their ancestry re-derived;
+round 9 is running.
+The lesson for the fold: a reviewer's suggested fix is a claim like any other, and the one at round 6 was refuted one round later.

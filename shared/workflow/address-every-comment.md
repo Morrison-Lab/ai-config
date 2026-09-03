@@ -811,7 +811,7 @@ for "frequently" --- and adds a hedging clause around it, with no second
 instance behind either.
 That reads as a genuine response, because the sentence changed and the
 finding named a word.
-It answers "is this word too strong" and leaves "is this claim supported" 
+It answers "is this word too strong" and leaves "is this claim supported"
 exactly where the reviewer found it, so a re-raise on the next round is not
 the reviewer being difficult --- it is the same finding, correctly repeated
 against the same absent evidence.

@@ -121,7 +121,10 @@ RX_WRITE_METHOD = re.compile(r"(?:-X|--method)[=\s]*(?:PUT|PATCH)\b")
 # `gh api ... -frequired_status_checks[][context]=lint`. The leading
 # `(?:^|\s)` keeps `-[fF]` from matching inside `--field` or `--force`, whose
 # second character is a dash.
-RX_IMPLICIT_POST = re.compile(r"(?:^|\s)(?:--input\b|-[fF]|--(?:raw-)?field\b)")
+# The leading `\s` (rather than `(?:^|\s)`) is deliberate: a segment reaching
+# this point has already cleared the command-word gate, so it begins with `gh`
+# or a wrapper and never with a flag. An `^` branch here could not match.
+RX_IMPLICIT_POST = re.compile(r"\s(?:--input\b|-[fF]|--(?:raw-)?field\b)")
 
 # An explicit read method beats both: `-X GET` with parameters is a query.
 RX_READ_METHOD = re.compile(r"(?:-X|--method)[=\s]*(?:GET|HEAD)\b")
@@ -130,7 +133,10 @@ RX_READ_METHOD = re.compile(r"(?:-X|--method)[=\s]*(?:GET|HEAD)\b")
 # rulesets are included: one bad context there blocks merges across every
 # repository in the org.
 RX_PROTECTION_ENDPOINT = re.compile(
-    r"(?:^|[\s\"'/])(?:repos|orgs)/[^\s\"']+?"
+    # `[\s"'/]` rather than `(?:^|[\s"'/])`, for the same reason
+    # RX_IMPLICIT_POST drops its `^` branch: the segment always begins with
+    # `gh`, so nothing can match at position zero.
+    r"[\s\"'/](?:repos|orgs)/[^\s\"']+?"
     # No `(?:/\d+)?` after `rulesets`: under re.search an optional trailing
     # group cannot change whether a match exists, so it would be inert.
     r"/(?:rulesets|branches/[^\s\"']+/protection)",
@@ -224,8 +230,14 @@ SHELL_WRAPPERS = frozenset(SHELL_KEYWORDS + COMMAND_WRAPPERS)
 RX_DURATION = re.compile(r"^\d+(?:\.\d+)?[smhd]?$")
 RX_SHELL_WRAPPER_PREFIX = re.compile(
     r"^\s*(?:(?:" + "|".join(re.escape(w) for w in SHELL_WRAPPERS)
-    # a flag, optionally followed by its separated value (never `gh` itself)
-    + r")\s+(?:-\S+\s+(?!gh\s)(?:[^-\s]\S*\s+)?)*"
+    # A flag, optionally followed by its separated value. The `(?!gh\s)` sits
+    # INSIDE the optional group on purpose: outside it, failing the lookahead
+    # aborts the whole flag-consuming iteration rather than merely declining to
+    # eat `gh`, so a valueless flag followed straight by the command (`xargs -r
+    # gh api ...`, `sudo -n`, `env -i`) left the flag unstripped and the
+    # anchor failed. This is the fallback twin of the `tokens[0] != "gh"` guard
+    # on the token path.
+    + r")\s+(?:-\S+\s+(?:(?!gh\s)[^-\s]\S*\s+)?)*"
     + r"(?:\d+(?:\.\d+)?[smhd]?\s+)?)*"
 )
 

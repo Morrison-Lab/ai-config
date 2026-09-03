@@ -170,10 +170,10 @@ CASES = {
     ),
     "W20": (
         "UNBALANCED QUOTE behind a command wrapper",
-        # Exercises the fallback's RX_SHELL_WRAPPER_PREFIX. `nice` rather than
-        # `timeout`, whose duration is a positional argument the wrapper-flag
-        # skip does not cover -- a real limit, recorded rather than papered
-        # over.
+        # Exercises the fallback's RX_SHELL_WRAPPER_PREFIX with a BARE
+        # wrapper -- no flags, no duration -- so it pins the wrapper-stripping
+        # itself. W32 covers a wrapper with a flag and a duration, and W33 a
+        # valueless flag followed straight by the command.
         "Bash",
         "nice gh api -X PUT "
         "repos/o/r/branches/main/protection/required_status_checks "
@@ -254,6 +254,17 @@ CASES = {
         # (bare `nice`) leaves untested.
         "Bash",
         "timeout -k 10 60 gh api -X PUT "
+        "repos/o/r/branches/main/protection/required_status_checks "
+        "-f x='unclosed",
+        True,
+    ),
+    "W33": (
+        "UNBALANCED QUOTE behind a VALUELESS wrapper flag, then `gh`",
+        # The fallback twin of the token path's `tokens[0] != "gh"` guard: the
+        # lookahead protecting `gh` must decline to eat it WITHOUT aborting
+        # the flag-consuming loop. `xargs -r` takes no value.
+        "Bash",
+        "xargs -r gh api -X PUT "
         "repos/o/r/branches/main/protection/required_status_checks "
         "-f x='unclosed",
         True,
@@ -448,14 +459,14 @@ MUTATIONS = {
     ),
     "implicit_post_f_flag": (
         "`-f`/`-F` alone makes it a write",
-        [(r'r"(?:^|\s)(?:--input\b|-[fF]|--(?:raw-)?field\b)"',
-          r'r"(?:^|\s)(?:--input\b|--(?:raw-)?field\b)"')],
+        [(r'r"\s(?:--input\b|-[fF]|--(?:raw-)?field\b)"',
+          r'r"\s(?:--input\b|--(?:raw-)?field\b)"')],
         {"W14", "W26"},
     ),
     "implicit_post_field_flag": (
         "`--field`/`--raw-field` alone makes it a write",
-        [(r'r"(?:^|\s)(?:--input\b|-[fF]|--(?:raw-)?field\b)"',
-          r'r"(?:^|\s)(?:--input\b|-[fF])"')],
+        [(r'r"\s(?:--input\b|-[fF]|--(?:raw-)?field\b)"',
+          r'r"\s(?:--input\b|-[fF])"')],
         {"W15", "W27"},
     ),
     "method_patch": (
@@ -483,7 +494,7 @@ MUTATIONS = {
     # could never pin those two, and left stdbuf and parallel unmeasured.
     "wrapper_xargs": (
         "`xargs` is a command wrapper",
-        [('"xargs", ', "")], {"W18", "W22"},
+        [('"xargs", ', "")], {"W18", "W22", "W33"},
     ),
     "wrapper_timeout": (
         "`timeout` is a command wrapper",
@@ -535,8 +546,8 @@ MUTATIONS = {
     ),
     "implicit_post_f_no_separator": (
         "`-f` needs no separator, matching gh's pflag shorthand",
-        [(r'r"(?:^|\s)(?:--input\b|-[fF]|--(?:raw-)?field\b)"',
-          r'r"(?:^|\s)(?:--input\b|-[fF]\s|--(?:raw-)?field\b)"')],
+        [(r'r"\s(?:--input\b|-[fF]|--(?:raw-)?field\b)"',
+          r'r"\s(?:--input\b|-[fF]\s|--(?:raw-)?field\b)"')],
         {"W26"},
     ),
     "read_method_long_form": (
@@ -551,11 +562,16 @@ MUTATIONS = {
           r'r"(?:-X|--method)[=\s]+(?:GET|HEAD)\b"')],
         {"S8"},
     ),
+    "fallback_gh_lookahead": (
+        "the fallback's value-skip declines `gh` without aborting the loop",
+        [(r"(?:(?!gh\s)[^-\s]\S*\s+)?", r"(?:[^-\s]\S*\s+)?")],
+        {"W33"},
+    ),
     "fallback_flag_and_duration": (
         "the regex fallback skips wrapper flags, their values, and durations",
-        [(r'r")\s+(?:-\S+\s+(?!gh\s)(?:[^-\s]\S*\s+)?)*"',
+        [(r'r")\s+(?:-\S+\s+(?:(?!gh\s)[^-\s]\S*\s+)?)*"',
           r'r")\s+"')],
-        {"W32"},
+        {"W32", "W33"},
     ),
     "wrapper_duration_skip": (
         "a wrapper's positional duration is skipped too",
@@ -584,7 +600,7 @@ MUTATIONS = {
         # instead of behaving differently, which measures nothing.
         [('stripped = RX_SHELL_WRAPPER_PREFIX.sub("", segment)',
           "stripped = segment")],
-        {"W20", "W32"},
+        {"W20", "W32", "W33"},
     ),
     "implicit_post": (
         "parameters alone make it a write, since gh defaults to POST",
@@ -611,7 +627,7 @@ MUTATIONS = {
           '        stripped = RX_ENV_PREFIX.sub("", stripped).lstrip()\n'
           '        return bool(re.match(r"gh\\s+api\\b", stripped))',
           "        return False")],
-        {"W11", "W19", "W20", "W32"},
+        {"W11", "W19", "W20", "W32", "W33"},
     ),
     "protection_endpoint": (
         "only ruleset / branch-protection endpoints are in scope",
@@ -637,7 +653,7 @@ MUTATIONS = {
         # every case whose only payload marker is the field name, whether
         # it appears as a flag value or inside the URL path
         {"W3", "W6", "W13", "W14", "W15", "W16", "W19", "W20", "W26",
-         "W27", "W32"},
+         "W27", "W32", "W33"},
     ),
     "payload_contexts": (
         "a `contexts` key counts even without the field name",

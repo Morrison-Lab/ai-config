@@ -1277,3 +1277,44 @@ event, leaving the input silently inert, and *sideways*, a sibling branch of an
 unrelated ternary that told every such run it had been triggered by a mention
 that did not exist.
 Three defects, one shape, one direction named.)
+
+## A story that fits the evidence is not a finding
+
+The section above governs a cause read off the wrong artifact.
+This one governs a cause read off the **right** artifact, where the reading is
+accurate, the story accounts for every observation, and the cause is still
+made up.
+
+Fitting is cheap.
+A small set of readings admits several stories that each explain all of them,
+so the story arriving first tends to be the one whose vocabulary was already
+in mind rather than the one the evidence selects.
+It then feels verified precisely because nothing in the evidence contradicts
+it --- which is the property every rival story shares.
+
+The check is not "does this explain what I saw" but "what observation would
+this predict that a rival would not".
+Run that experiment before naming a cause.
+When no such experiment is available or affordable, the honest report is that
+the cause is **not established**, listing the candidates, rather than the
+likeliest one dressed as a finding.
+Naming the likeliest is the near-miss here: it reads as a conclusion, it is
+usually hedged nowhere, and it closes the question for everyone downstream.
+
+- **Do:** run the experiment that discriminates between candidate causes
+  before naming one.
+- **Do:** report the cause as not established, with its candidates, when no
+  discriminating experiment is available.
+- **Don't:** treat a story that accounts for every observation as verified ---
+  that is the property that made it convincing, not evidence for it.
+- **Don't:** publish the likeliest candidate as the cause because a reader is
+  waiting for one.
+
+(Measured 2026-09-01.
+Three instrument readings on one corpus were published with a cause, then
+republished with a different cause once the first was ruled out --- first a
+vocabulary difference in the findings, then a stale checker version.
+A controlled re-run falsified both: each checker version returned identical
+verdicts on the same inputs.
+Both stories fit every reading, and the actual cause was never established ---
+which is what the report should have said in the first round.)

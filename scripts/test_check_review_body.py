@@ -74,9 +74,13 @@ check("a conditional sign-off states no verdict", verdict(
     f"## Summary\n\nfine\n\n## Verdict\n\n"
     f"Verdict: Ready for merge once the tests pass\n{FINGERPRINT}\n"),
     "NO-VERDICT")
-check("bare prose is not a verdict", verdict(
+# NO-VERDICT rather than IGNORED. Both expectations here previously encoded
+# the re-derived marker gate; with the checker's own admission logic these
+# bodies are examined and simply state nothing, which is the accurate answer --
+# `classify_verdict` returns '' for each, so neither clears nor blocks.
+check("bare prose states no verdict", verdict(
     f"## Summary\n\nI think this is ready for merge, honestly.\n{FINGERPRINT}\n"),
-    "IGNORED")
+    "NO-VERDICT")
 check("a Nits heading with real items vetoes", verdict(
     f"## Summary\n\nfine\n\n## Nits\n\n- a small thing\n\n## Verdict\n\n"
     f"Verdict: Ready for merge\n{FINGERPRINT}\n"),
@@ -84,8 +88,8 @@ check("a Nits heading with real items vetoes", verdict(
 
 # --- edges ---------------------------------------------------------------
 
-check("a body with no marker at all is ignored",
-      verdict("Looks fine to me, merging shortly.\n"), "IGNORED")
+check("casual prose states no verdict",
+      verdict("Looks fine to me, merging shortly.\n"), "NO-VERDICT")
 check("a genuine not-clean is not-clean", verdict(
     f"## Summary\n\ntrouble\n\n## Verdict\n\nVerdict: Needs work\n{FINGERPRINT}\n"),
     "NOT-CLEAN")
@@ -139,8 +143,44 @@ check("--json emits parseable JSON",
 # The whole point is that this reads the checker's OWN symbols. If it ever
 # reimplements them, this fails.
 for sym in ("classify_verdict", "_unresolved_finding_pattern",
-            "_is_structured_review_body", "has_review_body_marker"):
+            "_is_structured_review_body", "is_non_review_notice"):
     check(f"classifier exposes {sym}", hasattr(MOD, sym), True)
+
+# --- the two the delegating version still got wrong ----------------------
+# Both were the SAME error as the four before them: a gate re-derived here
+# rather than taken from the checker.
+
+# `unreadable` is truthy and is not "not-clean", so it fell through to CLEAN.
+# The checker counts it toward no quorum, so the PR reports "No valid clean
+# review found" -- a body that BLOCKS reported as clean.
+check("an agent body the classifier cannot parse is not clean", verdict(
+    f"**Claude finished review**\n\n## Summary\n\nSome notes.\n\n{FINGERPRINT}\n"),
+    "UNREADABLE")
+
+# `has_review_body_marker` is not in the checker's admission path at all. A
+# marker-free body carrying a real not-clean signal is admitted from any
+# author through the fail-closed branch, and became a standing veto.
+check("a marker-free body with a real finding is still not-clean", verdict(
+    f"## Summary\n\n[FINDINGS_COUNT: 3]\n\n{FINGERPRINT}\n"),
+    "NOT-CLEAN")
+
+# The notice gate, which survived mutation until this case existed. A workflow
+# status notice is skipped outright -- and the shape that matters is a notice
+# that ALSO carries verdict-ish words, since without the gate it would be
+# classified rather than skipped.
+check("a workflow status notice is skipped, not classified", verdict(
+    "Claude Review Dispatched\n\nThe review workflow has started; "
+    "no verdict yet.\n"),
+    "IGNORED")
+# The precedence the classifier documents: a real review that DISCUSSES a
+# notice stays a review. Without it, any review of this corpus quoting
+# "Claude Review Dispatched" would be excluded outright.
+check("a review that merely mentions a notice is still a review", verdict(
+    f"**Claude finished review**\n\n## Summary\n\nThis PR changes how "
+    f"`Claude Review Dispatched` notices are handled. "
+    f"`[FINDINGS_COUNT: 0]`\n\n## Verdict\n\n"
+    f"Verdict: Ready for merge\n{FINGERPRINT}\n"),
+    "CLEAN")
 
 if failures:
     print("FAILED:")

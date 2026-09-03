@@ -62,7 +62,6 @@ import argparse
 import importlib.util
 import json
 import os
-import re
 import sys
 
 _HERE = os.path.dirname(os.path.realpath(__file__))
@@ -107,26 +106,44 @@ def analyse(body, mod):
     verdict = mod.classify_verdict(body)
     finding = mod._unresolved_finding_pattern(body)
     structured = bool(mod._is_structured_review_body(body))
-    marker = bool(mod.has_review_body_marker(body))
+    notice = bool(mod.is_non_review_notice(body))
 
     result = {
-        "has_review_marker": marker,
+        "is_non_review_notice": notice,
         "is_structured_review_body": structured,
         "classifier_verdict": verdict or "none",
         "unresolved_finding_pattern": finding,
     }
 
-    # Mirrors the checker's own precedence at its verdict-scan loop: a body it
-    # never examines, then findings-win-over-clean, then the structure gate
-    # that a non-bot clean must pass.
-    if not marker:
+    # Order taken from the checker's ADMISSION branches, not invented here. A
+    # previous version gated first on `has_review_body_marker`, which reads
+    # like the right question and is not: that helper's only caller in the
+    # classifier is `is_non_review_notice`, where it is a reason to KEEP a body
+    # rather than to drop one. Nothing in `check_review_comments` or
+    # `check_latest_verdict` consults it. The cost was 28 measured marker-free
+    # bodies carrying a real signal, every one reported IGNORED while the
+    # checker admits them from any author through its fail-closed not-clean
+    # branch. Re-deriving one gate was enough to reproduce the whole class of
+    # error this tool exists to remove -- the third time in this file.
+    if notice:
         result["verdict"] = "IGNORED"
-        result["why"] = "no review marker, so the scanner never examines it"
+        result["why"] = "a non-review notice, which the checker skips"
     elif verdict == "not-clean" or finding:
         result["verdict"] = "NOT-CLEAN"
         result["why"] = (
             f"an unresolved finding pattern matches: {finding}" if finding
             else "the classifier reads this as not-clean")
+    elif verdict == "unreadable":
+        # Explicit, because falling through to CLEAN is what the previous
+        # version did. The checker routes this to `unreadable_items`, a NOTE
+        # that never sets `latest_verdict`, and filters it out of the
+        # per-provider quorum -- so the PR reports "No valid clean review found
+        # for HEAD SHA". A body that blocks a merge must never read as clean.
+        result["verdict"] = "UNREADABLE"
+        result["why"] = (
+            "a known review agent posted this and the classifier cannot read "
+            "its verdict: it clears nothing, blocks nothing, and counts toward "
+            "no quorum")
     elif not verdict:
         result["verdict"] = "NO-VERDICT"
         result["why"] = (
@@ -145,7 +162,7 @@ def analyse(body, mod):
 
 def render(r):
     lines = [
-        f"  review marker present   : {r['has_review_marker']}",
+        f"  non-review notice       : {r['is_non_review_notice']}",
         f"  structured report       : {r['is_structured_review_body']}",
         f"  classifier verdict      : {r['classifier_verdict']}",
         f"  unresolved finding      : {r['unresolved_finding_pattern'] or 'none'}",

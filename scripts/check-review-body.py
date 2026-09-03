@@ -39,9 +39,9 @@ The four body-level facts that decide a body's fate, each computed by
     separately as well as combined, because they are different mistakes to
     have made and the combined boolean alone does not say which one fired.
     This is the one bullet with an asterisk on "OWN code": the checker inlines
-    its ARD test at `check-pr-fully-clean.py:2555` and exposes no function for
-    it, so the phrase is duplicated here and a test asserts the checker's
-    source still contains it;
+    its ARD test in `check_review_comments` and exposes no function for it, so
+    the phrase is duplicated here and a test parses the checker to confirm it
+    still compares against that phrase;
   * whether `_is_structured_review_body` reads it as a report -- a report
     heading AND a `Reviewed-Commit:` fingerprint;
   * what `classify_verdict` makes of it: clean, not-clean, unreadable, or no
@@ -59,9 +59,8 @@ together, so neither could be reported separately.
 Note what is NOT being said about the marker check, because an earlier
 revision of THIS paragraph said it and it is false. `has_review_body_marker`
 is not a branch in `check_review_comments`, and it is reached during
-admission all the same: `is_non_review_notice` calls it
-(`check-pr-fully-clean.py:451`) as a precedence guard, and it decides that
-function's answer. Measured -- `Claude Review Dispatched` followed by
+admission all the same: `is_non_review_notice` calls it as a precedence
+guard, and it decides that function's answer. Measured -- `Claude Review Dispatched` followed by
 `Verdict: Ready for merge` SURVIVES the notice skip, the same notice without
 the verdict line is skipped outright, and `has_review_body_marker` is the only
 difference to `is_non_review_notice`'s answer. So the reason the marker check
@@ -162,18 +161,23 @@ def analyse(body, mod):
     verdict = mod.classify_verdict(body)
     finding = mod._unresolved_finding_pattern(body)
     structured = bool(mod._is_structured_review_body(body))
-    # The checker skips this BEFORE it reaches `is_non_review_notice`
-    # (check-pr-fully-clean.py:2555). Every ARD round posts one of these, per
+    # The checker skips this BEFORE it reaches `is_non_review_notice`, inline
+    # in `check_review_comments`. Every ARD round posts one of these, per
     # skills/ard/SKILL.md, so a driving session's own summary must not read as
     # a verdict.
     ard_summary = "ard review disposition summary" in body.lower()
     checker_notice = bool(mod.is_non_review_notice(body))
     # The one duplicated literal in this file. `is_non_review_notice` is a
-    # function and gets called; the ARD test is inlined at
-    # check-pr-fully-clean.py:2555 and cannot be. `test_check_review_body.py`
-    # asserts the checker's source still contains this exact phrase, so the
-    # drift `load_classifier`'s docstring warns about fails a test rather than
-    # silently mispredicting.
+    # function and gets called; the ARD test is inlined in
+    # `check_review_comments` and cannot be. `test_check_review_body.py`
+    # parses the checker and asserts this exact phrase is still compared
+    # against inside that function, so the drift `load_classifier`'s docstring
+    # warns about fails a test rather than silently mispredicting.
+    #
+    # Cited by function rather than by line, deliberately. An earlier revision
+    # gave `check-pr-fully-clean.py:2555` in three places -- a line number
+    # reads as the more precise citation and is the one nothing can pin, so a
+    # single line inserted above it silently invalidates all three.
     #
     # Reported separately as well as combined. They are two different skips
     # with two different remedies, and a single conflated boolean tells a

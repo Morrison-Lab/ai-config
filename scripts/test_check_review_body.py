@@ -8,6 +8,7 @@ that matter; the rest guard the edges.
 """
 from __future__ import annotations
 
+import ast
 import importlib.util
 import os
 import subprocess
@@ -32,6 +33,8 @@ def check(label, got, want):
 def verdict(body):
     return crb.analyse(body, MOD)["verdict"]
 
+
+ARD_PHRASE = "ard review disposition summary"
 
 FINGERPRINT = "Reviewed-Commit: 78c3eb0d0e0bb23165225166cfabdb3393876d01"
 
@@ -146,7 +149,8 @@ for sym in ("classify_verdict", "_unresolved_finding_pattern",
             "_is_structured_review_body", "is_non_review_notice"):
     check(f"classifier exposes {sym}", hasattr(MOD, sym), True)
 
-# The docstring states this count in prose. Pinned rather than
+# `analyse`'s docstring states this count in prose -- not the module
+# docstring, which is where a reader would check first. Pinned rather than
 # timestamped, because `FINDING_PATTERNS` is edited whenever a new not-clean
 # shape is added and nothing else would notice the prose going stale.
 check("the finding-pattern count the docstring states",
@@ -155,10 +159,30 @@ check("the finding-pattern count the docstring states",
 # ARD test, so `analyse` duplicates the phrase -- and a duplicate that nothing
 # pins is exactly the drift `load_classifier`'s docstring forbids. Asserted
 # against the checker's SOURCE, since there is no function to call.
-_CHECKER_SRC = open(
-    os.path.join(HERE, "check-pr-fully-clean.py"), encoding="utf-8").read()
-check("the checker still inlines the ARD phrase this tool copies",
-      '"ard review disposition summary" in body_lower' in _CHECKER_SRC, True)
+# Parsed, not grepped. A raw substring search over the source passed with the
+# live test DELETED and the phrase surviving only in a historical-note comment
+# -- measured -- which is the exact silent misprediction this assertion exists
+# to catch, and preserving superseded code in a comment is this corpus's own
+# house style. `ast` cannot see a comment at all.
+def _ard_phrase_is_live():
+    with open(os.path.join(HERE, "check-pr-fully-clean.py"),
+              encoding="utf-8") as fh:
+        tree = ast.parse(fh.read())
+    for fn in ast.walk(tree):
+        if not (isinstance(fn, ast.FunctionDef)
+                and fn.name == "check_review_comments"):
+            continue
+        for node in ast.walk(fn):
+            if (isinstance(node, ast.Compare)
+                    and isinstance(node.left, ast.Constant)
+                    and node.left.value == ARD_PHRASE
+                    and any(isinstance(o, ast.In) for o in node.ops)):
+                return True
+    return False
+
+
+check("the checker still compares against the ARD phrase this tool copies",
+      _ard_phrase_is_live(), True)
 
 check("the findings heading is one of them",
       MOD._FINDINGS_HEADING_PATTERN in MOD.FINDING_PATTERNS, True)

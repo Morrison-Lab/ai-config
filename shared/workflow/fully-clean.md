@@ -69,7 +69,7 @@ The defect reached `main` and needed a follow-up PR.)
 The trap above needs a real, checked cause before it closes.
 This one needs none.
 [`metacognitive-monitoring`](metacognitive-monitoring.md)'s "Read the artifact that failed, not the one beside it" and "A story that fits the evidence is not a finding" own the mechanism and the remedy: proximity is not evidence, and a cause no experiment discriminates is reported as not established rather than as the likeliest candidate.
-One thing here is local to a rollup: there is no artifact beside it to be wrong about.
+One thing here is local to a rollup.
 `mergeable_state: blocked` reports that at least one input is non-passing and never which, so every input you can see is equally available as an explanation, and the field can neither confirm nor refute whichever one you pick.
 
 The other is who acts on it.

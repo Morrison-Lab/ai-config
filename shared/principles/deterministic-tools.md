@@ -317,9 +317,11 @@ earlier command had *read a config manifest under the root about to be deleted*.
 Answering it needs three facts about one command --- the verb, which argument is
 the operand, and which root that operand sits under.
 A pattern over raw command text has no notion of argument position, so it can
-see none of them, and each revision closed one boundary case while opening a
-neighbouring one.
-The cases the sequence passed through:
+see none of them, and its revisions kept closing one boundary case while leaving
+a neighbouring one open.
+A sample of what the rounds found, which is how
+[#3126](https://github.com/Morrison-Lab/ai-config/issues/3126) itself introduces
+the same list:
 
 - a manifest *name* supplied with no root;
 - the right shape under the wrong root;
@@ -334,8 +336,7 @@ The cases the sequence passed through:
 
 The structural answer was a parse: `shlex` the command, then ask whether a read
 verb's argv holds a manifest under a targeted root.
-It was filed as [#3126](https://github.com/Morrison-Lab/ai-config/issues/3126)
-rather than attempted in the round that noticed it.
+That was filed rather than attempted in the round that noticed it.
 
 **When to stop is already settled elsewhere.**
 [`learn-from-review-findings`](../workflow/learn-from-review-findings.md) fires
@@ -346,7 +347,7 @@ What neither answers is what to do when the structural fix is a rework you
 cannot land in the round that found it --- which is the whole of what follows.
 
 **Write the ceiling into the artifact.**
-Three parts, and the first is the load-bearing one.
+Three parts, and none of them stands alone.
 Narrow the **comment** that overclaims, so the code stops asserting a guarantee
 it only approximates.
 Add a limits section naming the residual cases in **both** directions, since

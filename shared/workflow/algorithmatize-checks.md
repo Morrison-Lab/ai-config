@@ -1322,10 +1322,10 @@ Three shapes, measured in one session:
   stating in terms of formatting and not only in terms of chained verification.
 
 They share one cause.
-`--jq`, `>/dev/null`, a trailing `echo`, and a pipe are each applied for
-readability, while composing the command, with no thought of the guard --- and
-each is a transformation applied to the very output that was going to serve as
-the record.
+The transformations differ --- `--jq`, `>/dev/null`, a trailing `echo`, a pipe
+--- and each is applied for readability, while composing the command, with no
+thought of the guard.
+Each is applied to the very output that was going to serve as the record.
 So the rule is about *which* commands get formatted rather than about formatting
 in general: a command whose output is evidence gets run bare, alone, unchained
 and unredirected, and the tidying goes on a separate follow-up call.
@@ -1337,10 +1337,13 @@ sat uncommitted in the working tree.
 The checker was right, and the first conclusion was again that it was broken.
 That is
 [`verify-the-right-artifact`](verify-the-right-artifact.md)'s
-working-directory shape pointed the other way --- there a stale checkout stands
-in for the authoritative revision, here the authoritative revision stands in for
-the uncommitted change --- so it belongs to that fragment rather than to this
-section.
+working-directory shape pointed the other way: there a stale checkout stands in
+for the authoritative revision, and here the authoritative revision stands in
+for the uncommitted change.
+That fragment covers only the first direction today
+([#3130](https://github.com/Morrison-Lab/ai-config/issues/3130)), so this is
+adjacent to it rather than owned by it --- and it is still not this section's
+subject, since no command shape is involved.
 It is named here only because it wears the same disguise: an action that visibly
 worked, and a check that says it did not.
 Committing costs one command and settles it.

@@ -290,20 +290,20 @@ This is about its *speed*, and it is the condition that produces both of those.
 When the cause is genuinely understood, the edit that follows feels settled before it is written --- there is nothing left to work out, so there is nothing left to check --- and that feeling is indistinguishable from the edit actually being safe.
 An unclear finding gets a careful fix precisely because the confusion forces a pass over it.
 
-Measured across the adversarial rounds on [#3101](https://github.com/Morrison-Lab/ai-config/pull/3101), where successive rounds each found a defect the previous round's fix had introduced.
-Five such fixes, each resting on a diagnosis that was correct:
+Measured while drafting [#3101](https://github.com/Morrison-Lab/ai-config/pull/3101).
+Four such fixes, each resting on a diagnosis that was correct.
+Two of them were caught before their commit and so leave no trace in that PR's history, which is why they are described rather than cited:
 
 - Adding `2>/dev/null` to a timing loop fixed stderr interleaving and silenced the only remaining failure signal, so a nonexistent command reported a plausible fast spread (`0.007 / 0.003 / 0.003`).
-- Narrowing a regex branch to option tokens only fixed a false positive and silently dropped `git clean -fdx <root>`, a real destructive form the previous draft caught.
-- Widening a regex branch fixed a false negative and admitted new false discharges, one of which was the deletion command discharging the warning about itself.
-- Restoring a rationale clause fixed a lost explanation and severed the document's purpose statement onto the wrong sentence.
 - Moving a hard-to-time probe in-process fixed a misattribution and made the guard hang rather than fail.
+- Narrowing a regex branch to option tokens only fixed a false positive and silently dropped `git clean -fdx <root>`, a real destructive form the previous draft caught.
+- Adding a not-exhaustive note to a catalog document fixed an underived count claim and severed the document's own purpose statement onto the wrong sentence, where the next round had to restore it.
 
 Read the list by column rather than by row.
 Each fix did what it was for;
-each also *hid* something (a failure signal, an explanation) or *admitted* something (a destructive form, a set of false discharges).
-Those two are the only questions worth asking once the edit is written.
-So ask them explicitly: what does this fix now hide, and what does it now let through?
+each also broke something the finding it answered never mentioned --- a hidden failure signal, a stranded purpose statement, a dropped destructive form, a hang in place of a failure.
+Two questions would have caught all four, and neither is the one the finding asks.
+So ask them explicitly once the edit is written: what does this fix now hide, and what does it now let through?
 Then probe that specific question before reporting the fix, rather than probing the finding again.
 
 **Re-running the original failing case is the probe this list does not otherwise ask for.**

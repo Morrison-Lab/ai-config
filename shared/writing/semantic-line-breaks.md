@@ -613,6 +613,19 @@ NLB_PATHS_IGNORE='codex-skills/**,docs/**,_site/**,.quarto/**' \
 That path is the file `scripts/lib/nlb_gate.py` loads.
 Refreshing it after an action-pin bump is `python3 scripts/sync-nlb-checker.py`.
 
+**That script takes no arguments and runs the sync on any invocation, including `--help`.**
+It has no `argparse` or usage guard,
+so `--help` is not special-cased and runs the full fetch-and-write path at whatever SHA `validate.yml` currently pins.
+Measured 2026-09-02: `python3 scripts/sync-nlb-checker.py --help` fetched the vendored checker at the pinned SHA and rewrote `scripts/vendor/gha-check-new-line-breaks.py` plus its `.pin`.
+The run was a no-op only because the pin had not moved yet.
+- **Do:** bump the `uses:` SHA in `.github/workflows/validate.yml` first, run the script with no arguments, then commit the workflow, the vendored script, and the `.pin` together.
+  `scripts/lib/nlb_gate.py`'s `assert_pin_matches_ci` refuses to load if the three disagree.
+- **Don't:** run the script with `--help` to learn its usage.
+  Read its module docstring instead.
+(Measured 2026-09-02 on [Morrison-Lab/gha#826](https://github.com/Morrison-Lab/gha/pull/826)
+and [ai-config#3089](https://github.com/Morrison-Lab/ai-config/pull/3089);
+tracked as [ai-config#3095](https://github.com/Morrison-Lab/ai-config/issues/3095).)
+
 **`NLB_PATHS_IGNORE` is the one input the local run needs and does not
 default to**, so a command without it over-reports on generated files this
 repo's workflow excludes --- the `codex-skills/` wrappers most of all, since
@@ -670,7 +683,13 @@ a mechanism-keyed grep (`unified=0`) found both at once, per
 That recurrence count meets
 [`deterministic-tools`](../principles/deterministic-tools.md)'s bar for an
 instrument rather than more prose:
-a dirty-tree warning in the checker itself is tracked as ai-config#2382.)
+a dirty-tree warning in the checker itself is tracked as ai-config#2382.
+[Morrison-Lab/gha#826](https://github.com/Morrison-Lab/gha/pull/826) shipped that dirty-tree warning as `NLB_SCOPE=auto`, which widens the check to the working tree exactly when it is dirty.
+[`warn-new-line-breaks-on-push.py`](../../hooks/warn-new-line-breaks-on-push.py) now pins `NLB_SCOPE=committed`,
+so the pre-push hook keeps predicting CI on the pushed commits
+rather than also warning on uncommitted edits CI will never see.
+That pin closes the "hook over-warns" question [ai-config#3027](https://github.com/Morrison-Lab/ai-config/issues/3027) raised.
+(measured 2026-09-02 on [ai-config#3089](https://github.com/Morrison-Lab/ai-config/pull/3089).)
 
 **A third dirty-tree symptom, and the only one that flags a line you never
 touched: the line NUMBERS come from the commit and the line CONTENT comes

@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.18">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="description" content="Address, rebut, or defer review items.">
+
+<title>skill – ai-config</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<script src="../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dark-b85bc7c33db8c58e0ec93c3465666fed.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap-3e9b1289f5f353c49b617ce48ad2bc38.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-a515e054079012129989d5397ee3c9c1.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-3e9b1289f5f353c49b617ce48ad2bc38.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="../../styles.css">
+</head>
+
+<body class="nav-fixed quarto-light"><script id="quarto-html-before-body" type="application/javascript">
+    const toggleBodyColorMode = (bsSheetEl) => {
+      const mode = bsSheetEl.getAttribute("data-mode");
+      const bodyEl = window.document.querySelector("body");
+      if (mode === "dark") {
+        bodyEl.classList.add("quarto-dark");
+        bodyEl.classList.remove("quarto-light");
+      } else {
+        bodyEl.classList.add("quarto-light");
+        bodyEl.classList.remove("quarto-dark");
+      }
+    }
+    const toggleBodyColorPrimary = () => {
+      const bsSheetEl = window.document.querySelector("link#quarto-bootstrap:not([rel=disabled-stylesheet])");
+      if (bsSheetEl) {
+        toggleBodyColorMode(bsSheetEl);
+      }
+    }
+    const setColorSchemeToggle = (alternate) => {
+      const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+      for (let i=0; i < toggles.length; i++) {
+        const toggle = toggles[i];
+        if (toggle) {
+          if (alternate) {
+            toggle.classList.add("alternate");
+          } else {
+            toggle.classList.remove("alternate");
+          }
+        }
+      }
+    };
+    const toggleColorMode = (alternate) => {
+      // Switch the stylesheets
+      const primaryStylesheets = window.document.querySelectorAll('link.quarto-color-scheme:not(.quarto-color-alternate)');
+      const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+      manageTransitions('#quarto-margin-sidebar .nav-link', false);
+      if (alternate) {
+        // note: dark is layered on light, we don't disable primary!
+        enableStylesheet(alternateStylesheets);
+        for (const sheetNode of alternateStylesheets) {
+          if (sheetNode.id === "quarto-bootstrap") {
+            toggleBodyColorMode(sheetNode);
+          }
+        }
+      } else {
+        disableStylesheet(alternateStylesheets);
+        enableStylesheet(primaryStylesheets)
+        toggleBodyColorPrimary();
+      }
+      manageTransitions('#quarto-margin-sidebar .nav-link', true);
+      // Switch the toggles
+      setColorSchemeToggle(alternate)
+      // Hack to workaround the fact that safari doesn't
+      // properly recolor the scrollbar when toggling (#1455)
+      if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+        manageTransitions("body", false);
+        window.scrollTo(0, 1);
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+          manageTransitions("body", true);
+        }, 40);
+      }
+    }
+    const disableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        stylesheet.rel = 'disabled-stylesheet';
+      }
+    }
+    const enableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        if(stylesheet.rel !== 'stylesheet') { // for Chrome, which will still FOUC without this check
+          stylesheet.rel = 'stylesheet';
+        }
+      }
+    }
+    const manageTransitions = (selector, allowTransitions) => {
+      const els = window.document.querySelectorAll(selector);
+      for (let i=0; i < els.length; i++) {
+        const el = els[i];
+        if (allowTransitions) {
+          el.classList.remove('notransition');
+        } else {
+          el.classList.add('notransition');
+        }
+      }
+    }
+    const isFileUrl = () => {
+      return window.location.protocol === 'file:';
+    }
+    const hasAlternateSentinel = () => {
+      let styleSentinel = getColorSchemeSentinel();
+      if (styleSentinel !== null) {
+        return styleSentinel === "alternate";
+      } else {
+        return false;
+      }
+    }
+    const setStyleSentinel = (alternate) => {
+      const value = alternate ? "alternate" : "default";
+      if (!isFileUrl()) {
+        window.localStorage.setItem("quarto-color-scheme", value);
+      } else {
+        localAlternateSentinel = value;
+      }
+    }
+    const getColorSchemeSentinel = () => {
+      if (!isFileUrl()) {
+        const storageValue = window.localStorage.getItem("quarto-color-scheme");
+        return storageValue != null ? storageValue : localAlternateSentinel;
+      } else {
+        return localAlternateSentinel;
+      }
+    }
+    const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+      const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+      const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+      let newTheme = '';
+      if(authorPrefersDark) {
+        newTheme = isAlternate ? baseTheme : alternateTheme;
+      } else {
+        newTheme = isAlternate ? alternateTheme : baseTheme;
+      }
+      const changeGiscusTheme = () => {
+        // From: https://github.com/giscus/giscus/issues/336
+        const sendMessage = (message) => {
+          const iframe = document.querySelector('iframe.giscus-frame');
+          if (!iframe) return;
+          iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+        }
+        sendMessage({
+          setConfig: {
+            theme: newTheme
+          }
+        });
+      }
+      const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+      if (isGiscussLoaded) {
+        changeGiscusTheme();
+      }
+    };
+    const authorPrefersDark = false;
+    const darkModeDefault = authorPrefersDark;
+      document.querySelector('link#quarto-text-highlighting-styles.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+      document.querySelector('link#quarto-bootstrap.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+    let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+    // Dark / light mode switch
+    window.quartoToggleColorScheme = () => {
+      // Read the current dark / light value
+      let toAlternate = !hasAlternateSentinel();
+      toggleColorMode(toAlternate);
+      setStyleSentinel(toAlternate);
+      toggleGiscusIfUsed(toAlternate, darkModeDefault);
+      window.dispatchEvent(new Event('resize'));
+    };
+    // Switch to dark mode if need be
+    if (hasAlternateSentinel()) {
+      toggleColorMode(true);
+    } else {
+      toggleColorMode(false);
+    }
+  </script>
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../../index.html">
+    <span class="navbar-title">ai-config</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../setup.html"> 
+<span class="menu-text">Setup</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../skills.html"> 
+<span class="menu-text">Skills</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../agents.html"> 
+<span class="menu-text">Agents</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../workflow.html"> 
+<span class="menu-text">Workflow</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/Morrison-Lab/ai-config"> <i class="bi bi-github" role="img" aria-label="GitHub">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+  <a href="" class="quarto-reader-toggle quarto-navigation-tool px-1" onclick="window.quartoToggleReader(); return false;" title="Toggle reader mode">
+  <div class="quarto-reader-toggle-btn">
+  <i class="bi"></i>
+  </div>
+</a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#ard-address-rebut-defer-or-acknowledge" id="toc-ard-address-rebut-defer-or-acknowledge" class="nav-link active" data-scroll-target="#ard-address-rebut-defer-or-acknowledge">ARD — Address, Rebut, Defer, or Acknowledge</a>
+  <ul class="collapse">
+  <li><a href="#what-counts-as-a-finding" id="toc-what-counts-as-a-finding" class="nav-link" data-scroll-target="#what-counts-as-a-finding">What counts as a finding</a></li>
+  <li><a href="#the-four-dispositions" id="toc-the-four-dispositions" class="nav-link" data-scroll-target="#the-four-dispositions">The four dispositions</a>
+  <ul class="collapse">
+  <li><a href="#decision-order" id="toc-decision-order" class="nav-link" data-scroll-target="#decision-order">Decision order</a></li>
+  </ul></li>
+  <li><a href="#procedure" id="toc-procedure" class="nav-link" data-scroll-target="#procedure">Procedure</a>
+  <ul class="collapse">
+  <li><a href="#gather-every-finding" id="toc-gather-every-finding" class="nav-link" data-scroll-target="#gather-every-finding">1. Gather every finding</a></li>
+  <li><a href="#disposition-each-one" id="toc-disposition-each-one" class="nav-link" data-scroll-target="#disposition-each-one">2. Disposition each one</a></li>
+  <li><a href="#commit-addressed-fixes-one-commit-per-review-round" id="toc-commit-addressed-fixes-one-commit-per-review-round" class="nav-link" data-scroll-target="#commit-addressed-fixes-one-commit-per-review-round">3. Commit Addressed fixes (one commit per review round)</a></li>
+  <li><a href="#post-one-summary-comment" id="toc-post-one-summary-comment" class="nav-link" data-scroll-target="#post-one-summary-comment">4. Post one summary comment</a></li>
+  <li><a href="#b.-reply-to-every-inline-review-thread-and-resolve-where-appropriate" id="toc-b.-reply-to-every-inline-review-thread-and-resolve-where-appropriate" class="nav-link" data-scroll-target="#b.-reply-to-every-inline-review-thread-and-resolve-where-appropriate">4b. Reply to every inline review thread — and resolve where appropriate</a></li>
+  <li><a href="#ard-round-close-checklist" id="toc-ard-round-close-checklist" class="nav-link" data-scroll-target="#ard-round-close-checklist">ARD round-close checklist</a></li>
+  <li><a href="#report-back-with-a-link" id="toc-report-back-with-a-link" class="nav-link" data-scroll-target="#report-back-with-a-link">5. Report back with a link</a></li>
+  </ul></li>
+  <li><a href="#rules" id="toc-rules" class="nav-link" data-scroll-target="#rules">Rules</a></li>
+  <li><a href="#delegating-sidecar-work" id="toc-delegating-sidecar-work" class="nav-link" data-scroll-target="#delegating-sidecar-work">Delegating sidecar work</a></li>
+  <li><a href="#proactive-hook-compliance" id="toc-proactive-hook-compliance" class="nav-link" data-scroll-target="#proactive-hook-compliance">Proactive hook compliance</a></li>
+  <li><a href="#integration-with-ardi" id="toc-integration-with-ardi" class="nav-link" data-scroll-target="#integration-with-ardi">Integration with ardi</a></li>
+  <li><a href="#edge-cases" id="toc-edge-cases" class="nav-link" data-scroll-target="#edge-cases">Edge cases</a></li>
+  </ul></li>
+  </ul>
+<div class="toc-actions"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/ard/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/ard/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"></header>
+
+
+
+
+
+<section id="ard-address-rebut-defer-or-acknowledge" class="level1">
+<h1>ARD — Address, Rebut, Defer, or Acknowledge</h1>
+<p>Every review comment gets exactly one disposition: <strong>A</strong>, <strong>R</strong>, <strong>D</strong>, or <strong>K</strong>. Ignoring is not an option.</p>
+<section id="what-counts-as-a-finding" class="level2">
+<h2 class="anchored" data-anchor-id="what-counts-as-a-finding">What counts as a finding</h2>
+<p>A <em>finding</em> is anything the reviewer requests or implies a change to — including items tagged “nit”, “minor”, “non-blocker”, “optional”, or “consider”. All of these require <strong>Address</strong>, <strong>Rebut</strong>, or <strong>Defer</strong>.</p>
+<p>Pure praise or neutral observations with <strong>no</strong> requested change (“nice refactor”, “TIL”) still get a row — disposition <strong>Acknowledge</strong> — so the summary accounts for <em>every</em> comment the reviewer made and nothing reads as silently dropped.</p>
+</section>
+<section id="the-four-dispositions" class="level2">
+<h2 class="anchored" data-anchor-id="the-four-dispositions">The four dispositions</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 18%">
+<col style="width: 28%">
+<col style="width: 53%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Code</th>
+<th>Meaning</th>
+<th>Action required</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>A</strong> — Address</td>
+<td>Valid and in-scope.</td>
+<td>Fix it in this PR/MR and commit.</td>
+</tr>
+<tr class="even">
+<td><strong>R</strong> — Rebut</td>
+<td>Incorrect, already handled, or a misunderstanding.</td>
+<td>Explain <em>why</em>, citing concrete evidence (line, test, doc, spec). Specific enough that the reviewer can verify it without re-reading the whole PR.</td>
+</tr>
+<tr class="odd">
+<td><strong>D</strong> — Defer</td>
+<td>Valid but out of scope (new feature, broad refactor, needs design discussion).</td>
+<td>File a follow-up issue (<code>CREATE_ISSUE</code> on GitHub — <code>gh issue create</code>; <code>glab issue create</code> on GitLab), link it, and add it to the PR/MR’s <strong>Deferred / Out-of-Scope</strong> section.</td>
+</tr>
+<tr class="even">
+<td><strong>K</strong> — Acknowledge</td>
+<td>Praise or a neutral observation with no change requested.</td>
+<td>Give it a row so it’s accounted for; no code change, no rebuttal needed. Don’t stretch this to dodge a real finding.</td>
+</tr>
+</tbody>
+</table>
+<section id="decision-order" class="level3">
+<h3 class="anchored" data-anchor-id="decision-order">Decision order</h3>
+<p>For anything that requests a change, choose among the first three (Acknowledge is only for no-ask comments):</p>
+<ol type="1">
+<li><strong>Address</strong> — the default. Most findings are 1–5 line fixes; if it takes under ~2 min, just fix it.</li>
+<li><strong>Rebut</strong> — only when you’re confident the reviewer is mistaken. A rebuttal that isn’t falsifiable (“I think it’s fine”) is not a rebuttal. <strong>Before applying <em>or</em> rebutting any factual claim about an API, deprecation, signature, or behavior, TEST it</strong> — run the code both ways. Reviewers (including the <code>@claude</code> bot) state such claims confidently but are sometimes exactly backwards, and blindly “Addressing” a wrong one breaks the build. (Seen on rme #873 with igraph ≥ 2.x: the bot insisted <code>bfs(mode=)</code> was deprecated in favor of <code>neimode=</code>; the reverse is true — <code>neimode</code> is a hard <code>deprecate_stop</code> error, <code>mode</code> is current. Re-running the script revealed it instantly. The deprecation <em>direction</em> can differ across igraph major versions, so test on the locked version.) The same testing discipline applies when the claim is about the <strong>PR’s own state or metadata</strong> rather than code behavior — which footer/URL convention a given post uses, whether a file matches <code>main</code>, whether a check still exists — not just runnable code. Fetch the actual PR data (the API call, not memory) before Addressing or Rebutting. (Seen on ai-config#688: a review claimed a memory bullet’s cited attribution-footer text was wrong, reasoning from the PR’s own body — but the PR <em>body</em> and a <em>reply comment</em> get their footer through two different code paths that don’t match. Fetching both directly via the API before responding showed the bullet was right and the reviewer had compared the wrong artifact; rebutted with that evidence instead of either implementing the suggested fix or dismissing the finding unchecked.)</li>
+<li><strong>Defer</strong> — only when the fix genuinely expands scope. Never defer just because a fix is “minor” — minor fixes get Addressed.</li>
+</ol>
+<p><strong>Recording a finding as a known limitation, to close it without changing anything, is a Rebut — and it owes a Rebut’s evidence.</strong> Writing the finding into a code comment closes it without fixing it, reads as rigour, and leaves nothing red. The claim it rests on — <em>no rule could decide this</em> — is one nobody asks you to support, unlike the claims in a posted rebuttal. Before recording a limitation, name the mechanism that makes the input undecidable, and check it against the format’s own generator rather than against how the input looks. If the generator cannot emit the shape you are excusing, it is decidable and the disposition is Address.</p>
+<ul>
+<li><strong>Do:</strong> cite the generator’s own behaviour when you claim an input is ambiguous, the way any other Rebut cites a line or a spec.</li>
+<li><strong>Don’t:</strong> let a comment describing a limitation stand in for a disposition — it is a Rebut written where the reviewer cannot see it.</li>
+</ul>
+<p>(Measured on d-morrison/altdoc#125, 2026-08-28. A parser input was documented as one of several inherent ambiguities. roxygen2 joins its file list with <code>", "</code> and wraps at spaces, so the shape being excused — a continuation line beginning with a comma — is one that format cannot produce. One added predicate rejected it. The claim had survived several review rounds inside a comment that read as careful.)</p>
+<blockquote class="blockquote">
+<p><strong>“You deleted/removed X” findings — check for branch-behind-main first.</strong> When a reviewer says the PR removed something you don’t recall touching, run <code>git log HEAD..origin/main</code> and <code>git show HEAD:&lt;file&gt;</code> before Addressing. Main may have <em>added</em> X after you branched, so X is absent only because the branch is stale — not because your diff deleted it. The fix is <strong>merge <code>origin/main</code> in</strong> (the standing keep-synced rule), not “restore” a line you never removed. Verify the actual committed diff (<code>git show &lt;commit&gt; -- &lt;file&gt;</code>) rather than trusting the finding’s framing. (Seen on ai-config PR #52.)</p>
+</blockquote>
+<blockquote class="blockquote">
+<p><strong>“Blocking: missing X” findings that cite a CI job or policy — check the job still exists on <code>main</code> first.</strong> A review can flag a CI failure (e.g.&nbsp;“the Require Changelog Entry job is failing, add a CHANGELOG.md entry”) as blocking, but the requirement itself can be removed from <code>main</code> in the time between when the review ran and when you address it — a different PR deletes the CI job and/or the file it checks. This isn’t the branch-behind-main case above (nothing was deleted from <em>this</em> PR); the requirement stopped existing project-wide. Before Addressing, check whether the cited job/file is still on <code>main</code> (<code>git log --oneline origin/main -- &lt;path&gt;</code>, or <code>git show origin/main:&lt;path&gt;</code>). If it’s gone, Rebut with the removal commit(s) as evidence rather than resurrecting a dead requirement. (Seen on ai-config PR #376: a “blocking” CHANGELOG.md finding referenced <code>require-changelog.yml</code>, which had been deleted from <code>main</code> in #385/#387 by the time the fix round ran.)</p>
+</blockquote>
+</section>
+</section>
+<section id="procedure" class="level2">
+<h2 class="anchored" data-anchor-id="procedure">Procedure</h2>
+<section id="gather-every-finding" class="level3">
+<h3 class="anchored" data-anchor-id="gather-every-finding">1. Gather every finding</h3>
+<p>Collect the full set <em>before</em> dispositioning, so none slips through. Pull both the summary comment and the inline review threads — <code>READ_PR_COMMENTS</code> and <code>READ_PR_REVIEW_COMMENTS</code> (abstract operation tokens; resolve to your model’s tool via <a href="../../tool-mappings.md"><code>tool-mappings.md</code></a>).</p>
+<p><strong>GitHub</strong></p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> pr view <span class="op">&lt;</span>N<span class="op">&gt;</span> --comments                            <span class="co"># READ_PR_COMMENTS — top-level + summary comments</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> api repos/{owner}/{repo}/pulls/<span class="op">&lt;</span>N<span class="op">&gt;</span>/comments       <span class="co"># READ_PR_REVIEW_COMMENTS — inline review-thread comments</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>GitLab</strong></p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">glab</span> mr view <span class="op">&lt;</span>N<span class="op">&gt;</span> --comments                          <span class="co"># discussion notes</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="ex">glab</span> api <span class="at">--paginate</span> <span class="st">"projects/:id/merge_requests/&lt;N&gt;/notes?per_page=100"</span>  <span class="co"># authoritative unresolved DiffNote sweep</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="ex">glab</span> api <span class="st">"projects/:id/merge_requests/&lt;N&gt;/discussions"</span>                    <span class="co"># thread identifiers for replies/resolution</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Bots often post the same finding twice — once inline and once in the summary comment. Collect the <strong>union and dedupe</strong> before numbering, so one issue doesn’t get two rows (or two conflicting dispositions). Then number 1..n; every number must end up with a row in the summary.</p>
+<p>Filter the paginated notes response for <code>.resolvable == true and .resolved == false</code>; GitLab can return unresolved <code>DiffNote</code>s there even when a discussion-level timestamp filter finds no recent unresolved thread. The Discussions endpoint still owns the reply and resolution actions once the note has been identified.</p>
+<p>A PR can also carry <strong>more than one review surface from different reviewers</strong>: an inline code-review bot, a separate <em>agent</em> post-step that posts its own top-level summary, and Copilot are each distinct. <code>gh pr view &lt;N&gt; --comments</code> returns every top-level comment, so disposition each reviewer’s findings — not just the inline review or the most recent comment. A whole review summary left un-dispositioned reads as ignored even when every inline thread was handled.</p>
+</section>
+<section id="disposition-each-one" class="level3">
+<h3 class="anchored" data-anchor-id="disposition-each-one">2. Disposition each one</h3>
+<p>Apply the decision order above. For Address items, make the edits now.</p>
+</section>
+<section id="commit-addressed-fixes-one-commit-per-review-round" class="level3">
+<h3 class="anchored" data-anchor-id="commit-addressed-fixes-one-commit-per-review-round">3. Commit Addressed fixes (one commit per review round)</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> add <span class="at">-p</span>                                           <span class="co"># stage deliberately</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> commit <span class="at">-m</span> <span class="st">"fix: address round &lt;k&gt; review findings"</span>   <span class="co"># COMMIT</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> push                                                  <span class="co"># PUSH</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<ul>
+<li><strong>One commit per round</strong>, not one per finding — reference its SHA in every Address row.</li>
+<li><strong>Never <code>--amend</code></strong> the already-reviewed commits: the reviewer (and CI) ran against them and others may have pulled. A fresh commit keeps the audit trail.</li>
+<li>Don’t push generated cruft (<code>.Rout</code>, build artifacts); respect the repo’s <code>.gitignore</code>.</li>
+<li>If every finding is Rebut/Defer, there’s nothing to commit — skip to step 4 and still post the summary.</li>
+</ul>
+</section>
+<section id="post-one-summary-comment" class="level3">
+<h3 class="anchored" data-anchor-id="post-one-summary-comment">4. Post one summary comment</h3>
+<p>Write the summary to a file and post it <em>from</em> the file — <strong>never inline on GitLab</strong>, because <code>glab</code> mis-parses backticks (e.g.&nbsp;commit SHAs in code spans) as shell subcommands:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># write the summary to ard-summary.md, then:</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> pr comment <span class="op">&lt;</span>N<span class="op">&gt;</span> --body-file ard-summary.md         <span class="co"># COMMENT_PR — GitHub</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="ex">glab</span> mr note <span class="op">&lt;</span>N<span class="op">&gt;</span> -F ard-summary.md                   <span class="co"># GitLab</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>End <code>ard-summary.md</code> with the agent-disclosure marker</strong>, on its own line after a blank line:</p>
+<pre><code>_Posted by Claude Code (AI agent) --- not written by a human._</code></pre>
+<p>This comment is posted under the account holder’s own login on every round of every PR, so it is among the likeliest in the corpus to be mistaken for their own writing — see <a href="../../shared/workflow/disclose-agent-authorship.md"><code>disclose-agent-authorship</code></a>. The body arrives via <code>--body-file</code>, which the disclosure guard cannot read. It still warns — but only that the body is unreadable, never that the marker is absent, and that weaker note reads as a formality rather than a finding. So this step states the requirement itself.</p>
+<p><strong>Keep the bot’s trigger phrase out of the summary body.</strong> The <code>issue_comment</code> trigger fires on the bare bot <code>@</code>-mention <strong>anywhere</strong> in a comment — even in a sentence saying you’re <em>not</em> re-requesting a review. Refer to it obliquely (“re-request review”, “the review-trigger mention”) or split the tokens (e.g. <code>@ claude</code>, with a space, so the raw body never contains the contiguous handle); paste the literal <code>@</code>-mention only when you actually intend to dispatch a review. A stray mention spawns a run that cancels the push-triggered review on <code>cancel-in-progress</code> setups. On some mention-bot setups it also starts a session whose residual-commit sweep can churn the branch.</p>
+<p>Summary format:</p>
+<pre><code>Addressed findings from review of &lt;commit-or-range&gt;:
+
+| # | Finding | Disposition | Detail |
+|---|---------|-------------|--------|
+| 1 | &lt;summary&gt; | ✅ Address | Fixed in &lt;commit-sha&gt; |
+| 2 | &lt;summary&gt; | 🔄 Rebut | &lt;one-line reason&gt; |
+| 3 | &lt;summary&gt; | 📌 Defer | &lt;issue-link&gt; |
+| 4 | &lt;summary&gt; | 👍 Acknowledge | &lt;one-line thanks / note&gt; |
+
+### Rebuttal: Finding 2
+&lt;full explanation with evidence&gt;</code></pre>
+<p>Expand each Rebut below the table. Deferred rows must carry a real issue link.</p>
+<p><strong>Backtick any verdict phrase you quote, including the one in the opening line.</strong> A disposition summary names the round it is disposing of, and the natural way to write that names the round’s verdict too:</p>
+<pre><code>Addressed GitHub Claude of `9508454e` (Needs more work). Pushed `8af4edc9`.</code></pre>
+<p><code>check-pr-fully-clean.py</code> reads that parenthetical as this comment’s OWN verdict. Because a driving session never posts a superseding clean one, the per-reviewer rule from #2274 then keeps the PR not-clean permanently, on a citation of a round that was already addressed. Measured on ai-config#2341: that line alone froze the PR, while the disposition table and a self-imposed hold in the same comment produced no verdict at all.</p>
+<p>The fix is one pair of backticks, because <code>strip_cited_finding_vocab</code> already blanks inline code spans as citation (#1202):</p>
+<pre><code>Addressed GitHub Claude of `9508454e` (`Needs more work`). Pushed `8af4edc9`.</code></pre>
+<p>Do not expect the checker to infer it from the sentence instead. Three attempts were built and deleted on ai-config#2409 – a driver-ledger classifier keyed on claim wording, the same classifier gated on the agent-disclosure marker, and a citation rule keyed on the disposition verb. Each dropped or blanked a genuine reviewer’s not-clean, because a reviewer rejecting a claimed fix writes the same sentence a driver does (“Addressed in <code>abc1234</code> (still Needs more work)”). The disambiguation has to come from the author, and a code span is how this corpus already spells it.</p>
+<p><strong>The opening line is the commonest instance, not the only one.</strong> The same wire is tripped by a verdict phrase left bare anywhere in the comment — a table cell summarizing what the reviewer said, or a paraphrase inside a Rebuttal expansion:</p>
+<pre><code>| 1 | Reviewer said `Needs more work` on the null check | Address | Fixed in `8af4edc9` |</code></pre>
+<p>Verified by execution: without those backticks, that row alone classifies the whole comment not-clean, exactly as the header line does. So sweep the finished comment for the phrase rather than backticking only the line the example shows.</p>
+<ul>
+<li><strong>Do:</strong> wrap a quoted verdict phrase in backticks wherever it appears in a disposition comment — the opening line, a table cell, and a Rebuttal paraphrase alike.</li>
+<li><strong>Do:</strong> re-read the finished comment for any remaining bare verdict phrase before posting it.</li>
+<li><strong>Don’t:</strong> leave a bare <code>(Needs more work)</code> next to a cited SHA – that is the exact shape that freezes the PR.</li>
+<li><strong>Don’t:</strong> backtick the opening line and stop, on the strength of the worked example above.</li>
+</ul>
+</section>
+<section id="b.-reply-to-every-inline-review-thread-and-resolve-where-appropriate" class="level3">
+<h3 class="anchored" data-anchor-id="b.-reply-to-every-inline-review-thread-and-resolve-where-appropriate">4b. Reply to every inline review thread — and resolve where appropriate</h3>
+<p>(The standalone <a href="../../skills/resolve-pr-threads/SKILL.html"><code>resolve-pr-threads</code></a> skill runs just the resolve half of this step on its own — useful for sweeping already-settled threads without a full ARD pass.)</p>
+<p>The one summary comment is <strong>not</strong> enough on its own. A reviewer who left inline comments wants a response <strong>on each thread</strong>, not just a table posted elsewhere. For every inline comment, post a short reply on its own thread with the disposition (and the commit SHA for an Address), then <strong>resolve</strong> the thread once the item is genuinely settled.</p>
+<p><strong>GitHub</strong> — reply on the comment’s thread (<code>REPLY_REVIEW_COMMENT</code>), then resolve via GraphQL (<code>RESOLVE_REVIEW_THREAD</code>):</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Reply on the same thread as inline comment &lt;comment_id&gt;:</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="co"># (quote every argument containing a &lt;placeholder&gt; -- bash treats a bare `&lt;`</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="co"># as a redirection operator even mid-word, so an unquoted path like</span></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="co"># /tmp/reply-&lt;comment_id&gt;.md silently writes to the wrong file)</span></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span> <span class="op">&gt;</span> <span class="st">"/tmp/reply-&lt;comment_id&gt;.md"</span> <span class="op">&lt;&lt;'EOF'</span></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a><span class="st">✅ Addressed in `&lt;sha&gt;`.</span></span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a><span class="st">_Posted by Claude Code (AI agent) --- not written by a human._</span></span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a><span class="op">EOF</span></span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> api <span class="st">"repos/{owner}/{repo}/pulls/&lt;N&gt;/comments"</span> <span class="dt">\</span></span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>  <span class="at">-F</span> in_reply_to=<span class="st">"&lt;comment_id&gt;"</span> <span class="at">-F</span> body=<span class="st">"@/tmp/reply-&lt;comment_id&gt;.md"</span>   <span class="co"># REPLY_REVIEW_COMMENT</span></span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a><span class="co"># List threads to get the node id, then resolve the settled one:</span></span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> api graphql <span class="at">-f</span> query=<span class="st">'query { repository(owner:"&lt;owner&gt;",name:"&lt;repo&gt;") {</span></span>
+<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a><span class="st">  pullRequest(number:&lt;N&gt;) { reviewThreads(first:100) { nodes {</span></span>
+<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a><span class="st">    id isResolved comments(first:1){ nodes { databaseId body } } } } } } }'</span></span>
+<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> api graphql <span class="at">-f</span> query=<span class="st">'mutation {</span></span>
+<span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a><span class="st">  resolveReviewThread(input:{threadId:"&lt;thread_node_id&gt;"}) { thread { isResolved } } }'</span>   <span class="co"># RESOLVE_REVIEW_THREAD</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>In a remote/web session without <code>gh</code>, resolve <code>RESOLVE_REVIEW_THREAD</code> via <code>mcp__github__resolve_review_thread</code> instead (see <code>tool-mappings.md</code>).</p>
+<p><strong>GitLab</strong> — reply to the discussion, then resolve it:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span> <span class="op">&gt;</span> <span class="st">"/tmp/reply-&lt;discussion_id&gt;.md"</span> <span class="op">&lt;&lt;'EOF'</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="st">Addressed in `&lt;sha&gt;`.</span></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a><span class="st">_Posted by Claude Code (AI agent) --- not written by a human._</span></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a><span class="op">EOF</span></span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a><span class="ex">glab</span> api <span class="at">-X</span> POST <span class="st">"projects/:id/merge_requests/&lt;N&gt;/discussions/&lt;discussion_id&gt;/notes"</span> <span class="dt">\</span></span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">-F</span> body=<span class="st">"@/tmp/reply-&lt;discussion_id&gt;.md"</span></span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a><span class="ex">glab</span> api <span class="at">-X</span> PUT <span class="st">"projects/:id/merge_requests/&lt;N&gt;/discussions/&lt;discussion_id&gt;?resolved=true"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>Resolve only when the item is actually settled:</strong></p>
+<ul>
+<li><strong>Address</strong> — resolve after the fix is <strong>pushed</strong> (reply names the SHA). Never resolve an Address whose fix isn’t on the branch yet. Not confident the fix fully settles the concern? When the finding is ambiguous, turns on a design choice, or admits only a partial fix, reply explaining what you did and <strong>ask for confirmation</strong> instead of resolving. Leave the thread open for the reviewer to verify.</li>
+<li><strong>Defer</strong> — reply with the tracked issue link, then resolve (work lives elsewhere now).</li>
+<li><strong>Acknowledge</strong> — reply briefly, then resolve.</li>
+<li><strong>Rebut</strong> — reply with the falsifiable evidence. A rebuttal only counts as settled once it <strong>convinces the reviewer</strong> — i.e.&nbsp;they don’t re-raise it on the next round. While that’s still in question, <strong>leave the thread open</strong>: resolve a bot’s thread once it drops the item, and leave a human’s thread open if they may want to respond. Resolving on acceptance happens a round <em>later</em> than the rebuttal, so it’s easy to forget — <strong>at the start of each new round, first sweep your still-open rebuttal threads and resolve any the latest review didn’t re-raise</strong>, before dispositioning the new findings. If you and the reviewer reach an impasse (your rebuttal didn’t convince them, their re-raise didn’t convince you), <strong>escalate to a human reviewer</strong> — request <code>the repository owner</code> via the <code>request-pr-review</code> skill (or <code>gh pr edit &lt;N&gt; --add-reviewer &lt;reviewer&gt;</code>, which bypasses that skill and so does <strong>not</strong> inherit its <code>Lacaedemon/sparta</code> exception — in sparta, escalate to the user in chat instead of requesting a reviewer) and <code>@</code>-mention them with the impasse — rather than resolving unilaterally or looping forever. Not every re-raise is an impasse, though: if the reviewer <strong>accepts your fact but objects that the claim is over-generalized</strong> (you verified one case and stated a sweeping rule), <strong>narrow the claim to what you actually observed</strong> — that’s an Address, not a continued Rebut. Reserve escalation for genuine factual disputes. (Seen on ai-config PR #183: a tested project-root <code>{{&lt; include &gt;}}</code> behavior was correct but asserted as a universal Quarto-projects rule; the reviewer granted the test and asked only that it be scoped to the observed case, so the fix was to soften the wording, not re-argue.)</li>
+</ul>
+<p>Don’t resolve a thread you haven’t replied to. Every inline comment ends with both a reply and (where appropriate) a resolution — silence on a thread reads as ignored, exactly the failure ARD exists to prevent.</p>
+<p><strong>End-state (fully clean):</strong> when the PR/MR is fully clean, <strong>every inline review thread is resolved</strong>, and the only conversation left open is the final all-clear exchange — the reviewer’s all-clear comment (usually a top-level PR comment, not an inline thread) and your reply to it. A leftover open inline thread (an unaccepted rebuttal, an un-resolved Address) means you’re not clean yet.</p>
+</section>
+<section id="ard-round-close-checklist" class="level3">
+<h3 class="anchored" data-anchor-id="ard-round-close-checklist">ARD round-close checklist</h3>
+<p><strong>Pause point: before reporting the round done.</strong> Do-Confirm; per <a href="../../shared/workflow/skill-checklists.md"><code>shared/workflow/skill-checklists.md</code></a>.</p>
+<ul class="task-list">
+<li><label><input type="checkbox">Every finding is captured exactly once in the ARD table (after deduping summary + inline duplicates).</label></li>
+<li><label><input type="checkbox">Every table row has exactly one disposition (A/R/D/K), and no change request is labeled K.</label></li>
+<li><label><input type="checkbox">Every Address row points to a pushed commit SHA.</label></li>
+<li><label><input type="checkbox">Every Defer row links a filed tracking issue.</label></li>
+<li><label><input type="checkbox"><strong>Killer item:</strong> every inline thread has a reply; settled Address/Defer/Acknowledge threads are <strong>resolved</strong>; unresolved rebuttals stay open. Marked because addressing and resolving are separate actions and only the second clears <a href="../../shared/workflow/fully-clean.md"><code>fully-clean</code></a>’s criterion — an addressed-but-unresolved thread reads as outstanding work to every later reviewer. Sweep by thread id, not by finding: a re-raise usually opens a <em>second</em> thread on the same line, often already marked outdated.</label></li>
+<li><label><input type="checkbox">The summary comment is posted from a body file (not inline), and no accidental review-trigger mention is present unless this round must explicitly re-request review.</label></li>
+</ul>
+</section>
+<section id="report-back-with-a-link" class="level3">
+<h3 class="anchored" data-anchor-id="report-back-with-a-link">5. Report back with a link</h3>
+<p>Tell the user what you did and give a <strong>clickable URL</strong> to the PR/MR (and to the posted summary comment if available), so they can review in one click.</p>
+</section>
+</section>
+<section id="rules" class="level2">
+<h2 class="anchored" data-anchor-id="rules">Rules</h2>
+<ul>
+<li><strong>Every reviewer comment appears in the table AND gets a reply on its own inline thread</strong> (step 4b). The summary table is the overview; the per-thread reply is what the reviewer sees in context. A thread with no reply reads as ignored.</li>
+<li><strong>Resolve threads once settled</strong> (Addressed-and-pushed / Deferred-with-issue / Acknowledged), but never resolve a thread you haven’t replied to or whose fix isn’t pushed — and leave a human reviewer’s thread open if they may want to respond.</li>
+<li><strong>Severity never exempts.</strong> “Informational” / “Not a blocker” / “Nit” / “optional” / “consider” still require A, R, or D — never K.</li>
+<li><strong>Rebuttals must be falsifiable</strong> — point to specific code, behavior, or documentation.</li>
+<li><strong>Deferrals must be tracked.</strong> A defer without a filed issue is just ignoring with extra words.</li>
+<li><strong>Push before you post.</strong> The reviewer should be able to verify Addressed fixes are on the branch.</li>
+<li><strong>A <code>suggestion</code> block is a hint, not gospel.</strong> Before committing a reviewer’s suggested fix, verify it actually works and handles the <em>general</em> case — not just the flagged spot. A confident suggestion can overcorrect (e.g.&nbsp;a regex tweak that fixes one form but breaks all the others). If the correct fix differs, apply that and note the divergence in your reply, so the reviewer sees why.</li>
+</ul>
+</section>
+<section id="delegating-sidecar-work" class="level2">
+<h2 class="anchored" data-anchor-id="delegating-sidecar-work">Delegating sidecar work</h2>
+<p>When dispositioning a finding (step 2) turns up something that needs independent digging — testing a reviewer’s factual claim before Addressing or Rebutting it (see the testing rule above), researching how a prior PR handled the same pattern, or checking whether a cited CI job still exists on <code>main</code> — hand it to a subagent via the <code>Agent</code> tool rather than blocking the rest of the round on it. Keep dispositioning the remaining findings, posting the summary, and pushing fixes on the main thread.</p>
+<p>Give the subagent a stronger model (e.g.&nbsp;<code>model: 'opus'</code> on the <code>Agent</code> tool call) when the check is judgment-heavy — a subtle behavioral claim, a disputed rebuttal — rather than leaving it at the session default. Symmetrically, drop to a cheaper/faster tier (<code>model: 'fable'</code> or <code>'haiku'</code>) for a mechanical check (a lookup, confirming a file/symbol still exists); see <a href="../../skills/select-model/SKILL.html"><code>select-model</code></a>’s decision tree for both directions. For a heavy fan-out verification pass, prefer a separately-billed provider (e.g.&nbsp;the <code>codex</code> CLI) first when available — see <a href="../../skills/delegate-to-codex/SKILL.html"><code>delegate-to-codex</code></a>.</p>
+</section>
+<section id="proactive-hook-compliance" class="level2">
+<h2 class="anchored" data-anchor-id="proactive-hook-compliance">Proactive hook compliance</h2>
+<p>Active hooks guard review interactions and round responses (see <a href="../../memories/hooks.md"><code>memories/hooks.md</code></a>): - <strong><code>require-agent-disclosure.py</code></strong>: All posted round summaries and per-thread replies must include <code>_Posted by &lt;Agent Name&gt; (AI agent) --- not written by a human._</code> on its own line after a blank line. Never use the robot emoji. - <strong><code>flag-uncited-rebuttal.py</code></strong>: If a reviewer finding cites an external documentation URL, always fetch that URL via <code>WebFetch</code> or <code>WebSearch</code> before posting a rebuttal. - <strong><code>flag-uncounted-comment-claims.py</code></strong>: When stating file counts or listing identifiers in forge comments, run and cite deriving commands (<code>grep -c</code>, <code>wc -l</code>) in the session. - <strong><code>flag-unmeasured-timestamp.py</code></strong>: A round summary or reply that carries a clock time needs a fresh <code>TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"</code> in the same turn. Never infer the time from how many tool calls have run since the last reading. - <strong><code>no-handrolled-verdict-parse.py</code></strong>: Always run <code>python3 scripts/check-pr-fully-clean.py &lt;pr&gt;</code> to verify review and CI cleanliness. Do not grep comments for ad-hoc verdict keywords. - <strong><code>remind-learn-from-review.py</code> &amp; <code>remind-ums-on-scrutiny.py</code></strong>: Whenever accepting valid reviewer concerns or scrutinizing feedback, run an explicit UMS pass (<code>skills/ums</code>) to update memories or skills before ending the loop.</p>
+</section>
+<section id="integration-with-ardi" class="level2">
+<h2 class="anchored" data-anchor-id="integration-with-ardi">Integration with ardi</h2>
+<p>Inside the <code>ardi</code> loop (also reachable as <code>iterate</code>):</p>
+<ol type="1">
+<li>Read the latest review (<code>ardi</code> step 2)</li>
+<li>Apply ARD to each finding (this skill: steps 1–2)</li>
+<li>Commit + push fixes (this skill: step 3)</li>
+<li>Post the ARD summary and per-thread replies (this skill: steps 4–4b)</li>
+<li>Re-request review (<code>ardi</code> step 6) — <strong>even if this round was Rebut/Defer only</strong>, so the reviewer re-evaluates.</li>
+</ol>
+<p>The loop continues until the PR/MR is <strong>fully clean</strong> — zero findings, all CI workflows green, and every inline review thread resolved (the only open conversation being the final all-clear exchange — the reviewer’s all-clear and your reply to it). A rebuttal counts only once it convinces the reviewer; on an impasse, escalate to a human reviewer (<code>the repository owner</code>; see step 4b for how).</p>
+</section>
+<section id="edge-cases" class="level2">
+<h2 class="anchored" data-anchor-id="edge-cases">Edge cases</h2>
+<ul>
+<li><strong>Ambiguous finding</strong> — if you can’t tell whether it’s a change request or an observation, treat it as a finding and Address or Rebut. Don’t assume it’s informational.</li>
+<li><strong>Reviewers contradict each other</strong> — Address the most recent reviewer; note the contradiction in your response so the user can arbitrate.</li>
+<li><strong>Finding duplicates a deferred item</strong> — Rebut by pointing to the existing issue. Keeping the <strong>Deferred / Out-of-Scope</strong> section current in the PR/MR description should prevent re-flagging; if it recurs, update that section.</li>
+<li><strong>Findings sourced from a different PR/MR than the target branch</strong> — treat the cited review as the finding source, but apply dispositions on the target PR/MR branch the user names. Post the ARD summary on the target PR/MR, then reply on each original inline thread with the target PR/MR link plus disposition-specific evidence: Address -&gt; target fix commit SHA; Rebut -&gt; target PR/MR comment link with the falsifiable evidence; Defer -&gt; follow-up issue link; Acknowledge -&gt; brief acknowledgment. This keeps provenance auditable across both threads without requiring a commit in non-Address rounds.</li>
+</ul>
+
+
+</section>
+</section>
+
+<a onclick="window.scrollTo(0, 0); return false;" role="button" id="quarto-back-to-top"><i class="bi bi-arrow-up"></i> Back to top</a></main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    // Ensure there is a toggle, if there isn't float one in the top right
+    if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+      const a = window.document.createElement('a');
+      a.classList.add('top-right');
+      a.classList.add('quarto-color-scheme-toggle');
+      a.href = "";
+      a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+      const i = window.document.createElement("i");
+      i.classList.add('bi');
+      a.appendChild(i);
+      window.document.body.appendChild(a);
+    }
+    setColorSchemeToggle(hasAlternateSentinel())
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/Morrison-Lab\.github\.io\/ai-config\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+            // default icon
+            link.classList.add("external");
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+<p>Built with <a href="https://quarto.org/">Quarto</a></p>
+<div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/ard/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/ard/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>

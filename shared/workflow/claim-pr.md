@@ -359,14 +359,15 @@ the listing cannot tell you which case you are in.
   the one input that says nothing about which version is better.
 
 **Sixth occurrence, 2026-09-03 --- the merge was better than either branch, which is a fourth reading the three above do not offer.**
-All three of them are choices *between* the two versions: theirs is better, theirs is equivalent, or theirs is missing something you contribute back.
-Each assumes one branch is a superset of the other once the comparison is done.
+The third of them --- theirs is missing something, so rebuild on their tip and contribute the missing part --- already prescribes a union, so the novelty here is narrower than "take both" and worth stating precisely.
+What all three share is that the comparison runs **branch against branch** and terminates in a verdict on one of them.
 
 Two independent drivers do not produce that.
 They produce two overlapping sets, and the interesting region is the **symmetric difference**: what each one caught that the other did not.
 Measured on one PR, a peer session reached 20 commits ahead while this one accumulated 5;
 both had fixed the same two defects, and each had fixed one the other missed.
-Discarding either branch would have dropped a real fix, and neither the "better" nor the "equivalent" reading would have surfaced that, because both stop at a verdict on the branch as a whole.
+Discarding either branch would have dropped a real fix.
+The "better" and "equivalent" readings cannot surface that at all, and the third reading gets there only if you happen to run the comparison in both directions --- its wording assumes the peer's branch is the base you rebuild on, which is the assumption that hides your own unique fix.
 
 So diff the two heads against their merge base and enumerate the fixes on each side before deciding, rather than judging the branches.
 The unit of comparison is the fix, not the branch.

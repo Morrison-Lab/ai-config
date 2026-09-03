@@ -196,7 +196,7 @@ Morrison-Lab/ai-config#1174.)
 
 ## Searching only the rendered output is the same error one layer down
 
-The section above governs searching the wrong **repo**.
+The wrong-corpus section above governs searching the wrong **repo**.
 This one governs searching the wrong **layer within the right repo**: a sweep whose file filter reaches the generated artifact and not the generator that produces it.
 
 The filter is what hides it, and it is chosen for a good reason.
@@ -223,7 +223,7 @@ That file's own header says it is generated from [`tool-mappings.yml`](../../too
 
 ## An unmerged PR is part of the corpus a citation can be corroborated against, and no default-branch search reaches it
 
-The section above governs searching the wrong **repo**.
+The wrong-corpus section above governs searching the wrong **repo**.
 This one governs searching the wrong **branch state within the right repo**: a citation to content that ships only in an open PR, checked by grepping the default branch.
 
 The null result here is not merely inconclusive --- it is guaranteed whether or not the cited content is genuine.

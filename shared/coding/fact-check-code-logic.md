@@ -651,12 +651,16 @@ Each looks like ordinary, specific coverage --- a named value, an anchored patte
   Pair every ordering assertion with a length or exact-set assertion, or the ordering check is a lower bound and nothing more.
 
 The general form: **name the stream, the field, and the completeness the assertion actually constrains**, and check that each is the one the test is about.
-All three failures survive the "does it read as coverage" glance precisely because the assertion names a real, specific value --- what is wrong is the haystack, not the needle.
+All three survive the "does it read as coverage" glance precisely because the assertion names a real, specific value --- what is wrong is the haystack, not the needle.
 
-(Measured 2026-09-03 across nine review rounds on one PR, several of which found a real defect in the previous round's fix.
-Four separate times a suite passed against code broken on purpose.
-A fifth shape from the same PR --- asserting a value is PRESENT on the failure path without asserting it ABSENT on the success path --- is the positive-fixture-without-negative-control case that "A predicate a fix adds needs mutation in both directions" above already covers;
-counted as a recurrence of that entry rather than written again here.)
+- **Do:** state, for each assertion, which stream it reads, which field it isolates, and what it forbids the output from also containing.
+- **Do:** pair an ordering assertion with an exact-set or length assertion, so it constrains more than a lower bound.
+- **Don't:** trust an assertion over captured text without checking whether the harness captured one stream or two.
+- **Don't:** read a specific, named, anchored expected value as evidence the assertion is discriminating --- specificity of the needle says nothing about the haystack.
+
+(Measured 2026-09-03 over nine review rounds on one PR, several of which found a real defect in the previous round's fix.
+The three shapes above account for three of the four occasions on that PR where a suite passed against deliberately broken code.
+The fourth --- asserting a value is PRESENT on the failure path without asserting it ABSENT on the success path --- is the positive-fixture-without-negative-control case that "A predicate a fix adds needs mutation in both directions" above already covers, and is recorded as a recurrence of that entry rather than written again here.)
 
 ## When the runtime is available, run the claim instead of reasoning about it
 

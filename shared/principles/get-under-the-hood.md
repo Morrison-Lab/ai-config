@@ -124,7 +124,8 @@ Two measured shapes, both from 2026-09-03:
   The word doing the work was in the message the whole time.
 - **The discharge has a structural condition the message does not state.**
   [`no-unreviewed-pr.py`](../../hooks/no-unreviewed-pr.py) credits a reviewer request only when it is the **last simple command** in the Bash call, because otherwise the call's exit status belongs to some later command.
-  Six attempts failed on that condition alone --- three piped to `head`, two with a trailing `; echo "EXIT=$?"` --- while every request had genuinely succeeded.
+  Six attempts were made and five failed on that condition alone --- three piped to `head`, two with a trailing `; echo "EXIT=$?"` --- while every request had genuinely succeeded.
+  The sixth, a bare single-command request with nothing chained after it, was the only one credited.
   The condition is stated in the source and in [`pr-on-claim.rationale.md`](../workflow/pr-on-claim.rationale.md), and in neither case did the refusal text carry it.
 
 **Diagnosing a guard and changing the habit are separate acts**, which is the sharper half and the one no amount of reading prevents.

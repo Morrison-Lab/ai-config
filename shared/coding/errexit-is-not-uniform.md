@@ -555,14 +555,21 @@ gather() { trap '[[ $BASHPID == $$ ]] && rm -f "$f"' EXIT; echo out; }
 
 `$$` is the script's PID and stays fixed across subshells, while `BASHPID` is the current shell's, so the comparison is false in every subshell and true only in the shell that installed the trap.
 
-- **Do:** guard a function-installed `EXIT` trap with `[[ $BASHPID == $$ ]]` when the function may be called in a command substitution.
-- **Do:** install cleanup at the script's top level, where its lifetime is unambiguous, when nothing requires it to be per-function.
+**That guard stops the premature deletion and does not by itself restore the cleanup**, which is the half worth stating because the guarded snippet looks complete.
+If `gather` is only ever called in a substitution, the trap is only ever installed in a subshell, the guard is false every time it runs, and the temp file survives the script --- silent data loss traded for a silent leak.
+Measured on bash 5.3.15 with exactly the snippet above: the file is present after the substitution and still on disk after the script exits.
+So the guard is the right fix only alongside a cleanup whose lifetime is the script's, which in practice means installing the trap at the top level and letting the helper stay stateless.
+
+- **Do:** install cleanup at the script's top level, where its lifetime is unambiguous, rather than inside a helper that may be captured.
+- **Do:** guard a function-installed `EXIT` trap with `[[ $BASHPID == $$ ]]` when the trap must stay in the helper, and confirm the helper is also reached outside a substitution --- otherwise the guarded trap never fires at all.
 - **Don't:** conclude a temp file was never written when several consumers report empty input --- check whether anything between the write and the read ran in a subshell.
 - **Don't:** assume a parent's trap is the one that fired;
   the subshell resets inherited traps, so the culprit is a trap set inside it.
+- **Don't:** read the `BASHPID` guard as a drop-in repair;
+  it removes the deletion and leaves nothing in its place.
 
 (Measured 2026-09-03, bash 5.3.15: `out=$(run_gather ...)` deleted the temp file the next line read, and five downstream checks failed with empty input.
-Reproduced and both forms confirmed on the same shell --- the naive form deletes, the `BASHPID`-guarded form survives the substitution and still cleans up at script exit.)
+Both forms were reproduced on the same shell --- the naive form deletes at the substitution, and the guarded form survives it and then leaks, which is how the incomplete-remedy half above was found.)
 
 ## In review
 

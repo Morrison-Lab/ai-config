@@ -453,3 +453,7 @@ The git-memory UMS agent finished before it could be stopped:
 `ums/2026-09-03-merge-visibility` carries the merge-visibility entry in `memories/git-diffing.md` (which owns diff-range selection, so not `git.md`) and the `refs/pull/N/head` classifier in `memories/git.md`.
 Its reproduction gives `git log -p -m` a count of 3 where the 12:38 entry in part 2 said 2, a repo-specific figure, so that entry's "wants promotion" note is discharged and its count is not a general one.
 It waits for a verdict and a push under the five-subagent cap.
+
+User directive at 14:19 PDT: do not grab any more new issues in this session.
+The 40 issues already claimed across waves 1 to 4 are the current wave and run to completion;
+no new claim is posted from here on, and the check-in prompt no longer resumes anything beyond those four runs.

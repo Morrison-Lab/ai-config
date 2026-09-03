@@ -89,3 +89,31 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
   In local Claude Code sessions, `Stop` hooks in `hooks/hooks.json` intercept bare placeholders like `No response requested.` (ai-config#1579, #2943).
   In remote/web cloud sessions, `Stop` hooks may not be dispatched by the web harness across turn boundaries or after context window summarization.
   Do not rely on local `Stop` hook enforcement to prevent placeholder turns when running in remote/web cloud sessions --- adhere to `CLAUDE.md`'s "Always produce a reply" rule directly in every turn.
+- **This session's GitHub identity varies BY OPERATION, and which routes exist follows from that rather than from any single probe.**
+  The credential is proxy-substituted (the literal value begins `prox`), and it does not resolve to one actor.
+  Measured 2026-09-02 in a remote session scoped to `Morrison-Lab/ai-config`:
+
+  | operation | identity observed | how it was read |
+  |---|---|---|
+  | `GET /user` | `d-morrison` (User) | the response body; header says `allows_permissionless_access=true` |
+  | REST write (post a PR comment) | `claude[bot]` (Bot), `author_association: CONTRIBUTOR` | fetched the created comment and read its `user` |
+  | `git push` | `d-morrison` (User) | the Actions `actor` on every push-triggered run |
+
+  So a `GET /user` probe answers nothing about what a write will look like, which is the trap:
+  it reports the friendly answer, and the write then lands under a different actor.
+  Read the artifact the write produced --- the comment's `user`, or the run's `actor` --- rather than the token's self-description.
+- **Two consequences follow, and both bite where a workflow gates on who acted.**
+  A REST write produces a **bot-authored** event, so any workflow gated on `github.event.sender.type != 'Bot'` skips for it;
+  `git push` produces a User-authored event and does not.
+  That covers **every** `pull_request` event a REST call originates, not only the `update-branch` one that first exposed it:
+  a PR **created** through `POST /repos/<owner>/<repo>/pulls` sends `pull_request.opened` as the bot, so it gets no automatic review at all.
+  The branch push beforehand does not rescue it, because a push to a branch with no PR yet fires no `pull_request` event --- so the one User-sent action happens too early to help.
+  Measured 2026-09-03 on [#3043](https://github.com/Morrison-Lab/ai-config/pull/3043), the PR recording this entry, which tripped the trap it documents:
+  its `Claude Code Review` run reported `completed success` with all six `review / *` jobs `skipped`, actor `claude[bot]`.
+  Read a review run's **jobs** rather than its conclusion, since the run is green either way.
+  The remedy is the same shape: push a further commit with `git` once the PR exists, which fires a User-sent `synchronize`.
+  And a bot-authored comment carries `author_association: CONTRIBUTOR`, which is not in the `OWNER`/`MEMBER`/`COLLABORATOR` set `Morrison-Lab/gha`'s `claude.yml` gates its agent on, so an `@claude review` comment posted this way is skipped by design.
+  `POST /actions/workflows/<file>/dispatches` is refused outright with `403 Resource not accessible by integration` --- "integration" is GitHub's word for an App, and the App's installation token carries `issues: write` and `pull_requests: write` but not `actions: write`.
+  Deleting a remote branch is refused by the proxy itself (`Write access to this GitHub API path is not permitted through this proxy`), so a merged branch is tidied locally and left on the remote.
+  - **Do:** re-trigger a review by pushing with `git`, which is the one write here that carries a User identity.
+  - **Don't:** reach for `workflow_dispatch` or an `@claude review` comment as the fallback --- in this session both are closed, for the two distinct reasons above.

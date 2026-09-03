@@ -960,3 +960,43 @@ So: deriving a number is not the whole of it.
 An integer division is an estimate wearing a computation's clothes, and a figure
 derived FROM derived figures needs its own arithmetic run rather than an
 eyeball.)
+
+## An instrument named in a rule must be one that exists
+
+Naming a check as "an awk pass" or "a scan" reads as grounding a rule in something mechanical.
+That grounding is the whole appeal of an instrument,
+per [`algorithmatize-checks`](../workflow/algorithmatize-checks.md).
+That appeal survives even when no such instrument exists in the repo.
+That survival is what makes this a fact-check gap rather than a wording one.
+The sentence names a tool the way a version number names a release,
+and the claim is false in the same way an uninspected version number can be.
+
+The tell is that the author really did run something.
+An ad-hoc `awk` one-liner or a manual `grep` during the session produced a real result,
+and writing that command up as "an awk pass" or "a scan" describes that session's shell history
+rather than a repo artifact a later reader could run.
+Nothing about the sentence signals the difference,
+so the sentence reads as citing an instrument while citing a memory of typing a command once.
+
+Before naming an instrument in a rule,
+`ls` or `grep` the repo for that instrument and cite the path that runs it.
+When no such path exists,
+either say so plainly ("no repo check does this; this is judgment")
+or build the instrument first and then cite it.
+
+- **Do:** run `ls` or `grep` for the named script before writing that script into a rule, and cite the script's path.
+- **Do:** write "unautomated judgment" when that is true,
+  rather than dressing the check as an instrument that does not exist.
+- **Don't:** promote a one-off shell command run during the session into a rule's instrument list.
+- **Don't:** write a check into an instrument list on the strength of its sounding mechanical.
+
+([ai-config#3061](https://github.com/Morrison-Lab/ai-config/pull/3061), 2026-09-02:
+a new section listed "line length (an awk pass)" and "ambiguous pronouns (a scan)" as deterministic pre-dispatch instruments.
+Review found that no such scan exists anywhere in the repo,
+that [`ambiguous-reference`](ambiguous-reference.md) itself says an ambiguous antecedent
+"has no decidable condition" and "stays in the judgment residue",
+and that the repo's actual gate is the sentence-and-clause checker,
+`scripts/vendor/gha-check-new-line-breaks.py`,
+documented in [`semantic-line-breaks`](semantic-line-breaks.md),
+not a raw character-length pass.
+The author had run an ad-hoc `awk` and `grep` during the session and wrote them up as if they were repo instruments.)

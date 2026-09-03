@@ -252,7 +252,7 @@ Re-queried rather than recalled, per the state-claim rule.
 | [#3084](https://github.com/Morrison-Lab/ai-config/pull/3084) | `bf558244` | pushed, 14 checks success and 1 skipped (a superseded `new-line-breaks` run), `review / require-clean-verdict` success, both threads resolved |
 | [#3060](https://github.com/Morrison-Lab/ai-config/pull/3060) | remote `c851d68f`, local `0daed144` | round 6 committed, unpushed, awaiting a push-gate verdict |
 | [#3023](https://github.com/Morrison-Lab/ai-config/pull/3023) | `6aa021b5` | open, the peer's |
-| [#3089](https://github.com/Morrison-Lab/ai-config/pull/3089) | `8f1ca761` | **merged 06:51Z by the peer**, not by me |
+| [#3089](https://github.com/Morrison-Lab/ai-config/pull/3089) | `8f1ca761` | **merged 06:51Z**, not by me (`merged_by` is the shared login, so the API cannot say by whom) |
 | [#3100](https://github.com/Morrison-Lab/ai-config/pull/3100) | `3acc79bd` | new since the last sweep, the peer's |
 | [#3101](https://github.com/Morrison-Lab/ai-config/pull/3101) | `d8c88486` | new since the last sweep, the peer's |
 
@@ -269,7 +269,7 @@ That is the session's recurring pattern getting an instrument rather than a rule
 `ListAgents` reported no peers all session and still does.
 The instrument that actually settles it is the commit trailer, not `updated_at`, which cannot separate a peer from any other actor pushing under the same login:
 the tip of #3023 carries a `Claude-Session:` URL differing from this session's, which is decisive;
-the tips of #3089, #3100 and #3101 carry no trailer, the human's authorship, and a `Co-Authored-By: Claude ...` line, which is the signature of a *local* session rather than of a person.
+the tips of #3089, #3100 and #3101 carry no trailer, the human's authorship, and a `Co-Authored-By: Claude ...` line, which is consistent with a local session rather than with a person typing that line, and does not settle it.
 Banked as a rule in `memories/git-worktrees.md` on #3060's branch.
 
 ## The merge gate, re-probed rather than recalled

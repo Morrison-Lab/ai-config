@@ -104,12 +104,12 @@ When static source reading is insufficient to resolve runtime behavior:
   and process exit statuses directly rather than inferring them from subsequent
   steps.
 
-## A guard's refusal message is not its specification, and re-running the command is not reading it
+## A guard's refusal message goes unread precisely because it arrives with a remedy
 
 The failure modes above all concern a component you are trying to *use*.
-A blocking hook is the case where the component is trying to stop you, and it is the one where black-box reasoning survives longest, because the refusal arrives with a remedy attached.
-That remedy sentence reads as the whole contract.
-It is a summary of one discharge path, written to be short, and it silently omits the conditions that decide whether your attempt counts.
+A blocking hook is the case where the component is trying to stop you, and it is the one where black-box reasoning survives longest --- not because the message is uninformative, but because it arrives already shaped like an answer.
+A refusal that ends in an imperative reads as a prompt to act rather than as a specification to study, so the eye takes the verb and skips the qualifiers.
+Measured twice below, the qualifier was in the message both times and was read past both times.
 
 The economics are lopsided and easy to get backwards.
 Reading the hook source costs a couple of minutes and is bounded.
@@ -122,11 +122,12 @@ Two measured shapes, both from 2026-09-03:
   That sentence was read six times across four blocked pushes and registered as boilerplate;
   six reviews were dispatched with `run_in_background: true`, none of them consumable, and the loop was misdiagnosed as a stale-fingerprint bug.
   The word doing the work was in the message the whole time.
-- **The discharge has a structural condition the message does not state.**
+- **The remedy sentence carries a structural condition that reads as an aside.**
   [`no-unreviewed-pr.py`](../../hooks/no-unreviewed-pr.py) credits a reviewer request only when it is the **last simple command** in the Bash call, because otherwise the call's exit status belongs to some later command.
   Six attempts were made and five failed on that condition alone --- three piped to `head`, two with a trailing `; echo "EXIT=$?"` --- while every request had genuinely succeeded.
   The sixth, a bare single-command request with nothing chained after it, was the only one credited.
-  The condition is stated in the source and in [`pr-on-claim.rationale.md`](../workflow/pr-on-claim.rationale.md), and in neither case did the refusal text carry it.
+  Its refusal text states the condition outright --- "Request it now, as the only command in this call" --- and has since `462de02b3` on 2026-09-02, a day before these attempts.
+  The clause was skipped five times in favour of the command example printed below it.
 
 **Diagnosing a guard and changing the habit are separate acts**, which is the sharper half and the one no amount of reading prevents.
 In the second case above the mechanism was read, stated correctly in the session's own reply, and then violated on the very next call --- the next request went out piped to `head` again.
@@ -134,11 +135,12 @@ Understanding arrives as a sentence;
 compliance has to arrive as a different keystroke.
 So after diagnosing a guard, write the corrected invocation out in full and use that literal string, rather than trusting that knowing the rule will change what you type.
 
-- **Do:** open the hook's source the first time it blocks you, before the second attempt.
-- **Do:** read the refusal's remedy clause word by word, including the qualifiers, since a stale reading of it is what makes it look like boilerplate.
+- **Do:** read the refusal's remedy clause word by word, including every qualifier, before composing the second attempt --- the prose around the command example is where the condition lives.
+- **Do:** open the hook's source the first time the message does not resolve it, which costs minutes and is bounded, rather than re-attempting, which costs a cycle per try and returns the identical text.
 - **Do:** write out the exact corrected command after diagnosing a guard, and reuse that string.
 - **Don't:** treat a repeated identical refusal as evidence the guard is malfunctioning;
-  it is far likelier evidence you have not read it.
+  it is far likelier evidence the message has not been read to the end.
+- **Don't:** skip from a refusal's verb to its command example --- the qualifier between them is what the guard actually parses.
 - **Don't:** read having explained the mechanism as having adopted it.
 
 ## In review

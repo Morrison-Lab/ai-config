@@ -539,8 +539,10 @@ cat "$f"           # gone
 ```
 
 Note which case does *not* bite, because assuming the wrong one sends the diagnosis somewhere unproductive.
-A trap installed in the parent **before** the substitution is reset to default in the subshell and does not fire, and neither an `exit` inside the substituted function nor a failing command in it reaches a parent-installed trap.
+A trap installed in the parent **before** the substitution is reset to default in the subshell, so it does not fire *at the substitution* --- not for an ordinary return, not for a failing command, and not for an `exit` inside the substituted function.
 Only a trap installed *within* the subshell fires there.
+Note what that does not say: an `exit` inside the substituted function still becomes the substitution's status, so under `errexit` it terminates the parent, and the parent's own `EXIT` trap then runs at parent exit as designed (measured: bash 5.3.15 prints the parent trap's output and exits 3).
+The parent trap is exonerated for the *early* deletion, not removed from the script.
 So the shape to look for is a self-cleaning helper, not a script-level cleanup.
 
 The failure presents far from its cause.

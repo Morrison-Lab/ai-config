@@ -64,6 +64,12 @@ DELETE_REPLY = (
 )
 
 WARN_CASES = [
+    ("Reset it with `git clean -fdx ~/.claude`.", (),
+     "git clean as a STANDALONE verb over a config root: narrowing the rm "
+     "branch to option-tokens-only silently dropped this form"),
+    (DELETE_REPLY, ("grep -rn 'settings.json' README.md",),
+     "grepping the CORPUS for the string opens no config file, so it must not "
+     "discharge -- an earlier draft let it"),
     (DELETE_REPLY, (),
      "the measured incident: a find -delete over a config root, no ref check"),
     ("Clean it up with `rm -rf ~/.claude/hooks`.", (),
@@ -76,6 +82,9 @@ WARN_CASES = [
 ]
 
 SILENT_CASES = [
+    ("Run `rm -rf /tmp/build` before you look at ~/.config/app.yml.", (),
+     "an unrelated rm and a later config mention in one sentence: only OPTION "
+     "tokens may sit between the verb and its operand"),
     (DELETE_REPLY,
      ("grep -o 'hooks/[a-z-]*.py' ~/.claude/settings.json | sort -u",),
      "an earlier grep of settings.json discharges it"),
@@ -130,6 +139,40 @@ wrong += not _ok
 print("%-7s the same message warns once, then self-suppresses (got %s)"
       % ("ok" if _ok else "FAIL", "/".join(_verdicts)))
 
+# The known OVER-approximation: the guard cannot tell a recommendation from a
+# mention, so a reply warning AGAINST the command still fires. Pinned so the
+# behaviour is a documented choice rather than an accident.
+_verdict = run("Do NOT run `rm -rf ~/.claude/hooks` -- it unregisters the guards.")
+total += 1
+_ok = _verdict == "WARN"
+wrong += not _ok
+print("%-7s a reply arguing AGAINST the deletion still fires (documented "
+      "over-approximation)" % _verdict)
+
+# Linearity. An earlier draft paired two adjacent lazy stars and took 14.3s on
+# a 40,000-character line, against this hook's declared 10s timeout, on the
+# SILENT path -- a reply merely quoting config paths would have burned it.
+import re as _re
+import time as _time
+_src = open(HOOK, encoding="utf-8").read()
+_ns = {"__name__": "_probe"}
+exec(compile(_src, HOOK, "exec"), _ns)
+# Every branch is VERB-anchored, so a probe without a verb fails at the first
+# literal and never enters a quantifier -- it would pass against an
+# arbitrarily explosive pattern. Probe each branch through its own verb.
+_worst = 0.0
+for _prefix in ("find ~/.claude ", "rm -rf ~/.claude ", "cd ~/.claude ",
+                "git clean -fdx ~/.claude "):
+    _probe = _prefix + "a" * 40000
+    _t0 = _time.time()
+    _ns["RX_DESTRUCTIVE"].search(_probe)
+    _worst = max(_worst, _time.time() - _t0)
+total += 1
+_ok = _worst < 0.5
+wrong += not _ok
+print("%-7s every branch stays linear on a 40,000-char line (worst %.4fs)"
+      % ("ok" if _ok else "FAIL", _worst))
+
 print("\n--- fail-open")
 _proc = subprocess.run([sys.executable, HOOK], input="not json",
                        capture_output=True, text=True)
@@ -137,6 +180,17 @@ total += 1
 _ok = _proc.returncode == 0 and not _proc.stdout.strip()
 wrong += not _ok
 print("%-7s unparseable stdin fails open" % ("silent" if _ok else "WARN"))
+
+for _payload in ('"hello"', '[1,2]', 'null',
+                 json.dumps({"transcript_path": ["a"]}),
+                 json.dumps({"transcript_path": "/nonexistent"})):
+    _proc = subprocess.run([sys.executable, HOOK], input=_payload,
+                           capture_output=True, text=True)
+    total += 1
+    _ok = _proc.returncode == 0 and not _proc.stdout.strip()
+    wrong += not _ok
+    print("%-7s a non-object or non-string payload fails open (%s)"
+          % ("silent" if _ok else "WARN", _payload[:24]))
 
 _proc = subprocess.run([sys.executable, HOOK],
                        input=json.dumps({"transcript_path": "/nonexistent"}),

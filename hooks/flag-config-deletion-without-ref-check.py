@@ -18,6 +18,17 @@ is a property of a file; safety-to-delete is a property of the graph around it.
 
 Warns, never blocks. The condition cannot tell an orphan from a registered file
 without reading the config; the point is to prompt that read, not replace it.
+
+Limits, in both directions, deliberately unclosed.
+UNDER: `unlink`, `trash`, `mv <root> /tmp`, `ls <root> | xargs rm`, a path held
+in a variable, an already-expanded absolute path, and a `find` split across a
+line continuation all miss. Several are as likely as the matched form; each
+would need a construct-specific clause, and a warn-only reminder is not worth
+that surface.
+OVER: the guard cannot tell a recommendation from a mention, so a reply that
+QUOTES a destructive command in order to warn against it still fires --- this
+file's own message text included. The sentinel bounds that to one warning per
+message.
 Fires once per distinct message (sentinel keyed by content hash).
 """
 import hashlib
@@ -36,25 +47,41 @@ CONFIG_ROOTS = (
     r"~/[.]gemini", r"[$]HOME/[.]gemini",
     r"~/[.]cursor", r"[$]HOME/[.]cursor",
 )
-_ROOTS = "(?:" + "|".join(CONFIG_ROOTS) + ")"
+# The trailing lookahead stops `~/.config` matching inside `~/.config-notes`,
+# which would otherwise let an unrelated file discharge the guard.
+_ROOTS = "(?:" + "|".join(CONFIG_ROOTS) + r")(?=[/\"'`.,;)\]]|\s|$)"
 
-# A destructive verb applied to a path under one of those roots. `find ... -delete`
-# puts the verb AFTER the path, so both orders are matched.
-RX_DESTRUCTIVE = re.compile(
-    r"(?:{r}[^\n`'\"]*?[^\n]*?(?:-delete|-exec[ ]+rm)"
-    r"|"
-    r"(?:{b}rm{b}(?:[ ]+-[A-Za-z]+)*|{b}rmdir{b}|git[ ]+clean{b}[^\n]*?)[ ]+[^\n]*?{r})".format(
-        r=_ROOTS, b=r"{b}".format(b="\\b")
-    ),
-)
+# A destructive verb applied to a path under one of those roots. `find` puts
+# the verb AFTER the path and `rm` before it, so both orders are matched.
+#
+# Only OPTION tokens may sit between `rm` and its operand. An earlier draft
+# allowed arbitrary same-line text, which matched an unrelated `rm -rf /tmp/x`
+# in the same sentence as a later `~/.config` mention -- the misfire
+# README.md:560 calls worse than a missing guard.
+_DESTRUCTIVE_PARTS = [
+    r"\bfind\b[ ]+[\"']?" + _ROOTS + r"[^\n]{0,200}?-(?:delete|exec[ ]+rm)",
+    r"(?:\brm\b|\brmdir\b)(?:[ ]+-[-A-Za-z0-9]+)*[ ]+[\"']?" + _ROOTS,
+    r"\bcd\b[ ]+[\"']?" + _ROOTS + r"[^\n]{0,80}?&&[ ]*(?:rm\b|git[ ]+clean\b)",
+    # `git clean -fdx <root>`. Kept as a standalone verb: narrowing the `rm`
+    # branch to option-tokens-only dropped it, which silently lost
+    # `git clean -fdx ~/.claude` -- a real destructive recommendation the
+    # first draft caught.
+    r"\bgit[ ]+clean\b(?:[ ]+-[-A-Za-z0-9]+)*[ ]+[\"']?" + _ROOTS,
+]
+RX_DESTRUCTIVE = re.compile("(?:" + "|".join(_DESTRUCTIVE_PARTS) + ")")
 
-# Evidence the author looked for references before proposing removal: any
-# earlier command that read a manifest in a config root.
+# Evidence the author looked for references before proposing removal: an
+# earlier command that read a manifest AND named a config root in the same
+# command, in either order. Requiring both is what makes the comment true: an
+# earlier draft matched any mention of `settings.json`, so
+# `grep -rn 'settings.json' README.md` -- which opens no config file at all --
+# discharged the guard for the rest of the session.
 RX_REF_CHECK = re.compile(
-    r"(?:grep|rg|jq|cat|sed|awk|python3?)[^\n]*?"
-    r"(?:settings[.]json|config[.]toml|config[.]json|[.]mcp[.]json)",
+    r"(?:grep|rg|jq|cat|sed|awk|python3?|head|less)[^\n]{0,200}?" + _ROOTS +
+    r"[^\n]{0,120}?(?:settings[.]json|config[.]toml|config[.]json|[.]mcp[.]json)"
+    r"|(?:grep|rg|jq|cat|sed|awk|python3?)[^\n]{0,200}?"
+    r"(?:settings[.]json|config[.]toml|config[.]json|[.]mcp[.]json)[^\n]{0,120}?" + _ROOTS,
 )
-
 
 def transcript_records(path):
     try:
@@ -126,8 +153,10 @@ def main():
         payload = json.load(sys.stdin)
     except Exception:
         return
+    if not isinstance(payload, dict):
+        return
     path = payload.get("transcript_path") or ""
-    if not path:
+    if not isinstance(path, str) or not path:
         return
     text = last_assistant_text(path)
     if not text or not RX_DESTRUCTIVE.search(text):

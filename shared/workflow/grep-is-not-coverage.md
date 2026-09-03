@@ -214,7 +214,8 @@ where [`ums`](../../skills/ums/SKILL.md) step 3 long read "the whole `memories/`
 
 (Recorded 2026-09-03 on [ai-config#3060](https://github.com/Morrison-Lab/ai-config/pull/3060), where a markdownlint entry was added to `memories/markdownlint.md` while `shared/writing/semantic-line-breaks.md` already carried the same collision in three places, one of them a full section.
 The checkable part is what the wider grep would have done.
-`grep -ril "issue reference" memories/` returns four files and none of them is the owner, because the owner is `shared/writing/semantic-line-breaks.md` and no search of `memories/` can reach it.
+`grep -ril "issue reference" memories/` returns three files at `origin/main`, and none of them is the owner, because the owner is `shared/writing/semantic-line-breaks.md` and no search of `memories/` can reach it.
+The ref matters and is this section's own rule: the same query returns four at ai-config#3060's head, where the duplicate entry this record is about supplies the fourth hit.
 So this is not the old step 3 merely going unfollowed: following it exactly, over the whole of `memories/`, still misses.
 Note also why this section's own `Do` could not have caught it.
 It reads "grep the ai-config corpus as well as the destination repo's docs, **whenever step 2 routes an item anywhere other than ai-config**", and this item was routed to ai-config, so its trigger never fires.)
@@ -392,26 +393,30 @@ FIRE-condition addition", so both parties held the evidence and neither drew the
 conclusion that the count needed a ref rather than a correction.
 The fix stated the ref and the flags and changed no number.)
 
-**The same defect at VERIFICATION time is the dangerous direction, and it is the one nothing above covers.**
-Every case above is a false **absent** while authoring: the query misses, you conclude the corpus lacks the thing, and you write a duplicate.
-The mirror is a false **missing** while checking your own work --- confirming that content survived a merge, that a fix landed, that a line is still there.
-Both come from a query too precise for its target.
-Their consequences are not comparable.
+**A false MISSING while checking your own work is the same defect at a different moment, and the moment is what this adds.**
+[`memories/debugging.md`](../../memories/debugging.md)'s "An empty grep for one spelling is not evidence the concept is absent" already owns the mechanism and the consequence, in as many words: "'missing' leads you to *add* a second copy alongside the broken one, which is worse than the defect you started with".
+This fragment already delegates both of its mechanisms there, near the top.
+So read that first;
+what follows is only the part that section does not cover.
 
-A false absent produces a *judgement* you can still revisit, and the duplicate arrives as new prose someone may notice.
-A false missing produces an *edit*.
-You re-add content that is already present, and the duplication lands inside a merge commit, which is the artifact least likely to be read line by line afterwards.
-So the more accurate the surrounding process, the worse this gets: a careful merge, verified string by string, is exactly where a mistyped pattern turns into a silent duplication.
+That part is **when** the query runs.
+Every case there is a search that decides whether to author something.
+The same query also runs at the end, confirming that content survived a merge, that a fix landed, that a line is still there --- and the two differ in where the resulting duplicate lands.
+An authoring-time duplicate arrives as a new block in an ordinary diff, which is what review looks at.
+A verification-time re-add arrives inside a merge commit, which is the artifact least likely to be read line by line afterwards.
+So the more careful the surrounding process, the worse this gets: a merge verified string by string is exactly where a mistyped pattern turns into a silent duplication.
 
 Measured 2026-09-03: two consecutive false MISSING readings while verifying that a merge preserved earlier work, both from the pattern rather than the file.
-`demotes ` did not match `demotes** \`time\``, and a case-sensitive `keep the content` did not match `Keep the content`.
-Both were caught before acting, and the repair for either would have been to re-add text already in the file.
+A trailing space in `demotes ` did not match the bolded `` demotes** `time` `` in the target, and a case-sensitive `keep the content` did not match `Keep the content`.
+Both were caught before acting, and either repair would have re-added text already present.
 
 - **Do:** re-test a MISSING before acting on it, with `grep -F` on a distinctive contiguous substring, and with `-i`.
 - **Do:** prefer a substring test in the tool you are already in --- `"<text>" in path.read_text()` --- which has no pattern language to get wrong.
-- **Don't:** treat a verification query as exempt because it is checking rather than searching;
-  it is the same instrument, pointed at a target you wrote yourself and therefore expect to find.
 - **Don't:** act on a single MISSING inside a merge, where the correction is additive and nothing later re-reads it.
+
+(The first draft of this entry opened "nothing above covers" this.
+A review pointed at `debugging.md`, which covered most of it, and at this fragment's own delegation to that file.
+That is the second gap claim in one branch that the corpus already filled, and the dupe check behind both stopped at a single file --- which is the defect the sibling commit here exists to prevent.)
 
 ## A claim that nothing exists owes its deriving command, even when no search ran
 

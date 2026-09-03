@@ -925,35 +925,64 @@ and was not the one the claim was about.
 
 ## "A peer's edge cases raised against a different implementation"
 
-Measured 2026-09-03, recorded from
-[ai-config#3059](https://github.com/Morrison-Lab/ai-config/issues/3059), which
-is the filed record of the session that produced these findings, rather than a
-re-derivable artifact.
+Measured 2026-09-02 PT, recorded 2026-09-03.
+Re-derivable from four artifacts, named here because the first two drafts of
+this record were written from a filed summary instead and were wrong twice:
 
-A peer session flagged two edge cases from an adversarial pass on its own draft
-of a similar hook, and asked whether they applied here.
-Both already passed, established across seven concrete command shapes rather
-than argued from the pattern.
+- `hooks/test-warn-stale-review-diff-base.py` on `main` --- the `git -C` cases.
+- `hooks/warn-stale-review-diff-base.py:96` --- the pattern whose bound decides
+  what "coverage" means here.
+- [ai-config#3014](https://github.com/Morrison-Lab/ai-config/pull/3014)'s
+  comment thread --- the peer's flag, and the duplicate-and-revert report.
+- `memories/session-2026-09-02-gia-ai-config.md` --- the banked correction.
+
+A peer session flagged two edge cases from an adversarial pass on **its own**
+draft of a similar hook, and asked whether they applied here.
+Both already passed.
 
 **They were not pinned, and the reason is the more useful half of the record.**
 The first instinct was to add regression cases for both shapes.
-They turned out to be verbatim duplicates: the suite already carried a
-`git -C <path>` case, including long and space-containing paths, added by the
-very PR whose session raised the question.
+They were verbatim duplicates.
+`hooks/test-warn-stale-review-diff-base.py` already carried four `git -C` cases
+--- a temp directory, a path containing spaces, `~/repo`, and a bare basename
+--- all introduced by commit `879f2273`, which is #3014's own merge.
 The added cases were reverted.
 
-Coverage was established by **mutation** rather than by reading --- breaking the
+Coverage was established by **mutation** rather than by reading: breaking the
 guard turned the pre-existing cases red (78/80 and 79/80), which is what proved
 the shapes were covered.
 That is the transferable step.
 A claim that something is untested is a claim to check, not to act on, and
 checking it means breaking the thing and seeing what goes red.
 
-Recorded here because the issue that specified this entry asserted the opposite
---- that the shapes "were previously pinned only with short paths" and were
-pinned in response.
-That assertion was written before its own session discovered the duplication,
-and this entry originally reproduced it unchecked.
-A review round caught it by observing that the diff touches no test file, so
-nothing it described could have happened.
+**The path-length framing was wrong on both sides, which is worth more than the
+episode itself.**
+The peer's concern, and the summary that carried it forward, both turned on a
+*long* `git -C <path>` prefix being unpinned.
+Path length is not a property the guard can respond to at all:
+`warn-stale-review-diff-base.py:96` bounds the prefix by **option count**,
+`){0,12}`, with each value matching `\S+`, and its own comment says the cutoff
+costs a missed reminder "past 13 `-c k=v` options".
+So neither the worry nor the reassurance was about a dimension the code has.
+When a peer names the property that makes a shape matter, check that the
+implementation can see that property before measuring anything.
 
+**How this record went wrong, stated exactly, since a vaguer version would
+teach the wrong lesson.**
+Two different errors, from two different sources:
+
+- *Inherited.* The summary this entry was drafted from
+  ([ai-config#3059](https://github.com/Morrison-Lab/ai-config/issues/3059))
+  says the shape "was previously pinned only with short paths" --- singular,
+  about one of the two shapes. It was filed at 02:10Z, and the session that
+  discovered the duplication started at 02:27Z, so it is an earlier session's
+  summary superseded by a later session's finding, not a session contradicting
+  itself.
+- *Invented.* The sentence a CI round actually caught --- that a future
+  narrowing "now fails a test" --- appears nowhere in that summary. This entry
+  wrote it. The first correction described the whole error as reproducing the
+  summary unchecked, which was self-favourable: the worst claim was its own.
+
+The CI round caught it by noticing a test claim in a diff that touches no test
+file. Four adversarial rounds had not, because all four read the entry against
+the summary rather than against the suite.

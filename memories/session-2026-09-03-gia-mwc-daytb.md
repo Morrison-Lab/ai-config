@@ -402,3 +402,18 @@ The false version had been written into `fix/ums-step3-corpus-scope`.
 The round-one adversarial verdict on the two held branches caught it, alongside five other findings: a headline universal resting on that mechanism sentence, an n=2 "most", a bare `#605` resolving to the wrong repository, a bullet list coalescing with its host section's list, and a case record asserting an underived cause inside the subsection that forbids exactly that.
 All six are fixed on the two branches, and a round-two verdict is running.
 Wants promotion to `memories/git.md` when this notebook is folded.
+
+## 13:48 PDT --- part 2 merged; two PRs driven; the merge subsection deleted
+
+[#3129](https://github.com/Morrison-Lab/ai-config/pull/3129) merged as the squash on `main` titled "docs(memories): session notebook for 2026-09-03, part 2 (#3129)", fully clean at its final head: CI green, claude-review CLEAN, Copilot approval recommended, Jules approve, adversarial verdict.
+Five adversarial rounds and one Copilot round went into it after the 12:20 entry; every round's findings were claims one step wider than their evidence, and the round that cleared was the one that deleted the clause rather than rewording it.
+This file continues here on `docs/session-notebook-2026-09-03-part3`, so the merged part stays reviewed once.
+
+[#3135](https://github.com/Morrison-Lab/ai-config/pull/3135) (`fix/2465-rollup-cause`, Refs [#2465](https://github.com/Morrison-Lab/ai-config/issues/2465)) is open: claude-review CLEAN and Jules approve on every head so far, and Copilot has asked for one change per pass across three passes (a self-contradicting clause, clause-boundary line breaks, then the bold lead-in's line break), each addressed by deletion or reflow with the token sequence unchanged.
+Copilot's Lite reviews find one item per round, so on a still-growing file the review request waits for the final head.
+
+`fix/ums-step3-corpus-scope` ([#3123](https://github.com/Morrison-Lab/ai-config/issues/3123)) reached its fourth adversarial round with eight findings, five of them inside the merge-time subsection that had produced findings in every round since the three-dot claim.
+Decision taken under the three-rounds-without-consensus signal ([#3110](https://github.com/Morrison-Lab/ai-config/issues/3110)): delete that subsection outright rather than patch it a fifth time.
+It sits outside #3123's stated fix, the corpus's own review read (`git diff origin/main...HEAD`) shows a merge-commit re-add, and its one durable learning is the corrected belief recorded in the 12:38 entry, now being promoted to `memories/git.md` on `ums/2026-09-03-merge-visibility`.
+
+Four workflows run on: 40 issues claimed, 30 implementations committed at the 13:13 reading, refuter stages in progress, nothing from them pushed yet.

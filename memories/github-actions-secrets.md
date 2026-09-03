@@ -229,7 +229,7 @@ the value belongs on stdin rather than in `argv`.
 GitHub Actions secrets passed in HTTP `Authorization` headers to the Anthropic API (like `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`) must not contain whitespace.
 A pasted multi-line block (a PEM key, a JSON credential file, or a wrapped terminal copy) introduces spaces or newlines that cause HTTP clients to reject the header before making the request.
 
-`Morrison-Lab/gha` (`run-claude-review-attempt`, gha#543) runs a pre-flight credential shape check that detects internal whitespace in configured review secrets.
+`Morrison-Lab/gha` (`check-credential-shape`, gha#686) runs a pre-flight credential shape check that detects internal whitespace in configured review secrets.
 When every configured secret contains whitespace, the step exits 0 without calling the API (spending zero tokens) and posts a `[!CAUTION]` comment indicating that the configured API credential is unusable.
 The downstream `require-review` gate then fails red.
 

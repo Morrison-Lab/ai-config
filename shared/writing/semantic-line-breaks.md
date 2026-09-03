@@ -237,7 +237,7 @@ The third is a **different mechanism** and is counted separately for that
 reason rather than omitted:
 `memories/r-quarto.md:1053` in #3016 flagged two *sentences* sharing one
 physical line, which is the digit/parenthesis-opener case already recorded
-at [ai-config#2127](https://github.com/Morrison-Lab/ai-config/issues/2127)
+at [ai-config#2127](https://github.com/Morrison-Lab/ai-config/pull/2127)
 below, not a comma-or-conjunction clause join.
 Naming that split matters because the merged commit message for
 [#3036](https://github.com/Morrison-Lab/ai-config/pull/3036) (`52d6fa57`)
@@ -317,10 +317,11 @@ script and the gate at once instead of trading one off against the other.
   hand-break; convert the clause pair into two genuine sentences instead.
 
 (Morrison-Lab/ai-config, 2026-09-02.
-Copilot findings read from `gh api
-repos/Morrison-Lab/ai-config/pulls/{3007,3016,3036}/comments` --- all three
-that drew one, since a query over only the two clause-density PRs would have
-produced the undercount this entry now warns about.
+Copilot findings read one endpoint at a time, since `gh api` takes a single
+endpoint per invocation:
+`for n in 3007 3016 3036; do gh api "repos/Morrison-Lab/ai-config/pulls/$n/comments"; done`
+--- all three that drew one, since a query over only the two clause-density PRs
+would have produced the undercount this entry now warns about.
 No such comment appeared on
 [#3004](https://github.com/Morrison-Lab/ai-config/pull/3004).
 The rejoin and restructure account is from the PRs' own commit messages, not

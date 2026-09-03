@@ -111,6 +111,10 @@ jobs:
         run: python3 scripts/test_check_verdict_scan_parity.py
       - name: Run check-user-quote tests
         run: python3 scripts/test_check_user_quote.py
+      - name: Run check-leadin-counts tests
+        # ai-config#3005. The test suite runs here; the checker itself is not
+        # yet a gate over the corpus, which is a deliberate follow-up.
+        run: python3 scripts/test_check_leadin_counts.py
       - name: Run check-doi-bib tests
         run: python3 scripts/test_check_doi_bib.py
       - name: Run test_pull_request tests

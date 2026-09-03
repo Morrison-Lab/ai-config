@@ -53,6 +53,19 @@ ROOT = Path(__file__).resolve().parent.parent
 INVALID_ESCAPE_MARKER = "invalid escape sequence"
 
 
+def is_invalid_escape(entry: warnings.WarningMessage) -> bool:
+    """Say whether one recorded warning is an invalid-escape diagnostic.
+
+    Keyed on the message text alone.  The category is deliberately not
+    consulted: it is ``DeprecationWarning`` on Python 3.11 and
+    ``SyntaxWarning`` on 3.12 and later, so a category test passes vacuously
+    on whichever interpreter the check does not happen to run on.  Exposed as
+    its own function so the suite can exercise it against both categories on
+    a single interpreter.
+    """
+    return INVALID_ESCAPE_MARKER in str(entry.message)
+
+
 def tracked_python_files(root: Path) -> list[Path]:
     """Return every git-tracked ``.py`` file under ``root``, sorted."""
     try:
@@ -110,7 +123,7 @@ def scan_file(path: Path) -> tuple[list[str], str | None]:
     findings = [
         f"{path}:{entry.lineno}: {entry.message}"
         for entry in caught
-        if INVALID_ESCAPE_MARKER in str(entry.message)
+        if is_invalid_escape(entry)
     ]
     return findings, None
 

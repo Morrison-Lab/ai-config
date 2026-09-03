@@ -171,7 +171,19 @@ def run_one_suite(test_path, subject, timeout):
     # and was caught in review: 36 of 46 suites spawn the subject as a
     # subprocess, and a SyntaxWarning injected into one of them (verified
     # empirically) still passed cleanly under the `-W`-only form.
-    env = dict(os.environ, PYTHONWARNINGS="error::SyntaxWarning")
+    #
+    # The second entry is keyed on the warning MESSAGE rather than a category
+    # (ai-config#3114): an invalid escape sequence is a DeprecationWarning on
+    # Python 3.11 and a SyntaxWarning on 3.12 and later, so the category-only
+    # form is vacuous on whichever interpreter is not the one it names.
+    # Measured 2026-09-03: `P = "a\s"` under `error::SyntaxWarning` alone
+    # exits 0 on 3.11 and 1 on 3.12, and the message-keyed entry makes both
+    # exit 1. Keying on the message rather than adding
+    # `error::DeprecationWarning` keeps every unrelated deprecation a warning.
+    env = dict(
+        os.environ,
+        PYTHONWARNINGS="error::SyntaxWarning,error:invalid escape sequence::",
+    )
     env.pop("ANTIGRAVITY_AGENT", None)
     proc = subprocess.Popen(
         [sys.executable, test_path, subject],

@@ -11,7 +11,9 @@ Verifies that:
    warnings filter. Python 3.11 raises DeprecationWarning, silent by default,
    while 3.12 and later raise SyntaxWarning; a category-keyed scan would pass
    vacuously on one of them, and a filter-dependent scan would pass under
-   PYTHONWARNINGS=ignore.
+   PYTHONWARNINGS=ignore. The category half is checked by calling the
+   predicate directly, since one interpreter can only ever raise one of the
+   two categories.
 5. An empty search space fails rather than reporting a vacuous clean --- the
    negative control the issue asks for.
 6. A file that does not compile is reported rather than swallowed.
@@ -19,10 +21,12 @@ Verifies that:
 Every fixture below writes its backslash through a valid escape in THIS file,
 so the suite stays clean under the very check it exercises.
 """
+import importlib.util
 import os
 import subprocess
 import sys
 import tempfile
+import warnings
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
@@ -74,6 +78,50 @@ def main() -> int:
     check("the denominator is non-zero", examined > 0)
     check("nothing is written to stderr on a clean run", err == "")
 
+    # The denominator has to be RIGHT, not merely non-zero. A pathspec that
+    # regressed to a subdirectory would still report a non-empty search space
+    # while the gate scanned a fraction of the corpus --- the undercount the
+    # empty-search-space guard cannot see. Derive the expected count
+    # independently rather than asserting a literal that goes stale.
+    listed = subprocess.run(
+        ["git", "-C", str(REPO), "ls-files", "-z", "--", "*.py"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    expected = len([name for name in listed.stdout.split(chr(0)) if name])
+    check("the denominator matches the tracked .py count", examined == expected)
+
+    # And the default path needs a positive detection test, not only a clean
+    # one: every other must-flag fixture below is reached through an explicit
+    # path argument, which returns before the tracked-tree enumeration runs.
+    with tempfile.TemporaryDirectory() as tmp:
+        repo = Path(tmp)
+        (repo / "scripts").mkdir()
+        copied = repo / "scripts" / SCRIPT.name
+        copied.write_bytes(SCRIPT.read_bytes())
+        write(repo, "offender.py", 'PATTERN = "^a\\s+b$"\n')
+        for cmd in (
+            ["git", "init", "-q"],
+            ["git", "add", "-A"],
+        ):
+            subprocess.run(cmd, cwd=repo, check=True, capture_output=True)
+        proc = subprocess.run(
+            [sys.executable, str(copied)],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+        )
+        check("the tracked-tree path flags an offender", proc.returncode == 1)
+        check(
+            "the tracked-tree path names the offender",
+            "offender.py" in proc.stdout,
+        )
+        check(
+            "the tracked-tree path counts every tracked file",
+            "Examined 2 " in proc.stdout,
+        )
+
     # 2. A non-raw literal with an unrecognized backslash sequence is flagged.
     with tempfile.TemporaryDirectory() as tmp:
         d = Path(tmp)
@@ -124,6 +172,35 @@ def main() -> int:
         check("a muted warnings filter does not hide the finding", code == 1)
         check("the muted run still names the escape", "invalid escape" in out)
 
+    # The filter half of that claim is testable on any interpreter; the
+    # CATEGORY half is not, because one interpreter only ever raises one of
+    # the two. So exercise the predicate directly against both categories
+    # instead. Without this, a regression from the message test to
+    # `issubclass(entry.category, SyntaxWarning)` would pass every assertion
+    # in this file on the 3.12 CI runner while going blind on a 3.11
+    # maintainer machine --- the exact split the check exists to close.
+    spec = importlib.util.spec_from_file_location("check_python_escapes", SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    for category in (DeprecationWarning, SyntaxWarning, UserWarning):
+        entry = warnings.WarningMessage(
+            category("invalid escape sequence " + chr(39) + "\\s" + chr(39)),
+            category,
+            "fixture.py",
+            1,
+        )
+        check(
+            f"the predicate accepts a {category.__name__} carrying the message",
+            module.is_invalid_escape(entry),
+        )
+    unrelated = warnings.WarningMessage(
+        SyntaxWarning("assertion is always true"), SyntaxWarning, "fixture.py", 1
+    )
+    check(
+        "the predicate rejects an unrelated SyntaxWarning",
+        not module.is_invalid_escape(unrelated),
+    )
+
     # 5. Negative control: examining nothing is a failure, not a clean tree.
     with tempfile.TemporaryDirectory() as tmp:
         code, out, _ = run_script(str(tmp))
@@ -133,7 +210,8 @@ def main() -> int:
 
     # 6. A file that does not compile is reported, never swallowed. The first
     #    attempt at this scan swallowed every compile failure and reported a
-    #    clean tree over 238 files it had never actually examined.
+    #    clean tree it had never actually examined, with no denominator to
+    #    show for it.
     with tempfile.TemporaryDirectory() as tmp:
         target = write(Path(tmp), "broken.py", "def f(:\n")
         code, out, _ = run_script(str(target))

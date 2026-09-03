@@ -248,7 +248,7 @@ The trap is specific to a **test harness that spawns its subject as a subprocess
 Applying `-W` only to the outer runner passes silently on exactly the case the flag exists to catch, because the warning fires inside the un-flagged grandchild and never becomes an error there.
 The failure is invisible from the outside: the outer process still exits 0, and nothing in its own output distinguishes "no warning occurred" from "a warning occurred where nobody was listening".
 
-- **Do:** set `PYTHONWARNINGS` in the subprocess environment (`env=dict(os.environ, PYTHONWARNINGS="error::SyntaxWarning")`) when the goal is for a spawned child to inherit the same warnings-as-errors behavior as its parent.
+- **Do:** set `PYTHONWARNINGS` in the subprocess environment (`env=dict(os.environ, PYTHONWARNINGS="error::SyntaxWarning,error:invalid escape sequence::")`) when the goal is for a spawned child to inherit the same warnings-as-errors behavior as its parent.
 - **Do:** verify the propagation empirically --- inject the exact defect class into a subject invoked the same way production invokes it, and confirm the harness actually fails --- rather than trusting that a flag which works on the outer process must also reach an inner one.
 - **Don't:** assume `-W` on the outer interpreter secures anything a subprocess it spawns does.
 
@@ -256,3 +256,28 @@ The failure is invisible from the outside: the outer process still exits 0, and 
 Caught in review by injecting an invalid escape sequence into a hook whose test spawns it via `subprocess.run([sys.executable, HOOK], ...)` (~36 of 46 suites use this pattern;
 a minority import their subject in-process instead): the suite still reported 19/19 correct, exit 0.
 Fixed by switching to `PYTHONWARNINGS`, and reproducing the same injection to confirm the fixed suite now fails.)
+
+### The category half of that filter is version-dependent, so key on the message
+
+`PYTHONWARNINGS` takes `action:message:category:module:lineno`, and everything after the action is optional.
+A category-only entry is the form everyone reaches for, and for one common defect class it is vacuous on half the interpreters in use.
+An invalid escape sequence in a non-raw string literal is a `DeprecationWarning` on Python 3.11 and a `SyntaxWarning` on 3.12 and later, so `error::SyntaxWarning` alone catches it on one and silently ignores it on the other.
+
+The empirical check the bullet above prescribes cannot see this on its own.
+Injecting an invalid escape and watching the harness fail confirms the mechanism on whichever interpreter you happen to be running;
+the version whose category you did not name still passes, and nothing in the green run says which version you proved anything about.
+That is the same maintainer-versus-CI split [ai-config#3114](https://github.com/Morrison-Lab/ai-config/issues/3114) was filed about.
+
+The message field is a regex matched against the start of the warning text, so `error:invalid escape sequence::` fires on the diagnostic under any category.
+Prefer it over adding `error::DeprecationWarning`, which would turn every unrelated deprecation in every suite into an error.
+
+Measured 2026-09-03 on this machine.
+A file containing `P = "a\s"` run under `PYTHONWARNINGS="error::SyntaxWarning"` exits 0 on `/usr/bin/python3.11` and exits 1 on `/usr/bin/python3.12`;
+adding `error:invalid escape sequence::` makes both exit 1, while an unrelated `DeprecationWarning` still exits 0.
+The same injection at suite level says it more plainly.
+Adding one invalid escape to `hooks/flag-cop-out-offer.py` and running `hooks/test-flag-cop-out-offer.py` on 3.11 reported 11 passed, 0 failed under the category-only filter and 5 passed, 6 failed under the message-keyed one.
+
+- **Do:** key a warnings-as-errors filter on the message text when the diagnostic's category varies by interpreter version.
+- **Do:** name the interpreter version an empirical propagation check was run on, since the check only ever proves the mechanism for that one.
+- **Don't:** rely on `error::SyntaxWarning` alone for invalid escapes --- it is vacuous on 3.11, and the injection test passes anyway on 3.12 and later.
+- **Don't:** broaden a category-only filter to `error::DeprecationWarning` to cover the gap, which errors on every unrelated deprecation as well.

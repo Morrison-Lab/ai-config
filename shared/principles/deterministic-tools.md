@@ -319,28 +319,33 @@ position.
 So every narrowing trades one boundary case for a neighbouring one, and the
 sequence has no end.
 
-Eight rounds on [#3101](https://github.com/Morrison-Lab/ai-config/pull/3101)
-each closed a real case and opened another: a manifest *name* with no root; the
-right shape under the wrong root; the deletion command clearing its own warning;
-a `grep` **for** the manifest string over `.py` files; the root supplied as the
-search *pattern* while the manifest belonged to a different root; a quoted
-pattern spelling a whole path; `locate` matching because it contains `cat`; and
-finally a verb and an operand in two different commands, where the second one
-*deletes* the manifest.
+On [#3101](https://github.com/Morrison-Lab/ai-config/pull/3101) the pattern was
+widened eight times, and each widening closed a real case while opening another:
 
-**The tell is the trade, not the count.**
-[`learn-from-review-findings`](../workflow/learn-from-review-findings.md)'s
-recurrence bar fires on the second finding of a class and is the right
-instrument for a heuristic that keeps *missing*.
-This is the adjacent shape: each fix works, and each one breaks something
-adjacent that the previous draft handled.
-Two such trades is the signal to stop asking what else the pattern should match
-and ask what question the instrument is really being asked.
-Here the answer was a parse --- `shlex` the command, then ask whether a read
-verb's argv holds a manifest under a targeted root --- and the structural rework
-was filed as
-[#3126](https://github.com/Morrison-Lab/ai-config/issues/3126) rather than
-attempted in the round that noticed it.
+- a manifest *name* supplied with no root;
+- the right shape under the wrong root;
+- the deletion command clearing its own warning;
+- a `grep` **for** the manifest string, over `.py` files;
+- the root supplied as the search *pattern*, with the manifest belonging to a
+  different root;
+- a quoted pattern spelling out a whole path;
+- `locate` matching because the word contains `cat`;
+- a verb and an operand in two different commands, where the second one
+  *deletes* the manifest.
+
+**The trigger for stopping is already written down, in two places, and neither
+is restated here.**
+[`learn-from-review-findings`](../workflow/learn-from-review-findings.md) fires
+on the second finding of a class, and on two successive fixes turning the same
+knob;
+read those rather than a third statement of the same bar.
+What this section supplies is the answer they leave open --- what to do about a
+question that is structural rather than lexical, and what to write down when you
+cannot fix it in the round that noticed it.
+Here the structural answer was a parse: `shlex` the command, then ask whether a
+read verb's argv holds a manifest under a targeted root.
+It was filed as [#3126](https://github.com/Morrison-Lab/ai-config/issues/3126)
+rather than attempted in the round that noticed it.
 
 **Then write the ceiling into the artifact.**
 The disposition that ends such a sequence is not a ninth widening and not a
@@ -358,9 +363,14 @@ Note the boundary with
 flagging an overclaimed check is a prompt to build it, not to soften the claim".
 That section rejects deleting an overclaiming sentence *in place of* building
 the instrument the finding asked for, and it still governs.
-What is permitted here is narrowing the claim to what the code does **while**
-filing the instrument, which resolves by addition on a longer clock.
-Deleting the sentence and filing nothing is the move both sections refuse.
+It also permits deletion outright for a property that is a genuine one-off ---
+"state plainly when a property is a genuine one-off, and delete the claim then"
+--- so deletion is not forbidden, only deletion standing in for an instrument
+that is still wanted.
+The case here is neither: the property is real and recurring, and the instrument
+is wanted but is a whole rework.
+So narrow the claim to what the code does **while** filing the instrument, which
+resolves by addition on a longer clock.
 
 - **Do:** ask what question the instrument is really being asked, once two
   successive fixes have each traded one boundary case for another.
@@ -372,8 +382,9 @@ Deleting the sentence and filing nothing is the move both sections refuse.
   each opened a new case; a pattern with no argument positions cannot converge
   on a question about argument positions.
 - **Don't:** let a comment assert a guarantee the code only approximates.
-- **Don't:** read this as licence to delete the overclaim and stop --- without
-  the filed issue it is the softening `algorithmatize-checks` refuses.
+- **Don't:** read this as licence to narrow the overclaim and stop, where the
+  instrument is still wanted --- without the filed issue that is the softening
+  `algorithmatize-checks` refuses.
 
 ## Limits
 

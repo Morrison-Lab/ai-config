@@ -285,13 +285,13 @@ A suite that grows while staying inside one shape reports coverage and adds none
 So when a fix restricts what a pattern accepts, ask what the restriction excludes and write a case on the far side of it -- the far side is where the regression lives, by construction.
 
 **A correct diagnosis is what licenses the unsafe edit, which is why a well-understood finding is the dangerous one.**
-The two shapes above are about the *content* of a fix.
-This is about its *speed*, and it is the condition that produces both.
+The over-correction and the mis-fired probe above are both about the *content* of a fix.
+This is about its *speed*, and it is the condition that produces both of those.
 When the cause is genuinely understood, the edit that follows feels settled before it is written --- there is nothing left to work out, so there is nothing left to check --- and that feeling is indistinguishable from the edit actually being safe.
 An unclear finding gets a careful fix precisely because the confusion forces a pass over it.
 
-Measured on [#3101](https://github.com/Morrison-Lab/ai-config/pull/3101) over eight adversarial rounds, where five separate rounds found a defect that the previous round's fix had introduced.
-Every one of the five diagnoses was correct:
+Measured across the adversarial rounds on [#3101](https://github.com/Morrison-Lab/ai-config/pull/3101), where a round repeatedly found a defect that the previous round's fix had introduced.
+Five such fixes, each resting on a diagnosis that was correct:
 
 - Adding `2>/dev/null` to a timing loop fixed stderr interleaving and silenced the only remaining failure signal, so a nonexistent command reported a plausible fast spread (`0.007 / 0.003 / 0.003`).
 - Narrowing a regex branch to option tokens only fixed a false positive and silently dropped `git clean -fdx <root>`, a real destructive form the previous draft caught.
@@ -300,24 +300,25 @@ Every one of the five diagnoses was correct:
 - Moving a hard-to-time probe in-process fixed a misattribution and made the guard hang rather than fail.
 
 Read the list by column rather than by row.
-Each fix did what it was for; each also *hid* something (a failure signal, an explanation) or *admitted* something (a destructive form, eight discharges), and the two are the only questions worth asking after the edit is written.
+Each fix did what it was for;
+each also *hid* something (a failure signal, an explanation) or *admitted* something (a destructive form, eight discharges).
+Those two are the only questions worth asking once the edit is written.
 So ask them explicitly: what does this fix now hide, and what does it now let through?
 Then probe that specific question before reporting the fix, rather than probing the finding again.
 
-**Probe in the direction the reviewer did not name, and re-run the original.**
-The reviewer names one direction, so the fix is tested in that direction, so the suite grows along the axis that was already safe --- which is the coverage failure the section above describes, arriving through a different door.
-Two probes settle it and neither is expensive: the original failing case, which establishes the fix works at all, and a case on the opposite side, which is where the fix's new cost lives.
-The `2>/dev/null` case above is the cheapest illustration: the original probe still passed, and no probe existed for "the command does not exist", which was the only failure the redirect could now conceal.
+**Re-running the original failing case is the probe this list does not otherwise ask for.**
+The far-side case the coverage rule above prescribes catches what a narrowing excluded.
+It says nothing about whether the fix still does its own job, and a fix that hides a signal can pass a far-side case while quietly failing the case that prompted it.
+The `2>/dev/null` fix is the cheapest illustration: it silenced the very failure it was added to tidy, so the original probe was the only one that could have caught it, and it was the one probe nobody thought to repeat.
 
 - **Do:** ask what a fix now hides and what it now admits, and probe that question before reporting the fix.
-- **Do:** re-run the original failing probe *and* one probing the opposite direction, not only the case the reviewer named.
+- **Do:** re-run the original failing case after a fix, alongside the far-side case, so the fix is shown still to do its own job.
 - **Do:** ask which single change is sufficient for a finding, and ship only that one.
 - **Do:** write at least one case on the far side of any restriction you add, varying the axis the restriction acts on.
 - **Do:** check *which* alternative made a probe fire before reading it as coverage.
 - **Don't:** treat code written in response to a finding as pre-validated --- it is a new diff and gets a new review.
 - **Don't:** conclude a class is covered because one member of it fired.
 - **Don't:** treat a correct diagnosis as evidence the edit implementing it is safe --- being right about the cause says nothing about the patch.
-- **Don't:** report a fix in the turn it was written without an adversarial pass over the fix itself.
 
 ## A cosmetic pass over a paragraph is not a read of it
 

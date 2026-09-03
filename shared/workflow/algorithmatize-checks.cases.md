@@ -662,24 +662,27 @@ The control that settled it was a pristine `cp -a` copy of the same HEAD with th
 Note which direction the repetition pushed.
 Three identical readings did not merely fail to rule the confounder out --- they raised confidence, because reproducibility is what an attribution normally needs, and the load was as reproducible as the tree.)
 
-## Two green checks that were both blind to the property
+## A cited check that could not go red, and a measurement nobody could re-run
 
 (Measured on [Morrison-Lab/ai-config#3103](https://github.com/Morrison-Lab/ai-config/pull/3103), 2026-09-03.
-Prose in a fragment was reflowed, and the reflow's correctness was reported as verified by `scripts/vendor/gha-check-new-line-breaks.py` and by markdownlint.
+Prose in several fragments was reflowed, and the reflow's correctness was reported as verified by `scripts/vendor/gha-check-new-line-breaks.py` and by markdownlint.
+Neither instrument asks where a break fell inside a sentence, and `MD013` --- the only rule that would notice a column boundary --- is disabled repo-wide in `.markdownlint-cli2.jsonc`, so a green run from the pair says nothing about the property being claimed.
+[`semantic-line-breaks`](../writing/semantic-line-breaks.md) carries the argument and the two measurements that do discriminate.
+This record is about how the citation held up.
 
-Neither is looking at the property.
-The gate flags a line holding more than one sentence, unconditionally.
-It separately flags a line with a mid-line semicolon, once that line's stripped text reaches 80 characters.
-And `MD013` is disabled repo-wide in `.markdownlint-cli2.jsonc`.
-Run over the added prose lines at three states of the same file --- the unreflowed original, an 80-column hard wrap, and the clause-boundary reflow --- the gate reported zero violations at each.
-Three trees, one verdict, and only one of the three is the wanted outcome.
-A column wrap is not *guaranteed* to pass --- filling to a column can merge two short sentences onto one line, which trips the sentence rule --- so the gate can catch one by accident, and this fragment's prose simply produced no such line.
+The second half is the part worth keeping.
+The verification was restated here as a three-state measurement --- the unreflowed original, an 80-column hard wrap, and the clause reflow, all reported clean --- and a later reviewer could not reproduce it.
+Reproduced against the PR's own added prose, a genuine fill to 80 columns merges short sentences onto shared lines and turns the gate **red** in every fragment it touched.
+So the claim that all three states pass was false, and the base first published with it belonged to a different PR.
 
-What discriminated was measuring the property directly.
-A length histogram of the added lines shows a hard cliff at exactly 80 characters for the column wrap and no such edge for the clause reflow, since clauses do not end on a column.
-Counting added prose lines that end mid-phrase separates them the same way: the column wrap leaves many such lines and the clause reflow leaves approximately none.
-Exact figures for that count depend on how a "prose line" is delimited and on which base the diff is taken against, so report the definition and the base alongside any number, per
-[`grep-is-not-coverage`](grep-is-not-coverage.md)'s "A published count needs the ref and the flags it was measured with".)
+Three separate mechanisms hid that, and none of them is the original green run.
+The measurement was cited before it was written down, so the number entered the record already carrying the authority of a check that had been run.
+It was then recorded in two files at once, which made the two accounts corroborate each other while resting on one unverified run.
+And the strong form is the memorable one: "all three states pass" is a cleaner sentence than the true, narrower claim about breaks inside a sentence, so each restatement drifted toward it.
+
+The transferable rule is the one this file's
+"A checker that returns the same verdict on the broken tree is not evidence the fix worked" section states.
+Add to it: when the evidence is a measurement rather than an exit code, publish the base, the commits, and the command with it, so the first reader who doubts it can re-run it instead of inheriting it.)
 
 ## A relocated skip that re-parented an elif chain
 

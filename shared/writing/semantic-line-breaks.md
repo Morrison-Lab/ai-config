@@ -1126,29 +1126,20 @@ each from exactly 1200 to 1201 lines, failing `validate` with no content
 change; fixed by re-wrapping the same sentences at a different clause
 boundary, restoring both to 1200.)
 
-**Neither the gate nor markdownlint can tell a column wrap from a clause reflow, so a green run from both is weak evidence that a reflow was done right.**
+**Neither gate can tell a clause reflow from any other layout of the same sentences, so a green run is weak evidence that a reflow was done right.**
 
 Both instruments are described at length above --- the gate's two predicates, and `MD013` being off repo-wide --- and what matters here is what neither of them asks.
-Neither asks **where** a break fell.
-That is the whole content of the difference between a clause reflow and a hard wrap at column 80, and the width rule that would notice a column boundary directly is the one this repo disables.
+Neither asks **where** a break fell inside a sentence.
+That is the whole content of the difference between clause-broken prose and one long line per sentence, and the width rule that would notice a column boundary directly is the one this repo disables.
 
-Measured on [ai-config#3103](https://github.com/Morrison-Lab/ai-config/pull/3103), over the added prose lines of one fragment at three states, all diffed against base `2cde8d0bf` and classified with the gate's own `classify_line`: the unreflowed original at `02cbf00d8`, a fill-to-80 wrap of that same commit's added lines, and the clause-boundary reflow at `ba265b546`.
-The gate reported zero flagged lines at each of the three.
-The original scored zero because it was already sentence-conformant --- it was clause-broken prose awaiting a better reflow, not a paragraph blob --- which is the state this comparison needs it to be in.
-Three trees, one verdict, and only one of the three is the wanted outcome.
-Citing either instrument in that situation is the vacuous verification
-[`algorithmatize-checks`](../workflow/algorithmatize-checks.md)'s
-"A checker that returns the same verdict on the broken tree is not evidence the fix worked" section describes.
-
-**A column wrap is not guaranteed to pass, which is why the gate's silence has to be read as silence rather than as approval.**
-Filling to a column merges as well as splits, so a wrap that packs two short sentences onto one line trips the sentence rule and turns the gate red.
-The measurement above came back clean because that fragment's prose happened not to produce such a line.
-So the gate can catch a column wrap by accident and cannot catch one on purpose.
-Its silence therefore rules out one narrow subclass --- a wrap that merged two sentences --- and says nothing about where any other break fell, which is why it is weak evidence rather than none.
+Be careful about how far that goes, because the obvious stronger claim is false.
+A hard wrap to 80 columns over multi-sentence prose *does* trip the gate, by merging two short sentences onto one line, and measured over one PR's added prose it did so in every fragment it touched.
+So the gate is not blind to column wrapping.
+What it is blind to is the placement of breaks *within* a sentence, which is exactly the property a clause reflow is about, and `MD013` being disabled means nothing else looks at width either.
 
 Two measurements do discriminate, each one command over the diff.
 
-Print the added lines' lengths and look for a hard cliff at exactly 80, which is the signature of a column wrap.
+Print the added lines' lengths and look for a hard cliff at exactly 80, which is the signature of a fill-to-column pass.
 Clause-broken prose has no such edge, because clauses do not end on a column.
 
 ```bash
@@ -1157,7 +1148,7 @@ git diff origin/main -- '*.md' | grep '^+[^+]' | cut -c2- |
 ```
 
 Then count added prose lines that end mid-phrase --- on an article, a preposition, a conjunction, or an open bracket --- before and after.
-A column wrap leaves many, and a clause reflow leaves approximately none, so the pair is the number worth reporting.
+A fill-to-column pass leaves many, and a clause reflow leaves approximately none, so the pair is the number worth reporting.
 
 ```bash
 git diff origin/main -- '*.md' | grep '^+[^+]' | cut -c2- |
@@ -1170,7 +1161,7 @@ Report the base and the line definition alongside either figure, per
 The second command counts every added line rather than only prose lines, and the gate's own `prose_line_numbers` gives a stricter population, so the two disagree by a margin that depends on how much of the diff is fenced or tabular.
 
 - **Do:** measure the length distribution and the mid-phrase count before reporting a reflow verified.
-- **Do:** publish the base and the definition with either figure, since neither is defined by the gate.
-- **Don't:** cite the `new-line-breaks` gate or markdownlint as evidence a reflow was done at clause boundaries --- neither looks at where a break fell.
+- **Do:** publish the base, the commits, and the line definition with either figure, since neither is defined by the gate.
+- **Don't:** cite the `new-line-breaks` gate or markdownlint as evidence that breaks landed at clause boundaries --- neither looks at where a break fell inside a sentence.
 - **Don't:** read a green gate on the reflowed tree as discriminating.
-  Confirm it goes red on the unreflowed one first, and on this property it may not.
+  Confirm it goes red on the tree you are claiming to have fixed, and drop the citation when it does not.

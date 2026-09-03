@@ -427,7 +427,7 @@ A distribution beats a pass/fail here: a property's *signature* is visible in a 
 - **Don't:** cite a green gate as evidence a fix landed --- green is the same answer it gives to no fix at all.
 - **Don't:** treat "two independent checks agree" as corroboration when neither has been shown able to disagree.
 
-See [`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md), "Two green checks that were both blind to the property".
+See [`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md), "A cited check that could not go red, and a measurement nobody could re-run".
 
 ## Widening an instrument invalidates every figure it produced, not only the one that exposed it
 

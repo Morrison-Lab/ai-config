@@ -234,7 +234,8 @@ What this section rules out is the forward form: a count written as what a futur
 
 (Measured on [Morrison-Lab/ai-config#3100](https://github.com/Morrison-Lab/ai-config/pull/3100), merged 2026-09-03.
 A comment in `scripts/test_check_review_body.py` read "754 pass with the helper neutered", and the same figure went into a commit message.
-The suite carries wall-clock assertions that intermittently miss a one-second budget
+The 754 counts a *different* file's suite, `scripts/test_check_pr_fully_clean.py`, which is the point of the anecdote: the number was written where nothing regenerates it.
+That suite carries wall-clock assertions that intermittently miss a one-second budget
 ([#3127](https://github.com/Morrison-Lab/ai-config/issues/3127)),
 so a run reports `753 passed, 1 failed` out of the same 754.
 The baked count had that flake read as a regression.

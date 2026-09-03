@@ -157,7 +157,7 @@ Deciding where a learning belongs is a real step ---
 [`ums`](../../skills/ums/SKILL.md) step 2 routes each item either to ai-config
 or to the owning repo's own agent docs --- and once an item is routed to a repo
 we own, every later instruction reads as relative to *that* repo.
-Step 3's "grep the whole corpus" then means the destination's,
+Step 3's "Grep the whole corpus rather than one file" is easily read as the destination's,
 so the dupe check runs to completion, finds nothing,
 and never looked at ai-config at all.
 
@@ -212,11 +212,11 @@ where [`ums`](../../skills/ums/SKILL.md) step 3 long read "the whole `memories/`
 - **Do:** grep every directory the corpus spans, not the one the destination sits in.
 - **Don't:** read "the whole directory" as thorough --- the word doing the damage is the directory name, not the word "whole".
 
-(Recorded 2026-09-03 on [ai-config#3060](https://github.com/Morrison-Lab/ai-config/pull/3060), where a markdownlint entry was added to `memories/markdownlint.md` while `shared/writing/semantic-line-breaks.md` already carried the same collision in three places, one of them a full section.
+(Recorded 2026-09-03 on [ai-config#3060](https://github.com/Morrison-Lab/ai-config/pull/3060), where a markdownlint entry was added to `memories/markdownlint.md` while `shared/writing/semantic-line-breaks.md` already mentioned the same collision at three points, one of them a bold-lead block with its own `Do`/`Don't` pair.
 The checkable part is what the wider grep would have done.
 `grep -ril "issue reference" memories/` returns three files at `origin/main`, and none of them is the owner, because the owner is `shared/writing/semantic-line-breaks.md` and no search of `memories/` can reach it.
 The ref matters and is this section's own rule: the same query returns four at `eb0cf15e`, the commit that added the duplicate entry, whose `memories/markdownlint.md` is the fourth hit.
-At ai-config#3060's head (`5f2dab94`) the count is still four, but that fourth hit is the cross-link `1732000a` put in the duplicate's place --- so the number outlived the thing it was measuring.
+At `5f2dab94`, #3060's head when this was measured, the count is still four, but that fourth hit is now a stub whose body `1732000a` replaced with a cross-link --- so the number outlived the thing it was measuring.
 So this is not the old step 3 merely going unfollowed: following it exactly, over the whole of `memories/`, still misses.
 Note also why this section's own `Do` could not have caught it.
 It reads "grep the ai-config corpus as well as the destination repo's docs, **whenever step 2 routes an item anywhere other than ai-config**", and this item was routed to ai-config, so its trigger never fires.)
@@ -394,7 +394,7 @@ FIRE-condition addition", so both parties held the evidence and neither drew the
 conclusion that the count needed a ref rather than a correction.
 The fix stated the ref and the flags and changed no number.)
 
-**A false MISSING while verifying a merge lands its duplicate in the merge commit, whose patch `git log -p` omits by default, and that scope is what this adds.**
+**A false MISSING while resolving a merge lands its duplicate in the merge commit, whose patch `git log -p` omits by default, and that scope is what this adds.**
 This section owns the axis that a result is relative to the query that produced it and the ref it ran against;
 this subsection points that axis at a presence check rather than at a count, and at a query run mid-merge.
 [`memories/debugging.md`](../../memories/debugging.md)'s "An empty grep for one spelling is not evidence the concept is absent" already owns the mechanism and the consequence, in as many words:
@@ -406,24 +406,26 @@ So read that first;
 one thing it leaves open is worth adding.
 
 That part is **where the resulting duplicate lands**, and only for one kind of check.
-A verification-time miss can land in an ordinary commit, fully in review's path --- `UCD-SERG/serocalculator#605`'s README paragraph would have.
+A verification-time miss can land in an ordinary commit --- `UCD-SERG/serocalculator#605`'s README paragraph would have.
 The case this adds is a check run *inside a merge*.
 The moment is already covered: the two case records that state a search's purpose are both checking searches --- a README grepped "to check whether it linked the development docs", a citation "checked before citing it" and one step from being reported as dangling --- so verification is where it was written from, not a gap in it.
 What it does not say is where the second copy ends up, or who reads that.
-An authoring-time duplicate arrives as a new block in an ordinary diff, which is what review looks at.
+An authoring-time duplicate arrives as a new block in an ordinary commit's diff, which `git log -p` prints.
 A re-add made while resolving a merge arrives in the merge commit.
 Which read shows it is decided by the command, measured 2026-09-03 in a scratch repo over a merge whose conflict resolution re-added a paragraph already present on `main`.
-`git diff main...feature` listed the re-add as an added line, and `git show <merge-sha>` and `git log --cc main..feature` showed it too, as a `++` line of the merge's combined diff, which both of those default to.
-`git log -p main..feature` did not: it printed the merge commit's message with no patch at all, so a reviewer reading the branch commit by commit is never shown the re-add.
+`git diff main...feature` listed the re-add as an added line, and `git show <merge-sha>` and `git log --cc main..feature` showed it too, as a `++` line of the merge's combined diff, which `git show` defaults to and `--cc` turns on for `git log`.
+`git log -p main..feature` did not: it printed the merge commit's message with no patch at all, so a reviewer reading the branch with `git log -p` is never shown the re-add.
 A merge verified string by string is exactly where a mistyped pattern produces such a re-add, and whether review sees it depends on which of those reads review does.
 
 Measured 2026-09-03: two consecutive false MISSING readings while verifying that a merge preserved earlier work, both from the pattern rather than the file.
 A trailing space in `demotes ` did not match the bolded `` demotes** `time` `` in the target, and a case-sensitive `keep the content` did not match `Keep the content`.
 Both were caught before acting, and either repair would have re-added text already present.
+Whether those readings were taken before the merge commit was made is not recorded, so this case does not itself establish the headline's scope.
+A repair made after the merge commit lands in an ordinary commit, whose patch `git log -p` prints.
 
 - **Do:** re-test a MISSING before acting on it, with `grep -F` on a distinctive contiguous substring, and with `-i`.
 - **Do:** prefer a substring test in the tool you are already in --- `"<text>" in path.read_text()` --- which has no pattern language to get wrong.
-- **Don't:** act on a single MISSING inside a merge, where the correction is additive and nothing later re-reads it.
+- **Don't:** act on a single MISSING inside a merge, where the correction is additive and the default `git log -p` read never shows it.
 
 (The first draft of this entry opened "nothing above covers" this.
 A review pointed at `debugging.md`, which covered most of it, and at this fragment's own delegation to that file.

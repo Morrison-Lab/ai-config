@@ -302,6 +302,34 @@ currently uninstrumented.
 See [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md),
 "A summary read as its source, in the session that fixed the summary".
 
+**The same substitution runs over your own transcript,
+and there it corrupts a measurement rather than a citation.**
+The section above concerns a summary of a corpus *file*.
+A context-window summary of the *conversation* is the other copy that is already in front of you,
+and the reply it condenses is not.
+
+That matters most when the text is being used as a **specimen** rather than as a source.
+Designing a matcher --- a hook's regex, a grep, a classifier's word list ---
+against the summary's rendering of a reply is validating it against paraphrase.
+The summary's wording is written to be representative, so it matches readily,
+and the measurement comes back clean;
+the real reply's wording is what the matcher will actually meet in production,
+and it need not match at all.
+Nothing distinguishes the two outcomes,
+because both are "the pattern fired on the text I tested it against".
+
+Measured 2026-09-02/03 while drafting the `no-unverified-approval-claim` Stop hook on `Morrison-Lab/ai-config` (branch `hook/no-unverified-approval-claim`,
+unpushed at the time of writing, so there is no PR to cite):
+the matcher was designed and validated against a context-window summary of the session's own reply.
+The summary's phrasing matched and the reply's phrasing did not,
+so the design read as validated by its own measurement while not firing on the one case that motivated it.
+
+- **Do:** pull the verbatim text out of the raw transcript when a matcher is being fitted to it,
+  per [`get-under-the-hood`](../principles/get-under-the-hood.md)'s raw-log practice.
+- **Do:** treat "the pattern matched my test string" as a claim about the test string until you can say where that string came from.
+- **Don't:** fit a matcher to a summary of the thing it must match ---
+  a paraphrase is the one specimen guaranteed to be cooperative.
+
 ## A drift claim is relational, so one read cannot settle it
 
 Every shape above is one substitution: you read A and made a claim about B.
@@ -839,3 +867,52 @@ The stub's own added NOTE at the cited commit (`856b8702`) read "Do NOT declare 
 Verified with `gh api "repos/Morrison-Lab/gha/contents/examples/quarto-publish.yml?ref=856b8702" --jq '.content' | base64 -d`.
 The claim was retracted in the PR thread;
 the retraction described `856b8702` as the commit its comments were written against, which a separate check against `gh api repos/Morrison-Lab/gha/pulls/811/commits` and `.../compare/856b8702...e34e03d5` did not confirm, though the file itself was confirmed unchanged.)
+
+**An eleventh: an issue's OPEN state,
+standing in for the behaviour it describes.**
+
+The seventh shape above substitutes a *future* state for the present one.
+This one substitutes a **stale past** one,
+and it arrives with a citation attached,
+which is what makes it the more persuasive of the two.
+An open issue is a durable, linkable,
+timestamped artifact that describes a defect precisely.
+Everything about it reads as evidence.
+What it actually records is that nobody has closed it,
+and closing is a bookkeeping act performed by a person,
+so the gap between "the defect exists" and "the issue is open" is exactly the set of fixes that landed without their issue being closed ---
+which in a fast-moving repo is a large set.
+
+The asymmetry runs against you.
+A closed issue over-claims in the safe direction: you go and check.
+An open issue under-claims in the dangerous one:
+it confirms the belief you already had, from a source you can cite,
+so nothing prompts the read.
+
+The falsifying question from "The test" above disposes of it in one step:
+*could this issue be open while the behaviour it describes is fixed?*
+It always could.
+So the issue can never settle the question, and only the code can.
+
+- **Do:** read the code (or run the test) before asserting current behaviour,
+  and cite the file and line rather than the issue.
+- **Do:** cite the issue for the *history* --- that this was once broken,
+  and is tracked --- which is the claim it can actually support.
+- **Do:** check whether the fix landed and the issue simply was not closed,
+  and close it (or say so) when it did.
+- **Don't:** treat an open issue as a live measurement;
+  its state is bookkeeping, not behaviour.
+
+(Measured 2026-09-02, and re-checked 2026-09-03.
+`hooks/flag-background-review-dispatch.py` ---
+authored at commit `9009e787a` on the local `ai-config` branch `hook/flag-background-review`,
+which `git ls-remote --heads origin hook/flag-background-review` confirms is unpushed,
+so neither the commit nor the file is reachable from any clone but the author's ---
+carried a docstring asserting that [`no-push-without-self-review.py`](../../hooks/no-push-without-self-review.py) does not register verdicts arriving via background task notifications,
+citing [ai-config#2483](https://github.com/Morrison-Lab/ai-config/issues/2483), which was ---
+and as of 2026-09-03 still is --- open.
+The fix had landed on 2026-09-01 in [#2820](https://github.com/Morrison-Lab/ai-config/pull/2820) (`0d78e04c`),
+whose `is_task_notification` branch sits at `hooks/no-push-without-self-review.py:1400-1417` and is covered by a passing test.
+`git log -L 1400,1417:hooks/no-push-without-self-review.py` names that commit in one command;
+no such command was run, because an open issue looked like the answer.
+The docstring was still uncorrected on that branch as this was written.)

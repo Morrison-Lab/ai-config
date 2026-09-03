@@ -558,7 +558,8 @@ A docstring in `scripts/check-review-body.py` described when a `## Findings` hea
 It went through four states, three of them wrong.
 Two of those revisions did call the classifier, and their messages report the run --- so a call is not by itself the fix.
 One of those two produced a wrong state anyway, because it ran the classifier on a single body and then generalized from that one answer.
-What separates candidate rules is a *pair* of inputs differing by one line, which is the derivation the section below describes.
+A single call confirms a verdict.
+Only a pair of inputs differing by one line separates one candidate rule from another.
 
 The original said the heading forces not-clean regardless of contents.
 The first retraction said `_findings_section_resolves_empty` exempts any section that says there are none --- which reversed the error rather than fixing it.

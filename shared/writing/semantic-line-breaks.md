@@ -1128,13 +1128,13 @@ boundary, restoring both to 1200.)
 
 **Neither the gate nor markdownlint can tell a column wrap from a clause reflow, so a green run from both is weak evidence that a reflow was done right.**
 
-Both instruments are described at length above.
-What matters here is what each does *not* look at.
-The `new-line-breaks` gate flags a line holding more than one sentence, and a line whose stripped text reaches 80 characters and carries a mid-line semicolon.
-`MD013`, the width rule that would notice a column boundary directly, is disabled repo-wide in `.markdownlint-cli2.jsonc`.
-Neither predicate asks **where** a break fell, which is the whole content of the difference between a clause reflow and a hard wrap at column 80.
+Both instruments are described at length above --- the gate's two predicates, and `MD013` being off repo-wide --- and what matters here is what neither of them asks.
+Neither asks **where** a break fell.
+That is the whole content of the difference between a clause reflow and a hard wrap at column 80, and the width rule that would notice a column boundary directly is the one this repo disables.
 
-Measured on one fragment's added prose lines, at three states of the same file --- the unreflowed original, an 80-column hard wrap, and the clause-boundary reflow --- the gate reported zero violations at each.
+Measured on [ai-config#3103](https://github.com/Morrison-Lab/ai-config/pull/3103), over the added prose lines of one fragment at three states, all diffed against base `2cde8d0bf` and classified with the gate's own `classify_line`: the unreflowed original at `02cbf00d8`, a fill-to-80 wrap of that same commit's added lines, and the clause-boundary reflow at `ba265b546`.
+The gate reported zero flagged lines at each of the three.
+The original scored zero because it was already sentence-conformant --- it was clause-broken prose awaiting a better reflow, not a paragraph blob --- which is the state this comparison needs it to be in.
 Three trees, one verdict, and only one of the three is the wanted outcome.
 Citing either instrument in that situation is the vacuous verification
 [`algorithmatize-checks`](../workflow/algorithmatize-checks.md)'s
@@ -1143,7 +1143,8 @@ Citing either instrument in that situation is the vacuous verification
 **A column wrap is not guaranteed to pass, which is why the gate's silence has to be read as silence rather than as approval.**
 Filling to a column merges as well as splits, so a wrap that packs two short sentences onto one line trips the sentence rule and turns the gate red.
 The measurement above came back clean because that fragment's prose happened not to produce such a line.
-So the gate can catch a column wrap by accident and cannot catch one on purpose, and a green run distinguishes nothing either way.
+So the gate can catch a column wrap by accident and cannot catch one on purpose.
+Its silence therefore rules out one narrow subclass --- a wrap that merged two sentences --- and says nothing about where any other break fell, which is why it is weak evidence rather than none.
 
 Two measurements do discriminate, each one command over the diff.
 

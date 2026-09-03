@@ -650,9 +650,10 @@ Deleting an apparently-dead local variable turned `scripts/test_check_pr_fully_c
 That was reported as a deterministic regression caused by the deletion, and the deletion was defended on it.
 
 The reading was noise.
-The suite carries several wall-clock assertions, each bounding how long a scan may take --- most at one second and at least one at two.
-They do not share a phrasing, so enumerate them by their shared machinery rather than by a phrase: every one goes through a `best_of_three` helper, whose own docstring already says that a single sample makes the measurement flaky, so the helper's call sites are the population and a search for any one assertion's wording is not.
-Measured 2026-09-03 on `main`, `grep -n 'best_of_three' scripts/test_check_pr_fully_clean.py` returns seven lines: the definition and six call sites.
+The suite carries a number of wall-clock assertions bounding how long a scan may take, at budgets that differ from one to another.
+They share neither a phrasing nor a single helper --- most go through a `best_of_three` wrapper, whose own docstring already says a single sample makes the measurement flaky, and at least one times inline with `time.time()`.
+That is worth stating because two attempts to write this record down published a population and got it wrong: once by grepping an assertion's wording, and once by grepping the helper's name.
+Enumerating them needs a read of the file rather than either query, and a read of the current file: a count taken here against a stale local checkout differed from the same count against `origin/main`.
 Several reviewer subagents dispatched by this session were saturating the machine at the time, so every one of the three runs was taken under the same load.
 
 The control that settled it was a pristine `cp -a` copy of the same HEAD with the same deletion applied, which ran green 8 of 8.
@@ -666,12 +667,13 @@ Three identical readings did not merely fail to rule the confounder out --- they
 (Measured on [Morrison-Lab/ai-config#3103](https://github.com/Morrison-Lab/ai-config/pull/3103), 2026-09-03.
 Prose in a fragment was reflowed, and the reflow's correctness was reported as verified by `scripts/vendor/gha-check-new-line-breaks.py` and by markdownlint.
 
-Neither can see the property.
+Neither is looking at the property.
 The gate flags a line holding more than one sentence, unconditionally.
 It separately flags a line with a mid-line semicolon, once that line's stripped text reaches 80 characters.
 And `MD013` is disabled repo-wide in `.markdownlint-cli2.jsonc`.
 Run over the added prose lines at three states of the same file --- the unreflowed original, an 80-column hard wrap, and the clause-boundary reflow --- the gate reported zero violations at each.
 Three trees, one verdict, and only one of the three is the wanted outcome.
+A column wrap is not *guaranteed* to pass --- filling to a column can merge two short sentences onto one line, which trips the sentence rule --- so the gate can catch one by accident, and this fragment's prose simply produced no such line.
 
 What discriminated was measuring the property directly.
 A length histogram of the added lines shows a hard cliff at exactly 80 characters for the column wrap and no such edge for the clause reflow, since clauses do not end on a column.

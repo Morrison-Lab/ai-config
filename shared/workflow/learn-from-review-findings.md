@@ -290,18 +290,18 @@ This is about its *speed*, and it is the condition that produces both of those.
 When the cause is genuinely understood, the edit that follows feels settled before it is written --- there is nothing left to work out, so there is nothing left to check --- and that feeling is indistinguishable from the edit actually being safe.
 An unclear finding gets a careful fix precisely because the confusion forces a pass over it.
 
-Measured across the adversarial rounds on [#3101](https://github.com/Morrison-Lab/ai-config/pull/3101), where a round repeatedly found a defect that the previous round's fix had introduced.
+Measured across the adversarial rounds on [#3101](https://github.com/Morrison-Lab/ai-config/pull/3101), where successive rounds each found a defect the previous round's fix had introduced.
 Five such fixes, each resting on a diagnosis that was correct:
 
 - Adding `2>/dev/null` to a timing loop fixed stderr interleaving and silenced the only remaining failure signal, so a nonexistent command reported a plausible fast spread (`0.007 / 0.003 / 0.003`).
 - Narrowing a regex branch to option tokens only fixed a false positive and silently dropped `git clean -fdx <root>`, a real destructive form the previous draft caught.
-- Adding a third regex alternative fixed a false negative and admitted eight new false discharges, one of which was the deletion command discharging the warning about itself.
+- Widening a regex branch fixed a false negative and admitted new false discharges, one of which was the deletion command discharging the warning about itself.
 - Restoring a rationale clause fixed a lost explanation and severed the document's purpose statement onto the wrong sentence.
 - Moving a hard-to-time probe in-process fixed a misattribution and made the guard hang rather than fail.
 
 Read the list by column rather than by row.
 Each fix did what it was for;
-each also *hid* something (a failure signal, an explanation) or *admitted* something (a destructive form, eight discharges).
+each also *hid* something (a failure signal, an explanation) or *admitted* something (a destructive form, a set of false discharges).
 Those two are the only questions worth asking once the edit is written.
 So ask them explicitly: what does this fix now hide, and what does it now let through?
 Then probe that specific question before reporting the fix, rather than probing the finding again.

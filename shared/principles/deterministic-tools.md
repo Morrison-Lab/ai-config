@@ -303,24 +303,23 @@ round 11 established that neither works, because the harness delivers control ta
 The tool was inverted to report records and their provenance rather than classify authorship, which ends the sequence by removing the claim rather than narrowing it.
 Round 12 then found the coverage half.)
 
-## A flat pattern over command text has no argument positions, so widening it never converges
+## A flat pattern over command text has no argument positions, so adjusting it never converges
 
-The section above is a parse that moved from grammar to **vocabulary**.
-This is the same move to a **flat pattern**, and it is harder to see, because a
-regex plainly is a matcher rather than a parser --- so nothing about writing one
-feels like claiming to have parsed anything.
+The section above is a parse that moved from grammar to **vocabulary**, and its
+tell is that someone else owns the set.
+This is a different disguise for the same thing, with a different tell: the
+question has *structure* the instrument cannot see, and no adjustment in either
+direction can supply it.
 
-The question being answered was structural: did an earlier command *read a
-config manifest under the root about to be deleted?*
+The question on
+[#3101](https://github.com/Morrison-Lab/ai-config/pull/3101) was whether an
+earlier command had *read a config manifest under the root about to be deleted*.
 Answering it needs three facts about one command --- the verb, which argument is
-the operand, and which root that operand sits under --- and a regex over raw
-command text can see none of them, because it has no notion of argument
-position.
-So every narrowing trades one boundary case for a neighbouring one, and the
-sequence has no end.
-
-On [#3101](https://github.com/Morrison-Lab/ai-config/pull/3101) the pattern was
-widened eight times, and each widening closed a real case while opening another:
+the operand, and which root that operand sits under.
+A pattern over raw command text has no notion of argument position, so it can
+see none of them, and each revision closed one boundary case while opening a
+neighbouring one.
+The cases the sequence passed through:
 
 - a manifest *name* supplied with no root;
 - the right shape under the wrong root;
@@ -333,58 +332,54 @@ widened eight times, and each widening closed a real case while opening another:
 - a verb and an operand in two different commands, where the second one
   *deletes* the manifest.
 
-**The trigger for stopping is already written down, in two places, and neither
-is restated here.**
-[`learn-from-review-findings`](../workflow/learn-from-review-findings.md) fires
-on the second finding of a class, and on two successive fixes turning the same
-knob;
-read those rather than a third statement of the same bar.
-What this section supplies is the answer they leave open --- what to do about a
-question that is structural rather than lexical, and what to write down when you
-cannot fix it in the round that noticed it.
-Here the structural answer was a parse: `shlex` the command, then ask whether a
-read verb's argv holds a manifest under a targeted root.
+The structural answer was a parse: `shlex` the command, then ask whether a read
+verb's argv holds a manifest under a targeted root.
 It was filed as [#3126](https://github.com/Morrison-Lab/ai-config/issues/3126)
 rather than attempted in the round that noticed it.
 
-**Then write the ceiling into the artifact.**
-The disposition that ends such a sequence is not a ninth widening and not a
-quiet retreat.
-It has three parts, and the first is the one that is actually load-bearing:
-narrow the **comment** that overclaims, so the code no longer asserts a guarantee
-it only approximates;
-add a limits section naming the residual cases in **both** directions, since a
-list of what still slips through is only half of what a later reader needs;
-and file the structural fix as its own issue so the ceiling is recorded as
+**When to stop is already settled elsewhere.**
+[`learn-from-review-findings`](../workflow/learn-from-review-findings.md) fires
+on the second finding of a class, and again on two successive fixes turning the
+same knob.
+Read those.
+What neither answers is what to do when the structural fix is a rework you
+cannot land in the round that found it --- which is the whole of what follows.
+
+**Write the ceiling into the artifact.**
+Three parts, and the first is the load-bearing one.
+Narrow the **comment** that overclaims, so the code stops asserting a guarantee
+it only approximates.
+Add a limits section naming the residual cases in **both** directions, since
+what still slips through is only half of what a later reader needs and the
+false-positive half is the one that gets omitted.
+File the structural fix as its own issue, so the ceiling is recorded as
 temporary rather than accepted.
 
 Note the boundary with
 [`algorithmatize-checks`](../workflow/algorithmatize-checks.md)'s "A review
 flagging an overclaimed check is a prompt to build it, not to soften the claim".
-That section rejects deleting an overclaiming sentence *in place of* building
-the instrument the finding asked for, and it still governs.
-It also permits deletion outright for a property that is a genuine one-off ---
-"state plainly when a property is a genuine one-off, and delete the claim then"
---- so deletion is not forbidden, only deletion standing in for an instrument
-that is still wanted.
+That section rejects deleting an overclaiming sentence *in place of* building the
+instrument the finding asked for.
+It also permits deletion outright for a genuine one-off --- "state plainly when a
+property is a genuine one-off, and delete the claim then" --- so deletion is not
+forbidden, only deletion standing in for an instrument that is still wanted.
 The case here is neither: the property is real and recurring, and the instrument
 is wanted but is a whole rework.
-So narrow the claim to what the code does **while** filing the instrument, which
-resolves by addition on a longer clock.
 
-- **Do:** ask what question the instrument is really being asked, once two
-  successive fixes have each traded one boundary case for another.
+- **Do:** ask whether the question has structure your instrument cannot
+  represent, before adjusting the instrument again.
 - **Do:** narrow an overclaiming comment to what the code actually does, and
   file the structural rework as its own issue in the same round.
 - **Do:** write a limits section naming the residual cases in both directions
   --- what still fires wrongly, and what still slips through.
-- **Don't:** widen a lexical pattern a further time when the previous widenings
-  each opened a new case; a pattern with no argument positions cannot converge
-  on a question about argument positions.
+- **Don't:** adjust a lexical pattern a further time once its revisions have
+  each traded one boundary case for another;
+  a pattern with no argument positions cannot converge on a question about
+  argument positions.
 - **Don't:** let a comment assert a guarantee the code only approximates.
-- **Don't:** read this as licence to narrow the overclaim and stop, where the
-  instrument is still wanted --- without the filed issue that is the softening
-  `algorithmatize-checks` refuses.
+- **Don't:** narrow the overclaim and stop where the instrument is still wanted
+  --- without the filed issue that is the softening `algorithmatize-checks`
+  refuses.
 
 ## Limits
 

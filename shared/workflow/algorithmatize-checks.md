@@ -1330,16 +1330,19 @@ So the rule is about *which* commands get formatted rather than about formatting
 in general: a command whose output is evidence gets run bare, alone, unchained
 and unredirected, and the tidying goes on a separate follow-up call.
 
-**The mirror is that the guard may be reading a different artifact, and that one
-is not the subject's command at all.**
+**The mirror is a check reading a different artifact, and that failure has
+nothing to do with the subject's command.**
 The same session ran a CI-gate checker against the committed head while the fix
 sat uncommitted in the working tree.
-The checker was right and the first conclusion was again that it was broken.
-That belongs to
+The checker was right, and the first conclusion was again that it was broken.
+That is
 [`verify-the-right-artifact`](verify-the-right-artifact.md)'s
-working-directory shape rather than to this section, and it is named here only
-because it arrives wearing the same disguise: an action that visibly worked, and
-a check that says it did not.
+working-directory shape pointed the other way --- there a stale checkout stands
+in for the authoritative revision, here the authoritative revision stands in for
+the uncommitted change --- so it belongs to that fragment rather than to this
+section.
+It is named here only because it wears the same disguise: an action that visibly
+worked, and a check that says it did not.
 Committing costs one command and settles it.
 
 - **Do:** run a discharge-relevant command alone --- unchained, unredirected,

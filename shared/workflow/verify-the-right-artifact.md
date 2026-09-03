@@ -846,7 +846,8 @@ The seventh shape above is already a substitution across time, so what is new he
 That one reads a **future** state for the present one, knowingly, because the future state is the one being worked toward.
 This one reads a **past** state for the present one, unknowingly, because the artifact carries no signal that it is a past state at all.
 A pull request's check runs are current, complete, and correct.
-They describe the workflows as they existed **at that pull request's head**, which is a commit whose relationship to the default branch nobody stated.
+What they describe is the workflow definitions **in force when each run executed** --- resolved from the pushed commit for a `push` run, and from the head-into-base merge for a `pull_request` one.
+Neither of those is the default branch as of now, and the name carries no trace of which moment or which resolution produced it.
 
 The tell is a claim of the form "this repository emits X", derived from observing X somewhere.
 A check run is produced by a workflow file, and a workflow file is versioned like any other, so a rename, a job restructuring, or a migration from inline jobs to a called reusable workflow changes every context string the repository publishes from that moment on.
@@ -897,12 +898,16 @@ One clause on the corroborating run, because the obvious reading of it is unsati
 The workflow definition on the default branch is the authority;
 the run is corroboration that the definition composes the string you think it does.
 A workflow triggered only by `pull_request` produces no run at all on an ordinary push to the default branch, so for that class the corroborating run is usually a pull-request run.
-The exception is worth taking when it exists: a pull request opened *from* the default branch into some other base has that branch as its head, and its run reads the file you want directly.
-Failing that, any pull-request run resolved the workflow file from the merge of its head into its base, so it corroborates the default branch's copy only when the head does not touch **that** file --- `gh pr diff <N> --name-only` and look for the one path, not for the directory, since a head editing some other workflow is irrelevant.
+The exception is worth taking when it exists: a pull request opened *from* the default branch into some other base carries that branch's copy of the file on its head side, so its run reads what you want unless the base has diverged on that same file.
+Failing that, a pull-request run resolved the workflow file from the merge of its head into its base, so it corroborates the **default branch's** copy only when two things hold together.
+Its base is the default branch --- `gh pr view <N> --json baseRefName` --- since a stacked pull request or one targeting a release branch resolves the file from that other base instead, and would corroborate a different branch's copy while looking identical.
+And its head does not touch that one file --- `gh pr diff <N> --name-only`, matching the single path rather than the `.github/workflows/` directory, since a head editing some other workflow is irrelevant.
+The first condition is the one that goes unstated, and omitting it reinstates this shape's own substitution by way of its remedy.
 Prefer a recent run, since an older one may predate the definition you just read.
 
 - **Do:** derive a required-context string from the default branch's workflow definitions, and use a run only to corroborate how those definitions compose.
 - **Do:** date every check-run observation by the commit its run executed, and say what has landed on the default branch since.
+- **Don't:** accept a pull-request run as corroboration without reading its `baseRefName` --- a head that leaves the workflow file alone is necessary and not sufficient.
 - **Don't:** read check names off a pull request, however recent, and generalize them to the repository.
 - **Don't:** treat a pull request having merged as evidence its check names still describe the branch --- they described it at one instant, and a later merge can retire them without touching that pull request at all.
 

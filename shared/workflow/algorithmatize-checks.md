@@ -1288,60 +1288,33 @@ Two newer hooks each re-derived a weaker version instead of reusing it.
 - **Don't:** treat a command-position anchor as covering quoted text;
   strip heredoc bodies first.
 
-**When every candidate discharge is satisfiable by typing the right characters,
-ship the guard with no discharge at all.**
-The section above assumes the discharge can be anchored well enough to be
-sound, and asks for the same care the trigger gets.
+**When every candidate discharge is satisfiable by typing the right characters, ship the guard with no discharge at all.**
+The section above assumes the discharge can be anchored well enough to be sound, and asks for the same care the trigger gets.
 Some obligations have no such matcher.
 The design question there is whether to write a discharge at all.
 
-The recognizable case is an obligation to have **derived** something, where
-every observable trace of the derivation is a string.
-A guard warning that a required status-check context was set without deriving
-it from the default branch has no honest discharge:
-a run-jobs read names no branch, so it cannot show which branch was consulted;
-`gh run list --branch <name>` accepts any branch, so its presence proves only
-that a branch was named;
-and any transcript scan for the derived context string is satisfied by typing
-that string in a comment.
-Each candidate is a check the obligation's own subject can write by hand, so
-it fails open in [`fail-fast`](../principles/fail-fast.md)'s sense --- "a
-precondition that can never fire is indistinguishable from one that fires
-correctly and finds nothing".
+The recognizable case is an obligation to have **derived** something, where every observable trace of the derivation is a string.
+A guard warning that a required status-check context was set without deriving it from the default branch has no honest discharge: a run-jobs read names no branch, so it cannot show which branch was consulted;
+`gh run list --branch <name>` accepts any branch, so its presence proves only that a branch was named;
+and any transcript scan for the derived context string is satisfied by typing that string in a comment.
+Each candidate is a check the obligation's own subject can write by hand, so it fails open in [`fail-fast`](../principles/fail-fast.md)'s sense --- "a precondition that can never fire is indistinguishable from one that fires correctly and finds nothing".
 
 A guard with no discharge warns every time.
-That is a real cost and it is the *right* one for a warning-only guard, because
-the alternative is not a quieter guard but a silent one --- and by the argument
-above, silence is indistinguishable from compliance.
-The asymmetry decides it: a repeated warning is visible and annoying, while a
-typable discharge is invisible and permanent.
-Note the boundary with the reminder-guard pattern, which does need a discharge
-because its obligation (run UMS, post a review) leaves a durable artifact a
-scan can anchor to.
-The distinction is whether the obligation's satisfaction is *observable outside
-the transcript*, not whether the guard is a reminder.
+That is a real cost and it is the *right* one for a warning-only guard, because the alternative is not a quieter guard but a silent one --- and by the argument above, silence is indistinguishable from compliance.
+The asymmetry decides it: a repeated warning is visible and annoying, while a typable discharge is invisible and permanent.
+Note the boundary with the reminder-guard pattern, which does need a discharge because its obligation (run UMS, post a review) leaves a durable artifact a scan can anchor to.
+The distinction is whether the obligation's satisfaction is *observable outside the transcript*, not whether the guard is a reminder.
 
-- **Do:** enumerate the candidate discharges explicitly, and say in the guard
-  which ones were rejected and why.
-- **Do:** ship no discharge when every candidate is satisfiable by typing, and
-  keep the guard warning-only so the cost stays a note rather than a block.
-- **Don't:** add a weak discharge to reduce noise --- it converts a visible
-  cost into an invisible one.
+- **Do:** enumerate the candidate discharges explicitly, and say in the guard which ones were rejected and why.
+- **Do:** ship no discharge when every candidate is satisfiable by typing, and keep the guard warning-only so the cost stays a note rather than a block.
+- **Don't:** add a weak discharge to reduce noise --- it converts a visible cost into an invisible one.
 - **Don't:** read "this guard has no discharge" as an unfinished design;
   for an obligation with no artifact outside the transcript, it is the design.
 
-(ai-config#3039 proposes such a guard, on ruleset and branch-protection
-writes.
-Read as of 2026-09-03, its filed body carries a discharge this section would
-reject: the guard fires only when the transcript contains no default-branch
-job-name derivation, given as `gh run list ... --branch <default>` followed by
-`actions/runs/<id>/jobs`, "or an equivalent".
-Both halves are strings a session can type, and neither names a workflow
-definition or the branch a run's job names came from, so the pair is the third
-candidate above wearing two commands.
-The issue is open and no hook file exists on `main`, so this section is the
-argument that its discharge should be dropped rather than a description of a
-shipped file;
+(ai-config#3039 proposes such a guard, on ruleset and branch-protection writes.
+Read as of 2026-09-03, its filed body carries a discharge this section would reject: the guard fires only when the transcript contains no default-branch job-name derivation, given as `gh run list ... --branch <default>` followed by `actions/runs/<id>/jobs`, "or an equivalent".
+Both halves are strings a session can type, and neither names a workflow definition or the branch a run's job names came from, so the pair is the third candidate above wearing two commands.
+The issue is open and no hook file exists on `main`, so this section is the argument that its discharge should be dropped rather than a description of a shipped file;
 a comment recording that argument was posted on the issue on 2026-09-03.)
 
 ## Measure CPU time, not wall clock, when the assertion is about work done

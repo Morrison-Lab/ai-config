@@ -470,19 +470,21 @@
   Run `33688762211` prints `check / spellcheck`, where neither job sets `name:`, so both halves are keys.
   Run `33727364476` prints `Check-Changelog / Check Changelog Action`, where the left half is the **caller**'s job key in the repo's own `news.yaml` and the right half is the `name:` on `check-news.yml@v2`'s inner job -- whose key, also `Check-Changelog`, never appears.
   The coincidence of those two names is why this example needs spelling out: read the caller's job key for the left half, always, however the called workflow happens to key its own job.
-  Read the definitions on the default branch;
-  a run only corroborates that they compose the way you think, and which run is usable is not obvious, so take that half from
-  [`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md)'s eleventh shape rather than from a second copy here.
+  Read the definitions off the default branch by ref, never off a checkout and never off a PR's rollup:
   ```bash
   gh api "repos/<o>/<r>/contents/.github/workflows?ref=<default-branch>" --jq '.[].name'
   gh api "repos/<o>/<r>/contents/.github/workflows/<file>?ref=<default-branch>" --jq .content | base64 -d
-  gh api "repos/<o>/<r>/actions/runs/<run-id>/jobs" --jq '.jobs[].name'
   ```
-  A required context naming a check no workflow emits never turns red -- it sits as `Expected`, so the mistake has no failing signal to find it by.
+  A run can corroborate that those definitions compose as you read them, but **which** run is usable is the subtle half -- a `pull_request` run resolves the file from the head-into-base merge, so its base and its touched paths both matter.
+  [`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md)'s eleventh shape carries those conditions.
+  Do not reconstruct them from a `gh api .../jobs` line here, since a placeholder that names no branch is exactly what drops them.
+  - **Do:** read the workflow file at `?ref=<default-branch>` and compose the context string from its job names.
+  - **Don't:** read a required-context string off any pull request's check runs -- merged, recent, or green.
   (ucdavis/rampp, 2026-09-03: bare `Spellcheck` and `Check Changelog Action` were added to ruleset `3889405` on the strength of check-run names read off merged PR #157.
   Those names were accurate for `main` when #157 merged.
   The move to called reusable workflows landed on `main` three hours later via #153, retiring them.
-  `main` now emits `check / spellcheck` and `Check-Changelog / Check Changelog Action`.)
+  `main` now emits `check / spellcheck` and `Check-Changelog / Check Changelog Action`.
+  Such a context never turns red -- it sits as `Expected`, so there is no failing signal to find the mistake by.)
 
 - **GitHub PR Reviews REST API (`POST /repos/{owner}/{repo}/pulls/{number}/reviews`) Requirements & Fallbacks**:
   - `pull_number` MUST be an explicit integer in the URL path (e.g. `/pulls/412/reviews`), not `'current'` or branch names.

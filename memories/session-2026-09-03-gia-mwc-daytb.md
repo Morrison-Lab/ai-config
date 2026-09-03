@@ -419,3 +419,12 @@ Decision taken under the three-rounds-without-consensus signal ([#3110](https://
 It sits outside #3123's stated fix, the corpus's own review read (`git diff origin/main...HEAD`) shows a merge-commit re-add, and its one durable learning is the corrected belief recorded in the 12:38 entry, now being promoted to `memories/git.md` on `ums/2026-09-03-merge-visibility`.
 
 Four workflows run on: 40 issues claimed, 30 implementations committed at the 13:13 reading, refuter stages in progress, nothing from them pushed yet.
+
+## 13:52 PDT --- #3135 merged
+
+[#3135](https://github.com/Morrison-Lab/ai-config/pull/3135) merged as the squash on `main` titled "docs(fully-clean): naming a cause an aggregate rollup never confirmed (#3135)", fully clean at its final head: CI green, claude-review CLEAN, Copilot approval recommended, Jules approve, adversarial verdict.
+Squash body written by hand, because an intermediate commit message on the branch asserted the underived cause the file no longer states.
+
+What the lifecycle taught: Copilot's Lite pass on prose returns one item per round, and the three rounds here were a self-contradicting clause, clause-boundary line breaks, and the bold lead-in's line break.
+The CI gate enforces sentence breaks and mid-line semicolons only, so a clause-boundary reflow pass before the first Copilot request would have saved two rounds.
+Wants a pre-request checklist line in `shared/writing/semantic-line-breaks.md` when this notebook is folded.

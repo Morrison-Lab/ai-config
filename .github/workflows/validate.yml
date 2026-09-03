@@ -394,6 +394,11 @@ jobs:
         run: python3 scripts/check-memory-file-size.py --strict
       - name: Run stale-record check tests
         run: python3 scripts/test_check_stale_records.py
+      - name: Run bare-fragment-mention check tests
+        # ai-config#3034. The test suite only; the checker itself is not wired
+        # into CI yet, so this step proves the detector still fires without
+        # gating any PR on the corpus scan.
+        run: python3 scripts/test_check_bare_fragment_mentions.py
       - name: Check for stale and orphaned records (advisory)
         # ai-config#1544. Non-blocking, and for two separate reasons.
         #

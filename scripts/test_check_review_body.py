@@ -251,6 +251,21 @@ _plain_noverdict = _crb.analyse("## Summary\n\nSome notes on the diff.\n", MOD)
 check("a finding-free NO-VERDICT body says blocks nothing, plainly",
       _plain_noverdict["why"].endswith("blocks nothing"), True)
 
+# The `verdict == "clean"` conjunct of the same branch, the last live mutation
+# of 25. A STRUCTURED body carrying a finding and a non-clean verdict was a
+# combination no probe covered, so `elif structured and finding:` passed green
+# -- and would report a drafter's own body as a standing veto on their PR when
+# it is not, inverting the distinction BOT_FINDING_CAVEAT exists to preserve.
+# `main()` returns 1 either way, so the exit status hides it.
+_structured_unreadable = (
+    "**Claude finished review**\n\n## Summary\n\nnotes\n\n## Nits\n\n"
+    f"- a small thing\n{FINGERPRINT}\n")
+check("a STRUCTURED agent body with a finding and no readable verdict",
+      verdict(_structured_unreadable), "UNREADABLE")
+check("and its caveat arm fires on a structured body too",
+      "UNLESS posted under a bot identity"
+      in _crb.analyse(_structured_unreadable, MOD)["why"], True)
+
 if failures:
     print("FAILED:")
     for line in failures:

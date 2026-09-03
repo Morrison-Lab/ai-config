@@ -949,13 +949,20 @@ A clean automated review from every available provider evaluating the current HE
 ## Pattern 47: Signature-Only Fallback Guard and Silent Content Loss in Reformatting
 - **Do**: When providing a fallback script or local mirror for an external or suggested dependency, verify full formals (names and defaults) and test output equivalence across target formats (e.g. HTML and OpenXML/DOCX) rather than merely comparing argument names (`names(formals())`).
   When adapting or reformatting an established technical specification, statistical analysis plan, or contract into a new layout or visual template, explicitly audit that foundational methodological statements (blinding, multiplicity policies, non-error-free reference standard caveats, cluster-size variations) are preserved rather than silently dropped, and maintain consistent heading level hierarchy across the entire document.
-- **Don't**: Rely on `names(formals())` equality as proof that a fallback function mirrors its upstream counterpart; signature equality misses body divergence, dropped text, layout changes, and argument default drift.
+- **Don't**: Rely on `names(formals())` equality as proof that a fallback function mirrors its upstream counterpart;
+  signature equality misses body divergence, dropped text, layout changes, and argument default drift.
   Don't describe a document reformatting as "formatting only" in changelogs or PR descriptions if substantive methodological prose or caveats were removed.
-- **Example**: 2026-09-02 on `ucdavis/matt.contracts` [PR #98](https://github.com/ucdavis/matt.contracts/pull/98):
+- **Example**: 2026-09-02 on `ucdavis/matt.contracts` [PR #98](https://github.com/ucdavis/matt.contracts/pull/98),
+  a private repository whose link resolves only with access:
   A fallback script `altdoc/scripts/format-sap-table.R` claimed to mirror `ucdavis/hac.sap`, but its guard test compared only `names(formals())`.
   The non-DOCX branch of `format_charter_table` diverged materially (emitting two boxed tables and omitting prompt questions and bullet points rather than a single merged table), while the guard passed 24/24 tests.
   Simultaneously, reformatting the SAP into the HAC template dropped the blinding procedure, multiplicity policy, error-free reference standard caveat, and variable cluster size caveats, and inverted document heading levels by placing `## References` over a document rooted at `###`.
 - **Canonical Rule**: [`fail-fast.md`](../shared/principles/fail-fast.md), [`preferences.md`](preferences.md) (verify outputs, not assumptions), and [`check-rendered-refs`](../skills/check-rendered-refs/SKILL.md).
-- **Fix**: Write regression tests that verify output equivalence (rendered HTML / OpenXML) and full `formals()` matching. Perform a content preservation diff check before finalizing documentation reformatting, and enforce consistent heading depth across all markdown sections.
+- **Fix**: Write regression tests that verify output equivalence (rendered HTML / OpenXML) and full `formals()` matching.
+  Perform a content preservation diff check before finalizing documentation reformatting,
+  and enforce consistent heading depth across all markdown sections.
 - **Algorithmatizable?**
-  Yes. In tests guarding fallback implementations, assert `expect_equal(formals(fallback), formals(upstream))` and test output equivalence on representative fixtures. In document linters, check that heading levels are monotonically descending or rooted at a single top level without orphaned higher-level headings at document end.
+  Yes.
+  In tests guarding fallback implementations, assert `expect_equal(formals(fallback), formals(upstream))`
+  and test output equivalence on representative fixtures.
+  In document linters, check that a document intentionally rooted at level 3 has no orphaned level-2 headings.

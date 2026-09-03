@@ -166,22 +166,14 @@ F3 is the one worth keeping.
 Verified against bash directly rather than reasoned about.
 Three of this PR's own test cases asserted the wrong reading and had to be replaced, which is the tell that the defect was in the model of the shell rather than in the code.
 
-### The false attribution
+### The false attribution, and the amend that hit the wrong commit
 
-My first commit message said F1 was "a regression of this PR's own opener-line fix."
-The reviewer said it predated that fix.
-Checked: for the same input, `7b54d28`'s `_heredoc_free` emits a blanked opener followed by both git commands as live text, so the reviewer is right.
-The literal return value is not quoted here because it carries a doubled space inside a code span, and `scripts/semantic-line-breaks.py` collapses any run of whitespace in a prose line, code spans included --- so the reformatter would silently alter the evidence.
-The route differs --- the older code dropped the opener-line remainder and lost the second opener with it, the newer kept the remainder and never rescanned it --- and the observable defect is identical.
+Both lessons are now folded into durable memory, so only the session-specific facts stay here.
 
-The inference was cheap and wrong in a specific, repeatable way: the defect sat inside the function I had just reworked, so "I caused it" arrived with no deliberation and read as candour rather than as a claim needing a check.
-Self-blame is not self-evidently safe.
-It is a **cause** claim, and [`metacognitive-monitoring`](../shared/workflow/metacognitive-monitoring.md) says a cause claim gets asked what else explains it --- here, that the function was already wrong.
-Correcting the attribution cost one `git show` against the parent commit.
+My first commit message said F1 was "a regression of this PR's own opener-line fix";
+`7b54d28` reproduces the same defect by a different route, so it predated the fix.
+`git commit --amend` after merging `main` in then retargeted the merge rather than the fix commit, and the recovery was a reset, amend and re-merge whose resulting tree hash matched the pre-reset one.
 
-### The amend that hit the wrong commit
-
-`git commit --amend` after a merge amends the MERGE, not the commit whose message you meant to fix.
-The merge commit silently took the fix commit's subject line, so the history read as two commits with one title and no merge.
-Caught by reading `git log --oneline -3` rather than by any check.
-Recovery: `git reset --hard <fix-commit>`, amend, re-merge, then assert the resulting tree hash equals the pre-reset one --- which it did, so the rewrite provably changed no content.
+The generalizable halves live in [`metacognitive-monitoring`](../shared/workflow/metacognitive-monitoring.md), "Your own most recent change is a cause claim too" with its case record, and in [`git`](git.md), "`git commit --amend` after a merge amends the MERGE".
+Read those rather than this;
+the paragraphs that used to restate them here were pruned during the same UMS pass that wrote them, per [`run-ums-proactively`](../shared/workflow/run-ums-proactively.md)'s fold-or-prune step.

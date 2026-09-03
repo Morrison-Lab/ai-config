@@ -1392,8 +1392,11 @@ The loop uses the shell's **reserved word** `time` rather than `/usr/bin/time -f
 Three details in that one line, each measured rather than reasoned:
 
 - **Reserved word, not a builtin**, which is worth getting right because the misnomer invites the natural prefix form and that form fails the same way the binary did: `type -t time` reports `keyword`, `compgen -b` does not list it, and `TIMEFORMAT=%R time <cmd>` dies with `time: command not found`.
-- **Parentheses rather than braces**, because a brace group is not a subshell and `TIMEFORMAT` would leak into the calling shell, silently reformatting every later `time` in that session. Measured: the brace form leaves `TIMEFORMAT=%R` set afterwards, the paren form leaves it unset.
-- **`2>&1` is load-bearing**, since `time` writes to stderr. With it, `| tee` captured `0.202`; without it, `tee` captured an empty file.
+- **Parentheses rather than braces**, because a brace group is not a subshell and `TIMEFORMAT` would leak into the calling shell, silently reformatting every later `time` in that session.
+  Measured: the brace form leaves `TIMEFORMAT=%R` set afterwards, the paren form leaves it unset.
+- **`2>&1` is load-bearing**, since `time` writes to stderr.
+  With it, `| tee` captured `0.202`;
+  without it, `tee` captured an empty file.
 
 Read `uptime` first, but do not stop there.
 Its figures are 1-, 5- and 15-minute *decaying* averages, so a burst that inflated

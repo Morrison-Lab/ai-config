@@ -117,9 +117,9 @@ committed pass.
      test -f "$repo/CLAUDE.md" && test -d "$repo/shared" || { echo "not an ai-config checkout: $repo" >&2; exit 1; }
      (cd "$repo" && grep -rilI --exclude-dir=__pycache__ "<keywords>" skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md)
      ```
-     The path list is the one skill-builder step 0 runs, over the files on disk;
-     `-I` skips binary files and `--exclude-dir` skips bytecode caches, which a plain `grep -r` would otherwise report as hits,
+     The path list is the one skill-builder step 0 runs, over the files on disk,
      so an entry that exists only on a branch not checked out there is out of reach (see the unmerged-PR section of [`grep-is-not-coverage`](../../shared/workflow/grep-is-not-coverage.md)).
+     `-I` skips binary files and `--exclude-dir` skips bytecode caches, which a plain `grep -r` would otherwise report as hits.
      A rule can be owned by a `shared/` fragment or a skill as easily as by a memory,
      and a `memories/`-only grep stays outside those paths.
      When one exists, extend it in place; don't add a second bullet.

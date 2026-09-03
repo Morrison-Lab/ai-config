@@ -414,25 +414,37 @@ The frequency is the point, and an earlier draft of this section got it backward
 Measured 2026-09-02 over 565 session transcripts matching `~/.claude/projects/*/*.jsonl`.
 That glob is the flat session files only;
 a recursive walk of the same tree also reaches each session's `subagents/*.jsonl` and roughly doubles the population.
-An independent re-run swept the recursive set and found the same zero, so the conclusion holds --- but the glob is stated because a fragment arguing "measured rather than assumed" should say what it measured:
+The glob is stated because a fragment arguing "measured rather than assumed" should say what it measured:
 
 ```
 trailer as its own content block : 334
 trailer concatenated onto text   :   0
 ```
 
-The concatenated form was observed twice, in one session, and did not reproduce in the corpus sweep:
+An independent re-run over the recursive set returned that same zero.
+
+**Read the zero as a failed positive control, not as a confirmation**, which is the opposite of how it first reads.
+The concatenated form is known to exist --- it was seen directly, twice, within one session, and here it is:
 
 ```
 --- end of report ---agentId: ae8726223279fc9e8 (use SendMessage with to: '...')
 ```
+
+A detector reporting zero over a shape known to occur is impeached by that miss rather than corroborated by it.
+[`verify-the-right-artifact`](verify-the-right-artifact.md) states the general form --- "running the thing and seeing no complaint feels like a test", and is not one, because a surface that silently ignores what it cannot see is quiet for the same reason a working one is.
+Here the known instance below *is* the paired input that should have been refused, and the sweep stayed quiet over it.
+So the two counts carry different weight.
+The **334** is a real observation and establishes that the own-block form is the common one.
+The **0** establishes nothing about the concatenated form's rate, because the sweep did not find an instance that certainly happened --- either its matcher cannot see that shape, or those transcripts are outside the tree it walked, and this section does not know which.
+The word "rarely" above therefore rests on two direct sightings and on no other sighting turning up, rather than on the sweep, and should be re-derived if the sweep is ever repaired.
 
 In the prevailing shape the trailer is a separate content block, and `_result_text` joins blocks with a newline, so the fingerprint line is untouched and nothing below arises at all.
 
 **Two conditions have to hold together before any of this can bite, and a conforming report fails the first.**
 The trailer must concatenate rather than arrive as its own block, AND the fingerprint must be the report's last line.
 This file's own contract puts the JSON payload last, and [`.claude/agents/adversarial-reviewer.md`](../../.claude/agents/adversarial-reviewer.md) says to emit nothing after its closing marker --- so a conforming report ends with the payload, the trailer lands on that, and the fingerprint is never exposed.
-The measured occurrence was a report that put the verdict and fingerprint AFTER the payload, which is the ordering this file's "Structured review data" section rules out.
+The sighting that prompted this section was a report that put the verdict and fingerprint AFTER the payload, which is the ordering this file's "Structured review data" section rules out.
+Whether the two sightings were two such reports or one report read twice is not recorded, so treat the shape as attested and its rate as unmeasured.
 
 So read the rest of this section as what happens when a brief reorders the tail, not as a hazard of ordinary dispatch.
 
@@ -457,18 +469,22 @@ So read the block as the mitigation for that reordering, not as a template to co
 What [#3050](https://github.com/Morrison-Lab/ai-config/issues/3050) has to settle is which of the two orderings a brief should mandate, not whether a conforming report needs a sentinel.
 
 ```
+-->
 Verdict: <phrase>
 Reviewed-Commit: <full sha>
 --- end of report ---
 ```
 
-It puts a non-hex line between the fingerprint and anything the harness appends, so the fingerprint's length stops mattering.
+The leading `-->` is the JSON payload's own closing marker, included so the ordering the prose describes is visible in the block rather than asserted over it: everything shown sits *after* the payload, which is what makes this a reordered tail and not a conforming one.
+
+The sentinel puts a non-hex line between the fingerprint and anything the harness appends, so the fingerprint's length stops mattering.
 
 Two caveats.
 The concatenation has been observed on Claude Code's `Agent` tool and nowhere else, so it is a claim about that harness on that date rather than about subagent dispatch generally.
-And the sentinel sits in tension with [`.claude/agents/adversarial-reviewer.md`](../../.claude/agents/adversarial-reviewer.md)'s own instruction to emit nothing after the JSON payload's closing `-->`;
-a brief asking for both is asking the reviewer to order them, and the ordering that worked put the verdict, the fingerprint and the sentinel after the payload.
-Reconciling the two contracts is its own open decision, filed as [ai-config#3050](https://github.com/Morrison-Lab/ai-config/issues/3050), rather than something to settle inside a review brief.
+And the **reordering** is what sits in tension with [`.claude/agents/adversarial-reviewer.md`](../../.claude/agents/adversarial-reviewer.md)'s own instruction to emit nothing after the JSON payload's closing `-->`.
+The sentinel is not the source of that tension and does not add to it: a brief that puts the verdict and the fingerprint after the payload has already overridden the emit-nothing instruction, and the sentinel then joins a tail that exists either way.
+The ordering the guard parsed successfully was that reordered one --- which is a statement about the guard, not an endorsement, since the same ordering fails this file's payload-last contract.
+Which of the two orderings a brief should mandate is the open decision filed as [ai-config#3050](https://github.com/Morrison-Lab/ai-config/issues/3050), consistent with the scope named above, rather than something to settle inside a review brief.
 It is adjacent to [#2483](https://github.com/Morrison-Lab/ai-config/issues/2483) and not the same item: that issue is about verdicts arriving via background task notifications going unregistered.
 
 - **Do:** state the fingerprint as the **full 40-character** sha, which is what actually protects it.

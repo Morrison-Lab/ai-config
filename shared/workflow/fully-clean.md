@@ -32,6 +32,39 @@ Do not report a PR/MR fully clean, ready to merge, or merge it until the review 
   findings can appear in an overall review note without a resolvable discussion.
 - **Don't:** let an earlier review's green pipeline or later code push erase an unresolved finding without a reviewer-confirmed clean round.
 
+**Finding a cause for an aggregate rollup signal is not finding all of its causes, and a satisfied explanation is what stops you looking for a second one.**
+`mergeable_state: unstable` (GitHub) or a comparable aggregate integration
+signal is a single value computed from several independent inputs --- a
+pending status check, a stale branch, an unresolved review, more than one
+provider's own required-checks list.
+Chasing it down to one genuine, checkable cause (a pending third-party
+status, say) explains the value completely from the inside: the signal was
+`unstable`, a cause was found, the cause was real, and the reasoning closes.
+Nothing about that chain tests whether it was the *only* input, because a
+rollup does not report which of its several inputs are currently non-passing,
+only that at least one is.
+
+- **Do:** after explaining an aggregate signal with one confirmed cause, ask
+  what else the same rollup can mean before treating it as accounted for ---
+  and re-derive the rollup once the confirmed cause clears, rather than
+  reading its earlier `unstable` reading as now resolved.
+- **Don't:** read "I found a cause for this and it checks out" as "I found
+  the cause" for a value that is, by construction, an aggregate of several
+  independent signals.
+
+(Morrison-Lab/ai-config#3084, 2026-09-03: `mergeable_state: unstable` was
+chased to a pending `jules/review` commit status, which was real and
+correctly diagnosed.
+When that status cleared, `unstable` was treated as explained and the PR was
+merged.
+A Copilot formal review carrying a real, unaddressed finding --- posted to
+the PR's `reviews` list, not as an inline thread --- had submitted on the
+exact head that merged, 4 minutes 47 seconds earlier, and was never read: the
+pre-merge check called `get_review_comments` for threads, never `get_reviews`
+for the formal review itself, and two of those threads being resolved read as
+the review question settled.
+The defect reached `main` and needed a follow-up PR.)
+
 **In a remote/web session the instrument still runs, and hand-checking the
 axes in its place is not acceptable** (user directive, 2026-08-29,
 ai-config#2441).

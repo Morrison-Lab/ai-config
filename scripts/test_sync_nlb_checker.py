@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
-"""Tests for `scripts/sync-nlb-checker.py`'s `_fetch`, offline.
+"""Tests for `scripts/sync-nlb-checker.py`'s `_fetch` and CLI, offline.
 
-Both routes are stubbed: `subprocess.run` stands in for `gh`, and
+Both fetch routes are stubbed: `subprocess.run` stands in for `gh`, and
 `urllib.request.urlopen` for raw HTTPS. The case that matters most is the
 one ai-config#2338 was filed for: a machine with no `gh` on PATH, where
 `subprocess.run` raises `FileNotFoundError` instead of returning a non-zero
 exit, and the HTTPS route must still run.
+
+The CLI checks cover ai-config#3095: `--help` used to run the sync, so it
+must now print usage and exit 0 with `_fetch` never reached, and an unknown
+argument must exit 2 rather than being ignored.
 
 Run:  python3 scripts/test_sync_nlb_checker.py
 """
@@ -107,7 +111,46 @@ for label, run, needle in (
             check(f"{label} + HTTPS down names the gh reason",
                   needle in message and "connection refused" in message)
 
+# ai-config#3095: `--help` ran the sync, fetching over the network and
+# rewriting two tracked files. It must print usage and exit 0 instead, and
+# `_fetch` must never be reached -- so stub it to fail loudly if it is.
+saved_fetch = subject._fetch
+
+
+def fetch_forbidden(sha):
+    raise AssertionError("the CLI parse must not fetch")
+
+
+subject._fetch = fetch_forbidden
+try:
+    for flag in ("--help", "-h"):
+        out = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(out):
+                subject.main([flag])
+            check(f"{flag} exits", False)
+        except SystemExit as exc:
+            check(f"{flag} exits 0", exc.code == 0)
+        check(f"{flag} prints the module docstring",
+              "Refresh the vendored" in out.getvalue()
+              and "Do not hand-edit" in out.getvalue())
+
+    err = io.StringIO()
+    try:
+        with contextlib.redirect_stderr(err):
+            subject.main(["--bogus"])
+        check("an unknown argument exits", False)
+    except SystemExit as exc:
+        check("an unknown argument exits 2", exc.code == 2)
+
+    # The no-argument invocation still parses cleanly and stays the sync.
+    check("no arguments parse to an empty namespace",
+          vars(subject._parse_args([])) == {})
+finally:
+    subject._fetch = saved_fetch
+
 if failures:
     sys.exit(f"{failures} check(s) failed")
-print("PASS: _fetch falls through to HTTPS when gh is missing or failing, and "
-      "names both routes when both fail")
+print("PASS: _fetch falls through to HTTPS when gh is missing or failing, "
+      "names both routes when both fail, and the CLI prints usage for "
+      "--help/-h without fetching")

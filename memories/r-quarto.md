@@ -1202,4 +1202,29 @@ Hit on wai#128 (byok ITPM/budget figures).
   across reports/vignettes should be standard package functions in `R/` with full
   roxygen2 documentation and unit test coverage in `tests/testthat/`, rather than
   orphan vignette scripts.
+- **Preserve foundational design statements during template reformatting**:
+  When migrating or styling an SAP into a new template (such as an institutional
+  or HAC template), audit that all core methodological design statements are
+  preserved: review blinding and model freezing procedures, multiplicity
+  adjustment policy (e.g. stating that secondary metrics are estimation targets,
+  not hypothesis tests), reference standard concordance caveats (e.g. that a
+  single human reviewer is not an error-free reference standard, and agent-only
+  flags require adjudication before calling them false positives), and variable
+  cluster-size caveats.
+- **Consistent document heading hierarchy**:
+  If a multi-format document sets section slide boundaries at level 3 (`###`),
+  ensure the entire document body follows that hierarchy consistently,
+  including terminal standard sections (`### References {.unnumbered}` rather
+  than `## References`). An inverted heading level causes Pandoc and Word
+  navigation panes / table of contents to place all substantive sections as
+  subheadings under the single higher-level section.
+- **Table formatters must preserve column identity**:
+  Table formatters that accept user tables (such as milestones schedules) must
+  preserve the caller's column names rather than discarding numeric identifiers
+  (e.g. replacing `Month 1`..`Month 8` with `rep("Month", ncol - 1)`).
+- **Fallback mirror verification**:
+  When maintaining a fallback script mirror of an upstream or suggested R
+  package, unit tests must verify full `formals()` equality (both argument
+  names and default values) and output equivalence across rendered formats
+  (HTML and DOCX), rather than testing only `names(formals())`.
 

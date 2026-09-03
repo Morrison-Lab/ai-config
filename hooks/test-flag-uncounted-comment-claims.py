@@ -18,6 +18,7 @@ Run:  python3 hooks/test-flag-uncounted-comment-claims.py hooks/flag-uncounted-c
 import importlib.util
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -337,6 +338,76 @@ TRUNCATED_CITATION_FRAGMENT = (
     "ai-config/memories/tools.md were found."
 )
 
+# ai-config#2404, the false-negative family the fixture above only names in
+# passing, and route 11's own fixtures. `TOKEN` required EVERY segment of a
+# slash-joined citation to carry its own internal hyphen/underscore/dot, so
+# a real path with one bare segment -- wherever it sat -- was never parsed
+# as an enumeration ITEM at all, and a mixed list built around such a path
+# (the founding incident's own composite shape: one genuine citation plus
+# recalled bare identifiers) went entirely undetected. All three of the
+# issue's own example paths are pinned, one per bare-segment position, so a
+# future edit that re-narrows `PATH_TOKEN` has to break a named case rather
+# than a single representative one.
+BARE_MIDDLE_SEGMENT_MIXED_LIST = (
+    "The fingerprinted scripts: ai-config/memories/tools.md, "
+    "cycle-charge-flee, interval-labels."
+)
+BARE_LEADING_SEGMENT_MIXED_LIST = (
+    "The fingerprinted scripts: Support/glab-cli/config.yml, "
+    "cycle-charge-flee, interval-labels."
+)
+BARE_TRAILING_SEGMENT_MIXED_LIST = (
+    "The fingerprinted scripts: Morrison-Lab/gha, cycle-charge-flee, "
+    "interval-labels."
+)
+# The precision the fix must NOT trade away, which is the whole reason
+# ai-config#2404 stayed open for a dedicated pass rather than being closed
+# by letting a bare word be an item. `PATH_TOKEN` still demands ONE
+# `TOKEN`-shaped segment somewhere in the item, so a span whose every
+# segment is bare matches nothing -- whether it is an ordinary prose slash
+# pair or a real all-bare directory citation.
+PROSE_SLASH_PAIR_MUST_NOT_FIRE = (
+    "The affected files: and/or handling, input/output checks."
+)
+ALL_BARE_DIRECTORY_PAIR_MUST_NOT_FIRE = (
+    "No matches in shared/workflow, tests/fixtures were found."
+)
+# A bare-segment path cited on its own is a citation, not an enumeration:
+# it is one item, which cannot satisfy ENUM_RE's own two-item minimum.
+BARE_SEGMENT_PATH_ALONE_MUST_NOT_FIRE = (
+    "See files ai-config/memories/tools.md for the mapping."
+)
+# ... and a list of nothing but bare-segment paths stays silent through
+# `looks_like_one_path`, exactly as the all-hyphenated citation lists
+# routes 3-5 closed already do.
+ALL_BARE_SEGMENT_CITATIONS_MUST_NOT_FIRE = (
+    "No hits in ai-config/memories/tools.md, "
+    "Support/glab-cli/config.yml after the sweep."
+)
+# An EXTENSION-LESS path cited alone, the false positive the widened item
+# grammar would have created had `ENUM_SEPARATOR` not been tightened with
+# it: nothing in `Morrison-Lab/gha/antigravity-review` is an extension or a
+# trailing slash for `looks_like_citation` to key on, so the old bare-`/`
+# separator split it into three "items" and reported a hand-typed list.
+EXTENSION_LESS_PATH_ALONE_MUST_NOT_FIRE = (
+    "No matches in Morrison-Lab/gha/antigravity-review were found."
+)
+# The same shape with every segment hyphenated, which the hook got wrong
+# BEFORE this change too -- pinned because the separator fix closes it as
+# well, and a future edit that restores a bare `/` separator would reopen
+# both at once.
+EXTENSION_LESS_HYPHENATED_PATH_ALONE_MUST_NOT_FIRE = (
+    "No matches in codex-skills/pre-push-review were found."
+)
+# A citation carrying a digit-led segment (an issue number, a run id),
+# mixed with recalled identifiers. `_NUMBERED_SEGMENT` is what keeps the
+# item whole here; without it the item stops at "issues" and the rest of
+# the list falls outside the match.
+NUMBERED_SEGMENT_MIXED_LIST_MUST_FIRE = (
+    "The fingerprinted scripts: github.com/Morrison-Lab/ai-config/issues/1148, "
+    "cycle-charge-flee, interval-labels."
+)
+
 # ai-config#2386 review round 7 (claude-review, comment 5436013319): a
 # coincidental slash sitting next to a bare recalled identifier (a date, a
 # branch name) was being read, via round 6's single-character
@@ -372,10 +443,17 @@ COINCIDENTAL_SLASH_CITATION_FIRST = (
 # classification), shares ai-config#2404's root cause (content adjacent to
 # a `/` that `TOKEN` cannot parse), and is out of scope for the same
 # reason: a real fix needs the same broader `TOKEN`-parsing redesign that
-# issue already tracks. Pinned here as an ACCEPTED miss, not silently
-# left untested, so a future editor sees it was found and weighed rather
-# than missed.
-ACCEPTED_MISS_COINCIDENTAL_SLASH_ITEM_FIRST = (
+# issue already tracks.
+#
+# FIXED by that redesign (route 11, ai-config#2404), and renamed from
+# `ACCEPTED_MISS_COINCIDENTAL_SLASH_ITEM_FIRST` accordingly. `PATH_TOKEN`
+# absorbs `/2026` into the first item -- `_NUMBERED_SEGMENT` admits a
+# digit-led segment after the mandatory `TOKEN` -- so the list parses in
+# full, and `cycle-charge-flee/2026` still fails `looks_like_citation`
+# (an internal `/`, but no extension and no trailing slash), exactly as
+# round 7 requires. Kept as a positive regression fixture rather than
+# deleted: it is the one ordering round 7's own fix could not reach.
+COINCIDENTAL_SLASH_ITEM_FIRST_MUST_FIRE = (
     "The fingerprinted scripts: cycle-charge-flee/2026, "
     "local-bin/encrypt-gh-token.sh, interval-labels."
 )
@@ -392,7 +470,7 @@ ACCEPTED_MISS_COINCIDENTAL_SLASH_ITEM_FIRST = (
 # `PATH_EXTENSION_RE` are NEVER INVOKED for these fixtures. The real cause
 # is `TOKEN` truncation at the plain word "feature" (no internal hyphen/
 # underscore/dot of its own), the SAME `ai-config#2404` family as
-# `ACCEPTED_MISS_COINCIDENTAL_SLASH_ITEM_FIRST` above -- confirmed by
+# `COINCIDENTAL_SLASH_ITEM_FIRST_MUST_FIRE` above -- confirmed by
 # reproducing the identical silence with the version-suffix removed
 # entirely (`"...encrypt-gh-token.sh, feature was tested."` -> also `[]`).
 # Renamed from `ACCEPTED_MISS_VERSION_SUFFIX_*` to name the TRUE mechanism,
@@ -400,10 +478,24 @@ ACCEPTED_MISS_COINCIDENTAL_SLASH_ITEM_FIRST = (
 # "letter-required extension" remedy) is not misdirected: that remedy
 # would NOT close either of these two fixtures, since the extension check
 # it would narrow is never reached for them.
-ACCEPTED_MISS_BARE_WORD_TRUNCATION_TWO_ITEM = (
+#
+# RENAMED AGAIN, and split, by ai-config#2404's own fix (route 11 in the
+# class doc-comment above `ENUM_RE`). `PATH_TOKEN` now parses
+# `feature/v2.1` as one item, bare leading segment and all, so the two
+# sentences no longer share a mechanism and no longer share a verdict:
+#   * The 3-item sentence FIRES -- "interval-labels" is a bare identifier,
+#     so `looks_like_one_path`'s `all()` fails and the claim is reported.
+#     It is a positive regression fixture now, not an accepted miss.
+#   * The 2-item sentence stays SILENT, but by way of `PATH_EXTENSION_RE`:
+#     `feature/v2.1` ends in `.1`, which that regex accepts exactly as it
+#     would `.md`. That is round 8's ORIGINAL diagnosis, correct for this
+#     shape once the item parses in full, so this fixture joins
+#     `ACCEPTED_MISS_GENUINE_EXTENSION_VS_VERSION_TWO_ITEM` below and would
+#     be closed by the same letter-required-extension remedy.
+ACCEPTED_MISS_VERSION_TAIL_BARE_LEADING_SEGMENT_TWO_ITEM = (
     "No hits in local-bin/encrypt-gh-token.sh, feature/v2.1 was tested."
 )
-ACCEPTED_MISS_BARE_WORD_TRUNCATION_THREE_ITEM = (
+BARE_SEGMENT_PATH_MIXED_THREE_ITEM_MUST_FIRE = (
     "The fingerprinted scripts: local-bin/encrypt-gh-token.sh, "
     "feature/v2.1, interval-labels."
 )
@@ -490,8 +582,9 @@ BULLETED_ALL_CITATIONS_TRAILING_SLASH_AND_EXTENSION = (
 # bulleted forms) -- not requested by either of round 10's two findings, and
 # confirmed NOT a regression from round 10's fix: reproduces identically
 # against the pre-round-10 hook (`git show HEAD:hooks/...` before this PR's
-# round-10 commit). Same root cause as `ACCEPTED_MISS_BARE_WORD_TRUNCATION_*`
-# above -- `TOKEN` requires an internal separator, so "tests" in
+# round-10 commit). Same root cause the inline route's own bare-segment
+# misses had before ai-config#2404's fix -- `TOKEN` requires an internal
+# separator, so "tests" in
 # "tests/testthat.R" cannot match it -- but a DIFFERENT failure shape:
 # `BULLET_TOKEN_RE` is anchored to a bullet's line start, so when the
 # leading segment of a multi-segment path fails `TOKEN`, the WHOLE line
@@ -924,6 +1017,49 @@ def unit_checks(mod):
     # bare identifier.
     check("find_claims silent on a truncated-citation-fragment pair",
           mod.find_claims(TRUNCATED_CITATION_FRAGMENT), [])
+
+    # ai-config#2404: a citation with a bare segment, mixed with recalled
+    # bare identifiers, must now be seen -- one fixture per bare-segment
+    # position, since each defeated `TOKEN` by a different route.
+    for label, text in (
+        ("bare middle segment", BARE_MIDDLE_SEGMENT_MIXED_LIST),
+        ("bare leading segment", BARE_LEADING_SEGMENT_MIXED_LIST),
+        ("bare trailing segment", BARE_TRAILING_SEGMENT_MIXED_LIST),
+    ):
+        claims = mod.find_claims(text)
+        enum_claims = [c for c in claims if c[0] == "enumeration"]
+        check(f"find_claims catches a mixed list citing a path with a {label}",
+              bool(enum_claims), True)
+    # The precision half of the same fix: an item still needs one
+    # TOKEN-shaped segment, so an all-bare span stays invisible.
+    check("find_claims silent on an ordinary prose slash pair",
+          mod.find_claims(PROSE_SLASH_PAIR_MUST_NOT_FIRE), [])
+    check("find_claims silent on a comma-joined pair of all-bare directories",
+          mod.find_claims(ALL_BARE_DIRECTORY_PAIR_MUST_NOT_FIRE), [])
+    check("find_claims silent on a bare-segment path cited on its own",
+          mod.find_claims(BARE_SEGMENT_PATH_ALONE_MUST_NOT_FIRE), [])
+    check("find_claims silent on a list of only bare-segment citations",
+          mod.find_claims(ALL_BARE_SEGMENT_CITATIONS_MUST_NOT_FIRE), [])
+    # The separator half of the same fix: an unspaced `/` is path
+    # structure, so a lone extension-less path is one item and can never
+    # reach ENUM_RE's two-item minimum.
+    check("find_claims silent on an extension-less bare-segment path alone",
+          mod.find_claims(EXTENSION_LESS_PATH_ALONE_MUST_NOT_FIRE), [])
+    check("find_claims silent on an extension-less all-hyphenated path alone",
+          mod.find_claims(EXTENSION_LESS_HYPHENATED_PATH_ALONE_MUST_NOT_FIRE), [])
+    claims = mod.find_claims(NUMBERED_SEGMENT_MIXED_LIST_MUST_FIRE)
+    enum_claims = [c for c in claims if c[0] == "enumeration"]
+    check("find_claims catches a mixed list citing a path with a numeric segment",
+          bool(enum_claims), True)
+    # PATH_TOKEN itself: one TOKEN-shaped segment is mandatory, bare ones
+    # are optional on either side of it.
+    for ok in ("ai-config/memories/tools.md", "Support/glab-cli/config.yml",
+               "Morrison-Lab/gha", "tests/testthat.R", "cycle-charge-flee"):
+        check(f"PATH_TOKEN parses {ok}",
+              bool(re.fullmatch(mod.PATH_TOKEN, ok)), True)
+    for bad in ("shared/workflow", "and/or", "CI/CD", "memories"):
+        check(f"PATH_TOKEN rejects {bad}",
+              bool(re.fullmatch(mod.PATH_TOKEN, bad)), False)
     check("looks_like_citation recognizes a bare fragment via a bare '/' continuation",
           mod.looks_like_citation("ai-config", continuation="/"), True)
     check("looks_like_citation still requires internal '/' with no continuation",
@@ -954,18 +1090,21 @@ def unit_checks(mod):
         enum_claims = [c for c in claims if c[0] == "enumeration"]
         check(f"find_claims catches a mixed list with a coincidental slash ({label})",
               bool(enum_claims), True)
-    check("find_claims ACCEPTS missing a list starting with the coincidental-slash item",
-          mod.find_claims(ACCEPTED_MISS_COINCIDENTAL_SLASH_ITEM_FIRST), [])
+    claims = mod.find_claims(COINCIDENTAL_SLASH_ITEM_FIRST_MUST_FIRE)
+    enum_claims = [c for c in claims if c[0] == "enumeration"]
+    check("find_claims catches a list starting with the coincidental-slash item",
+          bool(enum_claims), True)
 
-    # Regression: review round 8 (comment 5436238489), RENAMED in round 10
-    # (comment 5436484201) once the true mechanism was demonstrated (TOKEN
-    # truncation at the bare word "feature", not an extension-check
-    # confusion). Both of the reviewer's own repro sentences, pinned as
-    # deliberate, tested accepted misses.
-    check("find_claims ACCEPTS missing a 2-item list truncated at a bare word",
-          mod.find_claims(ACCEPTED_MISS_BARE_WORD_TRUNCATION_TWO_ITEM), [])
-    check("find_claims ACCEPTS missing a 3-item list truncated at a bare word",
-          mod.find_claims(ACCEPTED_MISS_BARE_WORD_TRUNCATION_THREE_ITEM), [])
+    # Regression: review round 8 (comment 5436238489), renamed in round 10
+    # (comment 5436484201) and split again by ai-config#2404's fix -- see
+    # the fixtures' own comment. The 3-item sentence now fires; the 2-item
+    # one stays a pinned, tested accepted miss, via the extension check.
+    check("find_claims ACCEPTS missing a 2-item list ending in a version tail",
+          mod.find_claims(ACCEPTED_MISS_VERSION_TAIL_BARE_LEADING_SEGMENT_TWO_ITEM), [])
+    claims = mod.find_claims(BARE_SEGMENT_PATH_MIXED_THREE_ITEM_MUST_FIRE)
+    enum_claims = [c for c in claims if c[0] == "enumeration"]
+    check("find_claims catches a 3-item list whose citation has a bare segment",
+          bool(enum_claims), True)
     # The genuine extension-vs-version-tail confusion, confirmed reachable
     # via a different repro shape (see the fixture's own comment) -- this
     # is what ai-config#2404's letter-required-extension remedy would
@@ -1001,7 +1140,7 @@ def unit_checks(mod):
     # Accepted residual (found by round 10's own two-sided sweep, confirmed
     # pre-existing -- see the fixture's comment): a bulleted 2-item list
     # loses this one to token-count collapse, the bulleted-route sibling of
-    # ACCEPTED_MISS_BARE_WORD_TRUNCATION_* above.
+    # the inline route's own pre-ai-config#2404 bare-segment misses.
     check("find_claims ACCEPTS missing a bulleted 2-item list via bare-word leading-segment truncation",
           mod.find_claims(BULLETED_ACCEPTED_MISS_BARE_WORD_LEADING_SEGMENT_TWO_ITEM), [])
 

@@ -412,7 +412,8 @@ Two dots compares the two tips rather than diffing from the merge base, and it f
 A line the base DELETED after you branched shows as a `+`, so you claim a finding that is not yours and pay a redundant edit --- the cheaper failure, since the next reader can see and undo it.
 The costly one is the reverse: when the base independently ADDS the same line, both tips carry it, two dots emits no `+` at all, and the check reports a line your branch really did add as not-yours.
 That is the silent skip this section is about, arrived at through the instrument meant to prevent it.
-Both are measured in a repo whose default branch is named `main`, so the two readings below name that branch rather than the placeholder above:
+Both are measured against a local branch named `main`,
+so the two readings below name it rather than the remote-tracking placeholder above:
 they report the commands that ran, and are not themselves the instrument to copy.
 On a line the base deleted, `main..HEAD` reported `+removed-later-on-main` beside the real addition, where `main...HEAD` reported only the real one.
 On a line both sides added, `main..HEAD` reported 0 added lines against `main...HEAD`'s 1.

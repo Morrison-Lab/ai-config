@@ -1276,6 +1276,89 @@ case(create("c") + [bash('gh pr comment 1038 --body "next step: gh pr merge"',
      "the verb quoted inside a --body value is not a merge")
 
 
+# --- a LANDED review at the current head satisfies the demand (#3001) ------
+# A reviewer request is CONSUMED the moment Copilot posts, so "never
+# requested" and "requested, reviewed, request consumed" are the same state to
+# any request-keyed check -- and the second is the terminal success. Measured
+# on `ucdavis/hac.sap` #25 and #37: the guard fired on four consecutive turns
+# with a Copilot review sitting at each PR's exact head, and each firing bought
+# another paid review of an already-reviewed diff. So a landed review at the
+# current head discharges, read from the probe's own result.
+#
+# `HEAD_OID` differs from `STALE_OID` in more than its last character, so a
+# prefix comparison cannot accidentally match the two: the discharge is
+# prefix-based (the prescribed query abbreviates both sides to eight
+# characters) and a fixture that differed only at the tail would pass under a
+# broken comparison too.
+HEAD_OID = "9eccd32ab1c4d5e6f708192a3b4c5d6e7f809a1b"
+STALE_OID = "0ff0ed1122334455667788990aabbccddeeff001"
+REVIEW_CMD = ("gh pr view 1038 --json headRefOid,reviews "
+              "--jq '{head: .headRefOid[0:8], copilot: [.reviews[]]}'")
+
+
+def digest(head, shas):
+    """The DIGESTED body this guard's own recovery text prescribes."""
+    return json.dumps({
+        "head": head[0:8],
+        "copilot": [{"sha": sha[0:8], "at": "2026-09-02T00:00:00Z"}
+                    for sha in shas],
+    })
+
+
+def raw(head, reviews):
+    """The RAW `gh pr view --json headRefOid,reviews` body."""
+    return json.dumps({"headRefOid": head, "reviews": [
+        {"author": {"login": login}, "commit": {"oid": oid},
+         "state": "COMMENTED"} for (login, oid) in reviews]})
+
+
+case(create("c") + [bash(REVIEW_CMD, tid="v"),
+                    res("v", digest(HEAD_OID, [HEAD_OID])),
+                    say("Copilot reviewed the current head.")], False,
+     "a Copilot review at the current head discharges (digested shape)")
+case(create("c") + [bash("gh pr view 1038 --json headRefOid,reviews", tid="v"),
+                    res("v", raw(HEAD_OID,
+                                 [("copilot-pull-request-reviewer[bot]",
+                                   HEAD_OID)])),
+                    say("Copilot reviewed the current head.")], False,
+     "a Copilot review at the current head discharges (raw shape)")
+
+# ... and every way the satisfaction check must NOT fire, which is what keeps
+# the two true positives the guard already caught.
+case(create("c") + [bash(REVIEW_CMD, tid="v"),
+                    res("v", digest(HEAD_OID, [STALE_OID])),
+                    say("Copilot reviewed.")], True,
+     "a Copilot review one commit BEHIND the head does not discharge")
+case(create("c") + [bash(REVIEW_CMD, tid="v"),
+                    res("v", digest(HEAD_OID, [])),
+                    say("No review yet.")], True,
+     "a PR with no Copilot review at all still blocks")
+case(create("c") + [bash("gh pr view 1038 --json headRefOid,reviews", tid="v"),
+                    res("v", raw(HEAD_OID, [("d-morrison", HEAD_OID)])),
+                    say("A human reviewed it.")], True,
+     "a NON-Copilot review at the head does not discharge")
+case(create("c") + [bash(REVIEW_CMD, tid="v"),
+                    res("v", digest(HEAD_OID, [HEAD_OID]), err=True),
+                    say("The read failed.")], True,
+     "a FAILED review read does not discharge")
+case(create("c") + [bash(REVIEW_CMD + "; echo done", tid="v"),
+                    res("v", digest(HEAD_OID, [HEAD_OID])),
+                    say("Checked.")], True,
+     "a review read chained AHEAD of another command does not discharge")
+case(create("c") + [bash("gh pr list --json headRefOid,reviews", tid="v"),
+                    res("v", digest(HEAD_OID, [HEAD_OID])),
+                    say("Listed.")], True,
+     "a repo-wide list carrying a head-matching review is not a probe")
+# The obligation is per-HEAD, so satisfaction is not retirement: a push after
+# the review re-arms it, exactly as a push after a request does. This is the
+# case a `live.pop` here would silently break, and nothing else would catch.
+case(create("c") + [bash(REVIEW_CMD, tid="v"),
+                    res("v", digest(HEAD_OID, [HEAD_OID])),
+                    bash("git push origin HEAD", tid="p"), res("p", ""),
+                    say("Pushed a fix.")], True,
+     "a push AFTER a satisfying review re-arms the obligation")
+
+
 # --- redaction exemption (ai-config#1392) ----------------------------------
 # A redaction PR's diff carries the redacted literal on the REMOVED side of
 # every hunk, so requesting a reviewer is the exposure the redaction gate

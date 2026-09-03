@@ -879,12 +879,13 @@ A clean automated review from every available provider evaluating the current HE
   followed by `Reviewed-Commit: <HEAD sha>` (the parser accepts 7-40 hex characters; give the full 40).
   A foreground dispatch is the simplest credited path and the one the hook's own refusal message recommends,
   but background fallback dispatches, tracked `TaskOutput` reads, and task notifications are credited too, per Pattern 22.
-- **2nd occurrence of the stale-cache class, 2026-09-03** ([#3156](https://github.com/Morrison-Lab/ai-config/issues/3156)): the same stale-cache mechanism, with a payload that fails OPEN rather than staying outdated.
-  A `MORATORIUM_END` constant frozen at `2026-09-01` in the loaded copy had the guard compute the Copilot moratorium as expired and demand the forbidden review, while `main` carried `2026-12-01`.
-  `git pull --ff-only` on the marketplace clone advanced it to `b0f279f` and changed nothing loaded;
-  the cache's newest per-commit directory (`4140e5c25079`) matched the marketplace's pre-pull HEAD, and no `b0f279f` entry existed.
-  Tracked as [#3141](https://github.com/Morrison-Lab/ai-config/issues/3141);
-  see [`keep-checkouts-fresh.md`](../shared/workflow/keep-checkouts-fresh.md)'s dated-constant section for the fail-open rule this occurrence produced.
+- **2nd occurrence of the stale-cache class, 2026-09-03** ([#3141](https://github.com/Morrison-Lab/ai-config/issues/3141), recorded in [#3156](https://github.com/Morrison-Lab/ai-config/issues/3156)), and it is an occurrence of **this bullet's own Fix step being skipped** rather than of a new mechanism.
+  `hooks/no-unreviewed-pr.py` demanded a Copilot review while the moratorium ran to `2026-12-01`, and the session identified "the loaded copy" as the newest per-commit directory under `~/.claude/plugins/cache/` --- the exact proxy the Fix above rules out.
+  Nine cache directories carried the same value (counted 2026-09-03), so newest isolated nothing.
+  What the resolution order would have surfaced: the copy registered directly in `~/.claude/settings.json` carries the correct date and returns 0 before reading the transcript, `enabledPlugins` for this plugin is `false`, and the user-scope pin in `installed_plugins.json` names a hook with **no `MORATORIUM_END` at all**.
+  So an expired constant and an absent one produce the identical demand, and the cause stays unestablished;
+  only reading the file `${CLAUDE_PLUGIN_ROOT}` resolved to at firing time would settle it.
+  See [`keep-checkouts-fresh.md`](../shared/workflow/keep-checkouts-fresh.md)'s dated-constant section for the resolution order and for the fail-open hazard, which is argued from the construct rather than measured here.
 - **Algorithmatizable?**
   Partially.
   [#2544](https://github.com/Morrison-Lab/ai-config/issues/2544)'s suggested fix 3 --- have the hook's refusal message name a user-approvable permission rule for the override --- would have resolved the measured session in one step, and remains open under [#2899](https://github.com/Morrison-Lab/ai-config/issues/2899).

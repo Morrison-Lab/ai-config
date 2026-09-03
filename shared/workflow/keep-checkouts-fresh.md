@@ -288,8 +288,9 @@ supplied it under `${CLAUDE_PLUGIN_ROOT}`.)
 This narrows the recommendation above rather than leaving it untouched, so read the two together.
 Automatic re-arming is a real benefit and it is exactly as trustworthy as the copy carrying the date, which on a plugin install is a snapshot nobody in the session controls.
 A stale flag, threshold, or allowlist can fail in either direction too, so what distinguishes this one is not the direction but the *trigger*: those change behaviour only when the value they carry is wrong for a case someone brings to them, while a dated constant changes behaviour with no case, no edit, and no event at all.
-The clock crosses a number frozen in a snapshot, the guard computes that its own suppression has expired, and it starts demanding an action a standing directive forbids.
-Nobody edited the hook, no PR changed, no session did anything, and the guard began asserting the opposite of current policy.
+Let the clock cross a number frozen in a snapshot and the guard computes that its own suppression has expired, then starts demanding an action a standing directive forbids --- with nobody having edited the hook, no PR having changed, and no session having done anything.
+That is an argument from how the construct is built, not a mechanism this file has watched run;
+the case record below says why the one incident that looked like it cannot establish it.
 
 That composes with this file's plugin-cache material into a worse failure than either part describes alone.
 Those paragraphs --- in "On the plugin path nothing else is needed", well above this section --- explain why a merged fix does not reach a running session;
@@ -297,17 +298,34 @@ a dated constant is the one payload for which *not reaching the session* is not 
 
 - **Do:** gate the re-arm on a freshness signal from outside the snapshot --- the pinned rev in `~/.claude/plugins/installed_plugins.json`, or a network read --- and keep suppressing when that signal is unavailable.
   A corpus file the guard reads at runtime is not such a signal, since it is frozen in the same snapshot the constant is.
-- **Do:** check the loaded copy's constant, not the checkout's, when a guard demands something a standing directive forbids --- that demand is a freshness symptom before it is a policy question.
+- **Do:** read the constant from the copy that actually ran, when a guard demands something a standing directive forbids --- that demand is a freshness symptom before it is a policy question.
+  Resolve which copy that is in this order, since the answer is frequently not the plugin at all: grep `~/.claude/settings.json` for a direct non-plugin registration of the script and read that file if one exists;
+  check `enabledPlugins` for whether the plugin path is live on this machine at all;
+  then read the per-scope pin in `~/.claude/plugins/installed_plugins.json`, which names the snapshot the plugin loader serves.
+- **Don't:** identify the loaded copy by the newest directory under `~/.claude/plugins/cache/`.
+  Pattern 43's own Fix section already rules that proxy out --- "not the marketplace clone, and not merely the newest directory under the cache" --- and it isolates nothing when many cache directories carry the same value.
 - **Don't:** read "the guard re-armed" as evidence the suppression period actually ended.
 - **Don't:** treat a dated constant as carrying the same risk as a stale flag or threshold;
   a wrong flag waits for a case to reach it, and a wrong date fires on its own.
 - **Don't:** answer this by moving the switch into the environment;
   the pair above refuses that for a separate reason --- an env-readable clock or kill flag is a one-variable bypass of the guard in production --- and that refusal is untouched here.
 
-(Measured 2026-09-03, tracked as [#3141](https://github.com/Morrison-Lab/ai-config/issues/3141) with the two proposals above, and recorded in [#3156](https://github.com/Morrison-Lab/ai-config/issues/3156).
-`hooks/no-unreviewed-pr.py` demanded a Copilot review on two PRs while the all-repos moratorium ran to `MORATORIUM_END = 2026-12-01` ([#3078](https://github.com/Morrison-Lab/ai-config/pull/3078));
-the loaded copy carried `2026-09-01` and had computed the moratorium as expired two days earlier.
-`git pull --ff-only` in `~/.claude/plugins/marketplaces/Morrison-Lab` --- 52 commits behind, clean tree --- advanced it to `b0f279f` carrying the correct date and changed nothing the session loaded: `~/.claude/plugins/cache/Morrison-Lab/ai-config/` held one directory per commit, its newest (`4140e5c25079`) matched the marketplace's *pre-pull* HEAD and still carried `2026-09-01`, and no entry for `b0f279f` existed at all.
-A second occurrence of the class this file's plugin-cache paragraphs and [`mistake-patterns.md`](../../memories/mistake-patterns.md) Pattern 43 both record;
-first was 2026-09-01, [#2899](https://github.com/Morrison-Lab/ai-config/issues/2899).
-The session diagnosed it correctly and could not fix it for itself: the pin advances through a `/plugin` operation or a restart, neither available to a running non-interactive session.)
+**The hazard above is a property of the construct, argued rather than measured, and the incident that prompted it is worth reading for how badly the diagnosis went.**
+On 2026-09-03 `hooks/no-unreviewed-pr.py` demanded a Copilot review on two PRs while the all-repos moratorium ran to `MORATORIUM_END = 2026-12-01` ([#3078](https://github.com/Morrison-Lab/ai-config/pull/3078)).
+What is established stops well short of a mechanism.
+The copy registered directly in `~/.claude/settings.json` --- `python3 "$HOME/.claude/hooks/no-unreviewed-pr.py"`, present on disk --- carries `2026-12-01`, and its `main()` returns 0 on an active moratorium before reading the transcript, so that copy cannot be what fired.
+`enabledPlugins["ai-config@Morrison-Lab"]` is `false`, and the plugin path ran anyway.
+`installed_plugins.json` pins `a9ded3e1a9df` at user scope, whose hook carries **no `MORATORIUM_END` at all**, plus a project-scope pin whose directory is absent.
+The cache holds copies in three different states at once (counted 2026-09-03): nine directories carrying `2026-09-01`, a `b0f279f8e8bd` entry carrying `2026-12-01`, and the pinned copy carrying no constant.
+A second marketplace, `ai-config@d-morrison`, carries its own user-scope pin to a separate cache tree, so "which copy ran" has more candidate answers than the one marketplace suggests.
+
+**The cause is unknown, and one observation cannot separate the two explanations.**
+A copy whose constant has expired demands the review because the date passed;
+a copy with no moratorium logic demands it unconditionally, and no date is stale because no date exists.
+Both produce exactly the demand that was seen.
+Settling it needs one thing this incident never established: which copy `${CLAUDE_PLUGIN_ROOT}` resolved to at firing time, and what that file's constant reads.
+[#3141](https://github.com/Morrison-Lab/ai-config/issues/3141) carries the incident and now records its cause as unestablished, so cite it for the open question rather than for a mechanism.
+
+**The diagnosis itself is the transferable failure, and it is a plain instance of the rule two bullets above.**
+"The loaded copy" was identified as the cache's newest per-commit directory --- the one proxy Pattern 43's Fix section explicitly rules out --- while nine directories carried the same value, so "newest" isolated nothing.
+That is [`verify-the-right-artifact`](verify-the-right-artifact.md)'s substitution with a corpus rule already naming the substituted artifact by name, which is why the resolution order above is written as steps rather than as advice.

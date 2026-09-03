@@ -237,31 +237,25 @@ refusal, and it does not know which kind of comparison this is.
 """
 
 
-def inside_quotes(body, pos):
-    """True when `pos` falls inside an unterminated quote in `body`.
-
-    The separator class admits `\n`, because a multi-line shell script's second
-    line really is a command position. But a newline also occurs inside a
-    quoted argument --- a `gh pr comment --body` or `git commit -m` body of more
-    than one line --- and there the anchor would re-arm inside exactly the
-    string it exists to exclude.
-
-    Rather than removing `\n` (which would blind the hook to every multi-line
-    script), track quote state. This subsumes the special cases the anchor was
-    patched for one at a time: `(`, a backtick, and the words `then` and `do`
-    were each excluded because each occurs inside quoted prose, and this test
-    answers that question directly.
-    """
-    return quote_state_map(body)[min(pos, len(body))]
-
-
 def quote_state_map(body):
     """Per-offset quote state for `body`, computed in a single pass.
 
-    `inside_quotes` used to rescan from index 0 for every match, which is
-    quadratic: a 44 KB command carrying 2000 ranges took 11.7 s against the
-    10 s timeout `hooks.json` declares. One pass makes it linear, and the
-    per-match lookup an index.
+    Why quote state is tracked at all: the separator class admits a newline,
+    because a multi-line shell script's second line really is a command
+    position. But a newline also occurs inside a quoted argument --- a
+    `gh pr comment --body` or `git commit -m` body of more than one line ---
+    and there the anchor would re-arm inside exactly the string it exists to
+    exclude. Dropping the newline from the class instead would blind the hook
+    to every multi-line script, so the state is tracked rather than the
+    separator narrowed. This subsumes the special cases the anchor was patched
+    for one at a time: `(`, a backtick, and the words `then` and `do` were each
+    excluded because each occurs inside quoted prose, and asking whether an
+    offset is quoted answers that question directly.
+
+    Why one pass: a per-match rescan from index 0 would be quadratic. A 44 KB
+    command carrying 2000 ranges took 11.7 s against the 10 s timeout
+    `hooks.json` declares. One pass makes it linear, and the per-match lookup
+    an index.
     """
     states = [False] * (len(body) + 1)
     single = double = False

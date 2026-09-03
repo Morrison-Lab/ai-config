@@ -203,8 +203,8 @@ the same miss happens inside one repo when the dupe check is scoped to a directo
 - **Do:** grep the directories the corpus spans,
   `skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md`,
   not the one the destination sits in.
-- **Don't:** read "the whole `memories/` directory" as thorough;
-  the word doing the damage is `memories/`, not "whole".
+- **Don't:** read "the whole `memories/` directory", step 3's wording at `3935bfff`, as thorough;
+  the word doing the damage was `memories/`, not "whole".
 
 (Recorded 2026-09-03 on [ai-config#3060](https://github.com/Morrison-Lab/ai-config/pull/3060),
 where a markdownlint entry was added to `memories/markdownlint.md`

@@ -451,7 +451,7 @@ add a review gate for the cases that need one.
   ("always poll for new review after pushing — check commit SHA matches")
 - ❌ Skipping the "check existing notes" step and creating duplicates --
   specifically, reading only the region you're appending to instead of
-  grepping the whole target file for the subject (step 3)
+  grepping the corpus for the subject (step 3)
 - ❌ Updating only preferences when a skill also needs the fix
 - ❌ `git add -A` — it sweeps unrelated in-flight edits (the user's work, other
   draft skills) into your commit/PR. Stage the specific files you touched.

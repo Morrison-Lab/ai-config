@@ -1301,7 +1301,7 @@ The reliable tell is that the first conclusion is always *the guard is broken*, 
 
 Two shapes, measured in one session, and they break different things:
 
-- `gh pr view --json state` narrowed with `--jq` to pretty-print flattened `"state":"MERGED"` into `state=MERGED`, so the hook's exemption regex, written against the JSON, could not match.
+- `gh pr view --json state` narrowed with `--jq` to pretty-print flattened `"state":"MERGED"` into `state=MERGED`, so the hook's terminal-state discharge regex, written against the JSON, could not match.
   What the guard reads is the output's **spelling**, and reshaping it is what destroys the record.
 - A `requested_reviewers` POST written as `... ; echo rc=$?` and as `... | head` moved out of last-command position, so its exit status could no longer be attributed to it.
   What that guard needs there is the **position**, which is what makes the status attributable.

@@ -303,53 +303,6 @@ round 11 established that neither works, because the harness delivers control ta
 The tool was inverted to report records and their provenance rather than classify authorship, which ends the sequence by removing the claim rather than narrowing it.
 Round 12 then found the coverage half.)
 
-## A flat pattern over command text has no argument positions, so adjusting it never converges
-
-The section above is a parse that moved from grammar to **vocabulary**, and its tell is that someone else owns the set.
-This is a different disguise for the same thing, with a different tell: the question has *structure* the instrument cannot see, and no adjustment in either direction can supply it.
-
-The question on [#3101](https://github.com/Morrison-Lab/ai-config/pull/3101) was whether an earlier command had *read a config manifest under the root about to be deleted*.
-Answering it needs three facts about one command --- the verb, which argument is the operand, and which root that operand sits under.
-A lexical pattern gets the first of those cheaply, and the hook does exactly that with a front-anchored alternation over read verbs.
-The other two are positional, and a pattern over raw command text has no notion of argument position, so its revisions kept closing one boundary case while leaving a neighbouring one open.
-A sample of what the rounds found, which is how [#3126](https://github.com/Morrison-Lab/ai-config/issues/3126) itself introduces the same list:
-
-- a manifest *name* supplied with no root;
-- the right shape under the wrong root;
-- the deletion command clearing its own warning;
-- a `grep` **for** the manifest string, over `.py` files;
-- the root supplied as the search *pattern*, with the manifest belonging to a different root;
-- a quoted pattern spelling out a whole path;
-- `locate` matching because the word contains `cat`;
-- a verb and an operand in two different commands, where the second one *deletes* the manifest.
-
-The structural answer was a parse: `shlex` the command, then ask whether a read verb's argv holds a manifest under a targeted root.
-That was filed rather than attempted in the round that noticed it.
-
-**When to stop is already settled elsewhere.**
-[`learn-from-review-findings`](../workflow/learn-from-review-findings.md) fires on the second finding of a class, and again on two successive fixes turning the same knob.
-Read those.
-What neither answers is what to do when the structural fix is a rework you cannot land in the round that found it --- which is the whole of what follows.
-
-**Write the ceiling into the artifact.**
-Three parts, and none of them stands alone.
-Narrow the **comment** that overclaims, so the code stops asserting a guarantee it only approximates.
-Add a limits section naming the residual cases in **both** directions, since what still slips through is only half of what a later reader needs and the false-positive half is the one that gets omitted.
-File the structural fix as its own issue, so the ceiling is recorded as temporary rather than accepted.
-
-Note the boundary with [`algorithmatize-checks`](../workflow/algorithmatize-checks.md)'s "A review flagging an overclaimed check is a prompt to build it, not to soften the claim".
-That section rejects deleting an overclaiming sentence *in place of* building the instrument the finding asked for.
-It also permits deletion outright for a genuine one-off --- "state plainly when a property is a genuine one-off, and delete the claim then" --- so deletion is not forbidden, only deletion standing in for an instrument that is still wanted.
-The case here is neither: the property is real and recurring, and the instrument is wanted but is a whole rework.
-
-- **Do:** ask whether the question has structure your instrument cannot represent, before adjusting the instrument again.
-- **Do:** narrow an overclaiming comment to what the code actually does, and file the structural rework as its own issue in the same round.
-- **Do:** write a limits section naming the residual cases in both directions --- what still fires wrongly, and what still slips through.
-- **Don't:** adjust a lexical pattern a further time once its revisions keep leaving a neighbouring boundary case open;
-  a pattern with no argument positions cannot converge on a question about argument positions, however few of its revisions traded one case for another.
-- **Don't:** let a comment assert a guarantee the code only approximates.
-- **Don't:** narrow the overclaim and stop where the instrument is still wanted --- without the filed issue that is the softening `algorithmatize-checks` refuses.
-
 ## Limits
 
 Design, genuine judgment, and semantic work stay with a human or a model:

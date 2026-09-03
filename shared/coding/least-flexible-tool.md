@@ -172,6 +172,41 @@ The rule never needed the rest: what makes this the third occurrence is that fou
 
 (Dates Pacific; the commits are timestamped 2026-08-25 UTC.)
 
+**Fourth occurrence, 2026-09-02 on [ai-config#3101](https://github.com/Morrison-Lab/ai-config/pull/3101), and the one that asks what to write down when the layer change cannot land in the round that found it.**
+Everything above settles when to stop and what to reach for.
+It leaves open the case where the lexer is a rework rather than a patch, so the round that diagnoses it ships a matcher it has just established cannot work.
+
+The question there was whether an earlier command had *read a config manifest under the root about to be deleted*, which needs the verb, which argument is the operand, and which root that operand sits under.
+The last two are positional, so the pattern could not decide them, and its revisions kept closing one boundary case while leaving a neighbouring one open.
+A sample of what the rounds found, which is how [#3126](https://github.com/Morrison-Lab/ai-config/issues/3126) itself introduces the same list:
+
+- a manifest *name* supplied with no root;
+- the right shape under the wrong root;
+- the deletion command clearing its own warning;
+- a `grep` **for** the manifest string, over `.py` files;
+- the root supplied as the search *pattern*, with the manifest belonging to a different root;
+- a quoted pattern spelling out a whole path;
+- `locate` matching because the word contains `cat`;
+- a verb and an operand in two different commands, where the second one *deletes* the manifest.
+
+The layer change is again filed rather than shipped --- `shlex` the command, then ask whether a read verb's argv holds a manifest under a targeted root --- which is #2189's disposition arriving a second time and is not what this occurrence adds.
+
+**What it adds is the ceiling, written into the artifact.**
+Three parts, and none of them stands alone.
+Narrow the **comment** that overclaims, so the code stops asserting a guarantee it only approximates.
+Add a limits section naming the residual cases in **both** directions, since what still slips through is only half of what a later reader needs and the false-positive half is the one that gets omitted.
+File the layer change as its own issue, so the ceiling reads as temporary rather than accepted.
+
+Note the boundary with [`algorithmatize-checks`](../workflow/algorithmatize-checks.md)'s "A review flagging an overclaimed check is a prompt to build it, not to soften the claim".
+That section rejects deleting an overclaiming sentence *in place of* building the instrument the finding asked for.
+It also permits deletion outright for a genuine one-off --- "state plainly when a property is a genuine one-off, and delete the claim then" --- so deletion is not forbidden, only deletion standing in for an instrument that is still wanted.
+This case is neither: the property is real and recurring, and the instrument is wanted but is a whole rework.
+
+- **Do:** narrow an overclaiming comment to what the code actually does, in the same round that files the layer change.
+- **Do:** write a limits section naming the residual cases in both directions --- what still fires wrongly, and what still slips through.
+- **Don't:** ship a matcher you have just established cannot answer the question while its comment still claims it does.
+- **Don't:** narrow the overclaim and stop where the instrument is still wanted --- without the filed issue that is the softening `algorithmatize-checks` refuses.
+
 ## In review
 
 Flag these with the same weight as the other coding rules:

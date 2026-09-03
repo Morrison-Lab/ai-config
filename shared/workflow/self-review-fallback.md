@@ -22,6 +22,7 @@ CI stays green because it never ran anything meant to notice, and the PR/MR simp
 Check for this once per repo, right after the first push, rather than waiting to notice its absence: grep the repo's own CI config for the review job or template it would come from (a GitHub Actions workflow file, or a GitLab `.gitlab-ci.yml`'s `include:` list) rather than assuming a sibling or template repo's setup carried over.
 Treat "not configured" the same as the other two failure modes: self-review immediately, held to the same fact-check rigor "A fallback self-review is prone to being shallow, so hold it to the same bar as the bot it stands in for" requires (fact-check-prose, the cause check, the cited-source rule).
 Because a genuine config gap is a standing property of the repo rather than a one-off outage, also file a tracking issue on it per [`report-mistakes-proactively`](report-mistakes-proactively.md) --- wiring up review coverage is worth fixing, not just working around on every push.
+
 **Repository configuration defect (unusable API credential) is a fourth failure mode.**
 The pre-flight credential shape check in `Morrison-Lab/gha` (`check-credential-shape`, gha#686) detects when every configured API credential (`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`) carries INTERIOR whitespace --- a pasted PEM block, a JSON credential, or a wrapped terminal copy.
 Interior is the operative word: a trailing newline is trimmed and tolerated, because `gh secret set < file` writes one routinely, so stripping one is not the repair.

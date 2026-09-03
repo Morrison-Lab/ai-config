@@ -1040,21 +1040,24 @@ defect.
 **A finding raised against someone else's implementation is measured, not adopted
 or dismissed.**
 Dismissal is wrong because the peer is reasoning about the same problem, often
-having probed a part of it you did not. Adoption is wrong because the finding is
-about a different implementation, so whether it transfers is an empirical
-question about your code rather than a property of the finding. Both feel like a
-response and neither is one: the first spends nothing, the second spends a round
-on a fix that may repair nothing.
+having probed a part of it you did not.
+Adoption is wrong because the finding is about a different implementation, so
+whether it transfers is an empirical question about your code rather than a
+property of the finding.
+Both feel like a response and neither is one: the first spends nothing, the
+second spends a round on a fix that may repair nothing.
 
 Run the peer's cases as concrete inputs, not as a reading of your own regex or
 your own parser --- a reading of the code is exactly the confirmation the
-diff-versus-standards rules elsewhere in this corpus rule out. Then say which
-passed and which did not, so the peer learns something about the shape of the
-problem whichever way it goes.
+diff-versus-standards rules elsewhere in this corpus rule out.
+Then say which passed and which did not, so the peer learns something about the
+shape of the problem whichever way it goes.
 
 Pinning the shapes even when they all pass is the step that looks redundant and
-is not. A case that passes today passes by construction of code nobody promised
-to keep; what the peer supplied was a *reason to care about that shape*, and
-that reason survives the measurement. So the deliverable is the test, not the
-verdict.
+is not.
+A case that passes today passes by construction of code nobody promised to
+keep;
+what the peer supplied was a *reason to care about that shape*, and that reason
+survives the measurement.
+So the deliverable is the test, not the verdict.
 

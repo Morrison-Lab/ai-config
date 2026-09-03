@@ -1381,7 +1381,10 @@ magnitude on unchanged code needs no attribution to make its point.
 The check is two steps, and the **second** is the one that decides:
 
 ```bash
-uptime                       # load average; on Windows, Get-Counter or Task Manager
+uptime                                   # step 1: load average (Windows: Get-Counter)
+for i in 1 2 3 4 5; do                   # step 2: the one that decides
+  /usr/bin/time -f %e <the command>      # elapsed seconds, one line per run
+done
 ```
 
 Read `uptime` first, but do not stop there.
@@ -1397,17 +1400,25 @@ rather than a decaying average over a window you did not choose.
 A reading you cannot reproduce is not a measurement of the code, and a spread that
 spans an order of magnitude names its own cause.
 
-**A timing assertion written as a regression guard is the same exposure, and the two sections above already answer it** --- they are about exactly this, a busy machine inflating a wall-clock reading.
-Nothing here adds to that answer, and the sentence is here only to point at it: a session that has just learned its own machine was loaded will reach for a wider bound, which is the wrong repair.
-`process_time` is the repair.
-A catastrophic-backtracking probe looks like the exception, because the failure it guards against *is* elapsed time, and it is not: backtracking burns CPU rather than blocking, so CPU time measures it and is load-immune.
-That is this repo's own precedent, stated in `hooks/test-no-unauthorized-merge.py`: "Any bound tight enough to catch a regression sits inside that spread, so it goes red on PRs that never touched this hook, which is how a gating check stops being read."
-The genuine exception is already carved out above --- keep a wall-clock ceiling only where the measured code can actually block.
+**A timing assertion written as a regression guard is the same exposure, and the two sections above answer it** --- they are about exactly this, a busy machine inflating a wall-clock reading.
+What those sections do not separate, and what a session that has just learned its own machine was loaded most needs, is **which question the assertion asks**.
+
+A **regression bound** asks whether the code got slower.
+It compares against a figure chosen earlier, so it is the case those sections govern, and widening it under load is the wrong repair --- [`hooks/test-no-unauthorized-merge.py`](../../hooks/test-no-unauthorized-merge.py) states why in its own comment: "Any bound tight enough to catch a regression sits inside that spread, so it goes red on PRs that never touched this hook, which is how a gating check stops being read."
+`process_time` is the repair there, and the section above measures it at 3.96--4.31x under load against `perf_counter`'s 2.18--4.58x --- reproducible across machines and load rather than immune to either.
+
+A **watchdog** asks whether the code finishes at all, and that is a question about elapsed time by construction, so it stays wall-clock.
+This repo's own catastrophic-backtracking checker is exactly that shape: [`scripts/check_regex_patterns.py`](../../scripts/check_regex_patterns.py) arms `signal.setitimer(signal.ITIMER_REAL, timeout)` against a `DEFAULT_TIMEOUT` of 0.25 seconds, with a thread-join fallback, and `validate.yml` gates on it.
+A backtracking probe is therefore not the exception that proves a `process_time` rule;
+it is the other question, and the carve-out above already covers it --- keep a wall-clock ceiling where the measured code can actually block or run away.
+
+So ask which question the assertion asks before reaching for either repair.
+The `< 1.0s` probe that prompted this entry was a *regression guard shaped like a watchdog*, which is why it was ambiguous and why it could flake.
 
 - **Do:** read the load average before reporting a timing observation as a finding.
 - **Do:** re-run a timed command several times and report the spread, so a reading that cannot be reproduced is visible as one.
 - **Do:** reap your own background runs before timing anything, since they are the likeliest cause of the load you are about to measure through.
-- **Do:** switch a load-sensitive regression bound to `process_time` rather than widening it, per the two sections above.
+- **Do:** ask whether a timing assertion is a regression bound or a watchdog before repairing it --- the first wants `process_time`, the second stays wall-clock.
 - **Don't:** treat a stopwatch reading as evidence about the code merely because it was measured rather than guessed.
 - **Don't:** assume a fast-moving session is running on an idle machine --- it is the session most likely to have loaded it.
 

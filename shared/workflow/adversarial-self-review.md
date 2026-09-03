@@ -767,7 +767,7 @@ The section above retires the **work**.
 This one retires the **loop** while keeping the work, and the two need separating because a reviewer asked only the ship-or-drop question has no way to say "keep it, and stop iterating".
 
 **The default rule is elsewhere in this file, and this question is for the case that rule does not reach.**
-"Require detailed and holistic review passes" already gives the terminus: keep running rounds while findings keep landing, and let the round count be decided by whether they still are.
+"Review the instrument too, not only the change it verifies" already gives the terminus: keep running rounds while findings keep landing, and "Give a docs-only diff describing an instrument a full round" restates it.
 That is the right default and it is not withdrawn here.
 What it assumes is that each round's findings are *about the change*.
 Once a round's findings are about the **previous round's fix** --- the shape [`learn-from-review-findings`](learn-from-review-findings.md)'s "A later round can find a defect in the FIX" section documents --- findings still landing no longer distinguishes a series that is converging from one the fixes are feeding, so the default criterion returns "keep going" in both cases and stops discriminating.
@@ -782,7 +782,7 @@ Rounds 6, 7 and 8 each introduced a defect the next round found, which is exactl
 only round 9 introduced none.
 What ended the series was asking that question directly, rather than a round happening to come back empty --- which, per the convergence rule, would not have been evidence it was finished anyway.
 
-- **Do:** ask for a continue-or-stop judgement once several rounds have each fixed something real, separately from the ship-or-drop question.
+- **Do:** ask for a continue-or-stop judgement once a round's findings are about the previous round's *fix* rather than about the change, separately from the ship-or-drop question.
 - **Do:** give the reviewer the rate at which this change's own fixes have introduced new defects, since that is the term it cannot derive from the diff.
 - **Don't:** collapse the two questions.
   "Should this exist" and "should this iterate further" have different right answers, and a change worth shipping is the usual situation in which the continue-or-stop question arises at all.

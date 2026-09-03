@@ -1126,42 +1126,61 @@ each from exactly 1200 to 1201 lines, failing `validate` with no content
 change; fixed by re-wrapping the same sentences at a different clause
 boundary, restoring both to 1200.)
 
-**Neither gate can tell a clause reflow from any other layout of the same sentences, so a green run is weak evidence that a reflow was done right.**
+**Neither gate can tell a clause reflow from a fill-to-column pass over the same sentences, so a green run is weak evidence that a reflow was done right.**
 
-Both instruments are described at length above --- the gate's two predicates, and `MD013` being off repo-wide --- and what matters here is what neither of them asks.
-Neither asks **where** a break fell inside a sentence.
-That is the whole content of the difference between clause-broken prose and one long line per sentence, and the width rule that would notice a column boundary directly is the one this repo disables.
+Both instruments are described at length above, and what matters here is how little of a line's shape they look at.
+The gate asks two questions: does this line hold more than one sentence, and does an 80-plus-character line carry a mid-line semicolon.
+The second is a within-sentence placement rule, and it is the *only* one --- no other interior break position is examined.
+`MD013`, which would notice a column boundary directly, is disabled repo-wide in `.markdownlint-cli2.jsonc`.
 
-Be careful about how far that goes, because the obvious stronger claim is false.
-A hard wrap to 80 columns over multi-sentence prose *does* trip the gate, by merging two short sentences onto one line, and measured over one PR's added prose it did so in every fragment it touched.
-So the gate is not blind to column wrapping.
-What it is blind to is the placement of breaks *within* a sentence, which is exactly the property a clause reflow is about, and `MD013` being disabled means nothing else looks at width either.
+So a fill to 80 columns applied to prose that is already one sentence per line passes cleanly.
+It never merges two sentences, because it wraps each source line separately, and it introduces no semicolon that was not there.
+Measured on [ai-config#3103](https://github.com/Morrison-Lab/ai-config/pull/3103) against its merge base `ba9657270`, classifying every added non-blank Markdown line with the gate's own `classify_line`:
+
+| state | commit | added lines | sentence flags | clause flags |
+| --- | --- | ---: | ---: | ---: |
+| unreflowed original | `02cbf00d8` | 184 | 0 | 0 |
+| fill to 80 columns | `2d3e18fcf` | 440 | 0 | 0 |
+| clause-boundary reflow | `ba265b546` | 362 | 0 | 0 |
+
+Three trees, one verdict, and only the third is the wanted outcome.
+Citing either instrument here is the vacuous verification
+[`algorithmatize-checks`](../workflow/algorithmatize-checks.md)'s
+"A checker that returns the same verdict on the broken tree is not evidence the fix worked" section describes.
+
+Two things bound that result rather than weakening it.
+The commits are on a branch of an unmerged PR, so re-derive against whatever refs survive rather than assuming these resolve.
+And a fill applied to *paragraph* prose would merge sentences and turn the gate red --- so the blindness is specific to reflowing text that already had one sentence per line, which is the situation a clause reflow is always in.
 
 Two measurements do discriminate, each one command over the diff.
 
-Print the added lines' lengths and look for a hard cliff at exactly 80, which is the signature of a fill-to-column pass.
-Clause-broken prose has no such edge, because clauses do not end on a column.
+Print the added lines' lengths and look at the **top** of the distribution.
+A fill to 80 columns leaves a hard ceiling there --- the three states above top out at 630, **84** and 184 characters respectively --- and piles lines into the 76-to-80 band, where clause-broken prose has no such edge, because clauses do not end on a column.
 
 ```bash
-git diff origin/main -- '*.md' | grep '^+[^+]' | cut -c2- |
-  awk 'length > 0 { print length }' | sort -n | uniq -c | tail -20
+git diff origin/main...HEAD -- '*.md' | grep '^+[^+]' | cut -c2- |
+  awk 'length > 0 { print length }' | sort -n | tail -1          # the ceiling
+git diff origin/main...HEAD -- '*.md' | grep '^+[^+]' | cut -c2- |
+  awk 'length >= 76 && length <= 80' | wc -l                     # the pile-up
 ```
 
-Then count added prose lines that end mid-phrase --- on an article, a preposition, a conjunction, or an open bracket --- before and after.
-A fill-to-column pass leaves many, and a clause reflow leaves approximately none, so the pair is the number worth reporting.
+Then count added prose lines that end mid-phrase --- on an article, a preposition, a conjunction, or an open bracket --- running it once per state so the pair is a pair.
+Across the three states above the counts are 0, **36** and 0, which separates the fill from both hand-broken layouts where the gate could not.
 
 ```bash
-git diff origin/main -- '*.md' | grep '^+[^+]' | cut -c2- |
-  grep -cE '\b(a|an|the|of|to|in|on|for|and|or|is|that|with|by|as|at)$|[[(]$'
+for ref in "$BEFORE" "$AFTER"; do
+  git diff "$BASE" "$ref" -- '*.md' | grep '^+[^+]' | cut -c2- |
+    grep -cE '\b(a|an|the|of|to|in|on|for|and|or|is|that|with|by|as|at)$|[[(]$' || true
+done
 ```
 
-Report the base and the line definition alongside either figure, per
+Both figures depend on the definition as much as on the tree, so publish the base, the refs, and the pattern beside them, per
 [`grep-is-not-coverage`](../workflow/grep-is-not-coverage.md)'s
 "A published count needs the ref and the flags it was measured with".
-The second command counts every added line rather than only prose lines, and the gate's own `prose_line_numbers` gives a stricter population, so the two disagree by a margin that depends on how much of the diff is fenced or tabular.
+This regex counts every added line rather than only prose lines, and the gate's own `prose_line_numbers` gives a stricter population, so a figure derived the other way will differ.
 
-- **Do:** measure the length distribution and the mid-phrase count before reporting a reflow verified.
-- **Do:** publish the base, the commits, and the line definition with either figure, since neither is defined by the gate.
-- **Don't:** cite the `new-line-breaks` gate or markdownlint as evidence that breaks landed at clause boundaries --- neither looks at where a break fell inside a sentence.
+- **Do:** measure the length ceiling, the 76-to-80 pile-up, and the mid-phrase count before reporting a reflow verified.
+- **Do:** publish the base, the refs, and the pattern with any of those figures, since none is defined by the gate.
+- **Don't:** cite the `new-line-breaks` gate or markdownlint as evidence that breaks landed at clause boundaries --- between two layouts of the same sentences, both are silent.
 - **Don't:** read a green gate on the reflowed tree as discriminating.
-  Confirm it goes red on the tree you are claiming to have fixed, and drop the citation when it does not.
+  Confirm the gate goes red on the **unreflowed** tree first, and drop the citation when it does not.

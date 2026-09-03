@@ -1415,7 +1415,7 @@ A conductor that has fanned several reviewer subagents out across the machine is
 
 The control that repetition imitates is a **clean copy**: apply the same change to a pristine `cp -a` of the tree, run it N times there, and compare.
 Two details make the comparison readable.
-Tally failures **by name** rather than by count, since `753 passed, 1 failed` twice over says nothing about whether it was the same test both times, and a rotating failure is the signature of load rather than of code.
+Tally failures **by name** rather than by count, since the same total twice over says nothing about whether it was the same test both times, and a rotating failure is the signature of load rather than of code.
 And run the *unchanged* copy the same N times, so a green run has something to be green against.
 
 - **Do:** reproduce a suspected regression in a pristine copy of the tree before attributing it to the change.

@@ -662,27 +662,37 @@ The control that settled it was a pristine `cp -a` copy of the same HEAD with th
 Note which direction the repetition pushed.
 Three identical readings did not merely fail to rule the confounder out --- they raised confidence, because reproducibility is what an attribution normally needs, and the load was as reproducible as the tree.)
 
-## A cited check that could not go red, and a measurement nobody could re-run
+## A citation to a check that answers the same on every tree, and two retractions of it
 
 (Measured on [Morrison-Lab/ai-config#3103](https://github.com/Morrison-Lab/ai-config/pull/3103), 2026-09-03.
-Prose in several fragments was reflowed, and the reflow's correctness was reported as verified by `scripts/vendor/gha-check-new-line-breaks.py` and by markdownlint.
-Neither instrument asks where a break fell inside a sentence, and `MD013` --- the only rule that would notice a column boundary --- is disabled repo-wide in `.markdownlint-cli2.jsonc`, so a green run from the pair says nothing about the property being claimed.
-[`semantic-line-breaks`](../writing/semantic-line-breaks.md) carries the argument and the two measurements that do discriminate.
-This record is about how the citation held up.
+Prose was reflowed across six fragments, and the reflow's correctness was reported as verified by `scripts/vendor/gha-check-new-line-breaks.py` and by markdownlint.
+Classified with the gate's own `classify_line` against the PR's merge base, the unreflowed original, a fill to 80 columns, and the clause-boundary reflow each produce zero flagged lines, so the citation distinguished nothing.
+[`semantic-line-breaks`](../writing/semantic-line-breaks.md) carries the mechanism, the per-state table, and the two measurements that do discriminate.
 
-The second half is the part worth keeping.
-The verification was restated here as a three-state measurement --- the unreflowed original, an 80-column hard wrap, and the clause reflow, all reported clean --- and a later reviewer could not reproduce it.
-Reproduced against the PR's own added prose, a genuine fill to 80 columns merges short sentences onto shared lines and turns the gate **red** in every fragment it touched.
-So the claim that all three states pass was false, and the base first published with it belonged to a different PR.
+What this record adds is what happened to the claim afterwards, over three review rounds.
 
-Three separate mechanisms hid that, and none of them is the original green run.
-The measurement was cited before it was written down, so the number entered the record already carrying the authority of a check that had been run.
-It was then recorded in two files at once, which made the two accounts corroborate each other while resting on one unverified run.
-And the strong form is the memorable one: "all three states pass" is a cleaner sentence than the true, narrower claim about breaks inside a sentence, so each restatement drifted toward it.
+It was first stated too strongly and without provenance: no base, no commits, no command, and a figure whose denominator no definition reproduced.
+A reviewer then reproduced it *by construction* --- rejoining the original's lines into paragraphs and filling those to 80 --- and reported that the wrap turns the gate red in every fragment.
+That is a real property of paragraph prose and not of this PR, which had no such state, so the finding was true about a tree nobody made.
+It was accepted, and the whole claim was retracted.
+The next round re-derived it from the PR's own commits and showed the retraction was the larger error: the original claim had been right.
 
-The transferable rule is the one this file's
-"A checker that returns the same verdict on the broken tree is not evidence the fix worked" section states.
-Add to it: when the evidence is a measurement rather than an exit code, publish the base, the commits, and the command with it, so the first reader who doubts it can re-run it instead of inheriting it.)
+Three things are worth carrying.
+
+A finding can be *correct as measured* and still be about the wrong artifact, which is
+[`verify-the-right-artifact`](../../shared/workflow/verify-the-right-artifact.md)'s substitution arriving from the reviewer's side rather than the author's.
+The author cannot catch it by re-reading, only by re-deriving.
+
+A retraction is an assertion, so it can overshoot in the opposite direction --- and here it did, which is
+[`grep-is-not-coverage`](grep-is-not-coverage.md)'s
+"Second occurrence: a retraction can land the OPPOSITE overclaim, and then do it again" happening to the very diff that was recording that section.
+Accepting a finding is cheap and feels rigorous.
+Deriving before accepting is what was skipped both times.
+
+And the whole exchange was avoidable at the first step.
+Had the original claim shipped with its base, its three commit shas, and the classifier it used, the second round would have re-run it in one command instead of building a substitute for it.
+Publishing provenance is not bookkeeping.
+It is what stops a reviewer having to reconstruct your measurement, and reconstruct it wrong.)
 
 ## A relocated skip that re-parented an elif chain
 

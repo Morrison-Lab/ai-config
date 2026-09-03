@@ -96,11 +96,21 @@ def _load_shell_parser():
     return module.strip_heredocs, module.split_command
 
 
-# A `gh api` call carrying a write method. `-X PUT`, `--method PUT` and the
-# concatenated pflag shorthand `-XPUT` are all accepted by gh, so all three
-# count here; an earlier draft required a separator and missed `-XPUT`.
-RX_GH_API = re.compile(r"\bgh\s+api\b")
+# A `gh api` call that WRITES. `-X PUT`, `--method PUT` and the concatenated
+# pflag shorthand `-XPUT` are all accepted by gh, so all three count; an
+# earlier draft required a separator and missed `-XPUT`.
 RX_WRITE_METHOD = re.compile(r"(?:-X|--method)[=\s]*(?:PUT|PATCH|POST)\b")
+
+# ... but an explicit method is not required at all. `gh api --help`: "The
+# default HTTP request method is GET normally and POST if any parameters were
+# added", and gh's own documented example for this very endpoint is
+# `gh api repos/{owner}/{repo}/rulesets --input file.json` with no -X. So
+# supplying parameters IS a write, and an earlier draft missed the single most
+# idiomatic way to create a ruleset.
+RX_IMPLICIT_POST = re.compile(r"(?:^|\s)(?:--input\b|-[fF]\s|--(?:raw-)?field\b)")
+
+# An explicit read method beats both: `-X GET` with parameters is a query.
+RX_READ_METHOD = re.compile(r"(?:-X|--method)[=\s]*(?:GET|HEAD)\b")
 
 # Endpoints whose payload can carry required status checks. Organization
 # rulesets are included: one bad context there blocks merges across every
@@ -130,19 +140,27 @@ A string no workflow emits never fails loudly -- it sits as `Expected` on \
 every pull request forever and blocks every merge, with nothing red to point \
 at.
 
-Derive each context from the branch that will produce future runs, not from a \
-pull request. `gh pr view --json statusCheckRollup` reads a PR's own head, \
-which can predate a workflow rename, so its check names may be names the \
-default branch no longer emits -- that substitution is the failure this guard \
-exists to catch (shared/workflow/verify-the-right-artifact.md).
+Derive each context from the workflow definitions on the DEFAULT BRANCH -- \
+they are what future pull requests run. `gh pr view --json statusCheckRollup` \
+reads a PR's own head, which can predate a workflow rename, so its check names \
+may be names the default branch no longer emits; that substitution is the \
+failure this guard exists to catch \
+(shared/workflow/verify-the-right-artifact.md).
 
-    gh run list -R <owner>/<repo> --workflow=<file> --branch <default> \\
-        --limit 1 --json databaseId --jq '.[0].databaseId'
-    gh api repos/<owner>/<repo>/actions/runs/<id>/jobs --jq '.jobs[].name'
+A run listing is NOT a sound substitute, for the same reason. A \
+`pull_request`-only workflow has no default-branch run at all, so \
+`gh run list --branch <default>` returns `[]`; and on a mixed-trigger \
+workflow the newest default-branch run may be a `workflow_dispatch` whose job \
+set differs from the `pull_request` one under an event-gated `if:`. Read the \
+definition, and use a run only to confirm what you read:
 
-A reusable-workflow call reports as `<caller job name> / <called job name>`, \
-where the caller's name is its `name:` when set and its job key otherwise. \
-That pair is the string most often retyped as just one of its halves.
+    gh api repos/<owner>/<repo>/contents/.github/workflows \\
+        --jq '.[].name'                       # on the default branch
+
+A job's context is its `name:` when set, and its job key otherwise. A \
+reusable-workflow call (`uses:`) reports as `<caller job> / <called job>` \
+using that same rule for each half -- that pair is the string most often \
+retyped as just one of its halves.
 
 This is a warning, not a refusal -- if the contexts are already derived, \
 proceed."""
@@ -155,6 +173,22 @@ SYSTEM_MESSAGE = (
 
 # Leading `VAR=value` assignments precede the command word in a shell segment.
 RX_ENV_PREFIX = re.compile(r"^(?:\s*[A-Za-z_][A-Za-z0-9_]*=(?:\S*)\s+)*")
+
+# Words that can precede the real command word within one segment.
+# `split_command` emits a loop or conditional keyword as part of the segment,
+# so `for r in a b; do gh api -X PUT ...; done` arrives as `do gh api ...`.
+# Taken from `require-gh-repo-flag.py`'s own KEYWORD_PREFIX, whose parser this
+# file already borrows -- an earlier draft stripped only env/command/sudo and
+# was silent on every loop and conditional, which is the highest-blast-radius
+# shape there is (one ruleset write applied across many repositories).
+SHELL_WRAPPERS = frozenset({
+    "!", "{", "time", "nohup", "sudo", "then", "else", "do", "if", "elif",
+    "while", "until", "env", "command",
+})
+RX_SHELL_WRAPPER_PREFIX = re.compile(
+    r"^\s*(?:(?:!|\{|time|nohup|sudo|then|else|do|if|elif|while|until|env"
+    r"|command)\s+)*"
+)
 
 
 def segment_invokes_gh_api(segment):
@@ -176,13 +210,30 @@ def segment_invokes_gh_api(segment):
     try:
         tokens = shlex.split(segment)
     except ValueError:
-        stripped = RX_ENV_PREFIX.sub("", segment).lstrip()
+        stripped = RX_SHELL_WRAPPER_PREFIX.sub("", segment)
+        stripped = RX_ENV_PREFIX.sub("", stripped).lstrip()
         return bool(re.match(r"gh\s+api\b", stripped))
-    while tokens and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", tokens[0]):
-        tokens.pop(0)
-    if tokens and tokens[0] in ("env", "command", "sudo"):
-        tokens.pop(0)
+    while tokens:
+        if re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", tokens[0]):
+            tokens.pop(0)
+        elif tokens[0] in SHELL_WRAPPERS:
+            tokens.pop(0)
+        else:
+            break
     return len(tokens) >= 2 and tokens[0] == "gh" and tokens[1] == "api"
+
+
+def segment_is_write(segment):
+    """True when this `gh api` segment mutates rather than queries.
+
+    An explicit `-X GET`/`--method GET` wins outright: parameters on a GET are
+    query parameters, not a write.
+    """
+    if RX_READ_METHOD.search(segment):
+        return False
+    if RX_WRITE_METHOD.search(segment):
+        return True
+    return bool(RX_IMPLICIT_POST.search(segment))
 
 
 def command_is_protection_write(command, strip_heredocs, split_command):
@@ -192,11 +243,9 @@ def command_is_protection_write(command, strip_heredocs, split_command):
     a command that merely quotes or documents such a write does not match.
     """
     for segment in split_command(strip_heredocs(command)):
-        if not RX_GH_API.search(segment):
-            continue
         if not segment_invokes_gh_api(segment):
             continue
-        if not RX_WRITE_METHOD.search(segment):
+        if not segment_is_write(segment):
             continue
         if not RX_PROTECTION_ENDPOINT.search(segment):
             continue

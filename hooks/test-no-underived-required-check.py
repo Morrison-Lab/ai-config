@@ -21,11 +21,11 @@ its green line was positive evidence for coverage that did not exist.
 Run:  python3 hooks/test-no-underived-required-check.py \\
           hooks/no-underived-required-check.py
 """
-import importlib.util
 import json
 import os
 import subprocess
 import sys
+import types
 
 HOOK = os.path.abspath(sys.argv[1])
 SOURCE = open(HOOK, encoding="utf-8").read()
@@ -49,7 +49,12 @@ CASES = {
     ),
     "W3": (
         "the concatenated pflag shorthand -XPUT, which gh accepts",
-        "Bash", "gh api -XPUT repos/o/r/rulesets/1 --input rs.json", True,
+        # Body on stdin, no parameter flag: otherwise the implicit-POST
+        # inference would carry this case and the shorthand would go untested.
+        "Bash",
+        "gh api -XPUT repos/o/r/branches/main/protection/"
+        "required_status_checks < body.json",
+        True,
     ),
     "W4": (
         "an ORG ruleset write, blocking merges across every repo in the org",
@@ -72,6 +77,51 @@ CASES = {
         "cd /tmp && gh api -X PUT repos/o/r/rulesets/1 --input rs.json",
         True,
     ),
+    "W8": (
+        "IMPLICIT POST: gh switches to POST when parameters are supplied",
+        "Bash", "gh api repos/o/r/rulesets --input rs.json", True,
+    ),
+    "W9": (
+        "a write inside a for-loop body, applied across many repositories",
+        "Bash",
+        "for r in a b c; do gh api -X PUT repos/o/$r/rulesets/1 "
+        "--input rs.json; done",
+        True,
+    ),
+    "W10": (
+        "a write inside an if-then branch",
+        "Bash",
+        "if [ -f rs.json ]; then gh api -X PUT repos/o/r/rulesets/1 "
+        "--input rs.json; fi",
+        True,
+    ),
+    "W11": (
+        "UNBALANCED QUOTE: shlex fails, the fallback still anchors on gh api",
+        "Bash",
+        "gh api -X PUT repos/o/r/rulesets/1 -f x='unclosed --input rs.json",
+        True,
+    ),
+    "W12": (
+        "a bare `contexts` key with no required_status_checks and no --input",
+        # The URL deliberately stops at /protection. Including
+        # /required_status_checks would put the marker in the path, masking
+        # the `contexts` alternative this case exists to pin.
+        "Bash",
+        "gh api -X PATCH repos/o/r/branches/main/protection "
+        "-f 'contexts[]=lint'",
+        True,
+    ),
+    "W13": (
+        "an explicit method with the body on stdin, so no parameter flags",
+        # This is what pins RX_WRITE_METHOD. Every other write case also
+        # carries a parameter flag, so the implicit-POST inference alone would
+        # cover them -- checking the mutation anchor is what surfaced that.
+        "Bash",
+        "gh api --method PUT "
+        "repos/o/r/branches/main/protection/required_status_checks "
+        "< body.json",
+        True,
+    ),
     "S1": (
         "a READ of the same ruleset endpoint carries no write method",
         "Bash",
@@ -91,6 +141,15 @@ CASES = {
     "S4": (
         "a non-Bash tool is out of scope",
         "Read", RULESET_PUT, False,
+    ),
+    "S5": (
+        "an explicit GET with parameters is a query, not a write",
+        # Carries both a payload marker (in the path) and a parameter flag, so
+        # the read-method clause is the ONLY thing keeping it silent.
+        "Bash",
+        "gh api -X GET repos/o/r/branches/main/protection/"
+        "required_status_checks -f per_page=100",
+        False,
     ),
     "S20": (
         "DOC SHAPE: a heredoc documenting the command",
@@ -121,32 +180,34 @@ CASES = {
     ),
 }
 EXPECTED = {cid: spec[3] for cid, spec in CASES.items()}
-_MODULES = {}
 BASH_TOOLS = ("Bash", "bash", "run_command", "execute_command", "terminal",
               "shell")
 
 
-def _load(hook_path):
-    """Import a guard module from `hook_path` under a unique name.
+def load_module(source, label):
+    """Build a guard module from `source` IN MEMORY, as `test-warn-status-read-after-pipe.py` does.
 
-    In-process rather than by subprocess, deliberately. The mutation harness
-    runs every case against every mutant, and a `python3` cold start costs
-    ~1.4s on macOS -- so the subprocess form spends minutes on interpreter
-    startup alone, which is long enough to look like a hang.
+    `__file__` is set to the real hook path so `_load_shell_parser`, which
+    resolves `require-gh-repo-flag.py` from its own directory, still finds it.
+    An earlier draft wrote mutants to fixed paths inside `hooks/`, which
+    collided between concurrent runs and left strays behind on a kill.
+
+    In-process rather than by subprocess, deliberately: the harness runs every
+    case against every mutant, and a `python3` cold start costs ~1.4s on
+    macOS, so the subprocess form spends minutes on interpreter startup alone
+    -- long enough to look like a hang.
     """
-    spec = importlib.util.spec_from_file_location(
-        f"guard_{abs(hash(hook_path))}", hook_path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    module = types.ModuleType(f"guard_{label}")
+    module.__file__ = HOOK
+    exec(compile(source, HOOK, "exec"), module.__dict__)
     return module
 
 
-def verdict(hook_path, case_id):
-    """Run the guard at `hook_path` against a case; True when it warns."""
+def verdict(module, case_id):
+    """Run a loaded guard module against a case; True when it warns."""
     _, tool_name, command, _ = CASES[case_id]
     if tool_name not in BASH_TOOLS:
         return False  # main() filters these before evaluate() is reached
-    module = _MODULES.setdefault(hook_path, _load(hook_path))
     return module.evaluate(command) is not None
 
 
@@ -171,10 +232,12 @@ def cli_verdict(hook_path, case_id):
     return warned, bool(out.get("systemMessage"))
 
 
+BASELINE = load_module(SOURCE, "baseline")
+
 print("behaviour tests:")
 wrong = 0
 for cid in CASES:
-    got = verdict(HOOK, cid)
+    got = verdict(BASELINE, cid)
     ok = got == EXPECTED[cid]
     wrong += not ok
     print(f"  {'ok  ' if ok else 'WRONG'} {cid:<4} "
@@ -196,11 +259,19 @@ for cid, want_sysmsg in (("W1", True), ("S1", False), ("S4", False)):
 
 # --- mutation harness: revert one clause, see which cases flip ------------
 MUTATIONS = {
-    "write_method": (
-        "a write method is required, so a read is not a settings change",
-        [("        if not RX_WRITE_METHOD.search(segment):\n"
-          "            continue\n", "")],
-        {"S1"},
+    "explicit_write_method": (
+        "an explicit -X/--method PUT|PATCH|POST is a write on its own",
+        [("    if RX_WRITE_METHOD.search(segment):\n        return True\n",
+          "")],
+        {"W3", "W13"},  # both writes whose body is on stdin
+    ),
+    "is_write_gate": (
+        "a segment that neither declares nor implies a write is a read",
+        [("        if not segment_is_write(segment):\n            continue\n",
+          "")],
+        # S5 flips too: with the gate gone, every segment is scanned, so
+        # the explicit GET reaches the payload clause and matches.
+        {"S1", "S5"},
     ),
     "method_shorthand": (
         "`-XPUT` with no separator is a write method too",
@@ -208,11 +279,31 @@ MUTATIONS = {
           r'r"(?:-X|--method)[=\s]+(?:PUT|PATCH|POST)\b"')],
         {"W3"},
     ),
-    "method_post": (
-        "POST creates a ruleset, so it is a write method",
-        [(r'r"(?:-X|--method)[=\s]*(?:PUT|PATCH|POST)\b"',
-          r'r"(?:-X|--method)[=\s]*(?:PUT|PATCH)\b"')],
-        {"W4", "W5"},
+    "implicit_post": (
+        "parameters alone make it a write, since gh defaults to POST",
+        [("    return bool(RX_IMPLICIT_POST.search(segment))",
+          "    return False")],
+        {"W8"},
+    ),
+    "explicit_get_wins": (
+        "an explicit GET beats the implicit-POST inference",
+        [("    if RX_READ_METHOD.search(segment):\n        return False\n",
+          "")],
+        {"S5"},
+    ),
+    "shell_wrappers": (
+        "loop and conditional keywords precede the command word",
+        [('        elif tokens[0] in SHELL_WRAPPERS:\n            tokens.pop(0)\n',
+          '        elif tokens[0] in ("env", "command"):\n            tokens.pop(0)\n')],
+        {"W9", "W10"},
+    ),
+    "shlex_fallback": (
+        "an unbalanced quote falls back to anchoring on the command word",
+        [('        stripped = RX_SHELL_WRAPPER_PREFIX.sub("", segment)\n'
+          '        stripped = RX_ENV_PREFIX.sub("", stripped).lstrip()\n'
+          '        return bool(re.match(r"gh\\s+api\\b", stripped))',
+          "        return False")],
+        {"W11"},
     ),
     "protection_endpoint": (
         "only ruleset / branch-protection endpoints are in scope",
@@ -235,19 +326,20 @@ MUTATIONS = {
         "the bare `required_status_checks` field name counts",
         [(r'r"required_status_checks|\bcontexts\b|--input\b"',
           r'r"\bcontexts\b|--input\b"')],
-        {"W6"},
+        {"W3", "W6", "W13"},  # the three whose marker is the field name
     ),
     "payload_contexts": (
         "a `contexts` key counts even without the field name",
         [(r'r"required_status_checks|\bcontexts\b|--input\b"',
           r'r"required_status_checks|--input\b"')],
-        set(),  # W2 also names required_status_checks; documented as such
+        {"W12"},
     ),
     "payload_input": (
         "`--input` counts, since the document cannot be read from here",
         [(r'r"required_status_checks|\bcontexts\b|--input\b"',
           r'r"required_status_checks|\bcontexts\b"')],
-        {"W1", "W3", "W4", "W5", "W7"},  # every case whose payload is a file
+        # every case whose only payload marker is `--input`
+        {"W1", "W4", "W5", "W7", "W8", "W9", "W10", "W11"},
     ),
     "heredoc_stripping": (
         "heredoc bodies are dropped before the command is scanned",
@@ -262,7 +354,7 @@ MUTATIONS = {
         "the command is split on shell operators before scanning",
         [("    for segment in split_command(strip_heredocs(command)):",
           "    for segment in [strip_heredocs(command)]:")],
-        {"W7"},
+        {"W7", "W9", "W10"},
     ),
     "command_word_check": (
         "`gh api` must be the command word, not text inside an argument",
@@ -278,45 +370,29 @@ mutation_wrong = 0
 # guard borrows `require-gh-repo-flag.py` from its own directory via
 # `os.path.dirname(__file__)`, so a mutant anywhere else -- including a
 # subdirectory -- cannot resolve it and dies on import.
-HOOKS_DIR = os.path.dirname(HOOK)
-_mutant_paths = []
-try:
-    for clause, (statement, edits, expected_flips) in MUTATIONS.items():
-        mutated = SOURCE
-        for find, replace in edits:
-            if mutated.count(find) != 1:
-                sys.exit(f"FATAL: clause {clause}'s anchor is not present "
-                         f"exactly once in {HOOK} (found "
-                         f"{mutated.count(find)}). The mutation harness is "
-                         "measuring nothing; re-derive the anchor.\n---\n"
-                         f"{find}\n---")
-            mutated = mutated.replace(find, replace)
+for clause, (statement, edits, expected_flips) in MUTATIONS.items():
+    mutated = SOURCE
+    for find, replace in edits:
+        if mutated.count(find) != 1:
+            sys.exit(f"FATAL: clause {clause}'s anchor is not present exactly "
+                     f"once in {HOOK} (found {mutated.count(find)}). The "
+                     "mutation harness is measuring nothing; re-derive the "
+                     f"anchor.\n---\n{find}\n---")
+        mutated = mutated.replace(find, replace)
 
-        path = os.path.join(HOOKS_DIR, f".mutant-{clause}.py")
-        _mutant_paths.append(path)
-        with open(path, "w", encoding="utf-8") as handle:
-            handle.write(mutated)
-
-        flipped = {cid for cid in CASES if verdict(path, cid) != EXPECTED[cid]}
-        ok = flipped == expected_flips
-        mutation_wrong += not ok
-        if not flipped and expected_flips:
-            note = "NOTHING FLIPPED -- this clause is untested"
-        elif ok:
-            note = ("flipped " + ", ".join(sorted(flipped))
-                    if flipped else "flipped nothing, as declared")
-        else:
-            note = (f"flipped {sorted(flipped)}, expected "
-                    f"{sorted(expected_flips)}")
-        print(f"  {'ok  ' if ok else 'WRONG'} {clause:<22} {statement}\n"
-              f"         {note}")
-
-finally:
-    for path in _mutant_paths:
-        try:
-            os.unlink(path)
-        except OSError:
-            pass
+    mutant = load_module(mutated, clause)
+    flipped = {cid for cid in CASES if verdict(mutant, cid) != EXPECTED[cid]}
+    ok = flipped == expected_flips
+    mutation_wrong += not ok
+    if not flipped and expected_flips:
+        note = "NOTHING FLIPPED -- this clause is untested"
+    elif ok:
+        note = ("flipped " + ", ".join(sorted(flipped))
+                if flipped else "flipped nothing, as declared")
+    else:
+        note = f"flipped {sorted(flipped)}, expected {sorted(expected_flips)}"
+    print(f"  {'ok  ' if ok else 'WRONG'} {clause:<22} {statement}\n"
+          f"         {note}")
 
 print(f"\n{len(MUTATIONS) - mutation_wrong}/{len(MUTATIONS)} clauses behaved "
       "as declared under reversion")

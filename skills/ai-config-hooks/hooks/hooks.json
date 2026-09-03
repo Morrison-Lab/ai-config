@@ -913,6 +913,13 @@
             "timeout": 10,
             "script": "require-stopping-point.py",
             "why": "A stopping-point declaration is an explicit standing preference, not a best-effort recap; blocks an otherwise final reply that omits it."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/flag-config-deletion-without-ref-check.py\"'",
+            "timeout": 10,
+            "script": "flag-config-deletion-without-ref-check.py",
+            "why": "ai-config#3096 -- a reply recommended `find \"$HOME/.claude/hooks\" -name '*.py' -delete` over what was the LIVE guard set (settings.json registered 46 of those files by explicit path). A content diff had been run, so the removal felt sanctioned; the question never asked was what POINTS AT the files. Warns rather than blocks: the condition cannot tell an orphan from a registered file without reading the config, and the point is to prompt that read."
           }
         ]
       }

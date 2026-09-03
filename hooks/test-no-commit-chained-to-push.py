@@ -489,6 +489,46 @@ check("whitespace only", fires("   \n  "), False)
 check("unrelated command", fires("git status --short"), False)
 check("bare git", fires("git; git push"), False)
 
+# ----------------------------------------------------------------- registry
+
+# `tool-mappings.yml` is the registry `CLAUDE.md` calls the single source of
+# truth for the CLI-to-MCP mapping, and it is the one place a model is most
+# likely to copy a command from verbatim -- especially a remote session, which
+# has no `gh` at all and cannot fall back to a skill's own examples. Its
+# `WRITE_FILE` entry prescribed a chained commit-and-push this guard refuses
+# (ai-config#3002), and the sweep that shipped the guard could not reach it:
+# that sweep read fenced code blocks, while this value is a YAML scalar and a
+# generated table cell.
+#
+# So sweep the registry itself, and report how many command fields were
+# examined alongside how many were refused -- a zero with no denominator is
+# indistinguishable from a sweep that never ran.
+import yaml  # noqa: E402  (a hard dependency of this repo's checkers)
+
+REGISTRY = os.path.join(os.path.dirname(HERE), "tool-mappings.yml")
+registry = yaml.safe_load(open(REGISTRY, encoding="utf-8").read())
+operations = registry.get("operations") or []
+check("the registry has operations to sweep", bool(operations), True)
+
+examined = 0
+for op in operations:
+    command = op.get("cli")
+    if not isinstance(command, str):
+        continue
+    examined += 1
+    check(f"registry {op.get('id', '<unknown>')}.cli is not a chained "
+          "commit-and-push", fires(command), False)
+print(f"  swept {examined} tool-mappings.yml cli values")
+
+# The entry the issue named, pinned by id rather than by the sweep above, so a
+# registry that lost the operation entirely cannot pass by having nothing left
+# to examine.
+write_file = [op for op in operations if op.get("id") == "WRITE_FILE"]
+check("WRITE_FILE is still in the registry", len(write_file), 1)
+if write_file:
+    check("WRITE_FILE.cli is allowed by this guard",
+          fires(write_file[0].get("cli", "")), False)
+
 # --------------------------------------------------------------- end-to-end
 
 out = run_hook("git add -A && git commit -m x && git push -u origin b")

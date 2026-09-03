@@ -80,8 +80,8 @@ This is the CI-repair case of two rules already written down, and it belongs bes
 [`preferences.md`](preferences.md)'s "Keep PRs focused on a single concern" bullet, which already names CI and workflow infrastructure as the thing not to mix into a feature PR, and
 [`shared/workflow/issue-first.md`](../shared/workflow/issue-first.md)'s opening rule that new work gets a tracking issue before a branch or a PR, which is what makes the repair its own issue and PR rather than a hunk reverted and forgotten.
 (That fragment's later "Deferring a request out of the current change" section covers requests from the user and does not reach a defect you found yourself.)
-It applies to a PR of your own as much as to one you are reviewing;
-it lives in this file because the incident below surfaced while driving a review round, and this file is where review-round lessons land.
+This CI-repair rule applies to a PR of your own as much as to one you are reviewing;
+it lives in this file because the rampp incident that produced it surfaced while driving a review round, and this file is where review-round lessons land.
 
 [ucdavis/rampp#155](https://github.com/ucdavis/rampp/pull/155) (a private repository, so the links resolve only for lab members), 2026-09-02:
 the Claude review job failed during its OIDC app-token exchange because the workflow granted `contents: read`.

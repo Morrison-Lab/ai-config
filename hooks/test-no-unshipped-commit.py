@@ -662,6 +662,65 @@ try:
             shutil.rmtree(_p, ignore_errors=True)
         for _p in (wt2_transcript, wt_clean_transcript, sw_transcript, sw_dropped_transcript, unrelated_pushed_transcript):
             os.unlink(_p)
+
+    # --- ai-config#2422: another tool's dormant worktree is not this
+    # session's debt. A leftover Antigravity/Cursor worktree whose PR has
+    # already squash-merged still holds local commits no remote carries, and
+    # a session cannot always safely delete it. Visiting one to read its
+    # state used to make it relevant, so every Stop blocked on a debt this
+    # session never incurred --- three consecutive firings in the measured
+    # 2026-09-02 case. Relevance is now scoped to the calls that COMMITTED.
+    dormant_root, dormant_bare, dormant_run = gitrepo(
+        BASE,
+        "git remote add origin BARE",
+        "git push -q -u origin main",
+    )
+    # A dormant branch whose remote still exists: an ordinary ahead-by-one.
+    dormant_wt = tempfile.mkdtemp()
+    dormant_run(f"git worktree add -q -b agy-dormant {dormant_wt} main")
+    dormant_run("git push -q -u origin agy-dormant", cwd=dormant_wt)
+    dormant_run("git commit --allow-empty -m dormant-leftover", cwd=dormant_wt)
+    # A dormant branch whose PR squash-merged and whose remote branch was
+    # then deleted: `@{u}` no longer resolves, so the count is undefined and
+    # the old code blocked via the pending-plus-undefined path instead.
+    gone_wt = tempfile.mkdtemp()
+    dormant_run(f"git worktree add -q -b agy-gone {gone_wt} main")
+    dormant_run("git push -q -u origin agy-gone", cwd=gone_wt)
+    dormant_run("git push -q origin --delete agy-gone", cwd=gone_wt)
+    dormant_run("git commit --allow-empty -m gone-leftover", cwd=gone_wt)
+    dormant_run("git fetch -q --prune origin", cwd=gone_wt)
+
+    visit_only = transcript([
+        f"cd {dormant_wt} && git status",
+        f"git -C {gone_wt} log -1 --oneline",
+        "git commit -m hook",
+        "git push origin main",
+    ])
+    visit_then_pending = transcript([
+        f"cd {gone_wt} && git log -1 --oneline",
+        "git commit -m hook",
+    ])
+    commit_in_dormant = transcript([
+        f"cd {dormant_wt} && git status",
+        f"git -C {dormant_wt} commit -m hook",
+    ])
+    try:
+        # Reading a dormant foreign worktree is not committing in it.
+        assert subject.decide(dormant_root, visit_only) == "", "a dormant foreign worktree the session only visited must not block (ai-config#2422)"
+        # The same holds when the transcript still carries a pending commit
+        # and the visited worktree's upstream is gone, which is the shape the
+        # undefined-count branch of decide() reports on.
+        assert subject.decide(dormant_root, visit_then_pending) == "", "a visited squash-merged worktree must not block via the undefined-count path (ai-config#2422)"
+        # Negative control: committing in that same worktree still blocks, so
+        # the scoping narrowed the check rather than disabling it.
+        _d_reason = subject.decide(dormant_root, commit_in_dormant)
+        assert "agy-dormant" in _d_reason, _d_reason
+        assert _d_reason.startswith("1 commit(s) on worktree"), _d_reason
+    finally:
+        for _p in (dormant_root, dormant_bare, dormant_wt, gone_wt):
+            shutil.rmtree(_p, ignore_errors=True)
+        for _p in (visit_only, visit_then_pending, commit_in_dormant):
+            os.unlink(_p)
 finally:
     for _root in (dropped_root, unpushed_root, pushed_root, no_upstream_root,
                   plain_push_root, scoped_root, behind_root, other,
@@ -678,3 +737,4 @@ print("PASS: no-upstream falls back to the transcript, and staleness is not unsh
 print("PASS: without a cwd the verdict falls back to the transcript scan")
 print("PASS: main() blocks on the payload cwd's state once, then the sentinel holds")
 print("PASS: multi-worktree cross-checkout and branch-switch unpushed commits block accurately (ai-config#2737)")
+print("PASS: another tool's dormant worktree blocks only when this session committed in it (ai-config#2422)")

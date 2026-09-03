@@ -219,16 +219,39 @@ def unwrap_command(cmd):
     return cmd
 
 def scan_transcript(path):
-    """Return (saw_commit, pending, touched_branches, touched_paths) from the transcript scan.
+    """Return (saw_commit, pending, commit_branches, commit_paths).
 
     `saw_commit` is whether a real `git commit` ran at all --- the gate that
     decides whether repository state is worth consulting, so a session that
     never committed is not blocked for commits it did not make. `pending` is
     the last committed-but-never-discharged command, by the same scan.
-    `touched_branches` is the set of branch names touched via checkout/switch.
-    `touched_paths` is the set of working directories / worktree paths touched.
+
+    `commit_branches` and `commit_paths` are scoped to the tool calls that
+    actually COMMITTED, not to every branch and directory the session
+    happened to visit (ai-config#2422). Visiting is not committing: a
+    session that runs `cd /other-tool-worktree && git status` to inspect a
+    dormant Antigravity or Cursor worktree used to make that worktree
+    relevant, so a leftover branch there --- typically one whose PR already
+    squash-merged, leaving local commits no remote carries --- blocked every
+    Stop for a debt the session never incurred and often could not safely
+    discharge. The payload `cwd` stays relevant on its own, so the ordinary
+    single-checkout case is unaffected.
+
+    `commit_paths` collects the directories a commit-bearing call named ---
+    its `git -C` targets, its own `cd` targets, and the harness-recorded
+    working directory of that call. `commit_branches` carries the branch the
+    repo was on when the commit ran: the branch names in the commit's own
+    call when it has any, and otherwise those of the most recent
+    checkout/switch/worktree-add call before it. Attribution is per commit
+    rather than per session, so a later checkout away --- the switched-branch
+    case ai-config#2737 added --- still reports the branch that holds the
+    commit, while a checkout that no commit followed reports nothing.
     """
-    saw, pending, touched_branches, touched_paths = False, None, set(), set()
+    saw, pending, commit_branches, commit_paths = False, None, set(), set()
+    # The branches of the last checkout-ish call, awaiting a commit to claim
+    # them. A later checkout supersedes it, so inspecting a dormant branch
+    # and then switching back leaves the dormant one unattributed.
+    recent_branches = set()
     try:
         with open(path, encoding="utf-8", errors="ignore") as stream:
             for line in stream:
@@ -260,23 +283,28 @@ def scan_transcript(path):
                 for name, inp in tool_calls:
                     if name not in {"Bash", "bash", "run_command", "terminal", "execute_command", "shell"}:
                         continue
+                    call_dirs = set()
                     for k in ("cwd", "workdir", "Cwd", "WorkingDirectory", "path"):
                         val = inp.get(k)
                         if isinstance(val, str) and val:
-                            touched_paths.add(val)
+                            call_dirs.add(val)
                     command = str(inp.get("command") or inp.get("cmd") or inp.get("CommandLine") or inp.get("script") or "")
                     command = unwrap_command(command)
                     scanned = strip_quoted(command)
-                    touched_branches |= extract_touched_branches(scanned)
-                    touched_paths |= extract_touched_paths(scanned)
+                    call_branches = extract_touched_branches(scanned)
+                    call_dirs |= extract_touched_paths(scanned)
                     if COMMIT.search(scanned):
                         saw = True
                         pending = command
+                        commit_paths |= call_dirs
+                        commit_branches |= call_branches or recent_branches
+                    elif call_branches:
+                        recent_branches = call_branches
                     if pending and (PUSH.search(scanned) or CREATE.search(scanned)):
                         pending = None
     except Exception:
-        return saw, pending, touched_branches, touched_paths
-    return saw, pending, touched_branches, touched_paths
+        return saw, pending, commit_branches, commit_paths
+    return saw, pending, commit_branches, commit_paths
 
 
 def pending_commit(path):
@@ -418,14 +446,17 @@ def decide(cwd, path):
     The transcript scan gates whether to look; `git rev-list --count
     @{u}..HEAD` across checkouts and branches answers (ai-config#2727,
     ai-config#2737). Inspects all linked worktrees of the repo
-    via `git worktree list --porcelain` and unpushed local branches touched
-    in this session to detect unshipped session commits left across checkouts
-    or on switched branches.
+    via `git worktree list --porcelain` and unpushed local branches this
+    session COMMITTED on, to detect unshipped session commits left across
+    checkouts or on switched branches. Relevance is the payload `cwd` plus
+    the commit-scoped sets `scan_transcript` derives, so another tool's
+    dormant worktree the session merely visited is not this session's debt
+    (ai-config#2422).
     Without a `cwd` in the hook payload, repository state is unknowable,
     so the verdict falls back to the transcript scan --- the old behaviour,
     fail-safe rather than blind.
     """
-    saw_commit, pending, touched_branches, touched_paths = scan_transcript(path)
+    saw_commit, pending, commit_branches, commit_paths = scan_transcript(path)
     if not saw_commit:
         return ""
     if not cwd:
@@ -452,12 +483,12 @@ def decide(cwd, path):
     undefined_wts = []
     checked_out_branches = set()
     cwd_real = os.path.realpath(cwd) if os.path.exists(cwd) else cwd
-    touched_paths_real = set()
-    for p in touched_paths:
+    commit_paths_real = set()
+    for p in commit_paths:
         try:
-            touched_paths_real.add(os.path.realpath(p))
+            commit_paths_real.add(os.path.realpath(p))
         except Exception:
-            touched_paths_real.add(p)
+            commit_paths_real.add(p)
 
     for wt in worktrees:
         if wt.get("bare"):
@@ -466,26 +497,27 @@ def decide(cwd, path):
         wt_path_real = os.path.realpath(wt_path) if os.path.exists(wt_path) else wt_path
         wt_branch = wt.get("branch")
 
-        # Only check checkouts active in this session (cwd, touched paths, or touched branches)
-        # cwd or touched paths may be nested subdirectories inside the worktree root
+        # Only check checkouts this session committed in (cwd, commit paths,
+        # or commit branches). cwd or a commit path may be a nested
+        # subdirectory inside the worktree root.
         is_cwd_in_wt = False
         try:
             is_cwd_in_wt = (os.path.commonpath([cwd_real, wt_path_real]) == wt_path_real)
         except (ValueError, Exception):
             is_cwd_in_wt = (cwd_real == wt_path_real)
 
-        is_touched_in_wt = False
-        for p in touched_paths_real:
+        is_commit_in_wt = False
+        for p in commit_paths_real:
             try:
                 if os.path.commonpath([p, wt_path_real]) == wt_path_real:
-                    is_touched_in_wt = True
+                    is_commit_in_wt = True
                     break
             except (ValueError, Exception):
                 if p == wt_path_real:
-                    is_touched_in_wt = True
+                    is_commit_in_wt = True
                     break
 
-        is_relevant = is_cwd_in_wt or is_touched_in_wt or (wt_branch and wt_branch in touched_branches)
+        is_relevant = is_cwd_in_wt or is_commit_in_wt or (wt_branch and wt_branch in commit_branches)
         if not is_relevant:
             continue
 
@@ -497,11 +529,12 @@ def decide(cwd, path):
         elif count is None:
             undefined_wts.append(wt)
 
-    # Check switched-away branches (local branches touched in this session not checked out in any worktree)
+    # Check switched-away branches (local branches this session committed on,
+    # not checked out in any worktree)
     unpushed_branches = []
-    if touched_branches:
+    if commit_branches:
         for branch, upstream, _ in list_local_branches(cwd):
-            if branch not in touched_branches:
+            if branch not in commit_branches:
                 continue
             if branch in checked_out_branches:
                 continue

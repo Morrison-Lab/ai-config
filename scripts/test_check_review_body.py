@@ -314,6 +314,16 @@ check("the same section without the bullets is clean",
                 "The last substantive round fixed two items, both verified.\n"
               + _R2_TAIL),
       "CLEAN")
+# The compression trap: "prose is fine" is false. A paragraph OPENING with a
+# bold span is item-shaped to `_SECTION_FINDING_ITEM`, and `**Verified:**` is
+# a lead-in this corpus writes constantly.
+check("a resolving line followed by bold-lead prose is NOT clean",
+      verdict(_R2_HEAD
+              + "None. Zero findings at this head.\n\n"
+                "**Verified:** the fix holds across every input class.\n"
+              + _R2_TAIL),
+      "NOT-CLEAN")
+
 check("and a section that does not open by resolving is NOT clean",
       verdict(_R2_HEAD
               + "The last substantive round fixed two items.\n\n"

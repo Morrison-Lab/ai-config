@@ -38,15 +38,19 @@ fixed, and those bullets re-flagged it.
 
 So the heading was the cause, and the rule is narrower than the first version
 said and wider than the second: a `## Findings` section is safe when it opens
-by resolving and carries no items afterwards. Prose is fine. Bullets are not.
+by resolving and carries nothing item-SHAPED afterwards.
 
-That is the actual lesson twice over. Guessing at the rule produced a wrong
-answer, and guessing at the retraction produced the opposite wrong answer --
-while the classifier was two imports away throughout.
+Resist compressing that into "prose is fine, bullets are not" -- an earlier
+revision did, and it is false. `_SECTION_FINDING_ITEM` vetoes a bullet, and
+also any line OPENING with a bold span or a blockquote, and the bare severity
+tags. So a paragraph beginning `**Verified:** ...` -- a lead-in this corpus
+uses constantly -- re-flags a section that is otherwise clean. Read the
+pattern rather than a summary of it, or ask this tool.
 
-That is the actual lesson, and it is `deterministic-tools.md`'s: the classifier
-was two imports away throughout, and three comments were spent guessing at
-rules it would have answered for free.
+That is the lesson, and it is `deterministic-tools.md`'s: the classifier was
+two imports away throughout, and three comments were spent guessing at rules
+it would have answered for free -- then two more revisions of this paragraph
+were spent guessing at why the guesses were wrong.
 
 WHAT IT REPORTS
 ---------------

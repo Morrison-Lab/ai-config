@@ -901,7 +901,8 @@ second site is now known to exist, and the mutation matrix records
 scores rather than structure, so the finding has nowhere to live
 unless it is written down.
 
-- **Do:** name each enforcing site in a comment at the others.
+- **Do:** name every enforcing site in a comment at each of the
+  others.
 - **Don't:** let "the other site still holds" stand as the whole
   record --- it explains the survivor and loses the structural fact
   that produced it.

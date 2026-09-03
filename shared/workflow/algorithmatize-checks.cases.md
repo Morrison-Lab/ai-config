@@ -587,11 +587,16 @@ Measured, it turns red with exit 1: the fixture writes the callee under that
 same name, so a loosened regex resolves it and reports a real collision.
 The case discriminates either way; only the stated mechanism was wrong.
 
-Two things made it durable rather than a slip.
-It was written from the shape of the code rather than from a run, and the
-audited script `audit_example_concurrency.py` does exit 2 for a different
-condition, so re-reading the code confirms
+What made it durable rather than a slip is that re-reading the code confirms
 the number without confirming the claim.
+`audit_example_concurrency.py` does exit 2 on a missing callee, exactly as the
+comment said --- so the exit code checks out and the comment is still wrong,
+because the fixture writes the callee under that same name and never reaches
+that branch.
+Only running the mutant separates the two, and the comment was written from the
+shape of the code rather than from a run.
 It was introduced by round one's own fix, `21751be5`, survived rounds two
 through five, and was caught by the sixth --- established by walking that file
-through each commit rather than from recollection.)
+through each commit.
+A rationale comment is the artifact a later reader trusts in place of re-running
+the sweep, which is why five reviews read past it.)

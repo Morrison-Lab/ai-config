@@ -928,8 +928,7 @@ section carries the mechanism.)
 ## Prose staled by its own fixes, round after round
 
 (`Morrison-Lab/gha#811`, 2026-09-02.
-Six adversarial pre-push review rounds returned 11, 11, 11, 6, 3 and 2
-findings.
+Six adversarial pre-push review rounds ran on it.
 The final commit `0262c1c6` names the recurring class as "the class this branch
 has spent five rounds on -- a comment describing code inaccurately".
 That is wider than this record's subject, which is the part of it staled by the

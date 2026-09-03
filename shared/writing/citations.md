@@ -43,12 +43,14 @@ were never fetched at all rather than remembered from an earlier fetch.**
 Two `github/community` discussions were cited for a GitHub Actions deadlock
 message, and neither carries it: #30708 reports
 `Canceling since a higher priority waiting request ... exists`, whose cause is
-a `github.workflow` naming collision, and #43510 is about the default two-run
-concurrency limit.
+a `github.workflow` naming collision, and #43510 is a thread about reusable
+workflows being skipped, in which the default two-run limit is offered as one
+explanation and contested by a later poster.
 [rhysd/actionlint#538](https://github.com/rhysd/actionlint/issues/538) does
-carry it, verbatim:
-`Canceling since a deadlock for concurrency group 'ci-939eda80...' was detected
-between 'top level workflow' and 'build-image'`.
+carry it, as
+`Canceling since a deadlock for concurrency group '<sha>' was detected between
+'top level workflow' and 'build-image'` --- the group hash elided here, verbatim
+on the page.
 The rule above already prescribes the remedy.
 
 What is new is the **tell**, because this section states its cause as staleness

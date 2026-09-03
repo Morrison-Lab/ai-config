@@ -809,8 +809,9 @@ counted from the branch's own commit messages, `21751be5` through `0262c1c6`,
 rather than from recollection, which had dropped a round of eleven and read the
 last round's two prose items as zero.
 Two instances, both in fixes for **convention** findings: an over-long-line fix
-put its break on a dangling `and`, in five files, because the fix was applied
-uniformly; and a forward-reference fix reworded the pointer into two new
+put its break on a dangling `and` in each of five files, the uniformity
+suggesting a single edit applied across them --- an inference, not something the
+commits record; and a forward-reference fix reworded the pointer into two new
 forward references.
 
 Only the forward-reference instance is a member of this section's class, since
@@ -831,11 +832,12 @@ reading that let this session pass over it.
 
 Two neighbouring rules look as though they would have caught these and do not,
 which is worth stating so nobody else goes looking there:
-[`semantic-line-breaks`](../writing/semantic-line-breaks.md)'s re-run rule is a
-commit-first staleness rule about which tree the gate reads, and that gate
-enforces multi-sentence lines and long lines carrying a mid-line semicolon ---
-a break placed on a dangling conjunction trips neither predicate, which its own
-text says needs a syntactic parser it deliberately lacks;
+[`semantic-line-breaks`](../writing/semantic-line-breaks.md) tells you to
+re-run its gate after committing, but that gate enforces two predicates only,
+multi-sentence lines and long lines carrying a mid-line semicolon.
+A break placed on a dangling conjunction trips neither, and that fragment says
+plainly why: detecting a clause boundary needs a syntactic parser the tooling
+deliberately does not have;
 and [`ardi`](ardi.md)'s added-line scan is scoped to banned punctuation and
 multi-sentence lines.
 So this occurrence adds no new rule, only a carve-out to the chain's conclusion

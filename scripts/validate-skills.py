@@ -282,6 +282,7 @@ NON_OPERATION_TOKENS = {
     "CLAUDE_PROJECT_DIR",  # env var, one of the roots the .mwc marker is resolved from
     "CLAUDE_SESSION_ID",  # env var, the harness's own session id; AI_SESSION_ID's fallback
     "ENTITY_NUMBER",
+    "MORATORIUM_END",  # hooks/no-unreviewed-pr.py constant, not an operation token
     "EPI202_TOKEN",
     "ERR_TUNNEL_CONNECTION_FAILED",
     "GEMINI_API_KEY",

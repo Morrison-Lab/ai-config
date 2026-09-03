@@ -181,6 +181,49 @@ The shipped fix is positional, `grep '^+' | tail -n +2`, and `d426bf83` added
 its per-file precondition after the dogfooding scan violated it and returned
 three hits that read as defects in the files rather than in the scan.)
 
+(Two further instances, one session, `Morrison-Lab/ai-config`, 2026-09-02:
+a formatter breaking a verified command, and a provenance command never
+verified at all.
+
+Instance 1, [#3007](https://github.com/Morrison-Lab/ai-config/pull/3007),
+`memories/gh-cli.md`.
+A `gh api ... --paginate` command was written with a shell line continuation
+and verified by running it in a shell, where it worked.
+`scripts/semantic-line-breaks.py --write` then joined the continuation onto
+one physical line as part of the same commit, turning `\` + newline into
+`\` + space, so the shipped text would have passed the shell an argument
+named `" --jq"` rather than the option.
+Caught by Copilot's second review round on `afc8eb4d6` and fixed by
+`c8ca3dd65` (merged as `54f39a17e`), which moved the command into a fenced
+code block, a region the reflow leaves alone.
+
+Instance 2, [#3044](https://github.com/Morrison-Lab/ai-config/pull/3044),
+`shared/writing/semantic-line-breaks.md`.
+A provenance note cited
+`gh api repos/Morrison-Lab/ai-config/pulls/{3007,3016,3036}/comments` as the
+source of a set of review findings.
+Shell brace expansion turns that into three positional arguments, and `gh
+api` accepts exactly one endpoint --- `cobra.ExactArgs(1)`, confirmed by
+running it, which reports `accepts 1 arg(s), received 3` --- so the command
+as written could not have produced the cited findings, and had never been
+run at all.
+Caught by Copilot, whose review body names it directly --- "a `gh api`
+command that is not runnable as written (brace expansion into multiple
+endpoints ...)" --- and fixed by `e0ba7b63c` (merged as `9aeeb5fc7`), which
+replaced it with a loop over the three endpoints.
+The `@claude` bot's own round on that PR was about a different defect
+entirely, and its later round verified the already-pushed fix rather than
+finding it;
+attributing the catch to whoever pushed the fix is the error this very entry
+warns against, committed inside it and caught in review.
+
+Both commands sat in provenance position, "here is how this finding was
+obtained," which is where a non-runnable command is most misleading: it
+claims to be a record of work already done.
+Instance 1 shows a genuinely-tested command is not safe once a formatter runs
+on the file after the test; instance 2 shows a command never tested at all
+can still read as settled fact.)
+
 ## A reference frame chosen from the initial condition expires as the system moves
 
 (`Lacaedemon/sparta#1222`, merged 2026-08-07 as `320fe3b2`: an instrument
@@ -574,3 +617,28 @@ used repo-root-relative paths from inside `memories/`.
 `git diff --name-only origin/main...HEAD | grep -c memories/` returned 0, so the
 PR was unaffected --- but that was established afterwards, by query, and the
 original "links OK" claim had no such basis.
+
+## A mutation rationale that named the wrong exit code
+
+(`Morrison-Lab/gha#811`, fixed in commit `0262c1c6`, 2026-09-02, in
+`.github/workflows/scripts/tests/run-audit-example-concurrency-tests.py`.
+
+The `another owner's uses:` case carried a rationale saying that loosening
+`USES_RE` turns the case red "because the callee file would then be looked up
+and found missing" --- an exit 2.
+Measured, it turns red with exit 1: the fixture writes the callee under that
+same name, so a loosened regex resolves it and reports a real collision.
+The case discriminates either way; only the stated mechanism was wrong.
+
+What made it durable rather than a slip is that re-reading the code confirms
+the number without confirming the claim.
+`audit_example_concurrency.py` does exit 2 on a missing callee, exactly as the
+comment said --- so the exit code checks out and the comment is still wrong,
+because that branch is never reached.
+Only running the mutant separates the two, and the comment was written from the
+shape of the code rather than from a run.
+It was introduced by round one's own fix, `21751be5`, survived rounds two
+through five, and was caught by the sixth --- established by walking that file
+through each commit.
+A rationale comment is the artifact a later reader trusts in place of re-running
+the sweep, which is why four reviews read past it.)

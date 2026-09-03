@@ -621,12 +621,15 @@
   A completed run on an unchanged head is no veto: after a Rebut/Defer-only round with no push, `skills/ardi/SKILL.md` requires a fresh request, and this endpoint is how to make it.
   A ready-for-review head with no such run about a minute after the push is the other case, measured per push in [`memories/copilot-reviews.md`](copilot-reviews.md).
 
-  **As of 2026-08-04, Copilot is quota-exhausted across Morrison-Lab and unavailable until September 2026, so do not request it at all until then.**
+  **As of 2026-08-04, Copilot is quota-exhausted across Morrison-Lab, so do not request it at all while the moratorium stands.**
+  Its live expiry is `MORATORIUM_END` in `hooks/no-unreviewed-pr.py`, extended to December 2026 on 2026-09-02.
   The user stated this directly on 2026-08-04, in the words "copilot is unavailable until september" and "stop trying to get copilot reviews".
   Until then, skip both the `requested_reviewers` POST for `copilot-pull-request-reviewer[bot]` and the `request_copilot_review` MCP tool: either only produces a `COMMENTED` review whose whole body is *"Copilot was unable to review this pull request because the user who requested the review has reached their quota limit."*, which wastes a round and is not a verdict.
   This is a time-bounded override of two standing instructions that otherwise say to request Copilot every round: `shared/workflow/pr-on-claim.md`'s "Request the external reviewer in the same stride" and `shared/workflow/review-verdict-pitfalls.md`'s fifth case ("Keep re-requesting each round anyway").
-  Until September 2026, rely on `claude-review` plus self-review, which is exactly the no-reachable-external-reviewer fallback that fifth case already describes.
-  **Measured 2026-09-01:** Copilot code reviews resumed across Morrison-Lab in September 2026
+  Until `MORATORIUM_END`, rely on `claude-review` plus self-review, which is exactly the no-reachable-external-reviewer fallback that fifth case already describes.
+  **Measured 2026-09-01, then superseded the next day.**
+  Read the two as a sequence rather than a contradiction.
+  The quota did return, and Copilot code reviews resumed across Morrison-Lab in September 2026
   with login `copilot-pull-request-reviewer` and formal verdict headers
   (`### 🟢 Approval recommended` for clean signoff, `### 🟡 Changes recommended` for changes requested).
   Review verification tools and mistake patterns (Pattern 40) require recognizing `copilot-pull-request-reviewer`
@@ -682,7 +685,7 @@
   (Reproduced on Morrison-Lab/ai-config#1128, 2026-08-04.)
 
   **Superseded 2026-08-19 (ai-config#1709): the script now honors this override itself, and nothing needs unregistering.**
-  `hooks/no-unreviewed-pr.py` carries `MORATORIUM_END = 2026-09-01`, matching the September 2026 expiry above, and returns before scanning while that date is still ahead --- so the collision is gone on every installation shape and the guard re-arms itself on the day the override names, with nobody having to remember.
+  `hooks/no-unreviewed-pr.py` carries `MORATORIUM_END`, matching the expiry recorded above, and returns before scanning while that date is still ahead --- so the collision is gone on every installation shape and the guard re-arms itself on the day the override names, with nobody having to remember.
   Keep the two in step: extending the moratorium here means editing that constant in the same PR, or the memory and the hook start disagreeing again.
 
   The remedy this paragraph used to give --- unregister it from `~/.claude/settings.json`'s `Stop` hooks --- covered only ONE installation shape, and it is worth recording why rather than just deleting it.
@@ -698,7 +701,33 @@
   **Restated and widened 2026-08-19: the moratorium covers ALL REPOS, not just Morrison-Lab.**
   The user said "stop requesting copilot reviews until september", then, asked about scope, "ALL REPOS".
   So the paragraph above should be read with `ucdavis/bcs` and every other repo inside it, not only the Morrison-Lab org the 2026-08-04 measurement happened to cover.
-  The expiry is unchanged and deliberate: **September 2026**, after which re-verify the quota and re-enable the per-round request rather than letting the moratorium become permanent by default (`shared/writing/timestamp-volatile-claims.md`).
+  The expiry is deliberate rather than incidental: re-verify the quota at the end date and re-enable the per-round request, rather than letting the moratorium become permanent by default (`shared/writing/timestamp-volatile-claims.md`).
+
+  **Extended 2026-09-02 to December 2026, on the directive "stop using copilot reviews".**
+  The September expiry arrived and did exactly what it was designed to do: the guard re-armed on 2026-09-01, resumed demanding a Copilot request, and a session complied before the user stopped it.
+  Derived rather than recalled, by counting `review_requested` events for Copilot across that session's PRs: six PRs received requests (`#3004`, `#3007`, `#3016`, `#3036`, `#3044`, `#3076`), nine request events in total, and only the PR carrying this extension received none.
+  That is the mechanism working, not failing --- a date that re-arms is the whole reason the switch is a date and not an env flag --- but it does show the cost of a short window, since the re-arm lands mid-session with no announcement.
+  So the new window is three months rather than a fortnight, far enough from the day-to-day that its expiry is unlikely to surprise an active session.
+
+  `MORATORIUM_END` in [`hooks/no-unreviewed-pr.py`](../hooks/no-unreviewed-pr.py) is the live value and this paragraph is its prose pair;
+  the constant's own comment requires editing both together, and an extension that moves one is a silent divergence.
+
+  **Its test file derives every clock from that constant, and must keep doing so.**
+  Before this extension the tests pinned literal dates --- an `AFTER` of `2026-09-02`, and a boundary pair of `2026-08-31`/`2026-09-01`.
+  Moving the end date to December puts all three inside the new window, where `main()` returns at its first line.
+  Measured by reverting the literals and running them against the December constant: **92 passed, 88 failed**.
+  The split is the point rather than the totals.
+  Every case expecting a block fails loudly, because an inert guard blocks nothing;
+  every true-negative case passes vacuously, because "no block" is what it expected anyway.
+  So half the suite goes quiet while the other half screams --- loud enough to notice, and the passing half still means nothing.
+
+  An earlier draft of this paragraph claimed the whole file would pass vacuously, citing "179 cases".
+  That number came from a run with the fix already half-applied, generalized to the unfixed case without rerunning it, and labelled "measured".
+  It is recorded here rather than quietly replaced, because the correction is the same overclaim-from-one-observation this file's neighbours keep catching.
+
+  - **Do:** edit the constant and this paragraph in the same commit.
+  - **Do:** derive any date a test needs from `MORATORIUM_END`, never write one out.
+  - **Don't:** read a passing suite after an extension as evidence the guard still works --- check that the pinned clock still sits outside the window.
 
   The same session tried four `requested_reviewers` POSTs for `copilot-pull-request-reviewer[bot]` on `ucdavis/bcs` PRs #648, #649, and #650.
   Each was accepted with HTTP **200**, and each left zero Copilot reviews behind, the pending request absent from both `gh pr view --json reviewRequests` and the `GET .../requested_reviewers` endpoint.
@@ -718,13 +747,13 @@
   Say so in the PR or the recap when you defer on this ground, so the omission reads as a recorded deferral rather than as a missed step --- that is the whole reason to write it down, since silence and compliance look identical from outside.
   Unregistering the hook, per the paragraph above, remains the fix for the turn-by-turn nag while the moratorium is live.
 
-  - **Do:** skip the `requested_reviewers` POST and `request_copilot_review` on every repo until September 2026, and state the directive as the reason when a PR ships without a Copilot request.
+  - **Do:** skip the `requested_reviewers` POST and `request_copilot_review` on every repo while `MORATORIUM_END` is still ahead, and state the directive as the reason when a PR ships without a Copilot request.
   - **Do:** rely on `claude-review` plus self-review meanwhile, which is the same no-reachable-external-reviewer fallback the paragraph above already cites --- `shared/workflow/review-verdict-pitfalls.md`'s fifth case.
     Withheld-by-policy is not literally unreachable, so the fit is by analogy rather than by definition.
     Say which one applies when reporting a PR's review state.
   - **Don't:** read `hooks/no-unreviewed-pr.py`'s demand, or `shared/workflow/pr-on-claim.md`'s "request the external reviewer in the same stride", as overriding a standing user directive.
   - **Don't:** treat an accepted POST (200 or 201) as evidence the moratorium is over --- all four 2026-08-19 requests were accepted and none produced a review.
-  - **Don't:** let September 2026 pass without re-verifying.
+  - **Don't:** let `MORATORIUM_END` pass without re-verifying.
     The expiry is part of the rule, not a footnote to it.
 
   **Recurrence 2026-08-21 (Morrison-Lab/gha#571), and the new failure is what happened AFTER the request, not the request itself.**

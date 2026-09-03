@@ -12,7 +12,7 @@ The modern standard is native plugin installation: `Morrison-Lab/gha`'s reusable
 
 If a repository uses `ai-config` (or any other tool) as both a native plugin and a git submodule, **remove the submodule** per [`remove-redundant-plugin-submodules.md`](../shared/workflow/remove-redundant-plugin-submodules.md).
 
-Historically (prior to native plugins), consumer repos vendored ai-config as a submodule with a committed `.claude/skills` symlink (e.g. `d-morrison/rme#982`, later migrated off the submodule in `d-morrison/rme#1074`):
+Historically (prior to native plugins), consumer repos vendored ai-config as a submodule with a committed `.claude/skills` symlink (e.g. `d-morrison/rme#982` and `ucdavis/epi204#360`, later migrated off the submodule in `d-morrison/rme#1074` and `ucdavis/epi204#380`):
 
 1. `git submodule add https://github.com/Morrison-Lab/ai-config.git .ai-config`
    in the consumer repo.

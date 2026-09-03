@@ -133,6 +133,15 @@ join that would fail the gate is split rather than written.
   diff-scoped to added lines, and this script is not invoked by any workflow.
 - **Don't:** expect `--write` to wrap comma-clause chains to 80 columns.
   That is #2081, not the gate, and this construction does not close it.
+- **Do:** after any `--write` reflow,
+  print the longest added line's length with
+  `git diff | grep '^+[^+]' | awk '{ if (length > m) m = length } END { print m }'`
+  and re-break by hand when that number is past about 120,
+  since the gate does not flag a long comma-joined line with no mid-line semicolon.
+- **Don't:** ship a `--write` reflow on the gate's clean verdict alone.
+  Recurred 2026-09-02 in a `/gia` session:
+  `--write` rewrapped three clause-broken prose additions into single lines up to 398 characters long,
+  and the fix was `git checkout <prior-commit> -- <files>` and re-breaking by hand.
 
 (Morrison-Lab/ai-config, 2026-08-15, measured on this machine with the gate at
 `Morrison-Lab/gha@da46419`, whose `_DEFAULT_CLAUSE_BREAKS` is `True` and
@@ -211,6 +220,126 @@ lesson, until review consolidated it here instead.
   exists.
   After #2085, `--write` splits what `classify_line` flags.
   It still is not the diff-scoped CI job.
+
+**Fifth dated recurrence, 2026-09-02: the gap costs review rounds, not only
+CI, since a reviewer applies the wider convention the script does not.**
+Four PRs pushed the same day
+([#3004](https://github.com/Morrison-Lab/ai-config/pull/3004),
+[#3007](https://github.com/Morrison-Lab/ai-config/pull/3007),
+[#3016](https://github.com/Morrison-Lab/ai-config/pull/3016),
+[#3036](https://github.com/Morrison-Lab/ai-config/pull/3036), all merged)
+each carried a scoped `semantic-line-breaks.py` run reporting clean, and
+**three of the four** still drew a Copilot finding citing this convention on
+a line the script had approved.
+Two of those are the clause-density case this entry is about:
+`shared/workflow/metacognitive-monitoring.md:1057` in #3007
+("uses compound sentences as physical lines ... contrary to this corpus's
+semantic-line-break convention of one clause per line"), and, in #3036,
+`skills/daytb/SKILL.md:86`
+("diverges from this repo's semantic line break convention (one clause per
+line)") alongside `shared/workflow/pr-on-claim.md:275`, which asks for the
+same reflow in different words
+("currently written as a few very long lines ... reflow this new block into
+clause/sentence-level line breaks").
+
+The third is a **different mechanism** and is counted separately for that
+reason rather than omitted:
+`memories/r-quarto.md:1053` in #3016 flagged two *sentences* sharing one
+physical line, which is the digit/parenthesis-opener case already recorded
+at [ai-config#2127](https://github.com/Morrison-Lab/ai-config/pull/2127)
+below, not a comma-or-conjunction clause join.
+Naming that split matters because the merged commit message for
+[#3036](https://github.com/Morrison-Lab/ai-config/pull/3036) (`52d6fa57`)
+gets it wrong in the other direction, calling the findings on
+[#3016](https://github.com/Morrison-Lab/ai-config/pull/3016) and
+[#3007](https://github.com/Morrison-Lab/ai-config/pull/3007)
+"the same finding" raised "twice".
+They are not, and a tally that silently drops one of them is how the
+conflation survives.
+Every line flagged for *clause* density joined its clauses with a comma or a
+coordinating conjunction and carried no mid-line semicolon, so the gate's
+own clause rule --- the semicolon predicate documented above --- had nothing
+to catch either.
+This is the narrower-by-design gap arriving as a review comment instead of
+a CI failure, which the script's own docstring already predicts but no
+prior recurrence here had measured.
+
+**Applying this convention can itself break `lint-markdown`, and it did so
+in the commit that recorded the paragraph above.**
+Putting one sentence on its own line is exactly what puts a bare `#NNNN` at
+column 1, and markdownlint reads a line-initial `#` followed by a non-space
+character as a malformed ATX heading:
+
+```
+MD018/no-missing-space-atx No space after hash on atx style heading
+  [Context: "#3004 drew none."]
+```
+
+Two such lines went red on
+[#3044](https://github.com/Morrison-Lab/ai-config/pull/3044), both created
+by splitting a sentence out onto its own line during the fix for the
+finding above.
+So the convention and the markdown linter interact: a PR or issue reference
+is safe mid-sentence and unsafe as the first characters of a line.
+
+The remedy costs nothing and is already required elsewhere: link the
+reference.
+`[#3004](https://github.com/Morrison-Lab/ai-config/pull/3004)` opens with
+`[`, so MD018 cannot fire, and `AGENTS.md` asks for the linked form anyway.
+A bare reference that must stay bare can instead be moved off the line
+opening.
+
+- **Do:** link a PR or issue reference that lands at the start of a line, or
+  reword so the line does not open with it.
+- **Don't:** assume a sentence-per-line split is lint-neutral --- it changes
+  which token sits at column 1, which is the only thing MD018 looks at.
+
+The reformatter also worked against the fix once found, in both directions
+already named above.
+On #3007, splitting a comma-and-conjunction line at the conjunction still
+left `scripts/semantic-line-breaks.py` wanting to rejoin the halves,
+because a comma-clause split creates no sentence-ending punctuation for it
+to preserve.
+On #3016 the split fell into this file's own digit/parenthesis-opener case,
+first recorded at
+[ai-config#2127](https://github.com/Morrison-Lab/ai-config/pull/2127): a
+hand-split second sentence there opened with
+`(Verified 2026-09-02, ...)`.
+Not a new mechanism, but confirmation that it still fires more than a week
+after #2085's rewrite, on a fresh instance neither tool sees.
+Both times, and in the pre-emptive fourth split on #3036, the fix was the
+same: rewrite the pair as one full sentence split into two, rather than a
+single sentence with a hand-inserted clause break, which satisfies the
+script and the gate at once instead of trading one off against the other.
+
+- **Do:** when the script and the convention disagree, restructure the
+  sentence --- usually splitting one long sentence into two --- so both
+  pass, rather than picking a side.
+- **Do:** read a clean scoped run of `scripts/semantic-line-breaks.py` as
+  "no multi-sentence or semicolon-clause lines," not as "this section
+  satisfies the one-clause-per-line convention" --- the two claims differ
+  in kind, not only in degree.
+- **Don't:** treat the reformatter's silence on a comma-or-conjunction-joined
+  line as clearance; a reviewer applying the convention by eye still flags
+  it, and did, twice, the same day.
+- **Don't:** fight the reformatter's rejoin by reinstating the same
+  hand-break; convert the clause pair into two genuine sentences instead.
+
+(Morrison-Lab/ai-config, 2026-09-02.
+Copilot findings read one endpoint at a time, since `gh api` takes a single
+endpoint per invocation:
+`for n in 3007 3016 3036; do gh api "repos/Morrison-Lab/ai-config/pulls/$n/comments"; done`
+--- all three that drew one, since a query over only the two clause-density PRs
+would have produced the undercount this entry now warns about.
+No such comment appeared on
+[#3004](https://github.com/Morrison-Lab/ai-config/pull/3004).
+The rejoin and restructure account is from the PRs' own commit messages, not
+inferred.
+Whether the reformatter should learn comma/conjunction clause boundaries
+was considered and declined: that is the
+[ai-config#2586](https://github.com/Morrison-Lab/ai-config/issues/2586)
+measurement above, over-splitting more than half of comma boundaries in
+clean prose, and nothing in this recurrence changes that trade-off.)
 
 **Until [ai-config#1730](https://github.com/Morrison-Lab/ai-config/issues/1730) gated the job,
 a green check run named for this gate might not have run it,

@@ -299,6 +299,65 @@ The alternative, both sessions fixing the same round's findings, is the
   the standing grant still covers merging it once it is fully clean and the
   peer has gone quiet for twenty minutes.
 
+**Fifth occurrence, 2026-09-02 --- the peer was running the IDENTICAL
+invocation, which is what made the collisions systematic rather than
+coincidental.**
+Two sessions ran `gia ai-config, mwc daytb` concurrently.
+Because both selected work by the same priority rule from the same queue,
+they did not merely overlap --- they converged on the same PRs and reached
+the same fixes minutes apart.
+Three collisions inside one hour:
+
+- [#3037](https://github.com/Morrison-Lab/ai-config/pull/3037) gained the
+  peer's fix for a lint failure while an identical local commit was held
+  unpushed, so the local one was discarded in favour of theirs.
+- [#3024](https://github.com/Morrison-Lab/ai-config/pull/3024) was
+  **force-pushed** by the peer, carrying both fixes prepared against it, so
+  the local base was no longer an ancestor.
+- [#3061](https://github.com/Morrison-Lab/ai-config/pull/3061) gained a new
+  head between its clean verdict being read and a merge being considered.
+
+Every one was caught by the pre-push `git ls-remote` this file's sibling
+[`check-before-pushing`](check-before-pushing.md) requires, and nothing else
+in the session would have caught any of them.
+
+**What the fourth occurrence's Do list does not cover: what to do with your
+own now-duplicate work.**
+Stopping and merge-gating answers who drives; it does not answer whether your
+commit is worth landing.
+Three readings, and they need the peer's diff rather than a rule:
+
+- Their version was **better** (a reword that read more naturally than the
+  local prefix fix) --- discard yours.
+- Their version was **equivalent** (the same two fixes, arrived at
+  independently) --- discard yours.
+- Their version was **missing something** (a test pinning a fix that survived
+  deletion) --- rebuild on their tip and contribute only the missing part.
+
+A rejected push tells you a peer got there first and says nothing about which
+of the three you are in, so it does not prompt the read that decides.
+
+**A quiet [`ListAgents`](../../memories/git-worktrees.md) is not evidence the
+peer does not exist**, and it reported no reachable agents throughout this
+hour.
+The reason is not that it cannot see past this machine --- it lists cloud
+sessions, and Remote Control sessions on other machines, when this session is
+connected to those.
+It is the weaker and more useful fact already recorded in
+[`git-worktrees.md`](../../memories/git-worktrees.md): absence there means
+"not tracked here", never "does not exist".
+A peer outside whatever the harness currently tracks is invisible to it, and
+the listing cannot tell you which case you are in.
+
+- **Do:** check whether a peer is running the same sweep command before
+  attributing repeated collisions to bad luck.
+- **Do:** read the peer's diff and keep whichever version is better,
+  contributing only what theirs lacks.
+- **Don't:** treat a quiet `ListAgents` as licence to skip the pre-push
+  reading.
+- **Don't:** re-land your own commit because it was written first --- that is
+  the one input that says nothing about which version is better.
+
 **Handing off mid-task to another agent, on user request ("finish what you're
 doing, then relinquish holds; I'll put another agent on them"):** don't just
 stop --- leave the next agent a clean starting point. On each claimed PR/issue:

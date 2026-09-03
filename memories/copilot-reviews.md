@@ -80,6 +80,9 @@ ai-config#2969 (ai-config#694 pattern) to keep both files well under the
     Call `request_copilot_review` when none has appeared, and after a
     Rebut/Defer-only round with no push (`skills/ardi/SKILL.md`): the
     completed run on the unchanged head is no veto.
+    **That instruction is suspended while the Copilot moratorium stands**, which is the live state whenever `MORATORIUM_END` in [`hooks/no-unreviewed-pr.py`](../hooks/no-unreviewed-pr.py) is still in the future.
+    Every bullet in this file about *requesting* a review is suspended with it;
+    the bullets about *reading* one that already exists are not, since an older review's findings still bind.
     On the two heads above that waited, a run followed the request within
     seconds, an observed sequence rather than a proven cause.
   - **Don't:** arm a check-in that waits on a round that never started.

@@ -208,9 +208,19 @@ Give it the base ref, the paths, the standards that apply, and the question.
 Where the change's own reasoning matters, it is in the diff --- a comment, a docstring, a fragment --- and the reviewer should be reading it there, where a later reader will.
 Scope is not rationale: which branch, which base, where the tests live, and what is out of scope are facts the reviewer cannot derive and must be told.
 
+**`<base>` is a claim, and it is the one nobody checks.**
+The sentence above names the base as a fact the reviewer must be told, and stops there.
+A base you resolve from a *local* branch name silently widens the diff whenever that branch is behind, so the reviewer spends its attention on already-merged work and returns findings against code this change never touched.
+Resolve it from a remote-tracking ref after fetching that remote, and state the merge-base SHA and the file and insertion counts in the brief so the scope is checkable rather than asserted.
+[`verify-the-right-artifact`](verify-the-right-artifact.md)'s "A comparison's base is an artifact too" carries the direction of the error and the forge cross-check that settles it.
+
 - **Do:** hand over `git diff <base>...HEAD`, the applicable rules, and the question.
+- **Do:** resolve `<base>` from a fetched remote-tracking ref, and state the merge-base SHA and the diff's counts alongside it.
 - **Don't:** hand over the case for the change.
   If it is not persuasive from the diff alone, that is the finding.
+- **Don't:** name a bare local branch as `<base>` --- one behind its remote widens the diff so the reviewer works on already-merged code, and one that is ahead of or diverged from its remote in commits the head branch also carries narrows it so part of the change is never reviewed.
+- **Don't:** read a clean verdict as covering the whole change when the base was local;
+  the narrowing direction produces exactly that.
 
 ### The PR's own review history is rationale you cannot withhold
 
@@ -241,6 +251,66 @@ That is [`learn-from-review-findings`](learn-from-review-findings.md)'s converge
 - **Don't:** read a long visible review history as coverage --- it is a record of what was found, and every entry marks a place a defect once lived.
 - **Don't:** count a verdict that cites prior rounds in its justification as a fully independent round;
   that much of it is a re-reading of the rounds it names, however hard the rest of it worked.
+
+## Run every mechanical style instrument before dispatching, not after
+
+The rule above is about what the reviewer sees.
+This rule is about what should never reach the reviewer:
+a defect the repo's own deterministic checker already catches.
+
+Some of a prose diff's style classes have an instrument and some do not.
+In this repo the instruments are
+the vendored semantic line-break checker
+(`scripts/vendor/gha-check-new-line-breaks.py`, which is what CI runs:
+one sentence per line, plus a clause rule for a long line with a mid-line semicolon),
+`markdownlint`,
+`scripts/check-links.py`,
+and the directional-word grep the [`fix-forward-references`](../../skills/fix-forward-references/SKILL.md) skill runs.
+An ambiguous pronoun has no detector, per [`ambiguous-reference`](../writing/ambiguous-reference.md),
+so that class stays with the reviewer,
+though a grep for a pronoun that opens a clause after a comma or a conjunction,
+the positional heuristic that fragment names,
+narrows where to look.
+Each instrument is cheap and deterministic,
+and each runs in seconds.
+That speed is not a reason to skip the adversarial round.
+That speed is the reason the round should never be the first thing that finds a defect an instrument covers,
+per [`algorithmatize-checks`](algorithmatize-checks.md).
+An adversarial round costs real tokens and real time.
+Spending a round on a defect a repo script would have caught for free
+is the same waste `algorithmatize-checks` names for any check a human re-derives by hand:
+reviewer judgment substituting for an instrument that already exists.
+
+So run every available mechanical style instrument on the diff,
+fix what those instruments report,
+and only then hand the diff to the adversarial reviewer.
+Brief the reviewer to report every finding in one round, style findings included.
+The point of running the instruments first is to keep the round's own findings
+down to what only judgment can catch,
+not to teach the reviewer that style is someone else's job.
+
+- **Do:** run the repo's own style checkers on the diff
+  (the semantic line-break checker, `markdownlint`, the link checker,
+  the forward-reference grep, or whatever the repo defines)
+  and fix their output before the first adversarial dispatch.
+- **Do:** brief the reviewer to report every finding in one round
+  rather than holding style findings for a later pass.
+- **Don't:** dispatch a diff to the adversarial reviewer
+  before the repo's mechanical style checkers have run on that diff.
+- **Don't:** brief the reviewer to leave style findings for a later pass.
+
+(Measured 2026-09-02 driving
+[#3025](https://github.com/Morrison-Lab/ai-config/pull/3025),
+a 20-line addition to `memories/reviewing-prs.md`.
+Four adversarial-reviewer rounds ran, each costing roughly 210k tokens.
+Round 1 found a misattributed citation plus word-wrapped lines.
+Round 2 found an ambiguous "It" and a forward-pointing "below".
+Round 3 found lines that ran several clauses together.
+Round 4 was clean.
+The word-wrapped and run-together lines were the semantic line-break checker's territory,
+and the forward-pointing "below" was the forward-reference grep's;
+only the citation and the pronoun needed a reader.
+Running those two instruments first would have collapsed the four rounds to at most two.)
 
 ## Its findings are findings
 
@@ -673,3 +743,41 @@ That is the same-reviewer clean the rule asks for, and it is a real re-review ra
 - **Don't:** rely on "all findings addressed in <sha>" inside the not-clean comment, or on later bot verdicts, to clear a not-clean you relayed.
 
 (Measured 2026-09-01 on UCD-SERG/serocalculator#668: the relayed round on `065adf0` read as `d-morrison=not-clean` two CLEAN bot verdicts later, and a fresh Sonnet adversarial review of `2aa82df`, posted with its verdict, was what flipped the instrument to exit 0.)
+
+## Ask the reviewer plainly whether the work earns its place
+
+The sections above brief the reviewer to find defects in a change.
+This one asks a question they do not: **should this exist at all?**
+
+Nothing in an ordinary round poses it.
+A reviewer handed a diff reports what is wrong with the diff, so each round
+returns a fix, the fix lands, and the next round finds the next thing --- a
+loop that converges on a polished version of something that may never have
+been worth building.
+The author cannot break that loop, because by round three the sunk effort is
+exactly what makes dropping feel like waste.
+
+So put the question to the reviewer directly, in its own sentence: say
+plainly whether this mechanism earns its place, ship or drop.
+Then honour the answer.
+A drop verdict is the cheapest finding available --- it retires the remaining
+rounds along with the work --- and defending the change against it converts a
+finished decision back into an open one.
+
+- **Do:** ask for a ship-or-drop judgement outright when a mechanism has taken
+  more than a round or two of polishing.
+- **Do:** drop on a drop verdict, and say in the report that the reviewer's
+  judgement is why.
+- **Don't:** answer a drop verdict with the case for the change --- that is
+  the rationale this fragment already rules out of a brief, arriving late.
+- **Don't:** read successive rounds finding smaller things as evidence the
+  work is converging; it is equally consistent with polishing something
+  unjustified.
+
+(Measured 2026-09-01, on a hook that had been a no-op three different ways
+across three rounds.
+Asked plainly, the reviewer said drop; dropping was right and ended the loop.
+The companion half of that session --- concluding a silent subagent had
+stalled when it was alive and twelve rounds ahead --- is recorded in
+[`git-worktrees`](../../memories/git-worktrees.md), "A quiet worktree is not
+evidence the session working it has stopped".)

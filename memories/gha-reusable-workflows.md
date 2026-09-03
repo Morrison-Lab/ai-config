@@ -260,3 +260,23 @@ Generic Actions-authoring material stays there.
   - **Do:** require that companion hidden and visible payloads (e.g., HTML comment and markdown code block) remain synchronized.
   - **Don't:** use broad "no text after `-->`" phrasing when subsequent block elements (code fences, closing tags) are required by the template.
   (Measured 2026-08-31 on [Morrison-Lab/gha#794](https://github.com/Morrison-Lab/gha/pull/794).)
+
+- **`one-function-per-file` scans changed files only, so a pre-existing multi-function script goes red the first time a PR touches it.**
+  The check has no baseline exemption for a script that predates the rule:
+it counts top-level `def`s in every file the diff touches,
+not only in files the diff adds.
+  `check-new-line-breaks/check-new-line-breaks.py` in gha carried 18 top-level `def`s on `main` (`grep -c '^def '`) before [gha#826](https://github.com/Morrison-Lab/gha/pull/826) touched it for an unrelated working-tree-scope fix, and the touch alone was enough to fail the check.
+  The remedy is the opt-out marker the check itself names: `# check-one-function-per-file: allow-multiple` on the line after the shebang.
+  `check-one-function-per-file/check-one-function-per-file.py` in gha carries that same marker on itself,
+so the pattern is load-bearing rather than a workaround invented for this PR.
+  - **Do:** when a gha PR touches a pre-existing multi-function script, add the marker in the same PR and say so in the PR body.
+  - **Don't:** split a mature script into one-function files to satisfy a check that postdates it.
+  (Measured 2026-09-02 on [Morrison-Lab/gha#826](https://github.com/Morrison-Lab/gha/pull/826).)
+
+- **A `changelog.d/<slug>.<category>.md` fragment is scanned by gha's own `new-line-breaks` and `diff-scoped-guard` jobs, the same as any other `.md`/`.qmd` file.**
+There is no changelog-fragment exemption in either job's globs or paths-ignore.
+  A fragment written as one long bullet line fails `new-line-breaks` and triggers an avoidable `claude-review` round, exactly as a long line anywhere else would.
+  Every sibling fragment in the directory is already clause-broken, which is the tell that the convention is enforced rather than merely stylistic.
+  - **Do:** write the fragment at clause boundaries like its siblings, and run gha's own checker from the worktree before pushing: `NLB_GLOBS='*.md *.qmd' NLB_BASE_REF=origin/main python3 check-new-line-breaks/check-new-line-breaks.py`.
+  - **Don't:** write a changelog bullet as one unbroken line on the reasoning that it is "just a changelog" and outside the line-break convention's scope.
+  (Measured 2026-09-02 on [Morrison-Lab/gha#826](https://github.com/Morrison-Lab/gha/pull/826).)

@@ -922,3 +922,24 @@ Reproducing at HEAD rather than at the reviewed commit is
 [`verify-the-right-artifact`](verify-the-right-artifact.md)'s "a checkout for
 the run" substitution --- the artifact in hand was real, was read carefully,
 and was not the one the claim was about.
+
+## "A peer's edge cases raised against a different implementation"
+
+Measured 2026-09-03, recorded from
+[ai-config#3059](https://github.com/Morrison-Lab/ai-config/issues/3059), which
+is the filed record for this session rather than a re-derivable artifact.
+
+A peer session flagged two edge cases from an adversarial pass on its own draft
+of a similar hook, and asked whether they applied here. Both already passed,
+established across seven concrete command shapes rather than argued from the
+pattern.
+
+They were pinned anyway, because the peer was right that one of them --- a long
+`git -C <path>` prefix --- is the form this corpus tells a session to use
+against a named checkout
+([`git-worktrees`](../../memories/git-worktrees.md): "run `git -C <path>`
+against a named checkout instead of `cd`-ing to it"), and worktree paths are
+long enough for the prefix to matter. The existing suite pinned only short
+paths. A future narrowing of that pattern now fails a test instead of silently
+disarming the guard for every dispatched agent.
+

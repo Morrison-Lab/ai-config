@@ -1359,34 +1359,65 @@ A stopwatch reading feels like a measurement rather than a guess, so it goes int
 Background test runs, a re-invoked suite that was never reaped, several agents dispatched at once: each is a normal artifact of working quickly, and together they are the load that makes the next reading meaningless.
 So the readings likeliest to be wrong are the ones taken during exactly the kind of session that generates a lot of them.
 
-Measured: an end-to-end hook run took **8.0s** against a declared 10s timeout, which read as a serious performance defect worth filing.
-Profiling the internals put them under **0.6s** in total, which is the discrepancy that prompted looking further.
-`uptime` then reported a load average of **376**, most of it this session's own stacked background runs --- including five redundant copies of the same test suite left behind by repeated re-invocations.
-Re-running the identical command varied between **0.59s and 8.0s** with nothing about the code changed.
+The figures below are reported from
+[ai-config#3059](https://github.com/Morrison-Lab/ai-config/issues/3059), which is
+the filed record of the session that took them.
+They name no hook, command, or machine, so treat them as an illustration of the
+spread's *shape* rather than as a magnitude to cite --- which is itself the
+lesson, since a reading with no provenance is the one most easily quoted back as
+established.
 
-The check is one command and it settles the question, so run it rather than reasoning about whether the machine seems busy:
+An end-to-end hook run took **8.0s** against a declared 10s timeout, which read as
+a serious performance defect worth filing.
+Profiling the internals put them under **0.6s** in total, which is the discrepancy
+that prompted looking further.
+`uptime` then reported a load average of **376**, attributed in that record to the
+session's own stacked background runs.
+Re-running the identical command varied between **0.59s and 8.0s** with nothing
+about the code changed.
+That last figure is the load-bearing one: a range spanning more than an order of
+magnitude on unchanged code needs no attribution to make its point.
+
+The check is two steps, and the **second** is the one that decides:
 
 ```bash
 uptime                       # load average; on Windows, Get-Counter or Task Manager
 ```
 
-Then re-run the timed command a few times and report the spread rather than a single figure.
-A reading you cannot reproduce is not a measurement of the code, and a spread that spans an order of magnitude names its own cause.
+Read `uptime` first, but do not stop there.
+Its figures are 1-, 5- and 15-minute *decaying* averages, so a burst that inflated
+the run you care about can be gone from the 1-minute figure by the time you look,
+and a high reading persists for minutes after the load has cleared.
+A low number therefore does not clear the run, and a high one does not tell you
+the run overlapped it.
 
-**The second-order case is a timing assertion used as a regression guard**, which the sections above already cover for the choice of clock and do not cover for this exposure.
-A wall-clock bound is sometimes the only available instrument --- a catastrophic-backtracking probe is a real example, since the failure it guards against *is* elapsed time.
-Where one is genuinely necessary, give it headroom wide enough to survive the load a busy session generates, and say in the test that it is load-sensitive so a red result is read as a question rather than as a regression.
+So re-run the timed command several times and report the **spread**.
+That is what settles it, because it measures the interval you actually care about
+rather than a decaying average over a window you did not choose.
+A reading you cannot reproduce is not a measurement of the code, and a spread that
+spans an order of magnitude names its own cause.
+
+**A timing assertion written as a regression guard is the same exposure, and the two sections above already answer it** --- they are about exactly this, a busy machine inflating a wall-clock reading.
+Nothing here adds to that answer, and the sentence is here only to point at it: a session that has just learned its own machine was loaded will reach for a wider bound, which is the wrong repair.
+`process_time` is the repair.
+A catastrophic-backtracking probe looks like the exception, because the failure it guards against *is* elapsed time, and it is not: backtracking burns CPU rather than blocking, so CPU time measures it and is load-immune.
+That is this repo's own precedent, stated in `hooks/test-no-unauthorized-merge.py`: "Any bound tight enough to catch a regression sits inside that spread, so it goes red on PRs that never touched this hook, which is how a gating check stops being read."
+The genuine exception is already carved out above --- keep a wall-clock ceiling only where the measured code can actually block.
 
 - **Do:** read the load average before reporting a timing observation as a finding.
 - **Do:** re-run a timed command several times and report the spread, so a reading that cannot be reproduced is visible as one.
 - **Do:** reap your own background runs before timing anything, since they are the likeliest cause of the load you are about to measure through.
+- **Do:** switch a load-sensitive regression bound to `process_time` rather than widening it, per the two sections above.
 - **Don't:** treat a stopwatch reading as evidence about the code merely because it was measured rather than guessed.
 - **Don't:** assume a fast-moving session is running on an idle machine --- it is the session most likely to have loaded it.
 
-(Measured 2026-09-03, during a nine-round adversarial hook iteration.
-The same session's PR carried a `< 1.0s` wall-clock assertion as a backtracking regression guard, which under that load could have flaked;
-that is the second-order case above.
-Filed as [ai-config#3059](https://github.com/Morrison-Lab/ai-config/issues/3059).)
+(Recorded 2026-09-03 from
+[ai-config#3059](https://github.com/Morrison-Lab/ai-config/issues/3059), during a
+nine-round adversarial hook iteration.
+That session's PR also carried a `< 1.0s` wall-clock assertion as a
+backtracking regression guard, which under the same load could have flaked ---
+the case the paragraph on regression guards above answers, and the reason it
+answers it with `process_time` rather than with a wider bound.)
 
 ## Reading an instrument's PROSE instead of its exit status, generalized past the PR checker
 

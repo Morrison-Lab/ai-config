@@ -799,30 +799,12 @@ Reverted to the wording round 4 had displaced, which was stable at all three
 seeds.
 Tracked as
 [ai-config#2028](https://github.com/Morrison-Lab/ai-config/issues/2028).)
-## A finding raised against someone else's implementation is measured, not adopted or dismissed
 
-Every verification rule above assumes the finding was raised against **your** artifact: a reviewer read your diff, and the question is whether what it says about your diff is true.
+**A finding raised against someone else's implementation is measured, not adopted or dismissed.**
+Every verification rule above assumes the finding was raised against **your** artifact.
 A different shape arrives when a peer session runs an adversarial pass on **its own** draft of a similar mechanism, finds edge cases there, and asks whether they apply to yours.
-Nothing in that exchange is a review of your work, so none of the machinery above fires, and the two obvious responses are both wrong.
-
-**Dismissal is wrong because the peer is reasoning about the same problem**, often having probed a part of it you did not.
-**Adoption is wrong because the finding is about a different implementation**, so whether it transfers is an empirical question about your code rather than a property of the finding.
-Both feel like a response and neither is one: the first spends nothing, the second spends a round on a fix that may repair nothing.
-
-The right move is to **measure, and report the measurement back**.
-Run the peer's cases against your implementation as concrete inputs, not as a reading of your own regex or your own parser --- a reading of the code is exactly the confirmation the diff-versus-standards rules elsewhere in this corpus rule out.
-Then say which passed and which did not, so the peer learns something about the shape of the problem whichever way it goes.
-
-**Pin the shapes as regression tests even when they all pass**, which is the step that looks redundant and is not.
-A case that passes today passes by construction of code nobody promised to keep;
-what the peer supplied was a *reason to care about that shape*, and that reason survives the measurement.
-So the deliverable is the test, not the verdict.
-
-Measured 2026-09-03.
-A peer session flagged two edge cases from an adversarial pass on its own draft of a similar hook.
-Both already passed on this implementation, established across **seven** concrete command shapes rather than argued from the pattern.
-They were pinned anyway, because the peer was right that one of them --- a long `git -C <path>` prefix --- is the **mandated** form for subagent dispatch in this corpus, and the existing suite pinned only short paths.
-A future narrowing of that pattern would now fail a test instead of silently disarming the guard for every dispatched agent.
+Nothing in that exchange is a review of your work, so none of the machinery above fires, and the two obvious responses --- dismissing it as being about different code, or adopting it and fixing --- are both wrong.
+Run the peer's cases against your implementation as concrete inputs, report back which passed, and pin the shapes as regression cases even when all of them pass.
 
 - **Do:** run a peer's edge cases as concrete inputs against your implementation, and report which passed.
 - **Do:** pin the shapes as regression cases even when they all pass, when the peer's reason for raising them names a form your suite does not already cover.
@@ -831,4 +813,5 @@ A future narrowing of that pattern would now fail a test instead of silently dis
 - **Don't:** settle it by reading your own pattern;
   that is the same self-confirmation dispatching a reviewer exists to avoid.
 
-(Filed as part of [ai-config#3059](https://github.com/Morrison-Lab/ai-config/issues/3059).)
+See [`address-every-comment.cases.md`](address-every-comment.cases.md),
+"A peer's edge cases raised against a different implementation".

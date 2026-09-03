@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.18">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="description" content="Drive one PR to clean.">
+
+<title>skill – ai-config</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<script src="../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dark-b85bc7c33db8c58e0ec93c3465666fed.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap-e3adbaa939bcd423dddc8c8a834270b4.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-4de2da5e8af8a56ca594d71261300eb6.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-e3adbaa939bcd423dddc8c8a834270b4.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="../../styles.css">
+</head>
+
+<body class="nav-fixed quarto-light"><script id="quarto-html-before-body" type="application/javascript">
+    const toggleBodyColorMode = (bsSheetEl) => {
+      const mode = bsSheetEl.getAttribute("data-mode");
+      const bodyEl = window.document.querySelector("body");
+      if (mode === "dark") {
+        bodyEl.classList.add("quarto-dark");
+        bodyEl.classList.remove("quarto-light");
+      } else {
+        bodyEl.classList.add("quarto-light");
+        bodyEl.classList.remove("quarto-dark");
+      }
+    }
+    const toggleBodyColorPrimary = () => {
+      const bsSheetEl = window.document.querySelector("link#quarto-bootstrap:not([rel=disabled-stylesheet])");
+      if (bsSheetEl) {
+        toggleBodyColorMode(bsSheetEl);
+      }
+    }
+    const setColorSchemeToggle = (alternate) => {
+      const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+      for (let i=0; i < toggles.length; i++) {
+        const toggle = toggles[i];
+        if (toggle) {
+          if (alternate) {
+            toggle.classList.add("alternate");
+          } else {
+            toggle.classList.remove("alternate");
+          }
+        }
+      }
+    };
+    const toggleColorMode = (alternate) => {
+      // Switch the stylesheets
+      const primaryStylesheets = window.document.querySelectorAll('link.quarto-color-scheme:not(.quarto-color-alternate)');
+      const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+      manageTransitions('#quarto-margin-sidebar .nav-link', false);
+      if (alternate) {
+        // note: dark is layered on light, we don't disable primary!
+        enableStylesheet(alternateStylesheets);
+        for (const sheetNode of alternateStylesheets) {
+          if (sheetNode.id === "quarto-bootstrap") {
+            toggleBodyColorMode(sheetNode);
+          }
+        }
+      } else {
+        disableStylesheet(alternateStylesheets);
+        enableStylesheet(primaryStylesheets)
+        toggleBodyColorPrimary();
+      }
+      manageTransitions('#quarto-margin-sidebar .nav-link', true);
+      // Switch the toggles
+      setColorSchemeToggle(alternate)
+      // Hack to workaround the fact that safari doesn't
+      // properly recolor the scrollbar when toggling (#1455)
+      if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+        manageTransitions("body", false);
+        window.scrollTo(0, 1);
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+          manageTransitions("body", true);
+        }, 40);
+      }
+    }
+    const disableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        stylesheet.rel = 'disabled-stylesheet';
+      }
+    }
+    const enableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        if(stylesheet.rel !== 'stylesheet') { // for Chrome, which will still FOUC without this check
+          stylesheet.rel = 'stylesheet';
+        }
+      }
+    }
+    const manageTransitions = (selector, allowTransitions) => {
+      const els = window.document.querySelectorAll(selector);
+      for (let i=0; i < els.length; i++) {
+        const el = els[i];
+        if (allowTransitions) {
+          el.classList.remove('notransition');
+        } else {
+          el.classList.add('notransition');
+        }
+      }
+    }
+    const isFileUrl = () => {
+      return window.location.protocol === 'file:';
+    }
+    const hasAlternateSentinel = () => {
+      let styleSentinel = getColorSchemeSentinel();
+      if (styleSentinel !== null) {
+        return styleSentinel === "alternate";
+      } else {
+        return false;
+      }
+    }
+    const setStyleSentinel = (alternate) => {
+      const value = alternate ? "alternate" : "default";
+      if (!isFileUrl()) {
+        window.localStorage.setItem("quarto-color-scheme", value);
+      } else {
+        localAlternateSentinel = value;
+      }
+    }
+    const getColorSchemeSentinel = () => {
+      if (!isFileUrl()) {
+        const storageValue = window.localStorage.getItem("quarto-color-scheme");
+        return storageValue != null ? storageValue : localAlternateSentinel;
+      } else {
+        return localAlternateSentinel;
+      }
+    }
+    const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+      const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+      const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+      let newTheme = '';
+      if(authorPrefersDark) {
+        newTheme = isAlternate ? baseTheme : alternateTheme;
+      } else {
+        newTheme = isAlternate ? alternateTheme : baseTheme;
+      }
+      const changeGiscusTheme = () => {
+        // From: https://github.com/giscus/giscus/issues/336
+        const sendMessage = (message) => {
+          const iframe = document.querySelector('iframe.giscus-frame');
+          if (!iframe) return;
+          iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+        }
+        sendMessage({
+          setConfig: {
+            theme: newTheme
+          }
+        });
+      }
+      const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+      if (isGiscussLoaded) {
+        changeGiscusTheme();
+      }
+    };
+    const authorPrefersDark = false;
+    const darkModeDefault = authorPrefersDark;
+      document.querySelector('link#quarto-text-highlighting-styles.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+      document.querySelector('link#quarto-bootstrap.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+    let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+    // Dark / light mode switch
+    window.quartoToggleColorScheme = () => {
+      // Read the current dark / light value
+      let toAlternate = !hasAlternateSentinel();
+      toggleColorMode(toAlternate);
+      setStyleSentinel(toAlternate);
+      toggleGiscusIfUsed(toAlternate, darkModeDefault);
+      window.dispatchEvent(new Event('resize'));
+    };
+    // Switch to dark mode if need be
+    if (hasAlternateSentinel()) {
+      toggleColorMode(true);
+    } else {
+      toggleColorMode(false);
+    }
+  </script>
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../../index.html">
+    <span class="navbar-title">ai-config</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../setup.html"> 
+<span class="menu-text">Setup</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../skills.html"> 
+<span class="menu-text">Skills</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../agents.html"> 
+<span class="menu-text">Agents</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../workflow.html"> 
+<span class="menu-text">Workflow</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/Morrison-Lab/ai-config"> <i class="bi bi-github" role="img" aria-label="GitHub">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+  <a href="" class="quarto-reader-toggle quarto-navigation-tool px-1" onclick="window.quartoToggleReader(); return false;" title="Toggle reader mode">
+  <div class="quarto-reader-toggle-btn">
+  <i class="bi"></i>
+  </div>
+</a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#ardi-ard-iterate-single-prmr" id="toc-ardi-ard-iterate-single-prmr" class="nav-link active" data-scroll-target="#ardi-ard-iterate-single-prmr">ARDI — ARD + Iterate (single PR/MR)</a>
+  <ul class="collapse">
+  <li><a href="#procedure" id="toc-procedure" class="nav-link" data-scroll-target="#procedure">Procedure</a>
+  <ul class="collapse">
+  <li><a href="#per-round-checklist" id="toc-per-round-checklist" class="nav-link" data-scroll-target="#per-round-checklist">Per-round checklist</a></li>
+  </ul></li>
+  <li><a href="#fix-broken-ciworkflows-too" id="toc-fix-broken-ciworkflows-too" class="nav-link" data-scroll-target="#fix-broken-ciworkflows-too">Fix broken CI/workflows too</a></li>
+  <li><a href="#delegating-sidecar-work" id="toc-delegating-sidecar-work" class="nav-link" data-scroll-target="#delegating-sidecar-work">Delegating sidecar work</a></li>
+  <li><a href="#the-bar-fully-clean" id="toc-the-bar-fully-clean" class="nav-link" data-scroll-target="#the-bar-fully-clean">The bar: “fully clean”</a>
+  <ul class="collapse">
+  <li><a href="#fully-clean-exit-checklist" id="toc-fully-clean-exit-checklist" class="nav-link" data-scroll-target="#fully-clean-exit-checklist">Fully-clean exit checklist</a></li>
+  </ul></li>
+  <li><a href="#stopping-conditions" id="toc-stopping-conditions" class="nav-link" data-scroll-target="#stopping-conditions">Stopping conditions</a>
+  <ul class="collapse">
+  <li><a href="#sweep-level-scheduling-is-a-different-question" id="toc-sweep-level-scheduling-is-a-different-question" class="nav-link" data-scroll-target="#sweep-level-scheduling-is-a-different-question">Sweep-level scheduling is a different question</a></li>
+  <li><a href="#asymptotic-noise-is-an-anti-pattern-not-a-signal" id="toc-asymptotic-noise-is-an-anti-pattern-not-a-signal" class="nav-link" data-scroll-target="#asymptotic-noise-is-an-anti-pattern-not-a-signal">“Asymptotic noise” is an anti-pattern, not a signal</a></li>
+  </ul></li>
+  <li><a href="#on-clean" id="toc-on-clean" class="nav-link" data-scroll-target="#on-clean">On clean</a></li>
+  </ul></li>
+  </ul>
+<div class="toc-actions"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/ardi/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/ardi/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"></header>
+
+
+
+
+
+<section id="ardi-ard-iterate-single-prmr" class="level1">
+<h1>ARDI — ARD + Iterate (single PR/MR)</h1>
+<p>Drive one PR/MR to a clean review verdict by looping: read every review → ARD every finding from every reviewer → push → post summary → re-request review from those reviewers → repeat until every reviewer’s latest verdict is clean. A later all-clear from one reviewer does not clear another reviewer’s standing not-clean, even with <code>mwc</code> active (ai-config#2274).</p>
+<section id="procedure" class="level2">
+<h2 class="anchored" data-anchor-id="procedure">Procedure</h2>
+<ol type="1">
+<li><strong>Identify and claim the PR/MR.</strong> Use the current branch’s open MR, or the one the user specified. Post a brief claim comment (<code>COMMENT_PR</code>) so a parallel <code>@claude</code> CI run or another person doesn’t start a colliding session. The body carries a real blank line before the disclosure marker — <code>\n</code> inside a bash double-quoted string is the two characters, not a newline:</li>
+</ol>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> pr comment <span class="op">&lt;</span>N<span class="op">&gt;</span> --body <span class="st">"Driving this PR to clean --- please hold off until done.</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="st">_Posted by Claude Code (AI agent) --- not written by a human._"</span>   <span class="co"># COMMENT_PR</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Skip if your most recent comment already says so and is still live — claims expire 2 hours after the most recent push or comment, and an expired one needs reasserting, per <a href="../../shared/workflow/claim-pr.md"><code>claim-pr</code></a>. (<code>COMMENT_PR</code> and the other bracketed tokens below are abstract operation tokens — resolve to your model’s tool via <a href="../../tool-mappings.md"><code>tool-mappings.md</code></a>.)</p>
+<ol start="2" type="1">
+<li><p><strong>Read every review, not only the latest.</strong> Pull the most recent reviewer comment — the <code>@claude</code> bot’s, or a human’s — and every other review that still has a standing verdict. Don’t trust earlier cached verdicts — actively poll until a review appears that references the commit you just pushed, then read <strong>that</strong> one. If one review is all-clear and another raises findings or nits, the findings win: ARD the union, then request fresh reviews. Do not merge on the all-clear, even with <code>mwc</code> (ai-config#2274). <code>gh pr checks</code> (<code>PR_CHECKS</code>) / <code>glab ci list</code> going green is about <strong>CI state</strong>, not the review verdict — always parse the latest review <em>body</em> for findings. A user question about this PR that is not the word “status” still requires this fetch (see <a href="../../skills/pr-status/SKILL.html"><code>pr-status</code></a>). Don’t answer the chat question from session memory while a review comment sits unread.</p>
+<p><strong>When the user provides a specific review link/ID</strong> (e.g.&nbsp;<code>#pullrequestreview-4761444085</code>): Fetch that review directly via the GitHub API using its ID. Many bot reviews have a generic overview body but the actual findings live in <strong>inline comments on specific lines</strong> — don’t rely on the top-level review body alone. Fetch both the review overview and its inline comments:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> api <span class="st">"repos/&lt;owner&gt;/&lt;repo&gt;/pulls/&lt;N&gt;/reviews/&lt;review-id&gt;"</span> <span class="at">--jq</span> <span class="st">'{state, body}'</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> api <span class="st">"repos/&lt;owner&gt;/&lt;repo&gt;/pulls/&lt;N&gt;/comments"</span> <span class="at">--paginate</span> <span class="at">--jq</span> <span class="st">'.[] | select(.pull_request_review_id == &lt;review-id&gt;) | {line: (.line // .original_line), body}'</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The comments endpoint returns pages oldest-first – without <code>--paginate</code> a later review’s inline comments can sit past the first page and never reach the filter, making a review with real findings look empty.</p>
+<ul>
+<li><p><strong>GitHub:</strong> Filter on the body marker, not on an author login. Do not take <code>| last</code> as the only review to ARD (ai-config#2274). Claude, Antigravity, and skip notices can all post as <code>github-actions[bot]</code>, so a login filter silently drops a standing not-clean.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> api repos/<span class="op">&lt;</span>owner<span class="op">&gt;</span>/<span class="op">&lt;</span>repo<span class="op">&gt;</span>/issues/<span class="op">&lt;</span>N<span class="op">&gt;</span>/comments <span class="at">--paginate</span> <span class="dt">\</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  <span class="kw">|</span> <span class="ex">jq</span> <span class="at">-s</span> <span class="st">'[.[][] | select(.body | test("\\*\\*Claude finished|### Verdict|Antigravity Agent Report"; "i"))] | .[] | {created: .created_at, user: .user.login, body: .body}'</span>   <span class="co"># READ_PR_COMMENTS</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Completed Claude runs start the body with <code>**Claude finished</code>. Read every matching comment, not only the newest. A later all-clear from a different reviewer does not clear another reviewer’s standing not-clean. For a <strong>human</strong> reviewer (any login), also gather comments with the <code>ard</code> skill’s step 1 (<code>gh pr view &lt;N&gt; --comments</code> plus the inline-thread API).</p>
+<p><strong>Copilot code review doesn’t post as a PR comment at all – it’s a formal GitHub review</strong>, invisible to the command above.</p>
+<p><strong>Do not request it while the Copilot moratorium stands.</strong> <code>MORATORIUM_END</code> in <a href="../../hooks/no-unreviewed-pr.py"><code>hooks/no-unreviewed-pr.py</code></a> is the live value, and <code>memories/gh-cli.md</code> carries the directive it implements. While that date is in the future, skip the request and read whatever Copilot reviews already exist. A missing Copilot verdict is then not a gap to fill but the expected state, and <a href="../../shared/workflow/self-review-fallback.md"><code>self-review-fallback.md</code></a> governs the resulting absence exactly as it governs a quota-skipped <code>@claude</code> round.</p>
+<p>Otherwise request it (<code>REQUEST_COPILOT_REVIEW</code> – abstract operation token; resolve to your model’s tool via <a href="../../tool-mappings.md"><code>tool-mappings.md</code></a>) and check whether it posted a verdict <em>at the current head</em>. Finding a review object at the right <code>commit_id</code> only proves Copilot <em>looked</em> – it says nothing about whether that review is clean. Fetch the matched review’s own overview <strong>and</strong> its inline comments (same two-call shape as the review-link case above; the reviews list itself is <code>READ_PR_REVIEWS</code>) before treating it as an all-clear: <code>gh api</code>’s own <code>--jq</code> flag has no <code>--arg</code>/<code>--argjson</code> (see <a href="../../memories/gh-cli.md"><code>memories/gh-cli.md</code></a>’s <code>gh api</code>/<code>jq</code> note) – pipe the raw paginated output into standalone <code>jq -s</code> instead, which supports both:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="bu">set</span> <span class="at">-o</span> pipefail</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="va">head</span><span class="op">=</span><span class="st">"</span><span class="va">$(</span><span class="ex">gh</span> pr view <span class="st">"&lt;N&gt;"</span> <span class="at">--json</span> headRefOid <span class="at">-q</span> .headRefOid<span class="va">)</span><span class="st">"</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="va">review_id</span><span class="op">=</span><span class="st">"</span><span class="va">$(</span><span class="ex">gh</span> api <span class="st">"repos/&lt;owner&gt;/&lt;repo&gt;/pulls/&lt;N&gt;/reviews"</span> <span class="at">--paginate</span> <span class="dt">\</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>  <span class="kw">|</span> <span class="ex">jq</span> <span class="at">-s</span> <span class="at">--arg</span> head <span class="st">"</span><span class="va">$head</span><span class="st">"</span> <span class="dt">\</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>  <span class="st">'[.[][] | select(.user.login=="copilot-pull-request-reviewer[bot]" and .commit_id==$head)] | last | .id'</span><span class="va">)</span><span class="st">"</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="bu">[</span> <span class="ot">-n</span> <span class="st">"</span><span class="va">$review_id</span><span class="st">"</span> <span class="bu">]</span> <span class="kw">&amp;&amp;</span> <span class="bu">[</span> <span class="st">"</span><span class="va">$review_id</span><span class="st">"</span> <span class="ot">!=</span> <span class="st">"null"</span> <span class="bu">]</span><span class="kw">;</span> <span class="cf">then</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>  <span class="ex">gh</span> api <span class="st">"repos/&lt;owner&gt;/&lt;repo&gt;/pulls/&lt;N&gt;/reviews/</span><span class="va">$review_id</span><span class="st">"</span> <span class="at">--jq</span> <span class="st">'{state, body}'</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>  <span class="ex">gh</span> api <span class="st">"repos/&lt;owner&gt;/&lt;repo&gt;/pulls/&lt;N&gt;/comments"</span> <span class="at">--paginate</span> <span class="dt">\</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>    <span class="kw">|</span> <span class="ex">jq</span> <span class="at">-s</span> <span class="at">--arg</span> rid <span class="st">"</span><span class="va">$review_id</span><span class="st">"</span> <span class="dt">\</span></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>    <span class="st">'[.[][] | select(.pull_request_review_id == ($rid | tonumber))] | .[] | {line: (.line // .original_line), body}'</span></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a><span class="cf">else</span></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>  <span class="bu">echo</span> <span class="st">"no fresh review yet -- wait or re-request"</span></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a><span class="cf">fi</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>A genuine clean Copilot overview is <strong>not</strong> an empty string – it reads something like “Copilot reviewed N files and generated no new comments.” Don’t require a literally empty body; parse the overview for a zero-new-findings phrasing <strong>and</strong> confirm zero matched inline comments – both, not either alone, since zero inline comments with no affirmative zero-findings overview doesn’t rule out a non-verdict formal review. <strong>A “no new comments” overview can still carry real findings in a collapsed suppression block</strong> – these are genuine flagged items under the fully-clean rule (address every finding regardless of confidence label), even though they never become formal inline comment objects the <code>/comments</code> endpoint returns (verified: PR #660’s review 4767752501 read “generated no new comments” in its overview while its full body carried 3 suppressed findings; PR #1029 repeated the shape from round 3 onward). A third condition is required: the raw review <strong>body</strong> must not contain a suppression block at all. <strong>Match the suppression block inside its <code>&lt;summary&gt;</code> heading, case-insensitively on <code>suppressed</code> – not on either exact phrase, and not anywhere in the body.</strong> GitHub changed the wording and dropped the reason: PR #660 emits <code>&lt;summary&gt;Comments suppressed due to low confidence (3)&lt;/summary&gt;</code>, while PRs #1029 and #1031 emit <code>&lt;summary&gt;Suppressed comments (4)&lt;/summary&gt;</code>. So a literal grep for <code>Comments suppressed</code> returns <strong>zero</strong> against a current body that plainly has the block, which produced a real false negative during the ai-config#1029 loop. A body-wide match over-corrects, though, and would keep a clean PR permanently non-clean: ordinary overview prose contains the word, verified on review 4837572117, whose summary table reads “suppressed Copilot findings” outside any collapsed block. Scope the match to <code>&lt;summary&gt;</code> elements (or parse the <code>&lt;details&gt;</code> block), and accept both headings.</p>
+<p>The stakes are why this matters: from round 3 of ai-config#1029 onward <em>every</em> substantive finding arrived suppressed, under a “generated no new comments” overview with zero inline comments – including CRLF silently disabling a failure path repo-wide. So a suppressed finding is not a lower-value one, on the evidence available here — which is a run of valuable suppressed findings, not a measured correlation. GitHub’s own docs do not document suppression at all, so expect the label to keep moving and key on the stable token within that scope. And dispositioning a finding-bearing review’s comments yourself does <strong>not</strong> make that same review the all-clear – the fully-clean bar needs a <em>later</em> review, at the still-current head, that doesn’t re-raise them. So the all-clear is either (a) a review with a zero-new-findings overview, zero inline comments, and no suppressed- findings block, or (b) a later review at the same head as a finding-bearing one, confirming nothing remains – never the finding-bearing review itself, however thoroughly you addressed its findings. A review object existing at the current <code>commit_id</code> with unresolved findings inside it is not clean, it’s just current. A stub-like non-answer (“ineligible”, “reached their quota limit”) is also not a verdict – treat it the same as a skipped/stub <code>@claude</code> run (see the “Do the review yourself” fallback in <code>CLAUDE.md</code>) and retry later or fall back accordingly.</p></li>
+<li><p><strong>GitLab:</strong> poll the MR notes (<code>sort=desc</code>) for a review note that references your latest short SHA before proceeding; if none has appeared, wait and retry rather than reading a stale verdict.</p></li>
+</ul>
+<p><strong>If the latest review is a cancellation, the live verdict is stale — don’t re-do already-applied fixes.</strong> A <code>cancel-in-progress</code> cancellation (on setups that cancel superseded review runs) means the last <em>complete</em> review’s findings may already have been fixed by a commit that landed after it, with the confirming re-review killed before it could post. Before treating those findings as outstanding work, <strong>diff the current code against each one</strong> to see what’s already addressed — then push only what’s genuinely needed and let a fresh review confirm. Re-applying fixes that are already in the tree wastes a round and muddies the diff. If <em>nothing</em> remains outstanding (every finding is already applied), don’t push an empty commit — skip to step 6 and re-request the review directly.</p>
+<p><strong>Execute the sequential multi-provider review loop</strong> defined in <code>shared/workflow/adversarial-self-review.md</code>. You must pin all available providers (including external reviewers and the local <code>adversarial-reviewer</code> subagent). You must query them sequentially, one at a time. Do not request them in parallel. <strong>When the loop reaches the local self-review step, don’t perform it.</strong> Hand the review to a separate <a href="../../.claude/agents/adversarial-reviewer.md"><code>adversarial-reviewer</code></a> subagent (foreground, read-only), briefed with the base ref, the paths, and the standards that apply — never with your rationale for the change, which is what makes a reviewer agree with you. The session that wrote the diff knows what it was meant to say, so an inline pass reads the artifact and recovers the intent: confirmation rather than review, and indistinguishable from the real thing in the output (see <a href="../../shared/workflow/adversarial-self-review.md"><code>adversarial-self-review</code></a>). Its brief covers what an inline pass would have done: independently assessing both line-level implementation defects and the whole change (requirements, intent, cross-file consistency, integration, regression risk, and validation), explicitly reporting both passes in the structured verdict. This includes the current PR diff against its base, each changed call path and edge case, the focused tests, and the relevant lint/documentation checks. You must Address, Rebut, or Defer every finding it returns. If a provider skips or cannot produce a verdict (quota, offline), note the skip in your ARD summary comment. <strong>Re-check reviewer availability every round, not just once:</strong> A reviewer that was unavailable a few pushes ago can become available mid-session. A skipped review is never a clean external verdict on its own and does not authorize marking the PR as approved. See <a href="#the-bar-fully-clean"><em>The bar: “fully clean”</em></a>. It requires clean verdicts at the current head from all reachable providers in your pinned quorum, not just a self-review.</p></li>
+<li><p><strong>ARD every finding — regardless of severity label.</strong> “Informational”, “Not a blocker”, “minor”, “nit”, “optional”, “consider”, “if you want” are for the user’s prioritization, not a pass for the implementer. For each flagged item, choose exactly one:</p>
+<ul>
+<li><strong>Address</strong> — fix it, commit.</li>
+<li><strong>Rebut</strong> — explain why it’s correct (with evidence).</li>
+<li><strong>Defer</strong> — file a follow-up issue, link it (use the <code>defer-issue</code> skill).</li>
+</ul></li>
+<li><p><strong>Push fixes</strong> (if any). If main moved ahead of the branch, sync it in <em>before</em> you push, so the next review evaluates against current main:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> fetch origin main</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> log <span class="at">--oneline</span> ..origin/main <span class="kw">|</span> <span class="fu">head</span>   <span class="co"># any commits? merge them in</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> merge origin/main</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Resolve conflicts, run the repo’s pre-commit checks, then re-scan the PR’s touched files with whitespace-normalizing search for merge-status hedges that <code>main</code> may have falsified (<code>still open</code>, <code>not yet merged</code>, <code>once that merges</code>, <code>as of</code>, <code>will live at</code>, <code>proposed in</code>) before pushing. Do not use line-oriented literal grep; semantic line breaks can split the phrase this check needs to find. Don’t rebase/squash a published branch – a merge commit matches GitHub’s “Update branch” button. (The <code>sync-pr-branch</code> skill does exactly this.)</p>
+<p><strong>Resolve inline threads as you go — including outdated ones.</strong> After pushing fixes for a round, resolve the corresponding inline review threads immediately (<code>RESOLVE_REVIEW_THREAD</code>) via <code>mcp__github__pull_request_review_write</code> with <code>method: resolve_thread</code> and the <code>threadId</code> (returned by <code>READ_PR_REVIEW_COMMENTS</code> — <code>mcp__github__pull_request_read</code> with <code>method: get_review_comments</code>). Don’t wait until fully-clean to do thread housekeeping. For threads marked <em>outdated</em> in GitHub (the underlying code changed), confirm the fix is in the current tree, then resolve. Threads whose fixes are already in the tree but were never resolved still block the “fully clean” check — clear them as soon as you confirm the code is right.</p>
+<p><strong>Opportunistic conflict sweep.</strong> After pushing (or after any round where all findings were Rebutted/Deferred with no push), scan other open PRs in the same repo for merge conflicts:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> pr list <span class="at">--state</span> open <span class="at">--json</span> number,title,headRefName,author,assignees,mergeable,mergeStateStatus,comments   <span class="co"># LIST_PRS</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Filter that list by <code>memories/reviewing-prs.md</code>’s scope test first, as <code>ardia</code> step 1 does (opened by or assigned to the invoking user, explicitly requested by name, or authored by the GitHub Actions app (<code>github-actions</code>)); an out-of-scope conflicting PR is reported to the user and left untouched (no comment, no push); they can assign or name it if they want it resolved. For each in-scope PR where <code>mergeable == "CONFLICTING"</code> <strong>or <code>"UNKNOWN"</code></strong> (see <code>resolve-conflicts</code>, “Verify before you act” — <code>UNKNOWN</code> can mean GitHub hasn’t finished computing yet, not that there’s no conflict), verify with <code>git merge-tree --write-tree origin/main origin/&lt;branch&gt;</code> (git ≥ 2.38) before acting, then check claim status (most recent comment) and fix unclaimed ones — same cascade procedure as <code>post-merge</code> step 1.5 (claim → isolated worktree → fetch main → merge → <code>resolve-conflicts</code> skill → push → unclaim). A merge to <code>main</code> during your ARDI loop can create new conflicts in sibling PRs; clearing them while waiting for the next verdict is better than letting them pile up.</p></li>
+<li><p><strong>Post the ARD summary</strong> as a comment on the MR/PR (table format per the ARD skill).</p></li>
+<li><p><strong>Re-request review — but don’t double-trigger.</strong> How depends on the repo’s review trigger first, and on whether this round pushed code second. <strong>Read the review workflow’s <code>on:</code> block once per repo</strong> (the first time you push to a PR there) before applying the branches below — the first one is wrong for a repo that has no push-based trigger, and nothing about the PR’s appearance will tell you.</p>
+<ul>
+<li><strong>Code was pushed, and the review workflow carries a push-based trigger</strong> (<code>pull_request:</code> with <code>synchronize</code>): the push <strong>already</strong> triggers the review. Do <strong>NOT</strong> also post “<span class="citation" data-cites="claude">@claude</span> review again”. On workflows with <code>concurrency: cancel-in-progress</code>, the push-triggered and mention-triggered runs <strong>cancel each other</strong>, leaving the latest commit with a canceled, never-posted verdict. Just wait for the push-triggered review.</li>
+<li><strong>Code was pushed, and the review workflow is dispatch-only</strong> — its <code>pull_request:</code> trigger is absent or commented out, leaving <code>workflow_dispatch</code> (and perhaps <code>issue_comment</code>), which is how a repo disables automatic review on PR activity. The push fires <strong>nothing</strong>, so you must dispatch explicitly, <strong>after the round’s last push</strong> rather than once when the PR opened: <code>gh workflow run &lt;review-workflow&gt;.yml -R &lt;owner&gt;/&lt;repo&gt; --ref &lt;PR-branch&gt; -f pr_number=&lt;N&gt;</code>, taking the input’s name from that workflow’s own file. <strong>There IS a cancel-in-progress race here, and it is one you create yourself</strong> — dispatching after each push means each dispatch cancels the last, since the group is keyed on the PR number rather than on the trigger. Finish pushing, then dispatch once. Pass <code>--ref</code> as well, or the cancelled run’s failing review gate attaches to the default branch and never appears on the PR. See <a href="../../shared/workflow/ardi.md"><code>ardi</code></a>’s “Dispatch once, after the round’s LAST push”. This is the branch that fails silently: CI still goes green on each push, so watching CI to green feels like watching the PR, and a verdict from an earlier head stands unchallenged for as long as you keep pushing. (UCD-SERG/serocalculator, 2026-08-07: <code>claude-code-review.yml</code> has its <code>pull_request:</code> trigger commented out with the note “reviews are on request only”. Six pushes across several hours were each followed by watching CI to green. No review was ever dispatched, and a verdict from roughly 20 hours earlier stood until the user asked whether the PR had a clean review.)</li>
+<li><strong>No code pushed</strong> (all Rebut/Defer): no push occurred, so nothing auto-triggers — you <strong>must</strong> explicitly re-request (post <code>@claude review</code>, or the forge’s equivalent). This is the only case where you post the mention.</li>
+<li><strong>Heads-up — some repos’ review workflow is <em>not</em> comment-triggered.</strong> Some Quarto / R-package repos run <code>claude-code-review.yml</code> on <code>pull_request</code> (<code>opened, synchronize, ready_for_review, reopened</code>) and <code>workflow_dispatch</code> (input <code>pr_number</code>), not on an <code>@claude</code> comment. A new push auto-fires it. To force a fresh review on an existing PR <strong>without a new commit</strong>, prefer <code>workflow_dispatch</code>: <code>gh workflow run claude-code-review.yml --ref &lt;PR-branch&gt; -f pr_number=&lt;N&gt;</code>. Without <code>gh</code>, use the REST <code>.../actions/workflows/claude-code-review.yml/dispatches</code> endpoint, or your GitHub MCP workflow-dispatch tool. Closing+reopening the PR also works (fires <code>reopened</code>) but adds timeline noise. See <a href="../../memories/claude-review-dispatch.md"><code>memories/claude-review-dispatch.md</code></a>.</li>
+<li><strong>Marking a draft ready seconds after its final push is another cancel-in-progress race</strong> — the ready-event and synchronize runs fire a second apart and the cancellation can land on the newer (current-head) run; see <a href="../../shared/workflow/pr-on-claim.md"><code>pr-on-claim</code></a> for the diagnosis and the <code>gh run rerun</code> remedy.</li>
+<li><strong>A review ends up canceled with no comment:</strong> first check whether a <strong>newer run for this same PR</strong> is already in flight. Under <code>concurrency: cancel-in-progress</code> a fresh dispatch is what cancelled the old run, so a retry cancels the new one — possibly a review a human just asked for, since <code>claude-bot.yml</code>’s <code>review-workflow-file</code> re-dispatches this very workflow into the same per-PR group. Attribute each in-flight run to a PR from its own <code>gather-context</code> log, since <code>gh run list</code>’s branch column reads <code>main</code> for all of them, and <strong>wait</strong> rather than retry if one is running. Only when nothing is running, trigger one cleanly via <code>gh workflow run claude-review.yml --ref &lt;PR-branch&gt; -f pr_number=&lt;N&gt;</code> (input is <code>pr_number</code>) and don’t push/comment again until it posts. Pass <code>--ref</code> rather than omitting it: without it the dispatch runs against the default branch, so the run’s check runs attach to <code>main</code>’s tip instead of the PR’s head commit, leaving the PR’s own review check stale and making a check-runs query at that head useless as the in-flight pre-check above. See <a href="../../shared/workflow/review-verdict-pitfalls.md"><code>review-verdict-pitfalls</code></a>’s “A <code>cancelled</code> review is the one case where retrying is the cause rather than the remedy”, and its follow-on on why the cheap PR-side pre-check needs that ref. Note: a review run on a <strong>bot-pushed</strong> commit may show as <code>action_required</code> (gated) and never run — the explicit <code>workflow_dispatch</code> bypasses that.</li>
+</ul>
+<p><strong>Don’t let the trigger phrase leak into prose.</strong> The <code>issue_comment</code> trigger fires on the bare bot <code>@</code>-mention <strong>anywhere</strong> in a comment body — even inside a sentence saying you’re <em>not</em> triggering a review. In ARD summaries and status comments, refer to it obliquely (“re-request review”, “the review-trigger mention”) or split the tokens (e.g.&nbsp;<code>@ claude</code>, with a space, so the raw body never contains the contiguous handle); paste the literal <code>@</code>-mention only when you actually intend to dispatch. A stray mention spawns a run that cancels the push-triggered review on <code>cancel-in-progress</code> setups. On some mention-bot setups it also starts a session whose residual-commit sweep can churn the branch.</p>
+<p>Then wait for the new verdict <strong>and</strong> for CI.</p>
+<p>A CI-fix push is not handled when the first few jobs go green. Read the full rollup: pending, queued, and in-progress jobs are still running; a cancelled job has finished but is not clean and still needs investigation or a rerun before the rollup counts as done. Arm <a href="../../skills/wait-for-results/SKILL.html"><code>wait-for-results</code></a> (or the timer below) instead of returning to chat with a partial <code>gh pr checks</code> read. (gha#511, 2026-08-18: lint/link went green, a sibling job sat in setup then cancelled, and the session left without waiting; the user asked why.)</p>
+<p><strong>Set a timer when ending a turn waiting for AI reviews.</strong> Whenever ending a turn while waiting for AI reviews or CI completion after pushing code, launch a <code>schedule</code> timer (e.g.&nbsp;120s) and follow the check-and-reschedule procedure in <a href="../../shared/workflow/ardi.md"><code>shared/workflow/ardi.md</code></a> when it fires.</p>
+<p><strong>While waiting, keep checking for merge conflicts.</strong> Other PRs in this repo can become conflicting at any time (someone merges to <code>main</code> while the review runs). Poll every few minutes with <code>/loop</code> or a manual re-check:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> pr list <span class="at">--state</span> open <span class="at">--json</span> number,title,headRefName,author,assignees,mergeable,mergeStateStatus,comments <span class="dt">\</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">--jq</span> <span class="st">'.[] | select(.mergeable == "CONFLICTING" or .mergeable == "UNKNOWN")'</span>   <span class="co"># LIST_PRS</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Apply the same scope test as the sweep above before touching a candidate; an out-of-scope one is reported to the user and left untouched. Verify each in-scope candidate with <code>git merge-tree --write-tree origin/main origin/&lt;branch&gt;</code> (git ≥ 2.38; see <code>resolve-conflicts</code>, “Verify before you act”) before claiming — <code>UNKNOWN</code> isn’t proof of a real conflict, and <code>CONFLICTING</code> can be stale if a sibling PR merged since GitHub last computed it. Claim and fix confirmed conflicts using the cascade procedure in <code>post-merge</code> step 1.5. Re-check after each resolution — new ones can appear at any time. This turns idle wait time into productive conflict prevention.</p></li>
+</ol>
+<section id="per-round-checklist" class="level3">
+<h3 class="anchored" data-anchor-id="per-round-checklist">Per-round checklist</h3>
+<p><strong>Pause point: before advancing to the next round.</strong> Do-Confirm; per <a href="../../shared/workflow/skill-checklists.md"><code>shared/workflow/skill-checklists.md</code></a>.</p>
+<ul class="task-list">
+<li><label><input type="checkbox"><strong>Killer item:</strong> the latest review analyzed is for the current head commit, not a stale prior run. Marked because getting this wrong invalidates the whole round rather than leaving a gap in it: a reviewer’s snapshot predating your rebuttal re-raises an item you already answered, and a verdict from an older head says nothing about the code you just pushed. Compare the review run’s <code>started_at</code> against your last reply and the head SHA.</label></li>
+<li><label><input type="checkbox">Every finding from that review has an ARD disposition.</label></li>
+<li><label><input type="checkbox">If code changed, main was synced in first when needed, merge-status hedges in touched files were re-scanned with whitespace normalization, then fixes were pushed.</label></li>
+<li><label><input type="checkbox">If source comments or generated inputs changed, the repository’s generator was run after the final edit and its generated paths are clean against the index; stage any resulting artifacts before pushing.</label></li>
+<li><label><input type="checkbox">ARD summary was posted and corresponding inline-thread replies/resolutions were handled.</label></li>
+<li><label><input type="checkbox">Re-review trigger was chosen correctly, reading the repo’s trigger class first: rely on the push alone only where the review workflow carries a push-based trigger; dispatch explicitly after <strong>every</strong> push where it is dispatch-only; post the mention only when no code was pushed. A green CI run at the current head is not a review in flight.</label></li>
+</ul>
+<ol start="7" type="1">
+<li><strong>Repeat from step 2</strong> until the PR/MR is <strong>fully clean</strong> (see <a href="#the-bar-fully-clean"><em>The bar: “fully clean”</em></a> – zero findings <strong>and</strong> all CI workflows and check runs green and completed <strong>and</strong> every inline thread resolved). Don’t exit on a clean review body alone.</li>
+</ol>
+</section>
+</section>
+<section id="fix-broken-ciworkflows-too" class="level2">
+<h2 class="anchored" data-anchor-id="fix-broken-ciworkflows-too">Fix broken CI/workflows too</h2>
+<p>If the PR’s CI checks are failing (not just the review), investigate and fix them as part of the ARDI loop — don’t declare “clean” with red CI. This includes:</p>
+<ul>
+<li><strong>Workflow syntax errors</strong> — fix them in this repo.</li>
+<li><strong>Upstream template bugs</strong> — if the failure is in a reusable workflow from a shared CI library (e.g., HACtions) or a GitHub Action, file an issue (or open a PR) upstream using the <code>sup</code> skill, then either pin a working version or apply a local workaround until the upstream fix lands.</li>
+<li><strong>Flaky / infra failures</strong> — retry once; if it persists, investigate root cause.</li>
+</ul>
+<p>The goal is green CI + clean review, not just clean review.</p>
+</section>
+<section id="delegating-sidecar-work" class="level2">
+<h2 class="anchored" data-anchor-id="delegating-sidecar-work">Delegating sidecar work</h2>
+<p>Some steps benefit from a subagent rather than blocking the round on the main thread — investigating a CI failure whose cause isn’t obvious (see above), verifying a reviewer’s factual claim before Addressing/Rebutting it, or checking a sibling PR for a merge conflict during the opportunistic sweep. Delegate that via the <code>Agent</code> tool and keep driving the round itself (ARD, push, post summary, re-request review) on the main thread.</p>
+<p>For a judgment-heavy sidecar task (a subtle root-cause hunt, adjudicating a deadlocked rebuttal before escalating to a human), give the subagent a stronger model via the <code>Agent</code> tool’s <code>model</code> parameter (e.g.&nbsp;<code>model: 'opus'</code>). Symmetrically, drop to a cheaper/faster tier (<code>model: 'fable'</code> or <code>'haiku'</code>) for a mechanical sidecar task — see <a href="../../skills/select-model/SKILL.html"><code>select-model</code></a>’s decision tree for both directions. For a heavy fan-out investigation/verification pass, prefer a separately-billed provider (e.g.&nbsp;the <code>codex</code> CLI) first when available — see <a href="../../skills/delegate-to-codex/SKILL.html"><code>delegate-to-codex</code></a>.</p>
+</section>
+<section id="the-bar-fully-clean" class="level2">
+<h2 class="anchored" data-anchor-id="the-bar-fully-clean">The bar: “fully clean”</h2>
+<p>The loop ends only at <strong>fully clean</strong>, which means <strong>both</strong>:</p>
+<ol type="1">
+<li><strong>All CI workflows and check runs are green and completed</strong> — every check, not just required ones and not just the review job; never still queued or in progress (see <em>Fix broken CI/workflows too</em> above, and <code>shared/workflow/fully-clean.md</code> for the check-run-vs-workflow-run and API-casing gotchas).</li>
+<li><strong>Every reviewer’s latest verdict is totally clean</strong> — zero flagged items under any heading. “Looks good” / “no findings” / “approved” with no follow-on bullets. Every item that wasn’t directly <strong>Addressed</strong> is either <strong>Deferred</strong> to a tracked issue or <strong>Rebutted with a rebuttal that actually convinced the reviewer</strong> (they didn’t re-raise it on the next round). A rebuttal the reviewer still disputes does <strong>not</strong> count as clean. Don’t stop at “ready with one minor nit.” A later all-clear from one reviewer does not clear another reviewer’s standing not-clean, even with <code>mwc</code> (ai-config#2274). <strong>That review must be a genuine posted verdict at the current head, from an external reviewer if one is reachable</strong> – check availability again right before declaring clean, not just at the round where self-review first started; an inferred “probably clean” from green CI and resolved threads does not satisfy this.</li>
+</ol>
+<p><strong>Threads:</strong> at fully-clean, every <strong>inline</strong> review thread is resolved, and the only conversation left open is the final all-clear exchange — the reviewer’s all-clear comment (usually a top-level PR comment, not an inline thread) and your reply to it. (Thread mechanics live in the <code>ard</code> skill, step 4b.)</p>
+<section id="fully-clean-exit-checklist" class="level3">
+<h3 class="anchored" data-anchor-id="fully-clean-exit-checklist">Fully-clean exit checklist</h3>
+<p><strong>Pause point: before declaring “clean” or reporting the PR ready.</strong> Do-Confirm; per <a href="../../shared/workflow/skill-checklists.md"><code>shared/workflow/skill-checklists.md</code></a>.</p>
+<ul class="task-list">
+<li><label><input type="checkbox"><strong>Run automated clean check</strong>: <code>python3 scripts/check-pr-fully-clean.py --quorum &lt;number-of-reachable-providers&gt; &lt;pr-number&gt;</code> returned exit code <code>0</code> (confirming all CI check runs completed with success AND clean review comments for current HEAD SHA have been posted).</label></li>
+<li><label><input type="checkbox"><strong>Killer item:</strong> all workflows and check runs are green <strong>and completed</strong> for the current head — re-fetched and re-counted now, not checked off from the names you were watching. Marked because a posted verdict does not mean the review job finished, the check set can <em>grow</em> mid-run as jobs spawn others, and two check runs can share a name (a stale green plus a live one), so matching on name returns the wrong one. Key on check-run id, and read <code>status</code> before <code>conclusion</code>.</label></li>
+<li><label><input type="checkbox">Every reviewer’s latest verdict has zero findings and no disputed rebuttals.</label></li>
+<li><label><input type="checkbox">You have obtained genuine posted clean verdicts at the current head from ALL reachable providers in your pinned quorum – re-checked right before declaring clean.</label></li>
+<li><label><input type="checkbox">Every self-review posted along the way was produced by a separate <code>adversarial-reviewer</code> subagent rather than inline, and its findings were dispositioned (<a href="../../shared/workflow/adversarial-self-review.md"><code>adversarial-self-review</code></a>).</label></li>
+<li><label><input type="checkbox">Every inline review thread is resolved.</label></li>
+<li><label><input type="checkbox">The only open conversation is the final all-clear exchange (the reviewer’s all-clear comment and your reply — normally a top-level PR comment, not an inline thread).</label></li>
+</ul>
+</section>
+</section>
+<section id="stopping-conditions" class="level2">
+<h2 class="anchored" data-anchor-id="stopping-conditions">Stopping conditions</h2>
+<p><strong>There is no round limit. Always request another review.</strong> The loop on a single PR ends on exactly three things:</p>
+<ol type="1">
+<li><strong>A totally clean review on the latest pushed commit</strong> – no nits, no non-blocking comments, no informational notes, everything Addressed or agreed Deferred, evaluating the exact HEAD SHA currently on the branch. <strong>Crucial:</strong> Pushing fixes for a review starts a new review cycle. The ARDI loop is <strong>NEVER</strong> finished when you push fixes for a finding-bearing review or post an ARD summary. You must wait for the new review run evaluating your latest pushed commit to post, fetch and parse that review, and confirm it contains zero findings before ending the loop. See <a href="#the-bar-fully-clean"><em>The bar: “fully clean”</em></a>.</li>
+<li><strong>Nothing actionable remains</strong> — every open item has been escalated to a human and is waiting on their decision, so there is no next action you can take. Not “some items are deadlocked”; <em>all</em> of them.</li>
+<li><strong>The user says stop.</strong></li>
+</ol>
+<p>Nothing else. Not a round count, not a sense that findings are getting smaller, not a judgment that the reviewer is nitpicking.</p>
+<p><strong>Deadlock is per-item, and it does not stop the loop.</strong> If you and the reviewer can’t reach consensus on one finding (your rebuttal didn’t convince them, and their re-raise didn’t convince you), <strong>escalate that item to a human reviewer</strong> rather than looping on it or unilaterally overriding. Request <code>the repository owner</code> via the <code>request-pr-review</code> skill, <code>@</code>-mention them in a comment summarizing the impasse, and surface the open item to the user. The raw <code>gh pr edit &lt;N&gt; --add-reviewer &lt;reviewer&gt;</code> form bypasses that skill and so does <strong>not</strong> inherit its <code>Lacaedemon/sparta</code> exception. In sparta, escalate to the user in chat rather than requesting a reviewer at all. Then <strong>keep driving the PR</strong>: address every other finding, push, and request the next review. Only when <em>every</em> remaining item is an escalated deadlock does condition 2 above fire, and even then the loop resumes the moment the human rules.</p>
+<section id="sweep-level-scheduling-is-a-different-question" class="level3">
+<h3 class="anchored" data-anchor-id="sweep-level-scheduling-is-a-different-question">Sweep-level scheduling is a different question</h3>
+<p><a href="../../skills/ardia/SKILL.html"><code>ardia</code></a> and <a href="../../skills/gia/SKILL.html"><code>gia</code></a> drive <em>many</em> PRs. When one of those is waiting on a human — a deadlocked item, a blocked dependency, an unresolvable conflict — the sweep records it and moves to the next PR so the batch keeps moving. That is <strong>scheduling</strong>, not a stopping condition for the loop: the sweep returns when the human rules, and nothing about it licenses accepting unaddressed findings on the PR itself.</p>
+</section>
+<section id="asymptotic-noise-is-an-anti-pattern-not-a-signal" class="level3">
+<h3 class="anchored" data-anchor-id="asymptotic-noise-is-an-anti-pattern-not-a-signal">“Asymptotic noise” is an anti-pattern, not a signal</h3>
+<p>This skill used to carry a guard saying that after 3-4 rounds of new nits you should surface the pattern and ask whether to continue. <strong>That guard is removed, and reasoning of that shape must not be reintroduced.</strong> It fails three ways:</p>
+<ul>
+<li><strong>It fires on round count, not on finding quality.</strong> A round producing genuine, reproducible correctness bugs is indistinguishable from a round producing style churn if all you count is rounds.</li>
+<li><strong>It reads as diligence</strong>, which is exactly why it goes unexamined. Stopping to ask feels like respecting the user’s time.</li>
+<li><strong>It hands triage back to the user</strong> — the precise move <a href="../../shared/workflow/address-every-comment.md"><code>address-every-comment</code></a> already forbids for individual findings. The guard reintroduced at loop scale the thing that fragment bans at item scale.</li>
+</ul>
+<p>The tell is any sentence of the form “the reviewer keeps finding things, so maybe we should stop.” Replace it with another review request.</p>
+<p>Two things that are <strong>not</strong> this anti-pattern and stay:</p>
+<ul>
+<li><strong>The per-item hold.</strong> When a reviewer re-raises one already-deferred item verbatim each round, reply once pointing at the tracked issue and hold on <em>that item</em>, while continuing to fix every new finding. That is about not re-litigating one item; it never stops the loop.</li>
+<li><strong>Reporting the round count.</strong> Saying “round 7, 23 findings, all Addressed” is useful information. Attaching “shall I stop?” to it is the anti-pattern.</li>
+</ul>
+<p>(ai-config#1029 is the case record: six rounds, 23 findings, all Addressed, with rounds 2-6 each finding real bugs in <em>earlier rounds’ own fixes</em> — including CRLF silently disabling a failure path repo-wide, a <code>--compare</code> reporting a zero delta, and a traversal-order-dependent measurement. The loop stopped to ask twice under the old guard; both times the answer was to keep going, and the next round found four more real bugs.)</p>
+</section>
+</section>
+<section id="on-clean" class="level2">
+<h2 class="anchored" data-anchor-id="on-clean">On clean</h2>
+<p>Post an unclaim comment (<code>COMMENT_PR</code>) to unblock any parallel sessions that backed off in step 1:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> pr comment <span class="op">&lt;</span>N<span class="op">&gt;</span> --body <span class="st">"Done --- PR is free.</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="st">_Posted by Claude Code (AI agent) --- not written by a human._"</span>   <span class="co"># COMMENT_PR</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>Then run <code>ums</code>, before reporting ready.</strong> The clean verdict is still a proactive-UMS checkpoint for this PR, not the merge, but it is not the first one: run a pass when you read the review, including a Rebut/Defer round, rather than holding everything for the verdict. See <code>CLAUDE.md</code>’s “Run UMS proactively, as learnings accumulate”. The loop’s whole point is that it ends here and hands the merge to a human, so a pass deferred to the merge is deferred to a moment this session may never see. Everything the review lifecycle taught – recurring findings, corrections, guidance given along the way – is complete as of the verdict.</p>
+<p>Always provide a clickable link to the MR/PR in the final message.</p>
+<p>Report the final verdict and round count. Don’t merge unless asked.</p>
+
+
+</section>
+</section>
+
+<a onclick="window.scrollTo(0, 0); return false;" role="button" id="quarto-back-to-top"><i class="bi bi-arrow-up"></i> Back to top</a></main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    // Ensure there is a toggle, if there isn't float one in the top right
+    if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+      const a = window.document.createElement('a');
+      a.classList.add('top-right');
+      a.classList.add('quarto-color-scheme-toggle');
+      a.href = "";
+      a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+      const i = window.document.createElement("i");
+      i.classList.add('bi');
+      a.appendChild(i);
+      window.document.body.appendChild(a);
+    }
+    setColorSchemeToggle(hasAlternateSentinel())
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/Morrison-Lab\.github\.io\/ai-config\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+            // default icon
+            link.classList.add("external");
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+<p>Built with <a href="https://quarto.org/">Quarto</a></p>
+<div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/ardi/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/ardi/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>

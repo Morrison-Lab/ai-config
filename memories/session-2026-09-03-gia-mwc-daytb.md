@@ -431,12 +431,19 @@ Wants a pre-request checklist line in `shared/writing/semantic-line-breaks.md` w
 
 ## 14:13 PDT --- session limit hit at 13:56 PDT; resumed at 14:12 PDT
 
-The account's session limit (HTTP 429, reset 14:10 PDT) ended every in-flight subagent at once: the git-memory UMS agent, branch P's round-5 verdict, and the refuter, fix, and recheck stages of all four waves.
+The account's session limit (HTTP 429, reset 14:10 PDT) ended every in-flight subagent at once:
+the git-memory UMS agent, branch P's round-5 verdict,
+and the refuter, fix, and recheck stages of all four waves.
 All 40 implementations had already committed, and every first-round refuter that finished had refuted (2 to 7 findings each), so no wave branch reached verified state before the cut.
 The user asked to continue from where I left off.
 
 Resumed: waves 1 and 2 from their run ids (completed agents replay from cache, failed ones re-run), the UMS agent from its transcript, and a fresh round-5 verdict on branch P.
-Waves 3 and 4 are held until 1 and 2 finish, two workflows at a time rather than four, since four at once is what spent the limit in an hour.
-The Workflow tool refused the persisted script paths for waves 2 to 4 as unreadable; a copy under the scratchpad resumed with the same run id.
+Waves 3 and 4 are held until 1 and 2 finish, two workflows at a time rather than four,
+since four at once is what spent the limit in an hour.
+The Workflow tool refused the persisted script paths for waves 2 to 4 as unreadable;
+a copy under the scratchpad resumed with the same run id.
 Open PRs on the repo are all peer sessions' (#3137, #3101, #3060); none of this session's remain open.
 Check-in re-armed for 14:58 PDT.
+
+User directive at 14:13 PDT: keep to 5 subagents max.
+Two resumed workflows run 2 agents each on this 4-CPU container, so one of the two single agents (the UMS writer) is stopped until a wave finishes, and waves 3 and 4 wait their turn.

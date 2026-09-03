@@ -43,7 +43,7 @@ A subagent starts **fresh** â€” it sees only this prompt, not this skill file â€
 >       --jq '{
 >         author: .author.login,
 >         reviewRequests: [.reviewRequests[].login],
->         review: ([.comments[] | select(.author.login | startswith("claude"))] | last | {url: .url, body: .body, createdAt: .createdAt}),
+>         review: ([.comments[] | select((.author.login // "") | startswith("claude"))] | last | {url: .url, body: .body, createdAt: .createdAt}),
 >         lastCommitDate: (.commits[-1].committedDate),
 >         headRefOid: .headRefOid
 >       }'

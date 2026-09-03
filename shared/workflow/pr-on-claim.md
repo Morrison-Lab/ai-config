@@ -116,7 +116,7 @@ See [`pr-on-claim.cases.md`](pr-on-claim.cases.md), "The blocking message prescr
 
 **That message's verification query counts reviews on the PR, not reviews of the current head.**
 
-`[.reviews[] | select(.author.login | startswith("copilot"))] | length` returns every Copilot review the PR ever received, including one submitted against a diff that no longer exists.
+`[.reviews[] | select((.author.login // "") | startswith("copilot"))] | length` returns every Copilot review the PR ever received, including one submitted against a diff that no longer exists.
 On ai-config#3010 it returned 1 while the only review on record predated a force-push, so it read as satisfied over a diff nothing had reviewed --- the same head-scoping gap [`fully-clean`](fully-clean.md) closes by requiring `reviews[].commit.oid` in its payload.
 
 - **Do:** compare each review's `submittedAt` against the last push, or match `commit.oid` against the head, before reading a non-zero count as an answer.

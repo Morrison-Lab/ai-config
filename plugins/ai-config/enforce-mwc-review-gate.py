@@ -18,8 +18,11 @@ merged over a "Needs more work" verdict (reverted in sparta#1429):
 - only the text under `### Verdict` is classified, and negated approvals
   ("cannot approve", "not approved") classify as not-clean;
 - a formal review's mere existence no longer satisfies the gate (Copilot's
-  COMMENTED review used to), and a human review counts only when its latest
-  state is APPROVED -- a standing CHANGES_REQUESTED denies;
+  COMMENTED review used to); a human review counts as approval when its
+  latest state is APPROVED or its body affirmatively approves
+  (ai-config#3062 -- reviewers here never submit APPROVED, so keying the
+  allow-path on that state alone made it dead code), and a standing
+  CHANGES_REQUESTED denies;
 - a verdict naming a `Reviewed commit:` other than the PR head is stale and
   denies;
 - `--admin` merges (server-rule bypass) and GraphQL mergePullRequest
@@ -97,12 +100,51 @@ def is_bot_login(login):
             or login.removesuffix("[bot]") in REVIEWER_BOT_LOGINS)
 
 
-def latest_human_review_states(reviews):
-    """Latest APPROVED/CHANGES_REQUESTED state per non-bot author.
+def human_review_body_approves(body):
+    """Whether a human review body affirmatively approves the PR.
 
-    COMMENTED and PENDING never change an author's standing. GitHub marks a
-    dismissed review by mutating its state to DISMISSED in place; handle a
-    trailing DISMISSED entry too, so either payload shape clears standing.
+    An `APPROVED` state alone cannot carry human approval in this corpus,
+    so keying the allow-path on it made that branch dead (ai-config#3062).
+    Measured 2026-09-02 over the 25 most recently merged
+    Morrison-Lab/ai-config PRs: 168 of 168 reviews were COMMENTED and none
+    was APPROVED, and shared/workflow/fully-clean.md tells reviewers not to
+    wait for a formal APPROVED review. So read the body's substance beside
+    the state.
+
+    Only the headline can approve -- the first non-empty line, or the first
+    line under a `### Verdict` heading when the body carries one -- so a
+    review whose prose merely mentions an "approved" helper does not read
+    as an approval. Not-clean phrasing anywhere in the body vetoes first,
+    the *whole* body rather than just the verdict section, so a review
+    stating a blocker above its own heading cannot approve either.
+    Blockquoted and fenced regions are blanked exactly as
+    `evaluate_verdict` blanks them, so a review quoting someone else's
+    approval is not itself one.
+    """
+    if not body:
+        return False
+    blanked = FENCE_RE.sub("", BLOCKQUOTE_LINE_RE.sub("", body))
+    if NOT_CLEAN_VERDICT_RE.search(blanked):
+        return False
+    if VERDICT_MARKER_RE.search(blanked):
+        blanked = VERDICT_MARKER_RE.split(blanked, maxsplit=1)[1]
+    lines = [ln.strip() for ln in blanked.splitlines() if ln.strip()]
+    return bool(lines) and bool(CLEAN_VERDICT_RE.search(lines[0]))
+
+
+def latest_human_review_states(reviews):
+    """Latest APPROVED/CHANGES_REQUESTED standing per non-bot author.
+
+    PENDING never changes an author's standing, and COMMENTED changes it
+    only when the review body affirmatively approves (see
+    `human_review_body_approves`). GitHub marks a dismissed review by
+    mutating its state to DISMISSED in place; handle a trailing DISMISSED
+    entry too, so either payload shape clears standing.
+
+    A body-derived approval deliberately cannot clear a standing
+    CHANGES_REQUESTED: CLAUDE.md holds that only that reviewer or an
+    explicit dismissal resolves one, and an inferred approval is weaker
+    evidence than the formal state it would be overriding.
     """
     states = {}
     for r in reviews:
@@ -114,6 +156,10 @@ def latest_human_review_states(reviews):
             states[login] = state
         elif state == "DISMISSED":
             states.pop(login, None)
+        elif (state == "COMMENTED"
+              and states.get(login) != "CHANGES_REQUESTED"
+              and human_review_body_approves(r.get("body", "") or "")):
+            states[login] = "APPROVED"
     return states
 
 
@@ -260,8 +306,8 @@ def evaluate(cmd, pr_data):
             "the only clean verdict is a comment posted under a "
             "non-reviewer login, which cannot authorize a merge (an agent "
             "posting under the user's login must not approve its own "
-            "work). Get a clean verdict from the review workflow, or a "
-            "formal APPROVED review from a human."
+            "work). Get a clean verdict from the review workflow, or an "
+            "approving review from a human."
         ),
         "none": (
             "no review verdict and no human approval are present. You "

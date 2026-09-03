@@ -36,8 +36,8 @@ def comment(body, login="github-actions"):
     return {"author": {"login": login}, "body": body}
 
 
-def review(login, state):
-    return {"author": {"login": login}, "state": state}
+def review(login, state, body=""):
+    return {"author": {"login": login}, "state": state, "body": body}
 
 
 def pr(reviews=(), comments=(), checks=(), head=HEAD,
@@ -168,6 +168,76 @@ class TestEvaluate(unittest.TestCase):
 
     def test_human_commented_review_does_not_approve(self):
         state = pr(reviews=[review("d-morrison", "COMMENTED")])
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "deny")
+
+    def test_human_commented_review_with_approving_body_allows(self):
+        """ai-config#3062: reviewers here submit COMMENTED, never APPROVED,
+        so approval has to be readable from the body's substance too --
+        otherwise the human-approval allow-path can never fire."""
+        for body in ("Ready for merge.",
+                     "Approved -- nothing further from me.",
+                     "### Verdict\n**Ready for merge** --- looks right."):
+            state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+            self.assertEqual(
+                gate.evaluate(MERGE_CMD, state)["decision"], "allow", body)
+
+    def test_human_commented_body_negated_approval_denies(self):
+        for body in ("Cannot approve yet; the migration is missing.",
+                     "This isn't ready for merge.",
+                     "Ready for merge? No -- changes requested."):
+            state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+            self.assertEqual(
+                gate.evaluate(MERGE_CMD, state)["decision"], "deny", body)
+
+    def test_incidental_approval_word_in_review_body_does_not_approve(self):
+        """Only the headline can approve, so prose mentioning an approved
+        helper cannot launder itself into an approval."""
+        body = ("Two notes on the parser.\n\n"
+                "It reuses the approved validation helper, which is fine.")
+        state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "deny")
+
+    def test_blocker_above_verdict_heading_still_vetoes(self):
+        """The not-clean sweep covers the whole body, not just the section
+        under `### Verdict`, so a blocker stated above the heading holds."""
+        body = "The migration is not ready.\n\n### Verdict\nReady for merge."
+        state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "deny")
+
+    def test_quoted_approval_in_review_body_does_not_approve(self):
+        body = "Quoting the earlier round:\n> Ready for merge\n\nStill checking."
+        state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "deny")
+
+    def test_body_approval_does_not_clear_standing_changes_requested(self):
+        """An inferred approval is weaker than the formal state it would
+        override: only APPROVED or a dismissal clears CHANGES_REQUESTED."""
+        state = pr(
+            reviews=[review("d-morrison", "CHANGES_REQUESTED"),
+                     review("d-morrison", "COMMENTED", "Ready for merge.")],
+            comments=[CLEAN_VERDICT],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("CHANGES_REQUESTED", decision["reason"])
+
+    def test_bot_commented_review_with_approving_body_does_not_approve(self):
+        state = pr(
+            reviews=[review("copilot-pull-request-reviewer[bot]", "COMMENTED",
+                            "Ready for merge.")],
+            comments=[NEEDS_WORK_VERDICT],
+        )
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "deny")
+
+    def test_body_approval_does_not_override_not_clean_verdict(self):
+        state = pr(
+            reviews=[review("d-morrison", "COMMENTED", "Ready for merge.")],
+            comments=[NEEDS_WORK_VERDICT],
+        )
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "deny")
+
+    def test_pending_review_with_approving_body_does_not_approve(self):
+        state = pr(reviews=[review("d-morrison", "PENDING", "Ready for merge.")])
         self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "deny")
 
     def test_bot_suffix_login_ignored_but_botlike_human_counts(self):

@@ -573,6 +573,22 @@ def halfway_bound(step):
     return step ** 1.5
 
 
+def report_separation(label, bound, step):
+    """Assert a growth bound sits strictly between the two shapes it separates.
+
+    A timing control can only exercise the bound it is itself read against, so
+    a second bound in this file has nothing checking it. This costs no clock
+    at all and fails on any hand-edited flat figure that has stopped
+    separating linear from quadratic -- which is exactly how widening a size
+    step without recomputing the bound goes wrong.
+    """
+    ok = step < bound < step ** 2
+    print(f"  {'allow' if ok else 'WRONG':<6} "
+          f"{label}: bound {bound:g}x sits {'' if ok else 'NOT '}between "
+          f"linear ~{step}x and quadratic ~{step ** 2}x")
+    return ok
+
+
 SCAN_SMALL = 300            # repetitions in the baseline input
 SCAN_STEP = 4               # the large input is this multiple of the small one
 SCAN_GROWTH_BOUND = halfway_bound(SCAN_STEP)   # 8.0 = sqrt(4 * 16)
@@ -589,8 +605,11 @@ SCAN_FLOOR_SECONDS = 0.001
 # A liveness ceiling, deliberately absurd rather than a runtime budget: the
 # ratio is blind to a constant-factor blowup, and this hook runs before EVERY
 # Bash call, so a scan burning half a minute of CPU is broken whatever its
-# shape. The slowest reading ever reported was 2.1s, on an input five times
-# larger than the one measured here, so this ceiling cannot flake.
+# shape. The slowest reading this file takes is the negative control's
+# quadratic scan over 96000 characters, 1.5s on the 4-core container these
+# figures come from, so the ceiling leaves about 20x of headroom. Load eats
+# into that, so read a breach as a claim about the machine before one about
+# the scanner.
 SCAN_ABSURD_SECONDS = 30.0
 
 
@@ -647,6 +666,7 @@ def quoted_spans(n):
     return " ".join(f'echo "field {i}"' for i in range(n))
 
 
+check(report_separation("scanner bound", SCAN_GROWTH_BOUND, SCAN_STEP))
 check(report_growth("chained substitutions", chained_substitutions))
 check(report_growth("quoted spans", quoted_spans))
 
@@ -656,8 +676,12 @@ check(report_growth("quoted spans", quoted_spans))
 # a deliberately quadratic scan, measured through the same helper against the
 # halfway bound its own size step earns, has to land ABOVE it, and a linear
 # scan measured the same way has to land BELOW it. Without this pair the two
-# assertions above would keep passing if `fastest_scan` or the bound were ever
-# broken.
+# assertions above would keep passing if `fastest_scan` were ever broken.
+#
+# The pair is read against SCAN_CONTROL_BOUND, so it exercises that bound and
+# no other -- in particular not SCAN_GROWTH_BOUND, which is the bound those
+# two assertions are themselves read against. `report_separation` covers both,
+# and covers them without a clock.
 #
 # The control needs a much longer input than the scanners above, for two
 # reasons that push the same way. Python's own per-iteration overhead is
@@ -678,27 +702,43 @@ SCAN_CONTROL_SMALL = 6000
 #
 # What a wider step buys is margin, because the quadratic term outruns the
 # halfway bound: at step s the reading is s ** 2 and the bound is s ** 1.5, so
-# the margin is sqrt(s). Measured here, 3.8x at step 16 against 1.9x at step
-# 4, which clears the 2.1x compression the runner produced.
+# the margin is sqrt(s). Measured here, 3.6-3.7x at step 16 against 1.9x at
+# step 4, which clears the 2.1x compression the runner produced.
 #
 # The bound has to be recomputed at the control's own step for that to hold,
 # and this is the trap in widening the gap alone: 8.0 is the halfway line for
-# a 4x step and is BELOW the 8x a linear scan grows at an 8x step, so a flat
-# bound read against a widened step stops separating the two shapes. Measured
-# at step 8: a linear scan grew 7.8-8.8x across three runs, clearing 8.0 in
-# two of them. `linear_control` below asserts the separation rather than
-# arguing it.
+# a 4x step and is EXACTLY the 8x a linear scan grows at an 8x step, so a flat
+# bound read against a widened step separates the two shapes no better than a
+# coin flip. That is arithmetic rather than a measurement, and the readings
+# agree: at step 8 on this container a linear scan grew 7.55-8.09x across
+# twelve runs, straddling 8.0 and clearing it once. The positive control below
+# (`linear_scan`, checked through `report_control(..., expect_above=False)`)
+# asserts the separation rather than arguing it.
 #
-# Subtracting a measured fixed cost is the other repair on offer, and the
-# measurement rules it out: an empty loop of the same shape costs 0.09ms
-# against the 6.5ms baseline, 1.4% of it, which cannot account for a 2.1x
-# compression. Whatever inflates the denominator on a loaded runner is
-# multiplicative, and only a wider lever defends against that.
+# Subtracting a measured fixed cost was the other repair on offer. It was not
+# chosen, and not because measurement ruled it out: what an idle container can
+# measure is the INTERPRETER's fixed cost -- 0.62ms of the 6.2ms baseline for
+# the loop plus one zero-length `count` call, which is the shape #3098
+# proposed subtracting -- while the LOAD-induced fixed cost the repair targets
+# cannot be measured from here at all. So the distortion's shape stays a
+# hypothesis, and the wider step is chosen for surviving either shape rather
+# than for ruling one out: an additive fit of the runner's 7.3x at step 4 puts
+# the nuisance cost at ~1.4x the baseline, which still reads ~108x against the
+# 64x bound at step 16, and a 2.1x multiplicative compression leaves ~110x.
 SCAN_CONTROL_STEP = 16
 SCAN_CONTROL_BOUND = halfway_bound(SCAN_CONTROL_STEP)   # 64.0 = sqrt(16 * 256)
 
 # Passes chosen so the linear control's baseline costs ~8ms, well clear of
 # SCAN_FLOOR_SECONDS: one pass over 6000 characters is far too fast to time.
+#
+# The positive control is exposed to the OPPOSITE distortion from the negative
+# one, and its margin is worth stating because this file's timing assertions
+# have now flaked six times. Load INFLATING a ratio is the direction
+# shared/workflow/algorithmatize-checks.md already records, at 8.45x for an
+# unchanged linear scanner against a bound of 8.0 -- a ~2.0x inflation, though
+# of a wall-clock reading where this control uses `process_time`. Measured
+# here the positive control reads 15.2-15.4x against the 64x bound, so it
+# tolerates ~4.2x inflation, about twice the worst ever recorded.
 SCAN_LINEAR_CONTROL_PASSES = 4000
 
 
@@ -745,6 +785,8 @@ def report_control(label, scan, expect_above):
     return ok
 
 
+check(report_separation("control bound", SCAN_CONTROL_BOUND,
+                        SCAN_CONTROL_STEP))
 check(report_control("negative control: a quadratic scan",
                      quadratic_scan, expect_above=True))
 check(report_control("positive control: a linear scan",

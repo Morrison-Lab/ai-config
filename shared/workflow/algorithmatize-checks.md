@@ -1358,20 +1358,29 @@ An inflated ratio reports a regression that is not there, and reads as a finding
 A compressed one reports that the control cannot discriminate, and reads as a broken control --- so the instrument accuses itself, and the tempting repair is to loosen a bound that was working.
 
 Two repairs are on offer, and which one fits turns on whether the distortion is additive or multiplicative.
-That is measurable rather than assumable, so measure it.
-Subtracting a measured floor removes an additive fixed cost: timing an empty loop of the same shape cost 0.09ms against a 6.5ms baseline, 1.4% of it, which cannot account for a 2.1x compression, so subtraction would have bought nothing there.
-Widening the input-size gap is the repair that fits a multiplicative distortion, because the quadratic term outruns the bound: at a size step of `s` the reading is `s ** 2` and the halfway bound is `s ** 1.5`, so the margin is `sqrt(s)` --- 1.9x at a 4x step against 3.8x at a 16x step, measured.
+That is measurable rather than assumable, so measure it --- and measure it under the condition the distortion appears in, which is the step that fails quietly.
+Here it could not be: the fixed cost timeable on an idle container is 0.62ms of a 6.2ms baseline, for the loop plus one zero-length scan call, which bounds the *interpreter's* share and says nothing about a loaded runner's, since scheduler latency and a cold cache are load-dependent by construction.
+So the distortion's shape stayed a hypothesis, and the repair was chosen for surviving either shape rather than for ruling one out.
+Widening the input-size gap does that, because the quadratic term outruns the bound: at a size step of `s` the reading is `s ** 2` and the halfway bound is `s ** 1.5`, so the margin is `sqrt(s)` --- 1.9x at a 4x step against 3.6-3.7x at a 16x step, measured.
+An additive fit of the runner's reading puts the nuisance cost at ~1.4x the baseline, which still clears the widened bound by 1.7x, and a 2.1x multiplicative compression clears it by 1.7x too.
 
 **Widening the gap while leaving the bound fixed is the trap**, and it hides well because the number in the bound never changes, so nothing looks edited.
-A bound of 8.0 is the halfway line for a 4x step and sits *below* the 8x a genuinely linear scan grows at an 8x step: measured, a linear scan read 7.8-8.8x there and cleared 8.0 in two runs of three.
+A bound of 8.0 is the halfway line for a 4x step and sits *exactly on* the 8x a genuinely linear scan grows at an 8x step, so it separates the two shapes no better than a coin flip.
+That is arithmetic rather than a measurement, and the readings agree: a linear scan read 7.55-8.09x there across twelve runs, straddling the bound.
 A widened control against the old bound would pass for either shape, which is the one thing a control exists to rule out.
 Recompute the bound at whatever step it is read against, and pin the separation with a positive control of the opposite shape rather than arguing it.
 
+The 0.62ms, 3.6-3.7x, 1.7x and 7.55-8.09x figures here were read on one 4-core Linux container at load average ~2.5, through `time.process_time`, as the minimum of three baseline runs over the minimum of two target runs;
+the 14.5-15.3x readings came from a quieter container at load average ~0.5.
+A timing figure is a claim about a machine, so re-measure rather than porting these.
+
 - **Do:** ask which term a nuisance cost lands in, since load can push a ratio either way.
-- **Do:** measure the fixed cost before subtracting it, because an additive repair does nothing to a multiplicative distortion.
+- **Do:** measure a fixed cost under the load it appears under before subtracting it, since an idle reading bounds the interpreter's share and not the runner's.
+- **Do:** prefer the repair that survives both shapes of distortion when you cannot measure which shape you have.
 - **Do:** recompute a bound at the size step it is read against, and pin the separation with a control of the opposite shape.
 - **Don't:** read a control's "I cannot discriminate" as evidence about the code it controls.
 - **Don't:** widen a ratio's input-size gap while leaving a bound that was derived for the old gap.
+- **Don't:** rest a causal classification on a measurement taken where the cause cannot appear.
 
 ## Reading an instrument's PROSE instead of its exit status, generalized past the PR checker
 

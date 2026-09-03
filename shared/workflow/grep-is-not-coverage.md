@@ -194,28 +194,32 @@ The verification half of the same incident --- attempting the base form of a
 command and generalizing to a flag never passed --- is recorded separately in
 Morrison-Lab/ai-config#1174.)
 
+### The same failure has a same-repo sibling: the wrong directory
+
 **The same failure has a same-repo sibling that needs no second repo at all: the wrong *directory*.**
 The rule above turns on a routing decision between repos,
 so it reads as a cross-repo rule and is filed under one.
 The mechanism does not require two repos.
-It requires only that some earlier decision fixed a location,
-after which every later instruction is read relative to it.
+It needs some earlier decision to have fixed a location,
+after which a later instruction is read relative to it.
 Routing an item to a memory file does exactly that:
 the destination is under `memories/`, so the dupe check searches `memories/`,
-and a `shared/` fragment or a skill owning the same idea is never in view.
-The check runs to completion and returns a clean, correctly-constructed zero.
+and a `shared/` fragment or a skill owning the same idea stays outside the paths searched.
+The check runs to completion and returns hits that cannot include the owner,
+which is the unenumerated-hits failure this fragment names below ("A non-null result has the same defect, when the hits go unenumerated").
 
 It is worth separating because the remedy differs.
 The cross-repo case is fixed by adding a corpus;
 this one is fixed by widening within the corpus you are already in,
-which no amount of care about *which repo* will prompt.
+which care about *which repo* does not prompt.
 The corpus already owns the right query, in the sibling procedure ---
 [`skill-builder`](../../skills/skill-builder/SKILL.md) step 0 greps `skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md`,
 where [`ums`](../../skills/ums/SKILL.md) step 3 read "the whole `memories/` directory" at `3935bfff` and stopped there.
-`CLAUDE.md` names both procedures as the same trigger,
+`CLAUDE.md`'s pointer to this fragment names them as one trigger
+("Fires wherever a search decides whether to author something new --- `skill-builder`'s step 0, `ums`'s step 3, and `find-overlap`"),
 and their queries differed.
 
-- **Do:** grep every directory the corpus spans, not the one the destination sits in.
+- **Do:** grep the directories the corpus spans --- `skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md` --- not the one the destination sits in.
 - **Don't:** read "the whole `memories/` directory" as thorough --- the word doing the damage is `memories/`, not "whole".
 
 (Recorded 2026-09-03 on [ai-config#3060](https://github.com/Morrison-Lab/ai-config/pull/3060),
@@ -225,12 +229,18 @@ at `eb0cf15e` and unchanged at `3935bfff` (`origin/main` when this was measured)
 `grep -n MD018` over that file returns five lines at each ref ---
 274, 288, 295, 842 and 976 at `eb0cf15e`, and 274, 288, 295, 861 and 995 at `3935bfff` ---
 of which the first three sit inside one bold-lead block with its own `Do`/`Don't` pair.
-The checkable part is what the wider grep would have done.
-`grep -ril "issue reference" memories/` returns three files at `3935bfff`,
-and none of them is the owner,
-because the owner is `shared/writing/semantic-line-breaks.md` and no search of `memories/` can reach it.
-The ref matters, and is this fragment's own rule below ("A published count needs the ref and the flags it was measured with"):
-the same query returns four at `eb0cf15e`, the commit that added the duplicate entry,
+What step 3's own directory-wide grep would have done is checkable:
+`git grep -ril "issue reference" 3935bfff -- memories/` returns three files ---
+`memories/github.md`, `memories/preferences.md` and `memories/r-quarto.md` ---
+and the owner is not among them,
+because the owner is `shared/writing/semantic-line-breaks.md`,
+which a search of `memories/` cannot reach.
+What skill-builder's corpus-wide query would have done is checkable too:
+`git grep -ril "issue reference" 3935bfff -- skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md` returns eight files at that ref ---
+`hooks/test-no-unauthorized-merge.py`, `hooks/warn-stale-issue-edit.py`, `memories/github.md`, `memories/preferences.md`, `memories/r-quarto.md`, `shared/workflow/address-every-comment.md`, `shared/writing/semantic-line-breaks.md` and `skills/promote-memory/SKILL.md` ---
+with the owner among them.
+That the ref matters is this fragment's own rule below ("A published count needs the ref and the flags it was measured with"):
+the `memories/` query returns four at `eb0cf15e`, the commit that added the duplicate entry,
 whose `memories/markdownlint.md` is the fourth hit.
 At `5f2dab94`, #3060's head when this was measured, the count is still four,
 but that fourth hit is now a stub whose body `1732000a` replaced with a cross-link ---
@@ -240,11 +250,11 @@ following it exactly, over the whole of `memories/`, still misses.
 Note also why this section's own `Do` could not have caught it.
 It reads "grep the ai-config corpus as well as the destination repo's docs,
 **whenever step 2 routes an item anywhere other than ai-config**",
-and this item was routed to ai-config, so its trigger never fires.)
+and this item was routed to ai-config, so its trigger did not fire.)
 
 ## Searching only the rendered output is the same error one layer down
 
-The wrong-corpus section above governs searching the wrong **repo**.
+The wrong-corpus section above governs searching the wrong **repo**, and its last subsection the wrong **directory** within one.
 This one governs searching the wrong **layer within the right repo**:
 a sweep whose file filter reaches the generated artifact and not the generator that produces it.
 
@@ -302,7 +312,7 @@ and the next regeneration would have restored the exact shape the same PR's own 
 
 ## An unmerged PR is part of the corpus a citation can be corroborated against, and no default-branch search reaches it
 
-The wrong-corpus section above governs searching the wrong **repo**.
+The wrong-corpus section above governs searching the wrong **repo**, and its last subsection the wrong **directory** within one.
 This one governs searching the wrong **branch state within the right repo**: a citation to content that ships only in an open PR, checked by grepping the default branch.
 
 The null result here is not merely inconclusive --- it is guaranteed whether or not the cited content is genuine.

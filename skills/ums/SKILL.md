@@ -118,16 +118,23 @@ committed pass.
      the same query [`skill-builder`](../skill-builder/SKILL.md) step 0 runs.
      Those paths are ai-config's layout,
      and `grep` exits 2 in a repo that lacks them,
-     so run the query from the ai-config checkout you are working in ---
-     your own worktree in a worktree session,
-     never the main checkout that skill-builder's `cd` expression resolves to.
+     so run the query from an ai-config checkout.
+     Prefer your own worktree when you are in one,
+     since the shared checkout may sit on another session's branch;
+     reading the shared checkout is otherwise fine,
+     because step 4's prohibition is scoped to writing
+     ("never `cd` straight into the shared checkout itself to make a change"),
+     and step 4's own note calls discovering that path
+     "read-only -- discovering the path doesn't touch the shared working directory".
+     A session working in another repo reaches ai-config
+     through the same `${CLAUDE_PLUGIN_ROOT:-...}` expression step 4 uses to discover it.
      When step 2 routed the item to another repo,
      also run it over that repo's own doc paths,
      per the cross-repo bullet below.
      Stopping at `memories/` is how this check runs to
-     completion and still misses: the destination is a memory file, so every
+     completion and still misses: the destination is a memory file, so a
      later instruction reads as relative to `memories/`, and a `shared/`
-     fragment owning the same idea never enters view.
+     fragment owning the same idea stays outside the paths searched.
      When one exists, extend it in place; don't add a second bullet.
      (ai-config#689: a `list_workflow_runs` cost bullet went in next to the
      related `get_check_runs` guidance while an entry on the same tool already

@@ -8,7 +8,9 @@ Tests:
 4. Review prose containing modifier variations like "No major changes requested".
 5. Robust handling of None author objects in review payloads.
 """
+import contextlib
 import importlib.util
+import io
 import json
 import re
 import time
@@ -3395,6 +3397,37 @@ def main() -> int:
               exit_code_of(lambda: checker.get_pr_info("445", TEST_REPO)) == 2)
         check("a missing gh exits 2 from check_ci_runs too",
               exit_code_of(lambda: checker.check_ci_runs("sha123", TEST_REPO)) == 2)
+
+    # Exiting 2 is only half of it: the message a stranded session reads must
+    # name the remedy, not only the dependency (ai-config#3113). The recipe is
+    # a hardcoded string pointing at a sibling script and a flag, so it can rot
+    # away from either without anything failing -- this is what holds the three
+    # together. Asserted on stderr rather than on the source text, so a message
+    # assembled correctly but never reached would still fail.
+    def stderr_of_missing_binary(argv):
+        buf = io.StringIO()
+        with patch.object(checker, "subprocess") as missing:
+            missing.run.side_effect = FileNotFoundError(
+                2, "No such file or directory", argv[0]
+            )
+            with contextlib.redirect_stderr(buf):
+                exit_code_of(lambda: checker.run_cmd(argv))
+        return buf.getvalue()
+
+    gh_message = stderr_of_missing_binary(["gh", "pr", "view", "445"])
+    check("a missing gh names build-pr-payload.py as the remedy",
+          "build-pr-payload.py" in gh_message)
+    check("a missing gh names --from-json, the flag that consumes the payload",
+          "--from-json" in gh_message)
+
+    # The same `die` serves every command `run_cmd` is handed, and a payload
+    # recipe answers nothing about a missing `git` -- so the recipe is gated on
+    # the binary rather than appended unconditionally.
+    other_message = stderr_of_missing_binary(["git", "rev-parse", "HEAD"])
+    check("a missing non-gh binary still reports which binary is absent",
+          "`git`" in other_message)
+    check("a missing non-gh binary is not offered the --from-json recipe",
+          "--from-json" not in other_message)
 
     # Test 9: -R is parsed rather than silently ignored (#1391's repro)
     args = checker.parse_args(["445", "-R", "Morrison-Lab/gha"])

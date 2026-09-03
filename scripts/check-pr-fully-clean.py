@@ -117,10 +117,33 @@ def run_cmd(cmd: List[str]) -> str:
         # guard fail-fast.md describes -- the guard's presence reads as the
         # hazard being handled everywhere. See Morrison-Lab/ai-config#1330 for
         # the standing dependency on `gh` itself, which this does not remove.
-        die(
+        message = (
             f"`{cmd[0]}` is not installed or not on PATH.\n"
             "This script requires the GitHub CLI; -R cannot substitute for it."
         )
+        if cmd[0] == "gh":
+            # fail-fast.md asks a failure to name its own remedy, and the two
+            # sentences above name only the dependency: the second reads as a
+            # closed door, ruling out the one alternative it mentions and
+            # stopping. The remedy ships in this same directory
+            # (`build-pr-payload.py`, ai-config#2908) and was reachable only
+            # from `fully-clean.md` or that script's `--help`, both of which
+            # require already suspecting it exists -- so a stranded session
+            # hand-built the payload instead (ai-config#2938) or skipped the
+            # check. The error message is the one surface such a session is
+            # guaranteed to read (ai-config#3113).
+            #
+            # Gated on `gh` because this `die` serves every command run_cmd is
+            # handed, and `--from-json` answers nothing about any other missing
+            # binary.
+            message += (
+                "\n\nIn a remote/web session, score a JSON payload instead --"
+                " `build-pr-payload.py` assembles one from plain REST:\n"
+                "  python3 scripts/build-pr-payload.py OWNER/REPO N /tmp/pr.json\n"
+                "  python3 scripts/check-pr-fully-clean.py N -R OWNER/REPO"
+                " --from-json /tmp/pr.json"
+            )
+        die(message)
     if res.returncode != 0:
         # `stderr` is exposed to the same reader-thread decode failure as
         # `stdout`, so it can be None here even though the exit code arrived.

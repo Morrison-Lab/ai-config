@@ -463,6 +463,20 @@
   On `ucdavis/bcs` (2026-07-30) ruleset `19248641`, scoped to `~DEFAULT_BRANCH`, returns `{"review_on_push":true,"review_draft_pull_requests":true}` -- which is why draft PRs there get Copilot reviews at all.
   Check this before concluding that a Copilot review was requested by a person, or that its absence means nobody asked.
 
+  **A required-context STRING is derivable from the default branch's workflow files, and a PR's check-run names are not the place to read it.**
+  A caller job invoking a reusable workflow publishes `<job key> / <inner job name>`, where the job *key* is used and the caller workflow's own `name:` never appears.
+  So `check: {uses: Morrison-Lab/gha/.github/workflows/spellcheck.yml@v2}` in a workflow whose `name:` is `Spellcheck` publishes `check / spellcheck`, not `Spellcheck`.
+  Read the definitions on the default branch, and confirm against a run of *that* branch:
+  ```bash
+  gh api "repos/<o>/<r>/contents/.github/workflows?ref=<default-branch>" --jq '.[].name'
+  gh api "repos/<o>/<r>/contents/.github/workflows/<file>?ref=<default-branch>" --jq .content | base64 -d
+  gh api "repos/<o>/<r>/actions/runs/<run-id>/jobs" --jq '.jobs[].name'
+  ```
+  A required context naming a check no workflow emits never turns red -- it sits as `Expected` and blocks every merge silently, so the mistake has no failing signal to find it by.
+  (ucdavis/rampp, 2026-09-03: bare `Spellcheck` and `Check Changelog Action` were added to ruleset `3889405` on the strength of check-run names read off merged PR #157, whose head predated the repo's move to called reusable workflows;
+  `main` emits `check / spellcheck` and `Check-Changelog / Check Changelog Action`.
+  See [`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md)'s eleventh shape.)
+
 - **GitHub PR Reviews REST API (`POST /repos/{owner}/{repo}/pulls/{number}/reviews`) Requirements & Fallbacks**:
   - `pull_number` MUST be an explicit integer in the URL path (e.g. `/pulls/412/reviews`), not `'current'` or branch names.
     Query `number` and `headRefOid` via `gh pr view --json number,headRefOid`.

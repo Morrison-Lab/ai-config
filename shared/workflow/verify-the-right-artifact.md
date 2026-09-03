@@ -839,3 +839,42 @@ The stub's own added NOTE at the cited commit (`856b8702`) read "Do NOT declare 
 Verified with `gh api "repos/Morrison-Lab/gha/contents/examples/quarto-publish.yml?ref=856b8702" --jq '.content' | base64 -d`.
 The claim was retracted in the PR thread;
 the retraction described `856b8702` as the commit its comments were written against, which a separate check against `gh api repos/Morrison-Lab/gha/pulls/811/commits` and `.../compare/856b8702...e34e03d5` did not confirm, though the file itself was confirmed unchanged.)
+
+**An eleventh: a pull request's check-run names, standing in for the branch's own workflow definitions.**
+
+Every shape above substitutes one artifact for another that is adjacent in *space* --- a cache for an origin, a neighbour for a target, a hunk for its file.
+This one substitutes an artifact adjacent in *time*, and the substitution is invisible because the artifact is not stale in any way a freshness check can see.
+A pull request's check runs are current, complete, and correct.
+They describe the workflows as they existed **at that pull request's head**, which is a commit whose relationship to the default branch nobody stated.
+
+The tell is a claim of the form "this repository emits X", derived from observing X somewhere.
+A check run is produced by a workflow file, and a workflow file is versioned like any other, so a rename, a job restructuring, or a migration from inline jobs to a called reusable workflow changes every context string the repository publishes from that moment on.
+A pull request opened before that change --- **including one that merged after it** --- ran the old definitions, so its check names are an accurate record of a workflow file the default branch no longer contains.
+Merged-ness is the trap: a merged pull request feels like it *became* the branch, when what merged was its diff and not the workflow definitions its own run used.
+
+The consequence for a required status check is unusually expensive, because it fails in the direction nothing reports.
+A required context naming a check that no workflow emits does not error, does not turn red, and does not appear in any run.
+It sits as `Expected` forever, blocking every merge in the repository, and the only diagnosis is noticing that a check listed as required never appears at all.
+
+The authoritative artifact is the default branch's own workflow definitions, confirmed against a run **of that branch**:
+
+```bash
+gh api "repos/<o>/<r>/contents/.github/workflows?ref=<default-branch>" --jq '.[].name'
+gh api "repos/<o>/<r>/contents/.github/workflows/<file>?ref=<default-branch>" --jq .content | base64 -d
+gh api "repos/<o>/<r>/actions/runs/<run-id-on-that-branch>/jobs" --jq '.jobs[].name'
+```
+
+Read the definition rather than only the run, because a run answers only for the workflows that happened to trigger on that push.
+A caller job `check:` invoking `uses: <org>/gha/.github/workflows/spellcheck.yml@v2` publishes `check / spellcheck`, not `Spellcheck`: the caller's own `name:` never appears in the context, the **job key** does, and the inner job's name follows the slash.
+So the string is derivable from the file, and reading it off any observed check run is derivable from the wrong file.
+
+This is also [`run-ums-proactively`](run-ums-proactively.md)'s false-*state*-claim case in its purest form.
+No belief about reusable workflows was ever held and then corrected;
+the wrong thing was simply looked up, so the reusable lesson is the query rather than the value.
+
+- **Do:** derive a required-context string from the default branch's workflow definitions, confirmed against a run of that branch.
+- **Do:** state which commit a check-run observation came from, and whether that commit predates any workflow change.
+- **Don't:** read check names off a pull request, however recent, and generalize them to the repository.
+- **Don't:** treat a pull request having merged as evidence its check names describe the branch --- its diff merged, its workflow definitions did not.
+
+See [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md), "A merged pull request's check names written into a live ruleset".

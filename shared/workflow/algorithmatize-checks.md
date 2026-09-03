@@ -1288,6 +1288,51 @@ Two newer hooks each re-derived a weaker version instead of reusing it.
 - **Don't:** treat a command-position anchor as covering quoted text;
   strip heredoc bodies first.
 
+**When every candidate discharge is satisfiable by typing the right characters,
+ship the guard with no discharge at all.**
+The section above assumes the discharge can be anchored well enough to be
+sound, and asks for the same care the trigger gets.
+Some obligations have no such matcher, and the design question then is not
+which discharge to write but whether to write one.
+
+The recognizable case is an obligation to have **derived** something, where
+every observable trace of the derivation is a string.
+A guard warning that a required status-check context was set without deriving
+it from the default branch has no honest discharge:
+a run-jobs read names no branch, so it cannot show which branch was consulted;
+`gh run list --branch <name>` accepts any branch, so its presence proves only
+that a branch was named;
+and any transcript scan for the derived context string is satisfied by typing
+that string in a comment.
+Each candidate is a check the obligation's own subject can write by hand,
+which is [`fail-fast`](../principles/fail-fast.md)'s denominator move applied
+to the discharge: its passing and failing readings are indistinguishable.
+
+A guard with no discharge warns every time.
+That is a real cost and it is the *right* one for a warning-only guard, because
+the alternative is not a quieter guard but a silent one --- and by the argument
+above, silence is indistinguishable from compliance.
+The asymmetry decides it: a repeated warning is visible and annoying, while a
+typable discharge is invisible and permanent.
+Note the boundary with the reminder-guard pattern, which does need a discharge
+because its obligation (run UMS, post a review) leaves a durable artifact a
+scan can anchor to.
+The distinction is whether the obligation's satisfaction is *observable outside
+the transcript*, not whether the guard is a reminder.
+
+- **Do:** enumerate the candidate discharges explicitly, and say in the guard
+  which ones were rejected and why.
+- **Do:** ship no discharge when every candidate is satisfiable by typing, and
+  keep the guard warning-only so the cost stays a note rather than a block.
+- **Don't:** add a weak discharge to reduce noise --- it converts a visible
+  cost into an invisible one.
+- **Don't:** read "this guard has no discharge" as an unfinished design;
+  for an obligation with no artifact outside the transcript, it is the design.
+
+(`hooks/no-underived-required-check.py`, ai-config#3039: a `PreToolUse` guard
+on ruleset and branch-protection writes, shipped with no discharge condition
+after each of the three candidates above was defeated.)
+
 ## Measure CPU time, not wall clock, when the assertion is about work done
 
 A performance regression test asserts something about the *code*.

@@ -246,3 +246,64 @@ Re-run later it returns different figures, because the pull request's head moves
 compare against the head you actually diffed.
 
 Tracked as [ai-config#3013](https://github.com/Morrison-Lab/ai-config/issues/3013).
+
+## A merged pull request's check names written into a live ruleset
+
+The user asked whether `ucdavis/rampp`'s `main` ruleset still listing bare
+`Spellcheck` and `Check Changelog Action` as required contexts meant those
+settings needed updating to `check / spellcheck` and
+`Check-Changelog / Check Changelog Action`.
+
+The answer given was that the premise failed twice over: that the ruleset
+listed neither context, and that the repository's `gha` v2 workflows emit bare
+names rather than slash-prefixed pairs.
+The second claim was derived from the check-run names on
+[`ucdavis/rampp#157`](https://github.com/ucdavis/rampp/pull/157), whose head
+`e9e8d418` publishes exactly `Spellcheck` and `Check Changelog Action`.
+That reading was correct and about the wrong commit.
+`#157` merged on 2026-09-02, and its head predated the repository's migration
+to called reusable workflows.
+
+`main`'s own definitions, read 2026-09-03, settle it in the direction the user
+had already stated:
+
+```
+$ gh api "repos/ucdavis/rampp/contents/.github/workflows/check-spelling.yaml?ref=main" \
+    --jq .content | base64 -d
+name: Spellcheck
+...
+jobs:
+  check:
+    uses: Morrison-Lab/gha/.github/workflows/spellcheck.yml@v2
+
+$ gh api repos/ucdavis/rampp/actions/runs/33688762211/jobs --jq '.jobs[].name'
+check / spellcheck
+```
+
+`news.yaml` has the same shape with job key `Check-Changelog` calling
+`check-news.yml@v2`, whose inner job is named `Check Changelog Action` --- so
+`Check-Changelog / Check Changelog Action`, again as stated.
+
+The false claim was not merely said.
+It was written into
+[`ucdavis/rampp#159`](https://github.com/ucdavis/rampp/issues/159) as fact and
+applied to the live ruleset with
+`gh api -X PUT repos/ucdavis/rampp/rulesets/3889405`, which now carries
+`Spellcheck` and `Check Changelog Action` among its required contexts.
+Neither is emitted by any workflow on `main`, so both sit as `Expected` on
+every pull request and block every merge, with nothing red to point at.
+The correcting write was then refused by the permission classifier, leaving the
+repository in that state pending the user.
+
+Two things are worth separating.
+The wrong artifact was **real**, so gathering it felt like deriving from
+evidence rather than assuming --- which is this fragment's whole subject, and
+the reason it was loaded and did not fire.
+And the user had supplied the correct answer in the question itself, which
+means the evidence was not merely weak but weak against a strong prior;
+see [`challenge-the-assignment`](challenge-the-assignment.md)'s "The limit".
+
+Tracked as
+[ai-config#3125](https://github.com/Morrison-Lab/ai-config/issues/3125);
+the guard built in response is
+[ai-config#3039](https://github.com/Morrison-Lab/ai-config/issues/3039).

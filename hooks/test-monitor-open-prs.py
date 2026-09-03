@@ -14,15 +14,30 @@ assert subject.POLL_SECONDS == 120
 # pid recorded in it, so a rename would leave two daemons and two files.
 assert subject.STATE_PATH.endswith("all-open-prs.json")
 assert "all_open_prs" in subject.poll_once.__code__.co_consts
-assert any(isinstance(c, (str, tuple, list)) and "--author" in c for c in subject.open_prs.__code__.co_consts)
-# The command must run the absolutely-resolved GH_PATH; the literal "gh"
-# reappearing in open_prs would be a revert of the #1953 fix. CPython folds
-# a list display into a tuple inside co_consts, so nested consts are
-# searched too -- a top-level-only check passes on the reverted code.
-assert not any(
-    value == "gh"
+# The GitHub search covers the three arms of memories/reviewing-prs.md's
+# PR-scope test that a query can express (ai-config#2919): PRs the user
+# opened, PRs assigned to the user, and PRs the `github-actions` app
+# opened. The fourth arm, named in the request, is a property of a
+# conversation rather than of a PR, so no query can carry it.
+OPEN_PRS_CONSTS = [
+    value
     for const in subject.open_prs.__code__.co_consts
-    for value in (const if isinstance(const, (tuple, list)) else (const,)))
+    for value in (const if isinstance(const, (tuple, list)) else (const,))
+]
+for arm in ("--author", "@me", "--assignee", "app/github-actions"):
+    assert arm in OPEN_PRS_CONSTS, arm
+# The workflow-bot arm is the one that is not self-scoping, so it must be
+# bounded by owner: unqualified, it searches all of GitHub.
+assert "--owner" in OPEN_PRS_CONSTS
+# The command must run the absolutely-resolved GH_PATH; the literal "gh"
+# reappearing at a gh call site would be a revert of the #1953 fix. CPython
+# folds a list display into a tuple inside co_consts, so nested consts are
+# searched too -- a top-level-only check passes on the reverted code.
+for gh_caller in (subject.open_prs, subject.gh_search_prs, subject.gh_owners):
+    assert not any(
+        value == "gh"
+        for const in gh_caller.__code__.co_consts
+        for value in (const if isinstance(const, (tuple, list)) else (const,))), gh_caller
 assert any(isinstance(c, (str, tuple, list)) and "created_by_me" in c for c in subject.host_merge_requests.__code__.co_consts)
 assert "--hostname" in subject.host_merge_requests.__code__.co_consts
 assert "--paginate" in subject.host_merge_requests.__code__.co_consts
@@ -437,6 +452,99 @@ with tempfile.TemporaryDirectory() as d:
         subject.GH_PATH, subject.GLAB_PATH = saved_paths
         subject.STATE_PATH = orig_path
 
+# The GitHub arms end to end against a stub gh: the three searches are
+# unioned on url, deduplicated, and sorted, and the workflow-bot arm is
+# bounded to the owners `gh api` resolved. The stub records its argv so the
+# flags are asserted rather than assumed.
+with tempfile.TemporaryDirectory() as d:
+    gh_argv_log = os.path.join(d, "gh-argv.log")
+    owners_file = os.path.join(d, "owners.txt")
+    with open(owners_file, "w", encoding="utf-8") as stream:
+        stream.write("ezra\nMorrison-Lab\nUCD-SERG\n")
+    gh_stub = os.path.join(d, "gh")
+    with open(gh_stub, "w", encoding="utf-8") as stream:
+        stream.write(
+            "#!/usr/bin/env python3\n"
+            "import json, os, sys\n"
+            f"open({gh_argv_log!r}, 'a').write(' '.join(sys.argv[1:]) + chr(10))\n"
+            f"owners = open({owners_file!r}, encoding='utf-8').read().split()\n"
+            "if sys.argv[1] == 'api':\n"
+            "    listed = owners[1:] if 'user/orgs' in sys.argv else owners[:1]\n"
+            "    sys.stdout.write(''.join(name + chr(10) for name in listed))\n"
+            "    sys.exit(0)\n"
+            "shape = os.environ.get('GH_STUB_SHAPE', '')\n"
+            "if shape == 'object':\n"
+            "    sys.stdout.write(json.dumps({'message': 'Bad credentials'}))\n"
+            "elif shape == 'scalars':\n"
+            "    sys.stdout.write(json.dumps([1, 2]))\n"
+            "else:\n"
+            "    def pr(number):\n"
+            "        return {'number': number, 'url': 'https://example.com/p/%d' % number}\n"
+            "    if 'app/github-actions' in sys.argv:\n"
+            "        out = [pr(4)]\n"
+            "    elif '--assignee' in sys.argv:\n"
+            "        out = [pr(2), pr(1)]\n"
+            "    else:\n"
+            "        out = [pr(1), pr(3)]\n"
+            "    sys.stdout.write(json.dumps(out))\n")
+    os.chmod(gh_stub, os.stat(gh_stub).st_mode | stat.S_IEXEC)
+    gh_before = subject.GH_PATH
+    try:
+        if os.name == "nt":
+            print("SKIP: stub-gh end-to-end block (needs a POSIX executable stub)")
+        else:
+            subject.GH_PATH = gh_stub
+            # The union is deduplicated (the assignee arm repeats PR 1) and
+            # sorted: inject-pr-monitor-status.py fingerprints this list, so
+            # three searches kept in gh's own result order would reorder
+            # between polls and re-inject an unchanged population.
+            def pr(number):
+                return {"number": number, "url": "https://example.com/p/%d" % number}
+            assert subject.open_prs() == [pr(1), pr(2), pr(3), pr(4)], subject.open_prs()
+            with open(gh_argv_log, encoding="utf-8") as stream:
+                gh_calls = stream.read().splitlines()
+            assert gh_calls[0] == "api user --jq .login", gh_calls
+            assert gh_calls[1] == "api --paginate user/orgs --jq .[].login", gh_calls
+            # One search per arm of the scope test a query can express
+            # (ai-config#2919): opened by the user, assigned to the user,
+            # opened by the `github-actions` app.
+            assert gh_calls[2].endswith("--author @me"), gh_calls
+            assert gh_calls[3].endswith("--assignee @me"), gh_calls
+            # The two `@me` arms are self-scoping and carry no owner; the
+            # workflow-bot arm is not, so it is bounded to every owner the
+            # lookup resolved. Unbounded, it would search every open
+            # workflow-bot PR on GitHub.
+            assert "--owner" not in gh_calls[2] and "--owner" not in gh_calls[3], gh_calls
+            assert gh_calls[4].endswith(
+                "--author app/github-actions --owner ezra --owner Morrison-Lab "
+                "--owner UCD-SERG"), gh_calls
+            assert len(gh_calls) == 5, gh_calls
+            # A response that is not an array of objects is refused, never
+            # stored: poll_once catches ValueError into the source's error
+            # entry, where the AttributeError a non-object would raise
+            # would instead end the daemon.
+            for shape, message in (("object", "expected a JSON array"),
+                                   ("scalars", "expected PR objects")):
+                os.environ["GH_STUB_SHAPE"] = shape
+                try:
+                    subject.open_prs()
+                    raise AssertionError(f"a {shape} response should raise")
+                except ValueError as error:
+                    assert message in str(error), error
+                finally:
+                    del os.environ["GH_STUB_SHAPE"]
+            # No resolvable owner is an error rather than a silently
+            # unbounded-then-empty workflow-bot arm.
+            with open(owners_file, "w", encoding="utf-8") as stream:
+                stream.write("")
+            try:
+                subject.gh_owners()
+                raise AssertionError("no resolvable owner should raise")
+            except OSError as error:
+                assert "no owner" in str(error), error
+    finally:
+        subject.GH_PATH = gh_before
+
 # alive() must be truthful on every platform: signal-0 does not track
 # liveness on Windows (#2082), so the probe is OpenProcess there.
 # Non-positive and garbage pids are refused before any probe -- signal 0
@@ -449,4 +557,5 @@ if os.name == "nt":
     assert subject._alive_windows(os.getpid()) is True
 
 print("PASS: GitHub and GitLab CLIs are resolved or refused at startup; "
+      "the GitHub search covers the opened, assigned, and workflow-bot arms; "
       "failures accumulate an error streak that success resets")

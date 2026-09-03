@@ -1301,9 +1301,10 @@ versions.
 That is a direct test of the stale-checker explanation, and it fails.
 It is no test at all of the wording explanation, which is a claim about
 readings that no longer exist.
-What the re-run does establish is the residual: the PRs' own state moved
-between the original runs, which ai-config#3031 records as the verified
-statement.
+What the re-run leaves is the residual --- the PRs' own state moved between the
+original runs --- which ai-config#3031 records as the remaining explanation.
+That is elimination rather than measurement, and this section's own bullets say
+to report it as such.
 What it cannot establish is which reading each original run produced, because
 none was captured.
 ai-config#3022 was closed after review falsified two successive stated causes;

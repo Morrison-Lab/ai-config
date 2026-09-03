@@ -591,12 +591,11 @@ What made it durable rather than a slip is that re-reading the code confirms
 the number without confirming the claim.
 `audit_example_concurrency.py` does exit 2 on a missing callee, exactly as the
 comment said --- so the exit code checks out and the comment is still wrong,
-because the fixture writes the callee under that same name and never reaches
-that branch.
+because that branch is never reached.
 Only running the mutant separates the two, and the comment was written from the
 shape of the code rather than from a run.
 It was introduced by round one's own fix, `21751be5`, survived rounds two
 through five, and was caught by the sixth --- established by walking that file
 through each commit.
 A rationale comment is the artifact a later reader trusts in place of re-running
-the sweep, which is why five reviews read past it.)
+the sweep, which is why four reviews read past it.)

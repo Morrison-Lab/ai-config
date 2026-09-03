@@ -811,8 +811,13 @@ last round's two prose items as zero.
 Two instances, both in fixes for **convention** findings: an over-long-line fix
 put its break on a dangling `and` in each of five files, the uniformity
 suggesting a single edit applied across them --- an inference, not something the
-commits record; and a forward-reference fix reworded the pointer into two new
-forward references.
+commits record; and a forward-reference fix reworded the pointer into a new
+forward reference of its own, `README.md`'s "the audit described below", added
+by `a8a45881`.
+Round four's commit attributes two to that fix; only one is, since the other
+pointer was introduced a round earlier by `385d4f43`, which fixed no forward
+reference --- an over-count inherited here until it was checked against the
+tree.
 
 Only the forward-reference instance is a member of this section's class, since
 its fix reproduced the very finding it closed.

@@ -48,9 +48,9 @@ workflows being skipped, in which the default two-run limit is offered as one
 explanation and contested by a later poster.
 [rhysd/actionlint#538](https://github.com/rhysd/actionlint/issues/538) does
 carry it, as
-`Canceling since a deadlock for concurrency group '<sha>' was detected between
-'top level workflow' and 'build-image'` --- the group hash elided here, verbatim
-on the page.
+`Canceling since a deadlock for concurrency group '...' was detected between
+'top level workflow' and 'build-image'` --- the group name elided here, which
+on the page reads `ci-` followed by a forty-character hash.
 The rule above already prescribes the remedy.
 
 What is new is the **tell**, because this section states its cause as staleness

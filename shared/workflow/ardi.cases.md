@@ -952,7 +952,8 @@ Both sentences had been accurate when written, and the change that falsified
 them was in a different file --- `audit_example_concurrency.py` --- so nothing
 in the *code* diff put either sentence in front of the author.
 `CLAUDE.md` was not untouched, though, which is the sharper version: `385d4f43`
-edited it in the same commit, and that edit's hunk runs to line 2884 while the
+edited it in the same commit, and that edit's nearest hunk runs to line 2884
+while the
 first of the two stale sentences sits at 2887 --- three lines below the hunk's
 last context line, six below its last changed line.
 So the file was open and the region was on screen, and the round still pushed.

@@ -706,3 +706,32 @@ verifying the first settled the second.
 The remedy that section gives is the one that closed it here too --- derive
 the population (grep the calls' actual `num_cores`) rather than reasoning
 from the mechanism to the instance.
+
+## A defect attributed to the fix that merely sits beside it
+
+ai-config#3023, 2026-09-03.
+A review of `scripts/lib/shellcmd.py` found that `_heredoc_free` scanned only the first heredoc opener on a line, so `cat <<A > f1 && cat <<B > f2` left the second body as live text and a `git commit && git push` written inside it was refused.
+
+The fix was easy.
+The commit message was wrong: it called the defect "a regression of this PR's own opener-line fix", because the previous commit had reworked exactly that function and keeping the opener line's remainder was exactly the kind of change that could plausibly have introduced it.
+No check was run.
+The claim arrived as an admission and read as candour, which is what stopped it being read as a claim at all.
+
+The reviewer said it predated the fix.
+Settling it cost one command: `git show 7b54d28:scripts/lib/shellcmd.py`, then exercising that copy on the same input.
+The old version returns a blanked opener followed by both git commands as live text --- the same defect.
+The routes differ, which is why it was believable: the old code dropped the opener-line remainder and lost the second opener along with it, the new code kept the remainder and never rescanned it.
+Same observable failure, two mechanisms, and neither of them the new commit's doing.
+
+Two things generalize.
+The counterfactual is nearly free whenever the prior version is a commit away, so there is no cost argument for skipping it.
+And the reviewer's own attribution was equally a cause claim: agreeing with it because a reviewer said so would have produced the right answer by the wrong route, and the same command settles both.
+
+**The section written from this case opened with the same error, one level up.**
+Its first draft began "The two sections above govern a cause read off the wrong artifact and a justification written after the decision", which is a claim about the fragment's own structure --- and it was recalled rather than read.
+The section directly above is "A story that fits the evidence is not a finding", whose discriminating-experiment remedy the new section's counterfactual instantiates, so the entry presented itself as a fourth independent rule when it is a specialization of its immediate neighbour.
+Settling it cost one `grep -n '^## '`.
+
+That is the **scope** claim-type from the top of this fragment, committed inside a section about the **cause** claim-type, by an author who had just been corrected for an unchecked cause claim.
+Which is the transferable part: knowing a rule, and having just been burned by it, does not arm the check.
+Only asking what kind of claim a sentence is arms it, and "the two sections above" does not feel like a claim at all --- it feels like navigation.

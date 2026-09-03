@@ -148,3 +148,32 @@ Pushed and awaiting review (blacked out until 21:50 PDT): #3023, #3024, #3070.
 Left to the peer session: #3061 (its head moved again), #3037.
 Untouched: #3060, an empty draft closing #3059.
 Filed: #3069, #3071, #3072.
+
+## Round 6 on #3023 --- three false verdicts, a false attribution, and an amend that hit the wrong commit
+
+2026-09-03 09:33 PDT.
+The round-5 verdict came back **Needs more work** with one finding, and Copilot added two more in a separate pass.
+All three are false verdicts of the guard, and all three were reproduced against the shipped code before any fix:
+
+| # | Source | Defect | Direction |
+| --- | --- | --- | --- |
+| F1 | Claude verdict | `_heredoc_free` scans only the FIRST heredoc opener on a line | false DENY |
+| F2 | Copilot | `RX_HEREDOC_OPEN` matches the 2nd and 3rd `<` of a here-string | false ALLOW (silent guard) |
+| F3 | Copilot | `strip_env` peels `export` as a wrapper | false DENY |
+
+F3 is the one worth keeping.
+`export FOO=1 git push` runs no git: `export` is a builtin whose arguments are names and assignments, so it exports the three names `FOO`, `git` and `push`.
+Verified against bash directly rather than reasoned about.
+Three of this PR's own test cases asserted the wrong reading and had to be replaced, which is the tell that the defect was in the model of the shell rather than in the code.
+
+### The false attribution, and the amend that hit the wrong commit
+
+Both lessons are now folded into durable memory, so only the session-specific facts stay here.
+
+My first commit message said F1 was "a regression of this PR's own opener-line fix";
+`7b54d28` reproduces the same defect by a different route, so it predated the fix.
+`git commit --amend` after merging `main` in then retargeted the merge rather than the fix commit, and the recovery was a reset, amend and re-merge whose resulting tree hash matched the pre-reset one.
+
+The generalizable halves live in [`metacognitive-monitoring`](../shared/workflow/metacognitive-monitoring.md), "Your own most recent change is a cause claim too" with its case record, and in [`git`](git.md), "`git commit --amend` after a merge amends the MERGE".
+Read those rather than this;
+the paragraphs that used to restate them here were pruned during the same UMS pass that wrote them, per [`run-ums-proactively`](../shared/workflow/run-ums-proactively.md)'s fold-or-prune step.

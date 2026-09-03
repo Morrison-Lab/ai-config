@@ -151,6 +151,10 @@ jobs:
       - name: Run markdown fences library tests
         # ai-config#2540: scripts/lib/fences.py code block and code span parsing.
         run: python3 scripts/test_fences.py
+      - name: Run shell-command library tests
+        # ai-config#2992: scripts/lib/shellcmd.py argv splitting, heredoc
+        # blanking, and git-invocation classification.
+        run: python3 scripts/test_shellcmd.py
       - name: Run check-rendered-references tests
         # ai-config#2879: verify broken rendered reference checking and footnote isolation.
         run: python3 scripts/test_check_rendered_references.py
@@ -470,7 +474,7 @@ jobs:
           # the gate vacuous without turning anything red.
           fetch-depth: 0
       - name: Check new markdown lines for missing semantic breaks
-        uses: Morrison-Lab/gha/check-new-line-breaks@fdaeccc47273fb8c542d05b00d488242b8563b15 # v2, gha#300
+        uses: Morrison-Lab/gha/check-new-line-breaks@b91ecffc4db85baa2065c4ab2f0e7d25db74460f # v2, gha#826
         with:
           # This value is a git pathspec, not a shell glob: `*.md` already
           # matches at any depth (CLAUDE.md and shared/**/foo.md alike), while

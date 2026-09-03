@@ -540,6 +540,121 @@ pushing branch A afterward compares its shipped commit `X` against the held `Y`,
 - **Don't:** read that refusal as a defect in branch A's review;
   the guard has no notion of "branch" to be defective about, and the SHA comparison is doing exactly what it is built to do.
 
+**The harness appends an `agentId:` trailer to a subagent's report, sometimes as its own block and sometimes concatenated onto the last line.**
+Which of those is common is the question this section could not settle, and an earlier draft asserted an answer to it by generalizing from the two dispatches it happened to watch.
+
+Measured 2026-09-02 over 565 stored session-transcript JSONL files, matched by a flat per-session glob.
+A recursive walk of the transcript tree also reaches each session's nested subagent transcripts and roughly doubles the population.
+The scope is stated because a fragment arguing "measured rather than assumed" should say what it measured:
+
+```
+trailer as its own content block : 334
+trailer concatenated onto text   :   0
+```
+
+An independent re-run over the recursive set returned that same zero.
+
+The concatenated form is known to exist.
+It was seen directly, twice, within one session --- and the captured line is this:
+
+```
+--- end of report ---agentId: <id> (use SendMessage with to: '...')
+```
+
+**Note what that exhibit is: the trailer landing on a sentinel line, which is the safe case**, and the one this section goes on to prescribe.
+The shape the hazard is actually about is a fingerprint line with the trailer glued to it:
+
+```
+Reviewed-Commit: <sha>agentId: <id> (use SendMessage with to: '...')
+```
+
+That second block is constructed to show the shape, not captured.
+It is what the truncation table below analyses.
+
+**The zero and the sightings are about different artifacts, and that is what has to be settled before either number means anything.**
+The sweep read **stored** transcript JSONL.
+The two sightings were **in-context renders**.
+Three explanations fit, and only the third is checkable from here:
+
+1. The sweep's matcher cannot see the concatenated shape.
+2. Those transcripts sit outside the tree it walked.
+3. The concatenation is a render artifact that never reaches storage at all.
+
+If the third holds, the zero is a **true** negative and the hazard does not reach the guard, because the guard reads storage: `read_latest_review` opens the transcript file and `_result_text` flattens its stored content blocks.
+Under the first two the zero is uninformative, and reading it as confirmation would be the failure [`verify-the-right-artifact`](verify-the-right-artifact.md) names --- "running the thing and seeing no complaint feels like a test", and is not one, because a surface that silently ignores what it cannot see is quiet for the same reason a working one is.
+
+So the two counts carry different weight.
+The **334** establishes that the own-block form is common **in stored transcripts**, which is a lower bound rather than a ratio.
+The **0** settles nothing on its own, since which of the three explanations holds decides whether it is evidence or an artifact.
+Whoever next touches this section should settle that first, and the query has to be chosen carefully, because the obvious one cannot decide it.
+Grepping a stored transcript for a `Reviewed-Commit:` line with a non-hex suffix cannot fire on a **conforming** report, which never puts the fingerprint last, so nothing can be glued to it.
+That reason quantifies over conforming reports only, and this section is about **reordered** ones --- so the reason does not establish the null it appears to, and a zero from the grep stays uninformative either way.
+The right *criterion* is whether `agentId:` ever appears in stored content **preceded by other text on the same line**.
+The right *instrument* is not the sweep, and this is the part that is easy to get wrong: re-running the sweep's own matcher has no power against explanation 1, which says precisely that this matcher cannot see the shape --- under that explanation it returns zero whatever it is pointed at.
+It is also already spent against the other two, since the counts above are that query, run twice, over both the flat set and the recursive superset.
+
+So settling this needs something the section has not yet had: a **raw text scan** of the stored JSONL, written independently of the sweep, or a tree the sweep never reached.
+Only a hit settles anything.
+Another zero from the same matcher is the same uninformative zero, so do not read one as evidence for the rendering-quirk explanation.
+
+In the own-block shape the trailer is a separate content block, and `_result_text` joins blocks with a newline, so the fingerprint line is untouched and nothing below arises at all.
+
+**Two conditions have to hold together before any of this can bite, and a conforming report fails the second.**
+The trailer must concatenate rather than arrive as its own block, AND the fingerprint must be the report's last line.
+This file's own contract puts the JSON payload last, and [`.claude/agents/adversarial-reviewer.md`](../../.claude/agents/adversarial-reviewer.md) says to emit nothing after its closing marker --- so a conforming report ends with the payload, the trailer lands on that, and the fingerprint is never exposed.
+The sighting that prompted this section was a report that put the verdict and fingerprint AFTER the payload, which is the ordering this file's "Structured review data" section rules out.
+Whether the two sightings were two such reports or one report read twice is not recorded, so treat the shape as attested and its rate as unmeasured.
+
+So read the rest of this section as what happens when a brief reorders the tail, not as a hazard of ordinary dispatch.
+
+**Even then, for the mandated 40-character form nothing happens, and saying otherwise would be the easy overclaim here.**
+`no-push-without-self-review.py`'s `REVIEWED_COMMIT` captures `([0-9a-fA-F]{7,40})`, so a full sha stops the capture exactly at the boundary and the suffix is never reached.
+Run through the guard's own regex:
+
+| fingerprint | captured |
+|---|---|
+| 40 chars, then `agentId: a3f5...` | the correct sha |
+| 39 chars, then `agentId: a3f5...` | 40 chars ending in the `a` of `agentId` --- a **wrong sha, silently** |
+| 7 chars, then `agentId: a3f5...` | 8 chars, wrong |
+
+So the hazard is real and it is a **truncation** hazard rather than a suffix hazard.
+`agentId` begins with a hex character, which is what turns a short fingerprint into a plausible-looking wrong one instead of a parse failure.
+A wrong sha refuses the push with "the clean verdict is for commit X, but this push would ship Y" --- a message that reads as a stale verdict and is nothing of the kind.
+
+The remedy costs one line either way, and is cheap insurance rather than a fix for a demonstrated break at 40 characters.
+The block below is a report's TAIL, not a whole report.
+It shows the REORDERED ordering described above --- verdict and fingerprint after the payload --- which is the shape the sentinel exists for and the shape this file's "Structured review data" section rules out.
+So read the block as the mitigation for that reordering, not as a template to copy.
+What [#3050](https://github.com/Morrison-Lab/ai-config/issues/3050) has to settle is which of the two orderings a brief should mandate, not whether a conforming report needs a sentinel.
+
+```
+-->
+Verdict: <phrase>
+Reviewed-Commit: <full sha>
+--- end of report ---
+```
+
+The leading `-->` is the JSON payload's own closing marker, included so the ordering the prose describes is visible in the block rather than asserted over it: everything shown sits *after* the payload, which is what makes this a reordered tail and not a conforming one.
+
+The sentinel puts a non-hex line between the fingerprint and anything the harness appends, so the fingerprint's length stops mattering.
+
+Two caveats.
+The concatenation has been observed on Claude Code's `Agent` tool and nowhere else, so it is a claim about that harness on that date rather than about subagent dispatch generally.
+And the **reordering** is what sits in tension with [`.claude/agents/adversarial-reviewer.md`](../../.claude/agents/adversarial-reviewer.md)'s own instruction to emit nothing after the JSON payload's closing `-->`.
+The sentinel is not the source of that tension and does not add to it: a brief that puts the verdict and the fingerprint after the payload has already overridden the emit-nothing instruction, and the sentinel then joins a tail that exists either way.
+The ordering the guard parsed successfully was that reordered one --- which is a statement about the guard, not an endorsement, since the same ordering fails this file's payload-last contract.
+Which of the two orderings a brief should mandate is #3050's decision, as named above, rather than something to settle inside a review brief.
+It is adjacent to [#2483](https://github.com/Morrison-Lab/ai-config/issues/2483) and not the same item: that issue is about verdicts arriving via background task notifications going unregistered.
+
+- **Do:** state the fingerprint as the **full 40-character** sha, which is what actually protects it.
+- **Do:** add the sentinel line after it *when a brief reorders the tail so the fingerprint is last*, as cheap insurance against a truncated or reformatted fingerprint.
+- **Do:** read a "verdict is for commit X, but this push would ship Y" refusal as possibly a *misparsed* fingerprint rather than only a stale one --- print what the guard captured before concluding.
+- **Don't:** claim the suffix breaks a 40-character fingerprint;
+  run `REVIEWED_COMMIT` over the line before asserting either way.
+- **Don't:** abbreviate the sha in a review brief's template, which is the input that turns the suffix into a silently wrong parse.
+- **Don't:** read the sentinel as part of the payload-last contract.
+  It is a mitigation for the ordering that contract rules out, so a conforming report needs none.
+
 ## Structured review data (JSON payload)
 
 Every reviewer emits two representations of one verdict: the human-readable Markdown report, then a machine-readable JSON payload in a trailing HTML comment.
@@ -721,6 +836,45 @@ That is the same-reviewer clean the rule asks for, and it is a real re-review ra
 - **Don't:** rely on "all findings addressed in <sha>" inside the not-clean comment, or on later bot verdicts, to clear a not-clean you relayed.
 
 (Measured 2026-09-01 on UCD-SERG/serocalculator#668: the relayed round on `065adf0` read as `d-morrison=not-clean` two CLEAN bot verdicts later, and a fresh Sonnet adversarial review of `2aa82df`, posted with its verdict, was what flipped the instrument to exit 0.)
+
+## A reviewer handed nothing returns clean, so the brief must make an empty input an error
+
+`git diff origin/<default-branch>...HEAD` reads the **commit graph**.
+Work you have written but not committed is not in it.
+So dispatching a review while the changes sit in the working tree hands the reviewer an empty diff, and an empty diff has no defects in it --- the verdict comes back clean, on time, in the usual shape, having examined nothing.
+
+[`git-diffing`](../../memories/git-diffing.md)'s "A diff-scoped local check silently no-ops on an empty/uncommitted diff" states the same underlying fact for a **script** you run yourself, and its remedy is the same: commit first.
+What that section cannot reach is the second half here.
+A script you run reports its own zero, so the count is at least available to be read;
+a dispatched reviewer reports a verdict and no count at all, and cannot supply one, because from inside it no input and no defects are the same observation.
+That is why this case needs a fix in the **brief** rather than only in the habit.
+
+Nothing about the result says so.
+A clean review of an empty diff and a clean review of good work are the same artifact, and the second is what you were expecting, so the confirmation lands exactly where a check was supposed to be.
+[`ardi.rationale.md`](ardi.rationale.md) records the sibling case, where the branch is empty **by design** because [`pr-on-claim`](pr-on-claim.md) opens the PR from an empty commit;
+this one is worse to notice, because the work exists and you watched yourself write it.
+
+**The specific move that produces it is switching branches with the work uncommitted.**
+Git carries uncommitted changes across a checkout, so the edits follow you to whatever you switch to and the branch you meant to review keeps pointing at its old tip.
+[`git`](../../memories/git.md)'s "commit before switching branches" section is the same hazard read from the other end.
+
+Two fixes, and both are cheap enough that there is no reason to pick one.
+**Commit before dispatching**, then read the diff's own stat line rather than assuming it.
+And **tell the reviewer to refuse an empty input**: a brief that says which files the diff should touch, and that says to stop and report the emptiness rather than review, converts a silent false clean into a loud failure.
+The reviewer cannot infer this --- from inside, no input and no defects are indistinguishable --- so it has to be stated.
+
+The general form reaches past review.
+Any instrument that reports on a population will report clean over an empty one, so **a verdict is only as good as the count of things examined**, which is [`batch-merge-and-resolve`](batch-merge-and-resolve.md)'s negative-control rule --- report how many pairs were examined and not only how many collided --- restated for a reviewer rather than a sweep.
+[`algorithmatize-checks`](algorithmatize-checks.md) applies it to a combination sweep and credits that fragment as its source, which is where the wording comes from.
+Measured 2026-09-03 within one hour, on two surfaces: a repo-wide scan reported zero invalid escapes while a hand-confirmed instance sat in the tree, because it wrote to `/dev/null`, every compile raised, and a bare `except: continue` swallowed all 238 ([ai-config#3114](https://github.com/Morrison-Lab/ai-config/issues/3114));
+and an adversarial review returned clean over a branch carrying no commits ([ai-config#3118](https://github.com/Morrison-Lab/ai-config/issues/3118), which also tracks the mechanisms, since writing this rule did not prevent its second occurrence one message later).
+Different surfaces, one shape, and neither announced itself.
+
+- **Do:** commit, then confirm the diff is non-empty, before dispatching a review.
+- **Do:** name the files the diff should touch in the brief, and instruct the reviewer to report an empty or unexpected diff instead of reviewing it.
+- **Do:** read a clean verdict as a claim about a population, and ask what that population was.
+- **Don't:** dispatch against a working tree and read the result as covering it.
+- **Don't:** treat a clean result from any instrument as evidence until you know it examined something.
 
 ## Ask the reviewer plainly whether the work earns its place
 

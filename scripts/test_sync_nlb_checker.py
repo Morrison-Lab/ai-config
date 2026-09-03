@@ -9,7 +9,10 @@ exit, and the HTTPS route must still run.
 
 The CLI checks cover ai-config#3095: `--help` used to run the sync, so it
 must now print usage and exit 0 with `_fetch` never reached, and an unknown
-argument must exit 2 rather than being ignored.
+argument must exit 2 rather than being ignored. They run twice: in-process
+against `main(argv)`, and as a subprocess against the real entry point, which
+is the one the issue was reported against and the only one that exercises the
+`argv=None` default and the `if __name__ == "__main__"` wiring.
 
 Run:  python3 scripts/test_sync_nlb_checker.py
 """
@@ -117,11 +120,15 @@ for label, run, needle in (
 saved_fetch = subject._fetch
 
 
-def fetch_forbidden(sha):
-    raise AssertionError("the CLI parse must not fetch")
+class _Reached(Exception):
+    """Raised by the stub, so a check can tell whether `_fetch` ran."""
 
 
-subject._fetch = fetch_forbidden
+def fetch_stub(sha):
+    raise _Reached(sha)
+
+
+subject._fetch = fetch_stub
 try:
     for flag in ("--help", "-h"):
         out = io.StringIO()
@@ -129,6 +136,8 @@ try:
             with contextlib.redirect_stdout(out):
                 subject.main([flag])
             check(f"{flag} exits", False)
+        except _Reached:
+            check(f"{flag} exits before fetching", False)
         except SystemExit as exc:
             check(f"{flag} exits 0", exc.code == 0)
         check(f"{flag} prints the module docstring",
@@ -140,17 +149,47 @@ try:
         with contextlib.redirect_stderr(err):
             subject.main(["--bogus"])
         check("an unknown argument exits", False)
+    except _Reached:
+        check("an unknown argument exits before fetching", False)
     except SystemExit as exc:
         check("an unknown argument exits 2", exc.code == 2)
 
-    # The no-argument invocation still parses cleanly and stays the sync.
+    # The no-argument invocation parses to no options and is still the sync,
+    # so it must reach `_fetch` rather than stopping at the parser.
     check("no arguments parse to an empty namespace",
           vars(subject._parse_args([])) == {})
+    try:
+        subject.main([])
+        check("no arguments reach the fetch", False)
+    except _Reached:
+        check("no arguments reach the fetch", True)
 finally:
     subject._fetch = saved_fetch
+
+# The checks above drive `main(argv)` in-process, which cannot see the
+# `argv=None` default or the `if __name__ == "__main__"` line that forwards
+# the process command line into it -- and that entry point is the one #3095
+# was reported against. Exercise it for real. Neither run touches the
+# network, because the parse now precedes the fetch.
+VENDORED = subject.nlb_gate.VENDOR_PY
+before = VENDORED.stat().st_mtime_ns if VENDORED.exists() else None
+
+help_run = subprocess.run([sys.executable, str(SCRIPT), "--help"],
+                          capture_output=True, text=True)
+check("the real CLI exits 0 on --help", help_run.returncode == 0)
+check("the real CLI prints the module docstring on --help",
+      "Refresh the vendored" in help_run.stdout
+      and "Do not hand-edit" in help_run.stdout)
+
+bogus_run = subprocess.run([sys.executable, str(SCRIPT), "--bogus"],
+                           capture_output=True, text=True)
+check("the real CLI exits 2 on an unknown argument", bogus_run.returncode == 2)
+
+after = VENDORED.stat().st_mtime_ns if VENDORED.exists() else None
+check("the real CLI writes nothing when it only parses", before == after)
 
 if failures:
     sys.exit(f"{failures} check(s) failed")
 print("PASS: _fetch falls through to HTTPS when gh is missing or failing, "
-      "names both routes when both fail, and the CLI prints usage for "
-      "--help/-h without fetching")
+      "names both routes when both fail, and the CLI -- in-process and as the "
+      "real entry point -- prints usage for --help/-h without fetching")

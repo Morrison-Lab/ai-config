@@ -119,7 +119,7 @@ jobs:
         run: python3 scripts/test_check_pr_body_figures.py
       - name: Run semantic-line-break tool tests
         run: python3 scripts/test_slb.py
-      - name: Run sync-nlb-checker fetch tests
+      - name: Run sync-nlb-checker fetch and CLI tests
         run: python3 scripts/test_sync_nlb_checker.py
       - name: Run memory-file-size check tests
         run: python3 scripts/test_check_memory_file_size.py

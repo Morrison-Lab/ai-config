@@ -613,15 +613,19 @@ NLB_PATHS_IGNORE='codex-skills/**,docs/**,_site/**,.quarto/**' \
 That path is the file `scripts/lib/nlb_gate.py` loads.
 Refreshing it after an action-pin bump is `python3 scripts/sync-nlb-checker.py`.
 
-**That script takes no arguments and runs the sync on any invocation, including `--help`.**
-It has no `argparse` or usage guard,
-so `--help` is not special-cased and runs the full fetch-and-write path at whatever SHA `validate.yml` currently pins.
+**That script used to take no arguments and run the sync on any invocation, including `--help`.**
+It had no `argparse` or usage guard,
+so `--help` was not special-cased and ran the full fetch-and-write path at whatever SHA `validate.yml` pinned.
 Measured 2026-09-02: `python3 scripts/sync-nlb-checker.py --help` fetched the vendored checker at the pinned SHA and rewrote `scripts/vendor/gha-check-new-line-breaks.py` plus its `.pin`.
 The run was a no-op only because the pin had not moved yet.
+ai-config#3095 fixed it: the script now parses its command line before anything is fetched,
+so `--help` and `-h` print the module docstring and exit 0 without touching the network or the working tree,
+and an unknown argument exits 2 rather than being ignored.
+The no-argument invocation is still the sync.
 - **Do:** bump the `uses:` SHA in `.github/workflows/validate.yml` first, run the script with no arguments, then commit the workflow, the vendored script, and the `.pin` together.
   `scripts/lib/nlb_gate.py`'s `assert_pin_matches_ci` refuses to load if the three disagree.
-- **Don't:** run the script with `--help` to learn its usage.
-  Read its module docstring instead.
+- **Do:** run the script with `--help` to read its usage.
+  That is safe now, and was the surprise write above before the fix.
 (Measured 2026-09-02 on [Morrison-Lab/gha#826](https://github.com/Morrison-Lab/gha/pull/826)
 and [ai-config#3089](https://github.com/Morrison-Lab/ai-config/pull/3089);
 tracked as [ai-config#3095](https://github.com/Morrison-Lab/ai-config/issues/3095).)

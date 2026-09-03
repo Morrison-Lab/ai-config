@@ -164,50 +164,84 @@ check("the finding-pattern count the docstring states",
 # -- measured -- which is the exact silent misprediction this assertion exists
 # to catch, and preserving superseded code in a comment is this corpus's own
 # house style. `ast` cannot see a comment at all.
-def _ard_phrase_is_live():
-    """Is the phrase still the whole test of a `continue` in the skip loop?
+def _ard_skip_is_live():
+    """Does the ARD skip still have the shape `analyse` assumes?
 
-    Deliberately narrow. An earlier version accepted any `Compare` anywhere
-    in the function whose left operand was the phrase, and three mutations
-    each broke the checker's ARD skip while leaving the suite green:
-    comparing the phrase against `author_login` instead of the body; keeping
-    the expression but dropping the `continue`; and adding a conjunct so the
-    skip fires only for bot authors. Each is a plausible refactor, and each
-    would leave this tool predicting a skip the checker no longer performs.
+    Deliberately narrow, and narrowed twice. The first version accepted any
+    `Compare` with the phrase anywhere in `check_review_comments`, so three
+    behaviour-breaking mutations stayed green: comparing the phrase against
+    `author_login`, keeping the expression but dropping the `continue`, and
+    adding a conjunct so the skip fires only for bots. The second pinned the
+    `if`'s shape but not its POSITION, so relocating the same block below the
+    `all_items.append` calls -- where it no longer prevents admission --
+    stayed green too, and so did hiding it in a never-called nested `def`.
 
-    So the shape is pinned rather than the phrase: the phrase, `in`,
-    `body_lower`, as the ENTIRE test of an `if` whose body is a bare
-    `continue`. An added conjunct fails on purpose -- it narrows the skip,
-    which is exactly the drift that mispredicts.
+    So three things are required now: the `if` is a direct statement of the
+    `for c in comments` loop, it precedes the first `all_items.append` in
+    that loop, and its test is the phrase `in body_lower` with a bare
+    `continue` as the whole body.
+
+    Two refactors are accepted rather than punished, because both preserve
+    the skip. A left operand that is a module-level constant equal to the
+    phrase passes -- hoisting the literal into an importable constant is the
+    natural way to end the duplication this assertion exists to guard, and
+    an instrument that forbids its own fix is worse than none. And the test
+    may be one disjunct of an `or`, which only ever widens the skip. An
+    `and` conjunct is still refused: that narrows it, which is the drift.
     """
     with open(os.path.join(HERE, "check-pr-fully-clean.py"),
               encoding="utf-8") as fh:
         tree = ast.parse(fh.read())
+
+    consts = {t.id for n in tree.body if isinstance(n, ast.Assign)
+              for t in n.targets
+              if isinstance(t, ast.Name) and isinstance(n.value, ast.Constant)
+              and n.value.value == ARD_PHRASE}
+
+    def is_phrase(node):
+        return ((isinstance(node, ast.Constant) and node.value == ARD_PHRASE)
+                or (isinstance(node, ast.Name) and node.id in consts))
+
+    def is_skip_test(t):
+        if isinstance(t, ast.BoolOp) and isinstance(t.op, ast.Or):
+            return any(is_skip_test(v) for v in t.values)
+        return (isinstance(t, ast.Compare) and is_phrase(t.left)
+                and len(t.ops) == 1 and isinstance(t.ops[0], ast.In)
+                and len(t.comparators) == 1
+                and isinstance(t.comparators[0], ast.Name)
+                and t.comparators[0].id == "body_lower")
+
+    def admits(stmt):
+        return any(isinstance(n, ast.Attribute) and n.attr == "append"
+                   and isinstance(n.value, ast.Name) and n.value.id == "all_items"
+                   for n in ast.walk(stmt))
+
     for fn in ast.walk(tree):
         if not (isinstance(fn, ast.FunctionDef)
                 and fn.name == "check_review_comments"):
             continue
-        for node in ast.walk(fn):
-            if not isinstance(node, ast.If):
+        for loop in ast.walk(fn):
+            if not (isinstance(loop, ast.For)
+                    and isinstance(loop.iter, ast.Name)
+                    and loop.iter.id == "comments"):
                 continue
-            if not (len(node.body) == 1
-                    and isinstance(node.body[0], ast.Continue)):
-                continue
-            t = node.test
-            if not (isinstance(t, ast.Compare)
-                    and isinstance(t.left, ast.Constant)
-                    and t.left.value == ARD_PHRASE
-                    and len(t.ops) == 1 and isinstance(t.ops[0], ast.In)
-                    and len(t.comparators) == 1
-                    and isinstance(t.comparators[0], ast.Name)
-                    and t.comparators[0].id == "body_lower"):
-                continue
-            return True
+            for stmt in loop.body:
+                if admits(stmt):
+                    break
+                if (isinstance(stmt, ast.If) and len(stmt.body) == 1
+                        and isinstance(stmt.body[0], ast.Continue)
+                        and is_skip_test(stmt.test)):
+                    return True
     return False
 
 
-check("the checker still compares against the ARD phrase this tool copies",
-      _ard_phrase_is_live(), True)
+# Labelled by the SHAPE it pins, not by "the phrase is gone". A refactor can
+# preserve the comparison and still fail this -- renaming the `body_lower`
+# local does -- and a label naming the phrase would send a maintainer looking
+# for a deleted comparison that is still there.
+check("the ARD skip is still `<phrase> in body_lower -> continue`, ahead of "
+      "admission in the comment loop",
+      _ard_skip_is_live(), True)
 
 check("the findings heading is one of them",
       MOD._FINDINGS_HEADING_PATTERN in MOD.FINDING_PATTERNS, True)

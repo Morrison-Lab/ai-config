@@ -1,5 +1,15 @@
 # R, Quarto & the R toolchain
 
+Citations below point at pull requests and issues in the lab's own repositories,
+most of which are private,
+so a link resolves only for a reader with access to that repository.
+The link is still the right form:
+the URL is correct regardless of who can open it,
+and a bare `owner/repo#123` makes even an authorized reader assemble it by hand.
+
+- **Do:** cite a pull request or issue as a clickable link, private repository or not.
+- **Don't:** read a 404 from one of these links as a broken reference --- it is an access boundary.
+
 ## Conda activation before Quarto validation
 
 - **Activate the conda environment before checking a project toolchain; `conda
@@ -91,7 +101,7 @@ truncation. **Before trusting any regenerated lockfile, diff old-vs-new
 package *counts*** (e.g. `jq -r '.Packages|keys[]' old.json | sort >
 /tmp/old.txt`, same for `new.json`, then `comm -23 /tmp/old.txt
 /tmp/new.txt` to list dropped packages) and treat a dramatic shrink as a red
-flag requiring revert, not a "cleanup." (`d-morrison/rme#1017`: reverted via `git revert`, then fixed the
+flag requiring revert, not a "cleanup." ([`d-morrison/rme#1017`](https://github.com/d-morrison/rme/issues/1017): reverted via `git revert`, then fixed the
 actual root cause — see the repo-move 404 entry above — with a minimal
 hand-edit instead.)
 
@@ -106,7 +116,7 @@ neighboring `Packages` entry (`Package`, `Version`, `Source: "Repository"`,
 with `jsonlite::fromJSON("renv.lock")` that it still parses and
 `git diff --stat renv.lock` shows only the intended additive lines — a diff in
 the thousands means the wrong approach was used; `git checkout -- renv.lock`
-and redo it by hand. (UCD-SERG/lab-manual#381: `lint-project` failed on
+and redo it by hand. ([UCD-SERG/lab-manual#381](https://github.com/UCD-SERG/lab-manual/issues/381): `lint-project` failed on
 `cyclocomp_linter is disabled due to lack of the cyclocomp package`; the
 snapshot approach was tried first and reverted before the hand-edit.)
 
@@ -207,7 +217,7 @@ an existing record before trusting it on new input.
 - **Don't:** pass the raw `read.dcf()` result named --- the named key silently
   suppresses the `Author` field rather than erroring where you would notice.
 
-(`ucdavis/epi204#375`, 2026-08-16: fixed CI broken by `cards`/`cardx`
+([`ucdavis/epi204#375`](https://github.com/ucdavis/epi204/issues/375), 2026-08-16: fixed CI broken by `cards`/`cardx`
 relocating from `insightsengineering` to `pharmaverse`.
 Two `@claude` review rounds flagged that the initial hand-edit repointed only
 `RemoteUsername`/`RemoteSha`, leaving every DESCRIPTION-derived field stale
@@ -256,7 +266,7 @@ from `xmlparsedata` on the matched node, so line span is `line2 - line1 + 1`.
 `linter_level = "expression"` + the `is_lint_level()` guard is `lintr`'s own
 documented pattern (see `vignette("creating_linters", package = "lintr")`).
 Needs `lintr (>= 3.1.2)` for the `linter_level` argument. (Landed as
-`lms::function_length_linter()` in UCD-SERG/lab-manual#381.)
+`lms::function_length_linter()` in [UCD-SERG/lab-manual#381](https://github.com/UCD-SERG/lab-manual/issues/381).)
 
 ## lintr's `commented_code_linter` truncates at the SECOND `#`, so `# text #NNN` can flag as commented-out code
 
@@ -282,7 +292,7 @@ short assignment-shaped fragment.
   issue reference as a false positive to suppress --- reword it instead,
   since the same truncation will re-trigger on the next reviewer's re-run.
 
-(`UCD-SERG/serocalculator#668`, 2026-09-01.)
+([`UCD-SERG/serocalculator#668`](https://github.com/UCD-SERG/serocalculator/issues/668), 2026-09-01.)
 
 ## air (R formatter) vs lintr's `indentation_linter` — keep `indent-width` aligned
 
@@ -303,8 +313,8 @@ short assignment-shaped fragment.
   `air.toml` `indent-width = 2` so a future `air format` keeps it lintr-clean.
   (Only the *first* mis-indented line of a block is reported; de-indent the
   whole signature block, not just the flagged line, or the next line flags on
-  the next run.) (UCD-SERG/serocalculator#503, 2026-07.)
-- **Recurred on UCD-SERG/serocalculator#672, 2026-09-01, from the lab's own
+  the next run.) ([UCD-SERG/serocalculator#503](https://github.com/UCD-SERG/serocalculator/issues/503), 2026-07.)
+- **Recurred on [UCD-SERG/serocalculator#672](https://github.com/UCD-SERG/serocalculator/issues/672), 2026-09-01, from the lab's own
   4-space continuation indent rather than from leftover styler output**: a
   PR touching one R file whose function signatures already used that indent
   turned `lint-changed-files` (whole-file `lintr::lint_package()` scope) red
@@ -327,7 +337,7 @@ short assignment-shaped fragment.
   back to the always-present built-in token (`permissions: read-all` already
   covers the read). It's a flake (passes most runs), so a red
   `lint-changed-files` with no R lint output and a `gh_error`/`rate limit`
-  traceback is this, not a code problem. (UCD-SERG/serocalculator#503, 2026-07.)
+  traceback is this, not a code problem. ([UCD-SERG/serocalculator#503](https://github.com/UCD-SERG/serocalculator/issues/503), 2026-07.)
 - **The same `lint-changed-files` shape has two silent blind spots that make a
   green run weaker evidence than it looks --- both absent from
   `lint-changed-lines`.** Neither produces an error; the check just passes
@@ -346,11 +356,11 @@ short assignment-shaped fragment.
   neither cutoff --- an independent argument for the branch-protection switch
   beyond the incremental-adoption one. Don't treat a local
   `lint_package()` run as equivalent to CI in either direction.
-  (UCD-SERG/serocalculator#392, 2026-07-25: a 38-file PR silently skipped 8
+  ([UCD-SERG/serocalculator#392](https://github.com/UCD-SERG/serocalculator/issues/392), 2026-07-25: a 38-file PR silently skipped 8
   files, missing two real `line_length_linter` hits in its own new test file;
   `lint-changed-lines` separately caught an `undesirable_function_linter` hit
   in root `app.R` that a local `lint_package()` had reported clean.
-  Filed as UCD-SERG/serocalculator#608.)
+  Filed as [UCD-SERG/serocalculator#608](https://github.com/UCD-SERG/serocalculator/issues/608).)
 - **`air format . --check` passing is NOT the claim "no line exceeds
   `air.toml`'s `line-width`" --- air does not reflow string literals.**
   A long `cli::cli_abort()` / `cli_alert_*()` message, a URL, or any other
@@ -371,7 +381,7 @@ short assignment-shaped fragment.
   [`review-verdict-pitfalls`](../shared/workflow/review-verdict-pitfalls.md).
   Note that `lintr`'s `line_length_linter` DOES catch these, so a repo
   running air without lintr (d-morrison/altdoc) has no gate at all.
-  (d-morrison/altdoc#78, 2026-07-27: two `cli` strings in new code ran to 93
+  ([d-morrison/altdoc#78](https://github.com/d-morrison/altdoc/issues/78), 2026-07-27: two `cli` strings in new code ran to 93
   and 98 characters with `air format . --check` clean throughout.)
 
 ## jarl (Just Another R Linter) — `jarl.toml` fields lag the published docs
@@ -403,7 +413,7 @@ short assignment-shaped fragment.
   than editing fixture file content to appease the linter (fixture bytes often
   feed snapshot/rendering tests, so editing them risks unrelated test
   breakage). File a follow-up issue to narrow `exclude` to `per-file-ignores`
-  once the installed jarl version supports it. (`d-morrison/altdoc#18`, #19.)
+  once the installed jarl version supports it. ([`d-morrison/altdoc#18`](https://github.com/d-morrison/altdoc/issues/18), [#19](https://github.com/d-morrison/altdoc/issues/19).)
 - **There is no `.jarlignore` file — jarl has never supported one.** Don't
   assume jarl follows the `.gitignore`/`.eslintignore`-style convention of a
   dotfile-per-tool; its only exclusion mechanism is `jarl.toml`'s `[lint]`
@@ -418,7 +428,7 @@ short assignment-shaped fragment.
   Verify a suppression file is real by checking the tool's own config-file
   reference (or just removing `continue-on-error` and running the check) —
   not by pattern-matching on other tools' ignore-file conventions.
-  (`d-morrison/altdoc#7`: `continue-on-error: true` masked a `.jarlignore`
+  ([`d-morrison/altdoc#7`](https://github.com/d-morrison/altdoc/issues/7): `continue-on-error: true` masked a `.jarlignore`
   that did nothing; removing the flag immediately reproduced the
   `unused_function` failure it was supposed to prevent.)
 
@@ -428,12 +438,13 @@ short assignment-shaped fragment.
   **both** a `NEWS.md` entry under `# <pkg> (development version)` **and** a
   `DESCRIPTION` `Version:` dev-bump (e.g. `0.0.0.9053` → `.9054`), or CI
   failed. Add them up front rather than waiting for the red check. (Observed
-  on ucdavis/bcs#223.) For a **non-user-visible** PR (CI/workflow-only), the
+  on [ucdavis/bcs#223](https://github.com/ucdavis/bcs/issues/223).)
+  For a **non-user-visible** PR (CI/workflow-only), the
   `no changelog` + `no version increment` labels may skip both, but that
   bypass is per-repo and serodynamics has none: see the label-bypass note in
   `memories/github-actions.md`.
   **This per-PR dev-bump convention is what `Morrison-Lab/gha`'s new
-  `bump-dev-version`/`version-check` capabilities (gha#390, tracking gha#388)
+  `bump-dev-version`/`version-check` capabilities ([gha#390](https://github.com/Morrison-Lab/gha/issues/390), tracking [gha#388](https://github.com/Morrison-Lab/gha/issues/388))
   exist to retire** --- both were engineered as a direct fix for the
   merge-conflict-on-`DESCRIPTION` problem this convention structurally
   guarantees (every PR bumping the same `Version:` line collides with every
@@ -450,7 +461,7 @@ short assignment-shaped fragment.
   yet --- check a given repo's own `.github/workflows/version-check.yml` /
   `version-check.yaml` before assuming which regime it's under. The
   `news.yaml`/changelog-entry half above is unaffected until a separate
-  `news.d`-fragment capability ships (deferred; see gha#388).
+  `news.d`-fragment capability ships (deferred; see [gha#388](https://github.com/Morrison-Lab/gha/issues/388)).
 - **`read.dcf()` does not error on a DCF file with a duplicate top-level
   field; it silently keeps whichever occurrence comes LAST.** Confirmed with
   a live call, not assumed: a two-line `Version: 1.2.3` / `Version: 1.2.4`
@@ -464,7 +475,7 @@ short assignment-shaped fragment.
   (`DESCRIPTION`, a `Packages` index) gets read back: a check that assumes
   malformed DCF would be caught by the parser is assuming the wrong
   failure mode.
-  (ai-config#979, 2026-07-31: an earlier draft of that SKILL.md row claimed
+  ([ai-config#979](https://github.com/Morrison-Lab/ai-config/issues/979), 2026-07-31: an earlier draft of that SKILL.md row claimed
   a duplicate `Version:` field "breaks every DCF parser (`read.dcf()`,
   ...)", which a live `Rscript` call showed to be backwards.)
 - The **Spellcheck** job (`spelling::spell_check_package()`) fails on any word
@@ -476,14 +487,16 @@ short assignment-shaped fragment.
     NEWS entry, which tripped on `glm`), wrap it in backticks as inline code
     instead — the spellcheck parses markdown and skips code spans, and
     backticking a `pkg::fn()`/identifier/message is the correct markdown style
-    anyway. Cleaner than both rewording and a WORDLIST add. (ucdavis/ettbc#30.)
+    anyway.
+    Cleaner than both rewording and a WORDLIST add.
+    ([ucdavis/ettbc#30](https://github.com/ucdavis/ettbc/issues/30).)
   - **Cross-repo issue refs and bare domain names are spellable-token sources
     too, not just code identifiers.** The checker splits on punctuation, so an
     unbackticked `d-morrison/altdoc#26` flags `morrison`, and `rdrr.io` flags
     both `rdrr` and `io`. Backtick them (existing NEWS entries already backtick
     cross-repo refs, so this matches convention), and reword genuinely-prose
     words instead of listing them (`undiscoverable` → "cannot discover").
-    (ucdavis/bcs#375: four tokens flagged from one NEWS entry, fixed with zero
+    ([ucdavis/bcs#375](https://github.com/ucdavis/bcs/issues/375): four tokens flagged from one NEWS entry, fixed with zero
     WORDLIST additions.)
   - **A Quarto `{{< include >}}` path is a spellable-token source too, and the
     backtick remedy above cannot be applied to it.**
@@ -502,7 +515,7 @@ short assignment-shaped fragment.
     Prefer renaming the subfile over adding the token to `inst/WORDLIST`,
     which puts a path artifact into a word list
     and then silently permits that bare token everywhere else in the prose.
-    (UCD-SERG/serocalculator#635, 2026-08-07:
+    ([UCD-SERG/serocalculator#635](https://github.com/UCD-SERG/serocalculator/issues/635), 2026-08-07:
     `nlm` failed Spellcheck at `methodology.qmd:1014`.
     Every other `nlm` in that article sat inside backticks or a code chunk,
     so the only bare occurrence came from a filename
@@ -517,7 +530,7 @@ short assignment-shaped fragment.
     times, and there is nothing to rename.
     Copy the files to a temp dir, drop lines matching
     `^\s*\{\{<.*>\}\}\s*$`, and check the copies.
-    (Morrison-Lab/wai#177, 2026-09-01: 191 raw hits on the chapters, of which
+    ([Morrison-Lab/wai#177](https://github.com/Morrison-Lab/wai/issues/177), 2026-09-01: 191 raw hits on the chapters, of which
     the include paths were the bulk; `spell_check_package()` had never scanned
     them because they are not vignettes.)
 - **Regenerating `man/*.Rd`: run `devtools::document()` (or
@@ -530,7 +543,7 @@ short assignment-shaped fragment.
   `pkgload::load_all()` can load it --- and run `roxygen2::roxygenise()`
   (`devtools::document()` if `devtools` is also installed). Treat "no R
   toolchain" as a resource to obtain (growth-mindset), not a reason to edit
-  `.Rd` by hand. (Corrected 2026-07-20: on serocalculator#562 I hand-edited two
+  `.Rd` by hand. (Corrected 2026-07-20: on [serocalculator#562](https://github.com/UCD-SERG/serocalculator/issues/562) I hand-edited two
   `.Rd` files instead of installing roxygen2 and running `document()`; the
   user's rule is to run the generator.)
   - **An UNTRACKED file in `R/` silently poisons the generated `NAMESPACE`,
@@ -560,7 +573,7 @@ short assignment-shaped fragment.
     Different roxygen2 versions can rewrite the same `.Rd` differently,
     so a local version that differs from the one CI uses can produce a misleading diff.
     Install and verify the version recorded by the project's lockfile (or otherwise used by CI),
-    regenerate, and inspect the resulting diff before pushing. (ucdavis/bcs#448, 2026-07-28.)
+    regenerate, and inspect the resulting diff before pushing. ([ucdavis/bcs#448](https://github.com/ucdavis/bcs/issues/448), 2026-07-28.)
   - **Avoid `@inheritParams` or `@inheritDotParams` from packages with dynamic/transitive documentation.**
     Inheriting documentation from wrappers like `gtsummary::tbl_summary` pulls in transitive `cards::ard_tabulate` parameter descriptions whose text varies between upstream package versions.
     When local and CI package versions differ, `roxygen2::roxygenise()` generates unexpected diffs that fail CI `docs_check`.
@@ -578,22 +591,24 @@ short assignment-shaped fragment.
   transform-and-diff (`` perl -pe 's/`([^`]+)`/\\code{$1}/g' `` piped to `diff`
   against the `.Rd`). Watch `@inheritParams`/`@inherit`: editing one function's
   roxygen also changes every inheriting function's `.Rd`, so grep `man/` for the
-  changed sentence. (bcs#225; serocalculator#562 --- but prefer installing the
+  changed sentence.
+  ([bcs#225](https://github.com/ucdavis/bcs/issues/225);
+  [serocalculator#562](https://github.com/UCD-SERG/serocalculator/issues/562) --- but prefer installing the
   toolchain over all of this.)
 - **Codoc mismatch with escaped-dot defaults: limit the lesson to the observed case.**
-  In d-morrison/altdoc#30, changing the default regex from an escaped dot (`\\.`) to
+  In [d-morrison/altdoc#30](https://github.com/d-morrison/altdoc/issues/30), changing the default regex from an escaped dot (`\\.`) to
   a bracket expression (`[.]`) resolved an `R CMD check` codoc mismatch for
   `setup_github_actions()`. Keep this note scoped to that concrete escaped-dot case;
   avoid generalizing to other escape sequences without direct evidence.
-  (d-morrison/altdoc#30, 2026-07-22.)
+  ([d-morrison/altdoc#30](https://github.com/d-morrison/altdoc/issues/30), 2026-07-22.)
 - **Internal helper functions as default argument values appear literally in `.Rd` usage
   blocks.** If you write `foo = .helper_default()` as a parameter default, the roxygen
   `\usage{}` section shows `.helper_default()` verbatim — which is confusing to users
   copy-pasting the signature. Inline the literal value directly in the function
-  signature instead. (d-morrison/altdoc#30.)
+  signature instead. ([d-morrison/altdoc#30](https://github.com/d-morrison/altdoc/issues/30).)
 
 ## R test/lint gotchas that only surface in CI
-Also from ettbc#13/#14:
+Also from [ettbc#13](https://github.com/ucdavis/ettbc/issues/13)/[#14](https://github.com/ucdavis/ettbc/issues/14):
 - **`lintr::object_usage_linter` flags package datasets used inside a *named*
   helper function in a test file** (`no visible binding for global variable
   'cohort'`). The same dataset used directly inside a `test_that()` block is
@@ -615,7 +630,7 @@ Also from ettbc#13/#14:
   it is easy to *believe* it is, because an intervening local run can come back
   clean off a stale loaded namespace and then CI flags it again. If a lint
   disappears without you changing the thing it flagged, distrust the clean run.
-  (ucdavis/bcs#351.)
+  ([ucdavis/bcs#351](https://github.com/ucdavis/bcs/issues/351).)
 - **`spelling::spell_check_package()` locally over-reports vs CI** on accented
   hyphenated names: line-wrapped `García-Albéniz`/`Hernán` in `.Rd` files
   tokenize as `Garc`/`niz`/`Hern`, which the CI spellcheck action does not flag
@@ -643,7 +658,7 @@ Also from ettbc#13/#14:
   `Removed empty directory '<pkg>/.ai-config'`, so the uninitialized submodule
   never reached `R CMD check` at all — but exclude it in `.Rbuildignore`
   anyway rather than relying on that accident of checkout config.
-  (`UCD-SERG/serodynamics#265`: adding `.claude/settings.json` failed
+  ([`UCD-SERG/serodynamics#265`](https://github.com/UCD-SERG/serodynamics/issues/265): adding `.claude/settings.json` failed
   `ubuntu-latest`/`macos-latest`/`windows-latest` (all `release`) plus
   `ubuntu-latest (oldrel-1)` R-CMD-check
   simultaneously with this exact NOTE; the sibling `.ai-config` submodule
@@ -662,7 +677,7 @@ Also from ettbc#13/#14:
   specifically because `/init` writes `CLAUDE.md` to the repo root and does not
   touch `.Rbuildignore`, so running it in any R package leaves a build that
   will fail on the next push unless you add the line yourself.
-  (`ucdavis/mic.sim#49`, 2026-08-06: added `^CLAUDE\.md$` alongside the
+  ([`ucdavis/mic.sim#49`](https://github.com/ucdavis/mic.sim/issues/49), 2026-08-06: added `^CLAUDE\.md$` alongside the
   `^\.claude$` line the entry above calls for, and all five R-CMD-check
   platforms passed.)
 
@@ -693,10 +708,10 @@ To verify against the *rendered* output, count occurrences of a topic name in
 the built `reference.html`: an established topic appears **3** times (sidebar
 entry + index link + index text), a sidebar-missing one only **2**.
 
-(`UCD-SERG/serocalculator#392`, 2026-07-25: six new decay-curve topics were
+([`UCD-SERG/serocalculator#392`](https://github.com/UCD-SERG/serocalculator/issues/392), 2026-07-25: six new decay-curve topics were
 ported into `reference.qmd` only; caught before merge, fixed, and confirmed
 2 -> 3 occurrences each in the deployed preview.
-`UCD-SERG/serocalculator#610` proposes the cross-check as CI, possibly
+[`UCD-SERG/serocalculator#610`](https://github.com/UCD-SERG/serocalculator/issues/610) proposes the cross-check as CI, possibly
 belonging in `Morrison-Lab/gha` since every altdoc repo shares the structure.)
 
 ## renv — each git worktree gets its own (empty) project library
@@ -739,7 +754,7 @@ convention, verify each block **separately** with `sort -f -c`
 a whole-file `sort -f -c` false-fails at the block boundary even when the
 file is correctly formatted), and rebut Copilot citing the
 tool's own emitted order — the rebuttal stuck (Copilot dropped it on
-subsequent rounds; ucdavis/win#69, 2026-07-16).
+subsequent rounds; [ucdavis/win#69](https://github.com/ucdavis/win/issues/69), 2026-07-16).
 
 ## CI failure on untouched files: diff the installed-package line between last-green and first-red logs
 
@@ -751,7 +766,7 @@ r-lib/lintr` in r-lib/actions) makes this a recurring class, and the log
 line pins it exactly. Two 2026-07 instances in ucdavis/rampp: (1) `lint`
 red on 31 untouched files — `lintr 3.3.0.9000 Github(@4579471)` green on
 07-13 vs `3.4.0.9000 Github(@178882f)` red on 07-16 (lintr 3.4.0 dropped
-double-indent formals, r-lib/lintr#2830); fixed by restyling, since the new
+double-indent formals, [r-lib/lintr#2830](https://github.com/r-lib/lintr/issues/2830)); fixed by restyling, since the new
 style is valid under both versions. (2) `macos-latest` R CMD check red
 repo-wide — flextable 0.10.0 hit CRAN with no macOS binary yet, forcing a
 source build that needs XQuartz libs the runner lacks; self-healed when the
@@ -788,7 +803,7 @@ the dates beside the conclusions.
 - **Don't:** treat a run count as evidence without its date range; "10/10
   green" and "10/10 green, all before the release" are different claims.
 
-(`UCD-SERG/serocalculator` #635, 2026-08: a red `docs-check` was asserted to be
+([`UCD-SERG/serocalculator` #635](https://github.com/UCD-SERG/serocalculator/issues/635), 2026-08: a red `docs-check` was asserted to be
 "a regression introduced by this PR's diff" on the strength of 10/10 green
 `main` runs, every one of which predated the roxygen2 8.1.0 release;
 `roxygenise()` in a clean `origin/main` worktree changed the same two files.)
@@ -823,7 +838,7 @@ configured in `UCD-SERG/serocalculator`) only asserts that
 against the committed `README.md`, so a stale README is not hard-gated and
 staying in sync is on the author.
 
-(`UCD-SERG/serocalculator#605`, 2026-07-25: a one-sentence README link fix,
+([`UCD-SERG/serocalculator#605`](https://github.com/UCD-SERG/serocalculator/issues/605), 2026-07-25: a one-sentence README link fix,
 verified this way and merged; the reviewer independently confirmed the two
 files stayed consistent.)
 
@@ -857,7 +872,7 @@ no settings file under a directory that does not exist, and aborted with
 That message is confident, actionable, and pointing at the wrong problem.
 Check both the missing and the invalid case when guarding a forwarded
 argument, not only the one the issue reports.
-(d-morrison/altdoc#64.)
+([d-morrison/altdoc#64](https://github.com/d-morrison/altdoc/issues/64).)
 
 ## `system.file()` returns `""` on a miss, and its path consumers disagree about rejecting it
 
@@ -941,7 +956,7 @@ The same session hit the mirror image: a plain CRAN source install of
 installed all four packages in one call with no compilation.
 So neither repo is the reliable one --- when the first fails on a build
 step, switch and retry before concluding a package is unavailable.
-(`d-morrison/altdoc` #82/#83/#84, 2026-07-28: this turned "assert the output
+(`d-morrison/altdoc` [#82](https://github.com/d-morrison/altdoc/issues/82)/[#83](https://github.com/d-morrison/altdoc/issues/83)/[#84](https://github.com/d-morrison/altdoc/issues/84), 2026-07-28: this turned "assert the output
 tree and hope" into rendering each generator, listing its published `docs/`
 tree, and deriving the assertions from what was actually there.)
 
@@ -1074,7 +1089,7 @@ check which backend a test's own `num_cores`/`cores` argument resolves to
 on the platform running it, rather than assuming the guarded code path was
 exercised.
 
-(`UCD-SERG/serocalculator#668`, 2026-09-01: a snapshot-change prediction was
+([`UCD-SERG/serocalculator#668`](https://github.com/UCD-SERG/serocalculator/issues/668), 2026-09-01: a snapshot-change prediction was
 derived from which `RNGseq_seed()` branch each call would take, without
 checking what `num_cores` those calls actually ran under in CI.
 They used the multi-core default and forked, so the leak the PR fixed never
@@ -1140,7 +1155,7 @@ braces vanish from the output, silently corrupting the message (a user reads
 A **non-empty** `{foo}` hard-errors on the missing object, taking down the
 whole call.
 Which one applies is easy to get backwards --- a review of
-`d-morrison/altdoc#87` predicted the crash for the empty form, and the
+[`d-morrison/altdoc#87`](https://github.com/d-morrison/altdoc/issues/87) predicted the crash for the empty form, and the
 opposite is true.
 
 This matters wherever a message carries text the code did not author:
@@ -1160,7 +1175,7 @@ it formatted, and `cli_ul()` returns the element **id** (`"cli-10293-1"`), so
 inspecting its return value yields a plausible scalar that never held the
 message.
 Use the enclosing function's return value when it hands back the strings it
-printed (altdoc#87 asserts on `check_altdoc()`'s invisible findings),
+printed ([altdoc#87](https://github.com/d-morrison/altdoc/issues/87) asserts on `check_altdoc()`'s invisible findings),
 `testthat::expect_output()` when nothing is returned, or
 `conditionMessage()` for `cli_abort()`.
 
@@ -1179,14 +1194,14 @@ and missing any one is flagged as blocking:
 
 Lychee link check: authenticated MCP endpoints quoted as prose
 (`https://mcp.granola.ai/mcp`, `https://api.githubcopilot.com/mcp`) are not browsable pages;
-exclude them in `lychee.toml` rather than treating the check failure as a broken link (wai#133).
+exclude them in `lychee.toml` rather than treating the check failure as a broken link ([wai#133](https://github.com/Morrison-Lab/wai/issues/133)).
 
 ## Inline R: avoid scientific notation with `formatC(..., format="d", big.mark=",")`
 
 `format(200000, big.mark=",")` renders as `2e+05` under default `scipen`.
 Use `formatC(..., format="d", big.mark=",")` (or `prettyNum(..., scientific=FALSE)`)
 so derived figures like `192,000` render with commas in Quarto inline R.
-Hit on wai#128 (byok ITPM/budget figures).
+Hit on [wai#128](https://github.com/Morrison-Lab/wai/issues/128) (byok ITPM/budget figures).
 
 ## Statistical Analysis Plans (SAPs) and reporting documents
 

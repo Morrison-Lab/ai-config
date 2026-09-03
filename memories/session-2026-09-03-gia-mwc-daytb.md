@@ -242,3 +242,43 @@ What did work, every time, was an outside reader with the artifact in hand.
 - A SHA that resolves only in the authoring container is worse than no SHA in a record meant for a reader who has only the remote: it reads as checkable, invites the check, and fails it.
   Name the branch and say what gates the push.
 - A rule written and applied in the same commit is where the application gets checked least, because writing the rule feels like the work.
+
+## 01:28 PDT --- state re-derived after the compaction
+
+Re-queried rather than recalled, per the state-claim rule.
+
+| PR | head | state |
+|---|---|---|
+| [#3084](https://github.com/Morrison-Lab/ai-config/pull/3084) | `bf558244` | pushed, 15/15 checks green, `review / require-clean-verdict` success, both threads resolved |
+| [#3060](https://github.com/Morrison-Lab/ai-config/pull/3060) | remote `c851d68f`, local `0daed144` | round 6 committed, unpushed, awaiting a push-gate verdict |
+| [#3023](https://github.com/Morrison-Lab/ai-config/pull/3023) | `6aa021b5` | open, the peer's |
+| [#3089](https://github.com/Morrison-Lab/ai-config/pull/3089) | `8f1ca761` | **merged 06:51Z by the peer**, not by me |
+| [#3100](https://github.com/Morrison-Lab/ai-config/pull/3100) | `3acc79bd` | new since the last sweep, the peer's |
+| [#3101](https://github.com/Morrison-Lab/ai-config/pull/3101) | `d8c88486` | new since the last sweep, the peer's |
+
+Two things the re-derivation changed.
+
+**#3089 merged while I was not watching, which the earlier row called "left to the peer" and never revisited.**
+It carries the fix for the dirty-tree false-clean that cost this session two of its own errors:
+the bumped checker widens `auto` scope to the working tree when tracked matching files are dirty,
+and prints `Examined N added line(s) across M file(s) (scope: ...)` ahead of its verdict.
+So the instrument that reported an absence about lines it never examined now reports its own reach.
+That is the session's recurring pattern getting an instrument rather than a rule, and someone else built it.
+
+**The peer's PR count grew by two while this session was compacting.**
+`ListAgents` reported no peers all session and still does;
+the forge's `updated_at` is the only instrument here that works.
+
+## The merge gate, re-probed rather than recalled
+
+`shared/workflow/adversarial-self-review.md` on `origin/main` --- not on either of my branches, which edit that file ---
+requires for a merge "a reviewer differing from the authoring session in **both** model and harness",
+and says plainly that where none is reachable "the merge waits --- 'blocked on reviewer availability' is the honest status".
+
+Re-probed at 01:28 PDT: `codex`, `opencode`, `agy`, `cursor`, `cursor-agent`, `gemini`, `aider`, `crush` all absent from `PATH`,
+and no provider API key is set in the environment.
+The CI `claude-review` job does not close the gap:
+it differs in harness and not in model, and the gate requires both.
+
+So #3084 is finished except for a gate no reachable reviewer can satisfy, and it waits.
+The standing ai-config `mwc` grant does not help, because the gate is a condition on the *verdict*, not on authorization.

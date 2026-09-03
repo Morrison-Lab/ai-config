@@ -100,6 +100,42 @@ one of:
   meaning is fine and instead verifies the *link and its ordering* --- a
   resolved term can still be unlinked or defined too late.
 
+## The corpus form: a fragment linked once, then named bare
+
+The checks above run against a rendered document's crossref divs.
+This repo's own prose has a plainer version of the same miss, and it has an
+instrument:
+
+```bash
+python3 scripts/check-bare-fragment-mentions.py
+```
+
+It reports a fragment a file links correctly on first mention and then names
+as plain prose further down the same file --- the author knew the link form
+and stopped using it.
+`scripts/check-links.py` cannot see this, because it validates the links that
+exist and the defect here is a link nobody wrote.
+
+Advisory, and always exits 0.
+It also runs as a non-gating step in `.github/workflows/validate.yml`, so the
+numbers land in the log on every run.
+Whether a bare occurrence is a missing link or ordinary English is a judgment
+the corpus cannot settle, so names that double as phrases, unhyphenated
+basenames, and basenames that also name a script under `scripts/` are dropped
+into a reported `exempt` bucket rather than guessed at.
+
+- **Do:** run the checker over a prose diff that names a fragment more than
+  once.
+- **Do:** fix a real finding by linking the *first* bare mention, not every
+  one --- five links in a paragraph is the redundancy
+  [`challenge-redundant-content.md`](../workflow/challenge-redundant-content.md)
+  rejects.
+- **Don't:** link a fragment on its first mention and then repeat the basename
+  as plain prose further down the same file.
+- **Don't:** read a clean `scripts/check-links.py` run as covering this; that
+  script answers whether the links present resolve, and this defect is an
+  absent link.
+
 ## The doubling survives every check that already runs
 
 The linking and ordering checks above are decidable from the source: a

@@ -18,10 +18,13 @@ This checker fires only where the evidence is unambiguous:
 * the file **already links** the fragment, so the author knew the link form
   and meant the reference;
 * a later bare occurrence of that same basename appears **after** the first
-  link, outside code fences, code spans, link constructs, URLs, blockquotes
-  and headings;
-* the basename is hyphenated, and is not one of the names that double as
-  ordinary English.
+  link, outside code fences, indented code blocks, code spans, inline and
+  wiki link constructs, link reference definitions, autolinks, URLs,
+  double-quoted spans, HTML comments, blockquotes and headings (ATX and
+  setext alike);
+* the basename is hyphenated, is not one of the names that double as
+  ordinary English, and does not collide with a script name under
+  `scripts/`.
 
 A file that never links a fragment it names is deliberately out of scope: the
 mention may be incidental, and a checker that guessed would train its readers
@@ -45,14 +48,17 @@ review text names a fragment it is reporting on.
 An exemption nobody can see is indistinguishable from a detector that missed
 the file (`shared/principles/fail-fast.md`), so every (file, fragment) pair
 that had a bare mention and was dropped anyway is listed in the `exempt`
-bucket with its reason.  Two reasons exist, and neither can be decided from
+bucket with its reason.  Three reasons exist, and none can be decided from
 the corpus alone:
 
 * `single-word` --- an unhyphenated basename (`ardi`, `handoff`) that a
   boundary match cannot separate from ordinary text reliably enough;
 * `common-phrase` --- a hyphenated basename that is also ordinary English
   (`fail-fast`, `issue-first`), where a bare occurrence is usually the phrase
-  and not the reference.
+  and not the reference;
+* `script-name` --- a basename that also names a script under `scripts/`
+  (`semantic-line-breaks`), so a bare occurrence may be naming the executable
+  rather than the fragment.
 
 Advisory: always exits 0, and reports what it examined rather than only what
 it found, so a run that scanned nothing is distinguishable from a clean
@@ -75,9 +81,23 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 from fences import CODE_SPAN_RE, strip_fences  # noqa: E402
 
-# Same link vocabulary as scripts/check-links.py and
-# scripts/check-stale-records.py, so the three agree on what a link is.
+# Byte-identical to scripts/check-stale-records.py's LINK, so the two agree on
+# the inline link form.  scripts/check-links.py's LINK_PATTERN is deliberately
+# wider: it carries a `(?<!!)` lookbehind excluding image links, and matches
+# reference-style `[a][b]` links too.  Neither difference matters here --- an
+# image is not a fragment reference, and a reference-style link's target lives
+# in a definition line this checker drops whole.
 LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
+
+# A Claude Code auto-load import, as scripts/check-stale-records.py reads it:
+# `@` in the first column, then a path.  CLAUDE.md pulls in shared/ fragments
+# this way, and they are invisible to LINK.
+AUTOLOAD = re.compile(r"^@(\S+)", re.M)
+
+# A wiki-style cross-link, `[[some-name]]`.  skills/consolidate-memory and
+# skills/purge-hallucinations both treat this as a first-class link form in
+# memory bodies, so it establishes the reference and is not a bare mention.
+WIKI_LINK = re.compile(r"\[\[([^\]\n]+)\]\]")
 
 # The whole link construct, stripped before the bare-mention scan: a fragment
 # named inside link text is a reference that already carries its link.
@@ -90,15 +110,29 @@ LINK_DEFINITION = re.compile(r"^\s{0,3}\[[^\]]*\]:\s*\S")
 AUTOLINK = re.compile(r"<[^ >]+>")
 BARE_URL = re.compile(r"\b[a-z][a-z0-9+.-]*://\S+")
 
-# A double-quoted span on one line.  Quoted text -- an error message, a
-# reviewer's wording, a login -- is being reported rather than referenced, the
-# same reason blockquotes are skipped below.
-QUOTED = re.compile(r'"[^"\n]{1,200}"')
+# A double-quoted span.  Quoted text -- an error message, a reviewer's wording,
+# a login -- is being reported rather than referenced, the same reason
+# blockquotes are skipped below.  It may cross a line, because this corpus
+# writes semantic line breaks and so wraps quotations constantly; it may not
+# cross a blank line, so an unbalanced quote cannot swallow the document.
+QUOTED = re.compile(r'"(?:[^"\n]|\n(?![ \t]*\n)){1,400}"')
+
+# An HTML comment, which may span lines.  Commented-out prose is not prose.
+HTML_COMMENT = re.compile(r"<!--.*?-->", re.S)
+
+# A setext heading underline (CommonMark 4.3), which makes the line above it a
+# heading.  The ATX form is handled per line below.
+SETEXT_UNDERLINE = re.compile(r"^\s{0,3}(?:=+|-+)\s*$")
+
+# A list marker, used only to keep list continuation lines out of the
+# indented-code-block rule below.
+LIST_MARKER = re.compile(r"^\s{0,3}(?:[-*+]|\d{1,9}[.)])\s")
 
 SKIP_PREFIXES = ("http://", "https://", "mailto:", "tel:", "#")
 
 DEFAULT_SCAN_GLOBS = [
     "skills/**/*.md",
+    "codex-skills/**/*.md",
     "commands/**/*.md",
     "docs/**/*.md",
     "memories/**/*.md",
@@ -106,6 +140,11 @@ DEFAULT_SCAN_GLOBS = [
     "shared/**/*.md",
     "*.md",
 ]
+
+# Basenames that name a container rather than a fragment.  A link to
+# `skills/post-merge/SKILL.md` refers to `post-merge`, so taking the basename
+# would resolve every skill cross-reference to the same pseudo-fragment.
+CONTAINER_STEMS = frozenset({"SKILL", "README", "index"})
 
 # Companion suffixes that belong to a parent fragment.  A `.rationale.md` or
 # `.cases.md` file naming its own parent is talking about itself, not making a
@@ -116,7 +155,9 @@ COMPANION_SUFFIXES = (".cases", ".rationale")
 # occurrence of one of these is usually the phrase, so flagging it would train
 # readers to ignore the checker.  Every drop is reported in the `exempt`
 # bucket, so this list shrinks the findings visibly rather than silently.
-# Extend with --common-phrase rather than by loosening the boundary match.
+# `--common-phrase` adds to this list rather than replacing it, so tuning the
+# checker cannot silently make it noisier.  Extend it rather than loosening the
+# boundary match.
 DEFAULT_COMMON_PHRASES = (
     "fail-fast",
     "fully-clean",
@@ -156,6 +197,12 @@ def fragment_name(target: str) -> str | None:
     A companion target normalizes to its parent, so a link to
     `ardi.cases.md` registers `ardi`: the author demonstrated the link form
     for that family, which is the evidence this checker runs on.
+
+    A container basename normalizes to its directory, so
+    `skills/post-merge/SKILL.md` registers `post-merge`.  Taking the basename
+    instead would resolve every skill cross-reference --- the dominant form in
+    this corpus --- to one pseudo-fragment named `SKILL`, which is both blind
+    to the miss and noise in the report.
     """
     target = target.strip()
     if not target or is_external(target):
@@ -166,6 +213,10 @@ def fragment_name(target: str) -> str | None:
     if not path_part.endswith(".md"):
         return None
     stem = Path(path_part).name[: -len(".md")]
+    if stem in CONTAINER_STEMS:
+        parent = Path(path_part).parent.name
+        if parent and parent not in {".", ".."}:
+            stem = parent
     for suffix in COMPANION_SUFFIXES:
         if stem.endswith(suffix):
             stem = stem[: -len(suffix)]
@@ -196,36 +247,76 @@ def is_case_record(md: Path) -> bool:
 def prose_lines(text: str) -> list[str]:
     """Line-aligned prose with every non-prose region blanked.
 
-    Fenced blocks, code spans, whole link constructs, autolinks and bare URLs
-    all go, and blockquote, heading, and link-definition lines are dropped
-    whole.  Line indices are preserved so a finding can name a real line.
+    Blanked in place, so line indices are preserved and a finding names a real
+    line: fenced blocks, code spans, double-quoted spans, HTML comments, whole
+    inline and wiki link constructs, autolinks and bare URLs.  Dropped whole:
+    blockquote lines, ATX heading lines, the line a setext underline turns
+    into a heading, link reference definitions, and indented code blocks.
+
+    A quoted span and an HTML comment may cross lines, so both are blanked
+    over the whole text before it is split.  Blanking them per line would miss
+    every quotation this corpus wraps at a semantic line break, which is most
+    of them.
     """
-    stripped = strip_spans(text)
+    stripped = QUOTED.sub(_blank, HTML_COMMENT.sub(_blank, strip_spans(text)))
+    raw = stripped.split("\n")
     out: list[str] = []
-    for line in stripped.split("\n"):
+    in_list = False
+    for idx, line in enumerate(raw):
         bare = line.lstrip()
+        indent = len(line) - len(bare)
+        if not bare:
+            out.append("")
+            continue
+        if LIST_MARKER.match(line):
+            in_list = True
+        elif indent == 0:
+            in_list = False
+        # An indented code block: four spaces of indent outside a list, where
+        # a continuation line would otherwise be indented for readability.
+        if indent >= 4 and not in_list:
+            out.append("")
+            continue
         if bare.startswith(">") or bare.startswith("#"):
             out.append("")
             continue
         if LINK_DEFINITION.match(line):
             out.append("")
             continue
+        # A setext underline makes the line above it a heading.
+        if idx + 1 < len(raw) and SETEXT_UNDERLINE.match(raw[idx + 1]):
+            out.append("")
+            continue
         line = LINK_CONSTRUCT.sub(" ", line)
+        line = WIKI_LINK.sub(" ", line)
         line = BARE_URL.sub(" ", line)
         line = AUTOLINK.sub(" ", line)
-        line = QUOTED.sub(" ", line)
         out.append(line)
     return out
 
 
 def link_lines(text: str) -> dict[str, list[int]]:
-    """Map each linked fragment basename to the 1-indexed lines linking it."""
+    """Map each linked fragment basename to the 1-indexed lines linking it.
+
+    Three link forms register: an inline `[text](target.md)`, a `@`-import as
+    `scripts/check-stale-records.py` reads it, and a wiki-style `[[name]]`.
+    All three demonstrate that the author knew how to link the fragment, which
+    is the evidence this checker runs on.
+    """
     stripped = strip_spans(text)
     found: dict[str, list[int]] = {}
     for idx, line in enumerate(stripped.split("\n"), start=1):
         for target in LINK.findall(line):
             name = fragment_name(target)
             if name:
+                found.setdefault(name, []).append(idx)
+        for target in AUTOLOAD.findall(line):
+            name = fragment_name(target)
+            if name:
+                found.setdefault(name, []).append(idx)
+        for name in WIKI_LINK.findall(line):
+            name = name.strip()
+            if name and "/" not in name:
                 found.setdefault(name, []).append(idx)
     return found
 
@@ -262,13 +353,37 @@ def bare_lines(lines: list[str], name: str, after: int) -> list[int]:
     ]
 
 
-def exempt_reason(name: str, common_phrases: tuple[str, ...]) -> str | None:
+def exempt_reason(
+    name: str,
+    common_phrases: tuple[str, ...],
+    script_names: frozenset[str] = frozenset(),
+) -> str | None:
     """Why `name` is not a reliable bare-mention signal, or None."""
     if "-" not in name:
         return "single-word"
     if name in common_phrases:
         return "common-phrase"
+    if name in script_names:
+        return "script-name"
     return None
+
+
+def script_stems(root: Path) -> frozenset[str]:
+    """Stems of the executables under `scripts/`.
+
+    A basename that names both a fragment and a script is ambiguous by
+    construction: `semantic-line-breaks` is a `shared/writing/` fragment and
+    `scripts/semantic-line-breaks.py` at once, so a bare occurrence may be
+    naming the executable.  The collision is reported, not dropped silently.
+    """
+    scripts = root / "scripts"
+    if not scripts.is_dir():
+        return frozenset()
+    return frozenset(
+        path.stem
+        for pattern in ("*.py", "*.sh")
+        for path in scripts.glob(pattern)
+    )
 
 
 def scan_files(root: Path, globs: list[str]) -> list[Path]:
@@ -284,6 +399,7 @@ def scan_text(
     text: str,
     md: Path,
     common_phrases: tuple[str, ...] = DEFAULT_COMMON_PHRASES,
+    script_names: frozenset[str] = frozenset(),
 ) -> tuple[list[dict], list[dict], int]:
     """Findings, exemptions, and the number of linked fragments considered."""
     findings: list[dict] = []
@@ -308,7 +424,7 @@ def scan_text(
         ]
         if not bare:
             continue
-        reason = exempt_reason(name, common_phrases)
+        reason = exempt_reason(name, common_phrases, script_names)
         record = {
             "fragment": name,
             "link_line": first_link,
@@ -328,6 +444,7 @@ def collect(
 ) -> dict:
     """Scan `root` and return the full report as data."""
     files = scan_files(root, globs)
+    scripts = script_stems(root)
     findings: list[dict] = []
     exempt: list[dict] = []
     scanned = 0
@@ -343,7 +460,7 @@ def collect(
             continue
         scanned += 1
         file_findings, file_exempt, file_considered = scan_text(
-            text, md, common_phrases
+            text, md, common_phrases, scripts
         )
         considered += file_considered
         rel = str(md.relative_to(root)) if md.is_relative_to(root) else str(md)
@@ -408,8 +525,9 @@ def main(argv: list[str] | None = None) -> int:
         action="append",
         dest="phrases",
         help=(
-            "hyphenated basename that is also ordinary English, repeatable "
-            f"(default: {', '.join(DEFAULT_COMMON_PHRASES)})"
+            "hyphenated basename that is also ordinary English, repeatable; "
+            "added to the built-in list rather than replacing it "
+            f"(built in: {', '.join(DEFAULT_COMMON_PHRASES)})"
         ),
     )
     parser.add_argument(
@@ -420,7 +538,9 @@ def main(argv: list[str] | None = None) -> int:
 
     root = args.root.resolve()
     globs = args.globs or DEFAULT_SCAN_GLOBS
-    phrases = tuple(args.phrases) if args.phrases else DEFAULT_COMMON_PHRASES
+    # Added to, never substituted for: a flag that made the checker noisier
+    # would be a trap, since its whole purpose is to suppress ordinary English.
+    phrases = DEFAULT_COMMON_PHRASES + tuple(args.phrases or ())
     report = collect(root, globs, phrases)
 
     if args.json:

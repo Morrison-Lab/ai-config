@@ -395,9 +395,9 @@ jobs:
       - name: Run stale-record check tests
         run: python3 scripts/test_check_stale_records.py
       - name: Run bare-fragment-mention check tests
-        # ai-config#3034. The test suite only; the checker itself is not wired
-        # into CI yet, so this step proves the detector still fires without
-        # gating any PR on the corpus scan.
+        # ai-config#3034. The negative control: until the detector has been
+        # seen to produce a non-zero, a zero from the corpus scan below is not
+        # evidence of anything.
         run: python3 scripts/test_check_bare_fragment_mentions.py
       - name: Check for stale and orphaned records (advisory)
         # ai-config#1544. Non-blocking, and for two separate reasons.
@@ -419,6 +419,21 @@ jobs:
         # NUMBERS in the log on each run, and specifically the orphan list,
         # which is a link-graph fact the shallow clone does not affect.
         run: python3 scripts/check-stale-records.py
+      - name: Check for bare fragment mentions (advisory)
+        # ai-config#3034. Non-blocking: the script's main() ends `return 0`
+        # unconditionally, so this step reports and cannot gate a PR.
+        #
+        # Advisory by construction rather than by choice. Whether a bare
+        # occurrence is a missing link or ordinary English is a judgment the
+        # corpus cannot settle -- names like `fail-fast` and `plain-prose`
+        # are both a fragment and a phrase -- so the exempt bucket reports
+        # the drops instead of the script guessing, and the findings are a
+        # reading prompt.
+        #
+        # The value is the numbers in the log on each run: a file that links
+        # a fragment once and then names it bare is the miss this corpus
+        # states in prose and, before this step, had no instrument for.
+        run: python3 scripts/check-bare-fragment-mentions.py
   lint-qmd:
     uses: Morrison-Lab/gha/.github/workflows/lint-qmd.yml@v2
 

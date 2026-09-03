@@ -1560,6 +1560,12 @@ math, apply this in addition to the fact-check above.
 
 Applies wherever `code-review`/`ard`/`ardi` already reviews a prose diff, alongside the fact-check and ambiguous-terminology checks above.
 
+`python3 scripts/check-bare-fragment-mentions.py` is the instrument for this corpus's own version of the miss: a fragment linked once and then named as plain prose further down the same file.
+Advisory, always exits 0, and wired into `validate.yml` as a non-gating step.
+
+- **Do:** run it over a prose diff that names a fragment more than once.
+- **Don't:** link a fragment on its first mention and then repeat the basename bare further down.
+
 ## Remove forward-pointing phrases from prose, not just crossref divs
 
 The section above covers formal Quarto crossref-div ordering for term/result definitions specifically.

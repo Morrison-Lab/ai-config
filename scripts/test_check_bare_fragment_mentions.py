@@ -111,6 +111,49 @@ check(
     scan(LINKED + '\nThe log said "actor: quotable-findings (type: Bot)".\n') == [],
 )
 check(
+    "a quoted span wrapped at a semantic line break is still exempt",
+    # This corpus wraps quotations constantly, so a line-local quote guard
+    # would miss most of them.  Measured on memories/claude-bot-workflows.md,
+    # where a CI error message opens on one line and closes on the next.
+    scan(LINKED + '\nHe said "the first half\nnames quotable-findings here".\n')
+    == [],
+)
+check(
+    "a mention inside an HTML comment is not a bare mention",
+    scan(LINKED + "\n<!-- TODO: quotable-findings later -->\n") == [],
+)
+check(
+    "a mention inside an indented code block is not a bare mention",
+    scan(LINKED + "\n    grep quotable-findings docs/*.md\n") == [],
+)
+check(
+    "an indented list continuation line is still prose",
+    # The indented-code rule must not swallow a list whose continuation is
+    # indented for readability, which is the commoner shape in this corpus.
+    [f["bare_lines"] for f in scan(LINKED + "\n- a list item\n\n    quotable-findings applies.\n")]
+    == [[5]],
+)
+check(
+    "a setext heading naming the fragment is not a bare mention",
+    scan(LINKED + "\nquotable-findings\n=================\n") == [],
+)
+check(
+    "a wiki-style cross-link is not a bare mention",
+    # `[[name]]` is a first-class link form in memory bodies; see
+    # skills/consolidate-memory/SKILL.md.
+    scan(LINKED + "\nAnd per [[quotable-findings]], see above.\n") == [],
+)
+check(
+    "a wiki-style cross-link establishes the link, so a later bare mention counts",
+    [f["bare_lines"] for f in scan("See [[quotable-findings]].\n\nThe quotable-findings rule.\n")]
+    == [[3]],
+)
+check(
+    "an @-import establishes the link, so a later bare mention counts",
+    [f["bare_lines"] for f in scan("@shared/workflow/quotable-findings.md\n\nThe quotable-findings rule.\n")]
+    == [[3]],
+)
+check(
     "a mention inside a URL path is not a bare mention",
     scan(LINKED + "\nSee https://example.com/quotable-findings for it.\n") == [],
 )
@@ -168,6 +211,26 @@ check(
     == [],
 )
 
+# --- container basenames resolve to their directory ---------------------------
+
+check(
+    "a link to skills/<name>/SKILL.md registers <name>, not SKILL",
+    # Taking the basename would collapse every skill cross-reference --- the
+    # dominant form in this corpus --- onto one pseudo-fragment.
+    cbfm.fragment_name("../skills/post-merge/SKILL.md") == "post-merge",
+)
+check(
+    "a bare mention after a SKILL.md link is reported",
+    [f["fragment"] for f in scan(
+        "See [`post-merge`](../skills/post-merge/SKILL.md).\n\nRun the post-merge step.\n"
+    )]
+    == ["post-merge"],
+)
+check(
+    "a bare README.md link keeps its own stem, having no directory to borrow",
+    cbfm.fragment_name("README.md") == "README",
+)
+
 # --- exemptions are reported, not silent -------------------------------------
 
 single = exemptions("See [`ardi`](ardi.md).\n\nThe ardi loop applies.\n")
@@ -191,6 +254,23 @@ check(
         "See [`odd-name`](odd-name.md).\n\nThe odd-name rule.\n", HERE, ("odd-name",)
     )[1][0]["reason"]
     == "common-phrase",
+)
+
+script = cbfm.scan_text(
+    "See [`some-tool`](some-tool.md).\n\nThe some-tool run failed.\n",
+    HERE,
+    cbfm.DEFAULT_COMMON_PHRASES,
+    frozenset({"some-tool"}),
+)
+check(
+    "a basename that also names a script is exempt as script-name",
+    # `semantic-line-breaks` is a shared/writing fragment and a scripts/ file
+    # at once, so a bare occurrence may be naming the executable.
+    [(e["fragment"], e["reason"]) for e in script[1]] == [("some-tool", "script-name")],
+)
+check(
+    "a basename that also names a script produces no finding",
+    script[0] == [],
 )
 
 # --- corpus walk -------------------------------------------------------------
@@ -222,6 +302,30 @@ with tempfile.TemporaryDirectory() as tmp:
     )
 
 # --- the command-line surface ------------------------------------------------
+
+with tempfile.TemporaryDirectory() as tmp:
+    root = Path(tmp)
+    (root / "docs").mkdir()
+    (root / "docs" / "host.md").write_text(
+        "See [`odd-name`](odd-name.md) and [`fail-fast`](fail-fast.md).\n"
+        "\nThe odd-name rule, and we fail-fast here.\n",
+        encoding="utf-8",
+    )
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer):
+        cbfm.main(
+            ["--root", str(root), "--glob", "docs/**/*.md",
+             "--common-phrase", "odd-name", "--json"]
+        )
+    tuned = json.loads(buffer.getvalue())
+    check(
+        "--common-phrase adds to the built-in list rather than replacing it",
+        # Replacing would drop `fail-fast` back into findings, so the one
+        # documented way to tune the checker would make it noisier.
+        sorted((e["fragment"], e["reason"]) for e in tuned["exempt"])
+        == [("fail-fast", "common-phrase"), ("odd-name", "common-phrase")]
+        and tuned["findings"] == [],
+    )
 
 buffer = io.StringIO()
 with contextlib.redirect_stdout(buffer):

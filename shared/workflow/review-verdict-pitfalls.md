@@ -214,11 +214,16 @@ A question of the shape "are any checks failing" cannot see the difference, beca
   a skipped dispatcher and a passed review both leave nothing red to notice.
 
 (Second occurrence, `ucdavis/bcs`, 2026-09-03, and the timestamp on the measurement is load-bearing rather than decorative.
-Measured at 06:43 UTC, the moment `ucdavis/bcs#897` was filed: PR #891 at head `e49d47a1d828a108a0aa01bdda7274b0ab5a05c5` carried zero `claude-code-review.yml` runs on its branch, and two `ai-code-review.yml` runs, both `event: pull_request` and both `conclusion: skipped`.
-So `review / claude-review`, `require-review` and `require-clean-verdict` did not exist as check runs on that head, and nothing that had run was red --- the single non-success was a `copilot-pull-request-reviewer` run whose conclusion was `cancelled`, which is exactly the benign reading a sweep gives it.
-A hand-dispatched `claude-code-review.yml` run three minutes later produced all three, and they returned clean.
-So the head no longer shows the state this entry describes, and a reader who queries it today will find three green `review / *` checks sitting where the entry says none existed.
-That is the repair, not a refutation --- but it is also why a case record whose subject is live forge state has to say when it was true, since the act of reporting such a state is frequently what ends it.
+Measured at 06:43 UTC, the moment `ucdavis/bcs#897` was filed, and note that two different populations are in play.
+On the branch: zero `claude-code-review.yml` workflow runs, and two `ai-code-review.yml` runs, both `event: pull_request` and both `conclusion: skipped`.
+On PR #891's head `e49d47a1d828a108a0aa01bdda7274b0ab5a05c5`: 31 check runs, and `review / claude-review`, `require-review` and `require-clean-verdict` were not among them.
+Three of those 31 concluded something other than `success` --- `ai-review` and `redaction-gate`, the two skipped jobs of the dispatcher this entry is about, and a `copilot-pull-request-reviewer` run that concluded `cancelled`.
+None concluded `failure`, which is the whole point: a sweep asking whether anything is red gets "no" from a head that no reviewer had read.
+A hand-dispatched `claude-code-review.yml` run three minutes later produced the three missing checks, and they returned clean.
+So a reader who queries the PR today finds them sitting green exactly where this entry says none existed.
+That is the repair rather than a refutation, and it is why the measurement carries a time.
+What ended the state was that hand dispatch, recorded under the issue's own "Workaround applied now" heading --- not the act of filing, which changed nothing by itself.
+The two ran in one pass, as they commonly do when whoever finds such a state can also act on it, and that is the reason a record like this one needs its timestamp rather than a present tense.
 Filed upstream as `ucdavis/bcs#897`.)
 
 **A fourth case: a review job can post a syntactically valid, confidently stated verdict that is nonetheless invalid because it rests on a hallucinated premise about the PR's own state --- not a stub (no verdict) and not a misfire (guard-script/check-conclusion mismatch), but a fabricated fact baked into an otherwise well-formed review.** A reviewer that infers PR state from a commit message rather than querying the PR's actual `state`/`merged` API fields can mistake a routine `Merge remote-tracking branch 'origin/main' into <PR-branch>` commit --- pushed to resolve a sync conflict on the still-open PR branch itself --- for evidence the *PR* was merged into `main`, and confidently report "PR is closed, no action taken" while never actually reviewing the diff. This reads exactly like a legitimate all-clear (a `### Verdict` section is present, the job reports success), so the stub-detection guards described in CLAUDE.md's "Do the review yourself when the @claude workflow doesn't produce a verdict" section don't catch it. Sanity-check any surprising verdict --- especially "nothing to review" or "already merged/closed" --- against the PR's real API state before trusting it, and re-trigger for a genuine review rather than accepting a verdict-shaped comment built on a false premise.

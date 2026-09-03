@@ -869,6 +869,12 @@ A clean automated review from every available provider evaluating the current HE
   The documented way to advance it is the plugin CLI --- `claude plugin marketplace update Morrison-Lab`, then `claude plugin update ai-config`.
   `update` is the CLI's own subcommand for an already-installed plugin (present in Claude Code 2.1.258);
   the `install` step in [`use-plugins.md`](../shared/workflow/use-plugins.md) is the first-time path and does not advance an existing pin.
+  **2nd occurrence, 2026-09-03** ([#3156](https://github.com/Morrison-Lab/ai-config/issues/3156)): the same stale-cache mechanism, with a payload that fails OPEN rather than staying outdated.
+  A `MORATORIUM_END` constant frozen at `2026-09-01` in the loaded copy had the guard compute the Copilot moratorium as expired and demand the forbidden review, while `main` carried `2026-12-01`.
+  `git pull --ff-only` on the marketplace clone advanced it to `b0f279f` and changed nothing loaded;
+  the cache's newest per-commit directory (`4140e5c25079`) matched the marketplace's pre-pull HEAD, and no `b0f279f` entry existed.
+  Tracked as [#3141](https://github.com/Morrison-Lab/ai-config/issues/3141);
+  see [`keep-checkouts-fresh.md`](../shared/workflow/keep-checkouts-fresh.md)'s dated-constant section for the fail-open rule this occurrence produced.
   This incident did not measure those commands:
   an agent updating its own active guard mid-session is the same self-modification the classifier denies, so running them is the next thing for the USER to do.
   Verify the pinned copy in `installed_plugins.json` afterwards rather than assuming the pin moved.

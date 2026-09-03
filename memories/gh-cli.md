@@ -910,3 +910,20 @@ one update-plus-rerun cycle each.)
   then start the next PR's update (or use a merge queue where configured).
 - **Don't:** batch-update the whole queue without a merge queue --- every PR but the next one
   goes `BEHIND` again before its turn, and its re-run is wasted.
+
+## `gh pr merge` can succeed while printing nothing at all
+
+Measured 2026-09-03 on `Morrison-Lab/ai-config`: `gh pr merge <N> --squash --delete-branch` produced no stdout, no stderr, and no error, and the merge had in fact landed.
+
+Empty output is therefore not a signal in either direction here, and the two readings it invites are both wrong and both expensive.
+Read as a failure, it prompts a retry that either errors confusingly on an already-merged PR or --- worse on a repo with auto-delete --- runs against a branch that no longer exists, which `git ls-remote` then reports as an absence indistinguishable from a branch never pushed (see [`check-before-pushing`](../shared/workflow/check-before-pushing.md)).
+Read as a success, it is right by luck rather than by evidence.
+
+One query settles it, and it is cheaper than either misreading:
+
+```bash
+gh pr view <N> --json state,mergedAt,mergeCommit
+```
+
+- **Do:** confirm a merge from a state query rather than from the merge command's own output.
+- **Don't:** read empty output from `gh pr merge` as failure, and don't retry on it.

@@ -283,3 +283,29 @@ duration.
 `grep -n no-unreviewed-pr ~/.claude/settings.json` returned nothing on the
 machine where the hook was firing every turn, because `hooks/hooks.json:349`
 supplied it under `${CLAUDE_PLUGIN_ROOT}`.)
+
+**The dated constant has a failure direction the pair above does not name, and it is the opposite of every other stale-hook symptom: it fails OPEN, on its own schedule, with no edit and no event.**
+The recommendation above is still right, and this is its cost rather than a retraction.
+A stale env flag, a stale threshold, a stale allowlist all leave a guard enforcing something outdated --- annoying, visible, and safe.
+A stale *dated* constant instead has the guard compute that its own suppression has expired, so it re-arms early and starts demanding an action a standing directive forbids.
+Nothing triggers it.
+Nobody edited the hook, no PR changed, no session did anything;
+the clock crossed a number frozen in a snapshot, and the guard began asserting the opposite of current policy.
+
+That makes the two halves of this section compose into a worse failure than either describes alone.
+The plugin-cache paragraphs above explain why a merged fix does not reach a running session;
+a dated constant is the one payload for which *not reaching the session* is not merely a delay but an inversion, because the stale copy does not hold the old behaviour --- it computes a new, wrong one.
+
+- **Do:** give a dated suppression a fail-safe reading, so an expired constant suppresses rather than re-arms unless the current date is confirmed against a live source --- read the date from a corpus file at runtime, or treat expiry as "unknown, stay suppressed".
+- **Do:** check the loaded copy's constant, not the checkout's, when a guard demands something a standing directive forbids --- that demand is a freshness symptom before it is a policy question.
+- **Don't:** read "the guard re-armed" as evidence the suppression period actually ended.
+- **Don't:** treat a dated constant as equivalent in risk to a stale flag or threshold;
+  those fail closed, and this one does not.
+
+(Measured 2026-09-03, tracked as [#3141](https://github.com/Morrison-Lab/ai-config/issues/3141) with the two proposals above, and recorded in [#3156](https://github.com/Morrison-Lab/ai-config/issues/3156).
+`hooks/no-unreviewed-pr.py` demanded a Copilot review on two PRs while the all-repos moratorium ran to `MORATORIUM_END = 2026-12-01` ([#3078](https://github.com/Morrison-Lab/ai-config/issues/3078));
+the loaded copy carried `2026-09-01` and had computed the moratorium as expired two days earlier.
+`git pull --ff-only` in `~/.claude/plugins/marketplaces/Morrison-Lab` --- 52 commits behind, clean tree --- advanced it to `b0f279f` carrying the correct date and changed nothing the session loaded: `~/.claude/plugins/cache/Morrison-Lab/ai-config/` held one directory per commit, its newest (`4140e5c25079`) matched the marketplace's *pre-pull* HEAD and still carried `2026-09-01`, and no entry for `b0f279f` existed at all.
+A second occurrence of the class this section's cache paragraphs and [`mistake-patterns.md`](../../memories/mistake-patterns.md) Pattern 43 both record;
+first was 2026-09-01, [#2899](https://github.com/Morrison-Lab/ai-config/issues/2899).
+The session diagnosed it correctly and could not fix it for itself: the pin advances through a `/plugin` operation or a restart, neither available to a running non-interactive session.)

@@ -514,6 +514,34 @@ pushing branch A afterward compares its shipped commit `X` against the held `Y`,
 - **Don't:** read that refusal as a defect in branch A's review;
   the guard has no notion of "branch" to be defective about, and the SHA comparison is doing exactly what it is built to do.
 
+**That remedy assumes the two branches can be serialized, and once two PRs are genuinely in flight they cannot be --- the slot is then non-convergent, and neither escape the guard offers is correct.**
+The pair above reads as a sequencing preference, so it looks satisfiable by being tidier.
+It is not, in the case that actually produces the refusal: driving two open PRs means each one's review round is interleaved with the other's, and the second branch's fix is what forces the second dispatch.
+Every re-review then invalidates the other branch's held verdict, so the loop alternates rather than converging.
+
+Both discharge paths fail at once, which is what makes this a deadlock rather than a cost.
+Re-dispatching spends a full adversarial pass --- **about 125k subagent tokens, measured** --- to re-derive a verdict that already existed for that exact SHA, and then invalidates the branch you just left.
+`ALLOW_UNREVIEWED_PUSH=1` is the wrong instrument for a different reason: it is documented for a push whose verdict **cannot exist** for the guard to check, and here a clean verdict for the exact commit was produced and then overwritten.
+Using it would report the situation as unreviewable when the review was done.
+
+So read this refusal as a defect in the **guard's state model**, which is the one reading the pair above rules out.
+It is right that the guard has no notion of branch to be defective about;
+what it also has no notion of is *commit*, beyond the single most recent one.
+Keying verdicts by SHA --- `{sha: verdict}` rather than one latest-verdict slot --- removes both failures, and subsumes [#3131](https://github.com/Morrison-Lab/ai-config/issues/3131)'s original report (a sibling subagent's verdict leaking into the pushing thread) without anyone having to reason about which session produced a given verdict.
+
+- **Do:** serialize review-and-push per branch where you still can;
+  the pair above is the cheap case and it remains the first move.
+- **Do:** report the alternation as a blocker on [#3131](https://github.com/Morrison-Lab/ai-config/issues/3131) when serializing is not available, rather than paying a re-dispatch that will be invalidated again.
+- **Don't:** reach for `ALLOW_UNREVIEWED_PUSH=1` here --- a verdict existed, so the override would misreport why the push was unverified.
+- **Don't:** treat a re-dispatch as the cheap fix;
+  it costs a full pass and buys a verdict that the next branch's round destroys.
+
+(Measured 2026-09-03 across two worktrees in one session, recorded in [#3156](https://github.com/Morrison-Lab/ai-config/issues/3156).
+Branch A reviewed clean;
+branch B then reviewed not-clean, was fixed, and re-reviewed clean;
+pushing A was refused with "The clean verdict is for commit <B's sha>, but this push would ship <A's sha>", over a clean verdict for A's exact SHA that had been overwritten.
+The reverse happened earlier in the same session.)
+
 **The harness appends an `agentId:` trailer to a subagent's report, sometimes as its own block and sometimes concatenated onto the last line.**
 Which of those is common is the question this section could not settle, and an earlier draft asserted an answer to it by generalizing from the two dispatches it happened to watch.
 

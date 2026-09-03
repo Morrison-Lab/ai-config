@@ -132,3 +132,19 @@ The probe costs one cheap call and settles it.
 
 - **Do:** probe with a trivial subagent call before concluding a quota outage reaches this session.
 - **Don't:** infer from a CI review skip that self-review is unavailable too.
+
+## Correction to a correction
+
+I recorded earlier in this file that the diff-scoped checker "takes line numbers from the commit and content from the working tree" as though it were a fresh finding.
+It is not.
+`shared/writing/semantic-line-breaks.md` already carries it as its **third dirty-tree symptom**, in those words.
+I asserted the gap from recollection rather than checking, which is exactly the failure [`grep-is-not-coverage`](../shared/workflow/grep-is-not-coverage.md) names, committed in the same session where I quoted that fragment's sibling rule approvingly.
+The UMS pass caught it before it became a duplicate corpus entry, which is the argument for the pass running at all.
+
+## Phase 1 outcome
+
+Merged: #3056, #3014, #3058, #3044.
+Pushed and awaiting review (blacked out until 21:50 PDT): #3023, #3024, #3070.
+Left to the peer session: #3061 (its head moved again), #3037.
+Untouched: #3060, an empty draft closing #3059.
+Filed: #3069, #3071, #3072.

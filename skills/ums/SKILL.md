@@ -146,7 +146,7 @@ committed pass.
    - **When step 2 routed the item to a repo other than ai-config, grep both
      corpora.**
      The query above searches an ai-config checkout,
-     so run a second pass in that repo, over its own doc paths ---
+     so run a second pass in the destination repo, over that repo's own doc paths ---
      a repo-local entry can otherwise duplicate or contradict a fragment
      nobody thought to search from that repo.
      See

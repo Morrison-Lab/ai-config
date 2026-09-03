@@ -880,7 +880,8 @@ So the issue can never settle the question, and only the code can.
   its state is bookkeeping, not behaviour.
 
 (Measured 2026-09-03.
-A hook's docstring asserted that [`no-push-without-self-review.py`](../../hooks/no-push-without-self-review.py) "does not register" verdicts arriving via background task notifications, citing [ai-config#2483](https://github.com/Morrison-Lab/ai-config/issues/2483), which was --- and as of 2026-09-03 still is --- open.
-The fix had landed on 2026-09-01 in [#2820](https://github.com/Morrison-Lab/ai-config/pull/2820) (`0d78e04c`), whose `is_task_notification` branch sits at `hooks/no-push-without-self-review.py:1399-1416` and is covered by a passing test.
-`git log -L 1399,1416:hooks/no-push-without-self-review.py` names that commit in one command;
-no such command was run, because an open issue looked like the answer.)
+`hooks/flag-background-review-dispatch.py` --- authored on `Morrison-Lab/ai-config`'s unmerged branch `hook/flag-background-review`, commit `9009e787a`, so it is reachable only by `git log --all -S'2483' -- hooks/` --- carried a docstring asserting that [`no-push-without-self-review.py`](../../hooks/no-push-without-self-review.py) does not register verdicts arriving via background task notifications, citing [ai-config#2483](https://github.com/Morrison-Lab/ai-config/issues/2483), which was --- and as of 2026-09-03 still is --- open.
+The fix had landed on 2026-09-01 in [#2820](https://github.com/Morrison-Lab/ai-config/pull/2820) (`0d78e04c`), whose `is_task_notification` branch sits at `hooks/no-push-without-self-review.py:1400-1417` and is covered by a passing test.
+`git log -L 1400,1417:hooks/no-push-without-self-review.py` names that commit in one command;
+no such command was run, because an open issue looked like the answer.
+The docstring was still uncorrected on that branch as this was written.)

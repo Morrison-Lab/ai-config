@@ -365,7 +365,7 @@ Read against #2185 the gap in the third reading is visible: its wording assumes 
 
 Two independent drivers do not produce a verdict on a branch.
 They produce two overlapping sets of fixes, and the region that decides the merge is the **symmetric difference**: what each one caught that the other did not.
-Measured on [ai-config#3023](https://github.com/Morrison-Lab/ai-config/pull/3023), 2026-09-03, whose head carries both sessions' commits interleaved (`gh pr view 3023 --json commits` separates them by author): both sides had fixed the same defects, and each had fixed one the other missed.
+Measured on [ai-config#3023](https://github.com/Morrison-Lab/ai-config/pull/3023), 2026-09-03, whose head carries both sessions' work as two contiguous author blocks --- eleven `d-morrison` commits on 2026-09-02, then seven `claude` commits on 2026-09-03 (`gh pr view 3023 --json commits` separates them): both sides had fixed the same defects, and each had fixed one the other missed.
 Discarding either would have dropped a real fix.
 The resolution took the peer's `redact()` helper (`0c58c6a3`) over the local env-stripping approach, a review having shown env-stripping rendered `timeout 60 git push` as `git push` --- a remedy line that would not run --- and kept the local heredoc scanner.
 
@@ -380,7 +380,9 @@ The unit of comparison is the fix, not the branch.
 **A genuine design disagreement inside such a merge is a prompt to find the discriminator, not to trade.**
 When both positions are right about their own evidence, the two sides are describing different cases and neither has noticed it, so trading --- taking one and conceding the other --- throws away a case that was correctly handled.
 On #3023 the disagreement was over what to do with an unterminated heredoc, and it dissolved once the evidence was sorted rather than weighed: every command-hiding case had an **unquoted** delimiter, and the peer's counter-case had a quoted one.
-The rule that satisfied both was available only after the property separating the case sets was named.
+Naming the property is what ended the argument, and it is not the same as shipping the partition.
+`_heredoc_free` on that PR's head (`6aa021b5`) still returns uniformly on any unterminated heredoc and never branches on `RX_HEREDOC_OPEN`'s captured quote character, so the discriminator is recorded here as a resolution of the *disagreement* rather than as a merged behaviour --- the unquoted gap is what a Copilot thread on `scripts/lib/shellcmd.py:131` names with `cat <<< text`.
+That distinction is worth carrying: agreeing on which property separates the cases is what makes a partition designable, and treating the agreement as the fix is how a case set gets discussed and then left uniform.
 
 - **Do:** when two positions each survive their own evidence, sort the cases and look for the property that partitions them.
 - **Don't:** resolve such a disagreement by preference, seniority, or splitting the difference --- all three discard a correctly-handled case without noticing.

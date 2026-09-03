@@ -1236,6 +1236,19 @@ def _push_wording():
 # and the guard re-fires forever, which is how a guard stops being read.
 MERGED = ('{"state":"MERGED","merged":true,'
           '"url":"https://github.com/o/r/pull/1038"}')
+# The same observation for a PR CLOSED without merging (ai-config#3086). A
+# closed PR is terminal for exactly the reason a merged one is -- the request
+# POST returns 200 and adds nobody -- so it must discharge identically.
+CLOSED = ('{"state":"CLOSED","merged":false,'
+          '"url":"https://github.com/o/r/pull/1038"}')
+# Field-selecting probes, which is where merged and closed had drifted apart:
+# `--json merged,mergedAt` discharged and `--json closed,closedAt` did not.
+MERGED_FIELDS = '{"merged":true,"mergedAt":"2026-09-01T00:00:00Z"}'
+CLOSED_FIELDS = '{"closed":true,"closedAt":"2026-09-03T06:25:00Z"}'
+# A closed-unmerged PR read through the MERGE-side fields alone. Says nothing
+# about closure, so it must NOT discharge -- the pin that keeps the widened
+# regex from becoming "any probe discharges".
+UNMERGED_FIELDS = '{"merged":false,"mergedAt":null}'
 
 case(create("c") + [bash("gh pr merge 1038 --squash", tid="m"), res("m", "{}"),
                     say("Merged.")], False,
@@ -1254,6 +1267,19 @@ case(create("c") + [use("update_pull_request", tid="m", owner="o", repo="r",
 case(create("c") + [bash("gh pr view 1038 --json state,merged", tid="v"),
                     res("v", MERGED), say("Someone merged it.")], False,
      "observing a terminal state on a single-PR probe discharges")
+# Closed WITHOUT merging: the same terminal state, reached the other way
+# (ai-config#3086). Pinned alongside the merged cases so the equivalence is
+# asserted rather than incidental.
+case(create("c") + [bash("gh pr view 1038 --json state,merged", tid="v"),
+                    res("v", CLOSED), say("Closed it without merging.")],
+     False, "observing CLOSED on a single-PR probe discharges too")
+case(create("c") + [bash("gh pr view 1038 --json merged,mergedAt", tid="v"),
+                    res("v", MERGED_FIELDS), say("It merged.")], False,
+     "a probe selecting the merge FIELDS discharges")
+case(create("c") + [bash("gh pr view 1038 --json closed,closedAt", tid="v"),
+                    res("v", CLOSED_FIELDS), say("It closed.")], False,
+     "a probe selecting the close FIELDS discharges, exactly as the merge "
+     "fields do")
 
 # ... and the fail-safe direction, which must survive all of the above.
 case(create("c") + [bash("gh pr merge 1038 --squash", tid="m"),
@@ -1265,6 +1291,10 @@ case(create("c") + [bash("gh pr merge 1038 --squash; echo done", tid="m"),
 case(create("c") + [bash("gh pr view 1038 --json state", tid="v"),
                     res("v", '{"state":"OPEN"}'), say("Still open.")], True,
      "a probe reporting OPEN does not discharge")
+case(create("c") + [bash("gh pr view 1038 --json merged,mergedAt", tid="v"),
+                    res("v", UNMERGED_FIELDS), say("Not merged.")], True,
+     "a probe reporting merged:false alone does not discharge -- it says "
+     "nothing about closure")
 case(create("c") + [bash("gh pr list --state merged", tid="v"),
                     res("v", MERGED), say("Listed.")], True,
      "a repo-wide list naming no single PR is not a probe")
@@ -1693,6 +1723,33 @@ def _redaction_wording():
         os.unlink(path)
 
 
+def _terminal_wording():
+    """The block text must NAME the closed/merged case as a legitimate defer.
+
+    ai-config#3086: the message enumerated exactly two deferrals -- a
+    deliberate draft, and a redacting diff -- so a session holding a PR closed
+    without merging found no correct action described, and the only sanctioned
+    moves were a false claim of draft status or a request that GitHub accepts
+    and discards. Enumerating carve-outs as though they were exhaustive is the
+    same defect point 3 of ai-config#1392 recorded for the draft-only text.
+    """
+    fd, path = tempfile.mkstemp(suffix=".jsonl")
+    with os.fdopen(fd, "w") as fh:
+        for e in create("c") + [say("Opened it.")]:
+            fh.write(json.dumps(e) + "\n")
+    try:
+        out = subprocess.run(
+            hook_argv(), input=json.dumps({"transcript_path": path}),
+            capture_output=True, text=True,
+            env=dict(os.environ, TMPDIR=tempfile.mkdtemp())).stdout
+        reason = json.loads(out).get("reason", "") if out.strip() else ""
+        # "Two" would mean the draft and redaction pair survived unchanged.
+        return ("CLOSED" in reason and "Three legitimate reasons" in reason
+                and "Two legitimate reasons" not in reason)
+    finally:
+        os.unlink(path)
+
+
 def block_of(events):
     out = stdout_of(events)
     return '"decision": "block"' in out or '"decision":"block"' in out
@@ -1878,6 +1935,13 @@ def main():
         passes += 1
     else:
         print("FAIL: the block text does not name the redaction deferral")
+        failures += 1
+
+    if _terminal_wording():
+        print("PASS: the block text names the closed/merged deferral")
+        passes += 1
+    else:
+        print("FAIL: the block text does not name the closed/merged deferral")
         failures += 1
 
     if _chained_request_wording():

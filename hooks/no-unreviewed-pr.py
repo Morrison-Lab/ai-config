@@ -978,10 +978,22 @@ CLOSE_TOOLS = {"merge_pull_request", "mcp__github__merge_pull_request"}
 # RX_RES_NUM does. Only ever consulted for a result whose own command named a
 # single PR (see _argv_probe), so a body listing many PRs cannot discharge an
 # obligation for one of them.
+#
+# The `closed`/`closedAt` alternatives mirror the `merged`/`mergedAt` ones, and
+# their absence was a real asymmetry rather than a tidiness point: a probe that
+# selects the FIELDS rather than the state string --
+# `gh pr view <N> --json merged,mergedAt` -- discharged a merged PR, while the
+# close-side equivalent `--json closed,closedAt` did not, so a PR closed
+# without merging stayed armed and the guard demanded a reviewer request that
+# GitHub answers with HTTP 200 and nobody added (ai-config#3086). `closed` is
+# true for a merged PR too, which is correct here: both states are terminal for
+# review purposes, and neither can take a reviewer that ever reviews.
 RX_TERMINAL_STATE = re.compile(
     r"\\?\"state\\?\"\s*:\s*\\?\"(?:MERGED|CLOSED)\\?\""
     r"|\\?\"merged\\?\"\s*:\s*true"
-    r"|\\?\"mergedAt\\?\"\s*:\s*\\?\"\d",
+    r"|\\?\"mergedAt\\?\"\s*:\s*\\?\"\d"
+    r"|\\?\"closed\\?\"\s*:\s*true"
+    r"|\\?\"closedAt\\?\"\s*:\s*\\?\"\d",
     re.I,
 )
 
@@ -2062,7 +2074,17 @@ def main() -> int:
             "      --jq '{head: .headRefOid[0:8], copilot: [.reviews[] "
             "| select((.author.login // \"\") | startswith(\"copilot\")) "
             "| {sha: .commit.oid[0:8], at: .submittedAt}]}'\n\n"
-            "Two legitimate reasons to defer, and neither is silence:\n\n"
+            "Three legitimate reasons to defer, and none is silence:\n\n"
+            "  * The PR is CLOSED without merging, or already MERGED. Nothing "
+            "is owed there: GitHub answers the request POST with HTTP 200 and "
+            "adds nobody, so no review ever lands and the verification above "
+            "can never succeed -- the obligation is undischargeable by the "
+            "means prescribed here (ai-config#3086). This guard clears a "
+            "terminal PR on its own, so seeing this means it has not observed "
+            "the transition: run a single-PR status read, on its own, to make "
+            "the state visible:\n\n"
+            "        gh pr view \"<N>\" -R \"<owner>/<repo>\" "
+            "--json state,closed\n\n"
             "  * The PR is deliberately a DRAFT -- a draft does not trigger "
             "the review bot (see shared/workflow/pr-on-claim.md). Say so "
             "explicitly.\n"

@@ -4,6 +4,7 @@
 import json
 import os
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -170,7 +171,8 @@ class TestDoctor(unittest.TestCase):
     @patch("doctor.check_context_closure")
     @patch("doctor.check_jsonc_configs")
     @patch("doctor.check_ai_clis")
-    def test_run_doctor_healthy(self, m_ai, m_jsonc, m_closure, m_hooks, m_wrappers, m_subm, m_git):
+    @patch("doctor.check_consumer_leftovers")
+    def test_run_doctor_healthy(self, m_leftovers, m_ai, m_jsonc, m_closure, m_hooks, m_wrappers, m_subm, m_git):
         m_git.return_value = {"name": "git_status", "ok": True, "status": "OK", "details": "ok"}
         m_subm.return_value = {"name": "submodules", "ok": True, "status": "OK", "details": "ok"}
         m_wrappers.return_value = {"name": "codex_wrappers", "ok": True, "status": "OK", "details": "ok"}
@@ -178,6 +180,7 @@ class TestDoctor(unittest.TestCase):
         m_closure.return_value = {"name": "context_budget", "ok": True, "status": "OK", "details": "ok"}
         m_jsonc.return_value = {"name": "jsonc_configs", "ok": True, "status": "OK", "details": "ok"}
         m_ai.return_value = {"name": "ai_clis", "ok": True, "status": "OK", "details": "ok"}
+        m_leftovers.return_value = {"name": "consumer_leftovers", "ok": True, "status": "OK", "details": "ok"}
 
         report = doctor.run_doctor()
         self.assertTrue(report["all_ok"])
@@ -186,6 +189,100 @@ class TestDoctor(unittest.TestCase):
         text = doctor.format_text_report(report)
         self.assertIn("HEALTHY", text)
         self.assertIn("ai-config Doctor Diagnostic Report", text)
+
+
+class TestConsumerLeftovers(unittest.TestCase):
+    """Test the `~/.claude` pre-plugin leftover sweep."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.home = Path(self._tmp.name)
+        self.addCleanup(self._tmp.cleanup)
+        env = patch.dict(os.environ, {"CLAUDE_HOME": str(self.home)})
+        env.start()
+        self.addCleanup(env.stop)
+
+    def enable_plugin(self):
+        (self.home / "settings.json").write_text(
+            json.dumps({"enabledPlugins": {"ai-config@Morrison-Lab": True}}),
+            encoding="utf-8",
+        )
+
+    def symlink(self, target: Path, link: Path):
+        try:
+            os.symlink(str(target), str(link))
+        except OSError:  # Windows without developer mode
+            self.skipTest("symlinks unavailable on this platform")
+
+    def test_skips_sweep_when_plugin_not_enabled(self):
+        (self.home / "settings.json").write_text(
+            json.dumps({"enabledPlugins": {"ai-config@Morrison-Lab": False}}),
+            encoding="utf-8",
+        )
+        (self.home / "shared").mkdir()
+        res = doctor.check_consumer_leftovers()
+        self.assertTrue(res["ok"])
+        self.assertEqual(res["status"], "OK")
+        self.assertFalse(res["plugin_enabled"])
+        self.assertEqual(res["leftovers"], [])
+        self.assertIn("Skipped", res["details"])
+
+    def test_unparsable_settings_is_reported_not_swallowed(self):
+        (self.home / "settings.json").write_text("{not json", encoding="utf-8")
+        res = doctor.check_consumer_leftovers()
+        self.assertFalse(res["ok"])
+        self.assertEqual(res["status"], "WARN")
+        self.assertIsNone(res["plugin_enabled"])
+        self.assertIn("did not parse", res["details"])
+
+    def test_clean_home_reports_ok(self):
+        self.enable_plugin()
+        res = doctor.check_consumer_leftovers()
+        self.assertTrue(res["ok"])
+        self.assertEqual(res["status"], "OK")
+        self.assertEqual(res["leftovers"], [])
+        self.assertEqual(res["doubled_skills"], [])
+
+    def test_reports_leftover_directories(self):
+        self.enable_plugin()
+        (self.home / "shared").mkdir()
+        (self.home / "memories").mkdir()
+        res = doctor.check_consumer_leftovers()
+        self.assertFalse(res["ok"])
+        self.assertEqual(res["status"], "WARN")
+        self.assertEqual(len(res["leftovers"]), 2)
+        self.assertTrue(any("shared" in item for item in res["leftovers"]))
+        self.assertTrue(any("memories" in item for item in res["leftovers"]))
+
+    def test_reports_skill_symlink_into_checkout(self):
+        self.enable_plugin()
+        (self.home / "skills").mkdir()
+        self.symlink(REPO_ROOT / "skills" / "ums", self.home / "skills" / "ums")
+        res = doctor.check_consumer_leftovers()
+        self.assertEqual(res["status"], "WARN")
+        self.assertEqual(len(res["leftovers"]), 1)
+        self.assertIn("symlink -> ", res["leftovers"][0])
+        self.assertEqual(res["doubled_skills"], [])
+
+    def test_ignores_client_sync_bucket_and_personal_skills(self):
+        self.enable_plugin()
+        synced = self.home / "skills" / "synced" / "bucket-id"
+        synced.mkdir(parents=True)
+        (synced / "ums").mkdir()
+        (self.home / "skills" / "session-start-hook").mkdir()
+        res = doctor.check_consumer_leftovers()
+        self.assertTrue(res["ok"])
+        self.assertEqual(res["leftovers"], [])
+        self.assertEqual(res["doubled_skills"], [])
+
+    def test_name_match_reports_symptom_without_prescribing_removal(self):
+        self.enable_plugin()
+        (self.home / "skills" / "claim-pr").mkdir(parents=True)
+        res = doctor.check_consumer_leftovers()
+        self.assertEqual(res["status"], "WARN")
+        self.assertEqual(res["leftovers"], [])
+        self.assertEqual(res["doubled_skills"], ["claim-pr"])
+        self.assertIn("by hand", res["details"])
 
 
 if __name__ == "__main__":

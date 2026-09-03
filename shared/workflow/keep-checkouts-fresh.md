@@ -18,15 +18,20 @@ In every session --- at session start, and again periodically during long sessio
    A leftover `~/.claude/skills` from a pre-plugin install loads alongside the plugin, listing every skill twice --- bare `ums` beside `ai-config:ums` --- which crowds the skill listing and can cost entries their descriptions, the text routing selects on.
    Measured 2026-08-27 ([#2405](https://github.com/Morrison-Lab/ai-config/issues/2405)), found by Claude Code's built-in `/doctor` rather than by this check.
 
-   **Detecting it is harder than the other three, and this file does not yet have a reliable test.**
+   **Detecting it is harder than the other three, so the instrument reports it at a lower confidence.**
    Those three are paths no client creates, so finding one is the finding.
    `~/.claude/skills` is a standard client location, holding a user's own personal skills and an account-level `synced/` bucket the client populates --- on the machine measured 2026-08-28 that bucket carried 45 directories whose names match this repo's skills, none of them a leftover.
    So neither presence nor a name match settles it, and a wrong answer is expensive in one direction: deleting that directory takes the user's own skills with it, and this corpus references `~/.claude/skills/...` paths directly in 31 places (`grep -rn '~/\.claude/skills/' --include=*.md skills/ shared/ memories/`, 2026-08-28), which the plugin install does not provide ([#2530](https://github.com/Morrison-Lab/ai-config/issues/2530)).
-   Treat a doubled listing as the symptom, investigate by hand, and see [#2528](https://github.com/Morrison-Lab/ai-config/issues/2528) for making this an instrument.
+   `python3 scripts/doctor.py` sweeps all four paths and reports rather than deletes ([#2528](https://github.com/Morrison-Lab/ai-config/issues/2528)).
+   Its `consumer_leftovers` check settles provenance only for a symlink resolving into an ai-config checkout;
+   a bare name match it reports as the doubled-listing symptom to investigate by hand.
+   It skips the client's `synced/` bucket, and skips the sweep entirely when `settings.json` enables no ai-config plugin, since a `~/.claude` copy is then the only install.
 
    - **Do:** include `skills/` when sweeping `~/.claude` for leftovers.
    - **Do:** read a doubled listing (a bare name beside an `ai-config:`-prefixed one) as the symptom, since the cost is otherwise invisible.
+   - **Do:** run `python3 scripts/doctor.py` for the sweep rather than pasting an `ls` by hand.
    - **Don't:** read "the plugin serves it" as "nothing is installed to check" --- a replacement does not remove what it replaced.
+   - **Don't:** read its name-match finding as proof of a leftover --- provenance is what a symlink into a checkout settles and a shared name does not.
    - **Don't:** delete `~/.claude/skills` on presence or on a name match;
      neither distinguishes a leftover from the client's own skills.
 

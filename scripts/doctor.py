@@ -5,11 +5,19 @@ Inspects repository health, git worktree status, generated wrapper
 freshness, hook catalogs, context budgets, and submodule integrity in a
 single fast pass.
 
-Consumer symlink freshness is no longer part of this check: `bootstrap.sh`
+Consumer symlink *freshness* is no longer part of this check: `bootstrap.sh`
 no longer symlinks skills/commands into a consumer's home directory (Claude
 Code and Cursor now install this repo as a native plugin instead, and Codex
 has no replacement install path yet -- see ai-config#2352), so there is
 nothing left for a `check-install.py`-style comparison to audit.
+
+Consumer *leftovers* are a separate question, and this check still sweeps for
+them: a replacement install does not remove what earlier installs placed. A
+`~/.claude/skills` symlink predating the plugin survived one such change and
+listed every skill twice (ai-config#2405). `check_consumer_leftovers` reports
+what it finds and never deletes -- `~/.claude/skills` also holds a user's own
+skills and the client's account-level `synced/` bucket, so removal is a human
+decision.
 
 Usage:
     python3 scripts/doctor.py
@@ -329,6 +337,160 @@ def check_ai_clis() -> Dict[str, Any]:
     }
 
 
+# `bootstrap.sh` placed these three under `~/.claude` before the plugin
+# install replaced it, and no plugin equivalent has landed (ai-config#2352),
+# so a copy or symlink found there today was placed by an earlier install.
+LEFTOVER_NAMES = ("shared", "hooks", "memories")
+
+# The client populates this bucket under `~/.claude/skills` with an
+# account-level sync whose directory names match this repo's skills without
+# any of them being a leftover, so a name test has to skip it.
+CLIENT_SKILL_SYNC_DIR = "synced"
+
+
+def claude_home() -> Path:
+    """Return the consumer Claude Code home, honoring CLAUDE_HOME."""
+    return Path(os.environ.get("CLAUDE_HOME") or (Path.home() / ".claude"))
+
+
+def read_settings(path: Path) -> tuple[Dict[str, Any], Optional[str]]:
+    """Return (settings, parse_error) for a Claude Code settings file.
+
+    A missing file is not an error -- it simply enables no plugin. A file
+    that exists and does not parse is reported rather than swallowed: it
+    leaves the sweep unable to say whether the plugin route is in use.
+    """
+    if not path.is_file():
+        return {}, None
+    try:
+        data = json.loads(strip_jsonc_comments(path.read_text(encoding="utf-8")))
+    except Exception as exc:
+        return {}, str(exc)
+    return (data if isinstance(data, dict) else {}), None
+
+
+def describe_path(path: Path) -> str:
+    """Describe a leftover path as a symlink (with its target) or a copy."""
+    if path.is_symlink():
+        try:
+            return f"symlink -> {os.readlink(path)}"
+        except OSError:
+            return "symlink"
+    return "copy"
+
+
+def points_into_ai_config(path: Path) -> bool:
+    """Report whether `path` resolves inside something shaped like this repo.
+
+    Provenance, not a name or content test: the account-level skill sync
+    carries this repo's skill names and differing contents alike, so only a
+    link that lands in a checkout identifies a leftover install.
+    """
+    try:
+        resolved = path.resolve()
+    except OSError:
+        return False
+    for candidate in (resolved, *resolved.parents):
+        if (candidate / "CLAUDE.md").is_file() and (candidate / "hooks" / "hooks.json").is_file():
+            return True
+    return False
+
+
+def find_skill_leftovers(home: Path) -> tuple[List[str], List[str]]:
+    """Return (linked, doubled) skill leftovers under `home`/skills.
+
+    `linked` entries resolve into an ai-config checkout, so their provenance
+    is settled. `doubled` entries only share a name with this repo's skills,
+    which is the doubled-listing symptom rather than proof of a leftover --
+    a user's own skill may legitimately carry the same name.
+    """
+    skills = home / "skills"
+    if skills.is_symlink() and points_into_ai_config(skills):
+        return ([f"{skills} ({describe_path(skills)})"], [])
+    if not skills.is_dir():
+        return ([], [])
+
+    repo_skills = {p.name for p in (REPO_ROOT / "skills").iterdir() if p.is_dir()}
+    linked: List[str] = []
+    doubled: List[str] = []
+    for entry in sorted(skills.iterdir()):
+        if entry.name == CLIENT_SKILL_SYNC_DIR:
+            continue
+        if entry.is_symlink():
+            if points_into_ai_config(entry):
+                linked.append(f"{entry} ({describe_path(entry)})")
+        elif entry.is_dir() and entry.name in repo_skills:
+            doubled.append(entry.name)
+    return (linked, doubled)
+
+
+def check_consumer_leftovers() -> Dict[str, Any]:
+    """Report `~/.claude` copies and symlinks left by pre-plugin installs."""
+    from lib.plugin_overlap import enabled_ai_config_plugins
+
+    home = claude_home()
+    settings_path = home / "settings.json"
+    settings, parse_error = read_settings(settings_path)
+    if parse_error is not None:
+        return {
+            "name": "consumer_leftovers",
+            "ok": False,
+            "status": "WARN",
+            "plugin_enabled": None,
+            "leftovers": [],
+            "doubled_skills": [],
+            "details": f"Not swept: {settings_path} did not parse ({parse_error}), so whether the plugin route is in use is unknown.",
+        }
+
+    enabled = enabled_ai_config_plugins(settings)
+    if not enabled:
+        return {
+            "name": "consumer_leftovers",
+            "ok": True,
+            "status": "OK",
+            "plugin_enabled": False,
+            "leftovers": [],
+            "doubled_skills": [],
+            "details": f"Skipped: {settings_path} enables no ai-config plugin, so a ~/.claude copy may be this machine's only install.",
+        }
+
+    leftovers = [
+        f"{home / name} ({describe_path(home / name)})"
+        for name in LEFTOVER_NAMES
+        if (home / name).is_symlink() or (home / name).exists()
+    ]
+    linked_skills, doubled_skills = find_skill_leftovers(home)
+    leftovers.extend(linked_skills)
+
+    if not leftovers and not doubled_skills:
+        return {
+            "name": "consumer_leftovers",
+            "ok": True,
+            "status": "OK",
+            "plugin_enabled": True,
+            "leftovers": [],
+            "doubled_skills": [],
+            "details": f"No pre-plugin install leftovers under {home}.",
+        }
+
+    parts = []
+    if leftovers:
+        parts.append(f"{len(leftovers)} leftover(s): {'; '.join(leftovers)}")
+    if doubled_skills:
+        parts.append(
+            f"{len(doubled_skills)} skill name(s) shared with this repo, so the listing may be doubled: {', '.join(doubled_skills)}"
+        )
+    return {
+        "name": "consumer_leftovers",
+        "ok": False,
+        "status": "WARN",
+        "plugin_enabled": True,
+        "leftovers": leftovers,
+        "doubled_skills": doubled_skills,
+        "details": f"Under {home}: {'. '.join(parts)}. Reported only -- inspect each by hand before removing anything, since ~/.claude/skills also holds your own skills (see shared/workflow/keep-checkouts-fresh.md).",
+    }
+
+
 def run_doctor() -> Dict[str, Any]:
     """Execute all diagnostic health checks."""
     checks = [
@@ -339,6 +501,7 @@ def run_doctor() -> Dict[str, Any]:
         check_context_closure(),
         check_jsonc_configs(),
         check_ai_clis(),
+        check_consumer_leftovers(),
     ]
 
     all_ok = all(c["ok"] for c in checks)

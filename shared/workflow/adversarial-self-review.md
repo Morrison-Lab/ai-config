@@ -543,12 +543,11 @@ Reviewed-Commit: <sha>agentId: <id> (use SendMessage with to: '...')
 ```
 
 That second block is constructed to show the shape, not captured.
-It is what the truncation table below analyses.
 
 **The zero and the sightings are about different artifacts, and that is what has to be settled before either number means anything.**
 The sweep read **stored** transcript JSONL.
 The two sightings were **in-context renders**.
-Three explanations fit, and only the third is checkable from here:
+Three explanations fit, and the sweep as run distinguishes none of them:
 
 1. The sweep's matcher cannot see the concatenated shape.
 2. Those transcripts sit outside the tree it walked.
@@ -571,7 +570,7 @@ So settling this needs something the section has not yet had: a **raw text scan*
 Only a hit settles anything.
 Another zero from the same matcher is the same uninformative zero, so do not read one as evidence for the rendering-quirk explanation.
 
-In the own-block shape the trailer is a separate content block, and `_result_text` joins blocks with a newline, so the fingerprint line is untouched and nothing below arises at all.
+In the own-block shape the trailer is a separate content block, and `_result_text` joins blocks with a newline, so the fingerprint line is untouched and the hazard does not arise at all.
 
 **Two conditions have to hold together before any of this can bite, and a conforming report fails the second.**
 The trailer must concatenate rather than arrive as its own block, AND the fingerprint must be the report's last line.

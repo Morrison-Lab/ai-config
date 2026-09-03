@@ -107,41 +107,72 @@ When static source reading is insufficient to resolve runtime behavior:
 ## A guard's refusal message goes unread precisely because it arrives with a remedy
 
 The failure modes above all concern a component you are trying to *use*.
-A blocking hook is the case where the component is trying to stop you, and it is the one where black-box reasoning survives longest --- not because the message is uninformative, but because it arrives already shaped like an answer.
-A refusal that ends in an imperative reads as a prompt to act rather than as a specification to study, so the eye takes the verb and skips the qualifiers.
-The qualifier was in the message on both occasions this was measured, and was read past on both.
+A blocking hook is the case where the component is trying to stop you,
+and it is the one where black-box reasoning survives longest ---
+not because the message is uninformative,
+but because it arrives already shaped like an answer.
+A refusal that ends in an imperative reads as a prompt to act rather than as a specification to study,
+so the eye takes the verb and skips the qualifiers.
+The qualifier was in the message on both occasions this was measured,
+and was read past on both.
 
 The economics are lopsided and easy to get backwards.
 Reading the hook source costs a couple of minutes and is bounded.
-Re-attempting the blocked command costs a full cycle each time, produces the identical message, and cannot distinguish "my attempt was malformed" from "the guard is broken" --- so a run of failures reads as evidence of a bug in the guard rather than as evidence you have not read it.
+Re-attempting the blocked command costs a full cycle each time,
+produces the identical message,
+and cannot distinguish "my attempt was malformed" from "the guard is broken" ---
+so a run of failures reads as evidence of a bug in the guard rather than as evidence you have not read it.
 
 Two measured shapes, from 2026-09-02 and the small hours of 2026-09-03 Pacific:
 
 - **The remedy sentence names the simplest discharge and gets read as scenery.**
   [`no-push-without-self-review.py`](../../hooks/no-push-without-self-review.py)'s refusal says to dispatch `adversarial-reviewer` **in the foreground**.
   On 2026-09-02 that sentence was read six times across four blocked pushes and registered as boilerplate;
-  six reviews were dispatched with `run_in_background: true`, none of the six produced a verdict the push could consume, and the loop was misdiagnosed as a stale-fingerprint bug until a foreground dispatch cleared it on the first try.
-  Read the failure as evidence about those six dispatches rather than about the mode: the hook does credit a background dispatch whose task notification lands and whose task id matches, per [`mistake-patterns.md`](../../memories/mistake-patterns.md) Pattern 43 and the `is_task_notification` branch #2820 added.
-  What the message offered was the path with the fewest ways to go wrong, and skipping to the command example is what cost four cycles.
+  six reviews were dispatched with `run_in_background: true`,
+  none of the six produced a verdict the push could consume,
+  and the loop was misdiagnosed as a stale-fingerprint bug until a foreground dispatch cleared it on the first try.
+  Read the failure as evidence about those six dispatches rather than about the mode:
+  the hook does credit a background dispatch whose task notification lands and whose task id matches,
+  per [`mistake-patterns.md`](../../memories/mistake-patterns.md) Pattern 43 and the `is_task_notification` branch #2820 added.
+  What the message offered was the path with the fewest ways to go wrong,
+  and skipping to the command example is what cost four cycles.
 - **The remedy sentence carries a structural condition that reads as an aside.**
-  [`no-unreviewed-pr.py`](../../hooks/no-unreviewed-pr.py) credits a reviewer request only when it is the **last simple command** in the Bash call, because otherwise the call's exit status belongs to some later command.
-  Six attempts were made and five failed on that condition alone --- three piped to `head`, two with a trailing `; echo "EXIT=$?"` --- while every request had genuinely succeeded.
-  The sixth, a bare single-command request with nothing chained after it, was the only one credited.
-  Its refusal text states the condition outright --- "Request it now, as the only command in this call" --- and has since `462de02b3`, committed 2026-09-02 at 23:41 PDT, under an hour before these attempts.
+  [`no-unreviewed-pr.py`](../../hooks/no-unreviewed-pr.py) credits a reviewer request only when it is the **last simple command** in the Bash call,
+  because otherwise the call's exit status belongs to some later command.
+  Six attempts were made and five failed on that condition alone ---
+  three piped to `head`, two with a trailing `; echo "EXIT=$?"` ---
+  while every request had genuinely succeeded.
+  The sixth, a bare single-command request with nothing chained after it,
+  was the only one credited.
+  Its refusal text states the condition outright --- "Request it now,
+  as the only command in this call" --- and has since `462de02b3`,
+  committed 2026-09-02 at 23:41 PDT, under an hour before these attempts.
   The clause was skipped five times in favour of the command example printed below it.
 
-**Diagnosing a guard and changing the habit are separate acts**, which is the sharper half and the one no amount of reading prevents.
-In the second case above the mechanism was read, stated correctly in the session's own reply, and then violated on the very next call --- the next request went out piped to `head` again.
+**Diagnosing a guard and changing the habit are separate acts**,
+which is the sharper half and the one no amount of reading prevents.
+In the second case above the mechanism was read,
+stated correctly in the session's own reply,
+and then violated on the very next call ---
+the next request went out piped to `head` again.
 Understanding arrives as a sentence;
 compliance has to arrive as a different keystroke.
-So after diagnosing a guard, write the corrected invocation out in full and use that literal string, rather than trusting that knowing the rule will change what you type.
+So after diagnosing a guard,
+write the corrected invocation out in full and use that literal string,
+rather than trusting that knowing the rule will change what you type.
 
-- **Do:** read the refusal's remedy clause word by word, including every qualifier, before composing the second attempt --- the prose around the command example is where the condition lives.
-- **Do:** open the hook's source the first time the message does not resolve it, which costs minutes and is bounded, rather than re-attempting, which costs a cycle per try and returns the identical text.
-- **Do:** write out the exact corrected command after diagnosing a guard, and reuse that string.
+- **Do:** read the refusal's remedy clause word by word,
+  including every qualifier, before composing the second attempt ---
+  the prose around the command example is where the condition lives.
+- **Do:** open the hook's source the first time the message does not resolve it,
+  which costs minutes and is bounded, rather than re-attempting,
+  which costs a cycle per try and returns the identical text.
+- **Do:** write out the exact corrected command after diagnosing a guard,
+  and reuse that string.
 - **Don't:** treat a repeated identical refusal as evidence the guard is malfunctioning;
   it is far likelier evidence the message has not been read to the end.
-- **Don't:** skip from a refusal's verb to its command example --- the qualifier between them is what the guard actually parses.
+- **Don't:** skip from a refusal's verb to its command example ---
+  the qualifier between them is what the guard actually parses.
 - **Don't:** read having explained the mechanism as having adopted it.
 
 ## In review

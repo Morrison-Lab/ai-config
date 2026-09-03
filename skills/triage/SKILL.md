@@ -53,7 +53,7 @@ required.
 
 ```sh
 python3 scripts/triage-backlog.py -R <owner>/<repo> --override N=P ... --apply --dry-run
-python3 scripts/triage-backlog.py -R <owner>/<repo> --override N=P ... --apply   # EDIT_ISSUE, CLOSE_ISSUE
+python3 scripts/triage-backlog.py -R <owner>/<repo> --override N=P ... --apply   # LABEL_ISSUE, CLOSE_ISSUE
 ```
 
 Adding a label the repo lacks creates it with GitHub's default colour.

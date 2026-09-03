@@ -104,12 +104,12 @@ def norm_title(title: str) -> str:
 
 def classify_one(title: str, labels: list[str]) -> tuple[str, str]:
     """Return (disposition, reason) for a single issue, ignoring duplicates."""
-    t = norm_title(title)
-    if t in JUNK_TITLES:
-        return "not-planned", "junk title"
     for p in PRIORITY_LABELS:
         if p in labels:
             return p, f"already labelled {p}"
+    t = norm_title(title)
+    if t in JUNK_TITLES:
+        return "not-planned", "junk title"
     m = RX_SEVERE.search(title)
     if m:
         return "P1", f"severe phrase: {m.group(0)!r}"
@@ -191,7 +191,8 @@ def apply_plan(plan: list[dict], repo: str | None, dry_run: bool) -> int:
             for old in remove:
                 cmd += ["--remove-label", old]
         elif disp == "not-planned":
-            cmd = base + ["close", n, "--reason", "not planned"] + tail
+            cmd = base + ["close", n, "--reason", "not planned", "--comment",
+                          f"Closed by the triage pass: {row['reason']}."] + tail
         elif disp == "duplicate":
             cmd = base + ["close", n, "--reason", "not planned", "--comment",
                           f"Duplicate of #{row['duplicate_of']}."] + tail

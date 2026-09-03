@@ -45,6 +45,7 @@ FIXTURE = [
     {"number": 11, "title": "already triaged item", "labels": ["P2"]},
     {"number": 12, "title": "Fix bug", "labels": []},
     {"number": 13, "title": "no sacred cows", "labels": []},
+    {"number": 14, "title": "ping", "labels": ["P1"]},
 ]
 
 plan = tb.classify(FIXTURE, {})
@@ -64,6 +65,7 @@ check("low-priority label is P3", by[10]["disposition"] == "P3")
 check("existing priority label is kept", by[11]["disposition"] == "P2" and "already" in by[11]["reason"])
 check("short title with an action verb is P2", by[12]["disposition"] == "P2")
 check("short title with no action verb is P3", by[13]["disposition"] == "P3")
+check("junk title with an existing priority label keeps the label", by[14]["disposition"] == "P1")
 
 plan2 = tb.classify(FIXTURE, {3: "P1", 8: "P3"})
 by2 = {r["number"]: r for r in plan2}
@@ -72,8 +74,15 @@ check("override clears duplicate marking", by2[8]["disposition"] == "P3" and by2
 
 # --apply --dry-run: every non-skipped row yields exactly one gh call, and a
 # row already carrying its label yields none.
-calls = tb.apply_plan(plan, None, dry_run=True)
-check("dry-run call count skips the already-labelled row", calls == len(plan) - 1)
+import contextlib
+import io
+
+buf = io.StringIO()
+with contextlib.redirect_stdout(buf):
+    calls = tb.apply_plan(plan, None, dry_run=True)
+check("dry-run call count skips the already-labelled rows", calls == len(plan) - 2)
+check("not-planned close carries a reason comment",
+      "close 1 --reason not planned --comment Closed by the triage pass: junk title." in buf.getvalue())
 
 check("comment count reads ints", tb.comment_count(3) == 3)
 check("comment count reads lists", tb.comment_count([{}, {}]) == 2)

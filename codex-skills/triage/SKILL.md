@@ -1,18 +1,18 @@
 ---
-name: "adv"
-description: "Adversarial review from another local model."
+name: "triage"
+description: "Triage backlog: P1/P2/P3 or close."
 ---
 
-# adv (Codex wrapper)
+# triage (Codex wrapper)
 
 This is a generated Codex wrapper around the canonical ai-config Claude skill.
 
-Source: [skills/adv/SKILL.md](../../skills/adv/SKILL.md)
+Source: [skills/triage/SKILL.md](../../skills/triage/SKILL.md)
 
 Before acting, read the source skill completely and follow its workflow, adapting it to Codex.
 
-The source lives at `skills/adv/SKILL.md` in the same ai-config checkout as this wrapper.
-If this wrapper was loaded through `${CODEX_HOME:-$HOME/.codex}/skills/adv`, resolve the symlink target for this wrapper directory first, then read `../../skills/adv/SKILL.md` relative to that real directory.
+The source lives at `skills/triage/SKILL.md` in the same ai-config checkout as this wrapper.
+If this wrapper was loaded through `${CODEX_HOME:-$HOME/.codex}/skills/triage`, resolve the symlink target for this wrapper directory first, then read `../../skills/triage/SKILL.md` relative to that real directory.
 Do not resolve that relative path from inside `${CODEX_HOME:-$HOME/.codex}/skills`, because it points back at the wrapper tree.
 
 - Treat `user-invocable` and `allowed-tools` as Claude metadata, not Codex permissions.

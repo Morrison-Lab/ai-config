@@ -422,35 +422,33 @@ trailer concatenated onto text   :   0
 
 An independent re-run over the recursive set returned that same zero.
 
-The concatenated form is known to exist.
-It was seen directly, twice, within one session --- and the captured line is this:
+The concatenated form is known to exist, in two shapes, both captured.
+Agent ids are redacted as `<id>` throughout;
+nothing else in either exhibit is altered.
+
+**Landing on a sentinel line**, seen twice within one session --- the safe shape, and the one this section goes on to prescribe:
 
 ```
---- end of report ---agentId: <id> (use SendMessage with to: '...')
+--- end of report ---agentId: <id> (use SendMessage with to: '<id>')
 ```
 
-**Note what that exhibit is: the trailer landing on a sentinel line, which is the safe case**, and the one this section goes on to prescribe.
-**The shape the hazard is actually about --- the trailer glued to a fingerprint line --- has also been captured**, and it is the block the truncation table below analyses.
-Recorded 2026-09-03 in [ai-config#3084](https://github.com/Morrison-Lab/ai-config/pull/3084)'s own description, from a foreground review of an earlier head of that branch;
-the sha resolves to a real commit on it, which is how the capture is checkable rather than merely asserted:
+**Landing on the fingerprint line**, which is the shape the truncation table below analyses.
+A third observation, distinct from the two above: the trailer concatenates onto a report's *last* line, so a report ending on a sentinel cannot also carry it on a fingerprint.
+Recorded 2026-09-03 in [ai-config#3084](https://github.com/Morrison-Lab/ai-config/pull/3084)'s own description, from a foreground review of an earlier head of that branch:
 
 ```
 Reviewed-Commit: 6f10014883ccb4256250204fe9af216d7c3b775fagentId: <id> (use SendMessage with to: '<id>')
 ```
 
-Concatenated, no separator, on the fingerprint line itself.
-The agent id is redacted in **both** places it appears;
-nothing else is altered.
+That sha resolves to a real commit on the branch, so the fingerprint value is not invented.
+The **concatenation** rests on the recorded capture and on nothing further, which is the weaker of the two claims and the one the exhibit is actually for.
 
-**How many times the shape has been seen is deliberately not totalled here**, because the record cannot settle it.
-The two sightings named above ended on a sentinel line, and this one ends on a fingerprint, so they are different reports --- but whether this capture is a third observation or one of the two, re-described, is not recorded.
-Treat the shape as attested and leave the count alone.
+**What this second capture does not settle is more interesting than what it shows, and it is easy to bank as either a scare or an all-clear.**
+It is an **in-context render**, so it says nothing about the storage question raised below.
+The push it belonged to also went through --- and that is not evidence either, because the guard reads storage, so the outcome is identical under all three explanations below.
+Under the one where the concatenation never reaches storage, the guard never saw a suffix at all.
 
-Two things about the capture are worth stating, because it is easy to bank as a scare and easy to bank as an all-clear, and it is neither.
-
-It is an **in-context render**, like the sightings above and unlike the sweep's population, so it does not move the storage question raised below one way or the other.
-And the guard **accepted** it, because the fingerprint is a full 40 characters --- which is precisely what the table below predicts.
-So what this capture demonstrates is the **mandated 40-character form** holding, not the sentinel, which the captured line does not contain and which the section below is careful to call cheap insurance rather than a fix for a demonstrated break at 40 characters.
+What the exhibit does supply is the **shape**, which is what the truncation table needs: a full 40-character fingerprint with `agentId` glued to it.
 Truncate that sha to 39 and the same line yields a plausible wrong sha.
 
 **The zero and the sightings are about different artifacts, and that is what has to be settled before either number means anything.**
@@ -469,7 +467,9 @@ So the two counts carry different weight.
 The **334** establishes that the own-block form is common **in stored transcripts**, which is a lower bound rather than a ratio.
 The **0** settles nothing on its own, since which of the three explanations holds decides whether it is evidence or an artifact.
 Whoever next touches this section should settle that first, and the query has to be chosen carefully, because the obvious one cannot decide it.
-Grepping a stored transcript for a `Reviewed-Commit:` line with a non-hex suffix returns nothing under **all three** explanations --- a conforming report never puts the fingerprint last, so nothing can be glued to it --- and it would not have fired on the sighted report either, whose trailer landed on the sentinel line rather than on a fingerprint.
+Grepping a stored transcript for a `Reviewed-Commit:` line with a non-hex suffix is nearly null and not quite: it cannot fire on a **conforming** report, which never puts the fingerprint last, so nothing can be glued to it.
+It could fire on a stored copy of the reordered report captured above, if explanation 1 holds and the concatenation reaches storage while the sweep's matcher misses it.
+So run it --- but read a zero from it as uninformative, since a conforming corpus produces that zero whether or not the hazard is real.
 The right *criterion* is whether `agentId:` ever appears in stored content **preceded by other text on the same line**.
 The right *instrument* is not the sweep, and this is the part that is easy to get wrong: re-running the sweep's own matcher has no power against explanation 1, which says precisely that this matcher cannot see the shape --- under that explanation it returns zero whatever it is pointed at.
 It is also already spent against the other two, since the counts above are that query, run twice, over both the flat set and the recursive superset.
@@ -484,7 +484,6 @@ In the own-block shape the trailer is a separate content block, and `_result_tex
 The trailer must concatenate rather than arrive as its own block, AND the fingerprint must be the report's last line.
 This file's own contract puts the JSON payload last, and [`.claude/agents/adversarial-reviewer.md`](../../.claude/agents/adversarial-reviewer.md) says to emit nothing after its closing marker --- so a conforming report ends with the payload, the trailer lands on that, and the fingerprint is never exposed.
 The sighting that prompted this section was a report that put the verdict and fingerprint AFTER the payload, which is the ordering this file's "Structured review data" section rules out.
-The count is left alone for the reason given above, so treat the shape as attested and its rate as unmeasured.
 
 So read the rest of this section as what happens when a brief reorders the tail, not as a hazard of ordinary dispatch.
 

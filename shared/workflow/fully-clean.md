@@ -1157,6 +1157,120 @@ before reporting a PR ready, not just trust the last green run.
 `mergeStateStatus: CLEAN` means conflict-free plus passing commit status (GitHub's `mergeable` field), not merge-ready.
 A PR without a clean review verdict on the latest commit is not merge-ready.
 
+**A head green on its own branch can turn `main` red on merge, when the base gained a new CI check after the PR's latest CI run.**
+A `pull_request` run uses the workflow definition current at that run,
+so the gap opens when `main` gains a check afterwards
+and no new PR event re-runs CI.
+A check added to `main` after that run never fires on the PR until a new PR event synthesizes a fresh `refs/pull/N/merge`,
+so there is nothing red to see: the check simply never ran.
+Measured 2026-09-01 (Pacific) on [#2965](https://github.com/Morrison-Lab/ai-config/pull/2965).
+That branch added hook bindings to `hooks/hooks.json` before [#2967](https://github.com/Morrison-Lab/ai-config/pull/2967) landed the generated `skills/ai-config-hooks/hooks/hooks.json` and its `gen-hooks-plugin.py --check` gate on `main`.
+`check-pr-fully-clean.py` reported [#2965](https://github.com/Morrison-Lab/ai-config/pull/2965) FULLY CLEAN,
+a GIA session merged it under `mwc`,
+and `validate` on `main` went red at `da1a2d03` until [#2983](https://github.com/Morrison-Lab/ai-config/pull/2983) regenerated the manifest.
+The head-only verdict cannot see this, and no path diff can prove the base gained no check through a script or a reusable workflow,
+so for a direct merge the rule is the one [`sync-with-main`](sync-with-main.md) already states: a stale merge-base means update first.
+Under a merge queue where every clean-gate check both executes for `merge_group` and is required (or aggregated behind a required check),
+the queue's speculative merge test will cover this once [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030) defines the queue form of the gate,
+and [`merge-queue`](merge-queue.md) forbids the manual update loop there.
+Until then a base that requires a merge queue stops the merge.
+The conditions below are what that form has to prove.
+A `pull_request`-only workflow added to the base does not run on the queue's branch,
+and a workflow that lists `merge_group` can still carry a job or step whose `if:` skips that event,
+which branch protection then counts as passing.
+This corpus's clean gate counts every check, not only the required ones,
+while the queue advances on the required checks alone ([`merge-queue`](merge-queue.md)),
+and a failing non-required check has been measured to leave a PR mergeable ([`github-actions`](../../memories/github-actions.md), the bcs `test-coverage` entry).
+So two conditions hold before the manual update is skipped:
+every clean-gate check executes for `merge_group`, job and step conditions included,
+and every clean-gate check is a required status check on the base, or is aggregated behind one that is.
+A clean-gate check the queue cannot block on is a check the queue does not run as a gate.
+`gh pr checks --required` (present in `gh` 2.98.0) lists the required checks among those in the current rollup, but a required check absent from that rollup, one the base gained after the head's last run, is exactly the case here, and no `gh pr checks` output says whether a check executes on `merge_group`, so the rules query and the workflow read below are what settle both ([`gh-cli`](../../memories/gh-cli.md) carries the same distinction).
+Those two conditions are the specification the queue form of this gate has to prove ([#3030](https://github.com/Morrison-Lab/ai-config/issues/3030)), and until it lands the exception is unavailable: a base that requires a merge queue stops the merge, since a required check supplied by a GitHub App cannot be verified from workflow files at all.
+The proof will read the required checks from `gh api --paginate "repos/<owner>/<repo>/rules/branches/<base-encoded>"` (encode the base name as one path segment, `jq -rn --arg b "<base>" '$b|@uri'`, since `release/1.x` would otherwise split into two, and paginate, since the first page can omit rules), and each clean-gate workflow's `on:` block and job and step `if:` conditions for `merge_group`.
+
+The rule splits by merge mode: a direct merge from a session with `git` and `gh`, a direct merge from a remote session without `git`, and, once [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030) lands, a merge queue.
+It is GitHub-specific as written (`headRefOid`, `gh`, the compare endpoint, the update-branch and merge pins), so a GitLab merge has no equivalent gate until [#3021](https://github.com/Morrison-Lab/ai-config/issues/3021) supplies one, and `merge-it`, `mwc`, and `chores` inherit that scope.
+It binds every direct-merge path, including the dependency-bump merges in [`chores`](../../skills/chores/SKILL.md), not only `mwc` and `merge-it`.
+For a bot bump, the gate to rerun after an update is CI plus conflict state, which is what those PRs are gated on, since `@claude` review is skipped on them by design.
+`chores` states that form.
+A deferred merge (`gh pr merge --auto`, or a `@dependabot` merge command) stays out of every direct-merge path.
+Auto-merge stays enabled across a later push by anyone with write access (GitHub disables it only for a push from someone without write permission, or a base switch) and fires on required checks alone, so a pin on the enabling request protects nothing after it, and the sync-only-push rule in this fragment already forbids arming it after a new head.
+Merge synchronously, right after the check, with the merge command pinned.
+
+- **Do:** for a direct merge from a session with `git` and `gh`, record `headRefOid` and `baseRefName` before the clean gate runs, so the gate's verdict is tied to one head and one target.
+  Then, before the merge command, confirm the live `baseRefName` is still the recorded one, fetch that base, confirm the live PR head is still the recorded SHA, and confirm the merge-base with it is that base's current tip.
+  A retarget to another branch at the same tip during the gate would otherwise pass both the ancestry check and the head pin with a verdict produced for the old target.
+  A concurrent push after the gate can already contain the base tip, so an ancestry check alone would admit a head no verdict covers.
+  Until [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) wires this into `check-pr-fully-clean.py`, which [`mwc`](../../skills/mwc/SKILL.md) already runs, both [`mwc`](../../skills/mwc/SKILL.md) and [`merge-it`](../../skills/merge-it/SKILL.md) name it as a manual step after their readiness check and before the merge command:
+  `url=$(gh repo view "<owner>/<repo>" --json url -q .url) && b=$(gh pr view "<N>" -R "<owner>/<repo>" --json baseRefName -q .baseRefName) && [ -n "$url" ] && [ -n "$b" ] && [ "$b" = "<pinned-base>" ] && git fetch "$url" "$b" && tip=$(git rev-parse --verify FETCH_HEAD) && git fetch "$url" "refs/pull/<N>/head" && head=$(git rev-parse --verify FETCH_HEAD) && [ "$head" = "<pinned-sha>" ] && [ "$(git merge-base "$tip" "$head")" = "$tip" ] && echo "$tip"`,
+  where `<pinned-sha>` and `<pinned-base>` are the `headRefOid` and `baseRefName` recorded before the gate ran.
+  The trailing `echo` prints the tested base tip: record it as `<pinned-tip>` before the gate reruns, since a shell variable does not survive into the later tool call that makes the pre-merge comparison.
+  The live base name is compared to the pin rather than trusted, so a retarget fails the check instead of steering the fetch.
+  `git merge-base` needs both tips' history: in a shallow clone the two can appear disjoint ([`claude-code-consumer-wiring`](../../memories/claude-code-consumer-wiring.md) records the bogus merge-base), so run `git fetch --unshallow` (or `--deepen=<n>` with a depth that reaches the common ancestor) first, or use the compare endpoint, which is unaffected.
+  Both fetches name the repository the `-R` reads came from, not the checkout's `origin`, which in a fork or another checkout can be a different repository whose same-numbered PR would let the gate compare unrelated commits.
+  Each result is assigned inside the `&&` chain so an unresolved branch or a failed command fails the check rather than comparing two empty strings as equal.
+  Reading `FETCH_HEAD` after each fetch uses the tip the fetch just returned and writes no remote-tracking ref, so it holds in a single-branch clone (where a bare `git fetch origin` leaves `origin/<branch>` stale) and under `fetch.prune=true` (where an explicit `branch:refs/remotes/origin/branch` refspec was measured to delete the ref and fail `rev-parse` on its first run).
+  The base comes from the PR, not from the repository's default branch: a stacked or release PR targets another branch, and [`merge-it`](../../skills/merge-it/SKILL.md) already warns not to assume `main` for those.
+- **Do:** for a direct merge from a remote session without `git`, re-read the PR's `headRefOid` and `baseRefName` and require both to equal the recorded pins, then read the compare endpoint instead of `git merge-base`, `gh api "repos/<owner>/<repo>/compare/<base-encoded>...<head-sha>"`, with the base name encoded as one path segment (`jq -rn --arg b "<base>" '$b|@uri'`, so `release/1.x` does not split the path), and require `behind_by` of 0.
+  The pin comparison is the same one the local path makes, since `expectedHeadSha` on the merge protects the head and nothing protects the target branch.
+  When `behind_by` is 0, record the response's `base_commit.sha` as `<pinned-tip>` (the base tip at that moment, equal to `merge_base_commit.sha` in that state).
+  The pre-merge comparison re-reads the same endpoint and requires both `behind_by` of 0 again and `base_commit.sha` equal to `<pinned-tip>`, since with an unchanged head `merge_base_commit.sha` keeps the old ancestor after the base moves and would compare equal on its own.
+  Without that record the remote path has nothing to compare.
+  Measured 2026-09-02 (Pacific) on [#2989](https://github.com/Morrison-Lab/ai-config/pull/2989): `behind_by` was 0 and `base_commit.sha` and `merge_base_commit.sha` were both the base tip, the same answer the `git merge-base` form gives.
+  Where no raw API call is available either, as in an MCP-only session whose tools expose neither endpoint, the gate cannot run, so do not merge from that session until [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) supplies the tool.
+  That is the fail-closed direction, per [`fail-fast`](../principles/fail-fast.md).
+- **Do:** when the merge-base is not that tip and the merge is direct, update the branch pinned to the recorded head (the `expected_head_sha` update call, or `update_pull_request_branch` with `expectedHeadSha` remotely), then rerun the whole clean gate on the new head, review included, before merging.
+  The update is a new head, so a clean verdict on the old one no longer counts, per [`sync-with-main`](sync-with-main.md).
+  The update is asynchronous: the REST endpoint answers `202 Accepted` while the merge is still in progress, and the MCP tool reports that answer as success, so a gate rerun started at once can read the old head.
+  Pin the update itself to the head that failed the currency check.
+  Locally that is `gh api -X PUT "repos/<owner>/<repo>/pulls/<N>/update-branch" -f expected_head_sha="<pinned-sha>"`, since the `gh pr update-branch` wrapper has no flag for it in `gh` 2.98.0.
+  Remotely it is `expectedHeadSha` on the MCP `update_pull_request_branch` tool.
+  A `422` whose message names an expected-head mismatch means the head already moved.
+  Match on the substring `expected head sha`, since the live text carries a curly apostrophe and a trailing period that this ASCII rendering cannot show.
+  That is the another-writer signal, so it routes to the ownership rule (settle who owns the branch per [`claim-pr`](claim-pr.md)) instead of merging the base into someone else's push.
+  The endpoint uses `422` for other validation failures too, so any other message is a failed update: stop and read it rather than treating it as a moved head.
+  Measured 2026-09-02 (Pacific) on [#2989](https://github.com/Morrison-Lab/ai-config/pull/2989): a deliberately wrong `expected_head_sha` returned `422` with a message reading "expected head sha didn't match current head ref." (curly apostrophe in the live text) and changed nothing.
+  Then poll `headRefOid` until it changes, with a deadline (five minutes is generous for a merge commit GitHub has accepted), and treat expiry as a failed update to stop on and report, since a `202` can be returned without a new head ever appearing.
+  Once it changes, record that SHA, rerun the base-currency check on it, and only then rerun the gate, pinned to that SHA.
+  The gate itself takes minutes, so the base can advance again while it runs, and so can the head: a concurrent push that already contains the current base passes a currency-only recheck while the gate's verdict belongs to the earlier SHA ([`github`](../../memories/github.md) records that unpinned-head race).
+  So immediately before the merge command, check that the live `headRefOid` still equals the pinned SHA, that `baseRefName` is still the branch the gate ran against (a retarget to another branch at the same commit would otherwise pass a tip comparison), and that the live base tip still equals `<pinned-tip>`, and repeat the update-and-gate cycle when any of them moved.
+  Then make the merge itself carry the pin: `gh pr merge --match-head-commit "<pinned-sha>"` (measured 2026-09-02 (Pacific) in `gh` 2.98.0: the flag is documented as the commit SHA the head must match to allow the merge), or `expectedHeadSha` on the MCP `merge_pull_request` tool, so a push in the seconds after the read is refused by the API rather than merged.
+  A remote session's bash has neither: `gh` is absent, and the MCP tool belongs to the agent rather than to the shell.
+  The third form is plain REST, and it takes the pin as `sha`:
+  `curl -X PUT -H "Authorization: Bearer $GITHUB_TOKEN" ".../repos/<owner>/<repo>/pulls/<N>/merge" -d '{"merge_method":"squash","sha":"<pinned-sha>"}'`.
+  That `sha` is the same guarantee the other two spell differently --- the API refuses the merge when the head has moved --- so a session without `gh` is not thereby excused the pin.
+  Measured 2026-09-03 on [#3035](https://github.com/Morrison-Lab/ai-config/pull/3035) and [#3043](https://github.com/Morrison-Lab/ai-config/pull/3043), both merged this way after `gh` returned `command not found`.
+  It merges but does not tidy: `--delete-branch` has no REST counterpart here, and `DELETE /git/refs/heads/<branch>` is refused by the agent proxy itself, so the remote branch outlives the merge and only the local one can be cleaned up.
+  The pre-merge read still runs first, because it is what says which ref moved.
+  The pin closes only the head side: no merge API pins the base, so the base can still advance between that read and the merge, and a direct merge on a base without an up-to-date-branch requirement keeps that window open.
+  **Sync with `git` rather than `update-branch` where the review gate excludes bot senders**, since the update makes the new head *bot-authored* and the gate then skips the very verdict this rule goes on to require.
+  `Morrison-Lab/gha`'s `claude-code-review.yml` gates on `github.event.sender.type != 'Bot'`, so a head produced by the API call reports every review job `skipped` while CI stays green --- a state that reads like a review not yet started rather than one that will never run.
+  Rebasing onto the base and force-pushing (with `--force-with-lease --force-if-includes`) reaches the same base currency and triggers the review normally, because a `git` push carries a User identity where a REST write does not ([`github-remote-sessions`](../../memories/github-remote-sessions.md)).
+  Confirm the rebase preserved the change rather than assuming it: compare the tree hashes when the base did not move, and the diff against the base when it did.
+  The `expected_head_sha` machinery above still applies to the API route, which stays correct wherever the gate admits bot senders.
+- **Do:** measure the base's merge interval against one gate cycle before starting a third sync, rather than chasing.
+  `git log origin/<default-branch> --first-parent -8 --format='%ct'` gives the interval and the review run's own timestamps give the cycle;
+  when the interval is the shorter of the two, serial syncing cannot converge ([`batch-merge-and-resolve`](batch-merge-and-resolve.md)), and each attempt spends a paid review round.
+  Measured 2026-09-02 on [#3035](https://github.com/Morrison-Lab/ai-config/pull/3035): a median interval of 221s against a ~6 min cycle, three merges landing inside 30s, and four review rounds spent before the base held still long enough to merge.
+  The escape is to wait for a quiet window and sync then --- which is a real strategy rather than a stall, since the cadence is bursty --- or to raise the server-side closure with whoever owns the ruleset.
+  Read a repository's `rulesets` endpoint rather than assuming: `strict_required_status_checks_policy` false and no merge-queue rule means the closure this rule points to does not exist there, and branch protection may read `403` for the session's own token.
+  Where the base must be stable, only a server-side gate closes it, a merge queue or the up-to-date-branch requirement (with every clean-gate check required or aggregated, per the exception above), and the direct-merge entry points say so.
+  The cycle repeats for either ref, so a repeat says which one to look at rather than which remedy applies.
+  When the base moved twice it is advancing faster than the gate runs, which [`batch-merge-and-resolve`](batch-merge-and-resolve.md) measures: stop chasing and merge under strict up-to-date protection (or through a merge queue once [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030) lands), or batch the pending merges per that fragment.
+  When the head moved, another writer is pushing to the branch, and no queue or protection setting stabilizes that: find the writer per [`claim-pr`](claim-pr.md) and settle who owns the branch before rerunning.
+- **Do:** on a base that requires a merge queue, stop and report rather than merging: the queue form of this gate (the coverage proof, a retarget check before enqueue, and the asynchronous enrollment state machine) is [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030), and until it lands no agent path in this corpus merges through a queue.
+  Whether the pinned base requires one is read before any merge command, from the same rules query: `gh api --paginate "repos/<owner>/<repo>/rules/branches/<base-encoded>" --jq '[.[] | select(.type == "merge_queue")] | length'`, a nonzero count being the stop.
+  The merge command cannot serve as the probe, since `gh pr merge` enqueues rather than refuses.
+  Measured 2026-09-02 (Pacific) on this repository's `main`: the count is 0 and the rule types present are `deletion`, `non_fast_forward`, `pull_request`, `required_linear_history`, and `required_status_checks`.
+  A manual update repairs neither case, since it cannot make a check block or make a workflow run on `merge_group`.
+  Make every clean-gate check required (or aggregated behind one) and `merge_group`-triggered, or merge directly where the repository permits it, with the direct-merge checks above.
+- **Don't:** read a head-only FULLY CLEAN verdict as a merge-safe verdict when the base has advanced.
+- **Don't:** substitute a path diff of `.github/workflows/` for the update.
+  It cannot see a check that arrived through a script or a reusable workflow.
+
+Tracked as [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982).
+
 - **Do:** always check for merge conflicts (e.g., using `gh pr view <number> --json mergeable` or `gh pr checks`) at the same time you check for CI and review status.
 - **Do:** report a PR as blocked on review when HEAD has no authentic clean verdict, even if GitHub says `CLEAN`.
 - **Don't:** treat green CI plus a clean review as sufficient without independently re-checking merge-conflict state.

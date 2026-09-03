@@ -96,6 +96,41 @@ See [`pr-on-claim.cases.md`](pr-on-claim.cases.md),
 - **Do:** narrow the response with a flag on the POST itself rather than a downstream pipe.
 - **Don't:** pipe the POST anywhere, including to `tail`, `head`, or `jq` --- the hook cannot tell a formatting pipe from a chained verification, because the shell does not either.
 
+**Third occurrence, 2026-09-02, and the new fact is that the hook's own blocking message never states this constraint for the request, though it states it for a neighbouring command.**
+
+The two rules above tell you to run the POST alone.
+The message you read at Stop gives the POST, then `Then verify a review actually lands at the current head`, then a `gh pr view --json reviews` count --- two steps, each a four-space-indented block inside one reason string, silent on whether they belong in one Bash call.
+Silence is not neutral here, because one call is the cheap reading and the whole instruction arrives in one block.
+Taken that way the POST is no longer last, `request_ident()` reports it as non-last, and the obligation stays live: the hook re-fires, the message repeats verbatim, and following it again reproduces the same shape.
+
+Read the gap accurately rather than as a contradiction.
+The message does not instruct chaining;
+it declines to rule chaining out, while ruling it out explicitly one branch away --- its `gh pr edit --add-label` exemption says a chained-ahead command shares one exit status and so cannot be attributed.
+The same constraint binds the request, and the message says nothing about it.
+
+Note also what makes this hard to diagnose from inside the turn.
+The request succeeds and reviews arrive, so every signal available to the session says the obligation is met.
+The hook itself distinguishes the two perfectly --- `request_ident` returns `rlast`, and the command ordering is right there in the transcript.
+What does not distinguish them is anything the blocked session is shown: the message names only *the request failed*, so the reader has no reason to inspect an ordering the hook already measured.
+
+- **Do:** run the request as the sole command in its call, and verify in a separate call, whether or not the blocking message says so.
+- **Do:** read a verbatim-repeating block message as a candidate gap in the message, once the blocked action's own output says it succeeded.
+- **Don't:** infer from a successful POST and an arriving review that the obligation discharged --- neither is what the hook measures.
+
+Tracked as [ai-config#3017](https://github.com/Morrison-Lab/ai-config/issues/3017), whose suggested fix states the constraint in the request's own instruction;
+that issue was still open when this was written, so the message on `main` is unchanged.
+Third occurrence rather than a new lesson, so it meets [`deterministic-tools`](../principles/deterministic-tools.md)'s bar for building something --- and the something is the message, since the rule was already written down twice and the message is what a blocked session actually reads.
+
+See [`pr-on-claim.cases.md`](pr-on-claim.cases.md), "The blocking message prescribes a non-dischargeable shape".
+
+**That message's verification query counts reviews on the PR, not reviews of the current head.**
+
+`[.reviews[] | select(.author.login | startswith("copilot"))] | length` returns every Copilot review the PR ever received, including one submitted against a diff that no longer exists.
+On ai-config#3010 it returned 1 while the only review on record predated a force-push, so it read as satisfied over a diff nothing had reviewed --- the same head-scoping gap [`fully-clean`](fully-clean.md) closes by requiring `reviews[].commit.oid` in its payload.
+
+- **Do:** compare each review's `submittedAt` against the last push, or match `commit.oid` against the head, before reading a non-zero count as an answer.
+- **Don't:** treat a count of reviews on the PR as a count of reviews of the diff you just pushed.
+
 **A PreToolUse block for this was considered and rejected -- the Stop hook stays the only guard.**
 
 - **Do:** treat the Stop hook's post-hoc catch as sufficient for this specific mistake, and re-run the POST alone when it fires.
@@ -263,8 +298,12 @@ A branch whose content is already on the base normally merges cleanly, because b
 The converse fails too: a redundant branch conflicts as soon as the base edits the duplicated content afterwards.
 Merge-tree answers "will this apply", never "is this new".
 
-- **Do:** settle whether work is merged from an empty `git diff <base> <branch>`, or from the PR's own state.
+- **Do:** settle whether work is merged from the PR's own state, or from whether the branch's own additions are present in the default branch's current content.
 - **Don't:** read a non-empty `<base>..<branch>` range as unmerged work in a squash-merging repo --- it says nothing there, however fresh the base.
+- **Don't:** read a non-empty two-dot `git diff <base> <branch>` as unmerged work either.
+  The base advancing past the fork point makes that diff non-empty on its own, whether or not the branch's own content ever landed --- which is the same reason the commit range cannot say it.
+  Scoping the diff to the branch's own files does not fix this --- a sibling PR that touched the same file after the fork reproduces the same confusion.
+  Use a one-directional `git diff <base>...<branch>` (three-dot, merge base on the left) to isolate the branch's own additions, then confirm those specific lines are present in the base with `git show <base>:<path> | grep -c '<distinctive phrase>'`.
 - **Don't:** offer a clean or a conflicting `merge-tree` as evidence either way about novelty.
 
 (Measured 2026-08-22 on `Morrison-Lab/ai-config`.
@@ -273,3 +312,9 @@ It had merged as [#1995](https://github.com/Morrison-Lab/ai-config/pull/1995) si
 The duplicate went out as [#1998](https://github.com/Morrison-Lab/ai-config/pull/1998), with [#1997](https://github.com/Morrison-Lab/ai-config/issues/1997) as its tracking issue, and its diff against the post-merge `main` was empty.
 The rule above already existed in the fragment named at the top of this passage, which was linked from six files and not from this one --- so the session that needed it was reading the page that lacked it.
 Tracked as [ai-config#1999](https://github.com/Morrison-Lab/ai-config/issues/1999).)
+
+**The non-empty case is not exotic --- it is what a two-dot diff shows for most merged branches in an active repo, including the branch that produced this correction.**
+`ums-quarto-format-scope` merged as [#3004](https://github.com/Morrison-Lab/ai-config/pull/3004).
+Measured 2026-09-02, minutes after a later, unrelated PR ([#3016](https://github.com/Morrison-Lab/ai-config/pull/3016)) merged into `origin/main`: `git diff origin/main ums-quarto-format-scope` ran to 2839 lines across 30 files, not empty, purely because `origin/main` had moved on.
+The one-directional `git diff origin/main...ums-quarto-format-scope` isolated the branch's own additions to 120 lines in two files, and `git show origin/main:memories/quarto-sites.md | grep -c "reaches every document that declares no"` returned 1, confirming the added section was already there verbatim.
+A reader trusting the two-dot diff alone would have read this fully-merged branch as unestablished.

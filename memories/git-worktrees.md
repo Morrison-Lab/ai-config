@@ -1019,8 +1019,8 @@ stranger's.
 
 - **Do:** cut a separate worktree for your own commits on a dispatched agent's
   branch, rather than reusing the worktree it was given.
-- **Do:** read a completion notification as "stopped for now", the same way
-  the section above reads a quiet worktree.
+- **Do:** read a completion notification as "has produced a result", and nothing more.
+  Not even that the agent is currently idle, which the second occurrence below measured it not to be.
 - **Do:** tell the agent when one of its branch's commits is yours, so its
   parallel-session check has something to weigh.
 - **Don't:** treat a completion report as licence to reclaim a worktree --- it
@@ -1037,9 +1037,65 @@ The agent was resumed, found a commit it had not made --- correctly authored
 `Claude <noreply@anthropic.com>`, already pushed, present in its own reflog ---
 applied `claim-pr`'s parallel-session rule, declined to push, and asked which
 of the two sessions should keep driving.
-Its analysis was right at every step, including its verification that the
-commit it had not made was the better fix; only its premise was false, and the
-orchestrator had supplied it.)
+Its analysis was right at every step, including its verification that the commit it had not made was the better fix;
+only its premise was false, and the orchestrator had supplied it.)
+
+**Second occurrence, 2026-09-02, split out of the review of [ai-config#3023](https://github.com/Morrison-Lab/ai-config/pull/3023).**
+The orchestrator dispatched a sidecar UMS agent, received its full final report, and treated that report as termination.
+On the strength of that, it handed the agent's branch to a different session.
+The agent then resumed and committed to that branch, which by then had an owner expecting to be its only writer.
+`ListAgents` showed the agent `running` an hour after its report.
+
+**The branch and the colliding commit were not recorded at the time, and that omission is the first lesson.**
+The #1481 record above names `4d8c6c7a`, so a later reader can audit it;
+this one has not been recovered, and no recovery was attempted while the reflog and `ListAgents` state were still live.
+Capture the identifier while the incident is in front of you, because the narrative survives in memory and the sha does not.
+
+It shares #1481's premise --- a completion report is not termination --- and inverts its actors.
+There the orchestrator wrote into the agent's tree;
+here the agent wrote into work the orchestrator had reassigned.
+So the harm is not the one this section's heading names, and the entry sits here for the shared premise rather than for a shared shape.
+
+The sharper reading of the tell is this.
+This section says above that a completion report "bounds the past and promises nothing about the future", which is true and weaker than what was measured: the agent had not stopped at all.
+So the report does not establish even that the agent is *currently* idle.
+
+**Why no instrument was built is an OPEN QUESTION, not a settled negative, and two successive drafts of this entry got that wrong in the same way.**
+The first draft claimed a hook "cannot enumerate live agents".
+The second conceded that and then argued a `SubagentStop` ledger could not observe a resumption, which foreclosed the question again one step further in.
+Both were caught in review, and the pattern is worth more than either claim: an entry explaining why something was not built is under steady pressure to sound decided, because "we considered it and it cannot work" reads as more rigorous than "we did not get to it".
+
+What is actually known, as of 2026-09-02:
+
+- The v2.1 hook schema SUPPORTS `SubagentStart`, `SubagentStop`, `TeammateIdle`, `TaskCreated` and `TaskCompleted`, per [`claude-code-hooks.md`](claude-code-hooks.md).
+  Schema support is not an observation that they fire, and nothing here has observed one.
+  That catalog labels itself a snapshot measured 2026-08 against Claude Code v2.1.236 and asks to be re-verified rather than treated as permanent, so re-run it before building on it.
+- `hooks/hooks.json` registers only `PreToolUse`, `Stop` and `UserPromptSubmit`, and `.claude/settings.json` adds `SessionStart`.
+  None of the subagent events is used.
+  That is a choice this corpus has not revisited, not a limit it has hit.
+- A `SubagentStart`/`SubagentStop` pair is the obvious ledger, and the obvious objection is resumption.
+  Whether the objection holds is UNMEASURED: it turns on whether a resumed agent re-emits `SubagentStart`, and on whether the resuming session runs these hooks at all.
+  Neither recorded occurrence names the resuming session, so neither settles it.
+
+The measurement that would settle it has to vary the resuming session, or it answers only half the question.
+Register a logger on all five subagent and task events --- they are keyed by name with no wildcard, so "log every event" is itself a step.
+Dispatch an agent and let it report.
+Resume it twice: once from the dispatching session, once from a SECOND session with its own hook configuration.
+Record which session's log each event lands in.
+Resuming only from the dispatcher holds the variable that both occurrences turned on constant.
+Until someone runs that, "no instrument was built" is the honest sentence and "no instrument is possible" is not.
+
+Meanwhile the decidable slice upstream of the failure is already built: `hooks/flag-unassigned-worktree.py` warns on a write-capable `Agent` launch with no `isolation`.
+It makes a missing worktree a deliberate choice rather than an accident --- it warns and never denies, by its own docstring, so it bounds nothing.
+It does not make a dispatched agent's tree safe to reclaim, and #1481 is the counter-example --- the orchestrator committed `4d8c6c7a` from inside an agent's own assigned worktree.
+
+The one cheap check that works today is a message: `SendMessage` to the agent's id costs one call and answers the actual question, which is what the first `Do` bullet below says, and what the "Long-stalled uncommitted work in a container-local worktree" section says for a peer session.
+
+- **Do:** ask the agent directly, rather than inferring liveness from a report, a quiet tree, or an absent `ListAgents` row.
+- **Do:** record the branch and commit when a collision happens, so the case can be audited later rather than taken on trust.
+- **Don't:** read a completion report as evidence the agent is even idle;
+  measured twice, and the second time it was still running.
+- **Don't:** write "no instrument is possible" when what is true is "none was built and the objection is unmeasured" --- two drafts of this entry made exactly that upgrade, and a durable record that forecloses a question stops anyone reopening it.
 
 **Second occurrence, 2026-09-02, and the rule above was read before it was broken.**
 Same shape as #1481, down to it being a sidecar UMS agent: the orchestrator dispatched an agent, received its full final report, treated that as termination, and the agent then committed to a branch a different live session had taken ownership of.

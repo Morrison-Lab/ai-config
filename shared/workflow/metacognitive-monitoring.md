@@ -1051,6 +1051,30 @@ The cheap check that would have found the duplicates directly --- grep the suite
 
 Those three rules belong to this case alone, not to the section's standing Do/Don't list.
 
+**A refutation is the same overreach delivered by someone else, and being its target is what suspends the check.**
+The paragraphs above treat the claim and the adjacent measurement as authored by one person, so "no preferred direction" reads as a note about mood --- confident or alarmed, approving or retracting.
+The mood framing undersells what happens when the neighbouring claim arrives from another party, aimed at something you asserted.
+A correction reads as work already done, and the posture it puts you in is the one where running your own check feels like defensiveness rather than diligence --- so the very rigour you would apply to your own claim goes unapplied to the claim replacing it, in the same exchange, within minutes.
+Accepting a finding is not exempt from this section's test merely because agreeing feels less like asserting than disagreeing does.
+
+(Measured 2026-09-01--02 on [Morrison-Lab/ai-config#2984](https://github.com/Morrison-Lab/ai-config/issues/2984).
+A build log for a Quarto site's CI check carried `Output created: _site/sap-template-revealjs.html` and `_site/sap-template.docx`, cited by a peer session against the claim that the check "never rendered revealjs, so it was silent on the config".
+Both lines were real, and neither was about the setting under discussion: they came from a `post-render: Rscript scripts/post-render.R` step, which renders one document, `sap-template.qmd`, that declares its own `format:` block --- exactly the document the project-level setting does not reach.
+The measurement established that revealjs output exists in the log.
+The claim it was taken to license was that the project-level setting produced it, a different proposition on the other side of a boundary the same log marks (`Running script 'Rscript'` precedes both lines).
+The original claim was re-measured and retracted on the strength of that citation, which was the regression: a later review round restored it once the `post-render` step was read.
+The Quarto-specific mechanics are proposed in [ai-config#3004](https://github.com/Morrison-Lab/ai-config/pull/3004) --- once merged, they live in `memories/quarto-sites.md`;
+this entry is the general one.)
+
+- **Do:** ask which mechanism produced a cited artifact before asking whether the artifact is real, for evidence offered against your own claim exactly as hard as for evidence supporting it.
+- **Do:** re-run the check you would run on your own claim before retracting it on someone else's evidence, not after.
+- **Don't:** let "this refutes what I said" stand in for "this shows that what I said is not what happened" --- the first is a role the evidence is asked to play, the second is what the evidence would actually have to show.
+- **Don't:** read acceptance of a peer's finding as exempt from this section's test on the grounds that agreeing is not asserting.
+
+Those four rules belong to this case alone, in the same way the three above it do;
+the section's standing Do/Don't list is the one that follows this paragraph.
+[`A correction inherits its instrument`](#a-correction-inherits-its-instrument-so-a-second-reading-is-not-a-check) above reaches the same place from the other direction, governing the retraction itself rather than the evidence offered for it.
+
 - **Do:** write what the measurement establishes and what you are claiming as
   two separate sentences, and confirm the second does not reach past the first.
 - **Do:** measure the illustrating instance separately whenever a verified

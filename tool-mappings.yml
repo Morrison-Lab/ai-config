@@ -100,13 +100,17 @@ operations:
     cli: gh pr edit "<N>"
     github_mcp: mcp__github__update_pull_request
   - id: MERGE_PR
-    description: Merge a pull request.
-    cli: gh pr merge "<N>"
-    github_mcp: mcp__github__merge_pull_request
+    description: Merge a pull request directly, pinned to the head the clean gate evaluated; a base that requires a merge queue is out of scope until [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030) lands.
+    cli: gh pr merge "<N>" -R "<owner>/<repo>" --match-head-commit "<sha>"
+    github_mcp: mcp__github__merge_pull_request (expectedHeadSha="<sha>")
   - id: MARK_PR_READY
     description: Flip a draft pull request to ready for review.
     cli: gh pr ready "<N>"
     github_mcp: mcp__github__update_pull_request (draft=false)
+  - id: UPDATE_PR_BRANCH
+    description: Merge the base branch into a pull request's head branch, pinned to the head that was checked.
+    cli: gh api -X PUT "repos/<owner>/<repo>/pulls/<N>/update-branch" -f expected_head_sha="<sha>"
+    github_mcp: mcp__github__update_pull_request_branch (expectedHeadSha="<sha>")
   - id: REOPEN_PR
     description: Reopen a closed pull request.
     cli: gh pr reopen "<N>"

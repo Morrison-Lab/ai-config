@@ -57,3 +57,80 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
   - `glab api --method POST "/projects/<TARGET_ID>/job_token_scope/allowlist" -f "target_project_id=<SOURCE_ID>"`
   - `include:` (for CI templates) works independently of the API allowlist
   - Check existing: `glab api "/projects/<ID>/job_token_scope/allowlist"`
+
+## GitLab returns 404, not 403, for a project the token cannot SEE
+
+A `CI_JOB_TOKEN` or `GITLAB_TOKEN` call against a project the token lacks
+visibility into returns a bare `404 Not Found`, not `403 Forbidden` ---
+GitLab's REST API does not distinguish "doesn't exist" from "you can't see
+it."
+Same non-disclosure choice GitHub makes for its org-installations endpoint
+(`github-consumer-ci.md`'s "A 404 from that endpoint is about the caller's
+org ROLE").
+So "404 on a file I can see exists in the repo/browser" is a **token-scope**
+diagnosis, not a missing-file one --- re-scope or allowlist the token rather
+than hunting for a renamed or moved path.
+
+- **Do:** read a 404 from a project-scoped token as "this token cannot see
+  that project" first, and check the CI job token allowlist or PAT group
+  scope before assuming the file moved or was deleted.
+- **Don't:** treat a 404 as proof a file is absent when a differently-scoped
+  credential (browser session, group-level PAT) can read it fine.
+
+(Measured 2026-09-02, `ucdavis/hac.sap`#38: `CI_JOB_TOKEN` against
+`health-analytics-core/HACtions` got 403 --- `hac.sap` was not on HACtions'
+job-token allowlist, a role/scope problem the status code named correctly.
+The fallback `GITLAB_TOKEN` then got 404 for the exact same file, which
+exists at both `v2` and `main` and reads fine under a token with group
+access.
+Same missing-access problem, two different credentials, two different
+status codes on the one call --- 403 named the cause and 404 hid it.)
+
+## A mutable `include: ref:` plus `allow_failure: true` breaks a consumer silently
+
+`include:` pinning a shared CI template to a **tag** (`ref: v2`) rather than
+a SHA means every push to that tag reaches every consumer immediately, with
+no version bump and no consumer-side signal that anything changed.
+When the consuming job also carries `allow_failure: true`, a break
+introduced this way is invisible: the job fails, the pipeline still reads
+green, and nothing tells anyone the job didn't run.
+
+A job that never ran and a job that ran and found nothing produce the
+identical pipeline color.
+`allow_failure: true` is the right call for a genuinely flaky external
+check, but it also converts every future upstream change into a silent
+regression for anyone relying on that job's *output* (a posted review, a
+security report) rather than just its exit code.
+
+- **Do:** pin a shared CI template to a SHA, or an immutable
+  `v2.3.1`-style tag, when consumers depend on a job's output rather than
+  only its exit code.
+- **Do:** treat `allow_failure: true` as scoped to exit-code flakiness, and
+  add a separate signal (a required "did this job run" check, an assertion
+  that a comment got posted) for a job whose product matters more than its
+  status.
+- **Don't:** read a green pipeline as proof every `allow_failure: true` job
+  executed --- check the job's own log/conclusion, not just the pipeline
+  color.
+- **Don't:** read "nothing changed in this repo" as proof a CI job's
+  behavior is unchanged when it `include:`s a moving upstream ref.
+
+Mirror image of [`github-consumer-ci.md`](github-consumer-ci.md)'s "A moving
+upstream tag can turn a consumer's default branch red with no local change"
+--- there the moving tag makes the check itself loud (red, with no local
+diff to explain it); here it makes the review job silent (green, with the
+review simply missing), because `allow_failure: true` swallows the exit
+code that would otherwise announce it.
+Same underlying principle as [`fail-fast.md`](../shared/principles/fail-fast.md)'s
+"found nothing vs never ran" (there for a shell `||`-chained check; here for
+a CI job attribute).
+
+(Measured 2026-09-02, `ucdavis/hac.sap`#38: `.gitlab-ci.yml` includes
+`health-analytics-core/HACtions` at `ref: v2`.
+HACtions added a new script dependency to `templates/claude.yml`'s
+`claude-review` job on 2026-08-29; `hac.sap`'s own last relevant change was
+2026-08-30 and needed nothing from it.
+`v2` moved to include the new dependency, `claude-review`
+(`allow_failure: true`) started failing to fetch the script, and the
+pipeline stayed green throughout --- the MR simply stopped getting
+reviewed, with no failed check anywhere to notice.)

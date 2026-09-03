@@ -567,3 +567,37 @@ does not surface it.
 The proposed instrument is a grep-level check over `hooks/test-*.py` and
 `scripts/test_*.py` for `git init --bare` or a fixture `git clone`
 without `-b main`, filed for tracking (ai-config#2740).
+
+## A pre-push guard whose sibling module fails to load falls back to matching the command text, and a heredoc that quotes `git push` trips it
+
+`hooks/no-push-without-self-review.py` imports `no-unreviewed-pr.py` as a
+sibling module.
+When that import fails, the guard cannot parse the command.
+It was observed from a worktree where the guard's error path showed it running from `<worktree>/.claude/hooks/`, a copy with no sibling beside it.
+Which registration selected that copy, and whether `CLAUDE_PLUGIN_ROOT` resolved there, is what [ai-config#2981](https://github.com/Morrison-Lab/ai-config/issues/2981) leaves open.
+The guard then degrades to a narrow heuristic regex over the raw command text.
+That regex is not a substitute push parser.
+The hook uses it only to decide whether to report the broken installation and deny the command when the text looks like a `git ... push` invocation.
+The regex is deliberately narrow:
+`grep push` and `git commit -m "push the button"` do not trip it,
+and the hook's own suite pins that.
+It reads the whole command string, though,
+so a heredoc body that quotes a literal `git push -u origin <branch>` line is read as command text.
+It then matches exactly as a real push would.
+A `printf` body matches only when the character before `git` is not a quote (a backtick, in the measured case).
+`printf '%s' 'git push ...'` passes.
+Measured 2026-09-01 while writing an issue body,
+and again while posting the correction to that issue.
+Tracked as [ai-config#2981](https://github.com/Morrison-Lab/ai-config/issues/2981).
+
+- **Do:** write a comment or issue body that quotes a push command to a file
+  with your harness's file-writing tool (Claude Code's `Write`, or its
+  equivalent elsewhere), then post it with `--body-file` (or
+  `-F body=@file`), rather than composing it inside a Bash heredoc.
+- **Do:** reserve `ALLOW_UNREVIEWED_PUSH=1` for the one command that is an
+  actual `git push`, and state why in the same turn.
+- **Don't:** read the guard's block on a body-writing command as a real
+  self-review gap --- it is the sibling-import fallback reading quoted text.
+- **Don't:** export `ALLOW_UNREVIEWED_PUSH=1` for the whole session to work
+  around the false positive; that also waives the guard for the real push.
+

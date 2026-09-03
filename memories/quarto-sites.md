@@ -267,6 +267,83 @@ Note what the toolchain question actually turns on: a `pdf:` anywhere in that sw
 (Measured 2026-08-24 on `d-morrison/macros`, whose `_quarto.yml` declares `format: html` only while `demo-shortcode.qmd` and `demo-include-in-header.qmd` each declare their own `pdf:` and `revealjs:` blocks --- demonstrating the macros reaching the LaTeX preamble being the entire point of those two pages.
 Caught in self-review on [macros#83](https://github.com/d-morrison/macros/pull/83) before the TinyTeX removal merged.)
 
+## The project `format:` block reaches every document that declares no `format:` of its own
+
+The section above is about which **formats** a project renders, and says the project block understates that set.
+This is the other axis: which **documents** a given entry in that block reaches.
+The answer is every document that declares no `format:` of its own, since the block is those documents' *default* --- so adding a format there to give **one** document a slide deck silently gives it to every such page in the site.
+A document carrying its own `format:` block escapes it, which is the same override rule read from the other side, and is why the one page you meant to change may be the only page unaffected.
+
+Both axes fall out of the single rule that section states --- per-document front matter *overrides* the project block rather than adding to it --- so the block understates the format set and overstates the document set at the same time.
+What is surprising is the scope rather than the behaviour: the block does exactly what it is documented to do, and the edit was wider than the intent behind it.
+
+The failure is the filename collision already recorded twice in this corpus, reached from the project side with no document edited at all.
+Both formats claim `<stem>.html`, and the render dies rather than rendering something wrong.
+The "Verify a redirect on a site build" bullet above carries the remedy: an explicit `output-file:` on the second format.
+[`debugging.md`](debugging.md)'s "Reproduce heavy-tool project bugs minimally" carries a two-file, R-free reproducer for the same `safeMoveSync`/`renderProject` collision --- reach for that before rendering a real project twice.
+
+Three things the new observation adds to those two records.
+
+**The blast radius is the whole site, and the error names one page.**
+Measured on Quarto 1.9.36 / macOS, a `revealjs:` block added under the top-level `format:` key of a website project:
+
+```
+ERROR: NotFound ... rename 'docs/design-decisions.html' -> '_site/docs/design-decisions.html'
+```
+
+The output directory was left missing `index.html`, `styles.css`, `search.json`, and `site_libs/`.
+The page named is not the page the format was added for, and that mismatch is itself the tell that the scope is project-wide rather than per-document.
+Don't read the named page as the first one rendered either, or as the last.
+The name tracks a *colliding* document --- one inheriting both formats --- rather than render position.
+Measured on Quarto 1.9.36 / macOS in a three-page project where `index.qmd` alone declares no `format:` of its own: the render reports `[1/3] docs/design-decisions.md`, `[2/3] index.qmd`, `[3/3] aaa.qmd`, and the error names `index.html`, which is neither first nor last.
+Note what that discriminator does and does not settle.
+With exactly one colliding document it rules out the name being the first or the last document rendered, which is the misreading worth ruling out.
+It says nothing about which colliding document gets named when several collide, since only one could be named here;
+render order may well decide that, and this case cannot tell you.
+Which stage picks the reported path was not established, and is not needed: the name identifies a document that inherited the project's formats, which tells you the entry is reaching further than you intended.
+Read it as the symptom rather than the site of the fix.
+The remedy is in the project block and in the front matter of the document you meant to serve --- narrow the one, and give the other an explicit `output-file:` --- not in the page the error happens to name.
+
+**A green CI check here was not weak evidence that the block was fine --- it was no evidence either way.**
+Two runs on [ucdavis/hac.sap#9](https://github.com/ucdavis/hac.sap/pull/9) carried that top-level block: run `33432191485` (job `99619966191`) at `8c40c4db`, and run `33567826907` (job `100054940478`) at `e6d9e8a`.
+Both `build` checks passed, and both render steps dump the same inputs: `FORMATS` empty, `RENDER_PROFILE` empty, `TINYTEX: false`, and `HAS_LABEL_PDF`, `HAS_LABEL_DOCX`, `HAS_LABEL_REVEALJS` all false.
+Read `TINYTEX` as part of that input rather than the labels alone: the action's pdf branch fires on `TINYTEX = true` **or** `HAS_LABEL_PDF = true`, so a false label does not exclude pdf by itself.
+On those inputs `Morrison-Lab/gha`'s `preview@v2` takes its no-formats branch, builds `FORMAT_LIST=("html")`, and issues one command: `quarto render . --to html --output-dir _site`.
+The runner never echoes the resolved command line, so that reconstruction of the `quarto render` invocation is a derivation over the script text and the `env:` block the runner does print, rather than an observation of the command itself.
+Within the project render that command produces one output per document, so no two formats can contend for `<stem>.html`, and the collision was impossible in that phase by construction.
+Scope that to the project render deliberately: the same run renders `sap-template.qmd` twice more afterwards, through the `post-render` hook described below.
+Those extra renders cannot collide either, for a different reason --- each carries an explicit `output-file:`, so they claim `sap-template-revealjs.html` and `sap-template.docx` rather than a name any other output wants.
+
+**The later run's log reads like a multi-format render, and that is the trap.**
+Run `33567826907` carries `Output created: _site/sap-template-revealjs.html` and `_site/sap-template.docx` next to `_site/index.html`, which looks like the project block's revealjs rendering cleanly.
+Those two come from the project's `post-render: Rscript scripts/post-render.R`, which runs `quarto render sap-template.qmd --to revealjs` and the same to `docx`: two single-document renders of the one document whose front matter declares its own `format:` block, with an explicit `output-file:`.
+The log's ordering settles that without needing any prior belief about the project render, since both lines fall after `Running script 'Rscript'` and before the project render's own `Output created: _site/index.html`.
+By this section's own rule `sap-template.qmd` is precisely the document the project block does *not* reach, so those outputs are evidence about per-document front matter and say nothing about the project block.
+The earlier run carries no such lines, because `scripts/post-render.R` did not exist at `8c40c4db`.
+
+The reflex explanation is the version, and it is wrong: CI ran Quarto 1.10.18 on Linux against a local 1.9.36 on macOS, but installing 1.10.18 on macOS collides identically, so the version explains nothing.
+The difference that mattered was the render command, sitting in the same log as the environment dump.
+Reach for the command a check actually ran before reaching for its platform or its version.
+[`metacognitive-monitoring.md`](../shared/workflow/metacognitive-monitoring.md) states the general form: a claim about cause owes an alternative you can name and reject.
+Reading the deployed preview would not have rescued this either, which is worth knowing before reaching for the `pr-preview/pr-<N>/` recipe the bullet above cites.
+Run `33567826907` wrote every page the project declares, so the preview had nothing partial to show;
+a preview can only expose what the render command it came from actually built.
+
+- **Do:** put a single document's extra format in that document's own front matter, with an explicit `output-file:`.
+- **Do:** render the project locally before trusting CI on a `_quarto.yml` `format:` change.
+- **Do:** read a green render check by asking which formats it rendered, and treat a single-format run as silent on any collision between formats.
+- **Do:** check a project's `post-render` step before reading an output in the log as the project render's work.
+- **Do:** compare the error's source path against the document the format was added for;
+  a different path means the entry is reaching documents you did not intend.
+- **Don't:** read a green render check as evidence the config is right without asking which formats it rendered.
+- **Don't:** read an `Output created:` line as the project render's work before checking the project's `post-render` step.
+- **Don't:** add a format to the top-level `format:` key for one document's benefit.
+- **Don't:** read the page named in a `rename ... NotFound` as the one whose front matter you edited.
+  It names a document that inherited the format, not the one you meant to give it to.
+
+(Measured 2026-09-01 while reviewing a pull request on `ucdavis/hac.sap`, a Quarto website project: a `revealjs:` block added under the top-level `format:` key made `index.qmd` and `docs/design-decisions.md` each render to revealjs as well, colliding with their own HTML outputs.
+Tracked as [ai-config#2984](https://github.com/Morrison-Lab/ai-config/issues/2984).)
+
 ## quarto-actions/setup with tinytex — two shared-runner failure signatures (win, 2026-07)
 
 - **`ERROR: Unable to determine latest release for rstudio/tinytex-releases / 403 - Forbidden`**

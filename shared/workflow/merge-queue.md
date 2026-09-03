@@ -86,6 +86,15 @@ In repository settings under **Rulesets** -> **Rules** -> **Require merge queue*
 
 Workflows containing required status checks must listen for the `merge_group` event in addition to `pull_request` and `push`.
 Without `merge_group`, GitHub Actions will not run checks on speculative queue branches, causing queued PRs to hang indefinitely until timeout.
+The queue blocks only on required checks.
+A workflow runs on the speculative branch when its own `on:` block lists `merge_group`,
+or when it is a reusable workflow (`on: workflow_call`) invoked by a caller workflow whose `on:` block lists `merge_group`.
+The trigger and the required-check setting are independent.
+So the event to add lives in the event-triggered caller, not in a reusable callee.
+So a non-required check that lists `merge_group` runs there and cannot block the merge.
+A non-required `pull_request`-only check neither runs nor blocks.
+A required `pull_request`-only check is the hang above.
+Before the queue replaces the manual update, every check in the clean gate has to be required (or aggregated behind a required one) and has to execute on `merge_group`, per the stale-base rule in [`fully-clean`](fully-clean.md) (the passage tracked as [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982)).
 
 ```yaml
 name: CI
@@ -114,10 +123,11 @@ jobs:
 | **Strict branch protection without queue** | O(N^2) | Low (always tested against latest base) | High (serial `update-branch` chasing) |
 | **Non-strict branch protection (`strict: false`)** | O(N) | Medium (disjoint changes merge cleanly, but semantic conflicts reach `main`) | Low (immediate merge on approval) |
 | **Manual batch trains (integration branch)** | O(N) | Low (tested together on train branch) | High (manual branch coordination and cherry-picking) |
-| **GitHub Merge Queue** | O(N) or O(N / K) | Low (speculative merge testing guarantees clean `main`) | Minimal (automated queue handoff) |
+| **GitHub Merge Queue** | O(N) or O(N / K) | Low (speculative merge testing guarantees clean `main` when every clean-gate check is required and runs on `merge_group`) | Minimal (automated queue handoff) |
 
 - **Do:** enable `merge_group` event triggers on all workflows that provide required status checks.
 - **Do:** use merge queues to automate pre-merge speculative testing when landing multiple PRs in parallel.
-- **Do:** treat base-advance staleness on queued PRs as a platform queue concern rather than an immediate need for manual branch re-syncing.
-- **Don't:** run manual `gh pr update-branch` loops on simultaneously ready PRs when a merge queue is active.
+- **Do:** treat base-advance staleness on queued PRs as a platform queue concern rather than an immediate need for manual branch re-syncing, when every clean-gate check is required and runs on `merge_group`.
+  Otherwise the stale-base rule in [`fully-clean`](fully-clean.md) applies, because the queue then either cannot block on a check that runs, or never runs a check it would block on.
+- **Don't:** run manual `gh pr update-branch` loops on simultaneously ready PRs when a merge queue is active and configured that way.
 - **Don't:** omit the `merge_group` trigger from CI workflows when enabling merge queue rulesets.

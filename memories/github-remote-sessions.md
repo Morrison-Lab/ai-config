@@ -105,6 +105,13 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
 - **Two consequences follow, and both bite where a workflow gates on who acted.**
   A REST write produces a **bot-authored** event, so any workflow gated on `github.event.sender.type != 'Bot'` skips for it;
   `git push` produces a User-authored event and does not.
+  That covers **every** `pull_request` event a REST call originates, not only the `update-branch` one that first exposed it:
+  a PR **created** through `POST /repos/<owner>/<repo>/pulls` sends `pull_request.opened` as the bot, so it gets no automatic review at all.
+  The branch push beforehand does not rescue it, because a push to a branch with no PR yet fires no `pull_request` event --- so the one User-sent action happens too early to help.
+  Measured 2026-09-03 on [#3043](https://github.com/Morrison-Lab/ai-config/pull/3043), the PR recording this entry, which tripped the trap it documents:
+  its `Claude Code Review` run reported `completed success` with all six `review / *` jobs `skipped`, actor `claude[bot]`.
+  Read a review run's **jobs** rather than its conclusion, since the run is green either way.
+  The remedy is the same shape: push a further commit with `git` once the PR exists, which fires a User-sent `synchronize`.
   And a bot-authored comment carries `author_association: CONTRIBUTOR`, which is not in the `OWNER`/`MEMBER`/`COLLABORATOR` set `Morrison-Lab/gha`'s `claude.yml` gates its agent on, so an `@claude review` comment posted this way is skipped by design.
   `POST /actions/workflows/<file>/dispatches` is refused outright with `403 Resource not accessible by integration` --- "integration" is GitHub's word for an App, and the App's installation token carries `issues: write` and `pull_requests: write` but not `actions: write`.
   Deleting a remote branch is refused by the proxy itself (`Write access to this GitHub API path is not permitted through this proxy`), so a merged branch is tidied locally and left on the remote.

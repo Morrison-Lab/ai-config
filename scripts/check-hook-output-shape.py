@@ -13,7 +13,9 @@ This checks two things:
        never emits `"decision"` (or `permissionDecision: deny`), it must not
        emit `"reason"` alone, warn-only Stop hooks must emit `"systemMessage"`,
        and warn-only PreToolUse hooks must emit `"additionalContext"` or
-       `"systemMessage"` (ai-config#3068).
+       `"systemMessage"` (ai-config#3068). "Warn-only" there means neither a
+       JSON decision nor a non-zero exit, since exit code 2 blocks and its
+       stderr is fed back to Claude.
   2. Test-side payload inspection:
      - For every test suite `hooks/test-*.py` of a warn-only hook: the test must
        inspect the emitted payload shape (e.g. asserting `systemMessage` or
@@ -58,6 +60,60 @@ def parse_string_constants(source_code: str) -> tuple[set[str], str | None]:
         if isinstance(node, ast.Constant) and isinstance(node.value, str):
             strings.add(node.value)
     return strings, None
+
+
+def has_nonzero_exit(source_code: str) -> bool:
+    """True when the source can leave with a non-zero status.
+
+    The second documented blocking channel for a `PreToolUse` hook: exit code
+    2 denies the tool call and feeds stderr back to Claude, so such a hook
+    needs no advisory channel, and neither does one exiting non-zero
+    otherwise, since that stderr is shown to the user rather than only to the
+    debug log. Matches `sys.exit(N)` / `exit(N)` / `raise SystemExit(N)` and a
+    bare `return N` for a non-zero integer LITERAL N.
+
+    Literals only, deliberately. The near-universal `sys.exit(main())` idiom
+    passes a computed status, so treating a non-literal argument as possibly
+    non-zero would exempt almost every hook in the repo and hollow out Rule 3.
+    A hook that genuinely blocks writes the status as a literal somewhere.
+    """
+    try:
+        tree = ast.parse(source_code)
+    except SyntaxError:
+        return False
+
+    def nonzero_arg(args) -> bool:
+        if not args:
+            return False
+        arg = args[0]
+        return (
+            isinstance(arg, ast.Constant)
+            and isinstance(arg.value, int)
+            and not isinstance(arg.value, bool)
+            and arg.value != 0
+        )
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            func = node.func
+            name = getattr(func, "attr", None) or getattr(func, "id", None)
+            if name in ("exit", "_exit") and nonzero_arg(node.args):
+                return True
+        elif isinstance(node, ast.Raise):
+            exc = node.exc
+            if isinstance(exc, ast.Call) and getattr(exc.func, "id", None) == "SystemExit":
+                if nonzero_arg(exc.args):
+                    return True
+        elif isinstance(node, ast.Return):
+            value = node.value
+            if (
+                isinstance(value, ast.Constant)
+                and isinstance(value.value, int)
+                and not isinstance(value.value, bool)
+                and value.value != 0
+            ):
+                return True
+    return False
 
 
 def load_registered_hooks(hooks_json_path: Path) -> dict[str, list[tuple[str, str]]]:
@@ -105,6 +161,7 @@ def check_hook_sources(
         has_reason = "reason" in constants
         has_system_message = "systemMessage" in constants
         has_additional_context = "additionalContext" in constants
+        blocks_by_exit = has_nonzero_exit(source)
 
         events = [ev for ev, _ in registered.get(script, [])]
 
@@ -125,21 +182,29 @@ def check_hook_sources(
                     "Warn-only Stop hooks must emit 'systemMessage'."
                 )
 
-        # Rule 3: A PreToolUse hook with no block decision is warn-only, so it
+        # Rule 3: A PreToolUse hook that does not block is warn-only, so it
         # must emit additionalContext or systemMessage. On exit 0 stderr goes
         # to the debug log only, and for PreToolUse plain stdout is not
         # surfaced either -- so a hook with neither channel warns nobody while
         # looking exactly like one whose condition never fired
         # (ai-config#3068). UserPromptSubmit is deliberately out of scope: its
         # plain stdout IS added to the context, so the same shape is fine there.
-        if "PreToolUse" in events and not has_decision:
+        #
+        # "Does not block" covers both documented channels, matching the
+        # derivation in ai-config#3068: a JSON decision, and a non-zero exit,
+        # whose stderr IS fed back to Claude (memories/hooks.md, "Blocking
+        # hooks deny execution (exit code 2)"). A hook that blocks by exiting
+        # 2 already has a surfaced channel and needs no advisory one.
+        if "PreToolUse" in events and not (has_decision or blocks_by_exit):
             if not (has_additional_context or has_system_message):
                 errors.append(
-                    f"FAIL: {script} is registered as a PreToolUse hook without a "
-                    "'decision' block emit, but emits neither 'additionalContext' "
-                    "nor 'systemMessage'. A warn-only PreToolUse hook must emit "
-                    "'hookSpecificOutput.additionalContext' on stdout; stderr on "
-                    "exit 0 reaches the debug log only."
+                    f"FAIL: {script} is registered as a PreToolUse hook that "
+                    "neither blocks (no 'decision' emit and no non-zero exit) "
+                    "nor emits 'additionalContext' or 'systemMessage'. A "
+                    "warn-only PreToolUse hook must emit "
+                    "'hookSpecificOutput.additionalContext' on stdout (a "
+                    "'systemMessage' alongside it is fine); stderr on exit 0 "
+                    "reaches the debug log only."
                 )
 
     return errors

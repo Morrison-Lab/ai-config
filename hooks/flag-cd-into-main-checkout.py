@@ -50,7 +50,9 @@ that refuses legitimate work gets switched off, taking the real cases with it.
 ## How the warning is delivered
 
 Through `hookSpecificOutput.additionalContext` on stdout, paired with a
-one-line `systemMessage`. It used to print to stderr and exit 0, which reaches
+one-line `systemMessage` outside Antigravity (whose adapter surfaces
+`additionalContext` and `systemMessage` separately, so emitting both there
+prints the warning twice). It used to print to stderr and exit 0, which reaches
 the debug log and nobody else: for exit code 0 stderr is shown to neither
 Claude nor the user, and for `PreToolUse` plain stdout is not surfaced either.
 So the guard fired correctly and warned nobody, which is indistinguishable
@@ -152,12 +154,17 @@ def main() -> int:
             "hookEventName": "PreToolUse",
             "additionalContext": warning,
         },
-        "systemMessage": (
+    }
+    # Antigravity's adapter prints `additionalContext` itself AND separately
+    # prints every collected `systemMessage`, so carrying both there emits the
+    # warning twice. Every sibling that emits `systemMessage` gates it this
+    # way.
+    if not os.environ.get("ANTIGRAVITY_AGENT"):
+        out["systemMessage"] = (
             "This `cd` targets the MAIN checkout of this session's own "
             "repository, not its worktree. Use `git -C <path>` or drop the "
             "`cd`."
-        ),
-    }
+        )
     print(json.dumps(out))
     return 0
 

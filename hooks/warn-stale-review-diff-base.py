@@ -503,13 +503,22 @@ def _emit(note, summary):
     terminal. This hook exists to correct a premise the AUTHOR asserted, so
     the human-visible channel is the one that closes the loop.
 
-    `check-hook-output-shape.py` does not require it here: its emit rule is
-    scoped to `Stop` hooks, and its PreToolUse rule governs the test rather
-    than the hook. So the convention is the reason, and it is derivable ---
-    of the 16 `warn-`/`flag-`/`remind-` hooks registered under PreToolUse
-    besides this one, 14 emit `systemMessage` (measured 2026-09-02; the two
-    that do not are `warn-pr-create-without-dupe-check.py` and
-    `flag-cd-into-main-checkout.py`).
+    `check-hook-output-shape.py` now requires a warn-only PreToolUse hook to
+    emit one of the two channels (ai-config#3068), so `additionalContext`
+    alone would satisfy it; `systemMessage` on top is the convention, and it
+    is derivable --- of the 16 `warn-`/`flag-`/`remind-` hooks registered
+    under PreToolUse besides this one, 15 emit `systemMessage` (measured
+    2026-09-03 over `hooks/hooks.json`; the one that does not is
+    `warn-pr-create-without-dupe-check.py`). Deriving snippet:
+
+        import json, pathlib
+        d = json.load(open("hooks/hooks.json"))
+        s = [h["script"] for e in d["hooks"]["PreToolUse"] for h in e["hooks"]]
+        c = [x for x in dict.fromkeys(s)
+             if x.startswith(("warn-", "flag-", "remind-"))
+             and x != "warn-stale-review-diff-base.py"]
+        print(len(c), sum("systemMessage" in
+                          (pathlib.Path("hooks") / x).read_text() for x in c))
     """
     print(json.dumps({
         "hookSpecificOutput": {

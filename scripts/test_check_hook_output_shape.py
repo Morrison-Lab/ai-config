@@ -8,11 +8,12 @@ verifying that:
   3. A warn-only Stop hook that fails to emit `systemMessage` fails.
   4. A test for a warn-only hook that does not assert payload shape fails (test-side blindness).
   5. A warn-only PreToolUse hook emitting neither additionalContext nor
-     systemMessage fails, while a blocking one does not (#3068).
+     systemMessage fails, while one that blocks -- by a `deny` decision or by
+     exiting non-zero -- does not (#3068).
   6. Missing or unparseable hooks.json fails loudly with usage exit code 2.
-  6. Unparseable Python source in a hook fails loudly with a diagnostic.
-  7. The success line encodes on a cp1252 stdout (ai-config#2038).
-  8. parse_string_constants does not emit ast.Str DeprecationWarning.
+  7. Unparseable Python source in a hook fails loudly with a diagnostic.
+  8. The success line encodes on a cp1252 stdout (ai-config#2038).
+  9. parse_string_constants does not emit ast.Str DeprecationWarning.
 """
 from __future__ import annotations
 
@@ -217,7 +218,7 @@ case(
     CLEAN_HOOKS_JSON,
     NO_CHANNEL_FILES,
     want_exit=1,
-    needle="emits neither 'additionalContext' nor 'systemMessage'",
+    needle="neither blocks (no 'decision' emit and no non-zero exit)",
 )
 
 # A PreToolUse hook that BLOCKS is out of scope for the rule: its `deny`
@@ -236,6 +237,28 @@ case(
     "blocking PreToolUse hook needs no advisory channel (#3068)",
     CLEAN_HOOKS_JSON,
     BLOCKING_PRETOOL_FILES,
+    want_exit=0,
+)
+
+# A PreToolUse hook that blocks by EXIT CODE is equally out of scope: exit 2
+# denies the tool call and its stderr is fed back to Claude, so the advisory
+# channel Rule 3 demands would be redundant. #3068's own derivation excluded
+# this shape (`exit(2)`, `return 2`); the rule has to as well.
+EXIT2_PRETOOL_FILES = dict(CLEAN_FILES)
+EXIT2_PRETOOL_FILES["hooks/warn-pretool.py"] = (
+    "import sys\n"
+    "if True:\n"
+    "    print('nope', file=sys.stderr)\n"
+    "    sys.exit(2)\n"
+)
+EXIT2_PRETOOL_FILES["hooks/test-warn-pretool.py"] = (
+    "assert 2 == 2\n"
+)
+
+case(
+    "PreToolUse hook blocking by exit 2 needs no advisory channel (#3068)",
+    CLEAN_HOOKS_JSON,
+    EXIT2_PRETOOL_FILES,
     want_exit=0,
 )
 

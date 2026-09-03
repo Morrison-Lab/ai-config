@@ -500,6 +500,19 @@ A hook with *neither* channel used to fall through both rules above: the
 already emit one of the two.
 `UserPromptSubmit` is deliberately out of scope, since its plain stdout is
 added to the context.
+"Warn-only" here means the hook neither emits a blocking decision nor exits
+non-zero, matching the derivation in that issue:
+a `PreToolUse` hook that exits 2 denies the tool call and has its stderr fed
+back to Claude, so it already has a surfaced channel and the rule leaves it
+alone.
+That exemption reads literal exit statuses only, since the near-universal
+`sys.exit(main())` idiom passes a computed one and treating that as blocking
+would exempt nearly every hook.
+
+Under Antigravity, gate any `systemMessage` on `ANTIGRAVITY_AGENT` being
+unset.
+Its adapter surfaces `additionalContext` and every collected `systemMessage`
+separately, so a payload carrying both prints the warning twice there.
 
 Every hook must ship a companion `test-<name>.py` beside it in the same change before pushing;
 `scripts/test_hooks.py` runs

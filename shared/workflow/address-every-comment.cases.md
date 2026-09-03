@@ -926,65 +926,49 @@ and was not the one the claim was about.
 ## "A peer's edge cases raised against a different implementation"
 
 Measured 2026-09-02 PT, recorded 2026-09-03.
-Re-derivable from four artifacts, named here because the first two drafts of
-this record were written from a filed summary instead and were wrong twice:
+Re-derivable from two artifacts in the repository:
+[ai-config#3014](https://github.com/Morrison-Lab/ai-config/pull/3014)'s comment
+thread, and `hooks/warn-stale-review-diff-base.py`.
+This record has been cut twice for claiming more than those support;
+what is left is what they do.
 
-- `hooks/test-warn-stale-review-diff-base.py` on `main` --- the `git -C` cases.
-- `hooks/warn-stale-review-diff-base.py:96` --- the pattern whose bound decides
-  what "coverage" means here.
-- [ai-config#3014](https://github.com/Morrison-Lab/ai-config/pull/3014)'s
-  comment thread --- the peer's flag, and the duplicate-and-revert report.
-- `memories/session-2026-09-02-gia-ai-config.md` --- the banked correction.
+A peer session ran an adversarial pass on **its own** draft of a similar hook,
+raised two edge cases from it, and asked whether they applied here --- a flag
+between `diff` and the refs, and a long `git -C <path>` prefix.
 
-A peer session flagged two edge cases from an adversarial pass on **its own**
-draft of a similar hook, and asked whether they applied here.
 Both already passed.
+Regression cases were drafted for them and then **reverted as duplicates**:
+`hooks/test-warn-stale-review-diff-base.py` already carried a case for each
+shape.
+Nothing was pinned, and nothing needed to be.
 
-**They were not pinned, and the reason is the more useful half of the record.**
-The first instinct was to add regression cases for both shapes.
-They were verbatim duplicates.
-`hooks/test-warn-stale-review-diff-base.py` already carried four `git -C` cases
---- a temp directory, a path containing spaces, `~/repo`, and a bare basename
---- all introduced by commit `879f2273`, which is #3014's own merge.
-The added cases were reverted.
+**The peer's reason for raising the second shape is the part worth keeping, and
+it was wrong about this implementation in an instructive way.**
+The peer said a long `git -C <path>` prefix "defeats any bounded gap between
+`git` and `diff`" --- a claim about the matcher, not about test coverage.
+Against a gap bounded by *characters* that would be right.
+This hook's gap is bounded by **option count**:
+`warn-stale-review-diff-base.py:96` allows `){0,12}` options between `git` and
+its subcommand, and its own comment puts the cost at "past 13 `-c k=v`
+options".
+Length is therefore not a dimension this implementation can respond to at all,
+so neither the worry nor a reassurance about it was about anything the code
+does.
 
-Coverage was established by **mutation** rather than by reading: breaking the
-guard turned the pre-existing cases red (78/80 and 79/80), which is what proved
-the shapes were covered.
-That is the transferable step.
-A claim that something is untested is a claim to check, not to act on, and
-checking it means breaking the thing and seeing what goes red.
+That is the transferable step, and it comes before measuring:
+**when a peer names the property that makes a shape matter, check that your
+implementation can see that property.**
+Where it cannot, the shape is not the question --- and running the cases would
+have returned a green that meant nothing.
 
-**The path-length framing was wrong on both sides, which is worth more than the
-episode itself.**
-The peer's concern, and the summary that carried it forward, both turned on a
-*long* `git -C <path>` prefix being unpinned.
-Path length is not a property the guard can respond to at all:
-`warn-stale-review-diff-base.py:96` bounds the prefix by **option count**,
-`){0,12}`, with each value matching `\S+`, and its own comment says the cutoff
-costs a missed reminder "past 13 `-c k=v` options".
-So neither the worry nor the reassurance was about a dimension the code has.
-When a peer names the property that makes a shape matter, check that the
-implementation can see that property before measuring anything.
+Two cautions about the evidence, since this record got both wrong before.
 
-**How this record went wrong, stated exactly, since a vaguer version would
-teach the wrong lesson.**
-Two different errors, from two different sources:
+Establishing coverage means **mutation**, not reading: a test asserting the
+guard stays *silent* on some input passes just as well when the guard stopped
+matching that input entirely, so a silent case read off the suite proves
+nothing about coverage on its own.
 
-- **Inherited:** the summary this entry was drafted from
-  ([ai-config#3059](https://github.com/Morrison-Lab/ai-config/issues/3059))
-  says the shape "was previously pinned only with short paths" --- singular,
-  about one of the two shapes.
-  It was filed at 02:10Z, and the session that discovered the duplication
-  started at 02:27Z, so it is an earlier session's summary superseded by a
-  later session's finding, not a session contradicting itself.
-- **Invented:** the sentence a CI round actually caught --- that a future
-  narrowing "now fails a test" --- appears nowhere in that summary.
-  This entry wrote it.
-  The first correction described the whole error as reproducing the summary
-  unchecked, which was self-favourable: the worst claim was its own.
-
-The CI round caught it by noticing a test claim in a diff that touches no test
-file.
-Four adversarial rounds had not, because all four read the entry against the
-summary rather than against the suite.
+And a mutation figure is only re-derivable against the suite it was taken from.
+The counts recorded for this episode were taken before later cases landed, so
+re-running the mutation on `main` today gives different denominators.
+They are omitted here for that reason.

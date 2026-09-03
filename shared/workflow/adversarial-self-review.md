@@ -262,11 +262,10 @@ So name the commands in the brief.
 The repo's own checkers, its test suite, and whatever `check-install`-shaped verification exists are the ones that matter, and they are cheap for a reviewer already holding the checkout.
 
 Recorded 2026-09-03 from [ai-config#3059](https://github.com/Morrison-Lab/ai-config/issues/3059), on a hook that took nine adversarial rounds.
-Eight rounds read the diff and returned findings about it.
+Eight rounds read the diff.
 The ninth was briefed to run the repository's own local validation, and it found **two red CI gates that all eight prior rounds had missed** --- one of which would have shipped the hook completely **inert to plugin-path consumers** while every test in the suite passed.
-Nothing in the diff showed it: the hook's code was correct, and what was missing was a registration entry in a file the diff did not touch.
-That record does not name the hook or the file, so read it for the shape rather than the specifics;
-in this repo the plugin-path binder is [`hooks/hooks.json`](../../hooks/hooks.json), which is the file a registration gap would most likely be in.
+That is the whole of what the record says.
+It does not name the hook, the gates, or what was missing, so read it for the shape rather than for a mechanism --- and note that a diff-reading round cannot find a gate that fails on files the diff never touched, whatever the gate turns out to be.
 
 Note what this is not.
 It is not "Run every mechanical style instrument before dispatching, not after", which says *you* run the style instruments beforehand so the reviewer never spends attention on them.

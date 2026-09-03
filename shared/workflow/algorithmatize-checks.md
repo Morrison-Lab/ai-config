@@ -1421,7 +1421,7 @@ It compares against a figure chosen earlier, so it is the case those sections go
 A **watchdog** asks whether the code finishes at all, and that is a question about elapsed time by construction, so it stays wall-clock.
 This repo's own catastrophic-backtracking checker is exactly that shape: [`scripts/check_regex_patterns.py`](../../scripts/check_regex_patterns.py) arms `signal.setitimer(signal.ITIMER_REAL, timeout)` against a `DEFAULT_TIMEOUT` of 0.25 seconds, with a thread-join fallback, and `validate.yml` gates on it.
 A backtracking probe is therefore not the exception that proves a `process_time` rule.
-It is a **second** exception, and it needs its own reason rather than the blocking one's, which does not reach it: that carve-out is stated as "keep a wall-clock ceiling **only** where the measured code can actually block", and its rationale is that "the one thing CPU time cannot see is a span that blocks on I/O instead of burning cycles".
+It is a **second** exception, and it needs its own reason rather than the blocking one's, which does not reach it: that carve-out is stated as "keep a wall-clock ceiling only where the measured code can actually block", and its rationale is that "the one thing CPU time cannot see is a span that blocks on I/O instead of burning cycles".
 A runaway regex burns cycles, so CPU time sees it perfectly well and the blocking carve-out excludes it by construction.
 What justifies wall-clock here is different and narrower, and it is not availability: a CPU-time interval timer interrupts a runaway regex perfectly well (`ITIMER_VIRTUAL` fires on the same catastrophic pattern in 0.253s against `ITIMER_REAL`'s 0.250s, measured), so the choice is not forced by what exists.
 It is forced by what is being budgeted.

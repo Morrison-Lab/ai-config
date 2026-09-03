@@ -930,18 +930,11 @@ section carries the mechanism.)
 (`Morrison-Lab/gha#811`, 2026-09-02.
 Six adversarial pre-push review rounds returned 11, 11, 11, 6, 3 and 2
 findings.
-Prose was the dominant category in rounds three, five and six --- their
-messages record nine of eleven, all three, and both, respectively; round four's
-gives no split --- and within it, a comment or a document
-describing code inaccurately is what `0262c1c6` calls "the class this branch
+The final commit `0262c1c6` names the recurring class as "the class this branch
 has spent five rounds on -- a comment describing code inaccurately".
-
-That class is wider than this record's own subject, which is the part of it
-staled by the branch's own fixes; the commits do not separate the two, so read
-the five-round figure as bounding this record rather than measuring it.
-One instance is worked through below; the rest are not individually
-reconstructible from the commit messages, which is why this record argues from
-the instance rather than from a count.
+That is wider than this record's subject, which is the part of it staled by the
+branch's own fixes, and the commit messages do not separate the two --- so the
+record argues from one worked instance rather than from a count.
 
 `gha`'s `CLAUDE.md` is not merely a contributor guide.
 It runs to several thousand lines recording, per capability, which composite
@@ -959,9 +952,10 @@ meaningless.
 Both sentences had been accurate when written, and the change that falsified
 them was in a different file --- `audit_example_concurrency.py` --- so nothing
 in the *code* diff put either sentence in front of the author.
-`CLAUDE.md` was not untouched, though, which is the sharper version: the same
-commit edited it, and that edit's own hunk ends three lines above the first of
-the two stale sentences.
+`CLAUDE.md` was not untouched, though, which is the sharper version: `385d4f43`
+edited it in the same commit, and that edit's hunk runs to line 2884 while the
+first of the two stale sentences sits at 2887 --- three lines below the hunk's
+last context line, six below its last changed line.
 So the file was open and the region was on screen, and the round still pushed.
 Proximity is not the remedy; a grep for the replaced value is.
 

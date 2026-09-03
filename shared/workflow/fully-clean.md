@@ -1260,11 +1260,11 @@ Tracked as [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982).
 - **Don't:** describe a PR that lacks a clean HEAD review as merge-ready, ready to merge, or "green and merge-ready."
 
 **Because a clean CI run and a clean review verdict are a snapshot, a reading
-you took over a live PR cannot be re-derived later --- so capture the command and its output verbatim at the
-moment a decision starts to rest on it.**
+you took over a live PR cannot be re-derived later --- so capture the command
+and its output verbatim at the moment a decision starts to rest on it.**
 
-The section above says the state moves; this is what that costs when you try to
-explain a reading afterwards.
+"A clean CI run and a clean review verdict are a snapshot" says the state
+moves; this is what that costs when you try to explain a reading afterwards.
 Re-running the command answers a question about the PR *now*, and it is
 presented in exactly the form of an answer about the PR *then*, so a
 disagreement between the two invites a hunt for a cause --- a tool version, a
@@ -1294,18 +1294,20 @@ usually the whole basis for whatever was decided next.
 `check-pr-fully-clean.py` readings across `Morrison-Lab/gha#811`, `#814` and
 `#820` were attributed first to a vocabulary false positive and then to a stale
 checker.
-A controlled re-run --- the stale clone at `240650120` against a worktree at
-`origin/main` --- returned identical verdicts on all three (`#814` rc=0, `#820`
-rc=0, `#811` rc=1).
-That refutes the stale-checker explanation, which it holds constant and tests
-directly.
-It cannot refute the wording explanation, which is a claim about readings that
-no longer exist --- so both are left unsupported rather than both disproved,
-and the cause is not established.
-No reading from the original runs had been captured, which is what makes the
-difference unrecoverable.
-ai-config#3022 and #3032 were closed after review falsified successive stated
-causes; ai-config#3031 carries the verified statement.)
+A controlled re-run varied the checker version and held the three PRs fixed:
+the stale clone at `240650120` and a worktree at `origin/main` each returned
+`#814` rc=0, `#820` rc=0, `#811` rc=1 --- every PR the same under both
+versions.
+That is a direct test of the stale-checker explanation, and it fails.
+It is no test at all of the wording explanation, which is a claim about
+readings that no longer exist.
+What the re-run does establish is the residual: the PRs' own state moved
+between the original runs, which ai-config#3031 records as the verified
+statement.
+What it cannot establish is which reading each original run produced, because
+none was captured.
+ai-config#3022 was closed after review falsified two successive stated causes;
+#3032 was closed for that and for a guard that was a no-op at a third layer.)
 
 **A sync-only push invalidates a clean verdict just as thoroughly as a code push, and arming auto-merge after a sync violates the HEAD review gate.**
 When `main` moves and a direct merge is refused because the branch is not up to date,

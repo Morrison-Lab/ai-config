@@ -307,9 +307,7 @@ of which side of it a claim sits on.**
 
 **Second occurrence, 2026-09-02 on `Morrison-Lab/gha#811`, where the disputed
 part of the attribution was an EXIT CODE.**
-The Do lines above already prescribe the remedy, and the section immediately
-below governs the rest: a mutation reports whether the case flipped, so any
-status named beside it is a separate claim.
+The Do lines above already prescribe the remedy.
 What is new is the tell, because an exit code reads as a detail of the
 assertion rather than as an attribution claim, so the fact-checking exemption
 this section denies to comments gets granted to it silently.
@@ -716,10 +714,11 @@ unrelated case flips and the row reports caught.
   "a guard that rejects for a second reason -- a missing file, an empty value, a
   type check -- fails the input whether or not the alternative under test
   exists."
-  This is the INPUT-side twin of the ASSERTION-side collision this file records
-  separately, where the needle already occurs elsewhere in the unfixed artifact
-  so the assertion passes on that pre-existing occurrence; here an earlier
-  rejection point keeps the input rejected instead.
+  This is the INPUT-side twin of this file's "The same collision reaches the
+  ASSERTION, not only the mutation, and there it makes the whole test vacuous":
+  there the needle already occurs elsewhere in the unfixed artifact, so the
+  assertion passes on that pre-existing occurrence; here an earlier rejection
+  point keeps the input rejected instead.
   Both are a case passing for the wrong reason, by different mechanisms.)
 - **Don't:** infer coverage from a matrix whose rows all read caught; the count
   is a fact about the rows, and only the identity check makes it one about the
@@ -902,9 +901,7 @@ second site is now known to exist, and the mutation matrix records
 scores rather than structure, so the finding has nowhere to live
 unless it is written down.
 
-- **Do:** name each enforcing site in a comment at the others,
-  verified the way this outcome requires --- by mutating every site
-  together, since removing one is exactly what fails to flip here.
+- **Do:** name each enforcing site in a comment at the others.
 - **Don't:** let "the other site still holds" stand as the whole
   record --- it explains the survivor and loses the structural fact
   that produced it.

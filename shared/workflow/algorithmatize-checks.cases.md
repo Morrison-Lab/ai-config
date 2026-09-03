@@ -589,7 +589,8 @@ The case discriminates either way; only the stated mechanism was wrong.
 
 Two things made it durable rather than a slip.
 It was written from the shape of the code rather than from a run, and the
-script does have a 2 for a different condition, so re-reading the code confirms
+audited script `audit_example_concurrency.py` does exit 2 for a different
+condition, so re-reading the code confirms
 the number without confirming the claim.
 It was introduced by round one's own fix, `21751be5`, survived rounds two
 through five, and was caught by the sixth --- established by walking that file

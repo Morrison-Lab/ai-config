@@ -821,20 +821,23 @@ It is kept here because the remedy is identical and the class boundary is the
 part that goes unnoticed.
 
 A convention finding arrives *with* its instrument, and the corpus already says
-to re-run that instrument over your own fix, in three places this session did
-not consult.
-The first governs both instances; the second is scoped to the line-break gate,
-so it reaches the line-length one; the third governs neither, being scoped to
-banned punctuation and multi-sentence lines:
+to re-run that instrument over your own fix ---
 [`ardi.cases.md`](ardi.cases.md)'s "Run the literal-verification check over
-your own fix too", which calls running the rule against the fix "the entire
-mechanism";
-[`semantic-line-breaks`](../writing/semantic-line-breaks.md), whose "re-run the
-check after committing whenever it flags lines you believe you already fixed"
-is a commit-first staleness rule about which tree that gate reads, and reaches
-this only because the skipped step is the same re-run;
-and [`ardi`](ardi.md)'s own added-line scan, owed after every pass that edited
-the diff, your own reflow included.
+your own fix too" calls running the rule against the fix "the entire
+mechanism".
+Read at that general form it covers both instances; read strictly, its subject
+is a literal-verification finding and neither of these is one, which is the
+reading that let this session pass over it.
+
+Two neighbouring rules look as though they would have caught these and do not,
+which is worth stating so nobody else goes looking there:
+[`semantic-line-breaks`](../writing/semantic-line-breaks.md)'s re-run rule is a
+commit-first staleness rule about which tree the gate reads, and that gate
+enforces multi-sentence lines and long lines carrying a mid-line semicolon ---
+a break placed on a dangling conjunction trips neither predicate, which its own
+text says needs a syntactic parser it deliberately lacks;
+and [`ardi`](ardi.md)'s added-line scan is scoped to banned punctuation and
+multi-sentence lines.
 So this occurrence adds no new rule, only a carve-out to the chain's conclusion
 and evidence about how those places get missed: the fix is authored while
 holding the convention in mind, and therefore feels exempt from it.

@@ -40,16 +40,13 @@ review.)
 
 **Second occurrence, 2026-09-02 on `Morrison-Lab/gha#811`, where the citations
 were never fetched at all rather than remembered from an earlier fetch.**
-Two `github/community` discussions were cited for a GitHub Actions message ---
-`Canceling since a deadlock for concurrency group '<group>' was detected
-between 'top level workflow' and '<job>'` --- where the left slot reads as a
-fixed literal in the one instance fetched, though one instance does not
-establish the template --- and neither carries it: #30708 reports
+Two `github/community` discussions were cited for a GitHub Actions deadlock
+message, and neither carries it: #30708 reports
 `Canceling since a higher priority waiting request ... exists`, whose cause is
 a `github.workflow` naming collision, and #43510 is about the default two-run
 concurrency limit.
 [rhysd/actionlint#538](https://github.com/rhysd/actionlint/issues/538) does
-carry it, as
+carry it, verbatim:
 `Canceling since a deadlock for concurrency group 'ci-939eda80...' was detected
 between 'top level workflow' and 'build-image'`.
 The rule above already prescribes the remedy.
@@ -68,11 +65,6 @@ either."
   believe, on the same terms as one you are adding to establish a claim.
 - **Don't:** treat confidence in the underlying claim as evidence about the
   URL --- a real message can be cited to two pages that do not carry it.
-
-The retraction lives in `385d4f43`, not in any later summary of that round ---
-worth stating because a summary is the form this record is most likely to reach
-someone in, and the rule above applies to it unchanged: a URL quoted inside a
-recap has not thereby been fetched.
 
 **The other authoring-side counterpart: run the exact-substring check on your
 own quotation, not only on one a reviewer disputes.**

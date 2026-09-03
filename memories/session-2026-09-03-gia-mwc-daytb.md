@@ -467,3 +467,15 @@ the query now searches the resolved checkout's working tree behind a fail-closed
 Round 8 left two convention items, both applied by hand with their ancestry re-derived;
 round 9 is running.
 The lesson for the fold: a reviewer's suggested fix is a claim like any other, and the one at round 6 was refuted one round later.
+
+## 15:29 PDT --- #3154 opened for branch P; Jules blocked on the PR body
+
+[#3154](https://github.com/Morrison-Lab/ai-config/pull/3154) opened at `3084b58d` after round 9 returned Ready for merge;
+it closes #3123.
+Jules blocked it on the PR description: the merging note ("write the squash body by hand") and the phrase naming the last adversarial verdict read to it as instructions to the reviewer.
+Accepted: a PR body states facts about the branch, never an imperative or a verdict for a reviewer to defer to;
+the body was rewritten with no file change,
+and Jules was re-requested.
+Its second item, that `git grep` with a hardcoded path list fails when a directory is removed, was rebutted with a measurement on git 2.43.0: a missing pathspec is a silent miss (exit 1), not an error.
+Lesson for the fold: the same note on #3135 passed Jules earlier today, so the trigger is the wording, not the practice;
+keep squash-body guidance in the merge step, not in the PR body.

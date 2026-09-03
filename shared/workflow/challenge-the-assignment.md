@@ -204,14 +204,26 @@ Where the assignment is sound, the whole cost is one sentence.
 **The limit binds hardest where the premise is the user's own concrete claim
 about their own repository, and that is exactly where a challenge feels most
 like diligence.**
-Every shape above is a claim in a *document* --- a convention file, a brief, a
-posed choice, a supplied number --- and none of them has a person behind it who
-has been looking at the thing for months.
-A user saying "branch protection still lists the bare names, so those settings
-need updating" is not a premise of the same kind.
-It is a specific, checkable assertion by the one party with standing knowledge
-of that repository, so it is a strong prior, and overturning it takes evidence
-proportionate to that.
+Every shape above is a claim in a *document*, and the remedy each one gets is
+to go and check the thing the document describes.
+That remedy assumes the document's author had no better access to the thing
+than you do, which is true of a convention file, a brief, a posed choice, and
+even of a supplied measurement --- whoever ran it saw one reading, and you can
+run it again.
+A user saying "our workflows emit `check / spellcheck`, not `Spellcheck`"
+breaks that assumption.
+It is a specific, checkable assertion by the party with standing operational
+knowledge of that repository, so it is a strong prior, and overturning it takes
+evidence proportionate to that.
+
+Note that this cuts finely rather than wholesale.
+The same question can carry two claims, one of which you are right to overturn.
+In the recorded case the user's premise about what the ruleset *listed* was
+genuinely wrong and correctly contradicted;
+the premise about what the workflows *emit* was right and was overridden
+anyway, on evidence from an adjacent artifact.
+So the rule attaches to the individual claim, not to the message it arrived in,
+and having correctly refuted one half is not standing to refute the other.
 
 The failure mode is not deference lost but scrutiny misdirected.
 Contradicting the user is what makes the check *feel* performed: having gone
@@ -229,9 +241,9 @@ first, per
 [`verify-the-right-artifact`](verify-the-right-artifact.md)'s falsifying
 question, and only then as evidence about their claim.
 
-- **Do:** raise the evidence bar when a derivation contradicts a user's
-  specific claim about a system they own, rather than lowering it because you
-  found something.
+- **Do:** re-derive from the authoritative artifact --- the default branch's
+  own definition, the live setting --- before replying that a user's specific
+  claim about a system they own is wrong.
 - **Do:** name the artifact your contradiction rests on, in the reply that
   makes it, so the user can check the thing rather than the conclusion.
 - **Don't:** read "I checked and the user is mistaken" as a completed premise

@@ -1292,8 +1292,8 @@ Two newer hooks each re-derived a weaker version instead of reusing it.
 ship the guard with no discharge at all.**
 The section above assumes the discharge can be anchored well enough to be
 sound, and asks for the same care the trigger gets.
-Some obligations have no such matcher, and the design question then is not
-which discharge to write but whether to write one.
+Some obligations have no such matcher.
+The design question there is whether to write a discharge at all.
 
 The recognizable case is an obligation to have **derived** something, where
 every observable trace of the derivation is a string.
@@ -1329,9 +1329,16 @@ the transcript*, not whether the guard is a reminder.
 - **Don't:** read "this guard has no discharge" as an unfinished design;
   for an obligation with no artifact outside the transcript, it is the design.
 
-(`hooks/no-underived-required-check.py`, ai-config#3039: a `PreToolUse` guard
-on ruleset and branch-protection writes, shipped with no discharge condition
-after each of the three candidates above was defeated.)
+(ai-config#3039 proposes such a guard, on ruleset and branch-protection
+writes.
+Read as of 2026-09-03, its filed body specifies the *opposite* of the argument
+above: it makes the guard fire only when the transcript carries no
+`gh run list ... --branch <default>` derivation, which is the second candidate
+here, and it is defeated by that flag accepting any branch name at all ---
+`gh run list -R <o>/<r> --branch does-not-exist-xyz` exits 0.
+The issue is open and no hook file exists on `main`, so this section is the
+argument that its discharge should be dropped rather than a description of a
+shipped file.)
 
 ## Measure CPU time, not wall clock, when the assertion is about work done
 

@@ -464,17 +464,20 @@
   Check this before concluding that a Copilot review was requested by a person, or that its absence means nobody asked.
 
   **A required-context STRING is derivable from the default branch's workflow files, and a PR's check-run names are not the place to read it.**
-  A caller job invoking a reusable workflow publishes `<job key> / <inner job name>`, where the job *key* is used and the caller workflow's own `name:` never appears.
+  A caller job invoking a reusable workflow publishes `<caller job> / <inner job>`, where each half is a **job** display name -- its `name:` where one is set, its key otherwise -- and the caller *workflow*'s `name:` appears nowhere.
   So `check: {uses: Morrison-Lab/gha/.github/workflows/spellcheck.yml@v2}` in a workflow whose `name:` is `Spellcheck` publishes `check / spellcheck`, not `Spellcheck`.
+  Both branches of that rule are locally measured on `ucdavis/rampp` (2026-09-03): run `33688762211` prints `check / spellcheck`, where neither job sets `name:`, and run `33727364476` prints `Check-Changelog / Check Changelog Action`, where `check-news.yml@v2` keys its inner job `Check-Changelog` and gives it `name: Check Changelog Action`.
   Read the definitions on the default branch, and confirm against a run of *that* branch:
   ```bash
   gh api "repos/<o>/<r>/contents/.github/workflows?ref=<default-branch>" --jq '.[].name'
   gh api "repos/<o>/<r>/contents/.github/workflows/<file>?ref=<default-branch>" --jq .content | base64 -d
   gh api "repos/<o>/<r>/actions/runs/<run-id>/jobs" --jq '.jobs[].name'
   ```
-  A required context naming a check no workflow emits never turns red -- it sits as `Expected` and blocks every merge silently, so the mistake has no failing signal to find it by.
-  (ucdavis/rampp, 2026-09-03: bare `Spellcheck` and `Check Changelog Action` were added to ruleset `3889405` on the strength of check-run names read off merged PR #157, whose head predated the repo's move to called reusable workflows;
-  `main` emits `check / spellcheck` and `Check-Changelog / Check Changelog Action`.
+  A required context naming a check no workflow emits never turns red -- it sits as `Expected`, so the mistake has no failing signal to find it by.
+  Whether it blocks *every* merge turns on `strict_required_status_checks_policy`: a PR whose head predates the workflow change still publishes the old names and passes, until the strict policy forces it to update against the default branch.
+  (ucdavis/rampp, 2026-09-03: bare `Spellcheck` and `Check Changelog Action` were added to ruleset `3889405` on the strength of check-run names read off merged PR #157.
+  Those names were accurate for `main` when #157 merged; the move to called reusable workflows landed on `main` three hours later via #153, retiring them.
+  `main` now emits `check / spellcheck` and `Check-Changelog / Check Changelog Action`.
   See [`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md)'s eleventh shape.)
 
 - **GitHub PR Reviews REST API (`POST /repos/{owner}/{repo}/pulls/{number}/reviews`) Requirements & Fallbacks**:

@@ -842,19 +842,30 @@ the retraction described `856b8702` as the commit its comments were written agai
 
 **An eleventh: a pull request's check-run names, standing in for the branch's own workflow definitions.**
 
-Every shape above substitutes one artifact for another that is adjacent in *space* --- a cache for an origin, a neighbour for a target, a hunk for its file.
-This one substitutes an artifact adjacent in *time*, and the substitution is invisible because the artifact is not stale in any way a freshness check can see.
+The seventh shape above is already a substitution across time, so what is new here is the direction and the awareness.
+That one reads a **future** state for the present one, knowingly, because the future state is the one being worked toward.
+This one reads a **past** state for the present one, unknowingly, because the artifact carries no signal that it is a past state at all.
 A pull request's check runs are current, complete, and correct.
 They describe the workflows as they existed **at that pull request's head**, which is a commit whose relationship to the default branch nobody stated.
 
 The tell is a claim of the form "this repository emits X", derived from observing X somewhere.
 A check run is produced by a workflow file, and a workflow file is versioned like any other, so a rename, a job restructuring, or a migration from inline jobs to a called reusable workflow changes every context string the repository publishes from that moment on.
-A pull request opened before that change --- **including one that merged after it** --- ran the old definitions, so its check names are an accurate record of a workflow file the default branch no longer contains.
-Merged-ness is the trap: a merged pull request feels like it *became* the branch, when what merged was its diff and not the workflow definitions its own run used.
+A check run therefore records the definitions **in force when that run executed**, and its name carries no trace of when that was.
+
+Two independent routes make an observed name stale, and only the first one is the one people look for.
+A pull request opened before a change already on the branch runs the old definitions, so its names lag.
+And a pull request whose names were exactly right when it ran goes stale afterwards, because the branch keeps moving --- a *later* pull request changes the workflows and dates the observation retroactively.
+The second route is the one merged-ness conceals.
+A merged pull request feels like it *became* the branch, and in the ordinary case it did;
+what it did not become is the branch as of any later moment, and nothing about a merged status says which moment you are reading.
 
 The consequence for a required status check is unusually expensive, because it fails in the direction nothing reports.
 A required context naming a check that no workflow emits does not error, does not turn red, and does not appear in any run.
-It sits as `Expected` forever, blocking every merge in the repository, and the only diagnosis is noticing that a check listed as required never appears at all.
+It sits as `Expected`, and the only diagnosis is noticing that a check listed as required never appears at all.
+How far that spreads depends on one further setting.
+An open pull request whose head predates the workflow change still publishes the old names, so it satisfies the requirement and looks fine;
+where the ruleset also sets `strict_required_status_checks_policy`, every such pull request must first update against the default branch, at which point the old names stop being published and the requirement can never be met again.
+Read that flag before describing the blast radius.
 
 The authoritative artifact is the default branch's own workflow definitions, confirmed against a run **of that branch**:
 
@@ -865,16 +876,23 @@ gh api "repos/<o>/<r>/actions/runs/<run-id-on-that-branch>/jobs" --jq '.jobs[].n
 ```
 
 Read the definition rather than only the run, because a run answers only for the workflows that happened to trigger on that push.
-A caller job `check:` invoking `uses: <org>/gha/.github/workflows/spellcheck.yml@v2` publishes `check / spellcheck`, not `Spellcheck`: the caller's own `name:` never appears in the context, the **job key** does, and the inner job's name follows the slash.
+A caller job `check:` invoking `uses: <org>/gha/.github/workflows/spellcheck.yml@v2`, in a workflow whose own `name:` is `Spellcheck`, publishes `check / spellcheck`.
+The workflow-level `name:` does not appear at all.
+What appears on each side of the slash is a **job** display name --- the caller job's, then the called workflow's inner job's --- and a job's display name is its `name:` where one is set and its key otherwise.
 So the string is derivable from the file, and reading it off any observed check run is derivable from the wrong file.
 
 This is also [`run-ums-proactively`](run-ums-proactively.md)'s false-*state*-claim case in its purest form.
 No belief about reusable workflows was ever held and then corrected;
 the wrong thing was simply looked up, so the reusable lesson is the query rather than the value.
 
-- **Do:** derive a required-context string from the default branch's workflow definitions, confirmed against a run of that branch.
-- **Do:** state which commit a check-run observation came from, and whether that commit predates any workflow change.
+One clause on the corroborating run, because the obvious reading of it is unsatisfiable.
+The workflow definition on the default branch is the authority;
+the run is corroboration that the definition composes the string you think it does.
+A workflow triggered only by `pull_request` never produces a run whose head branch is the default branch, so for that class the corroborating run is necessarily a pull-request run --- take one whose **base** is the default branch, since that is the ref its definitions were read from, and read it as confirming the composition rather than as establishing the branch's contents.
+
+- **Do:** derive a required-context string from the default branch's workflow definitions, and use a run only to corroborate how those definitions compose.
+- **Do:** date every check-run observation by the commit its run executed, and say what has landed on the default branch since.
 - **Don't:** read check names off a pull request, however recent, and generalize them to the repository.
-- **Don't:** treat a pull request having merged as evidence its check names describe the branch --- its diff merged, its workflow definitions did not.
+- **Don't:** treat a pull request having merged as evidence its check names still describe the branch --- they described it at one instant, and a later merge can retire them without touching that pull request at all.
 
 See [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md), "A merged pull request's check names written into a live ruleset".

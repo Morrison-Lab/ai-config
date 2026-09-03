@@ -260,9 +260,18 @@ names rather than slash-prefixed pairs.
 The second claim was derived from the check-run names on
 [`ucdavis/rampp#157`](https://github.com/ucdavis/rampp/pull/157), whose head
 `e9e8d418` publishes exactly `Spellcheck` and `Check Changelog Action`.
-That reading was correct and about the wrong commit.
-`#157` merged on 2026-09-02, and its head predated the repository's migration
-to called reusable workflows.
+That reading was correct, and correct about `main` at the moment it was
+produced, which is what makes it the harder case rather than a careless one.
+The migration to called reusable workflows reached `main` at `9bdeb4de`, the
+merge commit of
+[`ucdavis/rampp#153`](https://github.com/ucdavis/rampp/pull/153), at
+`2026-09-02T22:07:16Z` --- three hours and fourteen minutes **after** `#157`
+merged at `18:53:12Z`.
+`main`'s `check-spelling.yaml` at `14f7b448`, the merge commit of `#157`
+itself, is still the inline form.
+So nothing about `#157` lagged the branch;
+the branch moved afterwards, and the observation was dated retroactively by a
+merge that had nothing to do with it.
 
 `main`'s own definitions, read 2026-09-03, settle it in the direction the user
 had already stated:
@@ -281,8 +290,19 @@ check / spellcheck
 ```
 
 `news.yaml` has the same shape with job key `Check-Changelog` calling
-`check-news.yml@v2`, whose inner job is named `Check Changelog Action` --- so
-`Check-Changelog / Check Changelog Action`, again as stated.
+`check-news.yml@v2`, and its published context was measured rather than
+derived:
+
+```
+$ gh api repos/ucdavis/rampp/actions/runs/33727364476/jobs --jq '.jobs[].name'
+Check-Changelog / Check Changelog Action
+```
+
+Again as stated.
+That run also settles the composition rule's second branch: `check-news.yml@v2`
+keys its inner job `Check-Changelog` and gives it `name: Check Changelog
+Action`, and the `name:` is what appears --- while `check / spellcheck`
+exercises only the branch where neither job sets one.
 
 The false claim was not merely said.
 It was written into
@@ -290,8 +310,14 @@ It was written into
 applied to the live ruleset with
 `gh api -X PUT repos/ucdavis/rampp/rulesets/3889405`, which now carries
 `Spellcheck` and `Check Changelog Action` among its required contexts.
-Neither is emitted by any workflow on `main`, so both sit as `Expected` on
-every pull request and block every merge, with nothing red to point at.
+Neither is emitted by any workflow on `main`, and nothing turns red to say so.
+The reach is narrower than it first looks and ends in the same place:
+a pull request whose head predates the migration still publishes the old names
+and passes on them --- `ucdavis/rampp#154` reports both `SUCCESS`, measured
+2026-09-03 --- but the same ruleset sets
+`strict_required_status_checks_policy: true`, so every such pull request must
+update against `main` before merging, and after that update neither context is
+published again.
 The correcting write was then refused by the permission classifier, leaving the
 repository in that state pending the user.
 
@@ -299,11 +325,12 @@ Two things are worth separating.
 The wrong artifact was **real**, so gathering it felt like deriving from
 evidence rather than assuming --- which is this fragment's whole subject, and
 the reason it was loaded and did not fire.
-And the user had supplied the correct answer in the question itself, which
-means the evidence was not merely weak but weak against a strong prior;
+And the user had supplied the correct answer in the question itself, so the
+evidence had a strong prior to overturn and did not;
 see [`challenge-the-assignment`](challenge-the-assignment.md)'s "The limit".
 
 Tracked as
 [ai-config#3125](https://github.com/Morrison-Lab/ai-config/issues/3125);
-the guard built in response is
-[ai-config#3039](https://github.com/Morrison-Lab/ai-config/issues/3039).
+a guard is *proposed* under
+[ai-config#3039](https://github.com/Morrison-Lab/ai-config/issues/3039), open
+and unimplemented as of 2026-09-03.

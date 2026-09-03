@@ -14,7 +14,10 @@ spots become that guard's silences. Two families carry the weight:
 Run:  python3 scripts/test_shellcmd.py
 """
 import os
+import py_compile
 import sys
+import tempfile
+import warnings
 
 sys.dont_write_bytecode = True
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -281,6 +284,26 @@ check("a bare assignment prefix still resolves to git",
 check("and still records its value",
       shellcmd.env_value(shellcmd.strip_env(["FOO=1", "git", "push"])[0],
                          "FOO"), "1")
+
+# ------------------------------------------------- source-level hygiene
+#
+# THIS MODULE QUOTES REGEX SOURCE IN ITS PROSE, so a docstring can carry an
+# escape sequence Python reads as invalid --- `(?:export\s+)?` did, in
+# `env_value`. The remedy is a raw docstring, and the reason it needs a test
+# rather than care is that the failure is INVISIBLE on some interpreters and
+# not others: Python 3.11 raises `DeprecationWarning`, which is silent by
+# default, while 3.12 and later raise `SyntaxWarning`, which prints on every
+# cold-cache import. So a maintainer on 3.11 sees nothing while CI prints the
+# warning on every run, and the deprecation ends in a hard `SyntaxError`.
+# Asserting on the warning CATEGORY would inherit that split, so this compiles
+# the file and reads the message instead.
+with warnings.catch_warnings(record=True) as _w:
+    warnings.simplefilter("always")
+    py_compile.compile(shellcmd.__file__, cfile=os.path.join(
+        tempfile.mkdtemp(), "probe.pyc"), doraise=True)
+    _escapes = [f"line {x.lineno}: {x.message}" for x in _w
+                if "invalid escape" in str(x.message)]
+check("the module compiles with no invalid escape sequences", _escapes, [])
 
 if failures:
     print("FAILED:")

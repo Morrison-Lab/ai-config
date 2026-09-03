@@ -434,7 +434,7 @@ def strip_env(argv):
 
 
 def env_value(env_tokens, name):
-    """The value assigned to `name` by `env_tokens`, or `None`.
+    r"""The value assigned to `name` by `env_tokens`, or `None`.
 
     The LAST assignment wins, as the shell does. Tokens arrive already
     `export`-free, because `strip_env` stops at an `export` token rather than

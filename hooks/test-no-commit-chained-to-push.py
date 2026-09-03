@@ -422,6 +422,27 @@ check("an override on an earlier unrelated push does not clear it",
 check("an override on a later commit does not clear an already-matched chain",
       fires("git commit -m a && git push origin x; "
             "ALLOW_COMMIT_AND_PUSH=1 git commit -m b"), True)
+
+# WHICH commit gets matched, which is what `commit_argv is None` decides: the
+# FIRST one, and a later commit never displaces it. The case above puts the
+# second commit AFTER the push, so `evaluate` returns before it and the clause
+# is never reached; the gap needs the second commit BETWEEN the commit and the
+# push (ai-config#3003).
+#
+# No `fires` assertion can close it. That issue proposed
+# `git commit -m a && ALLOW_COMMIT_AND_PUSH=1 git commit -m b && git push`
+# and reported the mutant allowing it; measured on this branch, the mutant
+# DENIES it too, because an overridden second commit takes the `continue` and
+# leaves `commit_argv` holding the first commit either way. Every chain a
+# mutant without the clause sees is one the shipped clause also refuses, so
+# the only observable difference is the commit the refusal NAMES -- and that
+# name is not decoration: the remedy lines tell the author which command to
+# split into its own call. M10 below is the matching mutation.
+_TWO_COMMITS = hook.evaluate("git commit -m a && git commit -m b && git push") or ""
+check("the refusal names the first commit of a two-commit chain",
+      "git commit -m a" in _TWO_COMMITS, True)
+check("a later commit does not displace the already-matched one",
+      "git commit -m b" in _TWO_COMMITS, False)
 check("a MENTION of the override does not clear it",
       fires("git commit -m 'set ALLOW_COMMIT_AND_PUSH=1 next time' && git push"),
       True)
@@ -814,6 +835,34 @@ def _fuse_heredoc(m):
 
 _mutate("fusing the heredoc marker with the separator goes silent",
         _fuse_heredoc, INCIDENT, False)
+
+# M10 -- drop `and commit_argv is None`, so a later commit displaces the
+#        first-matched one. Rewritten in SOURCE rather than patched at a
+#        collaborator, because the clause is a local test inside `evaluate`
+#        with nothing to stub; and asserted on the reason TEXT rather than
+#        through `_mutate`, because both modules deny every input, so a
+#        boolean case is vacuous and `_mutate` would report it as such.
+#
+#        A source anchor rots silently when the clause is reworded, which
+#        would leave this pinning nothing while still passing. So its absence
+#        is a FAILURE of the test rather than a skip.
+_M10_CLAUSE = 'if sub == "commit" and commit_argv is None:'
+_hook_source = open(HOOK, encoding="utf-8").read()
+if _M10_CLAUSE not in _hook_source:
+    failures.append(
+        "MUTATION a displaced commit_argv names the later commit: the source "
+        "anchor " + repr(_M10_CLAUSE) + " is gone, so nothing is pinned")
+else:
+    _m10_spec = importlib.util.spec_from_file_location("mutant_first", HOOK)
+    mutant_first = importlib.util.module_from_spec(_m10_spec)
+    exec(compile(_hook_source.replace(_M10_CLAUSE, 'if sub == "commit":', 1),
+                 HOOK, "exec"), mutant_first.__dict__)
+    _M10_REASON = mutant_first.evaluate(
+        "git commit -m a && git commit -m b && git push") or ""
+    check("MUTATION a displaced commit_argv names the later commit",
+          "git commit -m b" in _M10_REASON, True)
+    check("MUTATION a displaced commit_argv drops the first commit",
+          "git commit -m a" in _M10_REASON, False)
 
 if failures:
     print("FAILED:")

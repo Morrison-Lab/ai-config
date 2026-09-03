@@ -924,3 +924,42 @@ execute under the loader without failing loudly, and a mutation count taken
 under that loader proves nothing either way.
 `memories/r-quarto.md`'s "`pkgload::load_all()` cannot serve a PSOCK cluster"
 section carries the mechanism.)
+
+## Prose staled by its own fixes, round after round
+
+(`Morrison-Lab/gha#811`, 2026-09-02.
+Six adversarial pre-push review rounds ran on it.
+The final commit `0262c1c6` names the recurring class as "the class this branch
+has spent five rounds on -- a comment describing code inaccurately".
+That is wider than this record's subject, which is the part of it staled by the
+branch's own fixes, and the commit messages do not separate the two --- so the
+record argues from one worked instance rather than from a count.
+
+`gha`'s `CLAUDE.md` is not merely a contributor guide.
+It runs to several thousand lines recording, per capability, which composite
+does what, which exit code means what, which default each of two YAML files
+declares, and which mutation kills which test case.
+Almost any behavioural fix therefore falsifies a sentence in it, and a later
+reader who finds code and prose disagreeing has good reason to take the prose.
+
+The sharpest instance: a group-acceptance rule was changed, to close an earlier
+finding, from "an integer is accepted, a bool is refused" to "every non-string
+is refused".
+`CLAUDE.md` went on saying an integer "round-trips and is accepted", and went
+on prescribing that bool be tested before int --- an ordering the new rule makes
+meaningless.
+Both sentences had been accurate when written, and the change that falsified
+them was in a different file --- `audit_example_concurrency.py` --- so nothing
+in the *code* diff put either sentence in front of the author.
+`CLAUDE.md` was not untouched, though, which is the sharper version: `385d4f43`
+edited it in the same commit, and that edit's nearest hunk runs to line 2884
+while the
+first of the two stale sentences sits at 2887 --- three lines below the hunk's
+last context line, six below its last changed line.
+So the file was open and the region was on screen, and the round still pushed.
+Proximity is not the remedy; a grep for the replaced value is.
+
+What makes it recur rather than merely happen is that each round's fix creates
+the next round's stale sentence, which is what
+[`ardi`](ardi.md)'s grep bullet now says explicitly: the grep is owed after
+every round's fix, not once when the PR's headline defect is closed.)

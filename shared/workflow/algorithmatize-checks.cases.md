@@ -617,3 +617,28 @@ used repo-root-relative paths from inside `memories/`.
 `git diff --name-only origin/main...HEAD | grep -c memories/` returned 0, so the
 PR was unaffected --- but that was established afterwards, by query, and the
 original "links OK" claim had no such basis.
+
+## A mutation rationale that named the wrong exit code
+
+(`Morrison-Lab/gha#811`, fixed in commit `0262c1c6`, 2026-09-02, in
+`.github/workflows/scripts/tests/run-audit-example-concurrency-tests.py`.
+
+The `another owner's uses:` case carried a rationale saying that loosening
+`USES_RE` turns the case red "because the callee file would then be looked up
+and found missing" --- an exit 2.
+Measured, it turns red with exit 1: the fixture writes the callee under that
+same name, so a loosened regex resolves it and reports a real collision.
+The case discriminates either way; only the stated mechanism was wrong.
+
+What made it durable rather than a slip is that re-reading the code confirms
+the number without confirming the claim.
+`audit_example_concurrency.py` does exit 2 on a missing callee, exactly as the
+comment said --- so the exit code checks out and the comment is still wrong,
+because that branch is never reached.
+Only running the mutant separates the two, and the comment was written from the
+shape of the code rather than from a run.
+It was introduced by round one's own fix, `21751be5`, survived rounds two
+through five, and was caught by the sixth --- established by walking that file
+through each commit.
+A rationale comment is the artifact a later reader trusts in place of re-running
+the sweep, which is why four reviews read past it.)

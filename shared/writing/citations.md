@@ -38,6 +38,36 @@ source repo instead --- see the `github/docs` bullet in `memories/claude-code.md
 statement --- it had moved to the "Triggering a workflow" article; caught by
 review.)
 
+**Second occurrence, 2026-09-02 on `Morrison-Lab/gha#811`, where the citations
+were never fetched at all rather than remembered from an earlier fetch.**
+Two `github/community` discussions were cited for a GitHub Actions deadlock
+message, and neither carries it: #30708 reports
+`Canceling since a higher priority waiting request ... exists`, whose cause is
+a `github.workflow` naming collision, and #43510 is a thread about reusable
+workflows being skipped, in which the default two-run limit is offered as one
+explanation and contested by a later poster.
+[rhysd/actionlint#538](https://github.com/rhysd/actionlint/issues/538) does
+carry it, as
+`Canceling since a deadlock for concurrency group '...' was detected between
+'top level workflow' and 'build-image'` --- the group name elided here, which
+on the page reads `ci-` followed by a forty-character hash.
+The rule above already prescribes the remedy.
+
+What is new is the **tell**, because this section states its cause as staleness
+--- a pairing that was once right --- and a citation that was never checked
+matches none of that wording.
+The cause here is that the message was *known to be real*, so the URLs were
+selected to support a claim already believed rather than read to establish one,
+which feels like sourcing rather than like asserting.
+The round-two commit that retracted them, `385d4f43`, states it plainly: "I
+cited two community discussions for the deadlock message without opening
+either."
+
+- **Do:** fetch a citation you are adding to support a claim you already
+  believe, on the same terms as one you are adding to establish a claim.
+- **Don't:** treat confidence in the underlying claim as evidence about the
+  URL --- a real message can be cited to two pages that do not carry it.
+
 **The other authoring-side counterpart: run the exact-substring check on your
 own quotation, not only on one a reviewer disputes.**
 The bullet further down

@@ -698,7 +698,24 @@
   **Restated and widened 2026-08-19: the moratorium covers ALL REPOS, not just Morrison-Lab.**
   The user said "stop requesting copilot reviews until september", then, asked about scope, "ALL REPOS".
   So the paragraph above should be read with `ucdavis/bcs` and every other repo inside it, not only the Morrison-Lab org the 2026-08-04 measurement happened to cover.
-  The expiry is unchanged and deliberate: **September 2026**, after which re-verify the quota and re-enable the per-round request rather than letting the moratorium become permanent by default (`shared/writing/timestamp-volatile-claims.md`).
+  The expiry is deliberate rather than incidental: re-verify the quota at the end date and re-enable the per-round request, rather than letting the moratorium become permanent by default (`shared/writing/timestamp-volatile-claims.md`).
+
+  **Extended 2026-09-02 to December 2026, on the directive "stop using copilot reviews".**
+  The September expiry arrived and did exactly what it was designed to do: the guard re-armed on 2026-09-01, resumed demanding a Copilot request, and a session complied through four PRs before the user stopped it.
+  That is the mechanism working, not failing --- a date that re-arms is the whole reason the switch is a date and not an env flag --- but it does show the cost of a short window, since the re-arm lands mid-session with no announcement.
+  So the new window is three months rather than a fortnight, far enough from the day-to-day that its expiry is unlikely to surprise an active session.
+
+  `MORATORIUM_END` in [`hooks/no-unreviewed-pr.py`](../hooks/no-unreviewed-pr.py) is the live value and this paragraph is its prose pair;
+  the constant's own comment requires editing both together, and an extension that moves one is a silent divergence.
+
+  **Its test file derives every clock from that constant, and must keep doing so.**
+  Before this extension the tests pinned literal dates --- an `AFTER` of `2026-09-02`, and a boundary pair of `2026-08-31`/`2026-09-01`.
+  Moving the end date to December put all three inside the new window, where the guard is inert, so 179 cases would have passed for the wrong reason and the boundary pair stopped straddling any boundary at all.
+  One case failed loudly and exposed it; the rest would have gone quiet.
+
+  - **Do:** edit the constant and this paragraph in the same commit.
+  - **Do:** derive any date a test needs from `MORATORIUM_END`, never write one out.
+  - **Don't:** read a passing suite after an extension as evidence the guard still works --- check that the pinned clock still sits outside the window.
 
   The same session tried four `requested_reviewers` POSTs for `copilot-pull-request-reviewer[bot]` on `ucdavis/bcs` PRs #648, #649, and #650.
   Each was accepted with HTTP **200**, and each left zero Copilot reviews behind, the pending request absent from both `gh pr view --json reviewRequests` and the `GET .../requested_reviewers` endpoint.

@@ -19,6 +19,7 @@ import rather than by an environment variable.
 
 Run: python3 hooks/test-no-unreviewed-pr.py hooks/no-unreviewed-pr.py
 """
+import datetime
 import importlib.util
 import json
 import os
@@ -49,7 +50,22 @@ sys.exit(m.main())
 
 # One day after the moratorium ends, so the guard is live for the cases that
 # are about anything else.
-AFTER = "2026-09-02"
+#
+# DERIVED from the subject's own constant rather than written out. A literal
+# date here silently expires: extending `MORATORIUM_END` past it would put
+# every case below back inside the moratorium, where the guard is inert and
+# each one passes for the wrong reason --- which is precisely the vacuous
+# pass the comment above warns about, reintroduced by the fix for it.
+# Measured 2026-09-02: the literal was `2026-09-02`, and extending the
+# moratorium to December would have made this whole file vacuous.
+def _moratorium_end():
+    spec = importlib.util.spec_from_file_location("_subject_const", HOOK)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod.MORATORIUM_END
+
+
+AFTER = (_moratorium_end() + datetime.timedelta(days=1)).isoformat()
 
 
 def hook_argv(when=AFTER):
@@ -1540,11 +1556,22 @@ def main():
     # transcript, two clocks: the ONLY difference between these two is the
     # date, which is what makes the second one evidence the first is silent
     # for the moratorium's sake and not because the fixture stopped arming.
+    #
+    # Both clocks are DERIVED from the subject's constant. Written out, they
+    # drift the moment the moratorium is extended: a literal "day before" and
+    # "end date" from an earlier window both fall INSIDE the new one, the
+    # guard is inert on both, and the pair stops testing the boundary it
+    # exists for. Measured 2026-09-02, when extending the window to December
+    # turned the literals 2026-08-31 and 2026-09-01 into two dates on the
+    # same side of the line.
+    _end = _moratorium_end()
+    _during = (_end - datetime.timedelta(days=1)).isoformat()
+    _on_end = _end.isoformat()
     armed = create("c") + [say("Opened it.")]
-    if blocks_at("2026-08-31", armed):
+    if blocks_at(_during, armed):
         print("FAIL: the guard still fires during the Copilot moratorium")
         failures += 1
-    elif not blocks_at("2026-09-01", armed):
+    elif not blocks_at(_on_end, armed):
         print("FAIL: the guard stays inert on the moratorium's end date")
         failures += 1
     else:
@@ -1554,9 +1581,9 @@ def main():
     hookmod = load_hook()
     import datetime as _dt
     bounds = (
-        hookmod.moratorium_active(_dt.date(2026, 8, 31)),
+        hookmod.moratorium_active(hookmod.MORATORIUM_END - _dt.timedelta(days=1)),
         not hookmod.moratorium_active(hookmod.MORATORIUM_END),
-        not hookmod.moratorium_active(_dt.date(2027, 1, 1)),
+        not hookmod.moratorium_active(hookmod.MORATORIUM_END + _dt.timedelta(days=31)),
     )
     if all(bounds):
         print("PASS: moratorium_active is half-open -- live ON the end date")

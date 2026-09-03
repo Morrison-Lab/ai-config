@@ -127,9 +127,20 @@ import tempfile
 # expires. Extending the moratorium is then an edit to this constant and to
 # the memory together, rather than a silent divergence between them.
 #
-# The guard is live ON the end date: the moratorium runs up to September 2026,
+# The guard is live ON the end date: the moratorium runs up to the date named,
 # not through it.
-MORATORIUM_END = datetime.date(2026, 9, 1)
+#
+# Extended 2026-09-02 on a fresh directive ("stop using copilot reviews"),
+# given the day after the previous end date passed and the guard resumed
+# demanding the request. That expiry is what produced the demand, so the
+# recurrence is the mechanism working as designed rather than a defect --- the
+# date re-armed itself and the user turned it off again.
+#
+# The new date is longer than the last, because the previous fortnight-scale
+# window expired into an active session and cost a round of requests before
+# anyone noticed. Three months puts the re-review far from the day-to-day and
+# still refuses to become permanent by default.
+MORATORIUM_END = datetime.date(2026, 12, 1)
 
 
 def _today():

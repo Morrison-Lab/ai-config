@@ -126,6 +126,22 @@ directory let the first one's `cd` leak into the second and
 wrong-repository reading, arriving by the very mechanism added to prevent it
 (measured 2026-09-04).
 
+A `cd` the shell may never REACH is declined as well, and the two shapes that
+produce one arrive here looking exactly like an ordinary `cd`: a branch body
+(`if ...; then cd elsewhere; fi`) and an alternative (`cd here || cd
+elsewhere`). `_simple_commands` splits on operators and models no
+short-circuiting, so applying their `cd` read the later push in `elsewhere`,
+where neither shell ever puts it -- ai-config#2451's wrong-repository warning
+once more, in both shapes (measured 2026-09-04). Each simple command therefore
+carries the OPERATOR that precedes it, and the directory goes indeterminate
+whenever a `cd` follows `||` or sits behind a `then` / `else` / `elif` / `do`.
+
+`&&` is deliberately NOT declined, because a `cd` and a later push joined by an
+unbroken `&&` chain are reached together: the push runs only if everything
+before it succeeded, the `cd` included. That is the shape worth reading
+(`git fetch && cd wt && git push`), and declining it would cost the reading
+that matters most.
+
 A brace group is the opposite case and needs the opposite treatment: `{ ... ; }`
 runs in the CURRENT shell, so a `cd` inside one outlives the closing brace.
 `{` and `}` are therefore stripped as lead words rather than counted, which
@@ -164,11 +180,17 @@ measurement settles it, and is worth taking before this paragraph is trusted
 either way: a Bash call that `cd`s into a second worktree, a later call
 carrying a bare `git push`, and a record of the `cwd` the hook received.
 
-The other gap is an assignment that outlives its own simple command --- a bare
+Another gap is an assignment that outlives its own simple command --- a bare
 `GIT_DIR=...` command, or `export GIT_DIR=...`, either earlier in this compound
 command or in an earlier Bash call. Only the per-command prefix form is
 recognized, so the persistent form is invisible here and the reading is taken
 in the session's repository rather than declined.
+
+A third is an `&&` chain a `;` then breaks: in `false && cd elsewhere; git
+push` the push runs and the `cd` did not, and the paragraph above applies it
+anyway. Reaching that shape takes a `cd` guarded by a command that failed, and
+a push deliberately run outside the same chain, which is why the reading is
+kept rather than declined --- the `&&` shape it would cost is the common one.
 
 When the payload carries no `cwd` at all the fallback is the hook process's own
 directory, deliberately, rather than the `CLAUDE_PROJECT_DIR` that
@@ -211,14 +233,20 @@ import sys
 RX_HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1.*?\n[ \t]*\2\b", re.S)
 
 ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
-LEAD_WORDS = {"then", "do", "else", "!", "time", "sudo", "command", "exec",
-              "nohup", "env",
+LEAD_WORDS = {"then", "do", "else", "elif", "!", "time", "sudo", "command",
+              "exec", "nohup", "env",
               # A brace group runs in the CURRENT shell rather than forking, so
               # its `cd` outlives the closing brace. Stripping the braces as
               # lead words is what makes `{ cd elsewhere; } && git push` read
               # `elsewhere`; counting them the way parentheses are counted
               # would scope the `cd` to the group and be wrong.
               "{", "}"}
+
+# The lead words that make a simple command CONDITIONAL: it runs only when a
+# branch is taken, and which branch that is no static scan can decide. `{` and
+# `}` are deliberately absent -- a brace group runs in the current shell
+# whenever the command carrying it runs, so nothing about it is conditional.
+BRANCH_WORDS = {"then", "else", "elif", "do"}
 
 _SHELL_OPS = set("();|&")
 
@@ -270,8 +298,26 @@ LONG_FLAG = {
 }
 
 
+def _next_sep(sep, ch):
+    """The separator a further operator character leaves behind.
+
+    `&&` and `||` are read one character at a time so that a compound operator
+    token is recognized wherever `shlex` chooses to break one. A parenthesis
+    RESETS the separator rather than becoming one: the first command inside a
+    subshell, and the first after one closes, follow no operator of their own.
+    """
+    if ch in "()":
+        return ""
+    if ch == "&":
+        return "&&" if sep == "&" else "&"
+    if ch == "|":
+        return "||" if sep == "|" else "|"
+    return ch
+
+
 def _simple_commands(cmd):
-    """Split a shell command into `(subshell path, argv)` pairs; None on error.
+    """Split a shell command into `(subshell path, argv, separator)` triples;
+    None on error.
 
     Same construction as `flag-reset-hard-uncommitted-work.py`'s
     `_simple_commands`: join backslash-continued lines, blank heredoc bodies,
@@ -293,6 +339,12 @@ def _simple_commands(cmd):
     character by character, for a caller that needs the segment TEXT rather
     than an argv; it answers the weaker question and neither can be written in
     terms of the other.
+
+    The separator is the operator immediately BEFORE each simple command, and
+    it is what tells a `cd` the shell always reaches from one it may never
+    reach: this split knows nothing about short-circuiting, so `cd a || cd b`
+    hands back two ordinary `cd` commands (measured 2026-09-04). `evaluate`
+    reads it to decline the second rather than apply it.
     """
     cmd = re.sub(r"\\\r?\n", " ", cmd)
     cmd = RX_HEREDOC.sub("<<", cmd)
@@ -303,27 +355,30 @@ def _simple_commands(cmd):
         toks = list(lex)
     except ValueError:
         return None
-    cmds, cur, scopes, opened = [], [], [()], 0
+    cmds, cur, scopes, opened, sep = [], [], [()], 0, ""
     for t in toks:
         if t and set(t) <= _SHELL_OPS:
             if cur:
-                cmds.append((scopes[-1], cur))
+                cmds.append((scopes[-1], cur, sep))
                 cur = []
+                sep = ""
             for ch in t:
                 if ch == "(":
                     opened += 1
                     scopes.append(scopes[-1] + (opened,))
                 elif ch == ")" and len(scopes) > 1:
                     scopes.pop()
+                sep = _next_sep(sep, ch)
         else:
             cur.append(t)
     if cur:
-        cmds.append((scopes[-1], cur))
+        cmds.append((scopes[-1], cur, sep))
     return cmds
 
 
 def _lead_prefix(argv):
-    """`(index of the first real word, override assigned, git redirected)`.
+    """`(index of the first real word, override assigned, git redirected,
+    conditional)`.
 
     Shared with the `cd` scan in `evaluate`, which has to skip the same env
     assignments and shell lead words. `_simple_commands` splits on operators
@@ -336,17 +391,24 @@ def _lead_prefix(argv):
     that prefix rather than merely skipping it, for the reason `_push_argv`
     reads `-C`'s values back out: it moves the repository the push reads, and
     every comparison below is against a ref resolved in one.
+
+    The fourth element reports a BRANCH keyword in that prefix rather than
+    merely skipping it. A `cd` behind one runs only when the branch is taken,
+    so applying it reports on a repository the push may never run in.
     """
     i = 0
     override = False
     redirected = False
+    conditional = False
     while i < len(argv) and (ASSIGNMENT.match(argv[i]) or argv[i] in LEAD_WORDS):
         if argv[i].startswith(OVERRIDE + "="):
             override = argv[i].split("=", 1)[1].strip() == "1"
         if argv[i].startswith(GIT_ENV_REDIRECT):
             redirected = True
+        if argv[i] in BRANCH_WORDS:
+            conditional = True
         i += 1
-    return i, override, redirected
+    return i, override, redirected, conditional
 
 
 def _push_argv(argv):
@@ -367,7 +429,7 @@ def _push_argv(argv):
     are recognized: `--git-dir <dir>` consumes the following token, while
     `--git-dir=<dir>` does not.
     """
-    i, override, redirected = _lead_prefix(argv)
+    i, override, redirected, _conditional = _lead_prefix(argv)
     if i >= len(argv) or argv[i] != "git":
         return None, False, ()
     i += 1
@@ -392,6 +454,27 @@ def _push_argv(argv):
 # and this scan does not simulate a directory stack, so they are recognized
 # only in order to DECLINE.
 CD_WORDS = ("cd", "pushd", "popd")
+
+
+def _shell_expand(target):
+    """`target` with a leading `~` expanded, or `None` for indeterminate.
+
+    Shared by the `cd` scan and the `-C` scan below, because each receives a
+    token the SHELL would already have expanded before git ever saw it. A
+    `$name` or a command substitution names a directory only a shell can
+    produce, and joining it on as a literal path component invents one --
+    `git -C "$WT" push` from `/repo` resolving to `/repo/$WT` is a reading
+    taken in a directory that exists only if somebody made it (measured
+    2026-09-04). A leading `~` is expanded rather than declined, since
+    `os.path.expanduser` answers the same question the shell does.
+    """
+    if "$" in target or "`" in target:
+        return None  # unexpanded; resolving it means simulating the shell
+    if target.startswith("~"):
+        target = os.path.expanduser(target)
+        if target.startswith("~"):
+            return None  # an unknown user
+    return target
 
 
 def _resolve_cd(argv, cur):
@@ -424,12 +507,9 @@ def _resolve_cd(argv, cur):
         break
     if target is None or target == "-":
         return None  # bare `cd` goes home; `cd -` needs OLDPWD
-    if "$" in target or "`" in target:
-        return None  # unexpanded; resolving it means simulating the shell
-    if target.startswith("~"):
-        target = os.path.expanduser(target)
-        if target.startswith("~"):
-            return None  # an unknown user
+    target = _shell_expand(target)
+    if target is None:
+        return None
     if os.path.isabs(target):
         return os.path.normpath(target)
     if cur is None:
@@ -442,6 +522,11 @@ def _push_cwd(cur, cdirs):
     for d in cdirs:
         # `--git-dir`/`--work-tree`/`GIT_DIR=` name a repository, which no
         # directory can stand in for -- so the answer is indeterminate.
+        if d is None:
+            return None
+        # A `-C` value reaches git already expanded by the shell, so an
+        # unexpanded one is indeterminate for the same reason a `cd`'s is.
+        d = _shell_expand(d)
         if d is None:
             return None
         if os.path.isabs(d):
@@ -702,6 +787,14 @@ def evaluate(command, base_cwd=None):
     command; keyed on nesting depth instead of on identity, it leaked into the
     next sibling subshell rather than out of the parentheses.
 
+    A `cd` the shell may never REACH is declined rather than applied, which is
+    the answer `cd -` already gets. `_simple_commands` splits on operators and
+    models no short-circuiting, so a branch body and an alternative both
+    arrive as ordinary `cd` commands; applying them read
+    `if ...; then cd elsewhere; fi; git push` and `cd here || cd elsewhere;
+    git push` in `elsewhere`, where neither shell ever puts the push
+    (measured 2026-09-04).
+
     Where the reading ends up in a different directory from `base_cwd`, the
     warning SAYS so and emits its remediation commands with `git -C`, because
     the reader's shell is still in `base_cwd`: a bare `git merge origin/<b>`
@@ -732,12 +825,16 @@ def evaluate(command, base_cwd=None):
     # from the caller's directory rather than from what its predecessor moved
     # to.
     dirs = {(): base}
-    for scope, argv in cmds:
+    for scope, argv, sep in cmds:
         for n in range(1, len(scope) + 1):
             dirs.setdefault(scope[:n], dirs[scope[:n - 1]])
-        head = argv[_lead_prefix(argv)[0]:]
+        lead, _override, _redirected, conditional = _lead_prefix(argv)
+        head = argv[lead:]
         if head and head[0] in CD_WORDS:
-            dirs[scope] = _resolve_cd(head, dirs[scope])
+            if conditional or sep == "||":
+                dirs[scope] = None
+            else:
+                dirs[scope] = _resolve_cd(head, dirs[scope])
             continue
         rest, override, cdirs = _push_argv(argv)
         if rest is None:

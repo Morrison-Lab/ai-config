@@ -130,7 +130,7 @@ def _second_worktree(path, branch, start="HEAD", leaf="wt"):
     return target
 
 
-def _diverged_peer_worktree(path, branch, leaf="wt"):
+def _diverged_peer_worktree(path, branch, leaf="wt", target=None):
     """A second worktree whose HEAD diverges from `origin/<branch>`, while the
     session's own HEAD equals that remote tip exactly.
 
@@ -138,10 +138,21 @@ def _diverged_peer_worktree(path, branch, leaf="wt"):
     guard exists to report; the session half is what it read instead, and it
     reads as "already pushed" -- so resolving HEAD in the session's directory
     is a false NEGATIVE here, not merely a wrongly-worded warning.
+
+    `target` places the worktree at an EXACT path rather than inside a fresh
+    holder. Only the two `-C` cases pass it, and they need it: what they pin
+    is a `-C` value the guard must DECLINE, and a decline is observable only
+    where the literal path the guard would otherwise build is itself a real
+    diverged worktree.
     """
     _commit(path, "shared.txt", "shared\n")
     _run(path, "push", "-q", "origin", "main")
-    wt = _second_worktree(path, branch, "HEAD~1", leaf)
+    if target is None:
+        wt = _second_worktree(path, branch, "HEAD~1", leaf)
+    else:
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        _run(path, "worktree", "add", "-q", "-b", branch, target, "HEAD~1")
+        wt = target
     _commit(wt, "peer.txt", "peer\n")
     _run(wt, "push", "-q", "origin", branch)
     _run(path, "push", "-q", "-f", "origin", f"main:{branch}")
@@ -487,6 +498,59 @@ def sibling_subshell_cd_case(path, bare):
             "(git push origin HEAD:peer-sibling)")
 
 
+def conditional_cd_case(path, bare):
+    """`if ...; then cd <worktree>; fi; git push` with a FALSE condition.
+
+    A real shell never runs the `cd`, so the push is an already-pushed no-op
+    in the call's own directory. `_simple_commands` splits on operators and
+    models no short-circuiting, so the branch body arrives as an ordinary
+    `cd` command and applying it warns about a repository the push never
+    touches -- the wrong-repository reading of ai-config#2451.
+    """
+    wt = _diverged_peer_worktree(path, "peer-cond")
+    return (f"if [ -d /nonexistent-ncp ]; then cd {wt}; fi; "
+            "git push origin HEAD:peer-cond")
+
+
+def alternative_cd_case(path, bare):
+    """`cd <here> || cd <worktree>; git push` -- the first `cd` succeeds, so
+    the alternative never runs.
+
+    The counterpart to the branch body above, and the shape that shows why
+    `&&` and `||` cannot be treated alike: a `cd` after `||` runs only when
+    what preceded it FAILED.
+    """
+    wt = _diverged_peer_worktree(path, "peer-alt")
+    return f"cd {path} || cd {wt}; git push origin HEAD:peer-alt"
+
+
+def dash_c_unexpanded_case(path, bare):
+    """`git -C "$WT" push` -- the variable is unexpanded, so no directory is
+    named.
+
+    The worktree really is at `<path>/$WT`, which is the only way to tell a
+    decline from the silence a nonexistent directory produces anyway: joining
+    the token on as a literal path component lands exactly there and warns.
+    """
+    _diverged_peer_worktree(path, "peer-var",
+                            target=os.path.join(path, "$WT"))
+    return 'git -C "$WT" push origin HEAD:peer-var'
+
+
+def dash_c_tilde_case(path, bare):
+    """`git -C ~ncp-nosuchuser/wt push` -- a `~` git never sees, because the
+    SHELL is what expands one.
+
+    Joining it on as a literal path component is what the worktree at
+    `<path>/~ncp-nosuchuser/wt` catches. Expanding it is the right answer and
+    an unknown user has none, so the reading is declined.
+    """
+    _diverged_peer_worktree(
+        path, "peer-tilde",
+        target=os.path.join(path, "~ncp-nosuchuser", "wt"))
+    return "git -C ~ncp-nosuchuser/wt push origin HEAD:peer-tilde"
+
+
 def indeterminate_cd_case(path, bare):
     """`cd -` needs OLDPWD, which no static scan has.
 
@@ -654,6 +718,16 @@ SHOULD_STAY_SILENT = [
     ("S22", sibling_subshell_cd_case,
      "`(cd <worktree> && true) && (git push)` -- a sibling subshell starts "
      "from the caller's directory, not its predecessor's"),
+    ("S23", conditional_cd_case,
+     "`if ...; then cd <worktree>; fi; git push` -- the branch is not taken, "
+     "so the `cd` never runs"),
+    ("S24", alternative_cd_case,
+     "`cd <here> || cd <worktree>; git push` -- the alternative never runs"),
+    ("S25", dash_c_unexpanded_case,
+     "`git -C \"$WT\" push` -- an unexpanded variable names no directory"),
+    ("S26", dash_c_tilde_case,
+     "`git -C ~ncp-nosuchuser/wt push` -- a `~` is expanded, not joined on "
+     "as a literal path component"),
 ]
 
 
@@ -989,11 +1063,54 @@ MUTATIONS = {
         "a `cd` earlier in the compound command moves the directory the push "
         "runs in",
         [("        if head and head[0] in CD_WORDS:\n"
-          "            dirs[scope] = _resolve_cd(head, dirs[scope])\n"
+          '            if conditional or sep == "||":\n'
+          "                dirs[scope] = None\n"
+          "            else:\n"
+          "                dirs[scope] = _resolve_cd(head, dirs[scope])\n"
           "            continue",
           "        if head and head[0] in CD_WORDS:\n"
           "            continue")],
+        # S23 and S24 do NOT flip: their `cd` is declined rather than applied,
+        # and a `cd` that is not applied at all leaves the same directory.
         {"S17", "S18", "W8", "W11", "W12", "W13"},
+    ),
+    "conditional_cd_declines": (
+        "a `cd` the shell may never reach -- a branch body, or an `||` "
+        "alternative -- makes the directory indeterminate rather than moving "
+        "it",
+        [('            if conditional or sep == "||":\n'
+          "                dirs[scope] = None\n"
+          "            else:\n"
+          "                dirs[scope] = _resolve_cd(head, dirs[scope])",
+          "            dirs[scope] = _resolve_cd(head, dirs[scope])")],
+        {"S23", "S24"},
+    ),
+    "separator_is_tracked": (
+        "each simple command carries the operator before it, which is what "
+        "tells an `||` alternative from an `&&` chain",
+        [("                sep = _next_sep(sep, ch)", "                pass")],
+        # Only S24 can see this: S23's decline comes from the branch keyword,
+        # which `_lead_prefix` reports without any separator.
+        {"S24"},
+    ),
+    "unexpanded_value_declines": (
+        "a `$name` or a command substitution names no directory, so it is "
+        "declined rather than joined on as a literal path component",
+        [('    if "$" in target or "`" in target:\n'
+          "        return None  # unexpanded; resolving it means simulating "
+          "the shell",
+          "    pass")],
+        {"S25"},
+    ),
+    "tilde_is_expanded": (
+        "a leading `~` is expanded the way the shell would have expanded it, "
+        "and an unknown user declines",
+        [('    if target.startswith("~"):\n'
+          "        target = os.path.expanduser(target)\n"
+          '        if target.startswith("~"):\n'
+          "            return None  # an unknown user",
+          "    pass")],
+        {"S26"},
     ),
     "indeterminate_cd_declines": (
         "a `cd` that cannot be resolved declines the reading rather than "
@@ -1023,13 +1140,16 @@ MUTATIONS = {
     "subshell_scopes_cd": (
         "a subshell's parentheses are tracked, so a `cd` inside one does not "
         "leak onto a push outside it",
-        [("            for ch in t:\n"
-          '                if ch == "(":\n'
+        # Anchored on the parenthesis clause alone, NOT on the `for ch in t`
+        # loop around it: that loop also derives the separator each simple
+        # command carries, and blanking it would revert two clauses at once
+        # and report a flip set neither of them owns.
+        [('                if ch == "(":\n'
           "                    opened += 1\n"
           "                    scopes.append(scopes[-1] + (opened,))\n"
           '                elif ch == ")" and len(scopes) > 1:\n'
           "                    scopes.pop()",
-          "            pass")],
+          "                pass")],
         # W11's `cd` shares the subshell with its push, so it still applies
         # when every command reads as root -- which is what makes the pair a
         # two-sided pin rather than one case asserting silence.

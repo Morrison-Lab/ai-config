@@ -31,14 +31,19 @@ measured against the live corpus rather than guessed:
   of that last example -- "Two variables at once is hard:" -- is a known
   accepted false positive. No bound separates it from "Three answers are
   legitimate, and only the first is ...", which is a genuine lead-in of the
-  same shape; measured on the corpus, a rule keyed on the copula alone
-  suppresses 20 of the 88 accepted lead-ins, most of them real.
+  same shape. Measured 2026-09-04 on the corpus: 88 lead-ins are accepted by
+  the shipped implementation, and the simplest rule "keyed on the copula
+  alone" -- requiring the sentence to contain `is`/`are`/`was`/`were`
+  anywhere -- suppresses 70 of those 88, most of them genuinely real, so it
+  is not a workable substitute for the bound above.
 - The lead-in sentence does not end on a conditional subordinator ("if",
   "when", "unless"). "Two changes are independent if:" enumerates the
   CONDITIONS below it rather than the two changes, which is the issue's "the
-  number refers to something other than the list" class. Measured on the
-  corpus, this bound suppresses exactly one lead-in of 89, and that one is
-  the false positive.
+  number refers to something other than the list" class. Measured 2026-09-04
+  on the corpus: disabling this one bound alone raises the accepted count
+  from 88 to 89, and the single extra lead-in it lets through is exactly
+  that "Two changes are independent if:" example, the one false positive
+  this bound exists to catch.
 - That count is followed within three tokens by a plural-looking noun, so
   "two variables" is a candidate and "two of those runs" is not.
 - The lead-in starts its own paragraph and is not itself a list item, so a

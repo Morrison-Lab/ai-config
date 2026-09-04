@@ -362,7 +362,9 @@ It skips a lead-in ending on a conditional subordinator, since "Two changes are 
 And it discounts a bold-header run that overshoots the stated count by more than one, since body prose between such headers gives that shape no structural end.
 
 Those bounds are positional rather than semantic, so one shape stays a known false positive: a count that opens its sentence and then names a property of itself ("Two variables at once is hard:").
-No bound separates that from "Three answers are legitimate, and only the first is ...", which is a genuine lead-in of the same shape, and a rule keyed on the copula alone suppresses 20 of the 88 accepted lead-ins in this corpus.
+No bound separates that from "Three answers are legitimate, and only the first is ...", which is a genuine lead-in of the same shape.
+Measured 2026-09-04, this corpus has 88 accepted lead-ins under the shipped implementation.
+The simplest alternative, a rule "keyed on the copula alone" that just requires `is`/`are`/`was`/`were` to appear somewhere in the sentence, suppresses 70 of those 88, most of them genuinely real, so it is not a workable substitute.
 `scripts/test_check_leadin_counts.py` pins it as accepted rather than claiming coverage it does not have.
 
 - **Do:** run it over a file whose bulleted or bold-header sections you have just split or merged.

@@ -1459,18 +1459,15 @@ That is measurable rather than assumable, so measure it --- and measure it under
 Here it could not be: the fixed cost timeable off the runner is 0.62ms of a 6.2ms baseline, for the loop plus one zero-length scan call, which bounds the *interpreter's* share and says nothing about the runner's, since scheduler latency and a cold cache are load-dependent by construction.
 So the distortion's shape stayed a hypothesis, and the repair was chosen for surviving either shape rather than for ruling one out.
 Widening the input-size gap does that, because the quadratic term outruns the bound: at a size step of `s` the reading is `s ** 2` and the halfway bound is `s ** 1.5`, so the margin is `sqrt(s)` --- 1.9x at a 4x step against 3.6-3.7x at a 16x step, measured.
-An additive fit of the runner's reading puts the nuisance cost at ~1.4x the baseline, which still clears the widened bound by ~1.5x, and a 2.1x multiplicative compression clears it by ~1.7x.
-Both margins are taken against one basis, the control's own measured step-16 reading of ~229x, because a margin computed against the theoretical 256x is not comparable with one computed against a measured reading;
-that switch alone moves the additive margin from 1.5x to 1.7x, which is exactly the symmetry it would be tempting to report.
 
 **Widening the gap while leaving the bound fixed is the trap**, and it hides well because the number in the bound never changes, so nothing looks edited.
 A bound of 8.0 is the halfway line for a 4x step and sits *exactly on* the 8x a genuinely linear scan grows at an 8x step, so widening that far leaves it no margin against the shape it exists to reject.
 Measured, a linear scan read 7.55-8.09x at an 8x step on one container and 7.83-8.11x on another, crossing 8.0 in 1 run of 12 and in 3 of 12.
-At the 16x step the control actually runs at it read 15.7-16.0x and cleared 8.0 in all six runs, so a widened control against the old bound would pass for either shape --- the one thing a control exists to rule out.
+At the 16x step the control actually runs at, a linear scan read 15.7-16.0x and cleared 8.0 in all six runs, so a widened control against the old bound would pass for either shape --- the one thing a control exists to rule out.
 Recompute the bound at whatever step it is read against, and pin the separation with a positive control of the opposite shape rather than arguing it.
 
 The 0.62ms, 3.6-3.7x and 7.55-8.09x figures here were read on one 4-core Linux container at load average ~2.5, through `time.process_time`, as the minimum of three baseline runs over the minimum of two target runs;
-the 7.83-8.11x, 15.7-16.0x and ~229x figures came from a second 4-core container at load average ~4.1 under the same protocol, and the 14.5-15.3x readings from a quieter one at load average ~0.5.
+the 7.83-8.11x and 15.7-16.0x figures came from a second 4-core container at load average ~4.1 under the same protocol, and the 14.5-15.3x readings from a quieter one at load average ~0.5.
 A timing figure is a claim about a machine, so re-measure rather than porting these.
 
 - **Do:** ask which term a nuisance cost lands in, since load can push a ratio either way.

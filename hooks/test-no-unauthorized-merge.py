@@ -713,11 +713,11 @@ SCAN_CONTROL_SMALL = 6000
 # widening that far leaves it no margin against the shape it exists to reject.
 # Measured at step 8, a linear scan grew 7.55-8.09x across twelve runs on one
 # container and 7.83-8.11x on another, crossing 8.0 in 1 run of 12 and in 3 of
-# 12. At the step of 16 this control actually runs at it grew 15.7-16.0x and
-# cleared 8.0 in all six runs, so a flat 8.0 read against this step would pass
-# for either shape. The positive control below (`linear_scan`, checked through
-# `report_control(..., expect_above=False)`) asserts the separation rather than
-# arguing it.
+# 12. At the step of 16 this control actually runs at, a linear scan grew
+# 15.7-16.0x and cleared 8.0 in all six runs, so a flat 8.0 read against this
+# step would pass for either shape. The positive control below
+# (`linear_scan`, checked through `report_control(..., expect_above=False)`)
+# asserts the separation rather than arguing it.
 #
 # Subtracting a measured fixed cost was the other repair on offer. It was not
 # chosen, and not because measurement ruled it out: what can be measured off
@@ -726,12 +726,7 @@ SCAN_CONTROL_SMALL = 6000
 # proposed subtracting -- while the LOAD-induced fixed cost the repair targets
 # cannot be measured from here at all. So the distortion's shape stays a
 # hypothesis, and the wider step is chosen for surviving either shape rather
-# than for ruling one out. Both fits are taken against one basis, this
-# control's own measured step-16 reading of ~229x, since a margin computed
-# against the theoretical 256x is not comparable with one computed against a
-# measured reading: an additive fit of the runner's 7.3x at step 4 puts the
-# nuisance cost at ~1.4x the baseline, which still reads ~97x against the 64x
-# bound, and a 2.1x multiplicative compression leaves ~109x.
+# than for ruling one out.
 SCAN_CONTROL_STEP = 16
 SCAN_CONTROL_BOUND = halfway_bound(SCAN_CONTROL_STEP)   # 64.0 = sqrt(16 * 256)
 

@@ -313,9 +313,7 @@ def is_lead_in(lines: list[str], idx: int, fenced: set[int]) -> bool:
         return True
     previous = lines[idx - 1]
     # Its own paragraph. Semantic line breaks put a genuine lead-in at the end
-    # of a multi-line paragraph too, so this bound costs recall: relaxing it
-    # raises accepted lead-ins from 88 to 143 and reports 9 mismatches, 8 of
-    # them false positives.
+    # of a multi-line paragraph too, so this bound costs recall.
     return not previous.strip() or bool(HEADING_RE.match(previous))
 
 

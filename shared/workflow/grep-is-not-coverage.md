@@ -239,7 +239,8 @@ with the owner among them.
 The same `memories/` query returns four at `2156b439`:
 the three above plus `memories/markdownlint.md`, the file the entry was added to,
 where the entry is a cross-link to the owner rather than a restatement ---
-so the count rose by one either way, and a hit count cannot tell an owner from a pointer.
+so the count rose by one either way,
+and a hit count cannot tell an owner from a pointer.
 Every commit on #3060's branch is still reachable on `origin` from `refs/pull/3060/head`
 (`git ls-remote origin refs/pull/3060/head` returns `f9068299`,
 and after `git fetch --depth=200 origin refs/pull/3060/head`, `git rev-list --count 3935bfff..FETCH_HEAD` returns 33).

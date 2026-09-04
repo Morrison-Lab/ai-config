@@ -715,20 +715,24 @@ and the verdict's own conclusion every round.**
   own prose for `suppressed`: 137 bodies across 39 PRs, drawn from
   ai-config PRs 1000 through 1100 and 3060 through 3130, plus
   ai-config#660, ai-config#2913 and ai-config#2976.
-  Each wider form has exactly one measured false positive in that set.
-  Body-wide flags ai-config#1038 review `4837572117`, whose uncollapsed
-  overview sentence reads "Aligns ARDI-family guidance on deadlocks, sweep
-  scheduling, and suppressed Copilot findings" while its body carries no
-  suppression block.
-  Region-wide flags ai-config#1036 review `4837539268`, whose collapsed
+  Region-wide has exactly one measured false positive in that set, and
+  body-wide has two.
+  The two wider forms are nested rather than parallel: an occurrence inside
+  a `<details>` region is by definition an occurrence in the body, so every
+  body region-wide flags is also a body-wide hit.
+  Body-wide hit 80 bodies, region-wide 79, and the heading anchor 78.
+  Body-wide alone flags ai-config#1038 review `4837572117`, whose
+  uncollapsed overview sentence reads "Aligns ARDI-family guidance on
+  deadlocks, sweep scheduling, and suppressed Copilot findings" while its
+  body carries no suppression block.
+  Both wider forms flag ai-config#1036 review `4837539268`, whose collapsed
   `Show a summary per file` table reads "Detects suppressed Copilot
   findings." and whose body likewise carries no suppression block --- the
   settling counter-example an earlier version of this passage asserted the
   measured set did not contain.
-  The heading anchor hit 78 bodies and excludes both controls, a
-  `<summary>`-only match returns zero against 50 of those 78, and the only
-  body the region-wide form flagged and the heading anchor did not is that
-  false positive.
+  The heading anchor excludes both controls, a `<summary>`-only match
+  returns zero against 50 of those 78, and the only body the region-wide
+  form flagged and the heading anchor did not is `4837539268`.
   So region-scoping buys no measured coverage and costs one false positive
   in 137.
   Keep it as a fallback on the cost asymmetry alone --- a false zero merges

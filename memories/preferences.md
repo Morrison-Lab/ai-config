@@ -469,9 +469,7 @@
   always format them as clickable markdown hyperlinks to their forge URLs
   (e.g. `[PR #123](https://github.com/<owner>/<repo>/pull/123)`),
   never as bare unlinked `#123` text
-  (except for forge issue-closing syntax like `Closes #123`, and for the
-  illustrative-token case --- see [AGENTS.md](../AGENTS.md)'s "File formatting & links" rule
-  for the full exception set).
+  (see [AGENTS.md](../AGENTS.md)'s "File formatting & links" rule for the exceptions).
   (User directive / CAI, 2026-08-30.)
   Don't leave a bare SHA, review id, or GitHub review-event name (`COMMENT`) as the only pointer --- wrap it in a markdown link.
   Example formats:

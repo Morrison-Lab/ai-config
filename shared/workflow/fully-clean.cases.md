@@ -245,10 +245,12 @@ The heading moves across PRs:
 PR #660 emitted `Comments suppressed due to low confidence (3)`,
 while PRs #1029 and #1031 emitted `Suppressed comments (4)`.
 A literal match for either phrase can return a false zero.
-Matching case-insensitively on `suppressed` strictly inside the collapsed `<details>` region prevents false positives against overview prose
-(such as review 4837572117 whose summary table mentioned "suppressed Copilot findings" in uncollapsed text),
-and unlike a `<summary>`-only match it still catches ai-config#3084 review `5098574802`,
-whose block is a `### Suppressed comments (1)` heading nested under `<summary>Review details</summary>` (measured 2026-09-03).
+Matching case-insensitively on `suppressed` in a `<summary>` element or in an ATX heading inside a collapsed `<details>` region catches ai-config#3084 review `5098574802`,
+whose block is a `### Suppressed comments (1)` heading nested under `<summary>Review details</summary>` that a `<summary>`-only match returns zero against (measured 2026-09-03).
+Anchor the match to the heading rather than to the region.
+The only false-positive control the corpus has is review 4837572117, whose summary table mentioned "suppressed Copilot findings" in uncollapsed text,
+and `5098574802` wraps its own `Pull request overview` and `File summaries` prose in collapsed `<details>` regions (measured 2026-09-03 from `get_reviews`),
+so region-scoping alone no longer excludes ordinary overview prose --- it excluded 4837572117's only because that particular overview was not collapsed.
 
 ## A review comment's header SHA can be stale
 

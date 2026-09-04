@@ -668,13 +668,16 @@ and the verdict's own conclusion every round.**
   and create zero inline comments
   while placing substantive findings inside a collapsed
   `<details>` suppression block in the review body.
-  Match case-insensitively on `suppressed` **anywhere inside the collapsed
-  `<details>` region** --- its `<summary>` or a heading nested in it ---
-  not anywhere in the body.
+  Match case-insensitively on `suppressed` **in a `<summary>` element, or
+  in an ATX heading inside a collapsed `<details>` region** --- not
+  anywhere in the body, and not anywhere in the region either.
   Measured 2026-09-03 on ai-config#3084 review `5098574802`, the block
   arrives as `### Suppressed comments (1)` under
   `<summary>Review details</summary>`, which a `<summary>`-only match
-  returns zero against.
+  returns zero against, while that same body wraps its `Pull request
+  overview` and `File summaries` prose in collapsed `<details>` regions of
+  their own --- so the region is no longer a proxy for "not ordinary
+  overview prose".
   See [`fully-clean.cases.md`](fully-clean.cases.md),
   "The collapsed-block case (Morrison-Lab/ai-config#1029)".
 - **"No verdict" is its own state, distinct from "a verdict with no
@@ -711,11 +714,13 @@ and the verdict's own conclusion every round.**
 - **Don't:** treat an empty review body as an all-clear without checking the
   inline comments.
 - **Don't:** treat a "generated no new comments" overview as an all-clear
-  until every collapsed `<details>` region has been checked
-  case-insensitively for `suppressed` --- not until the whole body has,
-  which flags ordinary overview prose that merely mentions suppressed
-  findings, and not `<summary>` alone, which misses a block nested one
-  heading deeper.
+  until every `<summary>` element and every ATX heading inside a collapsed
+  `<details>` region has been checked case-insensitively for `suppressed`
+  --- not until the whole body has, which flags ordinary overview prose
+  that merely mentions suppressed findings, not until the whole region
+  has, which flags the same prose now that Copilot collapses its overview
+  too, and not `<summary>` alone, which misses a block nested one heading
+  deeper.
 - **Don't:** read a reviewer's silence as a verdict --- a job that posted
   nothing leaves the same zero counts as a job that found nothing.
 - **Don't:** act on a review wake's own payload --- it is one comment out of

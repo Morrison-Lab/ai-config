@@ -789,6 +789,64 @@ try:
         "popd",
         "git commit -m mine",
     ])
+    # A `cd` inside `( ... )` moves the SUBSHELL and dies with it, so the
+    # parent shell never left. `(cd <other-worktree> && git status)` is the
+    # routine way to read another checkout without leaving your own, and
+    # reading it as a move let a merely-visited dormant worktree claim a
+    # commit made later somewhere else.
+    subshell_cd = transcript([
+        f"(cd {dormant_wt} && git status)",
+        "git commit -m mine",
+    ])
+    subshell_cd_semicolon = transcript([
+        f"( cd {dormant_wt}; git log -1 )",
+        "git commit -m mine",
+    ])
+    # Negative control on the same axis: a `cd` OUTSIDE the parens still
+    # moves the shell, so the subshell skip narrowed the tracking rather
+    # than disabling it. The shell ends up in the dormant worktree here, and
+    # the commit that follows genuinely lands there.
+    subshell_beside_real_cd = transcript([
+        f"cd {dormant_wt} && (cd {dormant_root} && git status)",
+        "git commit -m mine",
+    ])
+    # `git checkout [<tree-ish>] -- <paths>` restores files and moves HEAD
+    # nowhere, so it must not clear the carried branch --- reading the
+    # pathspec as a branch name replaced `agy-dormant` with `README.md` and
+    # lost the switched-branch attribution of ai-config#2737.
+    pathspec_keeps_branch = transcript([
+        "git checkout agy-dormant && git log -1",
+        "git checkout -- README.md",
+        "git commit -m mine",
+    ])
+    treeish_pathspec_keeps_branch = transcript([
+        "git checkout agy-dormant && git log -1",
+        "git checkout main -- README.md",
+        "git commit -m mine",
+    ])
+    # The `--`-less form is NOT decidable from the command text: git resolves
+    # it as a ref when one exists and as a path otherwise, and both spellings
+    # are legal branch names. It reads as a switch, which clears the carried
+    # branch and names one no worktree holds, so the guard falls silent
+    # rather than blocking --- the direction ai-config#2422 requires.
+    bare_path_checkout_falls_open = transcript([
+        "git checkout agy-dormant && git log -1",
+        "git checkout README.md",
+        "git commit -m mine",
+    ])
+    # A `git -C` AFTER the commit reads another repository without running
+    # the commit there --- the `cd`-after-the-commit misattribution spelled
+    # with a different flag.
+    commit_then_git_c_away = transcript([
+        f"cd {dormant_root}",
+        f"git commit -m mine && git -C {dormant_wt} log -1",
+    ])
+    # And a `git -C` BEFORE it, in the same call, is the inspect-then-commit
+    # shape: the commit still runs where the shell stood.
+    git_c_before_commit = transcript([
+        f"cd {dormant_root}",
+        f"git -C {dormant_wt} log -1 && git commit -m mine",
+    ])
     # A compaction replays the first record below the second, carrying its
     # original timestamp, so the last `cd` IN FILE ORDER is one the session
     # left minutes earlier. Sorting by each record's own timestamp is what
@@ -841,6 +899,28 @@ try:
                           ("popd", popd_supersedes)):
             assert subject.decide(dormant_root, _t) == "", \
                 f"`{_name}` must supersede the visited worktree (ai-config#2422)"
+        # A subshell `cd` never moves the parent shell, in either spelling.
+        for _name, _t in (("&&", subshell_cd), (";", subshell_cd_semicolon)):
+            assert subject.decide(dormant_root, _t) == "", \
+                f"a subshell `cd` ({_name}) must not claim a later commit (ai-config#2422)"
+        # Negative control: the `cd` outside the parens still moves the shell,
+        # so the commit beside it is still attributed to where it landed.
+        _sb_reason = subject.decide(dormant_root, subshell_beside_real_cd)
+        assert "agy-dormant" in _sb_reason, _sb_reason
+        # A pathspec checkout moves HEAD nowhere, so the carried branch stands.
+        for _name, _t in (("git checkout -- <path>", pathspec_keeps_branch),
+                          ("git checkout <tree-ish> -- <path>", treeish_pathspec_keeps_branch)):
+            _reason = subject.decide(dormant_root, _t)
+            assert "agy-dormant" in _reason, f"{_name}: {_reason}"
+        # The undecidable `--`-less form falls open rather than blocking.
+        assert subject.decide(dormant_root, bare_path_checkout_falls_open) == "", \
+            "an undecidable `git checkout <path>` must fall open, not block (ai-config#2422)"
+        # A `git -C` after the commit, and one before it in the same call,
+        # each name a repository the commit did not run in.
+        for _name, _t in (("after", commit_then_git_c_away),
+                          ("before", git_c_before_commit)):
+            assert subject.decide(dormant_root, _t) == "", \
+                f"a `git -C` {_name} the commit must not attribute it (ai-config#2422)"
         # File order is not time order after a compaction replay.
         assert subject.decide(dormant_root, replayed_cd) == "", \
             "a replayed `cd` carrying an older timestamp must not claim a later commit"
@@ -858,6 +938,10 @@ try:
                    patch_mode_keeps_branch, worktree_add_keeps_branch,
                    checkout_index_keeps_branch,
                    bare_cd_moves_home, pushd_supersedes, popd_supersedes,
+                   subshell_cd, subshell_cd_semicolon, subshell_beside_real_cd,
+                   pathspec_keeps_branch, treeish_pathspec_keeps_branch,
+                   bare_path_checkout_falls_open,
+                   commit_then_git_c_away, git_c_before_commit,
                    replayed_cd, unstamped_replay):
             os.unlink(_p)
 finally:

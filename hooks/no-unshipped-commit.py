@@ -23,11 +23,12 @@ try:
         "scripts", "lib")
     if _LIB not in sys.path:
         sys.path.insert(0, _LIB)
-    from shellcmd import resolve_cd_target, simple_commands, strip_env
+    from shellcmd import (resolve_cd_target, simple_commands_with_depth,
+                          strip_env)
 except Exception as _exc:  # broken install; fail open and say so
     print(f"no-unshipped-commit: cannot load scripts/lib/shellcmd.py "
           f"({_exc}); not tracking the shell's directory", file=sys.stderr)
-    resolve_cd_target = simple_commands = strip_env = None
+    resolve_cd_target = simple_commands_with_depth = strip_env = None
 
 # `(?![\w-])`, not `\b`. A word boundary sits happily between `commit` and
 # `-`, because `-` is a non-word character -- so `git\s+commit\b` matched
@@ -163,7 +164,7 @@ WORKTREE_ADD_CMD = re.compile(
     re.MULTILINE
 )
 BRANCH_CMD = re.compile(
-    r"(?:^|[;&|\n])\s*" + _ENV + r"git\s+(?:checkout|switch|branch)\s+([^;&|\n]+)",
+    r"(?:^|[;&|\n])\s*" + _ENV + r"git\s+(checkout|switch|branch)\s+([^;&|\n]+)",
     re.MULTILINE
 )
 # Calls that MOVE HEAD, as opposed to merely naming a branch. Matched for
@@ -195,6 +196,21 @@ SWITCH_CMD = re.compile(
     re.MULTILINE
 )
 PATCH_FLAGS = {"-p", "--patch"}
+# The bare `--` token, which ends the options and makes everything after it a
+# PATHSPEC. `git checkout -- README.md` and `git checkout main -- README.md`
+# both restore a file into the working tree and move HEAD nowhere, so neither
+# may clear the carried branch --- and a path restore is far commoner in this
+# corpus's own workflows than the patch and plumbing forms above it.
+#
+# The bare `git checkout README.md` form, with no `--`, is NOT decidable from
+# the command text: git resolves it as a ref when one exists and as a path
+# otherwise, and `README.md` and `feature/x.y` are both legal branch names.
+# It is therefore left reading as a switch, which clears the carried branch
+# and names one no worktree holds --- so the guard falls silent rather than
+# blocking on a branch the session never committed to. That is the direction
+# ai-config#2422 requires: a missed block costs a reminder, a false block
+# costs every Stop in the session.
+PATHSPEC_SEP = "--"
 # A cheap pre-filter for `shell_dir_after`. Parsing every call's argv would
 # run `shlex` twice per Bash call across a whole transcript, and a Stop hook
 # has to answer promptly; a command carrying none of these three words moves
@@ -208,6 +224,8 @@ def switches_branch(command):
     for m in SWITCH_CMD.finditer(command):
         args = m.group(1).split()
         if any(a in PATCH_FLAGS for a in args):
+            continue
+        if PATHSPEC_SEP in args:
             continue
         return True
     return False
@@ -223,12 +241,23 @@ def shell_dir_after(text, cur_dir):
     that visits a dormant foreign worktree and then returns must not attribute
     its own later commit to the worktree it visited.
     """
-    if simple_commands is None or not DIR_MOVE.search(text):
+    if simple_commands_with_depth is None or not DIR_MOVE.search(text):
         return cur_dir
-    argvs = simple_commands(text)
+    argvs = simple_commands_with_depth(text)
     if argvs is None:
         return None
-    for argv in argvs:
+    for depth, argv in argvs:
+        # A `cd` inside `( ... )` moves the SUBSHELL and dies with it, so the
+        # parent shell --- the one the next tool call inherits --- never
+        # left. `(cd /other-worktree && git status)` is the routine way to
+        # read another checkout without leaving your own, and treating it as
+        # a move made every later commit inherit the worktree merely
+        # inspected, which is the false attribution ai-config#2422 exists to
+        # remove. `DIR_MOVE` deliberately still matches inside parens: it is
+        # a pre-filter, so over-inclusive is the safe direction, and the
+        # depth is what decides.
+        if depth:
+            continue
         _, rest = strip_env(argv)
         if rest and rest[0] in ("cd", "pushd", "popd"):
             cur_dir = resolve_cd_target(rest, cur_dir)
@@ -253,6 +282,10 @@ def extract_named_paths(command):
     their own and need no carrying forward. Where the shell IS standing is
     tracked separately by `shell_dir_after`, because a `cd` persists across
     tool calls while this function sees one call.
+
+    Callers attributing a COMMIT pass the committing git invocation itself
+    rather than the whole call, so that only a `-C` the commit carries counts
+    --- see `scan_transcript`.
     """
     paths = set()
     for m in GIT_C_CMD.finditer(command):
@@ -274,7 +307,13 @@ def extract_touched_branches(command):
     """Extract branch names touched by checkout/switch/branch/worktree add commands."""
     branches = set()
     for m in BRANCH_CMD.finditer(command):
-        args = m.group(1).split()
+        args = m.group(2).split()
+        # `git checkout [<tree-ish>] -- <paths>` restores files and moves HEAD
+        # nowhere, so it names no branch this scan may carry --- reading the
+        # pathspec as one replaced the real carried branch with a filename
+        # and lost the switched-branch attribution of ai-config#2737.
+        if m.group(1) in ("checkout", "switch") and PATHSPEC_SEP in args:
+            continue
         skip_next = False
         for arg in args:
             if skip_next:
@@ -410,8 +449,15 @@ def scan_transcript(path):
     previous call --- so `git commit -m x && cd /elsewhere` attributes where
     the shell stood, not where it ends up. The branch is the one named
     earlier in the same call, and otherwise the branch carried forward.
-    A `git -C <dir>` or `git worktree add <path>` anywhere in a committing
-    call names a repository directly and attributes on its own.
+    A `git -C <dir>` on the committing invocation ITSELF names the repository
+    the commit runs in and attributes on its own. A `git -C` elsewhere in the
+    same call does not, whether it precedes the commit or follows it: it
+    reads another repository without running the commit there, and
+    `git commit -m x && git -C /elsewhere log -1` used to report /elsewhere
+    --- the `cd`-after-the-commit misattribution spelled with a different
+    flag. `git worktree add <path>` likewise creates a checkout without
+    moving the shell into it, so a commit beside it lands where the shell
+    already stood.
 
     Both carried values are SUPERSEDED by a later call that moves the shell
     even when that call names nothing: `git checkout -` and `cd -` move away
@@ -447,7 +493,12 @@ def scan_transcript(path):
                 saw = True
                 pending = command
                 before = scanned[:commit.start()]
-                commit_paths |= harness_dirs | extract_named_paths(scanned)
+                # The commit's OWN match span, which runs from the start of
+                # its git invocation through the `commit` word, so a `git -C`
+                # it carries is inside it and every other one in the call is
+                # outside it.
+                invocation = scanned[commit.start():commit.end()]
+                commit_paths |= harness_dirs | extract_named_paths(invocation)
                 commit_dir = absolute_dir(shell_dir_after(before, start_dir))
                 if commit_dir:
                     commit_paths.add(commit_dir)

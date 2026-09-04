@@ -25,7 +25,8 @@ below -- which is the argument for a module rather than a ninth copy. Those
 eight are NOT rewired here: migrating eight live guards, two of which can
 REFUSE (`no-clobbering-push.py` denies, `no-unreviewed-pr.py` blocks; the
 other six only add context), is its own change with its own review, tracked
-as ai-config#2993. This module
+as ai-config#3178 --- not by the closed ai-config#2993, which reported the
+defect and shipped this module rather than the migration. This module
 is where the fix landed and where new callers import from.
 
 WHY AN ARGV SPLIT RATHER THAN A REGEX
@@ -45,7 +46,7 @@ THREE LIMITS, ALL INHERITED FROM THE EIGHT COPIES
 The heredoc pre-pass and the newline rewrite run on RAW TEXT, ahead of `shlex`,
 so neither knows the quoting rules the paragraph above credits `shlex` with.
 State that here rather than letting the argv-split argument imply otherwise --
-this docstring is the contract ai-config#2993 will migrate eight live guards
+this docstring is the contract ai-config#3178 will migrate eight live guards
 onto, two of which can refuse.
 
   * `RX_HEREDOC_OPEN` is QUOTE-BLIND. A `<<` inside a quoted argument -- a commit
@@ -108,7 +109,7 @@ The first two fail toward silence or toward a mangled argument. The third
 fails BOTH ways -- a phantom command and a hidden one -- and is stated
 separately for that reason. Fixing any of them
 means a quote-aware pre-scan, which is a real parser and out of scope for an
-extraction; ai-config#2993 is where that belongs, alongside migrating the
+extraction; ai-config#3178 is where that belongs, alongside migrating the
 eight copies.
 """
 from __future__ import annotations
@@ -336,6 +337,35 @@ def simple_commands(command):
     newlines into `;`, then let `shlex` split and dequote. The tokens come back
     DEQUOTED, so a quoted `"git push"` arrives as one token inside some other
     command's argv rather than as its own simple command.
+
+    Subshell nesting is FLATTENED here: `(cd /a && ls)` comes back as two
+    argv lists indistinguishable from `cd /a && ls`, because the `(` and `)`
+    tokens are separators and are dropped with the rest. A caller that models
+    shell STATE rather than asking which programs ran needs the distinction,
+    since a `cd` inside a subshell moves that subshell and never the parent;
+    `simple_commands_with_depth` is the same split with the nesting kept.
+    """
+    with_depth = simple_commands_with_depth(command)
+    if with_depth is None:
+        return None
+    return [argv for _depth, argv in with_depth]
+
+
+def simple_commands_with_depth(command):
+    """`simple_commands`, each argv paired with its SUBSHELL NESTING DEPTH.
+
+    Depth 0 is the caller's own shell. A greater depth means the command runs
+    inside `( ... )` or `$( ... )`, so anything it does to the shell's own
+    state --- its working directory above all --- dies with the subshell and
+    never reaches the parent.
+
+    Depth is counted from the separator tokens themselves, which is why the
+    count is per token rather than per character: `shlex` emits a run like
+    `));` as ONE separator, so `(cd /a && (cd /b; ls)); cd /c` returns the
+    final `cd /c` at depth 0 rather than at depth 2.
+
+    `{ ... }` grouping is NOT nesting for this purpose and is not counted: it
+    runs in the current shell, so a `cd` inside one does move the caller.
     """
     # ORDER MATTERS, and the natural order is wrong. Joining continuations
     # first lets a heredoc BODY line ending in a backslash eat its own
@@ -355,16 +385,21 @@ def simple_commands(command):
         toks = list(lex)
     except ValueError:
         return None
-    cmds, cur = [], []
+    cmds, cur, depth, cur_depth = [], [], 0, 0
     for tok in toks:
         if tok and set(tok) <= _SHELL_OPS:
             if cur:
-                cmds.append(cur)
+                cmds.append((cur_depth, cur))
                 cur = []
+            depth += tok.count("(") - tok.count(")")
+            if depth < 0:
+                depth = 0
         else:
+            if not cur:
+                cur_depth = depth
             cur.append(tok)
     if cur:
-        cmds.append(cur)
+        cmds.append((cur_depth, cur))
     return cmds
 
 
@@ -494,11 +529,13 @@ def resolve_cd_target(rest: list[str], cur_dir: str | None) -> str | None:
     treat `None` as "somewhere I cannot name", never as "unchanged".
 
     Adapted verbatim from `hooks/no-push-without-self-review.py`'s
-    `_resolve_cd_target`, which is the tested in-repo implementation.
-    That guard is NOT rewired onto this copy here: it can refuse a push, and
-    migrating a deny-capable guard is its own change with its own review ---
-    the same call this module's header makes for the eight `_simple_commands`
-    copies (ai-config#2993). New callers import from here.
+    `_resolve_cd_target`, which is the tested in-repo implementation. This is
+    a COPY and not a move: that guard still holds its own, because it can
+    refuse a push and migrating a deny-capable guard is its own change with
+    its own review --- the same call this module's header makes for the eight
+    `_simple_commands` copies. The duplication that leaves is tracked as
+    ai-config#3177, not by the closed ai-config#2993, whose scope is
+    `_simple_commands` and `_strip_env`. New callers import from here.
     """
     cmd_name = rest[0]
     if cmd_name == "popd":

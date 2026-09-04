@@ -297,6 +297,34 @@ def _split_command(command):
     return out
 
 
+def _mask_quoted(text, chars):
+    """`text` with each character in `chars` that sits inside a single- or
+    double-quoted span replaced by a space, everything else left in place.
+
+    Only the quotes are spans here: a redirect inside a brace group or a
+    substitution (`{ date > f; }`) is a real redirect, so `_mask_nested`'s
+    wider masking would hide exactly what this is used to find.
+    """
+    out = []
+    quote = None
+    escaped = False
+    for ch in text:
+        if escaped:
+            escaped = False
+        elif quote == "'":
+            if ch == "'":
+                quote = None
+        elif ch == "\\":
+            escaped = True
+        elif quote == '"':
+            if ch == '"':
+                quote = None
+        elif ch in ("'", '"'):
+            quote = ch
+        out.append(" " if quote and ch in chars else ch)
+    return "".join(out)
+
+
 def _mask_quoted_operators(text):
     """`text` with each `;`, `&`, or `|` inside a quoted, substituted, or
     grouped span replaced by a space, everything else left in place.
@@ -415,7 +443,10 @@ def _capture_only(command):
                 captured.add(name)
     saw_read = bool(captured)
     for (segment, bodies), spans in zip(segments, assigns):
-        prints = not RX_STDOUT_REDIRECT.search(segment)
+        # A `>` inside a quoted format string (`date "+%H:%M -> Checkpoint"`)
+        # is text, not a redirect, so the search runs over the segment with
+        # quoted `<` and `>` blanked.
+        prints = not RX_STDOUT_REDIRECT.search(_mask_quoted(segment, "<>"))
         rest = _blank(segment, spans)
         if RX_CLOCK_READ.search(rest) or any(
                 RX_CLOCK_READ.search(body) for body in bodies):

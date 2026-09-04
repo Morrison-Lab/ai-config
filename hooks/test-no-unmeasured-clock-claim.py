@@ -143,6 +143,18 @@ PIPED_PAST_VAR = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "id": "call_rpipe", "input": {
         "command": "t=$(TZ=America/Los_Angeles date \"+%H:%M %Z\"); "
                    "echo done | grep -c $t"}}]}}
+# An arrow inside the quoted format string is text: the read prints to the
+# transcript, and its `>` is not a redirect.
+QUOTED_ARROW_PRINTED = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_arrow", "input": {
+        "command": "TZ=America/Los_Angeles date \"+%H:%M %Z -> checkpoint\""}}]}}
+QUOTED_ARROW_SINGLE = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_arrow1", "input": {
+        "command": "TZ=America/Los_Angeles date '+%H:%M %Z -> checkpoint'"}}]}}
+# A redirect inside a brace group is a real redirect, and must stay one.
+GROUPED_REDIRECT = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_grp", "input": {
+        "command": "{ TZ=America/Los_Angeles date \"+%H:%M %Z\" >> notebook.md; }"}}]}}
 # `NAME=$(` inside a quoted argument is not an assignment: the read prints as
 # part of the echoed string, and the transcript carries it.
 QUOTED_HEAD_PRINTED = {"type": "assistant", "message": {"content": [
@@ -507,6 +519,18 @@ CASES = [
      True,
      "#2991: a real pipe between the echo and the variable hands the echo "
      "to grep, so the value never prints and the guard still fires"),
+
+    # --- review round 4 on #2991: the redirect search ran over the raw
+    #     segment, so a `>` inside a quoted format string read as a redirect.
+    ([QUOTED_ARROW_PRINTED, say("Recap: 00:59 PDT")], False,
+     "#2991: a `>` inside the double-quoted format string is text, and the "
+     "read prints"),
+    ([QUOTED_ARROW_SINGLE, say("Recap: 00:59 PDT")], False,
+     "#2991: the same inside single quotes"),
+    ([GROUPED_REDIRECT, result("call_grp", ""), say("Recap: 01:07 PDT")],
+     True,
+     "#2991: a redirect inside a brace group is still a redirect, so the "
+     "reading went to the file"),
 ]
 
 

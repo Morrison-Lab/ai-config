@@ -2120,6 +2120,8 @@ def _terminal_wording():
     return ("CLOSED" in reason and "Three legitimate reasons" in reason
             and "Two legitimate reasons" not in reason
             and "has not observed" not in reason
+            and "Either way" not in reason
+            and "does not credit as a status read" in reason
             and "CREDITED" in reason)
 
 

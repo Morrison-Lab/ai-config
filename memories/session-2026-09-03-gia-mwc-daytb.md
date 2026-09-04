@@ -722,3 +722,10 @@ applied and pushed as `5652ebd5` with Copilot and Jules re-requested.
 the claude-review run and `validate` for that head were in progress.
 Copilot's rounds on #3154 have run: recipe form, subshell, em dashes twice, unreachable SHAs, a placeholder;
 each was one item, and each push re-ran three reviewers, so the seven rounds cost about as much as the fifteen private ones.
+
+## 18:02 PDT --- #3166 fully clean on the forge; one pre-merge verdict before the merge
+
+At `147710bb`, [#3166](https://github.com/Morrison-Lab/ai-config/pull/3166) has the claude-review verdict (which rebuilt the scratch merge and confirmed the `--cc` byte-identity), a Jules approval, Copilot's "Approval recommended", every check run green including `require-clean-verdict`, and a clean mergeable state.
+The last adversarial verdict was at `6c8db734`, three commits back, so a pre-merge verdict at the shipping head runs in the one free slot before the standing grant is used;
+the session's bar for that grant has been the cross-model quorum plus the adversarial verdict at the head that ships.
+[#3154](https://github.com/Morrison-Lab/ai-config/pull/3154) at `5652ebd5` waits on its three reviewers.

@@ -777,13 +777,30 @@ try:
         "git commit -m mine",
     ])
     # `git worktree add -b` creates the branch in a SECOND checkout and leaves
-    # this shell's HEAD where it stood, so its name is ADDITIVE. Reading it as
-    # a replacement dropped the branch the commit actually landed on --- a
-    # fail-open on a real unshipped commit --- and named one the shell never
-    # entered in its place.
+    # this shell's HEAD where it stood, so it must not displace the branch the
+    # commit actually landed on --- doing so would fail open on a real
+    # unshipped commit and name one the shell never entered in its place.
     worktree_add_b_keeps_branch = transcript([
         "git checkout agy-dormant && git log -1",
         f"git worktree add -b side {gone_wt}-side main && git commit -m mine",
+    ])
+    # The other direction on that axis, and the conductor shape this corpus
+    # writes constantly: a session that creates subagent worktrees and then
+    # commits its OWN work. Contributing each created name additively made it
+    # permanent, since only a later head-moving switch removes one, so any
+    # subagent's unpushed commit blocked this session's every Stop --- a debt
+    # it never incurred. Two adds, because one is indistinguishable from a
+    # carry that happens to match nothing.
+    worktree_adds_then_own_commit = transcript([
+        f"git worktree add -b agy-dormant {dormant_wt} main",
+        f"git worktree add -b agy-gone {gone_wt} main",
+        "git commit -m mine",
+    ])
+    # The positive control on the same axis: entering the created checkout is
+    # what attributes a commit to it, and the directory axis is what sees
+    # that. Dropping the branch contribution must not cost this block.
+    worktree_add_then_cd_in = transcript([
+        f"git worktree add -b agy-dormant {dormant_wt} main && cd {dormant_wt} && git commit -m mine",
     ])
     # `git branch` names a branch without switching to it, so a commit that
     # follows one lands wherever the shell already stood. Reading these as
@@ -959,18 +976,18 @@ try:
         # the commit, not only whole earlier calls.
         assert subject.decide(dormant_root, checkout_back_same_call) == "", \
             "`git checkout - && git commit` must supersede the inspected branch (ai-config#2422)"
-        # The fold is applied in SOURCE order across both sources, which is
-        # what a `decide` fixture cannot show: a clearing switch AFTER a
-        # `git worktree add -b` empties the created name too, while one
-        # BEFORE it leaves that name standing. Grouping the two patterns and
-        # unioning the worktree names last makes these two agree, and the
-        # disagreement is the whole content of the ordering.
+        # `git worktree add -b` creates a branch in a SECOND checkout and
+        # contributes NOTHING to the carry, in either position: it neither
+        # names a branch a commit beside it lands on nor clears the one the
+        # shell is actually standing on. Asserted directly because a `decide`
+        # fixture cannot separate "contributed nothing" from "contributed a
+        # name that happened to match no worktree".
         assert subject.branches_after(
-            "git worktree add -b side /tmp/s main && git checkout -",
-            {"feature"}) == set(), "a clearing switch after the add empties it too"
+            "git worktree add -b side /tmp/s main",
+            {"feature"}) == {"feature"}, "an add names a branch in another checkout, not this one"
         assert subject.branches_after(
             "git checkout - && git worktree add -b side /tmp/s main",
-            {"feature"}) == {"side"}, "an add after the clear still names its branch"
+            {"feature"}) == set(), "an add after a clearing switch adds nothing back"
         # The whole round trip in one call, and the same two moves in one
         # earlier call: the LAST move before the commit decides, so the
         # inspected branch is superseded in both spellings.
@@ -982,10 +999,19 @@ try:
         # not the branch the commit lands on.
         assert subject.decide(dormant_root, base_then_new_branch) == "", \
             "a base branch left for a new one must not claim the commit (ai-config#2422)"
-        # Negative control on the additive side: a `git worktree add -b` in the
-        # committing call must not displace the branch the commit landed on.
+        # A `git worktree add -b` in the committing call must not displace the
+        # branch the commit landed on.
         _wtb_reason = subject.decide(dormant_root, worktree_add_b_keeps_branch)
         assert "agy-dormant" in _wtb_reason, _wtb_reason
+        # Nor may it claim a commit for the checkout it created: the shell
+        # never entered it, so this session owes nothing there.
+        assert subject.decide(dormant_root, worktree_adds_then_own_commit) == "", \
+            "created subagent worktrees must not claim this session's own commit (ai-config#2422)"
+        # Negative control: a `cd` into the created checkout still attributes
+        # the commit to it, so the narrowing did not disable the block.
+        _wtcd_reason = subject.decide(dormant_root, worktree_add_then_cd_in)
+        assert "agy-dormant" in _wtcd_reason, _wtcd_reason
+        assert _wtcd_reason.startswith("1 commit(s) on worktree"), _wtcd_reason
         # `git branch` names a branch without moving HEAD, so no commit may
         # be attributed to one it merely mentions.
         for _name, _t in (("git branch -d", branch_delete_attributes_nothing),

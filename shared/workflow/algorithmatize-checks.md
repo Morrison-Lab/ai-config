@@ -1739,3 +1739,45 @@ one echoed by the run that depends on it is checked on every execution.**
   the refutations are evidence the information is not in the artifact.
 - **Don't:** leave a validity assumption as prose in a README while the run
   that depends on it logs nothing.
+
+## A log's file order is an assumption, so state it before keying an instrument on position
+
+The sections above test an instrument's matcher.
+This one tests its **ordering** assumption,
+which is invisible precisely because it is never written down:
+a last-wins reader over an append-only log assumes file order is time order,
+and nothing in the code says so.
+
+That assumption fails whenever the log is rewritten, replayed, or merged,
+and it fails in the worst possible way ---
+every record parses correctly and the reader holds a real one, just not the newest,
+so there is no malformed input to notice.
+A Claude Code transcript after a context compaction is the measured case, per
+[`claude-code-transcripts`](../../memories/claude-code-transcripts.md).
+
+**When a guard's refusal contradicts your own read of the session, run its own reader against the artifact rather than theorizing about why it fired.**
+That is already
+[`mistake-patterns`](../../memories/mistake-patterns.md) Pattern 17,
+and it is what separates an ordering fault from a matcher fault:
+both produce an identical refusal message,
+and only executing the parser prints which record it actually held.
+
+**A guard being wrong does not make its escape valve available.**
+The two failures compose rather than cancelling.
+On 2026-09-03 the sanctioned `ALLOW_UNREVIEWED_PUSH=1` override was classifier-denied
+at the same moment the guard was holding a compaction-replayed stale verdict
+([#2899](https://github.com/Morrison-Lab/ai-config/issues/2899)),
+so the refusal was wrong and its documented remedy unreachable together.
+The unblock was to satisfy the guard honestly ---
+dispatch a second review so a fresher record lands last ---
+rather than to keep rephrasing the override,
+per [`mistake-patterns`](../../memories/mistake-patterns.md) Pattern 43.
+
+- **Do:** key a "most recent" reader on each record's own timestamp, and say in the code why position is not enough.
+- **Do:** run the instrument's own parsing function against the live artifact, printing what it held, before writing down a mechanism-level explanation.
+- **Do:** produce a fresh record to satisfy a position-keyed guard honestly,
+  once its own parser has been run and shown to hold a replayed record,
+  and when both the guard and its override are unavailable at once.
+- **Don't:** append a fresher record before that check --- a guard holding a current verdict is refusing on the merits, and appending over it is not an unblock.
+- **Don't:** treat an append-only log as sorted --- that is an assumption about the writer, not a property of the file.
+- **Don't:** diagnose a last-wins reader's wrong answer as a matcher bug without first checking the order of what it read.

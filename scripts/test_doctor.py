@@ -243,7 +243,7 @@ class TestConsumerLeftovers(unittest.TestCase):
         self.assertFalse(res["ok"])
         self.assertEqual(res["status"], "WARN")
         self.assertIsNone(res["plugin_enabled"])
-        self.assertIn("did not parse", res["details"])
+        self.assertIn("did not yield usable settings", res["details"])
 
     def test_settings_parsing_to_a_non_object_are_reported_not_swallowed(self):
         # A top level that is valid JSON but not an object still leaves the
@@ -256,8 +256,22 @@ class TestConsumerLeftovers(unittest.TestCase):
         self.assertFalse(res["ok"])
         self.assertEqual(res["status"], "WARN")
         self.assertIsNone(res["plugin_enabled"])
-        self.assertIn("did not parse", res["details"])
-        self.assertIn("not an object", res["details"])
+        self.assertIn("did not yield usable settings", res["details"])
+        self.assertIn("top-level value is list", res["details"])
+
+    def test_non_object_enabled_plugins_is_reported_not_swallowed(self):
+        # A settings file whose top level is an object but whose
+        # `enabledPlugins` is not leaves the same question open, so it must
+        # not fall through to a lower scope either.
+        (self.home / "settings.json").write_text(
+            json.dumps({"enabledPlugins": ["ai-config@Morrison-Lab"]}),
+            encoding="utf-8",
+        )
+        res = doctor.check_consumer_leftovers()
+        self.assertFalse(res["ok"])
+        self.assertEqual(res["status"], "WARN")
+        self.assertIsNone(res["plugin_enabled"])
+        self.assertIn("enabledPlugins is list, not an object", res["details"])
 
     def test_clean_home_reports_ok(self):
         self.enable_plugin()

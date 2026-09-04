@@ -59,8 +59,8 @@ In every session --- at session start, and again periodically during long sessio
    - **Don't:** read a green `consumer_leftovers` as proof `~/.claude/shared` is absent --- the documented symlink is reported outside the leftover list.
    - **Do:** change the documentation and the exemption together, so exactly one form of a manual step is both recommended and exempted.
    - **Don't:** exempt one form of a step the documentation offers two ways --- a reader who took the other one is red by construction, which is the failure the exemption was meant to remove.
-   - **Do:** say "the scope walk matches `run-hook.sh`" when describing the plugin gate, and name the within-file union as the deliberate divergence it is.
-   - **Don't:** write that the check and the runner agree without qualification --- they resolve a file naming two `ai-config@*` entries differently.
+   - **Do:** say the *scope walk* is the shared part when describing the plugin gate, and describe each reader's own within-file rule --- the runner's raw-text grep as well as the check's parsed `enabledPlugins` union.
+   - **Don't:** present the first-versus-union rule as the whole divergence --- the runner also matches a commented-out line and text outside `enabledPlugins`, which the check never reads.
 
    The dedicated verification instrument this section used to name (`check-install.py`, which compared installed copies against the checkout and repaired drift with `--fix`) was removed along with that symlink install and has no replacement yet either.
    Until one lands, use the manual branch-plus-diff check in this file's "The blast radius is the whole consumer surface" paragraph below, which does not depend on that instrument and still works whether the local copy is a symlink or a real copy.

@@ -407,8 +407,8 @@ def resolve_plugin_enabled(home: Path) -> tuple[Optional[bool], Optional[Path], 
 
     Returns `(enabled, source, parse_error)`. `source` is the file that
     decided, or None when no scope named an `ai-config@*` entry at all.
-    `enabled` is None only when a settings file exists and does not parse,
-    which leaves the answer unknown rather than false.
+    `enabled` is None only when a settings file exists and does not yield
+    usable settings, which leaves the answer unknown rather than false.
 
     Scope-resolved rather than read from one file, per
     `memories/claude-code-settings.md`: `enabledPlugins` resolves by
@@ -443,6 +443,9 @@ def resolve_plugin_enabled(home: Path) -> tuple[Optional[bool], Optional[Path], 
         settings, parse_error = read_settings(path)
         if parse_error is not None:
             return None, path, parse_error
+        plugins = settings.get("enabledPlugins")
+        if plugins is not None and not isinstance(plugins, dict):
+            return None, path, f"enabledPlugins is {type(plugins).__name__}, not an object"
         entries = ai_config_entries(settings)
         if entries:
             return any(entries.values()), path, None
@@ -538,7 +541,7 @@ def check_consumer_leftovers() -> Dict[str, Any]:
             "leftovers": [],
             "doubled_skills": [],
             "documented": [],
-            "details": f"Not swept: {source} did not parse ({parse_error}), so whether the plugin route is in use is unknown.",
+            "details": f"Not swept: {source} did not yield usable settings ({parse_error}), so whether the plugin route is in use is unknown.",
         }
 
     if not enabled:

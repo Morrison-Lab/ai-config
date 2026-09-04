@@ -70,11 +70,18 @@ committed pass.
   step, or a preference wasn't encoded)
 - When the user says "did you update memories?" (the answer should be "let
   me do that now")
-- **While paused waiting on a subagent or a long-running background process
-  to complete.** That idle stretch is exactly when there's time to survey
-  what's accumulated so far and persist it, rather than only running UMS at
-  a hard stop. Don't let a real wait sit fully idle when a useful pass is
-  available to run alongside it.
+- **Before ending a turn to wait on anything** --- a subagent,
+  a long-running background process, CI, a review round,
+  or an answer from the user.
+  Run the pass before the pause rather than alongside it,
+  and not only once the wait turns out to be long:
+  a wait's length is not knowable when it begins,
+  and the learnings sit in conversation state until it ends.
+  The pass is owed once per wait rather than once per timer,
+  so a monitoring loop gets it at the loop's first pause
+  and again only once new learnings accumulate.
+  See
+  [`run-ums-proactively`](../../shared/workflow/run-ums-proactively.md).
 
 ## Procedure
 

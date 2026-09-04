@@ -224,12 +224,13 @@ A pause leaves the session's learnings held only in conversation state, and that
 [`flag-session-boundaries`](flag-session-boundaries.md)'s "Arm resumption before every non-clean pause" section already obliges a wake mechanism at that same moment;
 this obliges the pass alongside it.
 
-The pass is owed once per wait rather than once per timer: `CLAUDE.md`'s "Monitor every pushed PR head to completion" re-arms a poll every couple of minutes, so run it at the loop's first pause and again only once new learnings accumulate.
+The pass is owed once per wait rather than once per timer: `CLAUDE.md`'s ["Monitor every pushed PR head to completion"](../../CLAUDE.md) re-arms a poll on a short timer (120s in its own example), so run it at the loop's first pause and again only once new learnings accumulate.
 The near-miss runs the other way --- a first wait that looks too short to count, or one waiting on the very trigger a rule above names, such as a CI run whose verdict will itself be a checkpoint.
 Deferring the pass to when the wait ends is the announced-and-never-run failure with a due date attached, since the resumption may land in a different session or never come.
 
 - **Do:** run the pass before ending a turn to wait on CI, a review, or an answer from the user.
-- **Do:** owe it once per wait, at a monitoring loop's first pause rather than at every re-arm of its timer.
+- **Do:** run the pass at a monitoring loop's first pause, then again only once new learnings accumulate.
+- **Don't:** re-run it at every re-arm of a monitoring timer, which across a multi-hour poll spends more than it records.
 - **Don't:** defer the pass to when the wait ends, on the reading that the resumption will carry it.
 - **Don't:** treat a routine-looking first wait as too small to be a boundary.
 

@@ -466,10 +466,10 @@ with tempfile.TemporaryDirectory() as d:
         subject.GH_PATH, subject.GLAB_PATH = saved_paths
         subject.STATE_PATH = orig_path
 
-# The GitHub arms end to end against a stub gh: the three searches are
-# unioned on url, deduplicated, and sorted, and the workflow-bot arm is
-# bounded to the owners `gh api` resolved. The stub records its argv so the
-# flags are asserted rather than assumed.
+# The GitHub arms end to end against a stub gh: each arm is searched and
+# sorted on its own, the workflow-bot arm is bounded to the owners
+# `gh api` resolved, and a denied owner lookup costs that arm alone. The
+# stub records its argv so the flags are asserted rather than assumed.
 with tempfile.TemporaryDirectory() as d:
     gh_argv_log = os.path.join(d, "gh-argv.log")
     owners_file = os.path.join(d, "owners.txt")
@@ -511,10 +511,6 @@ with tempfile.TemporaryDirectory() as d:
             print("SKIP: stub-gh end-to-end block (needs a POSIX executable stub)")
         else:
             subject.GH_PATH = gh_stub
-            # The union is deduplicated (the assignee arm repeats PR 1) and
-            # sorted: inject-pr-monitor-status.py fingerprints this list, so
-            # three searches kept in gh's own result order would reorder
-            # between polls and re-inject an unchanged population.
             def pr(number):
                 return {"number": number, "url": "https://example.com/p/%d" % number}
             # One search per arm of the scope test a query can express

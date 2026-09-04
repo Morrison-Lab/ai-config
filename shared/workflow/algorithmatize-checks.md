@@ -527,7 +527,7 @@ picking the script whose name matches the property.
   that measures it.
 
 (Measured 2026-08-19 on ai-config.
-`scripts/check-memory-file-size.py` exits `0` while printing that
+`scripts/check-memory-file-size.py` exited `0` while printing that
 `memories/github-actions.md` was over its 1200-line threshold, so the crossing
 was reported here as advisory and pushed.
 `validate` went red on both parallel runs: `scripts/test_check_memory_file_size.py`
@@ -900,6 +900,26 @@ A grep sees all three, so it does not matter that only the last is ever printed.
 (Measured 2026-09-02 while adding a hook test for [ai-config#3017](https://github.com/Morrison-Lab/ai-config/issues/3017).
 The needle was the phrase `chained AHEAD`, and `git show origin/main:hooks/no-unreviewed-pr.py | grep -n 'chained AHEAD'` returns 6 hits the fix never touches: three docstrings (lines 356, 418, 672), two inline comments (1522, 1550), and the label-exemption message (1917).
 So the assertion passed against the unfixed script, and the pre-fix control that was supposed to fail did not.)
+
+**A live guard's own substring needle has the identical failure mode, and it fires on the message that discharges it rather than only on a test fixture.**
+
+The section above is about a test's needle matching the fixture's own pre-existing text.
+The same collision reaches a shipped `Stop`/`PreToolUse` hook whenever its trigger phrase is one the corpus has to be able to *discuss*: a guard keyed on a cleanliness phrase fires on the very message that **retracts** an earlier, unsupported use of that phrase, because the retraction has to name the phrase to withdraw it.
+The guard is technically correct that the string appears --- it is wrong that the string's *appearance* still means what the guard was built to catch, because the sentence containing it is doing the opposite job: undoing the claim rather than making it.
+
+`no-placeholder-reply.py`'s whole-message anchoring, already named above, is the general answer: match the **whole** stripped message rather than a substring, specifically because this corpus quotes its own banned strings constantly.
+The same fix generalizes past that one hook.
+
+- **Do:** anchor a guard's needle on the whole message (or an unambiguous structural position within it), not a bare substring, whenever the corpus must be able to discuss the phrase it flags.
+- **Do:** exempt a sentence carrying a first-person negation of the claim ("I never ran ...", "I said X --- I never verified it") from a substring match, when whole-message anchoring is not available.
+- **Don't:** ship a guard whose needle is a bare substring of the phrase its own remedy has to use --- the remedy then trips the guard it exists to satisfy.
+- **Don't:** assume a guard is safe because its test fixtures don't happen to include a retraction of the guard's own vocabulary;
+  write that fixture deliberately.
+
+(Measured 2026-09-02: `hooks/no-incomplete-check-enumeration.py` blocked a message asserting two PRs were "clean by every instrument" on nothing but `gh pr checks` --- correctly, that is the exact short surface the guard exists to catch.
+The **next** message retracted it ("I said #3010 and #3029 were 'clean by every instrument' at merge.
+I never ran `check-pr-fully-clean.py` on either.") and the same guard, on the same phrase, blocked that retraction too --- twice, across two consecutive turns.
+Tracked as [ai-config#3053](https://github.com/Morrison-Lab/ai-config/issues/3053).)
 
 **A tenth outcome: the property under test is enforced at more than
 one independent site, and mutating one leaves the others standing
@@ -1317,6 +1337,54 @@ Both halves are strings a session can type, and neither names a workflow definit
 The issue is open and no hook file exists on `main`, so this section is the argument that its discharge should be dropped rather than a description of a shipped file;
 a comment recording that argument was posted on the issue on 2026-09-03.)
 
+## Your own command's shape is part of a transcript-read discharge condition
+
+The section above is the guard author's side of a discharge: does the matcher separate the obligation from prose that merely quotes it?
+This is the **subject's** side.
+[`pr-on-claim`](pr-on-claim.md) already states it for one hook --- run the `requested_reviewers` POST as the sole or last command, and pipe it nowhere --- and what follows generalizes that from one hook to every transcript-read guard, because the reason it holds there has nothing to do with that hook.
+
+A guard that reads the transcript sees the text of your command and the text of its output.
+It cannot see the effect the command had.
+So an ordinary formatting choice can destroy the evidence while the action itself succeeds perfectly, and the two outcomes are indistinguishable from where you are sitting: the thing you wanted happened, and the guard fired anyway.
+The reliable tell is that the first conclusion is always *the guard is broken*, because the action visibly worked.
+
+Two shapes, measured in one session, and they break different things:
+
+- `gh pr view --json state` narrowed with `--jq` to pretty-print flattened `"state":"MERGED"` into `state=MERGED`, so the hook's terminal-state discharge regex, written against the JSON, could not match.
+  What the guard reads is the output's **spelling**, and reshaping it is what destroys the record.
+- A `requested_reviewers` POST written as `... ; echo rc=$?` and as `... | head` moved out of last-command position, so its exit status could no longer be attributed to it.
+  What that guard needs there is the **position**, which is what makes the status attributable.
+
+The distinction decides the remedy, and getting it wrong forbids the right shape.
+`pr-on-claim` recommends narrowing that POST's response "with a flag on the POST itself rather than a downstream pipe".
+That is safe, and the reason is worth stating rather than assuming: the same hook does read the request's body --- a `"status":4xx` shape marks a failed request --- but a genuinely failed `gh api` also exits non-zero, so a projection cannot manufacture a false success by itself.
+The `gh pr view` above had no such second signal *for the fact in question*.
+Exit status distinguishes a failed read from a successful one and cannot distinguish MERGED from OPEN, so the terminal state has exactly one reader --- a regex written against the JSON spelling, which `--jq` rewrote.
+
+So ask what the guard reads, and expect the answer to name more than one thing.
+`no-unreviewed-pr.py` consults the output's text, the command's position, and its exit status, all three in one discharge, which is why "the position is what matters here" is not a licence to reshape the body.
+
+What the two shapes share is the moment.
+`--jq`, a trailing `echo`, and a pipe are each applied for readability, while composing the command, with no thought of the guard --- and each is applied to the very thing that was going to serve as the record.
+So the rule is about *which* commands get formatted rather than about formatting in general: a command that carries discharge evidence gets run bare, alone, and unchained, and the tidying goes on a separate follow-up call.
+
+**The mirror is a check reading a different artifact, and that failure has nothing to do with the subject's command.**
+The same session ran a CI-gate checker against the committed head while the fix sat uncommitted in the working tree.
+The checker was right, and the first conclusion was again that it was broken.
+That is [`verify-the-right-artifact`](verify-the-right-artifact.md)'s working-directory shape pointed the other way: there a stale checkout stands in for the authoritative revision, and here the authoritative revision stands in for the uncommitted change.
+That fragment covers only the first direction today ([#3130](https://github.com/Morrison-Lab/ai-config/issues/3130)), so this is adjacent to it rather than owned by it --- and it is still not this section's subject, since no command shape is involved.
+It is named here only because it wears the same disguise: an action that visibly worked, and a check that says it did not.
+Committing costs one command and settles it.
+
+- **Do:** run a discharge-relevant command alone and unchained, so the transcript carries its result verbatim.
+- **Do:** ask what the guard reads --- the output's text, the command's position, its exit status --- and expect more than one of those to matter at once.
+- **Do:** tidy or reshape that output in a separate call afterwards, when you want it readable.
+- **Do:** ask whether a disagreeing check is reading the artifact you changed, before diagnosing the check.
+- **Don't:** reshape the output of a command whose *text* is the evidence --- `--jq`, a downstream pipe, a formatting flag --- or chain anything after a command whose *position* is.
+- **Don't:** read those as alternatives;
+  a single guard can consult all three at once, so establishing that position matters says nothing about whether the body is inert.
+- **Don't:** conclude a guard is defective from the fact that the underlying action worked --- the guard measures the record, not the effect.
+
 ## Measure CPU time, not wall clock, when the assertion is about work done
 
 A performance regression test asserts something about the *code*.
@@ -1659,3 +1727,45 @@ one echoed by the run that depends on it is checked on every execution.**
   the refutations are evidence the information is not in the artifact.
 - **Don't:** leave a validity assumption as prose in a README while the run
   that depends on it logs nothing.
+
+## A log's file order is an assumption, so state it before keying an instrument on position
+
+The sections above test an instrument's matcher.
+This one tests its **ordering** assumption,
+which is invisible precisely because it is never written down:
+a last-wins reader over an append-only log assumes file order is time order,
+and nothing in the code says so.
+
+That assumption fails whenever the log is rewritten, replayed, or merged,
+and it fails in the worst possible way ---
+every record parses correctly and the reader holds a real one, just not the newest,
+so there is no malformed input to notice.
+A Claude Code transcript after a context compaction is the measured case, per
+[`claude-code-transcripts`](../../memories/claude-code-transcripts.md).
+
+**When a guard's refusal contradicts your own read of the session, run its own reader against the artifact rather than theorizing about why it fired.**
+That is already
+[`mistake-patterns`](../../memories/mistake-patterns.md) Pattern 17,
+and it is what separates an ordering fault from a matcher fault:
+both produce an identical refusal message,
+and only executing the parser prints which record it actually held.
+
+**A guard being wrong does not make its escape valve available.**
+The two failures compose rather than cancelling.
+On 2026-09-03 the sanctioned `ALLOW_UNREVIEWED_PUSH=1` override was classifier-denied
+at the same moment the guard was holding a compaction-replayed stale verdict
+([#2899](https://github.com/Morrison-Lab/ai-config/issues/2899)),
+so the refusal was wrong and its documented remedy unreachable together.
+The unblock was to satisfy the guard honestly ---
+dispatch a second review so a fresher record lands last ---
+rather than to keep rephrasing the override,
+per [`mistake-patterns`](../../memories/mistake-patterns.md) Pattern 43.
+
+- **Do:** key a "most recent" reader on each record's own timestamp, and say in the code why position is not enough.
+- **Do:** run the instrument's own parsing function against the live artifact, printing what it held, before writing down a mechanism-level explanation.
+- **Do:** produce a fresh record to satisfy a position-keyed guard honestly,
+  once its own parser has been run and shown to hold a replayed record,
+  and when both the guard and its override are unavailable at once.
+- **Don't:** append a fresher record before that check --- a guard holding a current verdict is refusing on the merits, and appending over it is not an unblock.
+- **Don't:** treat an append-only log as sorted --- that is an assumption about the writer, not a property of the file.
+- **Don't:** diagnose a last-wins reader's wrong answer as a matcher bug without first checking the order of what it read.

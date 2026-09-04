@@ -399,7 +399,6 @@ def checked_prs(path):
                     output_text = str(b.get("content") or b.get("output") or "")
                     is_failure = (
                         "is not installed or not on PATH" in output_text or
-                        "This script requires the GitHub CLI" in output_text or
                         "usage: check-pr-fully-clean.py" in output_text or
                         "Cannot resolve the repository" in output_text or
                         "is not in OWNER/REPO form" in output_text or

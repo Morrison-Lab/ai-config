@@ -437,6 +437,22 @@ markdownlint reported a real MD018 failure, `tail` exited 0, and the chain
 continued through the remaining checks and reported them all passing.
 The failure surfaced only on a later run that did not pipe.)
 
+(Recurred 2026-09-03 on Morrison-Lab/ai-config#3154, with this section loaded:
+two heads were pushed red, `73de53a9` with a `new-line-breaks` violation and
+`33673a01` with an MD018 hit, each after a chain of the form
+`markdownlint-cli2 ... | tail -2 && ... gha-check-new-line-breaks.py | tail -2 && ...`
+printed the gate's own red line and continued.
+Each cost a follow-up commit and a CI round.
+With the 2026-08-03 case above that makes three occurrences of this shape,
+past `deterministic-tools.md`'s bar.
+`hooks/warn-status-read-after-pipe.py` already guards the bare-pipeline
+`$?` read its own case (ai-config#2149) names, and does not fire on the `&&`
+chain, which reads no `$?` at all; a guard for that chain is filed as
+[#3184](https://github.com/Morrison-Lab/ai-config/issues/3184), where a
+comment proposes extending that hook rather than adding a second detector:
+a gate name on the left of a pipe into `tail`, `head`, or `grep`, an `&&`
+after it, and no `set -o pipefail` earlier in the command.)
+
 ## An explicit `exit` escapes the capture group
 
 The capture idioms above (`|| rc=$?` on a region, a status consumed by an

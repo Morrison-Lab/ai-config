@@ -694,6 +694,46 @@ def close_ident(cmd):
     return False, None, None, False
 
 
+# Flags whose VALUE is a payload, a header, or a method rather than the request
+# path. `gh api ... -f 'body=see repos/o/r/pulls/1038'` posts a COMMENT, and its
+# field value can quote any pull at all, so a scan over every token read that
+# write as a status read of PR 1038 and discharged its reviewer obligation
+# (ai-config#3086 review). `--url` is deliberately absent: its value IS the
+# request path, so it stays a candidate.
+_API_VALUE_FLAGS = {
+    "-f", "--field", "-F", "--raw-field", "-H", "--header",
+    "-X", "--method", "--request", "-q", "--jq", "-t", "--template",
+    "--input", "-p", "--preview", "--hostname", "--cache",
+    "-d", "--data", "--data-raw", "--data-binary", "--data-urlencode",
+    "-o", "--output", "-u", "--user", "-A", "--user-agent",
+    "-e", "--referer", "-b", "--cookie", "-T", "--upload-file",
+    "--post-data", "--post-file",
+}
+
+
+def _api_path_tokens(argv):
+    """The tokens of a `gh api`/`curl`/`wget` argv that could be its PATH.
+
+    A flag is never a path, and neither is the value of a flag that carries
+    payload or metadata. An `=`-joined flag (`--field=x`, `-XPOST`) starts with
+    `-` and is skipped as a flag. Anything left is a positional token, and the
+    caller still anchors its own pattern to the token's start, so a value this
+    filter fails to recognise cannot match a path in the middle of prose.
+
+    Skipping too much only costs a probe unrecognised, which leaves the guard
+    armed and warning -- the safe direction.
+    """
+    skip = False
+    for t in argv[1:]:
+        if skip:
+            skip = False
+            continue
+        if t.startswith("-"):
+            skip = t in _API_VALUE_FLAGS
+            continue
+        yield t
+
+
 def _argv_probe(argv):
     """(is_probe, num, repo) for a single-PR status read.
 
@@ -715,7 +755,11 @@ def _argv_probe(argv):
     state both return the state -- and the discharge is gated on the RESULT
     reporting a terminal one, so a GET against a still-open PR clears nothing.
     The path must name the pull ITSELF, with no sub-resource, so
-    `pulls/<N>/requested_reviewers` is not a probe.
+    `pulls/<N>/requested_reviewers` is not a probe. And it must be the request
+    PATH: scanning every token instead let a `-f body=...` payload quoting a
+    pull URL register a comment-posting WRITE as a status read of whatever pull
+    its prose mentioned (ai-config#3086 review), which is the silent-discharge
+    class every releasing path here refuses.
     """
     if not argv:
         return False, None, None
@@ -726,8 +770,8 @@ def _argv_probe(argv):
     api = (argv[0] == "gh" and len(argv) >= 2 and argv[1] == "api") \
         or argv[0] in ("curl", "wget")
     if api:
-        for t in argv[1:]:
-            m = RX_CMD_PULL.search(t)
+        for t in _api_path_tokens(argv):
+            m = RX_CMD_PULL.match(t)
             if m:
                 return True, m.group(3), f"{m.group(1)}/{m.group(2)}"
     return False, None, None
@@ -997,6 +1041,18 @@ CLOSE_TOOLS = {"merge_pull_request", "mcp__github__merge_pull_request"}
 # not on PATH at all -- had no way to make an outside close visible, and the
 # guard's own prescribed remedy was unrunnable (ai-config#3086 review).
 PROBE_TOOLS = {"pull_request_read", "mcp__github__pull_request_read"}
+# ... and the ONLY method of that tool which reports the PR's own state. The
+# same tool also serves `get_diff`, `get_files`, `get_comments`, `get_reviews`
+# and friends, whose bodies are arbitrary diff or comment text -- so an
+# ungated registration let any PR whose diff touches an API fixture or a JSON
+# snapshot discharge its own obligation merely by having that diff read
+# (ai-config#3086 review). The shell arm has the same restriction by
+# construction: `gh pr view`/`gh pr checks` are probes and `gh pr diff`, the
+# twin of `get_diff`, is not. `method` is REQUIRED by the tool's schema
+# (measured 2026-09-04 against the server's own input schema), so demanding it
+# explicitly rejects no legitimate call, and a missing one is treated as
+# not-a-probe -- the direction that leaves the guard armed.
+PROBE_TOOL_METHODS = {"get"}
 
 # A result body reporting that a PR has reached a terminal state -- merged or
 # closed. Tolerates the escaped quotes of a json.dumps'd tool_result, exactly as
@@ -1039,7 +1095,15 @@ RX_CMD_API = re.compile(r"repos/([\w.-]+)/([\w.-]+)/pulls?/(\d+)", re.I)
 # API call about one pull itself rather than about one of its sub-resources.
 # `pulls/1038/requested_reviewers` is a request, not a status read, and must not
 # register as a probe; `pulls/1038` and `pulls/1038?foo=1` must.
+#
+# Applied with `.match()`, so it is anchored to the START of a token, and the
+# optional host covers the `curl`/`wget` spelling
+# (`https://api.github.com/repos/...`, or a GHES `/api/v3/` prefix). Anchoring
+# is the second half of the fix _api_path_tokens begins: together they mean a
+# pull path has to BE the request path rather than merely appear somewhere in
+# the command line (ai-config#3086 review).
 RX_CMD_PULL = re.compile(
+    r"(?:https?://[^/\s]+)?/?(?:api/v3/)?"
     r"repos/([\w.-]+)/([\w.-]+)/pulls?/(\d+)(?:[?#]|$)", re.I)
 
 # A PR identity carried by a tool RESULT: the PR URL (owner/repo/number), gh's
@@ -1836,9 +1900,16 @@ def scan(path):
                     continue
                 if name in PROBE_TOOLS:
                     # A read, not an action: it discharges nothing by itself.
-                    # Registered exactly like the shell probe, so the same
-                    # gate applies -- the RESULT must report a terminal state
-                    # and must not have failed. Atomic, so `last` is True.
+                    # The RESULT must still report a terminal state and must
+                    # not have failed. Atomic, so `last` is True.
+                    #
+                    # Only the state-reading METHOD registers, mirroring the
+                    # shell arm's restriction to `gh pr view`/`gh pr checks`
+                    # (see PROBE_TOOL_METHODS): every other method returns a
+                    # diff or a comment thread, over which a terminal-state
+                    # match says nothing about this PR.
+                    if str(inp.get("method") or "") not in PROBE_TOOL_METHODS:
+                        continue
                     qn, qr = input_ident(inp)
                     pending_probe[tid] = (qn, qr, True)
                     continue

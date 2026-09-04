@@ -1259,6 +1259,14 @@ OPEN_CLOSE_FIELDS = '{"closed":false,"closedAt":null}'
 # facts in the same channel-independent shape must discharge.
 REST_CLOSED = ('{"number":1038,"state":"closed","merged":false,'
                '"closed_at":"2026-09-03T06:25:00Z","merged_at":null}')
+# A body that merely CONTAINS a terminal-state literal without reporting one:
+# the diff of a PR that touches an API fixture or a JSON snapshot -- this very
+# file, for one. `pull_request_read` serves `get_diff` under the same tool name
+# as `get`, so a registration that ignores the method reads this as a status
+# report (ai-config#3086 review).
+DIFF_QUOTING_CLOSED = (
+    'diff --git a/hooks/fixtures.json b/hooks/fixtures.json '
+    '+  "state": "CLOSED", "merged": false')
 
 case(create("c") + [bash("gh pr merge 1038 --squash", tid="m"), res("m", "{}"),
                     say("Merged.")], False,
@@ -1307,6 +1315,14 @@ case(create("c") + [use("mcp__github__pull_request_read", tid="v", owner="o",
                         repo="r", pullNumber=1038, method="get"),
                     res("v", REST_CLOSED), say("Read it.")], False,
      "the MCP single-PR read is a probe, so `gh` is not the only channel")
+# `curl`/`wget` are accepted alongside `gh api`, and the URL they carry has a
+# host in front of the path -- a shape no other case exercises, so an edit to
+# the anchoring would otherwise turn nothing red (ai-config#3086 review).
+case(create("c") + [bash("curl -s -H 'Accept: application/vnd.github+json' "
+                         "https://api.github.com/repos/o/r/pulls/1038",
+                         tid="x"),
+                    res("x", REST_CLOSED), say("Read it with curl.")], False,
+     "a curl read of one pull is a probe, host and all")
 
 # ... and the fail-safe direction, which must survive all of the above.
 case(create("c") + [bash("gh pr merge 1038 --squash", tid="m"),
@@ -1334,6 +1350,21 @@ case(create("c") + [use("mcp__github__pull_request_read", tid="v", owner="o",
                         repo="r", pullNumber=1039, method="get"),
                     res("v", REST_CLOSED), say("Read the other PR.")], True,
      "an MCP read of a DIFFERENT PR does not discharge this one")
+case(create("c") + [use("mcp__github__pull_request_read", tid="v", owner="o",
+                        repo="r", pullNumber=1038, method="get_diff"),
+                    res("v", DIFF_QUOTING_CLOSED), say("Read the diff.")],
+     True,
+     "an MCP read of a PR's DIFF is not a status read, whatever the diff "
+     "quotes -- the twin of `gh pr diff`, which is not a probe either")
+case(create("c") + [bash("gh api repos/o/r/issues/9/comments "
+                         "-f 'body=status of repos/o/r/pulls/1038'", tid="x"),
+                    res("x", REST_CLOSED), say("Posted a comment.")], True,
+     "a pull path quoted in a PAYLOAD is not the request path, so a "
+     "comment-posting write is not a probe")
+case(create("c") + [bash("curl -s https://api.github.com/repos/o/r/pulls/1038"
+                         "/requested_reviewers", tid="x"),
+                    res("x", REST_CLOSED), say("Read the reviewers.")], True,
+     "the curl negative control: a sub-resource URL is not a single-PR probe")
 case(create("c") + [bash("gh pr list --state merged", tid="v"),
                     res("v", MERGED), say("Listed.")], True,
      "a repo-wide list naming no single PR is not a probe")

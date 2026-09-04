@@ -14,6 +14,20 @@ Split out of [`tools.md`](tools.md) on 2026-09-01 when that file crossed the 125
   **Do:** spell alternatives out in prose (`` an `HH:MM` stamp suffixed `PDT`, `PST`, or `PT` ``) instead of writing a `|`-joined alternation, in backticks or not, inside a table cell.
   **Don't:** write a regex-style alternation containing `|` in a table cell and trust the backticks to shield it -- MD056 reads raw text, not rendered Markdown.
   (Morrison-Lab/ai-config#2906, 2026-09-01.)
+- **A line that begins with an issue reference is parsed as a heading (MD018).**
+  Covered in full by [`semantic-line-breaks`](../shared/writing/semantic-line-breaks.md)'s MD018 section, which owns the rule, the collision with bare references, and both remedies (link the reference, or reword so the line does not open with it).
+  Recorded here only for the sweep, since this file is where the linter's rule numbers are indexed: `grep -rn --include='*.md' '^#[0-9]' .` finds every instance.
+  (Morrison-Lab/ai-config#3060, 2026-09-03.)
+- **markdownlint-cli2 runs locally with no install step, at CI's exact version.**
+  `npx --yes markdownlint-cli2@<version>` reads `.markdownlint-cli2.jsonc` and lints the whole repo in seconds;
+  take the version from the `lint-markdown` job log, which prints it as its first line.
+  Note precisely what this does and does not clear.
+  `scripts/run-local-validation.py` deliberately declines to offer this as a local equivalent for the `lint-markdown` job, because gha's action runs four checks (markdownlint, code-block length, list-item splices, table splits) and a bare call reproduces one while reporting a clean zero for the other three.
+  That reasoning is about the *job*, not about the tool.
+  Running it by hand as one named check is sound, and reporting it as the job is the failure that runner exists to prevent.
+  **Do:** run it before pushing markdown, and say which of the four checks it covered.
+  **Don't:** read a clean markdownlint run as the `lint-markdown` job passing.
+  (Morrison-Lab/ai-config#3060, 2026-09-03.)
 - **Don't tag a non-shell CLI block `bash`/`sh` (MD040).**
   MD040 wants a language on every fence, which invites tagging anything command-shaped as `bash`.
   Claude slash commands (`/ums`, `/plugin`, `/also`) and other application-level directives are not shell-executable, so `bash` implies a reader can run them and they fail when someone tries.

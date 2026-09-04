@@ -284,11 +284,42 @@ None used a noun-phrase object, which is precisely what the narrowing broke, so 
 A suite that grows while staying inside one shape reports coverage and adds none.
 So when a fix restricts what a pattern accepts, ask what the restriction excludes and write a case on the far side of it -- the far side is where the regression lives, by construction.
 
+**A correct diagnosis is what licenses the unsafe edit, which is why a well-understood finding is the dangerous one.**
+The over-correction and the mis-fired probe above are both about the *content* of a fix.
+This is about its *speed*, and it is the condition that produces both of those.
+When the cause is genuinely understood, the edit that follows feels settled before it is written --- there is nothing left to work out, so there is nothing left to check --- and that feeling is indistinguishable from the edit actually being safe.
+An unclear finding gets a careful fix precisely because the confusion forces a pass over it.
+
+Measured while drafting [#3101](https://github.com/Morrison-Lab/ai-config/pull/3101).
+Four such fixes, each resting on a diagnosis that was correct.
+The first two were caught before their commit, so nothing in that PR's history records them and they are described rather than cited:
+
+- Adding `2>/dev/null` to a timing loop fixed stderr interleaving and silenced the only remaining failure signal, so a nonexistent command reported a plausible fast spread (`0.007 / 0.003 / 0.003`).
+- Moving a hard-to-time probe in-process fixed a misattribution and made the guard hang rather than fail.
+- Narrowing a regex branch to option tokens only fixed a false positive and silently dropped `git clean -fdx <root>`, a real destructive form the previous draft caught --- the surviving comment in `hooks/flag-config-deletion-without-ref-check.py` records it, on that PR's branch, which `main` did not carry at the time of writing.
+- Adding a not-exhaustive note to a catalog document fixed a count that had outrun its own table and severed the document's purpose statement onto the wrong sentence, which the next round had to restore (`eca210dbf` and `d8c88486f`, both on that same unmerged branch).
+
+Read the list by column rather than by row.
+Each fix did what it was for;
+each also broke something the finding it answered never mentioned --- a hidden failure signal, a hang in place of a failure, a dropped destructive form, a false claim stranded in prose the edit was only passing through.
+What those four share is not a category.
+It is that none of them is about the finding, and the finding is the only thing the edit was checked against.
+So ask the general question explicitly once the edit is written --- what does this change do outside the finding it answers? --- and then whichever specific ones it suggests: what does it now hide, what does it now let through, how can it now fail, what did it alter in text it merely passed through.
+Probe those before reporting the fix, rather than probing the finding again.
+
+**Re-running the original failing case is the probe this list does not otherwise ask for.**
+The far-side case the coverage rule above prescribes catches what a narrowing excluded.
+It says nothing about whether the fix still does its own job, and a fix that hides a signal can pass a far-side case while quietly failing the case that prompted it.
+The `2>/dev/null` fix is the cheapest illustration: it silenced the very failure it was added to tidy, so the original probe was the only one that could have caught it, and it was the one probe nobody thought to repeat.
+
+- **Do:** ask what a fix does outside the finding it answers --- what it now hides, admits, or can newly fail at, and what it altered in passing --- and probe that before reporting the fix.
+- **Do:** re-run the original failing case after a fix, alongside the far-side case, so the fix is shown still to do its own job.
 - **Do:** ask which single change is sufficient for a finding, and ship only that one.
 - **Do:** write at least one case on the far side of any restriction you add, varying the axis the restriction acts on.
 - **Do:** check *which* alternative made a probe fire before reading it as coverage.
 - **Don't:** treat code written in response to a finding as pre-validated --- it is a new diff and gets a new review.
 - **Don't:** conclude a class is covered because one member of it fired.
+- **Don't:** treat a correct diagnosis as evidence the edit implementing it is safe --- being right about the cause says nothing about the patch.
 
 ## A cosmetic pass over a paragraph is not a read of it
 

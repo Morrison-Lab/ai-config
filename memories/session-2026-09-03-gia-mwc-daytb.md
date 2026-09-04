@@ -673,7 +673,7 @@ Copilot's fifth round made two points on `3f8f2fd9`.
 The wording one ("the paths skill-builder step 0 runs" implied the whole recipe is identical) is applied as "skill-builder step 0's path list".
 The suppressed one was the real catch:
 the case record cited `eb0cf15e`, `1732000a`, and `5f2dab94` from #3060's branch, and `git fetch origin <sha>` fails for all three,
-because #3060's branch was rebased before merge (its `refs/pull/3060/head` is `f9068299`, and none of the three is an ancestor of it) --- both halves refuted in the 19:39 entry below: the reading was the shallow clone's, and all three are ancestors of `f9068299` in a full clone.
+because #3060's branch was rebased before merge (its `refs/pull/3060/head` is `f9068299`, and none of the three is an ancestor of it) --- the rebase cause is refuted in the 19:32 entry below, and the ancestry clause in the 19:39 entry: the reading was the shallow clone's, and all three are ancestors of `f9068299` in a full clone.
 Fifteen adversarial rounds and two claude-review runs had "confirmed all four cited SHAs exist" against the local object store, which held them from the session's own fetches;
 the artifact they verified was the clone, not the remote.
 The record now measures at `3935bfff` and `2156b439`, both on `main`: three then four `memories/` hits, the same five MD018 lines at both, and the added entry a cross-link at the merge, so a hit count cannot tell an owner from a pointer.

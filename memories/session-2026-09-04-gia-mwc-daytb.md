@@ -216,14 +216,22 @@ Each figure re-measured here before the fix (`wc -l` at the named SHAs, `git dif
 Fixed in one pass;
 the round is the notebook's own lesson applied to the notebook.
 
-## 03:07 PDT --- notebook branch at `de94b4cd`: round 2 returns six findings, three of them present since `95d6a96c`
+## 03:07 PDT --- notebook branch at `de94b4cd`: round 2 returns six findings, four of them present since `95d6a96c`
 
 A different class from round 1: cross-references that resolve to nothing, a mechanism claim the later correction never pointed back at, and a coverage claim in the notebook's own voice.
 Two "the HH:MM entry" pointers named entries that never existed (19:36 for the 19:32 entry;
 20:20 for the 20:22 entry, 20:20 being the check-in time that entry opens with);
-the 19:32 entry's "none of the three is an ancestor" parenthetical stood uncorrected in place while the 19:39 entry refuted it forty lines later (`git merge-base --is-ancestor` answers yes for all three in this full clone), so the pointer forward is now on the line itself;
+the 17:46 entry's "none of the three is an ancestor" parenthetical stood uncorrected in place while the 19:39 entry refuted it (`git merge-base --is-ancestor` answers yes for all three in this full clone), so the pointer forward is now on the line itself;
 the #3166 merge heading and the re-anchored 19:37 both read a minute late against `d8c507a8`'s committer time of 19:36:26 PDT, where the other four anchors truncate to their minute;
 the 02:49 entry asserted round 1 "confirmed every gate, every SHA, every heading time, and every forge claim" as the notebook's own finding, with a tool-use count a reader cannot re-run, and this round refuted the "every heading time" part on content round 1 had read;
 and the same entry said #3196's body "is wrong" thirty-seven seconds before the issue was corrected, a present-tense claim about live state with no timestamp.
 All six fixed;
 the coverage sentence now attributes the report to the reviewer and drops the count.
+
+## 03:18 PDT --- notebook branch at `c01aa15d`: round 3 returns four findings, every one in the previous round's account of its own fixes
+
+The round-2 fixes were correct as measured;
+what failed was the entry narrating them, which named the wrong entry for the ancestry parenthetical (it sits under the 17:46 heading), stated a line distance nobody measured, miscounted how many findings predated `95d6a96c`, and attributed two refutations to one entry when they sit in two.
+The same shape as the #3193 rounds recorded in the `ums` anti-pattern: each fix commit's narration is fresh unmeasured prose, so a round that fixes N findings and adds an entry adds new claims to refute.
+Fixed against the file's own headings and `grep -n`;
+this entry carries no figure that is not a heading time.

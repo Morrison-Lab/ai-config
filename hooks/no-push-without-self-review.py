@@ -196,10 +196,12 @@ SIBLING_NAME = "no-unreviewed-pr.py"
 def _sibling_candidates(here: str) -> list:
     """Where a copy of the detector may sit, best first.
 
-    The canonical copy is beside this file. An install can run the guard from
-    a checkout's `.claude/hooks/` directory that carries the guard but not the
-    detector (ai-config#2981), so that layout gets one more candidate: the same
-    checkout's own `hooks/`, reached by dropping `.claude`.
+    The canonical copy is beside this file. A guard at `<root>/.claude/hooks/`
+    gets one more candidate, `<root>/hooks/` -- but only when `<root>` carries
+    a `.git` entry, so that the candidate is in the same working tree as this
+    file rather than in whatever `hooks/` happens to sit beside a `~/.claude`
+    (ai-config#2981). Presence, not directory-ness: a linked worktree's `.git`
+    is a file.
 
     The git root of the process cwd is deliberately NOT a candidate, though the
     issue proposed it. It can name a different checkout from the one this file
@@ -211,9 +213,11 @@ def _sibling_candidates(here: str) -> list:
     """
     candidates = [os.path.join(here, SIBLING_NAME)]
     parent = os.path.dirname(here)
-    if os.path.basename(here) == "hooks" and os.path.basename(parent) == ".claude":
-        candidates.append(
-            os.path.join(os.path.dirname(parent), "hooks", SIBLING_NAME))
+    root = os.path.dirname(parent)
+    if (os.path.basename(here) == "hooks"
+            and os.path.basename(parent) == ".claude"
+            and os.path.exists(os.path.join(root, ".git"))):
+        candidates.append(os.path.join(root, "hooks", SIBLING_NAME))
     return candidates
 
 

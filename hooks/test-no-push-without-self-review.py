@@ -1136,62 +1136,90 @@ def dotclaude_fallback_cases() -> tuple[int, int]:
     ai-config#2981: a worktree install ran the guard from
     `<checkout>/.claude/hooks/`, where the detector does not sit, so the guard
     went degraded and refused push-shaped text it could not grade. The fallback
-    reads the detector out of the same checkout's `hooks/`, which is the same
-    working tree and so the same revision.
+    reads the detector out of the same checkout's `hooks/`, and fires only when
+    a `.git` entry marks that root as a working tree -- so a `~/.claude/hooks`
+    copy does not reach into `~/hooks/`.
 
     The discriminator is `git push --dry-run`. The degraded heuristic's regex
     matches it, and the real detector does not treat it as a push at all
     because it re-heads nothing -- so letting it through is only possible with
-    the detector loaded. The third case is the negative control: strip the
-    detector out of the checkout's `hooks/` and the same command denies again,
-    which is what makes the first case evidence of the fallback rather than of
-    a test that cannot fail.
+    the detector loaded. Two negative controls: strip the detector out of the
+    checkout's `hooks/`, and drop the `.git` entry, and the same command denies
+    again either way.
     """
     failures = 0
     ran = 0
-    root = tempfile.mkdtemp(prefix="npwsr-dotclaude-")
-    try:
+
+    def install(root, with_git):
         installed = os.path.join(root, ".claude", "hooks")
         checkout_hooks = os.path.join(root, "hooks")
         os.makedirs(installed)
         os.makedirs(checkout_hooks)
+        if with_git:
+            # A linked worktree's `.git` is a file, not a directory.
+            with open(os.path.join(root, ".git"), "w", encoding="utf-8") as fh:
+                fh.write("gitdir: /nonexistent\n")
         guard = os.path.join(installed, "no-push-without-self-review.py")
         shutil.copy(HOOK, guard)
         detector = os.path.join(checkout_hooks, "no-unreviewed-pr.py")
         shutil.copy(os.path.join(os.path.dirname(HOOK), "no-unreviewed-pr.py"),
                     detector)
+        return guard, detector
 
-        def check(label, cmd, should_deny, want_degraded):
-            nonlocal failures, ran
-            ran += 1
-            res = subprocess.run(
-                [sys.executable, guard],
-                input=json.dumps({"tool_name": "Bash",
-                                  "tool_input": {"command": cmd},
-                                  "transcript_path": ""}),
-                capture_output=True, text=True, cwd=REPO)
-            denied = '"deny"' in res.stdout
-            degraded = "could not load its push detector" in res.stdout
-            if res.returncode != 0 or denied != should_deny or degraded != want_degraded:
-                print(f"FAIL (deny={denied}, degraded={degraded}; "
-                      f"wanted {should_deny}/{want_degraded}): {label}")
-                failures += 1
-            else:
-                print(f"PASS: {label}")
+    def check(guard, detector, label, cmd, should_deny, want_degraded,
+              want_report):
+        nonlocal failures, ran
+        ran += 1
+        res = subprocess.run(
+            [sys.executable, guard],
+            input=json.dumps({"tool_name": "Bash",
+                              "tool_input": {"command": cmd},
+                              "transcript_path": ""}),
+            capture_output=True, text=True, cwd=REPO)
+        denied = '"deny"' in res.stdout
+        degraded = "could not load its push detector" in res.stdout
+        reported = f"loaded its push detector from {detector}" in res.stderr
+        if (res.returncode != 0 or denied != should_deny
+                or degraded != want_degraded or reported != want_report):
+            print(f"FAIL (deny={denied}, degraded={degraded}, "
+                  f"reported={reported}; wanted {should_deny}/{want_degraded}/"
+                  f"{want_report}): {label}")
+            failures += 1
+        else:
+            print(f"PASS: {label}")
 
-        check("a .claude/hooks guard loads the checkout's detector and lets a "
-              "dry-run push through", "git push --dry-run origin main",
-              False, False)
-        check("a .claude/hooks guard still denies an unreviewed real push, "
-              "and not for want of a detector", "git push origin main",
-              True, False)
-
+    root = tempfile.mkdtemp(prefix="npwsr-dotclaude-")
+    try:
+        guard, detector = install(root, True)
+        check(guard, detector,
+              "a .claude/hooks guard loads the checkout's detector, names it "
+              "on stderr, and lets a dry-run push through",
+              "git push --dry-run origin main", False, False, True)
+        check(guard, detector,
+              "a .claude/hooks guard still denies an unreviewed real push, "
+              "and not for want of a detector",
+              "git push origin main", True, False, True)
         os.remove(detector)
-        check("with no detector in the checkout either, the same dry-run push "
-              "goes back to the degraded deny",
-              "git push --dry-run origin main", True, True)
+        check(guard, detector,
+              "with no detector in the checkout either, the same dry-run push "
+              "goes back to the degraded deny and names no path",
+              "git push --dry-run origin main", True, True, False)
     finally:
         shutil.rmtree(root, ignore_errors=True)
+
+    outside = tempfile.mkdtemp(prefix="npwsr-nogit-")
+    try:
+        guard, detector = install(outside, False)
+        check(guard, detector,
+              "a .claude/hooks guard outside a working tree ignores the "
+              "hooks/ beside it and stays degraded",
+              "git push --dry-run origin main", True, True, False)
+    finally:
+        shutil.rmtree(outside, ignore_errors=True)
+
+    check(HOOK, os.path.join(os.path.dirname(HOOK), "no-unreviewed-pr.py"),
+          "the canonical guard names no path, having used its own sibling",
+          "git push --dry-run origin main", False, False, False)
     return failures, ran
 
 

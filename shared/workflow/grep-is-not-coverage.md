@@ -219,7 +219,7 @@ What step 3's own directory-wide grep would have done is checkable:
 and the owner is not among them,
 because the owner is `shared/writing/semantic-line-breaks.md`,
 which a search of `memories/` cannot reach.
-What skill-builder's corpus-wide query would have done is checkable too:
+What skill-builder's step 0 query would have done is checkable too:
 `git grep -ril "issue reference" 3935bfff -- skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md` returns eight files at that ref ---
 `hooks/test-no-unauthorized-merge.py`, `hooks/warn-stale-issue-edit.py`, `memories/github.md`, `memories/preferences.md`, `memories/r-quarto.md`, `shared/workflow/address-every-comment.md`, `shared/writing/semantic-line-breaks.md` and `skills/promote-memory/SKILL.md` ---
 with the owner among them.

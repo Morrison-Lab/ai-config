@@ -119,7 +119,7 @@ committed pass.
        cd "$repo" && grep -rilI "<keywords>" skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md
      )
      ```
-     The path list is the one skill-builder step 0 runs, over the files on disk,
+     The query runs over the files on disk,
      so an entry that exists only on a branch not checked out there is out of reach (see the unmerged-PR section of [`grep-is-not-coverage`](../../shared/workflow/grep-is-not-coverage.md)).
      `-I` skips binary files, bytecode caches included, which a plain `grep -r` would otherwise report as hits.
      A rule can be owned by a `shared/` fragment or a skill as easily as by a memory,

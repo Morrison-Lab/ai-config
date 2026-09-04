@@ -41,12 +41,18 @@ error and immediately records it is never nagged.
 An admission in the irrealis mood is not an admission, so a hypothetical
 ("even if I misread the status") is skipped -- see `IRREALIS_LEAD`.
 
-Fires once per distinct admission PHRASE per session (sentinel keyed by
-content hash and transcript path, and NOT by record index), because a reminder
-repeated every turn is noise, and noise is what gets a guard ignored. The index
-mattered: with it in the key, explaining a misfire re-fired the reminder,
-because the explanation must name the phrase and names it at a new index
-(ai-config#2997).
+Fires once per distinct admission PHRASE, bounded by transcript DISTANCE
+rather than by session lifetime. The sentinel is still keyed by content hash
+and transcript path, and NOT by record index -- putting the index in the KEY
+reintroduced the original #2997 bug, where explaining a misfire names the same
+phrase again a few records later and that read as a brand-new admission.
+Instead the sentinel's file CONTENT holds the record index of the last firing
+(see `_sentinel_gate`, `LOOP_WINDOW`): a later occurrence of the same phrase is
+a repeat only within LOOP_WINDOW records of it, and fires again beyond that
+window. An existence-only sentinel (fire once, ever, per phrase) was wrong the
+other direction -- it suppressed a genuinely later, unrelated admission that
+happened to share a short common phrase with an earlier one, for the rest of
+the session (ai-config#2997 review finding).
 
 Fails OPEN and SILENT: any parse trouble prints nothing at all.
 """
@@ -154,6 +160,16 @@ _ADMISSION_RE = re.compile(
 # cost: a hedged admission almost always continues into an unhedged one
 # ("... then my earlier claim was wrong"), which the alternatives above still
 # catch, whereas a false positive here is documented to cost six firings.
+#
+# The trailing whitespace class allows AT MOST ONE newline between the marker
+# and the clause it introduces, so a marker hard-wrapped across one line break
+# ("even if\nI misread the status") still counts as irrealis. A run of
+# horizontal whitespace matches outright; a newline matches only when the
+# lookahead cannot find a further newline (with nothing but horizontal
+# whitespace before it), which is exactly a blank line. That keeps a real
+# paragraph break ("even if\n\nI was wrong") from being swallowed: the first
+# newline's lookahead finds the second one, so the alternative fails and the
+# whole match cannot reach `$` (ai-config#2997 review nit).
 IRREALIS_LEAD = re.compile(
     r"""\b(?:
         (?:even\s+)?if
@@ -164,14 +180,16 @@ IRREALIS_LEAD = re.compile(
       | supposing
       | suppose(?:\s+that)?
       | assuming(?:\s+that)?
-    )[^\S\n]+$""",
+    )(?:[^\S\n]|\n(?![^\S\n]*\n))+$""",
     re.I | re.X,
 )
 
-# 32 characters holds the longest marker above ("whether or not ") with room
-# for the whitespace that can follow it. Adjacency is enforced by the anchor in
-# `IRREALIS_LEAD`, not by this bound.
-LEAD_WINDOW = 32
+# 40 characters holds the longest marker above ("whether or not") plus a
+# wrapped line's trailing space, the one newline `IRREALIS_LEAD` now accepts,
+# and up to eight columns of indentation on the line the admission continues
+# on. Adjacency is enforced by the anchor in `IRREALIS_LEAD`, not by this
+# bound.
+LEAD_WINDOW = 40
 
 
 class _AdmissionMatcher:
@@ -205,6 +223,46 @@ class _AdmissionMatcher:
 
 
 ADMISSION = _AdmissionMatcher(_ADMISSION_RE)
+
+# Measured from the loop ai-config#2997 itself was filed over: the
+# re-explanation that named the admitted phrase again landed 2 records after
+# the original admission (a user question, then the assistant's reply). A
+# real re-explanation exchange can run a turn or two longer than that single
+# question-and-answer, so this is not the bare minimum observed but that
+# minimum doubled plus a margin -- 6 records, i.e. three user/assistant turn
+# pairs -- so an ordinary multi-turn discussion of the same misfire still
+# reads as one admission rather than a fresh one partway through.
+LOOP_WINDOW = 6
+
+
+def _sentinel_gate(sentinel_path, admit_at, window=LOOP_WINDOW):
+    """Return True iff this occurrence of the phrase should fire.
+
+    The sentinel file's CONTENT is the record index of the last firing, not
+    just its existence, so this can tell a repeat (the same explanation
+    naming the same phrase a few records later) from a later, unrelated
+    admission that happens to share a short common phrase with an earlier
+    one. Only the first case is suppressed; the file is updated on every
+    actual firing, never on a suppressed repeat, so the window is always
+    measured from the most recent firing rather than drifting forward on
+    each silent repeat.
+    """
+    last_at = None
+    if os.path.exists(sentinel_path):
+        try:
+            with open(sentinel_path) as fh:
+                last_at = int(fh.read().strip())
+        except Exception:
+            last_at = None  # unreadable sentinel -- treat as no prior firing
+    if last_at is not None and admit_at - last_at <= window:
+        return False
+    try:
+        with open(sentinel_path, "w") as fh:
+            fh.write(str(admit_at))
+    except Exception:
+        pass
+    return True
+
 
 # A write to any of these is a recorded learning.
 UMS_PATH = re.compile(
@@ -384,12 +442,8 @@ def main() -> int:
     # that /tmp survives.
     key = hashlib.sha256(f"{path}:{admit_txt}".encode()).hexdigest()[:16]
     sentinel = os.path.join(tempfile.gettempdir(), f".claude-ums-after-error-{key}")
-    if os.path.exists(sentinel):
+    if not _sentinel_gate(sentinel, admit_at):
         return 0
-    try:
-        open(sentinel, "w").close()
-    except Exception:
-        pass
 
     print(
         "UMS reminder: an earlier turn in this session admitted an error "

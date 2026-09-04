@@ -133,6 +133,60 @@ def once_per_phrase():
         os.unlink(path)
 
 
+def window_bound():
+    """The once-per-phrase cap is bounded by transcript distance, not by
+    session lifetime (ai-config#2997 review finding). An existence-only
+    sentinel suppressed a genuinely later, unrelated admission that happened
+    to share a short common phrase with an earlier one, for the rest of the
+    session. Reuses the sibling's LOOP_WINDOW/`_sentinel_gate` mechanism.
+    """
+    fd, path = tempfile.mkstemp(suffix=".jsonl")
+    with os.fdopen(fd, "w") as fh:
+        fh.write(json.dumps(say("I was wrong about the base branch.")) + "\n")
+    payload = json.dumps({"transcript_path": path})
+
+    def invoke():
+        env = dict(os.environ)
+        env.pop("AI_CONFIG_STOP", None)
+        r = subprocess.run(
+            [sys.executable, HOOK], input=payload, capture_output=True,
+            text=True, env=env,
+        )
+        return "no-mistake-without-a-hook" in r.stdout
+
+    try:
+        checks = [(invoke(), True, "an admission reminds on the first prompt")]
+
+        # The loop case: a few turns later, re-explaining the same mistake
+        # names the same phrase again. That is a repeat, not a new
+        # admission, and must not re-fire.
+        with open(path, "a") as fh:
+            fh.write(json.dumps({"type": "user", "message": {"content": [
+                {"type": "text", "text": "was that right?"}]}}) + "\n")
+            fh.write(json.dumps(
+                say("Confirmed -- I was wrong about the base branch.")) + "\n")
+        checks.append(
+            (invoke(), False,
+             "the same phrase repeated within the window does not re-fire"))
+
+        # The suppressed repeat above never advances the sentinel (still
+        # recorded at record index 0), so enough filler records push the
+        # NEXT occurrence of the same phrase past LOOP_WINDOW records from
+        # that index, and it must read as a new, unrelated admission.
+        with open(path, "a") as fh:
+            for i in range(8):
+                fh.write(json.dumps({"type": "user", "message": {"content": [
+                    {"type": "text", "text": f"filler turn {i}"}]}}) + "\n")
+            fh.write(json.dumps(
+                say("I was wrong about a different thing entirely.")) + "\n")
+        checks.append(
+            (invoke(), True,
+             "the same phrase far beyond the window fires again"))
+        return checks
+    finally:
+        os.unlink(path)
+
+
 def main():
     passes = failures = 0
     for events, expected, label in CASES:
@@ -150,6 +204,14 @@ def main():
             failures += 1
 
     for got, expected, label in once_per_phrase():
+        if got == expected:
+            print(f"PASS: {label}")
+            passes += 1
+        else:
+            print(f"FAIL: {label} (expected remind={expected}, got {got})")
+            failures += 1
+
+    for got, expected, label in window_bound():
         if got == expected:
             print(f"PASS: {label}")
             passes += 1

@@ -83,6 +83,7 @@ _ums = _sibling("remind-ums-after-error.py")
 # sibling is missing -- it must never become a second, divergent copy.
 ADMISSION = getattr(_ums, "ADMISSION", None)
 visible_prose = getattr(_ums, "visible_prose", lambda t: t)
+_sentinel_gate = getattr(_ums, "_sentinel_gate", None)
 
 # Writing or registering a hook. `hooks.json` counts because registration is
 # the second half of the work, per README's activation gate.
@@ -177,20 +178,21 @@ def main() -> int:
     if done_at >= admit_at:
         return 0
 
-    # Once per distinct admission phrase per session, per registration
-    # (ai-config#2997). The mode is in the key because this hook is
-    # registered on both UserPromptSubmit and Stop, and each registration
-    # owes its own firing.
+    # Once per distinct admission phrase, per registration, bounded by
+    # transcript distance rather than session lifetime -- same reasoning and
+    # same mechanism as the sibling hook (ai-config#2997 review finding: an
+    # existence-only sentinel suppressed a genuinely later, unrelated
+    # admission that happened to share a short common phrase with an earlier
+    # one). `_sentinel_gate`/`LOOP_WINDOW` are reused from the sibling rather
+    # than reimplemented, so the two cannot drift apart. The mode is in the
+    # key because this hook is registered on both UserPromptSubmit and Stop,
+    # and each registration owes its own firing.
     mode = os.getenv("AI_CONFIG_STOP") or ""
     key = hashlib.sha256(f"{path}:{admit_txt}:{mode}".encode()).hexdigest()[:16]
     sentinel = os.path.join(
         tempfile.gettempdir(), f".claude-no-mistake-without-a-hook-{key}")
-    if os.path.exists(sentinel):
+    if _sentinel_gate is None or not _sentinel_gate(sentinel, admit_at):
         return 0
-    try:
-        open(sentinel, "w").close()
-    except Exception:
-        pass
 
     message = (
         "[hook: no-mistake-without-a-hook] You admitted a mistake earlier in "

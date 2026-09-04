@@ -896,7 +896,7 @@
             "command": "AI_CONFIG_STOP=1 python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-mistake-without-a-hook.py\"",
             "timeout": 10,
             "script": "no-mistake-without-a-hook.py",
-            "why": "Turns an admitted, mechanizable mistake into an immediate stop condition until hook work follows it."
+            "why": "Turns an admitted, mechanizable mistake into an immediate stop condition, capped once per admitted phrase within a short transcript window so a re-explanation of the same admission does not re-block; the same phrase re-admitted well beyond that window blocks again."
           },
           {
             "type": "command",

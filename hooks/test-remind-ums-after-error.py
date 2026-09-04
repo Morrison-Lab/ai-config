@@ -136,6 +136,14 @@ REMIND = [
      "`had` before a real admission is not an irrealis marker"),
     ([txt("I need to check whether\n\nI was wrong about the pin.")],
      "a marker in an earlier paragraph does not reach across the break"),
+    # Review nit on #2997 itself: the lead's whitespace class excluded EVERY
+    # newline, so a marker hard-wrapped across one line break ("even if\nI
+    # misread") never matched the guard and the admission fired falsely. A
+    # blank line (a paragraph break) is a different case and must still
+    # fire, exercising the same boundary the single-newline control below
+    # (in IRREALIS_2997) exercises from the other side.
+    ([txt("The check still runs even if\n\nI was wrong about the base branch.")],
+     "a blank line after the marker is a paragraph break, not a wrap -- fires"),
     ([txt("My earlier claim was wrong about the pin.")],
      "my earlier claim was wrong (ai-config#1898 anchored form still fires)"),
 ]
@@ -179,6 +187,18 @@ IRREALIS_2997 = [
      "if I was wrong (bare if)"),
     ([txt("The second signal is there lest I misread the job status.")],
      "lest I misread"),
+    ([txt("Supposing I was wrong about the base branch, the guard still "
+          "holds.")],
+     "supposing I was wrong"),
+    # Review nit on #2997 itself: the old lead's `[^\S\n]+$` excluded every
+    # newline, so a marker hard-wrapped across a single line break was not
+    # recognized as irrealis and a hypothetical fired as a false admission.
+    ([txt("The poller tracks job status as well as note count, so a posted "
+          "review is caught even if\nI misread the job status.")],
+     "a single newline between the marker and the clause is still irrealis"),
+    ([txt("The poller tracks job status as well as note count, so a posted "
+          "review is caught even if\n    I misread the job status.")],
+     "a single newline plus indentation is still irrealis"),
 ]
 
 SILENT = [
@@ -460,6 +480,26 @@ try:
             text=True, env=env).stdout.strip()
         seq.append(("REMIND" if out_other else "silent", "REMIND",
                     "a DIFFERENT admission in the same session still fires"))
+
+        # Review finding on #2997 itself: keying purely on content hash with
+        # NO distance bound meant that once "I was wrong" had fired, it never
+        # fired again for the rest of the session -- a genuinely later,
+        # unrelated admission that happens to share that short phrase was
+        # silently swallowed. The suppressed repeat two cases above never
+        # advanced the sentinel (still recorded at record index 0), so enough
+        # filler records push the NEXT occurrence of the same phrase past
+        # LOOP_WINDOW records from that index, and it must fire again.
+        with open(same_path, "a", encoding="utf-8") as fh:
+            for i in range(8):
+                fh.write(json.dumps(user(f"filler turn {i}")) + "\n")
+            fh.write(json.dumps(
+                txt("I was wrong about a different thing entirely.")) + "\n")
+        out_far = subprocess.run(
+            [sys.executable, HOOK], input=payload, capture_output=True,
+            text=True, env=env).stdout.strip()
+        seq.append(("REMIND" if out_far else "silent", "REMIND",
+                    "the same phrase far beyond the window is a new "
+                    "admission and fires again"))
     finally:
         os.unlink(same_path)
 finally:

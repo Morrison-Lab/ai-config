@@ -164,7 +164,7 @@ operations:
     cli: gh api --paginate "repos/<owner>/<repo>/issues/<N>/timeline"
     github_mcp: (no GitHub MCP tool; approximate with SEARCH_PRS)
   - id: CREATE_ISSUE
-    description: Open a new issue.
+    description: Open a new issue. **An agent-filed issue carries the `ai-authored` and `model:<model-id>` labels** --- see [`issue-first`](shared/workflow/issue-first.md) and [`label-agent-filed-issues`](shared/workflow/label-agent-filed-issues.md). The MCP path accepts `labels` on `method=create`, and silently creates an unknown label name rather than rejecting it.
     cli: gh issue create
     github_mcp: mcp__github__issue_write (method=create)
   - id: COMMENT_ISSUE

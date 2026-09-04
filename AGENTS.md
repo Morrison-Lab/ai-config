@@ -398,12 +398,16 @@ Check any replacement marker against that script's `REVIEW_BODY_MARKERS` and `RE
 
 Scope: comment bodies, on every surface --- claims, releases, status notes, review replies, self-reviews, issue comments filed on the user's behalf.
 Not commit messages, not titles, not issue bodies, not PR bodies, each of which has its own attribution convention.
+An issue body's convention is a pair of **labels** rather than a marker line: every issue an agent files into a repo we administrate carries `ai-authored` and `model:<model-id>`, set in the command that creates it.
+See [`shared/workflow/label-agent-filed-issues.md`](shared/workflow/label-agent-filed-issues.md) for the `gh`, `glab`, and MCP forms and for normalizing the model id.
 Two exemptions.
 A comment another machine parses as a command (`@dependabot rebase`), where the test is the audience rather than the length.
 And a comment posted under a genuine bot token, where the forge already reports `type: Bot` and the marker adds nothing.
 
 - **Do:** append the marker to every agent-posted comment, including ones whose prose already identifies the session.
+- **Do:** label an agent-filed issue `ai-authored` and `model:<model-id>` in the creating command, since the marker line does not go in an issue body.
 - **Don't:** use the robot emoji in the marker, and don't read "the account holder knows an agent is running" as making the disclosure unnecessary --- the reader is whoever finds the thread later.
+- **Don't:** put the marker in an issue body in place of those labels, or file an unlabelled issue on the grounds that the body carries no marker.
 
 ## File formatting & links
 

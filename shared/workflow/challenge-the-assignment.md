@@ -201,6 +201,32 @@ line in the report, while one whose falsity would waste the work gets raised
 before the work starts.
 Where the assignment is sound, the whole cost is one sentence.
 
+**The limit binds hardest where the premise is the user's own concrete claim about their own repository, and that is exactly where a challenge feels most like diligence.**
+Every shape above is a claim in a *document*, and the remedy each one gets is to go and check the thing the document describes.
+That remedy assumes the document's author had no better access to the thing than you do, which is true of a convention file, a brief, a posed choice, and even of a supplied measurement --- whoever ran it saw one reading, and you can run it again.
+A user saying "our workflows emit `check / spellcheck`, not `Spellcheck`" breaks that assumption.
+It is a specific, checkable assertion by the party with standing operational knowledge of that repository, so it is a strong prior, and overturning it takes evidence proportionate to that.
+
+Note that this cuts finely rather than wholesale.
+The same question can carry two claims, one of which you are right to overturn.
+In the recorded case the user's premise about what the ruleset *listed* was genuinely wrong and correctly contradicted;
+the premise about what the workflows *emit* was right and was overridden anyway, on evidence from an adjacent artifact.
+So the rule attaches to the individual claim, not to the message it arrived in, and having correctly refuted one half is not standing to refute the other.
+
+The failure mode is not deference lost but scrutiny misdirected.
+Contradicting the user is what makes the check *feel* performed: having gone looking, found something real, and reported a correction reads as the opposite of taking a premise on faith, so nothing further fires --- least of all the question of whether the artifact examined was the right one.
+A challenge you **win** against a user's concrete claim therefore deserves more scrutiny than one you lose, which inverts the usual instinct.
+
+The operational test is cheap: before saying a user's specific factual claim about their own repository is wrong, name the artifact that would show it wrong and confirm that is the one you read.
+Where the two disagree, treat the disagreement as evidence about your artifact first, per [`verify-the-right-artifact`](verify-the-right-artifact.md)'s falsifying question, and only then as evidence about their claim.
+
+- **Do:** re-derive from the authoritative artifact --- the default branch's own definition, the live setting --- before replying that a user's specific claim about a system they own is wrong.
+- **Do:** name the artifact your contradiction rests on, in the reply that makes it, so the user can check the thing rather than the conclusion.
+- **Don't:** read "I checked and the user is mistaken" as a completed premise check --- that sentence is where this rule's own machinery stops running.
+- **Don't:** carry a contradiction of a user's premise into a filed issue or a live setting before the artifact behind it has been named.
+
+See [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md), "A merged pull request's check names written into a live ruleset".
+
 ## The authoring side
 
 Everything above is written for the recipient.

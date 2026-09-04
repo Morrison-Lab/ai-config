@@ -510,10 +510,7 @@ CONTRACT_EXTRA = 1
 # another PR's review bodies, and including this note once the hook has fired.
 # Running it would then discharge the clause on the wrong figure. So run BOTH
 # commands on the fixture and print what each one says, rather than asserting
-# either figure in a comment: an earlier revision of this comment typed "16
-# across 6" where the bare grep sums 16 across 7 -- an aggregate over
-# transcript values recalled instead of read back, which is the exact failure
-# this clause detects, asserted in its own justification.
+# either figure in a comment.
 _BARE_GREP = (
     """grep -o 'FINDINGS_COUNT: [0-9]*' {t}"""
     """ | awk '{n++; s+=$2} END {print n" rounds, "s" findings"}'"""
@@ -552,15 +549,45 @@ finally:
 # reading it that way silenced the target case in its commonest phrasing. The
 # repo alone cannot decide it either: this corpus's briefs name SIBLING items
 # just as constantly, and reading only the repo made a count about
-# `ai-config#4242` read as this session's own review history. Both halves are
-# pinned by environment (`GITHUB_REPOSITORY`, `GITHUB_REF`), so no row depends
-# on the remote or the branch this checkout happens to be on.
+# `ai-config#4242` read as this session's own review history. Every source
+# `own_items` reads is pinned by environment (`GITHUB_REPOSITORY`,
+# `GITHUB_REF`, `GITHUB_HEAD_REF`, and a `gh` stub on `PATH`), so no row
+# depends on the remote, the branch, or the PR this checkout happens to be on.
 print("\nown-item scope (own repo AND own item, not either alone):")
 SELF_REF = ("The five adversarial rounds on ai-config#3107 produced "
             "ten findings.")
 SIBLING_REF = "Address the eleven findings on ai-config#4242."
+
+
+def gh_stub(body):
+    """A directory holding a `gh` that runs `body`, for prepending to `PATH`.
+
+    `own_items` shells out to `gh` for the branch's PR number, so a row that
+    left it unpinned would move with whatever a real `gh` reported.
+    """
+    d = tempfile.mkdtemp()
+    exe = os.path.join(d, "gh")
+    with open(exe, "w") as fh:
+        fh.write("#!/bin/sh\n" + body + "\n")
+    os.chmod(exe, 0o755)
+    return d
+
+
+_NO_PR = gh_stub("exit 1")
+_PR_3107 = gh_stub("echo 3107")
 MINE = {"GITHUB_REPOSITORY": "Morrison-Lab/ai-config",
-        "GITHUB_REF": "refs/pull/3107/merge"}
+        "GITHUB_REF": "refs/pull/3107/merge",
+        "GITHUB_HEAD_REF": "fix/3107-own-item",
+        "PATH": _NO_PR + os.pathsep + os.environ["PATH"]}
+
+# The configuration the deployed hook actually runs in: a Claude Code session
+# sets no `GITHUB_REF` item, and the issue-first flow names the branch for the
+# ISSUE while the brief names the PR, so `gh` is the only source that carries
+# the number the brief uses.
+LOCAL = {"GITHUB_REPOSITORY": "Morrison-Lab/ai-config",
+         "GITHUB_REF": "refs/heads/fix/3117-brief-premises-cardinality",
+         "GITHUB_HEAD_REF": "fix/3117-brief-premises-cardinality",
+         "PATH": _PR_3107 + os.pathsep + os.environ["PATH"]}
 OWN_REPO = [
     (run(SELF_REF, ROUNDS, env=MINE),
      "REMIND", "the session's own repo AND item -- still its own history"),
@@ -572,7 +599,13 @@ OWN_REPO = [
     (run(SIBLING_REF.replace("ai-config#", "Morrison-Lab/ai-config#"),
          ROUNDS, env=MINE),
      "silent", "same sibling item, owner-qualified"),
+    (run(SELF_REF, ROUNDS, env=LOCAL),
+     "REMIND", "no `GITHUB_REF` item: `gh` names the PR the branch does not"),
+    (run(SIBLING_REF, ROUNDS, env=LOCAL),
+     "silent", "same configuration, a SIBLING item -- not this session's"),
 ]
+shutil.rmtree(_NO_PR, ignore_errors=True)
+shutil.rmtree(_PR_3107, ignore_errors=True)
 for got, want, desc in OWN_REPO:
     wrong += got != want
     print(f"  {got:<7} {desc}")

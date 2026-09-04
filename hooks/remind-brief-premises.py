@@ -454,12 +454,14 @@ def own_repo():
     return _OWN_REPO
 
 
-# The item number this session is working, for the second half of the test
-# above. `GITHUB_REF` carries it outright on a pull-request workflow run; the
-# branch name carries it otherwise, because this corpus's own issue-first flow
-# cuts branches named for the issue they were cut for
-# (`fix/3117-brief-premises-cardinality`). Two digits minimum, so a `v2` or an
-# `mk3` in a branch name does not claim every two-digit item in the repo.
+# The item numbers this session is working, for the second half of the test
+# above. Three sources, UNIONED rather than tried in order: `GITHUB_REF` on a
+# pull-request workflow run, the branch name, and the PR number `gh` reports
+# for that branch. This corpus's issue-first flow cuts branches named for the
+# ISSUE (`fix/3117-brief-premises-cardinality`) while a brief names the PR, so
+# neither of the last two alone covers a local session. Two digits minimum in
+# a branch name, so a `v2` or an `mk3` does not claim every two-digit item in
+# the repo.
 GH_REF_ITEM = re.compile(r"^refs/(?:pull|merge-requests)/(\d+)/")
 BRANCH_ITEM = re.compile(r"\d{2,}")
 
@@ -469,8 +471,10 @@ _OWN_ITEMS = None
 def own_items():
     """The PR/issue numbers this session is demonstrably working, as strings.
 
-    `GITHUB_REF` first, then the branch name -- `GITHUB_HEAD_REF` where a run
-    sets it, else `git rev-parse --abbrev-ref HEAD`.
+    The union of three sources: `GITHUB_REF`, the branch name
+    (`GITHUB_HEAD_REF` where a run sets it, else
+    `git rev-parse --abbrev-ref HEAD`), and `gh pr view --json number` for the
+    checked-out branch. None of them is a fallback for another.
 
     Empty when nothing resolves, and `foreign_reference` then treats every
     qualified reference as somebody else's. That is the same safe direction
@@ -497,6 +501,15 @@ def own_items():
         except (OSError, subprocess.SubprocessError):
             branch = ""
     items.update(BRANCH_ITEM.findall(branch))
+    try:
+        out = subprocess.run(
+            ["gh", "pr", "view", "--json", "number", "--jq", ".number"],
+            capture_output=True, text=True, timeout=5)
+        number = out.stdout.strip() if out.returncode == 0 else ""
+    except (OSError, subprocess.SubprocessError):
+        number = ""
+    if number.isdigit():
+        items.add(number)
     _OWN_ITEMS = frozenset(items)
     return _OWN_ITEMS
 
@@ -1127,15 +1140,10 @@ def aggregate_note(tpath):
     it, including values pasted from another PR's review bodies by a
     `gh pr view ... --json comments`, and including this note itself once the
     hook has fired --- so it prescribed a figure the hook would then accept as
-    the derivation while disagreeing with the hook's own arming set. Measured
-    against a transcript holding rounds 2, 3, 3, 1, 0 plus one foreign PR
-    result carrying two more values: the bare grep summed 16 across 7, where
-    the values this clause is about are 9 across 5. Reading only the
-    `tool_result` blocks whose `tool_use_id` belongs to an `Agent`/`Task` call
-    returns 9 across 5. The test suite RUNS both commands on that fixture and
-    prints each figure, so neither half of the contrast is left to this
-    comment --- an earlier revision typed "16 across 6" here, which is the very
-    failure this clause detects.
+    the derivation while disagreeing with the hook's own arming set. Reading
+    only the `tool_result` blocks whose `tool_use_id` belongs to an
+    `Agent`/`Task` call excludes both. The test suite RUNS both commands on a
+    transcript carrying a foreign PR result and prints each figure.
     """
     t = tpath or "$HOME/.claude/projects/<this session>.jsonl"
     return (

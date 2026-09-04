@@ -1554,7 +1554,7 @@ Re-running holds the tree constant, which is what makes it feel like a control -
 A busy machine does not stop being busy between two consecutive runs.
 
 So the section above's remedy of re-running and reporting the spread is necessary and not sufficient.
-A wide spread does establish that the machine is the variable, as that section's own load-average-376 reading shows.
+A wide spread does establish that the machine is the variable, as that section's own 0.59s-to-8.0s re-run shows.
 A *narrow* one establishes nothing, because sustained load can hold every run in a batch at the same wrong value --- and narrowness is the reading most easily mistaken for precision.
 
 The control that repetition imitates is a **clean copy**: apply the same change to a pristine `cp -a` of the tree, run it N times there, and compare.

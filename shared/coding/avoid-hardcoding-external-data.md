@@ -244,12 +244,15 @@ The flake was the same in either location, and that explanation was retracted a 
 
 The other half of the point is that the total really is environment-dependent, and three successive attempts named the wrong cause.
 Measured 2026-09-03 on `origin/main`, `python3 scripts/test_check_pr_fully_clean.py` reports `754 passed, 0 failed` in an ordinary checkout and `753 passed, 0 failed` under `GIT_DIR=/nonexistent`.
-The suite fetches a prior revision of the checker with `git show` and emits one extra case only when some revision is reachable, so any tree without a repository behind it --- a `git archive` export, a shallow clone, a copied directory --- is one short.
+The suite fetches a prior revision of the checker with `git show`, trying `origin/main` first, and emits one extra case only when some revision resolves.
+So the total turns on whether that ref is reachable, not on where the tree sits: a `git archive` export reports 753 and a depth-1 clone reports 754, because the shallow clone still has `origin/main`.
 
 That is the discriminator, and it was one command away throughout.
-Each wrong explanation instead named whatever differed between the two runs that had been performed: first the code change, then the checkout's location, then --- while this entry was being written --- the claim that 754 had never been a real reading at all, which came from measuring an archive rather than a checkout and is
+What the three wrong explanations share is that none of them varied an input.
+The first two named whatever differed between the two runs already performed --- the code change, then the checkout's location.
+The third, written while this entry was being drafted, went further and denied that 754 had ever been a real reading, on the strength of an archive measured in place of a checkout, which is
 [`verify-the-right-artifact`](../workflow/verify-the-right-artifact.md)'s substitution exactly.
-A count that varies with the environment invites an explanation for every pair of numbers, and the explanations are unfalsifiable until someone varies one input at a time.
+A count that varies with the environment offers an explanation for every pair of numbers, and every one of them is unfalsifiable until someone changes one thing and re-runs.
 The text that shipped gives no count as an expectation, and says why.)
 
 ## Where the rule stops: text that records what was observed

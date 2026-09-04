@@ -699,7 +699,9 @@ Conventions for fragments:
   lab manual's non-standard-character check passes when it includes them.
 
 A session working in this repo's own checkout resolves `@shared/...` imports against the repo root directly (as `CLAUDE.md` does for this very session).
-A **global** `~/.claude/CLAUDE.md` that imports these fragments needs `~/.claude/shared/` to exist, which `bootstrap.sh` no longer places there (see its header comment) --- until a replacement lands ([#2352](https://github.com/Morrison-Lab/ai-config/issues/2352)), symlink or copy `shared/` there by hand.
+A **global** `~/.claude/CLAUDE.md` that imports these fragments needs `~/.claude/shared/` to exist, which `bootstrap.sh` no longer places there (see its header comment) --- until a replacement lands ([#2352](https://github.com/Morrison-Lab/ai-config/issues/2352)), symlink `shared/` there by hand.
+Symlink rather than copy: a symlink tracks the checkout, while a copy goes stale with nothing to say so.
+`python3 scripts/doctor.py` follows that split, reporting a `~/.claude/shared` copy as a leftover and exempting the symlink.
 The `@claude` CI bot reads `shared/` from the repo root.
 
 ### Vendored from wai (`shared/vendored/`)

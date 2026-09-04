@@ -420,9 +420,13 @@ class TestConsumerLeftovers(unittest.TestCase):
         (faux / "CLAUDE.md").write_text("looks like a corpus", encoding="utf-8")
         (faux / "hooks").mkdir()
         (faux / "hooks" / "hooks.json").write_text("{}", encoding="utf-8")
-        (faux / "skills" / "ums").mkdir(parents=True)
+        # A name this repo does not ship, so the name test cannot fire and
+        # only the provenance test decides. The fallthrough from one test to
+        # the other is pinned by
+        # `test_name_matching_skill_symlink_outside_a_checkout_is_doubled`.
+        (faux / "skills" / "my-skill").mkdir(parents=True)
         (self.home / "skills").mkdir()
-        self.symlink(faux / "skills" / "ums", self.home / "skills" / "ums")
+        self.symlink(faux / "skills" / "my-skill", self.home / "skills" / "my-skill")
         res = doctor.check_consumer_leftovers()
         self.assertEqual(res["leftovers"], [])
         self.assertEqual(res["doubled_skills"], [])
@@ -456,13 +460,46 @@ class TestConsumerLeftovers(unittest.TestCase):
         self.assertEqual(res["documented"], [])
         self.assertEqual(len(res["leftovers"]), 3)
 
-    def test_shared_copy_is_still_a_leftover(self):
+    def test_shared_copy_is_still_a_leftover_and_explains_itself(self):
+        # README.md documents symlinking this path and not copying it, so a
+        # copy is a leftover -- but it is the leftover a reader is likeliest
+        # to have placed deliberately, so the details say why it is reported
+        # and what to do instead. Without that the WARN reads as unexplained.
         self.enable_plugin()
         (self.home / "shared").mkdir()
         res = doctor.check_consumer_leftovers()
         self.assertFalse(res["ok"])
         self.assertEqual(res["documented"], [])
         self.assertEqual(res["leftovers"], [f"{self.home / 'shared'} (copy)"])
+        self.assertIn("is a copy", res["details"])
+        self.assertIn("ai-config#2352", res["details"])
+        self.assertIn("replace it with a symlink", res["details"])
+
+    def test_readme_documents_the_symlink_and_not_a_copy(self):
+        # The exemption above is only sound while README recommends exactly
+        # the form the check exempts. Offering a copy there would leave
+        # `--strict` red by construction on a conformant machine, which is
+        # the failure the exemption exists to remove.
+        readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+        self.assertIn("symlink `shared/` there by hand", readme)
+        self.assertNotIn("symlink or copy `shared/`", readme)
+
+    def test_name_matching_skill_symlink_outside_a_checkout_is_doubled(self):
+        # The provenance test and the name test run in order rather than on
+        # disjoint entry kinds: the client loads a symlinked personal skill
+        # exactly as it loads a real directory, so a shared name doubles the
+        # listing either way and the report must not turn on which it is.
+        self.enable_plugin()
+        outside = tempfile.TemporaryDirectory()
+        self.addCleanup(outside.cleanup)
+        mine = Path(outside.name)
+        (mine / "ums").mkdir()
+        (self.home / "skills").mkdir()
+        self.symlink(mine / "ums", self.home / "skills" / "ums")
+        res = doctor.check_consumer_leftovers()
+        self.assertEqual(res["status"], "WARN")
+        self.assertEqual(res["leftovers"], [])
+        self.assertEqual(res["doubled_skills"], ["ums"])
 
     def test_name_match_reports_symptom_without_prescribing_removal(self):
         self.enable_plugin()

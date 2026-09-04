@@ -340,15 +340,18 @@ def check_ai_clis() -> Dict[str, Any]:
 # `bootstrap.sh` placed these three under `~/.claude` before the plugin
 # install replaced it, and no plugin equivalent has landed (ai-config#2352),
 # so a copy or symlink found there today was placed by an earlier install,
-# or by the manual step README.md documents while that issue is open.
+# or by the one manual step README.md still documents while that issue is
+# open -- which `DOCUMENTED_MANUAL_LINKS` exempts and reports separately.
 LEFTOVER_NAMES = ("shared", "hooks", "memories")
 
-# README.md tells a reader with a global `~/.claude/CLAUDE.md` to place
-# `shared/` by hand until ai-config#2352 lands, so a `~/.claude/shared`
+# README.md tells a reader with a global `~/.claude/CLAUDE.md` to *symlink*
+# `shared/` there by hand until ai-config#2352 lands, so a `~/.claude/shared`
 # symlink resolving into a checkout is the documented configuration rather
 # than a leftover, and reporting it red would leave `--strict` red by
-# construction on a README-conformant machine. A *copy* stays a leftover:
-# it does not track the checkout, so it goes stale silently.
+# construction on a README-conformant machine. A *copy* is not that step:
+# README names only the symlink, precisely because a copy does not track the
+# checkout and so goes stale silently. `copy_note` below says that to a
+# reader who has one, rather than reporting it as an unexplained leftover.
 DOCUMENTED_MANUAL_LINKS = ("shared",)
 
 
@@ -379,7 +382,9 @@ def read_settings(path: Path) -> tuple[Dict[str, Any], Optional[str]]:
 def settings_scope_paths(home: Path) -> List[Path]:
     """Return the `enabledPlugins` settings files to read, highest scope first.
 
-    Local, then project, then user, matching `skills/ai-config-hooks/run-hook.sh`.
+    Local, then project, then user, matching the *scope walk* in
+    `skills/ai-config-hooks/run-hook.sh`. The within-file rule differs
+    between the two -- see `resolve_plugin_enabled`.
     The project root is `CLAUDE_PROJECT_DIR` when the harness exports it,
     and this checkout otherwise.
     """
@@ -405,6 +410,13 @@ def resolve_plugin_enabled(home: Path) -> tuple[Optional[bool], Optional[Path], 
     first file that names an entry decides and an explicit `false` there is
     final. Within one file any truthy `ai-config@*` entry counts, since a
     second marketplace's copy loads the same plugin.
+
+    That within-file union is a deliberate divergence from
+    `skills/ai-config-hooks/run-hook.sh`, which takes the *first*
+    `ai-config@*` entry in a file and ignores the rest, so the two disagree
+    on `{"ai-config@Morrison-Lab": false, "ai-config@other": true}`: this
+    reads the plugin as enabled, the runner as disabled. Only the scope walk
+    is shared. See `memories/claude-code-settings.md`.
 
     Two scopes above these three stay unread, so the answer can still be
     wrong in both directions: a managed-settings `false` over a walked
@@ -473,6 +485,12 @@ def find_skill_leftovers(home: Path) -> tuple[List[str], List[str]]:
     which is the doubled-listing symptom rather than proof of a leftover --
     a user's own skill may legitimately carry the same name.
 
+    The two tests run in that order rather than on disjoint entry kinds: an
+    entry whose provenance test fails still gets the name test, so a symlink
+    landing outside a checkout is reported as a doubled name exactly as a
+    real directory is. The client loads both the same way, so the symptom
+    does not turn on which one a user happens to have.
+
     The walk is one level deep, which is what keeps the client's
     account-level `synced/` bucket out of both lists: its skill-named
     directories sit at `synced/<bucket-id>/<name>` and are never reached,
@@ -489,9 +507,8 @@ def find_skill_leftovers(home: Path) -> tuple[List[str], List[str]]:
     linked: List[str] = []
     doubled: List[str] = []
     for entry in sorted(skills.iterdir()):
-        if entry.is_symlink():
-            if points_into_ai_config(entry):
-                linked.append(f"{entry} ({describe_path(entry)})")
+        if entry.is_symlink() and points_into_ai_config(entry):
+            linked.append(f"{entry} ({describe_path(entry)})")
         elif entry.is_dir() and entry.name in repo_skills:
             doubled.append(entry.name)
     return (linked, doubled)
@@ -532,6 +549,7 @@ def check_consumer_leftovers() -> Dict[str, Any]:
 
     leftovers: List[str] = []
     documented: List[str] = []
+    manual_copies: List[str] = []
     for name in LEFTOVER_NAMES:
         path = home / name
         if not (path.is_symlink() or path.exists()):
@@ -539,15 +557,24 @@ def check_consumer_leftovers() -> Dict[str, Any]:
         entry = f"{path} ({describe_path(path)})"
         if name in DOCUMENTED_MANUAL_LINKS and path.is_symlink() and points_into_ai_config(path):
             documented.append(entry)
-        else:
-            leftovers.append(entry)
+            continue
+        if name in DOCUMENTED_MANUAL_LINKS and not path.is_symlink():
+            manual_copies.append(str(path))
+        leftovers.append(entry)
     linked_skills, doubled_skills = find_skill_leftovers(home)
     leftovers.extend(linked_skills)
 
     documented_note = (
         f" {len(documented)} documented manual link(s), not leftovers: {'; '.join(documented)}"
-        " -- README.md documents placing ~/.claude/shared by hand while ai-config#2352 is open."
+        " -- README.md documents symlinking ~/.claude/shared by hand while ai-config#2352 is open."
         if documented
+        else ""
+    )
+    copy_note = (
+        f" {'; '.join(manual_copies)} is a copy: README.md documents symlinking that path by hand"
+        " while ai-config#2352 is open, and a copy does not track the checkout, so replace it with"
+        " a symlink into one rather than deleting it."
+        if manual_copies
         else ""
     )
 
@@ -578,7 +605,7 @@ def check_consumer_leftovers() -> Dict[str, Any]:
         "leftovers": leftovers,
         "doubled_skills": doubled_skills,
         "documented": documented,
-        "details": f"Under {home}: {'. '.join(parts)}. Swept because {source} enables the ai-config plugin.{documented_note} Reported only -- inspect each by hand before removing anything: ~/.claude/skills also holds your own skills (see shared/workflow/keep-checkouts-fresh.md).",
+        "details": f"Under {home}: {'. '.join(parts)}. Swept because {source} enables the ai-config plugin.{documented_note}{copy_note} Reported only -- inspect each by hand before removing anything: ~/.claude/skills also holds your own skills (see shared/workflow/keep-checkouts-fresh.md).",
     }
 
 

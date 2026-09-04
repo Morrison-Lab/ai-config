@@ -136,6 +136,27 @@ lets the first file that names an `ai-config@*` entry decide.
 - **Don't:** read one settings file as the answer, or union truthy names
   across files.
 
+**The two readers in this repo share that walk and diverge *within* one
+file, so cite the walk rather than claiming they agree.**
+`run-hook.sh` takes the first `ai-config@*` entry in a file
+(`grep -Eo ... | head -1`) and ignores the rest.
+`resolve_plugin_enabled` in `scripts/doctor.py` counts any truthy
+`ai-config@*` entry in that file, since a second marketplace's copy of the
+plugin loads the same content and so still supersedes a `~/.claude` install.
+They therefore answer
+`{"ai-config@Morrison-Lab": false, "ai-config@other": true}` differently:
+the check reads the plugin as enabled, the runner as disabled and fires the
+hook.
+Neither reading is wrong for its own question --- the runner asks whether
+*this* hook would fire twice, the check asks whether *any* ai-config plugin
+is installed --- but a reader of either file will assume they match unless
+told otherwise (measured 2026-09-04, ai-config#2528).
+
+- **Do:** say the *scope walk* matches when describing either reader, and
+  name the within-file rule separately.
+- **Don't:** call the two implementations equivalent, or copy one's
+  within-file rule into the other on the assumption that they already agree.
+
 ## A cloud session in ai-config loads no plugin, so `hooks/hooks.json` is inert there unless a skills-directory plugin carries it
 
 The hook catalog reaches Claude Code only through a **plugin**: a project's

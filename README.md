@@ -648,6 +648,22 @@ so a closed activation issue cannot keep a hook silently inert
 When the issue cannot be fetched (offline, timeout, or rate limit), the
 check prints `SKIP` and does not fail --- that skip is the documented
 offline path, not a silent pass.
+It also fails a script bound twice for the same event and the same tool
+([#2535](https://github.com/Morrison-Lab/ai-config/issues/2535)),
+whenever some tool name `hooks.json` itself spells out fires both matchers:
+the row comparison folds a script's several matcher groups into one
+comma-joined string, so a hook bound once and a hook bound twice were
+indistinguishable there, while the harness runs every group whose matcher
+fires.
+Deciding that needs the harness's own matcher semantics, which
+[`memories/claude-code-hooks.md`](memories/claude-code-hooks.md) records:
+a plain name is compared by equality, an alternation by membership, and only
+anything else is an unanchored regex.
+It decides that over the tool names `hooks.json` itself spells out, so a pair of
+two regexes is beyond it only when no such name fires both;
+such a pair is printed as a `NOTE` and excluded from the compared count, though
+the run still exits 0, so a green catalog check does not by itself rule that
+pair out.
 
 The Claude Code plugin (`.claude-plugin/plugin.json`, `source: "./"`) is the supported path for the full catalog: its loader auto-discovers [`hooks/hooks.json`](hooks/hooks.json) at the plugin root and registers every hook it names, no separate step needed.
 

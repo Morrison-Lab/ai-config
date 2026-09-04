@@ -55,6 +55,18 @@ Never inline heredocs in chained commands.
 Applies to git commit messages, MR descriptions, and any other multi-line content passed to CLI tools.
 (Learned during HACtions MR !37.)
 
+**A literal, predictable `/tmp/<name>.txt` like the one in the example above is not a safe destination for this, because `/tmp` is shared across every concurrent session on the machine.**
+A second, unrelated session can pick the same obvious filename (`msg.txt`, `patch.diff`) at the same time, and whichever session writes last silently wins --- the first session's `git commit -F` then commits the *other* session's content with no error at any step.
+Use the session's own scratchpad directory instead: the system prompt's "Scratchpad Directory" section names the actual, session-specific path (a long `/private/tmp/claude-<pid>/<sanitized-cwd>/<uuid>/scratchpad` form --- see [`claude-code.md`](claude-code.md), "The scratchpad directory path's trailing UUID is a usable stand-in for the harness session id"), so two sessions cannot collide on it by construction.
+Substitute that literal path in place of `/tmp` above;
+there is no standard environment variable that already holds it.
+
+- **Do:** write a commit-message (or any other multi-line CLI-input) file to the exact scratchpad path the current session's system prompt names, not to a bare `/tmp/<name>` path.
+- **Don't:** use a plain, predictable `/tmp` filename for content another concurrent session could plausibly also choose --- the collision is silent, and the resulting commit looks normal until someone reads its body.
+- **Don't:** assume a `$SCRATCHPAD`-style variable already holds the path --- it doesn't, and a script that references one silently writes to the wrong place (or fails outright) when the variable is unset.
+
+(Measured 2026-09-04: `git commit --amend -F /tmp/msg.txt` picked up a different concurrent session's message from the same shared path, silently replacing the intended PR's subject and body.)
+
 ## Writing robust bash scripts (recurring review findings)
 
 Lessons the reviewer flagged across the `session-lock` PR (Morrison-Lab/ai-config#38) ---

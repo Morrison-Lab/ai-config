@@ -534,7 +534,8 @@ amend the routing rule in that section.
 - **Don't:** generalize this measurement to another free-tier model id
   or another task shape --- neither was measured here.
 - **Don't:** credit the model's own confidence for the result;
-  nobody read the returned diff.
+  what made trusting it safe was the acceptance test passing,
+  not a reading of the returned diff.
 
 ## Conversation-inheriting subagent dispatch vs. clean-context dispatch for UMS and CAI
 

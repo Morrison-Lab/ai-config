@@ -62,19 +62,22 @@ Here they point the same way: authoring and judgment work is exactly what the fr
 
 The "needs strong reasoning, judgment, or long-context synthesis" bullet above rests on two grounds at once.
 The free tier is weakest at exactly that shape of work, and a wrong answer from it costs more to catch than the quota it saved.
-Only the second ground stops binding once a deterministic check settles correctness with nobody reading the returned diff.
+Only the second ground stops binding once a deterministic check settles correctness without the returned diff having to be reviewed for it.
 The first does not, so what the check buys is that a wrong answer is cheap rather than that it is unlikely --- expect to re-run or re-route on a failed check.
 That is why this exception requires the check rather than merely permitting the dispatch.
 
-One measurement bounds the exception rather than establishing a capability: one free-tier model id, on one R refactor, accepted because a mechanical suite passed rather than because the returned diff read well.
+One measurement bounds the exception rather than establishing a capability: one free-tier model id, on one R refactor, given a detailed brief and accepted because a mechanical suite passed rather than because the returned diff read well.
 [`memories/delegation.md`](../../memories/delegation.md)'s "opencode free tier: a full authoring task, validated mechanically" section is that record, and carries the date, the model id, the acceptance test, and the two failures from the same session that qualify it.
 
 The separate "result must conform to a schema and you have no cheap validator" bullet is untouched by any of this.
 It never bound on that measurement, whose result was an R refactor with no schema to conform to, and it still binds on its own terms wherever a schema is required and no validator is cheap.
 
-- **Do:** delegate authoring work to a free-tier model when a mechanical acceptance test --- a test suite, a linter, a byte comparison --- decides correctness on its own.
+- **Do:** delegate authoring work to a free-tier model only when the brief carries literal paths and exact expected content (step 2, "Prepare the prompt") *and* a mechanical acceptance test --- a test suite, a linter, a byte comparison --- decides correctness on its own;
+  one model id on one task was measured, so re-derive the judgment for another model id or another task shape.
+- **Do:** settle the data question before the shape question --- a mechanical acceptance test does not license a hosted dispatch the consuming repo's data rules forbid.
+- **Don't:** condition the dispatch on the acceptance test alone --- a vague brief with a passing check is a combination nobody measured.
 - **Don't:** let your own reading of the returned diff stand in for the mechanical check.
-- **Don't:** apply this exception to restricted data --- a data trigger forbids every hosted destination, the free tier included, unless the consuming repository has explicitly approved it.
+- **Don't:** apply this exception to restricted data --- a data trigger forbids OpenCode and OpenRouter dispatch, the free tier included, unless the consuming repository has explicitly approved that hosted destination (see "Hosted-only routing rule" below).
 
 ## Hosted-only routing rule
 

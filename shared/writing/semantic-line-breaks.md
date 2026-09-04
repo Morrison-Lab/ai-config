@@ -142,6 +142,12 @@ join that would fail the gate is split rather than written.
   Recurred 2026-09-02 in a `/gia` session:
   `--write` rewrapped three clause-broken prose additions into single lines up to 398 characters long,
   and the fix was `git checkout <prior-commit> -- <files>` and re-breaking by hand.
+  Recurred 2026-09-04 on `memories/github-closing-keywords.md`:
+  one `--write` run joined that file's clause lines into long ones
+  while leaving the same run's session-notebook target correct,
+  so the invocation's behaviour differed by file
+  and its own verdict said nothing about either.
+  Restored from a backup and re-broken by hand.
 
 (Morrison-Lab/ai-config, 2026-08-15, measured on this machine with the gate at
 `Morrison-Lab/gha@da46419`, whose `_DEFAULT_CLAUSE_BREAKS` is `True` and

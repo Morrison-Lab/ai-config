@@ -218,7 +218,7 @@ worse than one that is merely out of date.
 - `claim-pr` — owns the claim/unclaim lifecycle; `handoff` posts the *paused*
   note within an existing claim.
 - **`checkpoint`** — a lighter, deliberate mid-task snapshot for a session
-  that *isn't* ending: plan state, decisions, next actions, no branch/job/PR
+  that *isn't* ending: plan state, decisions, next actions, no branch/job/forge-post
   mechanics. Run `handoff` when actually stopping; `checkpoint` when just
   banking progress mid-task.
 - **`compress-session`** — distills the conversation into auto memory before

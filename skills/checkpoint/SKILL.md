@@ -46,8 +46,8 @@ Three different triggers, three different jobs — don't conflate them:
 | `handoff` | Ending/pausing the session | No | Full resumption state: branch, unpushed commits, running jobs, forge post (PR or issue comment, or a committed file) |
 
 A `checkpoint` note is a strict subset of what `handoff` captures — it skips
-the branch/job/PR-note mechanics because the session isn't ending. If you're
-about to genuinely stop, run `handoff` instead (or in addition, if the
+the branch/job/forge-post mechanics because the session isn't ending.
+If you're about to genuinely stop, run `handoff` instead (or in addition, if the
 checkpoint predates the stop by a while and the state has moved on).
 
 ## Procedure

@@ -50,11 +50,12 @@ that refuses legitimate work gets switched off, taking the real cases with it.
 ## How the warning is delivered
 
 Through `hookSpecificOutput.additionalContext` on stdout, paired with a
-one-line `systemMessage` outside Antigravity (whose adapter surfaces
-`additionalContext` and `systemMessage` separately, so emitting both there
-prints the warning twice). It used to print to stderr and exit 0, which reaches
-the debug log and nobody else: for exit code 0 stderr is shown to neither
-Claude nor the user, and for `PreToolUse` plain stdout is not surfaced either.
+one-line `systemMessage` outside Antigravity (whose adapter's `PreToolUse`
+branch surfaces `additionalContext` and `systemMessage` separately, so
+emitting both there prints the warning twice). It used to print to stderr and
+exit 0, which reaches the debug log and nobody else: for exit code 0 stderr is
+shown to neither Claude nor the user, and for `PreToolUse` plain stdout is not
+surfaced either.
 So the guard fired correctly and warned nobody, which is indistinguishable
 from a guard that never fires. `scripts/check-hook-output-shape.py` now
 refuses a warn-only `PreToolUse` hook with no such channel, so the shape
@@ -155,10 +156,11 @@ def main() -> int:
             "additionalContext": warning,
         },
     }
-    # Antigravity's adapter prints `additionalContext` itself AND separately
-    # prints every collected `systemMessage`, so carrying both there emits the
-    # warning twice. Most siblings emitting both channels gate it this way;
-    # some registered hooks do not yet, and the `PreToolUse` ones among
+    # The `PreToolUse` branch of Antigravity's adapter prints
+    # `additionalContext` itself AND separately prints every collected
+    # `systemMessage`, so a `PreToolUse` payload carrying both emits the
+    # warning twice there. Most siblings emitting both channels gate it this
+    # way; some registered hooks do not yet, and the `PreToolUse` ones among
     # them warn twice under Antigravity.
     # README.md's warn-only hook section is the single home for that census
     # and for the query deriving it -- a count repeated here goes stale on

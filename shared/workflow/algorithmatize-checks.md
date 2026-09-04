@@ -1427,7 +1427,7 @@ Where it does not enter both measurements with the same magnitude, the ratio amp
 The section above measures load pushing a growth ratio *up*, and that is one of two directions it can move.
 A ratio is large over small, so a nuisance cost that lands mostly in the **denominator** compresses it instead, and a genuinely quadratic scan then reads as sub-quadratic.
 
-Measured 2026-09-03: the negative control in `hooks/test-no-unauthorized-merge.py`, a deliberately quadratic scan whose growth has to clear an 8x bound, read 14.5-15.3x over five runs on an idle container and 7.3x on a loaded GitHub runner, going red on a PR whose whole diff was two `memories/*.md` files ([#3098](https://github.com/Morrison-Lab/ai-config/issues/3098)).
+Measured 2026-09-03: the negative control in `hooks/test-no-unauthorized-merge.py`, a deliberately quadratic scan whose growth then had to clear an 8x bound, read 14.5-15.3x over five runs on an idle container and 7.3x on a loaded GitHub runner, going red on a PR whose whole diff was two `memories/*.md` files ([#3098](https://github.com/Morrison-Lab/ai-config/issues/3098)).
 Nothing about the code differed between the two readings.
 
 The direction inverts what the failure looks like, which is why it is worth naming separately.
@@ -1465,7 +1465,7 @@ A timing figure is a claim about a machine, so re-measure rather than porting th
 
 ## A slow wall-clock reading is a claim about the machine before it is a finding about the code
 
-The three sections above govern a timing **bound written into a test** --- which clock it uses, and whether a ratio cancels the noise it is meant to cancel or instead inflates or compresses it.
+The three sections above govern a timing **bound written into a test** --- which clock it uses, and whether a ratio cancels the noise it is meant to cancel or is instead inflated or compressed by it.
 None of them reaches the reading you take **once**, by hand, in the middle of diagnosing something, and then report as a defect.
 No assertion is being authored there and no threshold is being chosen, so nothing about the moment resembles the situation those sections describe.
 

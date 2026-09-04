@@ -334,6 +334,60 @@ class TestEvaluate(unittest.TestCase):
             self.assertEqual(
                 gate.evaluate(MERGE_CMD, state)["decision"], "deny", body)
 
+    def test_conditional_marker_below_the_headline_does_not_approve(self):
+        """The withholding half of a qualified approval survives a line
+        break, so anchoring the marker test on the headline let the same
+        sentence families through one newline lower."""
+        for body in ("Ready for merge.\nBut please fix the typo in the "
+                     "docstring.",
+                     "Approved.\n\nThough the docstring drifts from the "
+                     "code.",
+                     "Approved.\n\nTwo questions before you land it.",
+                     "Approved.\n\nI'd want tests for the empty case first.",
+                     "Ready for merge.\n\nWhy did you drop the test?"):
+            state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+            self.assertEqual(
+                gate.evaluate(MERGE_CMD, state)["decision"], "deny", body)
+
+    def test_conditional_marker_below_the_verdict_heading_does_not_approve(self):
+        """The mirror of the lead-in case: the same words that veto above a
+        `### Verdict` heading must veto below it, or section order decides
+        the merge rather than substance."""
+        body = "### Verdict\nReady for merge.\n\nI'd want tests first."
+        state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "deny")
+
+    def test_findings_table_under_an_approving_headline_does_not_approve(self):
+        """A table is an ordinary way to list findings, so a structural veto
+        seeing bullets, numbered items, and headings only readmitted the
+        sparta#1427 shape it exists to close."""
+        body = ("Ready for merge.\n\n| file | issue |\n| --- | --- |\n"
+                "| a.py | drops tokens |")
+        state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "deny")
+
+    def test_body_approval_on_a_pr_opened_by_someone_else_allows(self):
+        """The self-approval bound is keyed on the PR author, so it does not
+        fire on a chore PR someone else opened: what stands between an
+        agent's own review and an allow there is the disclosure marker
+        hooks/require-agent-disclosure.py obliges it to carry. Keying the
+        veto on the merging account instead would deny the human reviews
+        this repo actually gets, since reviewer and merging agent share one
+        login here."""
+        state = pr(reviews=[review("d-morrison", "COMMENTED", "Ready for merge.",
+                                   assoc="OWNER")],
+                   author="dependabot[bot]")
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "allow")
+        disclosed = pr(
+            reviews=[review("d-morrison", "COMMENTED",
+                            "Ready for merge.\n\n_Posted by Claude Code "
+                            "(AI agent) --- not written by a human._",
+                            assoc="OWNER")],
+            author="dependabot[bot]",
+        )
+        self.assertEqual(
+            gate.evaluate(MERGE_CMD, disclosed)["decision"], "deny")
+
     def test_innocuous_lead_in_above_the_verdict_heading_still_allows(self):
         """The control for the case above: widening the veto to the whole
         body must not deny every review that writes a sentence before its

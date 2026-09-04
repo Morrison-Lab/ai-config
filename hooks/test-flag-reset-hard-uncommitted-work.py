@@ -367,6 +367,34 @@ def checkout_force_bundled_case(path):
     return "git checkout -qf other"
 
 
+def checkout_force_new_branch_bundled_case(path):
+    """`git checkout -fb mybranch` -- `-f` and the value-taking `-b` bundled
+    into one short cluster, `-b`'s value (`mybranch`) a SEPARATE next token.
+    Measured on git 2.43.0: this creates and switches to `mybranch`, exits 0,
+    and the dirty tracked edit is gone -- so `mybranch` must be consumed as
+    `-b`'s value, not misread as a pathspec that scopes the status check to
+    a nonexistent path."""
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return "git checkout -fb mybranch"
+
+
+def checkout_new_branch_bundled_case(path):
+    """`git checkout -qb mybranch`, UNFORCED -- `-q` and the value-taking
+    `-b` bundled into one short cluster, with `mybranch` as `-b`'s separate
+    next-token value. Measured on git 2.43.0: this creates and switches to
+    `mybranch`, exits 0 with no output (quiet), and the dirty tracked edit
+    survives -- so this must not warn, and `mybranch` must not be misread as
+    a pathspec."""
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return "git checkout -qb mybranch"
+
+
 def checkout_new_branch_attached_case(path):
     """`git checkout -bfixup` -- `-b`'s value attached to the cluster.
     Measured on git 2.43.0: this creates branch `fixup`, exits 0, and the
@@ -477,6 +505,9 @@ SHOULD_WARN += [
      "`git checkout --force -b <new>` still discards the working tree"),
     ("W16", checkout_force_bundled_case,
      "`git checkout -qf <ref>` -- force bundled into a short cluster"),
+    ("W17", checkout_force_new_branch_bundled_case,
+     "`git checkout -fb mybranch` -- `-f` bundled with the value-taking "
+     "`-b`, whose value is a separate next token, not a pathspec"),
 ]
 
 SHOULD_STAY_SILENT += [
@@ -504,6 +535,9 @@ SHOULD_STAY_SILENT += [
     ("S16", checkout_new_branch_attached_case,
      "`git checkout -bfixup` -- `-b` takes the rest of the cluster as its "
      "value, so the `f` is not `--force`"),
+    ("S17", checkout_new_branch_bundled_case,
+     "`git checkout -qb mybranch`, unforced -- `-b`'s value is a separate "
+     "next token, not a pathspec, and the change is carried across"),
 ]
 
 
@@ -620,7 +654,7 @@ MUTATIONS = {
         [('            if sub == "checkout" and saw_force:\n'
           '                return "checkout-force", " ".join(argv), None',
           "            pass")],
-        {"W13", "W14", "W15", "W16"},
+        {"W13", "W14", "W15", "W16", "W17"},
     ),
     "M4_status_gate": (
         "only a status report with at least one non-untracked entry warns",

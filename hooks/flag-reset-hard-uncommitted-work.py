@@ -108,7 +108,10 @@ scratch file sitting in the tree is not itself at risk.
 The flag lists below are a best-effort read of `git checkout`/`git
 restore`'s documented options, not an exhaustive reimplementation of git's
 argument parser. An unrecognized `-`-prefixed token is skipped rather than
-risking a false pathspec read from its value.
+risking a false pathspec read from its value -- and when that token is a
+short cluster ENDING in a value-taking short option (`-qb`, not `-bfixup`),
+the value is a SEPARATE next token, which is skipped along with it, rather
+than being left to fall through and get misread as a pathspec itself.
 
 Fails OPEN on any parse trouble, on `git status`/`git rev-parse` failing or
 timing out, and outside a git repository.
@@ -190,6 +193,20 @@ def _cluster_forces(tok, value_shorts):
     return "f" in cluster[:stop]
 
 
+def _cluster_value_consumes_next(tok, value_shorts):
+    """Whether short cluster `tok` ends in a value-taking short option with
+    NO value attached in the same token -- e.g. `-b` in `-qb`, but not the
+    `b` in `-bfixup`, where `fixup` is already `-b`'s attached value. When it
+    does, that option's value is a SEPARATE next token (`git checkout -qb
+    mybranch`), and the caller must skip that token too, or it falls through
+    and gets misread as a positional pathspec."""
+    if not SHORT_CLUSTER.fullmatch(tok):
+        return False
+    cluster = tok[1:]
+    idx = next((i for i, c in enumerate(cluster) if c in value_shorts), None)
+    return idx is not None and idx == len(cluster) - 1
+
+
 def _checkout_restore_targets(subcommand, args):
     """Positional targets of a `checkout`/`restore` invocation's ARGS (the
     tokens after `git checkout`/`git restore`).
@@ -201,6 +218,15 @@ def _checkout_restore_targets(subcommand, args):
     only rewrites the index, so it carries no risk to the working tree.
     `saw_force` is whether `--force`, or a short cluster whose `f` precedes
     the first value-taking short option in it, if any, appeared before any `--`.
+
+    A short cluster that ENDS in a value-taking short option (`-b`/`-B`/`-t`
+    for `checkout`, `-s` for `restore`) with nothing attached after it in the
+    same token takes the NEXT token as that option's value, exactly as the
+    bare flag would (`-b` in `CHECKOUT_VALUE_FLAGS`) -- so that next token is
+    skipped too, whether or not the cluster also carries `-f` (`-fb branch`,
+    `-qb branch`). A value-taking short that is NOT last in the cluster has
+    its value already attached in the same token (`-bfixup`) and consumes no
+    further token.
     """
     value_flags = (CHECKOUT_VALUE_FLAGS if subcommand == "checkout"
                    else RESTORE_VALUE_FLAGS)
@@ -229,7 +255,10 @@ def _checkout_restore_targets(subcommand, args):
             continue
         if tok == "--force" or _cluster_forces(tok, value_shorts):
             saw_force = True
-            i += 1
+            # A cluster like `-fb` or `-fB` still ends in a value-taking
+            # short (`b`/`B`), whose value is the NEXT token -- skip that
+            # too, or it falls through and gets misread as a pathspec.
+            i += 2 if _cluster_value_consumes_next(tok, value_shorts) else 1
             continue
         if tok in CHECKOUT_RESTORE_BOOL_FLAGS:
             i += 1
@@ -238,7 +267,10 @@ def _checkout_restore_targets(subcommand, args):
             i += 2
             continue
         if tok.startswith("-") and tok != "-":
-            i += 1  # an unrecognized flag -- see the module docstring
+            # An unrecognized flag -- see the module docstring. A short
+            # cluster ending in a value-taking short (`-qb`) still takes the
+            # NEXT token as that option's value; skip it too.
+            i += 2 if _cluster_value_consumes_next(tok, value_shorts) else 1
             continue
         pre.append(tok)
         i += 1

@@ -57,6 +57,9 @@ misfires is worse than a missing one" -- no `permissionDecision`, ever.
       one PATHSPEC (see "Ref-vs-path disambiguation" below) and, for
       `restore`, is not `--staged` without `--worktree` (that combination
       only rewrites the index, never the working tree)
+  M3'' for `git checkout` carrying `-f`/`--force` and NO pathspec: the whole
+      tracked working tree is in scope, the same as `reset --hard` (see
+      "Forced switches" below)
   M4  `git status --porcelain`, scoped to the whole tree for `reset --hard`
       or to the resolved pathspecs for `checkout`/`restore`, reports at
       least one entry that is NOT untracked (`??`) -- i.e. at least one
@@ -66,11 +69,12 @@ misfires is worse than a missing one" -- no `permissionDecision`, ever.
 ## Ref-vs-path disambiguation
 
 `git checkout <arg>` is ambiguous on its face: `<arg>` may be a ref (branch,
-tag, SHA, `HEAD`, `-` for "previous branch") -- a safe switch, since git
-itself refuses one that would clobber local changes -- or a pathspec, which
-this hook exists to catch. Mirroring git's own tie-break (a name that is
-both a ref and a path resolves as the REF) is the reliable way to tell them
-apart, so each bare positional argument is tested with
+tag, SHA, `HEAD`, `-` for "previous branch") -- an UNFORCED switch, which git
+refuses when it would clobber local changes and otherwise carries them
+across -- or a pathspec, which this hook exists to catch. Mirroring git's
+own tie-break (a name that is both a ref and a path resolves as the REF) is
+the reliable way to tell them apart, so each bare positional argument is
+tested with
 `git rev-parse --quiet --verify <arg>^{commit}`; only an argument that
 demonstrably does NOT resolve as a commit-ish counts as a pathspec.
 A `--` separator sidesteps the question entirely -- everything after it is
@@ -78,6 +82,25 @@ unambiguously a pathspec, per `git checkout`'s own syntax (`git checkout
 [<ref>] [--] <pathspec>...`). `git restore`'s positional operands are always
 pathspecs (its ref comes from `-s`/`--source`, never positionally), so no
 resolution is needed there.
+
+## Forced switches
+
+`-f`/`--force` removes the refusal that makes an unforced switch safe, and
+nothing else about the command announces it. Measured 2026-09-04 on git
+2.43.0, over a tree carrying ` M f.txt`: `git checkout other` printed
+`Switched to branch 'other'` and left the edit in place, while
+`git checkout -f other`, `git checkout -f -b feature`, and `git checkout -f`
+with no operand at all each printed the same one line (or nothing) at exit 0
+with the edit gone. The ref-less form is the widest of the three -- it
+reverts EVERY tracked file to HEAD, not only the ones a target ref would
+collide with -- so a forced `checkout` that resolves to no pathspec is
+scoped to the whole tracked tree, exactly like `reset --hard`.
+
+`git switch -f`/`--discard-changes` does the same thing and is NOT matched:
+`switch` is a fourth command this hook does not read at all, and reading it
+would widen the guard past the three it was built for. That gap is named in
+the catalogs. (`git switch -f` with no branch operand is a fatal error, so
+the gap is the ref-carrying form only.)
 
 Untracked files are deliberately out of scope for all three commands: none
 of `reset --hard`, `checkout <path>`, or `restore <path>` can discard a file
@@ -158,16 +181,17 @@ def _checkout_restore_targets(subcommand, args):
     """Positional targets of a `checkout`/`restore` invocation's ARGS (the
     tokens after `git checkout`/`git restore`).
 
-    Returns (pre, post, saw_sep, staged_no_worktree). `pre` is every
-    non-flag token before a `--` separator (or all of them, if none);
+    Returns (pre, post, saw_sep, staged_no_worktree, saw_force). `pre` is
+    every non-flag token before a `--` separator (or all of them, if none);
     `post` is every token after one. `staged_no_worktree` (restore only) is
     whether `--staged` appeared without `--worktree` -- that combination
     only rewrites the index, so it carries no risk to the working tree.
+    `saw_force` is whether `-f`/`--force` appeared before any `--`.
     """
     value_flags = (CHECKOUT_VALUE_FLAGS if subcommand == "checkout"
                    else RESTORE_VALUE_FLAGS)
     pre, post = [], []
-    saw_sep = saw_staged = saw_worktree = False
+    saw_sep = saw_staged = saw_worktree = saw_force = False
     i = 0
     while i < len(args):
         tok = args[i]
@@ -187,6 +211,10 @@ def _checkout_restore_targets(subcommand, args):
             saw_worktree = True
             i += 1
             continue
+        if tok in ("-f", "--force"):
+            saw_force = True
+            i += 1
+            continue
         if tok in CHECKOUT_RESTORE_BOOL_FLAGS:
             i += 1
             continue
@@ -200,7 +228,7 @@ def _checkout_restore_targets(subcommand, args):
         i += 1
     staged_no_worktree = (subcommand == "restore" and saw_staged
                            and not saw_worktree)
-    return pre, post, saw_sep, staged_no_worktree
+    return pre, post, saw_sep, staged_no_worktree, saw_force
 
 
 def _resolves_as_ref(arg):
@@ -228,9 +256,10 @@ def _looks_like_path(arg):
 def offending(command):
     """The matched destructive-discard invocation in `command`, or None.
 
-    Returns (kind, segment, paths). `kind` is "reset-hard" (paths is None
-    -- the whole tracked tree is in scope) or "checkout"/"restore" (paths
-    is the resolved pathspec list that invocation would revert).
+    Returns (kind, segment, paths). `kind` is "reset-hard" or
+    "checkout-force" (paths is None -- the whole tracked tree is in scope)
+    or "checkout"/"restore" (paths is the resolved pathspec list that
+    invocation would revert).
     """
     cmds = _simple_commands(command)
     if cmds is None:
@@ -250,8 +279,8 @@ def offending(command):
             return "reset-hard", " ".join(argv), None
         if sub not in ("checkout", "restore"):
             continue
-        pre, post, saw_sep, staged_no_worktree = _checkout_restore_targets(
-            sub, rest[2:])
+        (pre, post, saw_sep, staged_no_worktree,
+         saw_force) = _checkout_restore_targets(sub, rest[2:])
         if staged_no_worktree:
             continue
         if sub == "restore":
@@ -267,6 +296,8 @@ def offending(command):
         else:
             paths = pre if _looks_like_path(pre[0]) else pre[1:]
         if not paths:
+            if sub == "checkout" and saw_force:
+                return "checkout-force", " ".join(argv), None
             continue
         return sub, " ".join(argv), paths
     return None
@@ -320,6 +351,24 @@ NOTE_RESET_HARD = (
     "`git stash -u` them first. If a destructive experiment does not need "
     "the current working tree at all, run it in a scratch clone or a "
     "throwaway `git worktree add --detach` instead."
+)
+
+NOTE_FORCED_SWITCH = (
+    "This forced `git checkout` will discard {count} tracked file(s) with "
+    "uncommitted changes -- staged or unstaged -- that have nothing "
+    "necessarily to do with why this is being run:\n\n"
+    "  command:  {segment}\n"
+    "  would be discarded:\n{files}\n\n"
+    "`-f`/`--force` removes the refusal that makes a plain `git checkout "
+    "<ref>` safe: an unforced switch either refuses or carries local "
+    "changes across, while a forced one resets every tracked file to the "
+    "target and reports only `Switched to branch ...` at exit 0. With no "
+    "ref at all (`git checkout -f`), the whole tracked tree is reverted to "
+    "HEAD with no output whatsoever.\n\n"
+    "If these changes are not meant to be discarded, commit or "
+    "`git stash -u` them first.\n\n"
+    "`git switch -f` / `--discard-changes` does the same thing and this "
+    "hook does not read `git switch` at all -- check that form by hand."
 )
 
 NOTE_PATH_DISCARD = (
@@ -411,6 +460,11 @@ def main() -> int:
         note = NOTE_RESET_HARD.format(
             count=len(changed), segment=segment, files=files)
         summary = (f"`git reset --hard` will discard {len(changed)} "
+                   "tracked file(s) with uncommitted changes.")
+    elif kind == "checkout-force":
+        note = NOTE_FORCED_SWITCH.format(
+            count=len(changed), segment=segment, files=files)
+        summary = (f"Forced `git checkout` will discard {len(changed)} "
                    "tracked file(s) with uncommitted changes.")
     else:
         note = NOTE_PATH_DISCARD.format(

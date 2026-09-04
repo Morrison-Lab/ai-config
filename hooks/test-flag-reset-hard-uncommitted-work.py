@@ -324,6 +324,64 @@ def checkout_new_branch_case(path):
     return "git checkout -b feature"
 
 
+def checkout_force_ref_case(path):
+    """`git checkout -f <ref>` over a dirty tracked file. Measured on git
+    2.43.0: this prints only `Switched to branch 'other'`, exits 0, and the
+    edit is gone -- so the whole tracked tree is in scope, not the ref."""
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _run(path, "branch", "other")
+    _write(path, "tracked.txt", content="dirty\n")
+    return "git checkout -f other"
+
+
+def checkout_force_bare_case(path):
+    """`git checkout -f` with NO operand at all -- the widest form, which
+    reverts EVERY tracked file to HEAD with no output whatsoever."""
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return "git checkout -f"
+
+
+def checkout_force_new_branch_case(path):
+    """`git checkout --force -b <new>` -- creating a branch does not spare
+    the working tree once the switch is forced."""
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return "git checkout --force -b feature"
+
+
+def checkout_ref_dirty_case(path):
+    """`git checkout <ref>`, UNFORCED, over a dirty tracked file. Measured
+    on git 2.43.0: the change is carried across to the new branch and the
+    tree stays dirty, so nothing is discarded and this must not warn. The
+    companion to the forced case above, and the reason the force flag is
+    what decides it rather than the dirty tree."""
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _run(path, "branch", "other")
+    _write(path, "tracked.txt", content="dirty\n")
+    return "git checkout other"
+
+
+def switch_force_case(path):
+    """`git switch -f <ref>` discards the same way a forced checkout does,
+    and this hook does not read `git switch` at all -- a deliberate gap the
+    catalogs name. Pinned here so the gap is measured rather than assumed."""
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _run(path, "branch", "other")
+    _write(path, "tracked.txt", content="dirty\n")
+    return "git switch -f other"
+
+
 def mv_subcommand_case(path):
     """A different git subcommand (`mv`) carrying pathspec-shaped
     arguments must not be routed through the checkout/restore pathspec
@@ -387,6 +445,13 @@ SHOULD_WARN += [
      "regardless of the ref"),
     ("W12", checkout_ambiguous_path_wins_case,
      "a positional argument that does not resolve as a ref is a path"),
+    ("W13", checkout_force_ref_case,
+     "`git checkout -f <ref>` -- forcing removes the refusal that makes an "
+     "unforced switch safe"),
+    ("W14", checkout_force_bare_case,
+     "`git checkout -f` with no operand reverts every tracked file to HEAD"),
+    ("W15", checkout_force_new_branch_case,
+     "`git checkout --force -b <new>` still discards the working tree"),
 ]
 
 SHOULD_STAY_SILENT += [
@@ -405,6 +470,12 @@ SHOULD_STAY_SILENT += [
     ("S13", mv_subcommand_case,
      "a different git subcommand (`mv`) carrying pathspec-shaped args is "
      "not checkout/restore"),
+    ("S14", checkout_ref_dirty_case,
+     "`git checkout <ref>` UNFORCED over a dirty tree carries the change "
+     "across -- the force flag decides this, not the dirty tree"),
+    ("S15", switch_force_case,
+     "`git switch -f <ref>` is the deliberate gap: this hook does not read "
+     "`git switch`, and the catalogs say so"),
 ]
 
 
@@ -510,7 +581,18 @@ MUTATIONS = {
         "pathspec",
         [("    return _resolves_as_ref(arg) is False",
           "    return True")],
-        {"S9"},
+        # W13 rides on this clause too: misreading `other` as a pathspec
+        # scopes the status query to a path that does not exist, so the
+        # forced switch reports nothing rather than the whole tree.
+        {"S9", "W13"},
+    ),
+    "M3_forced_checkout": (
+        "a forced `git checkout` that resolves to no pathspec is scoped to "
+        "the whole tracked tree, like `reset --hard`",
+        [('            if sub == "checkout" and saw_force:\n'
+          '                return "checkout-force", " ".join(argv), None',
+          "            pass")],
+        {"W13", "W14", "W15"},
     ),
     "M4_status_gate": (
         "only a status report with at least one non-untracked entry warns",

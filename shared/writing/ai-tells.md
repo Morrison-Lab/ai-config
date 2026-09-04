@@ -42,7 +42,7 @@ Watch for:
   for a plain verb of report.
   Cue: count them per page, since each is ordinary English at one or two hits
   and a verbal tic at ten ---
-  `grep -icoE "rather than|not the same as|load-bearing|carr(y|ies)|does(n't| not) tell" FILE`.
+  `grep -ioE "rather than|not the same as|load-bearing|carr(y|ies)|\btells\b|does(n't| not) tell" FILE | wc -l`.
   Fix: state the claim positively, and keep one contrast per paragraph at most.
   Say what a thing **is**, not what it is not (-> "the lease compares against
   your remote-tracking ref", not "a lease is not the same as a force").
@@ -52,8 +52,10 @@ Watch for:
 - **Thin punctuation:** long sentences glued together with "and", while commas,
   semicolons, colons, and parentheses stay rarer than a human writer's.
   The Economist measured this in August 2026 ("How to spot AI writing").
-  The study compared 55,940 sentences and 1.2 million words of its own copy
-  against ChatGPT, Claude, Gemini, and Grok rewrites of the same articles.
+  Its corpus ran to 55,940 sentences and 1.2 million words:
+  the Economist's own copy, ChatGPT, Claude, Gemini, and Grok versions of
+  those articles, journalism from CNN, the New York Times, and the Washington
+  Post, and excerpts from novels published between 1950 and 2022.
   Sparse punctuation beat the em-dash as a marker, and only Claude used
   em-dashes more often than the human writers did.
   So read the em-dash bullet below as model-specific, not universal.
@@ -69,8 +71,9 @@ Watch for:
   [`use-preferred-style`](../../skills/use-preferred-style/SKILL.md) step 2
   already sets, or three or more commas plus a subordinator ("which", "whose",
   "because", "while", "so that").
-  Fix: [`plain-prose`](plain-prose.md)'s subordinate-clause rule --- split the
-  sentence, and repeat the shared subject in the second half.
+  Fix: split the sentence, per
+  [`plain-prose`](plain-prose.md)'s subordinate-clause rule.
+  Repeat the shared subject in the second half.
   On measuring it algorithmically: readability formulas score word and sentence
   length only.
   Flesch-Kincaid grade level (Kincaid et al. 1975) and Gunning fog

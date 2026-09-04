@@ -119,7 +119,7 @@ grep -rniE "\b($tells)\b" <target>       # no ripgrep — same pattern, via grep
   in for "essential".
   Each is ordinary English at one or two hits, so count density instead of
   banning them:
-  `grep -icoE "rather than|not the same as|load-bearing|carr(y|ies)|does(n't| not) tell" <target>`.
+  `grep -ioE "rather than|not the same as|load-bearing|carr(y|ies)|\btells\b|does(n't| not) tell" <target> | wc -l`.
 - **Convoluted sentences** --- clause nesting the reader must hold open across
   two or more embedded clauses.
   Cue: the ~25-word bar `use-preferred-style` step 2 sets, or three or more

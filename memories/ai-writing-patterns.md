@@ -147,9 +147,11 @@ the diagnostic signal lies in clustering and mechanical repetition.
   Over-reliance on commas and additive conjunctions ("and")
   while avoiding semicolons, colons, parentheses, or mid-thought periods.
   The Economist ("How to spot AI writing", August 2026)
-  compared 55,940 sentences and 1.2 million words of its own copy
-  against ChatGPT, Claude, Gemini, and Grok rewrites of the same articles,
-  and found sparse punctuation a better marker than the em-dash.
+  measured a 55,940-sentence, 1.2-million-word corpus:
+  its own copy, ChatGPT, Claude, Gemini, and Grok versions of those articles,
+  journalism from CNN, the New York Times, and the Washington Post,
+  and excerpts from novels published between 1950 and 2022.
+  It found sparse punctuation a better marker than the em-dash.
   Only Claude used em-dashes more often than the human writers did,
   so read the em-dash baselines below per model
   and re-check them as models change.

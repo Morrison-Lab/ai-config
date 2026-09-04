@@ -534,6 +534,61 @@ check("whitespace only", fires("   \n  "), False)
 check("unrelated command", fires("git status --short"), False)
 check("bare git", fires("git; git push"), False)
 
+# ----------------------------------------------------------------- registry
+
+# `tool-mappings.md` -- generated from `tool-mappings.yml` -- is the registry
+# `CLAUDE.md` calls the single source of truth for the gh/glab-to-MCP mapping,
+# and the one it points every agent at in a remote or web session where
+# `gh`/`glab` is not on `PATH`. That makes it a registry a model copies a
+# command from verbatim. Its `WRITE_FILE` entry prescribed a chained
+# commit-and-push this guard refuses (ai-config#3002), and the sweep that
+# shipped the guard could not reach it: that sweep read fenced code blocks,
+# while this value is a YAML scalar and a generated table cell.
+#
+# So sweep the registry itself, and report how many command fields were
+# examined alongside how many were refused -- a zero with no denominator is
+# indistinguishable from a sweep that never ran.
+#
+# PyYAML is guarded the way scripts/validate-skills.py,
+# scripts/sync-codex-skill-wrappers.py, and scripts/test_validate_workflow.py
+# guard it, so a missing dependency names itself rather than arriving as a
+# traceback -- this is the only third-party import under `hooks/`. Not every
+# consumer does: scripts/test_run_local_validation.py imports it bare and
+# scripts/check-vendored-drift.py swallows the ImportError, which is a gap in
+# those two files rather than a precedent to copy.
+try:
+    import yaml  # noqa: E402
+except ImportError:  # pragma: no cover
+    sys.exit("test-no-commit-chained-to-push: PyYAML is required "
+             "--- run `pip install pyyaml`.")
+
+REGISTRY = os.path.join(os.path.dirname(HERE), "tool-mappings.yml")
+registry = yaml.safe_load(open(REGISTRY, encoding="utf-8").read())
+operations = registry.get("operations") or []
+check("the registry has operations to sweep", bool(operations), True)
+
+examined = 0
+refused = 0
+for op in operations:
+    command = op.get("cli")
+    if not isinstance(command, str):
+        continue
+    examined += 1
+    denied = fires(command)
+    if denied:
+        refused += 1
+    check(f"registry {op.get('id', '<unknown>')}.cli is not a chained "
+          "commit-and-push", denied, False)
+
+# The entry the issue named, pinned by id rather than by the sweep above, so a
+# registry that lost the operation entirely cannot pass by having nothing left
+# to examine.
+write_file = [op for op in operations if op.get("id") == "WRITE_FILE"]
+check("WRITE_FILE is still in the registry", len(write_file), 1)
+if write_file:
+    check("WRITE_FILE.cli is allowed by this guard",
+          fires(write_file[0].get("cli", "")), False)
+
 # --------------------------------------------------------------- end-to-end
 
 out = run_hook("git add -A && git commit -m x && git push -u origin b")
@@ -907,4 +962,5 @@ if failures:
     for line in failures:
         print("  " + line)
     sys.exit(1)
-print("all tests passed")
+print(f"all tests passed (swept {examined} tool-mappings.yml cli "
+      f"values; {refused} refused)")

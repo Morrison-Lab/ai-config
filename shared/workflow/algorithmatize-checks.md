@@ -1553,8 +1553,9 @@ That inference is wrong, and it is wrong in a way repetition can never expose.
 Re-running holds the tree constant, which is what makes it feel like a control --- and it holds the **confounder** constant with exactly the same fidelity.
 A busy machine does not stop being busy between two consecutive runs.
 
-So the section above's remedy of re-running and reporting the spread answers a *transient* neighbour and not a sustained one.
-Where the load is your own dispatched work, it persists across every run in the batch, and the spread it produces is narrow --- which reads as precision.
+So the section above's remedy of re-running and reporting the spread is necessary and not sufficient.
+A wide spread does establish that the machine is the variable, as that section's own load-average-376 reading shows.
+A *narrow* one establishes nothing, because sustained load can hold every run in a batch at the same wrong value --- and narrowness is the reading most easily mistaken for precision.
 
 The control that repetition imitates is a **clean copy**: apply the same change to a pristine `cp -a` of the tree, run it N times there, and compare.
 Tally failures **by name** rather than by count, since the same total twice over says nothing about whether it was the same test both times, and a rotating failure is the signature of load rather than of code.

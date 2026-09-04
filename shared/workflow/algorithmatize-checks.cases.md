@@ -680,7 +680,7 @@ The next round re-derived it from the PR's own commits and showed the retraction
 What carries past this instance is the following.
 
 A finding can be *correct as measured* and still be about the wrong artifact, which is
-[`verify-the-right-artifact`](../../shared/workflow/verify-the-right-artifact.md)'s substitution arriving from the reviewer's side rather than the author's.
+[`verify-the-right-artifact`](verify-the-right-artifact.md)'s substitution arriving from the reviewer's side rather than the author's.
 The author cannot catch it by re-reading, only by re-deriving.
 
 A retraction is an assertion, so it can overshoot in the opposite direction --- and here it did, which is

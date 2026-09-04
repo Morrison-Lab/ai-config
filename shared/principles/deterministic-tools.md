@@ -520,11 +520,11 @@ Here the refactor removes the guard entirely, and what goes missing is a second 
 Both end in a test that no longer detects what it did, and both are invisible in the diff, which is why that section prescribes a mutation to expose its case and this one prescribes enumerating what the deleted guard asserted.
 
 (Measured on [Morrison-Lab/ai-config#3100](https://github.com/Morrison-Lab/ai-config/pull/3100), merged 2026-09-03.
-`scripts/check-review-body.py` retyped a disposition-summary phrase that `scripts/check-pr-fully-clean.py` owned, and a test guarded the copy with an `ast` predicate that parsed the **owner's** source to recover the phrase, then compared the consumer's literal against it.
+`scripts/check-review-body.py` retyped a disposition-summary phrase that `scripts/check-pr-fully-clean.py` owned, and a test guarded that duplication with an `ast` predicate carrying a *third* copy of the phrase, which it used to search the **owner's** parsed source for a skip of the expected shape.
 The predicate stood across three review rounds and was narrowed twice, growing from 7 to 10 to 19 lines carrying an `ast.` reference in `scripts/test_check_review_body.py`, and it still had escapes at the last of them.
 Extracting `is_ard_disposition_summary` into the checker, so the consumer calls it, deleted the guard outright: 57 lines added against 108 removed across three files.
 
-Both counterweights are from the same PR.
+The first two qualifications above are drawn from the same PR.
 An intermediate revision of the guard required the compared phrase to be an `ast.Constant`, so hoisting the literal into an importable module constant --- an `ast.Name`, and the natural way to end the duplication the guard existed for --- failed it.
 The same guard stayed green on relocating the block past the point where it could act, and on hiding it in a never-called nested function.
 That round's own commit message states it: an instrument that refuses its own fix is worse than none.

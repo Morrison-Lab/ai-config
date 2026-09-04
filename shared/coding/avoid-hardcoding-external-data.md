@@ -242,9 +242,14 @@ The revision after it then misattributed the flake to the checkout, saying in ef
 They did not.
 The flake was the same in either location, and that explanation was retracted a revision later.
 
-The other half of the point is what a later reader finds.
-Run from a pristine `git archive` of `origin/main` on 2026-09-03, `python3 scripts/test_check_pr_fully_clean.py` reports `753 passed, 0 failed`, and `git show --numstat 32a760c32` shows that #3100 never touched that file.
-So the written 754 does not reproduce on any tree the record points at, and no sha or command was published beside it that would let anyone say when it did.
+The other half of the point is that the total really is environment-dependent, and three successive attempts named the wrong cause.
+Measured 2026-09-03 on `origin/main`, `python3 scripts/test_check_pr_fully_clean.py` reports `754 passed, 0 failed` in an ordinary checkout and `753 passed, 0 failed` under `GIT_DIR=/nonexistent`.
+The suite fetches a prior revision of the checker with `git show` and emits one extra case only when some revision is reachable, so any tree without a repository behind it --- a `git archive` export, a shallow clone, a copied directory --- is one short.
+
+That is the discriminator, and it was one command away throughout.
+Each wrong explanation instead named whatever differed between the two runs that had been performed: first the code change, then the checkout's location, then --- while this entry was being written --- the claim that 754 had never been a real reading at all, which came from measuring an archive rather than a checkout and is
+[`verify-the-right-artifact`](../workflow/verify-the-right-artifact.md)'s substitution exactly.
+A count that varies with the environment invites an explanation for every pair of numbers, and the explanations are unfalsifiable until someone varies one input at a time.
 The text that shipped gives no count as an expectation, and says why.)
 
 ## Where the rule stops: text that records what was observed

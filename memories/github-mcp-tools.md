@@ -984,6 +984,39 @@ See ai-config#694 for the precedent.
     author-equals-reviewer collision, and it does not arise when the two
     logins differ.
 
+- **A PR opened, or an `@jules review` posted, through the raw REST API gets
+  no automatic review, because the review workflows skip a bot actor.**
+  The identity split above has a consequence the table does not state.
+  Ten PRs (ai-config#3220 through #3229) opened by `POST /pulls` through the
+  session proxy on 2026-09-04 carried `claude[bot]` as author and as the
+  `pull_request` event's actor;
+  `claude-review.yml`'s run on each completed with every reusable-workflow
+  job skipped, and the twelve latest `jules-review.yml` and
+  `antigravity-review.yml` runs, all triggered by the raw-API claim
+  comments, were skipped with actor `claude[bot]`.
+  One PR got a verdict anyway, because a later `git push` (a `synchronize`
+  event under the user's login) re-triggered the review.
+  The six wave-1 PRs opened the same day through
+  `mcp__github__create_pull_request` were reviewed on open.
+
+  The remedy is the client, not a re-run: open PRs and post mention comments
+  through the MCP tools, or, for a PR already opened by the raw API,
+  dispatch `claude-review.yml` through `mcp__github__actions_run_trigger`
+  with `inputs.pr_number` and re-post the mention through
+  `mcp__github__add_issue_comment`.
+  Both worked here: nine dispatches queued and ran, and Jules started on all
+  ten within a minute of the re-posted mentions.
+
+  - **Do:** open PRs and post reviewer mentions through the MCP tools, whose
+    writes carry the user's login.
+  - **Do:** read the review workflow's run list (`event`, `actor`,
+    `conclusion`) before concluding a review is slow;
+    an all-skipped run under a bot actor is the signature.
+  - **Don't:** open PRs by raw REST for the convenience of a loop and expect
+    the `opened` event to review them.
+  - **Don't:** re-post the mention through the same raw-API client that was
+    skipped the first time.
+
 - **The REST-backed reads can 404 while the GraphQL-backed ones succeed in the
   same container, against the same PR --- so a review verdict can be
   unreachable by every API route the session has and still arrive by webhook.**

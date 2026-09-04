@@ -1005,20 +1005,32 @@ the unquoted-delimiter case was written down nowhere.
 
 **Second occurrence, 2026-09-04, with the rule above loaded (ai-config#3230).**
 The payload this time was not a file but twenty-one forge bodies:
-a Python script under `python3 - <<PY`, unquoted to interpolate one scratchpad path, filed ai-config#3219, opened #3220 through #3229, and posted their claim comments.
+a Python script under `python3 - <<PY`, unquoted to interpolate one scratchpad path,
+filed issue ai-config#3219, opened PRs #3220 through #3229, and posted their claim comments.
 Every backtick span in those bodies ran as a shell command and was replaced by its empty output,
-so the issue read "The branch  records ... in  and performs no such audit".
-All twenty-one were repaired by PATCH from a quoted-delimiter rerun with the path passed as `export S=...` and read by `os.environ['S']`.
+so #3219 read "The branch  records ... in  and performs no such audit".
+All twenty-one were repaired by PATCH from a quoted-delimiter rerun,
+with the path passed as `export S=...` and read by `os.environ['S']`.
 
-Two things the first case did not record.
-The shell printed the substitutions as they ran (`fix/3110-three-rounds-reflect: No such file or directory`, `check-links.py: command not found`) to stderr, in the same tool result as the script's own output and before any body was posted;
-a run that reports `command not found` while writing a payload has already corrupted the payload, and that line is a cheaper detector than any read-back.
-And a loop that posts to a forge should read one posted body back before posting the rest, since the first body is where the corruption shows.
+Two things the first case left implicit.
+The shell printed the substitution errors
+(`fix/3110-three-rounds-reflect: No such file or directory`, `check-links.py: command not found`)
+to stderr in the same tool result as the script's own output, before any body was posted,
+so those lines are a detector usable before posting rather than after.
+The detector is one-sided:
+it fires only when the substituted command fails,
+and a span naming a command that exists, a `$(...)`, or a `$VAR` substitutes with empty stderr,
+so silence proves nothing and the read-back below stays required.
+And a loop that posts to a forge should read one posted body back before posting the rest,
+since the first body is where the corruption shows.
+No guard was built at this occurrence:
+the decidable half (an unquoted delimiter with a backtick or dollar sign in the heredoc body) is a `PreToolUse` regex over the Bash command,
+and #3230 holds that for the third occurrence, per `shared/principles/deterministic-tools.md`.
 
-- **Do:** treat `command not found` or `No such file or directory` on stderr from a heredoc-fed script as the payload having been substituted, and stop before posting.
+- **Do:** treat `command not found` or `No such file or directory` on stderr from a heredoc-fed script as the payload probably having been substituted, and stop before posting.
 - **Do:** read one posted body back before a script posts the rest of its batch.
 - **Don't:** read those stderr lines as noise from an unrelated command and let the loop run on.
-- **Don't:** post a whole batch and read the bodies afterwards.
+- **Don't:** read an empty stderr as a clean payload, or post a whole batch and read the bodies afterwards.
 
 ## Tool result persistence & disk spillover threshold
 

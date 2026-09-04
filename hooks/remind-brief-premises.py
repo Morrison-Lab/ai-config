@@ -103,7 +103,7 @@ an aggregate over findings or rounds, the addends are already in the transcript
 and "was anything run that reads them back" is decidable. It fires only when
 two or more such values came back from this session's own `Agent`/`Task` calls,
 the brief states a count of one of AGGREGATE_NOUNS that is NOT equal to one of
-those values, and no command naming `FINDINGS_COUNT` ran after the first value
+those values, and no command naming `FINDINGS_COUNT` ran after the last value
 or sits beside the claim in the brief.
 
 Both halves of that are narrower than they first read, and deliberately. The
@@ -311,7 +311,7 @@ IMPERATIVE = re.compile(
 #     what happened rather than what is wanted or still pending,
 #   - that count is not itself one of the printed values, and the brief does
 #     not write the addends out,
-#   - no command naming `FINDINGS_COUNT` ran after the first value, and none is
+#   - no command naming `FINDINGS_COUNT` ran after the last value, and none is
 #     pasted beside the claim in the brief itself.
 FINDINGS_VALUE = re.compile(r"FINDINGS_COUNT\s*:\s*(\d+)")
 
@@ -322,7 +322,13 @@ FINDINGS_VALUE = re.compile(r"FINDINGS_COUNT\s*:\s*(\d+)")
 #
 # The noun alone does not scope the claim to this session's review history --
 # "reviews" and "findings" both have ordinary uses the printed values say
-# nothing about -- so AGG_INTENT and AGG_NOT_YET below carry the rest of it.
+# nothing about. AGG_INTENT, AGG_NOT_YET and AGG_FOREIGN below SUBTRACT three
+# of those uses: an intention, work not yet done, and a count about another
+# forge item. Subtracting is not scoping, and the difference is worth stating
+# rather than leaving to a reader: a count about somebody else's review history
+# that names no PR or issue number ("we got seven reviews from the bot") is a
+# residual this clause cannot tell from its own, and the reminder it prints
+# there points at values the claim has nothing to do with.
 AGGREGATE_NOUNS = {"findings", "rounds", "reviews"}
 
 # The command that discharges clause C must NAME the token, exactly as
@@ -370,6 +376,17 @@ AGG_NOT_YET = re.compile(
     r"(?:pending|outstanding|queued|remaining|expected|planned|scheduled)\b",
     re.I,
 )
+
+# A count about ANOTHER PR's review history is not a count of this session's.
+# `transcript_derivations` closes only the ARMING half of that -- it refuses to
+# take values out of a foreign PR's comment bodies -- so a session whose own
+# rounds armed the clause still fired on "sparta#1375 had 8 findings."
+#
+# A BARE `#3117` is deliberately not a foreign reference: the incident brief
+# this clause exists for opens "Measured on #3107:", naming the PR the session
+# is working. What marks a reference as somebody else's is the repo or owner
+# glued to it, or the explicit "PR 4242" form.
+AGG_FOREIGN = re.compile(r"\b\w+#\d|\b(?:PR|MR|issue)\s+\d", re.I)
 
 # Word forms `COUNT` accepts, so a claim's numeral can be compared against
 # the values the transcript actually printed.
@@ -469,6 +486,18 @@ def segment_start(text, pos, clauses=True):
     for m in re.finditer(bounds, text[:pos]):
         best = m.end()
     return best
+
+
+def segment_end(text, pos):
+    """Index of the end of the clause containing `pos`.
+
+    The mirror of `segment_start`, so a suppression can read a claim's WHOLE
+    clause rather than only the words before it. AGG_FOREIGN needs that: a
+    foreign reference sits after the count as often as before it ("8 findings
+    on sparta#1375").
+    """
+    m = re.search(CLAUSE_BOUNDS, text[pos:])
+    return pos + m.start() if m else len(text)
 
 
 def imperative_governs(text, pos, upto, pattern=None):
@@ -614,7 +643,7 @@ def aggregate_claims(prompt):
     values -- see `evaluate`. Without that gate this is exactly the pathless
     count matcher the clause-C comment argues against.
 
-    Three suppressions, each closing a measured misfire:
+    Four suppressions, each closing a measured misfire:
 
     - The imperative guard, for the same reason it applies to clause A: a brief
       that says "count the findings across the five rounds" has already asked
@@ -624,6 +653,8 @@ def aggregate_claims(prompt):
       an intention rather than a count of anything that happened.
     - AGG_NOT_YET, because "There are three reviews pending on the stack."
       counts work not yet done, which no `FINDINGS_COUNT` value is about.
+    - AGG_FOREIGN, because "sparta#1375 had 8 findings." counts another PR's
+      review history, and this session's own values say nothing about it.
 
     `value` is the integer the claim states, carried out so `evaluate` can
     tell an aggregate from a per-round figure quoted straight off a review.
@@ -640,10 +671,12 @@ def aggregate_claims(prompt):
             continue
         if imperative_governs(text, m.start(), m.end(), AGG_IMPERATIVE):
             continue
-        clause = text[segment_start(text, m.start()):m.start()]
-        if AGG_INTENT.search(clause):
+        start = segment_start(text, m.start())
+        if AGG_INTENT.search(text[start:m.start()]):
             continue
         if AGG_NOT_YET.match(text[m.end():m.end() + 60]):
+            continue
+        if AGG_FOREIGN.search(text[start:segment_end(text, m.end())]):
             continue
         quote = " ".join(m.group(0).split())
         if quote.lower() in seen:
@@ -712,24 +745,46 @@ def aggregate_derivations(prompt):
             if DERIVE_AGGREGATE.search(seg)]
 
 
-def enumerates(text, values):
+# Digits that carry no count, and so cannot be an addend. A numbered
+# instruction list ("1. Read the diff.") and a forge reference ("PR 2",
+# "#3117") both put small integers into a brief, and a per-round
+# `FINDINGS_COUNT` value is a small integer too -- real ones run 0 to 3 -- so
+# an unfiltered scan reads either as the addends written out.
+LIST_MARKER = re.compile(r"^[\s>*+-]*\d+[.)]\s")
+REF_NUMBER = re.compile(r"(?:#|\b(?:PR|MR|issue)\s+)\d[\d,]*", re.I)
+
+
+def enumerates(text, values, line):
     """True when the brief pastes at least two of the transcript's own values.
 
     A brief that writes out "the five rounds returned 2, 3, 3, 1 and 0
     findings" carries its own derivation: the addends are in front of the
     reader, so telling it to go derive them is noise.
 
+    Scoped to NEAR_LINES around the claim, exactly as `aggregate_derivations`
+    is, and filtered by LIST_MARKER and REF_NUMBER. Both narrowings answer the
+    same fault: the discharge was a whole-brief scan for any two digits equal
+    to a printed value, so an ordinary numbered instruction list, or two PR
+    references, silenced the clause outright. That is this file's own named
+    failure direction -- an over-broad discharge, whose symptom is silence, and
+    silence is indistinguishable from compliance.
+
     Digits only. The word forms `COUNT` accepts are ordinary English -- "no",
     "one", "two" -- so matching them would let unrelated prose discharge the
-    clause wholesale.
+    clause wholesale. The identical argument is what rules out a list marker
+    and a forge reference, which are digits with no count behind them at all.
     """
     pool = list(values)
     hits = 0
-    for tok in re.findall(r"\b\d[\d,]*\b", text):
-        n = numeral(tok)
-        if n in pool:
-            pool.remove(n)
-            hits += 1
+    for n, raw in enumerate(text.splitlines()):
+        if abs(n - line) > NEAR_LINES:
+            continue
+        seg = REF_NUMBER.sub(" ", LIST_MARKER.sub("", raw))
+        for tok in re.findall(r"\b\d[\d,]*\b", seg):
+            v = numeral(tok)
+            if v in pool:
+                pool.remove(v)
+                hits += 1
     return hits >= 2
 
 
@@ -742,10 +797,18 @@ def transcript_derivations(path):
 
     Returns `(any_paths, count_paths, aggregate)`, where `aggregate` is
     `(values, derived)`: the `FINDINGS_COUNT` values this session's reviews
-    printed, in order, and whether a command naming that token ran AFTER the
-    first of them. The ordering matters -- a command that ran before the values
-    existed cannot have read them back -- and it is what makes "with no
+    printed, in order, and whether a command naming that token ran after the
+    LAST of them. The ordering matters -- a command that ran before a value
+    existed cannot have read that value back -- and it is what makes "with no
     deriving command between the values and the claim" decidable.
+
+    The anchor is the last value, not the first, because the first is the one
+    that makes the clause silent where it is needed most. A five-round ARDI
+    session derives a running total mid-loop, and under a first-value anchor
+    that round-two command discharged a round-five total it could not have
+    read: rounds three, four and five had not happened yet. So the position is
+    recorded rather than latched, and a derivation only counts when no value
+    arrived after it.
 
     The values are taken ONLY from `Agent`/`Task` results, which is where a
     review returns one. Scanning every tool result armed the clause off other
@@ -755,13 +818,13 @@ def transcript_derivations(path):
     review history it had no part in.
     """
     any_p, count_p = set(), set()
-    agg_vals, agg_derived = [], False
+    agg_vals, agg_derived_at = [], -1
     agent_ids = set()
     pending = {}
     try:
         fh = open(path, errors="ignore")
     except Exception:
-        return any_p, count_p, (agg_vals, agg_derived)
+        return any_p, count_p, (agg_vals, False)
 
     with fh:
         for line in fh:
@@ -837,7 +900,11 @@ def transcript_derivations(path):
                         continue
                     counts = bool(DERIVE_COUNT.search(cmd))
                     if agg_vals and DERIVE_AGGREGATE.search(cmd):
-                        agg_derived = True
+                        # How many values existed when this command ran, not
+                        # merely that one did. Compared against the final
+                        # count below, so a derivation overtaken by a later
+                        # round no longer answers for it.
+                        agg_derived_at = len(agg_vals)
                     if not counts and not DERIVE_ANY.search(cmd):
                         continue
                     for pm in PATH_IN_CMD.finditer(cmd):
@@ -846,7 +913,7 @@ def transcript_derivations(path):
                             count_p.add(k)
                         any_p.add(k)
 
-    return any_p, count_p, (agg_vals, agg_derived)
+    return any_p, count_p, (agg_vals, agg_derived_at == len(agg_vals))
 
 
 NOTE = (
@@ -861,17 +928,30 @@ NOTE = (
     "If you already derived these, say so in the brief and launch unchanged."
 )
 
-# Appended only when an `aggregate` claim is among them, so an ordinary
-# path-anchored reminder does not carry advice about a token it is not about.
-AGGREGATE_NOTE = (
-    "\n\nThis session's reviews printed `[FINDINGS_COUNT: N]` values, and no "
-    "command has read them back since. If a count above aggregates those "
-    "values, derive it rather than recalling it. They are in this session's "
-    "transcript under `~/.claude/projects`:\n"
-    "  grep -o 'FINDINGS_COUNT: [0-9]*' \"$T\" | awk '{s+=$2} END {print s}'\n"
-    "sums the findings, and `grep -c FINDINGS_COUNT \"$T\"` counts the rounds. "
-    "Put the derived figure in the brief."
-)
+def aggregate_note(tpath):
+    """The clause-C addendum, naming the transcript the values are actually in.
+
+    Appended only when an `aggregate` claim is among the findings, so an
+    ordinary path-anchored reminder does not carry advice about a token it is
+    not about.
+
+    The path is interpolated rather than left as a `$T` placeholder. No session
+    sets `$T`, so a pasted command expanded to an empty filename and died --- a
+    prescribed derivation that cannot be run derives nothing, which is this
+    hook's own complaint about a brief that asserts without deriving. The hook
+    already holds the path, so there was nothing to leave to the reader.
+    """
+    t = tpath or "$HOME/.claude/projects/<this session>.jsonl"
+    return (
+        "\n\nThis session's reviews printed `[FINDINGS_COUNT: N]` values, and "
+        "no command has read them back since. If a count above aggregates "
+        "those values, derive it rather than recalling it. They are in this "
+        "session's transcript:\n"
+        "  grep -o 'FINDINGS_COUNT: [0-9]*' \"" + t + "\""
+        " | awk '{s+=$2} END {print s}'\n"
+        "sums the findings, and `grep -c FINDINGS_COUNT \"" + t + "\"` counts "
+        "the rounds. Put the derived figure in the brief."
+    )
 
 
 def evaluate(prompt, tpath=""):
@@ -908,9 +988,9 @@ def evaluate(prompt, tpath=""):
     # values, not one: with a single `FINDINGS_COUNT` in the session there is
     # nothing to aggregate, and firing on it would make this the pathless
     # count matcher the clause-C comment argues against.
-    if agg_found and len(agg_vals) >= 2 and not agg_derived and not (
-            enumerates(visible_prose(prompt), agg_vals)):
+    if agg_found and len(agg_vals) >= 2 and not agg_derived:
         in_agg = aggregate_derivations(prompt)
+        agg_text = visible_prose(prompt)
         # A count clause A already anchored to a file is that clause's claim,
         # discharged by that clause's rule. Re-reporting it here would list it
         # twice, and worse, would re-fire one a counting command had cleared.
@@ -929,6 +1009,10 @@ def evaluate(prompt, tpath=""):
             if value is not None and value in seen_vals:
                 continue
             if any(abs(n - line) <= NEAR_LINES for n in in_agg):
+                continue
+            # Per claim, not once for the whole brief: the addends are a
+            # derivation only where they sit BESIDE the count they add up to.
+            if enumerates(agg_text, agg_vals, line):
                 continue
             undischarged.append((kind, quote))
     return undischarged
@@ -1030,7 +1114,7 @@ def main() -> int:
 
         note = NOTE.format(claims=listed)
         if any(k == "aggregate" for k, _ in undischarged):
-            note += AGGREGATE_NOTE
+            note += aggregate_note(tpath)
         out = {
             "hookSpecificOutput": {
                 "hookEventName": "PreToolUse",

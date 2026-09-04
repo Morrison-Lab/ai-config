@@ -135,6 +135,17 @@ ROUNDS_COUNTED = ROUNDS + [
     tool("Bash", {"command": "grep -c FINDINGS_COUNT /tmp/rounds.txt"}, "b9"),
     result("5", "b9"),
 ]
+# A deriving command that NAMES the token but ran when only the first two
+# values existed, with three more rounds after it. It must NOT discharge: the
+# total it printed is one that rounds 3, 4 and 5 had not yet contributed to.
+# A five-round ARDI session deriving a running total mid-loop is the clause's
+# own target population, so anchoring on the first value went silent there.
+ROUNDS_DERIVED_EARLY = (
+    review(2, "a1") + review(3, "a2")
+    + [tool("Bash", {"command": "grep -c FINDINGS_COUNT /tmp/rounds.txt"}, "b7"),
+       result("2", "b7")]
+    + review(3, "a3") + review(1, "a4") + review(0, "a5")
+)
 # An unrelated counting command, run after the values, that counted something
 # else entirely. It must NOT discharge: `wc -l` on a `find` is quoted verbatim
 # in the hook's own PRECISION docstring, so it is what a real ARDI session runs
@@ -229,6 +240,19 @@ REMIND = [
     # cases named the review log and so passed under either rule.
     (AGGREGATE_BRIEF, ROUNDS_UNRELATED,
      "C: an unrelated counting command counted something else"),
+    # Round 2 finding: the discharge latched on the FIRST value, so a running
+    # total derived mid-loop answered for a total three rounds newer than it.
+    (AGGREGATE_BRIEF, ROUNDS_DERIVED_EARLY,
+     "C: a derivation overtaken by later rounds did not read those rounds"),
+    # Round 2 finding: `enumerates` scanned the WHOLE brief for any two digits
+    # equal to a printed value, and real values run 0 to 3, so an ordinary
+    # numbered instruction list discharged the clause outright.
+    (AGGREGATE_BRIEF + "\n\n1. Read the diff.\n2. Address each finding.\n3. Push.",
+     ROUNDS, "C: a numbered instruction list is not the addends written out"),
+    (AGGREGATE_BRIEF + " See PR 1 and PR 2.", ROUNDS,
+     "C: forge references are not the addends written out"),
+    (AGGREGATE_BRIEF + "\n" * 20 + "The rounds returned 2, 3, 3, 1 and 0.",
+     ROUNDS, "C: addends 20 lines away are not beside the claim"),
     # Clause A's own coverage, which widening IMPERATIVE with `sum`/`tally`
     # silently removed: those words head a noun phrase far more often than
     # they open a command, so clause C now carries its own verb list.
@@ -343,6 +367,13 @@ SILENT = [
      "C: work not yet done, which no FINDINGS_COUNT value is about"),
     ("Address the eleven findings on that other PR.", FOREIGN_PR,
      "C: values read out of another PR's comments are not this session's"),
+    # Round 2 finding: this session's own rounds arm the clause, so the
+    # transcript-side scoping above cannot reach a claim about somebody
+    # else's PR. AGG_FOREIGN is the claim-side half of that.
+    ("sparta#1375 had 8 findings.", ROUNDS,
+     "C: a count about another repo's PR is not this session's history"),
+    ("PR 4242 came back with 8 findings.", ROUNDS,
+     "C: same, in the explicit PR-number form"),
 ]
 
 # ------------------------------------------------------------------- runner
@@ -417,6 +448,29 @@ p = subprocess.run([sys.executable, HOOK], input="not json at all",
 ok = p.returncode == 0 and not p.stdout.strip()
 wrong += not ok
 print(f"  {'silent' if ok else 'BROKE':<7} malformed payload fails open")
+
+# The clause-C addendum prescribes two commands. They have to be RUNNABLE: an
+# earlier revision pointed both at `"$T"`, a variable no session sets, so each
+# expanded to an empty filename and died. A prescribed derivation that cannot
+# be pasted and run derives nothing, which is this hook's own complaint about
+# a brief that asserts without deriving.
+_nd = tempfile.mkdtemp()
+_tp = transcript(ROUNDS)
+try:
+    _note = subprocess.run(
+        [sys.executable, HOOK],
+        input=json.dumps({"tool_name": "Agent", "transcript_path": _tp,
+                          "tool_input": {"prompt": AGGREGATE_BRIEF}}),
+        capture_output=True, text=True, env=dict(os.environ, TMPDIR=_nd))
+    _ctx = json.loads(_note.stdout)["hookSpecificOutput"]["additionalContext"]
+finally:
+    os.unlink(_tp)
+    shutil.rmtree(_nd, ignore_errors=True)
+ok = _tp in _ctx and "$T" not in _ctx
+wrong += not ok
+print(f"  {'ok    ' if ok else 'WRONG '} the aggregate note names the real "
+      "transcript, not an unset $T")
+CONTRACT_EXTRA = 1
 
 # ------------------------------------------------------------ sentinel scope
 print("\nsentinel (one shared dir):")
@@ -667,9 +721,32 @@ MUTANTS = [
      False, True),
 
     ("clause C: a brief listing the addends carries its own derivation",
-     "enumerates", staticmethod(lambda text, values: False),
+     "enumerates", staticmethod(lambda text, values, line: False),
      lambda: fires("The five rounds returned 2, 3, 3, 1 and 0 findings.",
                    ROUNDS),
+     False, True),
+
+    ("clause C: a numbered list marker is not an addend",
+     "LIST_MARKER", re.compile(r"zzz-never-matches"),
+     lambda: fires(AGGREGATE_BRIEF
+                   + "\n\n1. Read the diff.\n2. Address each finding.\n3. Push.",
+                   ROUNDS),
+     True, False),
+
+    ("clause C: a forge reference is not an addend",
+     "REF_NUMBER", re.compile(r"zzz-never-matches"),
+     lambda: fires(AGGREGATE_BRIEF + " See PR 1 and PR 2.", ROUNDS),
+     True, False),
+
+    ("clause C: the addends must sit beside the claim",
+     "NEAR_LINES", 10 ** 6,
+     lambda: fires(AGGREGATE_BRIEF + "\n" * 20
+                   + "The rounds returned 2, 3, 3, 1 and 0.", ROUNDS),
+     True, False),
+
+    ("clause C: a count about another forge item is not this session's",
+     "AGG_FOREIGN", re.compile(r"zzz-never-matches"),
+     lambda: fires("sparta#1375 had 8 findings.", ROUNDS),
      False, True),
 
     ("clause C: an intention is not a count of what happened",
@@ -727,7 +804,7 @@ ok = diff == {","}
 wrong += not ok
 print(f"  {'ok   ' if ok else 'WRONG'}  the two windows differ by exactly ',' (got {diff or 'nothing'})")
 
-total = (1 + len(REMIND) + len(SILENT) + len(CONTRACT) + 1 + len(seq)
+total = (1 + len(REMIND) + len(SILENT) + len(CONTRACT) + 1 + CONTRACT_EXTRA + len(seq)
          + len(SM_REMIND) + len(SM_SILENT) + SM_EXTRA + len(MUTANTS))
 print(f"\n{total - wrong}/{total} correct"
       + ("" if wrong == 0 else f"  ({wrong} WRONG)"))

@@ -925,6 +925,14 @@ try:
     sibling_subshell_commit = transcript([
         f"(cd {dormant_wt} && git status) && (git add -A && git commit -m mine)",
     ])
+    # A recorded call can be TRUNCATED mid-subshell, leaving the `(` unclosed
+    # --- `unwrap_command` exists for exactly that text. The parent shell
+    # still never entered the parens, so the carry between calls must read
+    # the caller's own shell rather than the subshell the text stopped in.
+    truncated_subshell_cd = transcript([
+        f"(cd {dormant_wt} && git log --oneline -5",
+        "git commit -m mine",
+    ])
     # `git checkout [<tree-ish>] -- <paths>` restores files and moves HEAD
     # nowhere, so it must not clear the carried branch --- reading the
     # pathspec as a branch name replaced `agy-dormant` with `README.md` and
@@ -1086,6 +1094,10 @@ try:
         # it, however equal their nesting depths.
         assert subject.decide(dormant_root, sibling_subshell_commit) == "", \
             "a sibling subshell must not inherit the previous one's `cd` (ai-config#2422)"
+        # An unclosed `(` leaves the text ending inside the subshell, which
+        # the parent shell never entered.
+        assert subject.decide(dormant_root, truncated_subshell_cd) == "", \
+            "a truncated subshell `cd` must not claim a later commit (ai-config#2422)"
         # A pathspec checkout moves HEAD nowhere, so the carried branch stands.
         for _name, _t in (("git checkout -- <path>", pathspec_keeps_branch),
                           ("git checkout <tree-ish> -- <path>", treeish_pathspec_keeps_branch)):

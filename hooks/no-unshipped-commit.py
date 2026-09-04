@@ -287,7 +287,7 @@ def _scope_dir(dirs, scope, cur_dir):
     return dirs[scope]
 
 
-def shell_dir_after(text, cur_dir):
+def shell_dir_after(text, cur_dir, parent_only=False):
     """The directory the shell stands in WHERE `text` ENDS, given `cur_dir`.
 
     `None` means INDETERMINATE, never "unchanged": `cd -`, `popd`, a `$VAR`
@@ -298,12 +298,14 @@ def shell_dir_after(text, cur_dir):
     its own later commit to the worktree it visited.
 
     WHERE THE TEXT ENDS is what lets one function answer both of the two
-    questions this file asks it. The between-call carry passes a whole
-    balanced call, which ends at depth 0 in the parent shell --- so
-    `(cd /other-worktree && git status)`, the routine way to read another
-    checkout without leaving your own, leaves the parent where it stood and
-    never claims a later commit. The commit attribution passes the text up to
-    the commit, which ends wherever that commit runs --- so
+    questions this file asks it. The between-call carry passes
+    `parent_only`, which reads the caller's own shell whether or not the text
+    closed every `(` --- so `(cd /other-worktree && git status)`, the routine
+    way to read another checkout without leaving your own, leaves the parent
+    where it stood and never claims a later commit, and the truncated
+    `(cd /other-worktree && git st` leaves it there too. The commit
+    attribution passes the text up to the commit, which ends wherever that
+    commit runs --- so
     `(cd /other-worktree && git commit -m x)` reports the worktree the commit
     really ran in. An earlier revision instead skipped every `cd` at a depth
     above 0, which answered the first question and silently lost the second:
@@ -339,7 +341,7 @@ def shell_dir_after(text, cur_dir):
         _, rest = strip_env(argv)
         if rest and rest[0] in ("cd", "pushd", "popd"):
             dirs[scope] = resolve_cd_target(rest, here)
-    return _scope_dir(dirs, end_scope, cur_dir)
+    return _scope_dir(dirs, (0,) if parent_only else end_scope, cur_dir)
 
 
 def absolute_dir(path):
@@ -634,7 +636,7 @@ def scan_transcript(path):
             # `git commit -m x && git checkout -` reports the branch the
             # commit landed on rather than the one the call ended on.
             recent_branches = branches_after(scanned, recent_branches)
-            cur_dir = absolute_dir(shell_dir_after(scanned, start_dir))
+            cur_dir = absolute_dir(shell_dir_after(scanned, start_dir, parent_only=True))
             if pending and (PUSH.search(scanned) or CREATE.search(scanned)):
                 pending = None
     except Exception:

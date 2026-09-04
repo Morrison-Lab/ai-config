@@ -343,37 +343,13 @@ def simple_commands(command):
     tokens are separators and are dropped with the rest. A caller that models
     shell STATE rather than asking which programs ran needs the distinction,
     since a `cd` inside a subshell moves that subshell and never the parent;
-    `simple_commands_with_depth` is the same split with the nesting kept, and
-    `simple_commands_with_scope` keeps the individual subshells apart as well.
-    """
-    with_depth = simple_commands_with_depth(command)
-    if with_depth is None:
-        return None
-    return [argv for _depth, argv in with_depth]
-
-
-def simple_commands_with_depth(command):
-    """`simple_commands`, each argv paired with its SUBSHELL NESTING DEPTH.
-
-    Depth 0 is the caller's own shell. A greater depth means the command runs
-    inside `( ... )` or `$( ... )`, so anything it does to the shell's own
-    state --- its working directory above all --- dies with the subshell and
-    never reaches the parent.
-
-    A DEPTH CANNOT TELL TWO SIBLING SUBSHELLS APART, which matters to any
-    caller carrying per-level state: `(cd /a) && (git commit` and
-    `(cd /a && git commit` both report the commit at depth 1, so the first
-    subshell's `cd` reads as still in force inside the second, which it is
-    not. `simple_commands_with_scope` is the split that distinguishes them,
-    and a caller modelling the shell's directory needs it (ai-config#2422).
-
-    `{ ... }` grouping is NOT nesting for this purpose and is not counted: it
-    runs in the current shell, so a `cd` inside one does move the caller.
+    `simple_commands_with_scope` is the same split with each argv paired with
+    the subshell it runs in.
     """
     with_scope = simple_commands_with_scope(command)
     if with_scope is None:
         return None
-    return [(len(scope) - 1, argv) for scope, argv in with_scope]
+    return [argv for _scope, argv in with_scope]
 
 
 def simple_commands_with_scope(command):
@@ -381,10 +357,9 @@ def simple_commands_with_scope(command):
 
     A scope is the tuple of subshell ids from the caller's own shell down to
     the command, so `(0,)` is the caller's shell and `len(scope) - 1` is the
-    nesting depth `simple_commands_with_depth` reports. Every `(` allocates a
-    FRESH id, so two sibling subshells at the same depth carry different
-    scopes and a caller can tell that the second inherited from the parent
-    rather than from the first.
+    nesting depth. Every `(` allocates a FRESH id, so two sibling subshells
+    at the same depth carry different scopes and a caller can tell that the
+    second inherited from the parent rather than from the first.
 
     Parens are read one character at a time rather than by net count, because
     a single separator token can both close and open: `shlex` emits `);` and

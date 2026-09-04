@@ -321,33 +321,22 @@ check("an unexpanded variable target is indeterminate",
 check("a subshell cd is flattened away by simple_commands",
       shellcmd.simple_commands("(cd /a && git status)"),
       [["cd", "/a"], ["git", "status"]])
-check("the depth-aware split keeps the nesting",
-      shellcmd.simple_commands_with_depth("(cd /a && git status)"),
-      [(1, ["cd", "/a"]), (1, ["git", "status"])])
-check("a cd outside the parens stays at depth 0",
-      shellcmd.simple_commands_with_depth("cd /r && (cd /a && ls) && git commit"),
-      [(0, ["cd", "/r"]), (1, ["cd", "/a"]), (1, ["ls"]),
-       (0, ["git", "commit"])])
-# `shlex` emits a closing run like `));` as ONE separator token, so the depth
-# has to come off the token's own paren COUNT rather than off one paren per
-# separator --- otherwise the trailing command reads as still nested.
-check("a run of closing parens in one token closes every level",
-      shellcmd.simple_commands_with_depth("(cd /a && (cd /b; ls)); cd /c"),
-      [(1, ["cd", "/a"]), (2, ["cd", "/b"]), (2, ["ls"]), (0, ["cd", "/c"])])
+check("the scope-aware split keeps the nesting",
+      shellcmd.simple_commands_with_scope("(cd /a && git status)"),
+      [((0, 1), ["cd", "/a"]), ((0, 1), ["git", "status"])])
+check("a cd outside the parens stays in the caller's shell",
+      shellcmd.simple_commands_with_scope("cd /r && (cd /a && ls) && git commit"),
+      [((0,), ["cd", "/r"]), ((0, 1), ["cd", "/a"]), ((0, 1), ["ls"]),
+       ((0,), ["git", "commit"])])
 # `{ ... }` runs in the CURRENT shell, so a `cd` inside one does move the
 # caller and must not be counted as nesting.
 check("brace grouping is not subshell nesting",
-      shellcmd.simple_commands_with_depth("f() { cd /a; }"),
-      [(0, ["f"]), (0, ["{", "cd", "/a"]), (0, ["}"])])
-check("a parse error is None on the depth-aware split too",
-      shellcmd.simple_commands_with_depth("git commit -m \'unclosed"), None)
+      shellcmd.simple_commands_with_scope("f() { cd /a; }"),
+      [((0,), ["f"]), ((0,), ["{", "cd", "/a"]), ((0,), ["}"])])
 # A DEPTH IS NOT AN IDENTITY. Two sibling subshells sit at the same depth and
 # share none of their state, so a caller carrying a per-level directory needs
 # the scope-aware split to tell them apart --- `(cd /a) && (git commit` reads
 # as `(cd /a && git commit` from the depths alone.
-check("sibling subshells share a depth",
-      shellcmd.simple_commands_with_depth("(cd /a) && (git commit)"),
-      [(1, ["cd", "/a"]), (1, ["git", "commit"])])
 check("sibling subshells get distinct scopes",
       shellcmd.simple_commands_with_scope("(cd /a) && (git commit)"),
       [((0, 1), ["cd", "/a"]), ((0, 2), ["git", "commit"])])

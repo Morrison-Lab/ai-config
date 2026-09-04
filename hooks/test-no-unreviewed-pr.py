@@ -409,7 +409,7 @@ case(create("c") + [
     res("q", '{"requested_reviewers":[{"login":"Copilot"}]}'),
     say("Requested a reviewer, successfully.")], False,
      "a sole successful api request discharges")
-# A request chained AHEAD of another command is AMBIGUOUS: is_error belongs to
+# A request chained AHEAD of another command is AMBIGUOUS: is_error is shared with
 # the trailing command, and no other signal recovers the request's own outcome
 # from the single combined result blob. The guard fails toward NOT discharging
 # (it keeps blocking -- the safe over-warn direction) rather than risk clearing
@@ -479,7 +479,7 @@ case(create("c") + [bash("gh pr ready 1038 -R o/r --undo", tid="d"),
                     say("Tried to undo ready; it failed.")], True,
      "a failed gh pr ready --undo keeps the ready PR tracked")
 # A draft transition chained AHEAD of a succeeding command has an is_error that
-# belongs to the LATER command, so the clear cannot trust it -- exactly the
+# is shared with the LATER command, so the clear cannot trust it -- exactly the
 # ordering hazard the reviewer-request discharge already guards against. Here
 # the `--undo` genuinely fails ("cannot revert to draft state") but `echo done`
 # succeeds (is_error=False) and the failure text carries no error-word/4xx, so
@@ -1036,8 +1036,10 @@ case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
      "a FAILED structured draft does not cancel the push's arm")
 # The boundary the fix must NOT cross, and a deliberate decision rather than an
 # oversight: a transition chained AHEAD of the push shares ONE combined exit
-# status, which belongs to the LAST command, so the call cannot attribute an
-# outcome to the transition either way. The draft and terminal discharges in
+# status with the commands after it, and which one produced it is not
+# recoverable (the operators are discarded, and a failing transition
+# short-circuits a following `&&`), so the call cannot attribute an outcome to
+# the transition either way. The draft and terminal discharges in
 # this same call already withhold on exactly this input, so the arm withholds
 # too -- an ambiguous call changes nothing in either direction. The cost is
 # bounded: the PR stays live (that same ambiguity withheld its own pop), so the
@@ -1321,7 +1323,7 @@ case(create("c") + [bash(LABEL_CMD, tid="x"),
                         err=True),
                     say("Tried to label it.")], True,
      "a FAILED label add does not exempt (the repo has no such label)")
-# Chained AHEAD of a succeeding command, the is_error belongs to that LATER
+# Chained AHEAD of a succeeding command, the is_error is shared with that LATER
 # command, so the outcome is unknowable. The body here deliberately carries no
 # error-word or 4xx shape ("unable to add" matches nothing in RX_FAILED), so
 # only the `last` check can withhold the exemption -- the same ordering hazard
@@ -1420,6 +1422,29 @@ def reason_of(events):
     """
     out = stdout_of(events)
     return json.loads(out).get("reason", "") if out.strip() else ""
+
+
+def two_requests_last_position(prefix):
+    """Transcript: two PRs opened, then ONE call POSTing reviewers for both.
+
+    Nothing follows the second POST, so it sits in the chain's LAST position
+    and is kept by `undischargeable_requests` because an earlier request took
+    `pending`'s slot. Two tests need exactly this shape and built it twice,
+    which let an edit to one copy leave the other silently exercising a
+    different case (adversarial review on ai-config#3071).
+
+    `prefix` distinguishes the tool_use ids, which must be unique per test.
+    """
+    return [
+        bash("gh pr create --base main --title x --body y", tid=prefix + "1"),
+        res(prefix + "1", URL),
+        bash("gh pr create --base main --title y --body z", tid=prefix + "2"),
+        res(prefix + "2", "https://github.com/o/r/pull/2222\n"),
+        bash(REQ_CMD_Q + " && "
+             'gh api "repos/o/r/pulls/2222/requested_reviewers" -X POST '
+             "-f 'reviewers[]=copilot-pull-request-reviewer[bot]'",
+             tid=prefix + "3"),
+        res(prefix + "3", OK), say("Requested both, nothing after.")]
 
 
 def _chained_request_wording():
@@ -1535,6 +1560,51 @@ def _chained_request_wording():
              "copilot-pull-request-reviewer[bot] && gh pr view", tid="d2"),
         res("d2", "https://github.com/o/r/pull/2222\n"),
         say("Two creates, each chained.")])
+    # ONE call requesting reviewers for TWO PRs, then verifying. Pre-fix the
+    # marking read `request_ident`, which returns the FIRST match only, so
+    # #2222's obligation went unmarked and the block named #1038 alone --
+    # the reader then re-issued the same shape for the PR that was never
+    # mentioned (Copilot on ai-config#3024).
+    #
+    # It is the only MULTI-REQUEST arm whose chain ends in something other
+    # than a request, which is the shape Copilot reported. Many single-request
+    # arms end in a non-request (`chained`, `mixed`, `pushed_chain` and
+    # others); what is unique here is the combination. `two_last_position` also turns red
+    # under a plain first-match-only mutation, so this arm is not the sole
+    # detector of that one -- but a mutation that truncates to the first match
+    # only when the chain's last command is not a request is killed here and
+    # nowhere else (adversarial review on ai-config#3071, which measured it).
+    #
+    # Stated as a coverage fact rather than a kill-set relation, because the
+    # relation asserted here before was a superset claim, and it was false.
+    two_in_one = reason_of([
+        bash("gh pr create --base main --title x --body y", tid="t1"),
+        res("t1", URL),
+        bash("gh pr create --base main --title y --body z", tid="t2"),
+        res("t2", "https://github.com/o/r/pull/2222\n"),
+        bash(REQ_CMD_Q + " && "
+             'gh api "repos/o/r/pulls/2222/requested_reviewers" -X POST '
+             "-f 'reviewers[]=copilot-pull-request-reviewer[bot]' "
+             "&& gh pr view 1038 --json reviews", tid="t3"),
+        res("t3", OK), say("Requested both, then verified.")])
+    # The same two requests with NO trailing command, so the second sits in
+    # the LAST position. `pending` is keyed from `request_ident`, which returns
+    # #1038 with `last` False, so the discharge fires for neither -- and a
+    # `undischargeable_requests` that skipped the last position unconditionally left
+    # #2222 discharged by nothing and named by nothing, which is the very
+    # failure this fix is about (adversarial review on ai-config#3071).
+    #
+    # Distinct from `two_in_one`: there the trailing `gh pr view` puts both
+    # requests in non-last positions, so that arm cannot reach this boundary.
+    two_last_position = reason_of(two_requests_last_position("l"))
+    # A SOLE request in the last position that FAILED. It is not chained, so
+    # the block must not say it was -- the reader would go looking for an
+    # operator that is not there instead of at the 422. This is the branch
+    # that keeps `undischargeable_requests` from flagging every request outright, and
+    # it is observable only on failure: a successful sole request discharges,
+    # so its obligation never reaches the message at all.
+    sole_failed = reason_of(create("c") + [
+        bash(REQ_CMD, tid="f"), res("f", FAIL, err=True), say("Requested.")])
     cross_pr = reason_of([
         bash("gh api \"repos/o/r/pulls/42/requested_reviewers\" -X POST "
              "-f 'reviewers[]=copilot-pull-request-reviewer[bot]' "
@@ -1555,6 +1625,12 @@ def _chained_request_wording():
             and needle in mixed and "Reviewer requests for" not in mixed
             and ready_named and needle not in ready_named
             and "Reviewer requests for #1038, #2222 appear" in two
+            # Both numbers, from ONE call. The plural sentence renders only
+            # when `flagged` holds both, so the singular's absence is implied
+            # rather than asserted separately.
+            and "Reviewer requests for #1038, #2222 appear" in two_in_one
+            and "Reviewer requests for #1038, #2222 appear" in two_last_position
+            and sole_failed and needle not in sole_failed
             and needle in pushed_chain
             and cross_repo and "#77 appears in the transcript" not in cross_repo
             and cross_repo_numbered
@@ -1664,10 +1740,62 @@ def _no_attribution_overclaim():
         say("Two creates, each chained.")])
     plain = reason_of(create("c") + [say("Opened it.")])
     banned = "belongs to that later command"
+    # A second banned phrase, added when the chained paragraph stopped saying
+    # "chained AHEAD of another command": a LAST-position request kept because
+    # an earlier one took `pending`'s slot is followed by nothing, so that
+    # sentence was false of it (adversarial review on ai-config#3071). Checked
+    # over BOTH `two_last` and `one_last` below, which each reach the case.
+    # Scoped to the CHAINED PARAGRAPH, not the whole message. The phrase is
+    # correct prose in ONE other rendered paragraph -- the redaction
+    # label-add recovery line, which really is about a command chained ahead
+    # of another -- so a whole-message needle fails on that and tests nothing
+    # about this paragraph. Located by rendering the message and splitting it
+    # on blank lines, after an earlier version of this comment named two
+    # paragraphs that do not exist in the output at all (adversarial review on
+    # ai-config#3071, which also caught the sentence this one replaced: it
+    # called `two_last` the only fixture reaching the case, which `one_last`
+    # below contradicts).
+    #
+    # Applied to BOTH fixtures below. Each keeps a last-position request, and
+    # they differ in which sentence that renders: `two_last` flags two numbers
+    # and takes the plural branch, `one_last` flags one and takes the
+    # singular. Checking either alone leaves the other branch free to regress.
+    def _chained_para(text):
+        for para in text.split("\n\n"):
+            if "appear in the transcript and none was" in para \
+                    or "appears in the transcript and was not" in para:
+                return para
+        return ""
+    banned_ahead = "chained AHEAD of another command"
+    two_last = reason_of(two_requests_last_position("p"))
+    # `flagged` is a set of NUMBERS, so two requests for the SAME PR with the
+    # second in last position keep that request and render the SINGULAR
+    # sentence. Without this fixture only the plural branch carries the
+    # `banned_ahead` needle.
+    #
+    # The mutation it alone catches is the NARROW one: swapping just "shared a
+    # call with another command" back to "was chained AHEAD of another
+    # command" in the singular branch. A wholesale revert of that branch is
+    # caught anyway, by the `chained` conjunct below, which asserts the
+    # replacement wording positively -- so stating this as "reverting the
+    # singular branch" would overstate what the fixture pins (adversarial
+    # review on ai-config#3071, which measured both).
+    one_last = reason_of(create("c") + [
+        bash(REQ_CMD_Q + " && " + REQ_CMD_Q, tid="o1"),
+        res("o1", OK), say("Requested the same PR twice.")])
     return (banned not in chained and banned not in two and banned not in plain
-            and "cannot be attributed to the request" in chained
-            and "cannot be attributed to any one of them" in two
-            and "cannot be attributed to it" in plain)
+            and _chained_para(two_last)
+            and banned_ahead not in _chained_para(two_last)
+            and _chained_para(one_last)
+            and banned_ahead not in _chained_para(one_last)
+            and "appears in the transcript and was not" in _chained_para(one_last)
+            # The unattributability must still be STATED, or dropping the
+            # sentence outright would satisfy both banned needles.
+            and "does not attribute that call's exit status to it" in chained
+            and "does not attribute any call's exit status to its own request" \
+                in two
+            and "cannot be attributed to it" in plain
+            and "shared a call with another command" in _chained_para(two_last))
 
 
 def _redaction_wording():

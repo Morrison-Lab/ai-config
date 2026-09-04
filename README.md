@@ -363,9 +363,8 @@ And it discounts a bold-header run that overshoots the stated count by more than
 
 Those bounds are positional rather than semantic, so one shape stays a known false positive: a count that opens its sentence and then names a property of itself ("Two variables at once is hard:").
 No bound separates that from "Three answers are legitimate, and only the first is ...", which is a genuine lead-in of the same shape.
-Measured 2026-09-04 at commit 7927fc44, the corpus had 88 accepted lead-ins under the shipped implementation;
-the total moves as prose lands, so re-measure before quoting it.
-The simplest alternative, a rule "keyed on the copula alone" that just requires `is`/`are`/`was`/`were` to appear somewhere in the sentence, suppressed 70 of those 88, most of them genuinely real, so it is not a workable substitute.
+The simplest alternative, a rule "keyed on the copula alone" that just requires `is`/`are`/`was`/`were` to appear somewhere in the sentence, suppresses the large majority of the lead-ins the shipped implementation accepts, most of them genuinely real, so it is not a workable substitute.
+No exact count is quoted: the total moves as prose lands, and three hand measurements while the checker was written gave three different totals, so derive it fresh rather than trusting a number.
 `scripts/test_check_leadin_counts.py` pins it as accepted rather than claiming coverage it does not have.
 
 - **Do:** run it over a file whose bulleted or bold-header sections you have just split or merged.

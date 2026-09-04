@@ -31,12 +31,13 @@ measured against the live corpus rather than guessed:
   of that last example -- "Two variables at once is hard:" -- is a known
   accepted false positive. No bound separates it from "Three answers are
   legitimate, and only the first is ...", which is a genuine lead-in of the
-  same shape. Measured 2026-09-04 at commit 7927fc44 (the total moves as
-  prose lands, so re-measure before quoting it): 88 lead-ins were accepted
-  by the shipped implementation, and the simplest rule "keyed on the copula
-  alone" -- requiring the sentence to contain `is`/`are`/`was`/`were`
-  anywhere -- suppressed 70 of those 88, most of them genuinely real, so it
-  is not a workable substitute for the bound above.
+  same shape. The simplest rule "keyed on the copula alone" -- requiring
+  the sentence to contain `is`/`are`/`was`/`were` anywhere -- suppresses
+  the large majority of the lead-ins the shipped implementation accepts,
+  most of them genuinely real, so it is not a workable substitute for the
+  bound above. (No exact count is quoted here: the total moves as prose
+  lands, and three hand measurements while this checker was written gave
+  three different totals, so derive it fresh rather than trusting a number.)
 - The lead-in sentence does not end on a conditional subordinator ("if",
   "when", "unless"). "Two changes are independent if:" enumerates the
   CONDITIONS below it rather than the two changes, which is the issue's "the

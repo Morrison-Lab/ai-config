@@ -213,9 +213,9 @@ def main():
     # position bound reaches only the form that has a word in front of the
     # count. The SENTENCE-INITIAL form still fires, and no bound separates it
     # from "Three answers are legitimate, and only the first is ..." -- a
-    # genuine lead-in of the same shape. Measured 2026-09-04 at commit
-    # 7927fc44, a rule keyed on the copula suppressed 70 of the 88 accepted
-    # lead-ins, most of them real. So this case
+    # genuine lead-in of the same shape, and a rule keyed on the copula
+    # suppresses the large majority of accepted lead-ins, most of them real.
+    # So this case
     # is pinned as accepted rather than silently claimed to be handled: if a
     # later bound fixes it, this line turns red and gets deleted deliberately.
     check(

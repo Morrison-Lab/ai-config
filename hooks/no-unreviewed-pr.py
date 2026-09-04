@@ -843,6 +843,25 @@ _PROBE_SAFE_FIELDS = _PROBE_STATE_FIELDS | {
 }
 
 
+def _json_selection(rest):
+    """The `--json` field names in a `gh pr view` argv tail; None when absent.
+
+    `--comments` yields None too: it prints comment bodies whatever the
+    selection says, so a selection alone no longer bounds the output.
+    """
+    fields = None
+    for i, a in enumerate(rest):
+        if a == "--comments":
+            return None
+        if a == "--json" and i + 1 < len(rest):
+            fields = rest[i + 1]
+        elif a.startswith("--json="):
+            fields = a.split("=", 1)[1]
+    if fields is None:
+        return None
+    return {f.strip().lower() for f in fields.split(",") if f.strip()}
+
+
 def _probe_selection(rest):
     """True when a `gh pr view`/`gh pr checks` selection is a STATUS read.
 
@@ -872,18 +891,32 @@ def _probe_selection(rest):
     emit. The `gh api` arm of _argv_probe has no `--json` to bound, so it
     refuses a projection outright instead (see _api_projects).
     """
-    fields = None
-    for i, a in enumerate(rest):
-        if a == "--comments":
-            return False
-        if a == "--json" and i + 1 < len(rest):
-            fields = rest[i + 1]
-        elif a.startswith("--json="):
-            fields = a.split("=", 1)[1]
-    if fields is None:
+    sel = _json_selection(rest)
+    if sel is None:
         return False
-    sel = {f.strip().lower() for f in fields.split(",") if f.strip()}
     return sel <= _PROBE_SAFE_FIELDS and bool(sel & _PROBE_STATE_FIELDS)
+
+
+# The `gh pr view` fields the SATISFACTION check reads (review_at_head). Kept
+# out of _PROBE_SAFE_FIELDS deliberately: a review object carries its author's
+# free-text `body`, so admitting this selection as a STATUS read would let a
+# review quoting an API response report a terminal state for a PR that has
+# none -- the hole _probe_selection's allowlist exists to close.
+_PROBE_REVIEW_FIELDS = {"headrefoid", "reviews"}
+
+
+def _review_selection(rest):
+    """True when a `gh pr view` selection can report a review AT a head.
+
+    Both fields are required, for the reason review_at_head requires both
+    halves: a head oid alone says nothing about review, and a review alone
+    cannot tell a current verdict from a stale one.
+    """
+    sel = _json_selection(rest)
+    if sel is None:
+        return False
+    return (sel <= _PROBE_SAFE_FIELDS | _PROBE_REVIEW_FIELDS
+            and _PROBE_REVIEW_FIELDS <= sel)
 
 
 # Flags that project a SUBSET of a `gh api` response body. `gh api` has no
@@ -1011,6 +1044,32 @@ def probe_ident(cmd):
         return False, None, None, False
     for i, argv in enumerate(cmds):
         ok, num, repo = _argv_probe(argv)
+        if ok:
+            return True, num, repo, (i == len(cmds) - 1)
+    return False, None, None, False
+
+
+def _argv_review_probe(argv):
+    """(is_probe, num, repo) for a single-PR REVIEW read.
+
+    Only the `gh pr view` spelling, whose selection _review_selection bounds.
+    The `gh api` arm has no field selection to bound, so a review read spelled
+    that way is simply not recognised and the guard keeps warning.
+    """
+    if argv and argv[0] == "gh" and len(argv) >= 3 and argv[1] == "pr" \
+            and argv[2] == "view" and _review_selection(argv[3:]):
+        num, repo = _verb_ident(argv)
+        return (num is not None), num, repo
+    return False, None, None
+
+
+def review_probe_ident(cmd):
+    """(is_probe, num, repo, last): mirrors probe_ident, for a review read."""
+    cmds = _simple_commands(cmd)
+    if cmds is None:
+        return False, None, None, False
+    for i, argv in enumerate(cmds):
+        ok, num, repo = _argv_review_probe(argv)
         if ok:
             return True, num, repo, (i == len(cmds) - 1)
     return False, None, None, False
@@ -1337,18 +1396,11 @@ RX_TERMINAL_STATE = re.compile(
 # a PR carrying no Copilot review at all still blocks, so the genuine
 # "never requested" catch is untouched.
 #
-# The patterns below are deliberately plain JSON, not the escaped shape
+# The pattern below is deliberately plain JSON, not the escaped shape
 # RX_TERMINAL_STATE tolerates: `_payloads` unwraps the dumped tool_result
 # first, so the text these read is already unescaped.
 RX_HEAD_OID = re.compile(
     r'"(?:headRefOid|head)"\s*:\s*"([0-9a-f]{7,40})"', re.I)
-# Shas inside the `copilot` key of the DIGESTED shape this guard's own recovery
-# text prescribes. Scoped to that key's array, never read from the whole body:
-# some other reviewer's oid sits in exactly the same field, and crediting one
-# would discharge on a review nobody asked Copilot for.
-RX_COPILOT_ARRAY = re.compile(r'"copilot"\s*:\s*\[(.*?)\]', re.I | re.S)
-RX_REVIEW_SHA = re.compile(
-    r'"(?:sha|oid)"\s*:\s*"([0-9a-f]{7,40})"', re.I)
 
 
 def _oid_match(a, b):
@@ -1425,9 +1477,6 @@ def _copilot_oids(text):
                 oid = rev.get("sha") or rev.get("oid") or ""
                 if oid:
                     out.append(str(oid))
-    m = RX_COPILOT_ARRAY.search(text)
-    if m:
-        out.extend(RX_REVIEW_SHA.findall(m.group(1)))
     return out
 
 
@@ -1946,6 +1995,7 @@ def scan(path):
     pending_clear = {}  # tool_use_id -> (num, repo) for draft transitions
     pending_close = {}  # tool_use_id -> (num, repo) for merge/close actions
     pending_probe = {}  # tool_use_id -> (num, repo) for single-PR status reads
+    pending_review = {}  # tool_use_id -> (num, repo) for single-PR review reads
     # tool_use_id -> (num, repo) for a `no-ai-review` label add, whose discharge
     # waits on positive evidence the label actually landed.
     pending_exempt = {}
@@ -2202,30 +2252,31 @@ def scan(path):
                             # the entry stays for its own sake and stops
                             # counting against a later PR (see _rearm).
                             _mark_uncertain(live, uncertain, xnum or rnum)
-                    # Two states leave no ACTION in the transcript, only an
-                    # observation: a PR merged OUTSIDE this session (by a
-                    # human, or by the merge queue), and a Copilot review that
-                    # has already landed and consumed its own request. Both are
-                    # discharged on POSITIVE evidence only -- the probe named
-                    # one PR, the read did not fail, and the body itself
-                    # reports the state.
+                    # A PR merged OUTSIDE this session (by a human, or by the
+                    # merge queue) leaves no action in the transcript -- only an
+                    # observation. Discharged on POSITIVE evidence only: the
+                    # probe named one PR, the read did not fail, and the body
+                    # actually reports a terminal state.
                     if rid in pending_probe:
                         pnum, prepo, plast = pending_probe.pop(rid)
-                        if plast and not failed:
-                            if RX_TERMINAL_STATE.search(body):
-                                _clear(obligations, pnum, prepo)
-                                live.pop(pnum, None)
-                                if not live:
-                                    obligations[:] = [
-                                        o for o in obligations
-                                        if o["num"] is not None]
-                            elif review_at_head(body):
-                                # The obligation is per-HEAD, and this head
-                                # has its review, so the demand is satisfied
-                                # rather than retired: the PR stays LIVE, and
-                                # a later push that re-heads it re-arms the
-                                # obligation exactly as before (ai-config#3001).
-                                _clear(obligations, pnum, prepo)
+                        if plast and not failed and RX_TERMINAL_STATE.search(body):
+                            _clear(obligations, pnum, prepo)
+                            live.pop(pnum, None)
+                            if not live:
+                                obligations[:] = [o for o in obligations
+                                                  if o["num"] is not None]
+                    # A landed Copilot review is the other observation-only
+                    # state, and it is read from its own channel: the selection
+                    # that carries it also carries review bodies, which must
+                    # never reach RX_TERMINAL_STATE above.
+                    if rid in pending_review:
+                        vnum, vrepo, vlast = pending_review.pop(rid)
+                        if vlast and not failed and review_at_head(body):
+                            # The obligation is per-HEAD, and this head has its
+                            # review, so the demand is satisfied rather than
+                            # retired: the PR stays LIVE, and a later push that
+                            # re-heads it re-arms it (ai-config#3001).
+                            _clear(obligations, vnum, vrepo)
                     # A `no-ai-review` label exempts a redaction PR from the
                     # reviewer request, but only once the label has actually
                     # landed: a repo with no such label fails the add outright
@@ -2464,6 +2515,9 @@ def scan(path):
                 pok, pnum, prepo, plast = probe_ident(cmd_raw)
                 if pok:
                     pending_probe[tid] = (pnum, prepo, plast)
+                vok, vnum, vrepo, vlast = review_probe_ident(cmd_raw)
+                if vok:
+                    pending_review[tid] = (vnum, vrepo, vlast)
                 # A redaction PR must not reach an automated reviewer at all, so
                 # its exemption is registered here, BEFORE the push arm below:
                 # the env form takes effect immediately (it depends on no API

@@ -1626,6 +1626,29 @@ case(create("c") + [bash(REVIEW_CMD + "; echo done", tid="v"),
                     res("v", digest(HEAD_OID, [HEAD_OID])),
                     say("Checked.")], True,
      "a review read chained AHEAD of another command does not discharge")
+case(create("c") + [bash(REVIEW_CMD, tid="v"),
+                    res("v", "A prior comment said: "
+                        + digest(HEAD_OID, [HEAD_OID])),
+                    say("Read it.")], True,
+     "PROSE quoting a head-matching review does not discharge")
+case(create("c") + [bash("gh pr view 1038 --json headRefOid,reviews,body",
+                         tid="v"),
+                    res("v", raw(HEAD_OID,
+                                 [("copilot-pull-request-reviewer[bot]",
+                                   HEAD_OID)])),
+                    say("Read it with the body.")], True,
+     "a selection carrying free text is not a review probe")
+case(create("c") + [bash("gh pr view 1038 --json reviews", tid="v"),
+                    res("v", raw(HEAD_OID,
+                                 [("copilot-pull-request-reviewer[bot]",
+                                   HEAD_OID)])),
+                    say("Read the reviews.")], True,
+     "a selection without headRefOid is not a review probe")
+case(create("c") + [bash(REVIEW_CMD, tid="v"),
+                    res("v", json.dumps({"head": HEAD_OID[0:8],
+                                         "copilot": [{"sha": HEAD_OID[0:4]}]})),
+                    say("Checked.")], True,
+     "an oid shorter than git's minimum abbreviation does not discharge")
 case(create("c") + [bash("gh pr list --json headRefOid,reviews", tid="v"),
                     res("v", digest(HEAD_OID, [HEAD_OID])),
                     say("Listed.")], True,
@@ -2289,6 +2312,53 @@ def _terminal_remedy_runs():
         say("Read the state.")])
 
 
+# The head/reviews verification the block text prints, whole: it is continued
+# across lines with a trailing `\`, so a line-anchored match would take the
+# `gh pr view` half and drop the `--jq` that shapes its output.
+RX_PRESCRIBED_REVIEW_READ = re.compile(
+    r"^[ \t]*(gh pr view \"<N>\" --json headRefOid,reviews[\s\S]*?\]\}\')",
+    re.M)
+
+
+def _review_remedy_runs():
+    """The verification the message prescribes must itself discharge.
+
+    Read OUT OF the block text rather than restated, for the reason
+    `_terminal_remedy_runs` is: an edit to either side that leaves them
+    disagreeing must turn this red rather than leave the message prescribing a
+    command the guard does not credit.
+    """
+    reason = reason_of(create("c") + [say("Opened it.")])
+    reads = RX_PRESCRIBED_REVIEW_READ.findall(reason)
+    if len(reads) != 1:
+        return False
+    cmd = reads[0].replace("<N>", "1038")
+    ok, num, _repo, last = load_hook().review_probe_ident(cmd)
+    if not (ok and num == "1038" and last):
+        return False
+    return not block_of(create("c") + [
+        bash(cmd, tid="v"), res("v", digest(HEAD_OID, [HEAD_OID])),
+        say("Verified the review at the head.")])
+
+
+def _review_selection_is_not_a_state_read():
+    """The review selection must reach review_at_head and nothing else.
+
+    A review object carries its author's free-text `body`, which is why
+    _probe_selection's allowlist excludes it -- so admitting the selection
+    there as well would let that text feed RX_TERMINAL_STATE.
+    """
+    hookmod2 = load_hook()
+    return (hookmod2.review_probe_ident(REVIEW_CMD)[0]
+            and not hookmod2.probe_ident(REVIEW_CMD)[0])
+
+
+def _review_discharge_wording():
+    """The block text must say the verification is itself a discharge."""
+    reason = reason_of(create("c") + [say("Opened it.")])
+    return "itself a discharge" in reason
+
+
 def block_of(events):
     out = stdout_of(events)
     return '"decision": "block"' in out or '"decision":"block"' in out
@@ -2488,6 +2558,29 @@ def main():
         passes += 1
     else:
         print("FAIL: the status read the block text prescribes does not "
+              "discharge")
+        failures += 1
+
+    if _review_remedy_runs():
+        print("PASS: the review read the block text prescribes discharges")
+        passes += 1
+    else:
+        print("FAIL: the review read the block text prescribes does not "
+              "discharge")
+        failures += 1
+
+    if _review_selection_is_not_a_state_read():
+        print("PASS: the review selection is a review read, not a state read")
+        passes += 1
+    else:
+        print("FAIL: the review selection is credited as a state read")
+        failures += 1
+
+    if _review_discharge_wording():
+        print("PASS: the block text names the landed-review discharge")
+        passes += 1
+    else:
+        print("FAIL: the block text does not name the landed-review "
               "discharge")
         failures += 1
 

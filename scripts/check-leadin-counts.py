@@ -31,17 +31,18 @@ measured against the live corpus rather than guessed:
   of that last example -- "Two variables at once is hard:" -- is a known
   accepted false positive. No bound separates it from "Three answers are
   legitimate, and only the first is ...", which is a genuine lead-in of the
-  same shape. Measured 2026-09-04 on the corpus: 88 lead-ins are accepted by
-  the shipped implementation, and the simplest rule "keyed on the copula
+  same shape. Measured 2026-09-04 at commit 7927fc44 (the total moves as
+  prose lands, so re-measure before quoting it): 88 lead-ins were accepted
+  by the shipped implementation, and the simplest rule "keyed on the copula
   alone" -- requiring the sentence to contain `is`/`are`/`was`/`were`
-  anywhere -- suppresses 70 of those 88, most of them genuinely real, so it
+  anywhere -- suppressed 70 of those 88, most of them genuinely real, so it
   is not a workable substitute for the bound above.
 - The lead-in sentence does not end on a conditional subordinator ("if",
   "when", "unless"). "Two changes are independent if:" enumerates the
   CONDITIONS below it rather than the two changes, which is the issue's "the
   number refers to something other than the list" class. Measured 2026-09-04
-  on the corpus: disabling this one bound alone raises the accepted count
-  from 88 to 89, and the single extra lead-in it lets through is exactly
+  at the same commit: disabling this one bound alone raises the accepted
+  count by exactly one, and the single extra lead-in it lets through is
   that "Two changes are independent if:" example, the one false positive
   this bound exists to catch.
 - That count is followed within three tokens by a plural-looking noun, so

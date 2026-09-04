@@ -445,12 +445,13 @@ printed the gate's own red line and continued.
 Each cost a follow-up commit and a CI round.
 With the 2026-08-03 case above that makes three occurrences of this shape,
 past `deterministic-tools.md`'s bar.
-`hooks/warn-status-read-after-pipe.py` already guards this section's `$?`
-form and does not fire on the `&&` chain, which reads no `$?` at all, so
-[#3184](https://github.com/Morrison-Lab/ai-config/issues/3184) extends that
-guard rather than adding a second detector: a gate name on the left of a
-pipe into `tail`, `head`, or `grep`, an `&&` after it, and no
-`set -o pipefail` earlier in the command.)
+`hooks/warn-status-read-after-pipe.py` already guards the bare-pipeline
+`$?` read its own case (ai-config#2149) names, and does not fire on the `&&`
+chain, which reads no `$?` at all; the guard is filed as
+[#3184](https://github.com/Morrison-Lab/ai-config/issues/3184), where a
+comment proposes extending that hook rather than adding a second detector:
+a gate name on the left of a pipe into `tail`, `head`, or `grep`, an `&&`
+after it, and no `set -o pipefail` earlier in the command.)
 
 ## An explicit `exit` escapes the capture group
 

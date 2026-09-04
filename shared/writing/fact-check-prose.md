@@ -992,7 +992,7 @@ so the squash body is the copy that rule is about, and the two agree.
 
 (Morrison-Lab/ai-config#3154, 2026-09-03, three times in one evening on grep alone.
 `75829fad`'s body said a `-zz` subject "exits 2 with \"invalid option\"";
-on GNU grep 3.11 `-zz` is two valid flags, so grep took the first path as its pattern and searched the current directory instead,
+on GNU grep 3.11 `-zz` is the valid `-z` flag twice, so grep took the first path as its pattern and searched the current directory instead,
 exiting on whether that accidental pattern matched; `-Q` is the case that exits 2.
 `a51a170f`'s body quoted the error for a `[` subject as "Unmatched [", the reviewer's wording, where the tool prints "Invalid regular expression".
 The prose line that same commit added, and the prepared squash body, said a bare `(` motivates `-F`;

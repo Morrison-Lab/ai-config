@@ -245,7 +245,7 @@ gh pr view "<N>" --json reviews \
           ((.body // "") | split("\n") | map(select(length > 0)) | .[0] // "(empty body)")] | @tsv'
 ```
 
-One line per review keeps a long PR's review history readable, and the last field is the body's first line.
+One line per review keeps a long PR's review history readable, and the last field is the body's first non-empty line, or `(empty body)` when the review has no body at all.
 That line identifies a review rather than settling it, so read the full body of every review the listing names --- not only those whose first line looks unclean, since "generated no new comments" is the overview a suppression block hides behind --- and read a collapsed suppression block inside it as findings (see *Parse for findings before declaring clean* above for the matcher).
 
 - **Do:** list every review's state and body, whoever posted it, before running the state-filtered query below.

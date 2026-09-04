@@ -24,6 +24,11 @@ This document records the load-bearing operational rationale, synthetic-fixture 
   No body in the measured set exercises that case, though: the 4837572117 control's overview table is uncollapsed, `5098574802`'s collapsed overview regions contain no occurrence of the word,
   and re-fetching every review on ai-config#660, #1029, #1031 and #3084 on 2026-09-03 found no collapsed region carrying `suppressed` outside a suppression block.
   So the region-wide match is the weaker anchor rather than a wrong one, and it stays as a fallback: a hit only the fallback finds is a prompt to read that region, not a finding.
+- **Every Copilot Review at the Head, Not the Last One**: Copilot submits more than one review per head, and a suppression block sits in each of them independently --- three reviews at head `6f10014` on ai-config#3084 (`5098574802`, `5098854246`, `5098881593`) each carried a `### Suppressed comments (1)` block (measured 2026-09-03 from `get_reviews`).
+  A `| last` reduction over that id list therefore scans one block and reports `clean` over the other two, which is the blind spot the skill exists to close.
+  The `group_by(.user.login)` guard used for human reviews does not help, because every Copilot review shares the one bot login.
+  - **Do:** loop the body and inline-comment fetch over every Copilot review whose `commit_id` matches the head.
+  - **Don't:** reduce that id list to a single review before scanning it for findings.
 - **Substance over State for Human Reviews**: Empirical measurements across this repository (measured 2026-07-30 on #668: 106 of 106 formal reviews across 60 merged PRs were submitted as `COMMENTED`, with zero `APPROVED`).
   Keying on `state == "APPROVED"` would produce a permanent false negative ("no verdict at head") on PRs humans actively approved in review comments.
   Reviews are therefore evaluated by substantive zero-findings content.

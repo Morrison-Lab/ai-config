@@ -259,9 +259,13 @@ Nothing outside the set has been checked, so a collapsed overview that does ment
 
 [ai-config#3170](https://github.com/Morrison-Lab/ai-config/issues/3170) asks `scripts/check-pr-fully-clean.py` to implement this check, quoting [`fully-clean.md`](fully-clean.md)'s pre-change wording,
 so its Ask prescribes matching strictly inside `<summary>` --- the form measured to return zero against `5098574802`.
+The correction has to reach the issue as well as this file.
+Whoever implements #3170 opens the issue and reads its Ask, not `fully-clean.cases.md`, and the issue carried no comment recording the counter-example when this was written (2026-09-04, 00:50 PDT).
 
 - **Do:** implement the heading anchor above when closing that issue.
+- **Do:** post the counter-example on that issue --- review `5098574802`'s `### Suppressed comments (1)` nested under `<summary>Review details</summary>`, measured 2026-09-03 --- and link the comment from here, so the two records point at each other.
 - **Don't:** build the `<summary>`-only matcher its Ask names.
+- **Don't:** read this in-repo note as having corrected the Ask --- it does not sit on the surface the implementer reads.
 
 ## A review comment's header SHA can be stale
 

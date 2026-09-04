@@ -722,13 +722,15 @@ and the verdict's own conclusion every round.**
   ai-config#2976.
   Nothing outside the measured set has been checked, so a body outside it
   can still collapse an overview that mentions suppressed findings.
-  So keep the region-wide match as a fallback behind the heading anchor,
-  and read a hit only the fallback finds as a prompt to read that region
-  rather than as a finding.
-  Every measured failure of this matcher has been a false zero, and a
-  false zero merges over real findings while a false positive costs one
-  re-read;
-  what would settle the choice is a body whose collapsed overview mentions
+  Every measured false zero belongs to a narrower matcher --- a literal
+  phrase against the heading rewording between ai-config#660 and
+  ai-config#1029, and `<summary>`-only against `5098574802`'s nested
+  heading --- while the corpus's one measured false positive is the
+  body-wide match on 4837572117, and the region-wide match has produced
+  neither.
+  A false zero merges over real findings, while a false positive costs one
+  re-read.
+  What would settle the choice is a body whose collapsed overview mentions
   suppressed findings while its own block sits elsewhere, and no body in
   the measured set is one.
   See [`fully-clean.cases.md`](fully-clean.cases.md),

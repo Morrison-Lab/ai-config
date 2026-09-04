@@ -597,19 +597,19 @@ gh api repos/<owner>/<repo>/issues/<N>/comments --paginate \
 A review submitted via GitHub's review UI (as opposed to a plain PR comment) shows up in `gh pr view N --json reviews`, and its top-level `body` is frequently **empty** --- the actual finding lives entirely in a per-line inline comment, which only appears via `gh api repos/<owner>/<repo>/pulls/N/comments` (a different endpoint from issue comments).
 The mirror case a threads-only check misses just as completely is a finding stated in the top-level `body`, either as plain text or inside a collapsed `<details>` suppression block.
 Neither shape produces an inline comment object, so both the `pulls/N/comments` endpoint and a review-thread query return nothing over it.
-The block has moved as well as changed wording, so match case-insensitively on `suppressed` in a `<summary>` element or in an ATX heading inside a collapsed `<details>` region, rather than on any literal.
-Measured 2026-09-03 on ai-config#3084 review `5098574802`, it arrives as `### Suppressed comments (1)` under `<summary>Review details</summary>`, which a `<summary>`-only match returns zero against.
-Anchor it to the heading and not to the region: that same body wraps its `Pull request overview` and `File summaries` prose in collapsed `<details>` regions of their own, so a region-wide match readmits the overview prose that keeps a clean PR permanently non-clean, per [`skills/ardi/SKILL.md`](skills/ardi/SKILL.md).
+The block has moved as well as changed wording, so match case-insensitively on `suppressed` in a `<summary>` element or in an ATX heading inside a collapsed `<details>` region --- not on any literal, not on `<summary>` alone, and not region-wide.
+[`shared/workflow/fully-clean.md`](shared/workflow/fully-clean.md) and its cases file carry the measurement behind each of those three exclusions.
 Checking `--json comments` alone can miss the review's existence entirely.
 A bot's `COMMENTED` review **carrying findings in its body** vetoes a merge under [`fully-clean`](shared/workflow/fully-clean.md) exactly as a human's `CHANGES_REQUESTED` does, whatever headline that body carries --- "Changes recommended", "Needs a closer look", and "generated no new comments" have each introduced a body carrying real findings --- because the blind spot is about *where the finding sits*.
 The forge enforces only `CHANGES_REQUESTED`, though: a `COMMENTED` review sets no blocking state and needs no dismissal, which is precisely why nothing stops you merging over its findings.
 Before declaring a PR ready, also run:
 ```
 gh pr view N --json reviews --jq '.reviews[] | [.state, .author.login, .submittedAt, ((.body // "") | split("\n") | map(select(length > 0)) | .[0] // "(empty body)")] | @tsv'
+gh pr view N --json reviews --jq '.reviews[] | select(.state == "CHANGES_REQUESTED") | "\(.author.login) \(.submittedAt)"'
 gh api repos/<owner>/<repo>/pulls/N/comments --jq '.[] | "\(.path):\(.line // .original_line // "?") \(.user.login) \(.body)"'
 ```
 A `CHANGES_REQUESTED` state is blocking regardless of whether an automated re-review later says "Ready for merge" — that bot verdict doesn't clear a human's own review state, which only the human (or an explicit dismissal) can resolve.
-The first command is deliberately unfiltered.
+The unfiltered listing comes first and the state filter second, because the narrow query answers only whether a review *state* blocks the merge button.
 [`skills/pr-status/SKILL.md`](skills/pr-status/SKILL.md)'s *Check for a blocking human CHANGES_REQUESTED* section carries the rest: what its per-review line does and does not settle, and why the full body of every review it names has to be read.
 
 - **Do:** read every formal review's state and body, whoever posted it, and treat a finding in a review body --- a collapsed suppression block included --- as blocking.

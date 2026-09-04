@@ -182,7 +182,7 @@ The login-filtered query returned the round-2 comment from `02:12:52Z` instead, 
 ## Re-check for latest review findings before reporting PR status --- A bot's `COMMENTED` review is the same blind spot
 
 (Morrison-Lab/ai-config#3084, 2026-09-03.
-Re-derived from `get_reviews` and `get_review_comments` on 2026-09-04, because the issue body's own account of it was wrong in a way worth recording.
+Re-derived from `get_reviews` and `get_review_comments` on 2026-09-03, because the issue body's own account of it was wrong in a way worth recording.
 Three Copilot reviews at head `6f10014` --- `5098574802`, `5098854246`, `5098881593` --- were submitted in state `COMMENTED`, two headed "Changes recommended" and the third "Needs a closer look".
 Each carried one finding in a collapsed `### Suppressed comments (1)` block, and a suppressed finding never becomes a comment object, so a review-thread query and `pulls/N/comments` both return nothing over it.
 Two of the three *also* posted an ordinary inline comment, which is what the issue body missed when it said the suppression block meant they "created no review thread":

@@ -19,7 +19,9 @@ This document records the load-bearing operational rationale, synthetic-fixture 
 - **Suppressed Low-Confidence Comments**: Copilot reviews can output "generated no new comments" in the main overview while collapsing real findings inside `<details>` blocks (verified on PR #660 review 4767752501 with 3 suppressed findings, and PR #1029 / #1031).
   Matching case-insensitively on `suppressed` in a `<summary>` element or in an ATX heading inside a collapsed `<details>` region catches these hidden findings without false-positive matching on ordinary overview summary prose (such as review 4837572117's overview table).
   A heading rather than `<summary>` alone, because ai-config#3084 review `5098574802` nests the block as a `### Suppressed comments (1)` heading under `<summary>Review details</summary>`;
-  a heading rather than the whole `<details>` region, because that same review collapses its `Pull request overview` and `File summaries` prose into regions of their own, which a region-wide match would flag (both measured 2026-09-03).
+  a heading rather than the whole `<details>` region, because that same review collapses its `Pull request overview` and `File summaries` prose into regions of their own (both measured 2026-09-03),
+  so the collapsed region is no longer a proxy for "not ordinary overview prose" --- a region-wide match would readmit any collapsed overview that did mention suppressed findings.
+  The 4837572117 control cannot exercise that case, because its overview table is uncollapsed and a region-scoped match therefore excludes it.
 - **Substance over State for Human Reviews**: Empirical measurements across this repository (measured 2026-07-30 on #668: 106 of 106 formal reviews across 60 merged PRs were submitted as `COMMENTED`, with zero `APPROVED`).
   Keying on `state == "APPROVED"` would produce a permanent false negative ("no verdict at head") on PRs humans actively approved in review comments.
   Reviews are therefore evaluated by substantive zero-findings content.

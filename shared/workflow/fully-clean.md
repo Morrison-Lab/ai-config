@@ -748,9 +748,9 @@ and the verdict's own conclusion every round.**
   `<details>` region has been checked case-insensitively for `suppressed`
   --- not until the whole body has, which flags ordinary overview prose
   that merely mentions suppressed findings, not until the whole region
-  has, which flags the same prose now that Copilot collapses its overview
-  too, and not `<summary>` alone, which misses a block nested one heading
-  deeper.
+  has, which would flag that same prose now that Copilot collapses its
+  overview too, and not `<summary>` alone, which misses a block nested one
+  heading deeper.
 - **Don't:** read a reviewer's silence as a verdict --- a job that posted
   nothing leaves the same zero counts as a job that found nothing.
 - **Don't:** act on a review wake's own payload --- it is one comment out of

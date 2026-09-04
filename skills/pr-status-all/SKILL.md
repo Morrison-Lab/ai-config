@@ -118,7 +118,7 @@ Fill in `<N>`, `<headRefName>`, `<isDraft>`, `<owner>`, `<repo>` for each PR (re
 >    Clean requires **three** things: an affirmative zero-new-findings overview (e.g. "generated no new comments" -- never a literally empty body), zero matched inline comments, **and no suppression block in the body**.
 >    Match on the block's heading --- a `<summary>` element, or an ATX heading inside a collapsed `<details>` region --- case-insensitively on `suppressed`, not on either exact phrase, not on `<summary>` alone, and not anywhere in the body or anywhere in the region.
 >    Measured 2026-09-03 on ai-config#3084 review `5098574802`, the block sits as a `### Suppressed comments (1)` heading under `<summary>Review details</summary>`, which a `<summary>`-only match misses entirely;
->    that same review collapses its `Pull request overview` and `File summaries` prose too, so a region-wide match would flag ordinary overview prose instead.
+>    that same review collapses its `Pull request overview` and `File summaries` prose too, so a region-wide match would no longer exclude a collapsed overview that mentions suppressed findings.
 >    A stub-like non-answer ("ineligible", "reached their quota limit") is not a verdict either.
 >    **A human's formal review at the current head counts as an external verdict too** -- check for one whenever the Copilot half found no clean verdict, before settling on `no verdict at head`:
 >    ```bash

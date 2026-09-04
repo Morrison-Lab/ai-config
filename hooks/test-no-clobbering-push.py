@@ -1011,9 +1011,8 @@ def verdict(hook_path, repo, command, case_id=None, payload_cwd=None):
 # This is not a shortcut: the guard is read-only by construction (`ls-remote`,
 # `rev-parse`, `merge-base`, `cat-file`, `log`), so no variant can leave a
 # fixture in a state a later variant would see. Rebuilding per variant cost one
-# repo-plus-bare-remote PAIR per case and per mutation clause, which pushed the
-# suite past two minutes; building once costs one pair per case and loses
-# nothing.
+# repo-plus-bare-remote PAIR per case and per mutation clause; building once
+# costs one pair per case and loses nothing.
 _BUILT = {}
 
 
@@ -1273,8 +1272,8 @@ MUTATIONS = {
           "                        sep = _next_sep(sep, ch)",
           "                    sep = _next_sep(sep, ch)")],
         # Only the end-of-line spelling can see this: S24 and S31 write the
-        # operator and the `cd` on one line, so their runs are single
-        # characters.
+        # operator and the `cd` on one line, so each run is one operator --
+        # `||` and `|` -- which folding leaves unchanged.
         {"S36", "S37"},
     ),
     "trailing_separator_is_tracked": (

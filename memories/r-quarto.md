@@ -3,13 +3,14 @@
 Every pull request and issue *cited* below is a clickable link, per [AGENTS.md](../AGENTS.md)'s "File formatting & links" rule,
 whose illustrative-token exception is what leaves `#629` in the `commented_code_linter` entry and `d-morrison/altdoc#26` in the spellcheck entry bare.
 
-Four of the sixteen cited repositories --- `ucdavis/bcs`, `ucdavis/epi204`, `ucdavis/hac.sap`, and `ucdavis/matt.contracts` --- did not answer an unauthenticated `git ls-remote` on 2026-09-04.
-That probe settles one direction only: resolving means the repository is public, while failing means private, renamed, moved, or absent, because GitHub answers all four of those conditions the same way to an unauthenticated caller.
+Four of the sixteen cited repositories --- `ucdavis/bcs`, `ucdavis/epi204`, `ucdavis/hac.sap`, and `ucdavis/matt.contracts` --- did not answer a `git ls-remote` from this session on 2026-09-04, each failing with `could not read Username`, which is what an anonymous caller gets, though the session runs behind a credential-injecting agent proxy and so measures its own reach rather than clean anonymous visibility.
+Resolving would not prove a repository public in any case, since GitHub redirects a renamed or moved path and `git ls-remote` follows it (measured 2026-09-04, `facebook/jest` and `zeit/next.js` each returned their successor's `HEAD` SHA), so a failure means private or deleted.
 
-- **Do:** cite a pull request or issue as a clickable link, whether or not its repository resolves anonymously --- where you cannot check which of `/issues/N` or `/pull/N` is right, either works, since GitHub redirects between them.
+- **Do:** cite a pull request or issue as a clickable link, whether or not its repository resolves for you --- where you cannot check which of `/issues/N` or `/pull/N` is right, either works, since GitHub redirects between them.
 - **Do:** read a 404 as a wrong number, and re-derive the number, whenever you have access to the repository.
-- **Don't:** conclude that a 404 from one of those four repositories is a wrong number when you lack access --- an access boundary is likelier, but a rename or a deletion looks identical, so settle it with `gh api repos/<owner>/<repo>` before repointing the citation.
-- **Don't:** infer that a repository is private from an anonymous `git ls-remote` failure --- renamed, moved, and absent fail identically.
+- **Don't:** conclude that a 404 from one of those four repositories is a wrong number when you lack access --- an access boundary is likelier, and `gh api repos/<owner>/<repo>` cannot tell you which, because it answers 404 for private, deleted, and never-existing alike to a caller without access.
+  Ask someone who has access rather than repointing the citation yourself.
+- **Don't:** infer that a repository is private from a `git ls-remote` failure --- a deleted or never-existing repository fails identically, while a renamed or moved one resolves.
 
 ## Conda activation before Quarto validation
 

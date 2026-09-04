@@ -99,7 +99,7 @@ committed pass.
    - Is it **cross-project or project-specific**? (`memories/preferences.md`'s
      "Memory and skill storage" rule: cross-project lessons commit to
      `Morrison-Lab/ai-config`; a convention/gotcha tied to one repo we own
-     commits to *that* repo's own agent docs instead — see the checklist
+     commits to *that* repo's own agent docs instead --- see the checklist
      item below for where. This changes step 4's target, not just the
      content.)
 
@@ -191,7 +191,7 @@ committed pass.
    - If updating a skill: the change should be specific enough that following
      the skill next time would avoid the mistake
 
-4. **Commit and push — via a branch + PR, not direct to `main`, in whichever
+4. **Commit and push --- via a branch + PR, not direct to `main`, in whichever
    repo step 2 routed the item to.**
 
    If the work will dispatch an expensive external action from a pinned commit

@@ -1,6 +1,6 @@
 ---
 name: adv
-description: "Get an adversarial review from another model available on this machine."
+description: "Adversarial review from another local model."
 user-invocable: true
 allowed-tools:
   - Bash

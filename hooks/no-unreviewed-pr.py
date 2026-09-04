@@ -1049,15 +1049,57 @@ def probe_ident(cmd):
     return False, None, None, False
 
 
+# The marks a review projection's filter must carry to be admitted: the two
+# fields review_at_head reads, and the attribution select. `reviews` carries
+# its author's free text, so the selection does not bound what a projection
+# emits; anything but the prescribed digest costs the probe (_api_projects).
+_REVIEW_FILTER_MARKS = (".headrefoid", ".reviews[", 'startswith("copilot")')
+
+
+def _review_projections(argv):
+    """The filter texts a `gh pr view` argv's projection flags carry.
+
+    Empty when nothing projects. Spellings as _api_projects reads them: the
+    bare flag, the `=`-joined form, and a shorthand carrying its value either
+    attached or in the next token.
+    """
+    out = []
+    for i, t in enumerate(argv):
+        if i == 0:
+            continue
+        if t in _API_PROJECTION_FLAGS:
+            out.append(argv[i + 1] if i + 1 < len(argv) else "")
+            continue
+        if t.startswith(("--jq=", "--template=")):
+            out.append(t.split("=", 1)[1])
+            continue
+        if t.startswith("--"):
+            continue
+        m = RX_API_SHORTHAND_PROJECTION.match(t)
+        if m:
+            tail = t[m.end():]
+            out.append(tail or (argv[i + 1] if i + 1 < len(argv) else ""))
+    return out
+
+
+def _review_projection_ok(argv):
+    """True when the argv projects nothing, or projects only the digest."""
+    texts = _review_projections(argv)
+    return all(all(mark in t.lower() for mark in _REVIEW_FILTER_MARKS)
+               for t in texts)
+
+
 def _argv_review_probe(argv):
     """(is_probe, num, repo) for a single-PR REVIEW read.
 
-    Only the `gh pr view` spelling, whose selection _review_selection bounds.
-    The `gh api` arm has no field selection to bound, so a review read spelled
-    that way is simply not recognised and the guard keeps warning.
+    Only the `gh pr view` spelling, whose selection _review_selection bounds
+    and whose projection _review_projection_ok bounds. The `gh api` arm has no
+    field selection to bound, so a review read spelled that way is simply not
+    recognised and the guard keeps warning.
     """
     if argv and argv[0] == "gh" and len(argv) >= 3 and argv[1] == "pr" \
-            and argv[2] == "view" and _review_selection(argv[3:]):
+            and argv[2] == "view" and _review_selection(argv[3:]) \
+            and _review_projection_ok(argv):
         num, repo = _verb_ident(argv)
         return (num is not None), num, repo
     return False, None, None

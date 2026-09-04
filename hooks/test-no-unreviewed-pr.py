@@ -1574,7 +1574,9 @@ case(create("c") + [bash('gh pr comment 1038 --body "next step: gh pr merge"',
 HEAD_OID = "9eccd32ab1c4d5e6f708192a3b4c5d6e7f809a1b"
 STALE_OID = "0ff0ed1122334455667788990aabbccddeeff001"
 REVIEW_CMD = ("gh pr view 1038 --json headRefOid,reviews "
-              "--jq '{head: .headRefOid[0:8], copilot: [.reviews[]]}'")
+              "--jq '{head: .headRefOid[0:8], copilot: [.reviews[] "
+              '| select((.author.login // "") | startswith("copilot")) '
+              "| {sha: .commit.oid[0:8]}]}'")
 
 
 def digest(head, shas):
@@ -1644,6 +1646,11 @@ case(create("c") + [bash("gh pr view 1038 --json reviews", tid="v"),
                                    HEAD_OID)])),
                     say("Read the reviews.")], True,
      "a selection without headRefOid is not a review probe")
+case(create("c") + [bash("gh pr view 1038 --json headRefOid,reviews "
+                         "--jq '.reviews[].body'", tid="v"),
+                    res("v", digest(HEAD_OID, [HEAD_OID])),
+                    say("Read the review bodies.")], True,
+     "a projection hoisting reviewer free text is not a review probe")
 case(create("c") + [bash(REVIEW_CMD, tid="v"),
                     res("v", json.dumps({"head": HEAD_OID[0:8],
                                          "copilot": [{"sha": HEAD_OID[0:4]}]})),

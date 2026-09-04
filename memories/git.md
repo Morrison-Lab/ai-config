@@ -276,7 +276,7 @@ so the earlier answer was about what had been fetched.
   and read a short-SHA failure as "not a ref name", not as "not on the remote".
 - **Do:** run `git rev-parse --is-shallow-repository` before an ancestry or count query;
   when it prints `true`, deepen the fetch (or fetch the ref itself) for an ancestry query,
-  and `git fetch --unshallow` for a total count, since any bounded depth still truncates it.
+  and `git fetch --unshallow` for a total count, since no depth picked in advance is known to reach the root.
 - **Don't:** write "not fetchable" or "reachable from no remote ref"
   from a short-SHA fetch or a shallow-clone walk;
   a full-SHA fetch, or the ref walk on a deepened fetch, is the measurement.

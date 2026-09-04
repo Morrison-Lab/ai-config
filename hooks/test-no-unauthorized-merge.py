@@ -707,13 +707,15 @@ SCAN_CONTROL_SMALL = 6000
 #
 # The bound has to be recomputed at the control's own step for that to hold,
 # and this is the trap in widening the gap alone: 8.0 is the halfway line for
-# a 4x step and is EXACTLY the 8x a linear scan grows at an 8x step, so a flat
-# bound read against a widened step separates the two shapes no better than a
-# coin flip. That is arithmetic rather than a measurement, and the readings
-# agree: at step 8 on this container a linear scan grew 7.55-8.09x across
-# twelve runs, straddling 8.0 and clearing it once. The positive control below
-# (`linear_scan`, checked through `report_control(..., expect_above=False)`)
-# asserts the separation rather than arguing it.
+# a 4x step and is EXACTLY the 8x a linear scan grows at an 8x step, so
+# widening that far leaves it no margin against the shape it exists to reject.
+# Measured at step 8, a linear scan grew 7.55-8.09x across twelve runs on one
+# container and 7.83-8.11x on another, crossing 8.0 in 1 run of 12 and in 3 of
+# 12. At the step of 16 this control actually runs at it grew 15.7-16.0x and
+# cleared 8.0 in all six runs, so a flat 8.0 read against this step would pass
+# for either shape. The positive control below (`linear_scan`, checked through
+# `report_control(..., expect_above=False)`) asserts the separation rather than
+# arguing it.
 #
 # Subtracting a measured fixed cost was the other repair on offer. It was not
 # chosen, and not because measurement ruled it out: what can be measured off
@@ -722,9 +724,12 @@ SCAN_CONTROL_SMALL = 6000
 # proposed subtracting -- while the LOAD-induced fixed cost the repair targets
 # cannot be measured from here at all. So the distortion's shape stays a
 # hypothesis, and the wider step is chosen for surviving either shape rather
-# than for ruling one out: an additive fit of the runner's 7.3x at step 4 puts
-# the nuisance cost at ~1.4x the baseline, which still reads ~108x against the
-# 64x bound at step 16, and a 2.1x multiplicative compression leaves ~110x.
+# than for ruling one out. Both fits are taken against one basis, this
+# control's own measured step-16 reading of ~229x, since a margin computed
+# against the theoretical 256x is not comparable with one computed against a
+# measured reading: an additive fit of the runner's 7.3x at step 4 puts the
+# nuisance cost at ~1.4x the baseline, which still reads ~97x against the 64x
+# bound, and a 2.1x multiplicative compression leaves ~109x.
 SCAN_CONTROL_STEP = 16
 SCAN_CONTROL_BOUND = halfway_bound(SCAN_CONTROL_STEP)   # 64.0 = sqrt(16 * 256)
 

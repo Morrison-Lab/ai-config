@@ -128,7 +128,7 @@ Blocking hooks prevent the turn from ending until the missing artifact or requir
 
 ## 4. Detached Timers & Monitoring Services
 
-- **[`monitor-open-prs.py`](../hooks/monitor-open-prs.py)**: Background daemon reconciling all open GitHub PRs and GitLab merge requests authored by the authenticated user every two minutes (`gh` and/or `glab`).
+- **[`monitor-open-prs.py`](../hooks/monitor-open-prs.py)**: Background daemon reconciling every open GitHub PR the authenticated user opened or is assigned to, plus every one the `github-actions` app opened under an owner that user works under, and every GitLab merge request they authored, every two minutes (`gh` and/or `glab`).
 - **Detached Execution**: Automatically started and verified via `ensure-open-pr-monitor.py` on session start.
 
 ---

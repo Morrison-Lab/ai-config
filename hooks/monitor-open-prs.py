@@ -29,7 +29,7 @@ POLL_SECONDS = 120
 ERROR_TAIL = 4000
 
 # The fields of a merge request kept in the state file, the counterpart of
-# the `--json` list open_prs() asks gh for. The rest of the object is
+# the `--json` list gh_search_prs() asks gh for. The rest of the object is
 # volatile (`user_notes_count`, `detailed_merge_status`, ...) and would
 # change the fingerprint -- and re-inject every description into the next
 # prompt -- on every poll.
@@ -125,7 +125,23 @@ def gh_search_prs(*qualifiers):
         [GH_PATH, "search", "prs", "--state", "open", "--limit", "1000",
          "--json", "number,repository,title,updatedAt,url", *qualifiers],
         capture_output=True, text=True, timeout=60, check=True)
-    return json.loads(result.stdout)
+    pull_requests = json.loads(result.stdout)
+    # `gh search prs --json` writes an array of objects. Anything else
+    # is refused rather than stored: poll_once() catches ValueError
+    # into the source's error entry, where the AttributeError a
+    # non-object would raise below would instead end the daemon.
+    if not isinstance(pull_requests, list):
+        raise ValueError(
+            f"expected a JSON array from gh search prs, got {type(pull_requests).__name__}")
+    for pull_request in pull_requests:
+        if not isinstance(pull_request, dict):
+            raise ValueError(
+                f"expected PR objects from gh search prs, got {type(pull_request).__name__}")
+    # Sorted, because inject-pr-monitor-status.py fingerprints this list:
+    # gh's own result order would reorder between polls and re-inject an
+    # unchanged population.
+    return sorted(pull_requests,
+                  key=lambda item: item.get("url") or json.dumps(item, sort_keys=True))
 
 
 def gh_owners():
@@ -135,11 +151,6 @@ def gh_owners():
     covered without editing this file. An empty result is an error: it
     would silently turn the workflow-bot arm below into a search of
     nothing, which is indistinguishable from that arm finding nothing.
-
-    `user/orgs` lists the memberships the token can see, so a token
-    without `read:org` reports only public ones and narrows that arm
-    accordingly. A missing organization there is the first thing to check
-    when a workflow-bot PR goes unreconciled.
     """
     owners = []
     for arguments in (["api", "user", "--jq", ".login"],
@@ -152,58 +163,34 @@ def gh_owners():
     return owners
 
 
-def open_prs():
-    """Every open GitHub PR a search can place in the user's scope.
+def workflow_bot_prs():
+    """Every open PR the `github-actions` app opened under the user's owners.
 
-    memories/reviewing-prs.md states that scope as four arms: the user
-    opened the PR, is assigned to it, named it in the request, or the
-    repository's own workflow bot (the `github-actions` app) opened it.
-    Polling `--author @me` alone covered the first arm only, so a PR
-    assigned to the user, or a `bump-submodule.yml` PR the user is
-    driving, was never reconciled (ai-config#2919). The named-in-request
-    arm is a property of a conversation rather than of a PR, so no query
-    can carry it.
-
-    The two `@me` arms are self-scoping. The workflow-bot arm is not:
+    The two `@me` arms below are self-scoping. This one is not:
     unqualified, `--author app/github-actions` searches every open
     workflow-bot PR on GitHub, so it is bounded by `--owner` to the
     owners the user actually works under.
-
-    A failure of any arm --- the owner lookup included --- propagates, so
-    the whole `github_prs` source records an error. Keeping the arms that
-    answered would write a partial population under a key that asserts a
-    complete one, which is the distinction poll_once() draws between an
-    absent key and an empty list.
     """
     owner_flags = []
     for owner in gh_owners():
         owner_flags += ["--owner", owner]
-    arms = [("--author", "@me"),
-            ("--assignee", "@me"),
-            ("--author", "app/github-actions", *owner_flags)]
-    found = {}
-    for arm in arms:
-        pull_requests = gh_search_prs(*arm)
-        # `gh search prs --json` writes an array of objects. Anything else
-        # is refused rather than stored: poll_once() catches ValueError
-        # into the source's error entry, where the AttributeError a
-        # non-object would raise below would instead end the daemon.
-        if not isinstance(pull_requests, list):
-            raise ValueError(
-                f"expected a JSON array from gh search prs, got {type(pull_requests).__name__}")
-        for pull_request in pull_requests:
-            if not isinstance(pull_request, dict):
-                raise ValueError(
-                    f"expected PR objects from gh search prs, got {type(pull_request).__name__}")
-            # A PR can match more than one arm (the user opened it and was
-            # then assigned to it), so the arms are unioned on the PR's
-            # url rather than concatenated.
-            key = pull_request.get("url") or json.dumps(pull_request, sort_keys=True)
-            found[key] = pull_request
-    # Sorted, because inject-pr-monitor-status.py fingerprints this list:
-    # three searches concatenated in gh's own result order would reorder
-    # between polls and re-inject an unchanged population.
-    return [found[key] for key in sorted(found)]
+    return gh_search_prs("--author", "app/github-actions", *owner_flags)
+
+
+# memories/reviewing-prs.md states the user's PR scope as four arms: the
+# user opened the PR, is assigned to it, named it in the request, or the
+# repository's own workflow bot (the `github-actions` app) opened it.
+# Polling `--author @me` alone covered the first arm only, so a PR assigned
+# to the user, or a `bump-submodule.yml` PR the user is driving, was never
+# reconciled (ai-config#2919). The named-in-request arm is a property of a
+# conversation rather than of a PR, so no query can carry it. Each arm is
+# its own source, the way each GitLab host is, so one failing arm -- the
+# workflow-bot arm's owner lookup included -- costs only its own entry.
+GITHUB_ARMS = (
+    ("github_prs/authored", ("--author", "@me")),
+    ("github_prs/assigned", ("--assignee", "@me")),
+)
+GITHUB_WORKFLOW_BOT_ARM = "github_prs/workflow-bot"
 
 
 # One `glab auth status` block per instance: a host line, then indented
@@ -349,7 +336,9 @@ def poll_once(state):
         # reaching here anyway must not write a "checked, none open" file.
         raise OSError("cannot resolve 'gh' or 'glab' on PATH; nothing to poll")
     if GH_PATH is not None:
-        run("github_prs", open_prs)
+        for name, qualifiers in GITHUB_ARMS:
+            run(name, functools.partial(gh_search_prs, *qualifiers))
+        run(GITHUB_WORKFLOW_BOT_ARM, workflow_bot_prs)
     if GLAB_PATH is not None:
         try:
             hosts, cut_short = glab_hosts()

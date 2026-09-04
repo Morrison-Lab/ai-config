@@ -235,7 +235,7 @@ Every commit on #3060's branch is still reachable on `origin` from `refs/pull/30
 (`git ls-remote origin refs/pull/3060/head` returns `f9068299`,
 and after `git fetch --depth=200 origin refs/pull/3060/head`, `git rev-list --count 3935bfff..FETCH_HEAD` returns 33).
 The default refspec does not bring `refs/pull/3060/head` down
-(`git config --get-all remote.origin.fetch` is `+refs/heads/*:refs/remotes/origin/*`),
+(`git config --get-all remote.origin.fetch` returned `+refs/heads/*:refs/remotes/origin/*` in the measuring clone),
 and a shallow clone walks only to its fetch depth,
 so this record anchors on `main` commits, which a full fetch of `main` brings down
 (`git merge-base --is-ancestor 3935bfff origin/main` and the same for `2156b439` both exit 0).

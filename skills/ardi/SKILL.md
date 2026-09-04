@@ -417,7 +417,7 @@ A round producing genuine, reproducible correctness bugs is indistinguishable fr
   The guard reintroduced at loop scale the thing that fragment bans at item scale.
 
 The tell is any sentence of the form "the reviewer keeps finding things, so maybe we should stop."
-Replace it with another review request.
+Replace it with another review request --- and, from the third finding-bearing round on, with a changed procedure alongside it, per [`ardi`](../../shared/workflow/ardi.md)'s "Three or more review rounds that each returned findings".
 
 Two things that are **not** this anti-pattern and stay:
 

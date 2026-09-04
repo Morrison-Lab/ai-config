@@ -1,7 +1,12 @@
 # Active Hooks Catalog & Proactive Compliance Guide
 
-This document indexes all 52 active hooks in `Morrison-Lab/ai-config` (51 registered in [`hooks/hooks.json`](../hooks/hooks.json) plus the `monitor-open-prs.py` daemon;
-count verified 2026-09-02), detailing their lifecycle events, triggering conditions, verification mechanisms, and rules for **proactive compliance** so agents can satisfy requirements naturally without tripping guards.
+`Morrison-Lab/ai-config`'s active hooks are those registered in [`hooks/hooks.json`](../hooks/hooks.json), plus the `monitor-open-prs.py` daemon, which is not registered there.
+For the current number run `python3 scripts/check-hook-catalog.py` and add one for the daemon.
+No count is written here on purpose: it moves whenever any hook-adding PR merges, so a figure in this file is stale the moment it is written and a reader cannot tell.
+This document describes those hooks --- their lifecycle events, triggering conditions, verification mechanisms, and rules for **proactive compliance** so agents can satisfy requirements naturally without tripping guards.
+The registry is the authority;
+the tables below are still catching up, and two registered hooks have no row yet: `flag-config-deletion-without-ref-check.py` and `warn-stale-review-diff-base.py`.
+The gap survives because `scripts/check-hook-catalog.py` compares the registry against README.md rather than against this file.
 
 For agents operating in this repository or consuming its skills, proactive compliance means following these rules by default rather than waiting for a hook to fire or block.
 

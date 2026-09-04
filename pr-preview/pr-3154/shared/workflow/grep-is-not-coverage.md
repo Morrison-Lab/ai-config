@@ -214,13 +214,13 @@ at `3935bfff` (`origin/main` before #3060 merged) and unchanged at `2156b439` (i
 274, 288, 295, 861 and 995 ---
 of which the first three sit inside one bold-lead block with its own `Do`/`Don't` pair.
 What step 3's own directory-wide grep would have done is checkable:
-`git grep -ril "issue reference" 3935bfff -- memories/` returns three files ---
+`git grep -il "issue reference" 3935bfff -- memories/` returns three files ---
 `memories/github.md`, `memories/preferences.md` and `memories/r-quarto.md` ---
 and the owner is not among them,
 because the owner is `shared/writing/semantic-line-breaks.md`,
 which a search of `memories/` cannot reach.
 What the [`skill-builder`](../../skills/skill-builder/SKILL.md) step 0 query would have done is checkable too:
-`git grep -ril "issue reference" 3935bfff -- skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md` returns eight files at that ref ---
+`git grep -il "issue reference" 3935bfff -- skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md` returns eight files at that ref ---
 `hooks/test-no-unauthorized-merge.py`, `hooks/warn-stale-issue-edit.py`, `memories/github.md`, `memories/preferences.md`, `memories/r-quarto.md`, `shared/workflow/address-every-comment.md`, `shared/writing/semantic-line-breaks.md` and `skills/promote-memory/SKILL.md` ---
 with the owner among them.
 The same `memories/` query returns four at `2156b439`:

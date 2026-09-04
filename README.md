@@ -532,8 +532,8 @@ Nothing enforces this, and three registered hooks do not yet carry the gate:
 `flag-add-a-outside-pathspec.py`, `no-fable-subagent.py` and
 `warn-stale-review-diff-base.py`.
 That census is derived over `hooks/hooks.json` rather than recalled ---
-registered scripts whose source names both channels and never names
-`ANTIGRAVITY_AGENT` (measured 2026-09-03):
+registered scripts whose source names both channels and never *gates* on
+`ANTIGRAVITY_AGENT` (measured 2026-09-03, output pasted below the snippet):
 
 ```python
 import json, pathlib
@@ -542,14 +542,27 @@ s = {h["script"] for e in d["hooks"].values() for g in e for h in g["hooks"]}
 print(sorted(x for x in s if (pathlib.Path("hooks") / x).is_file()
              and all(k in (pathlib.Path("hooks") / x).read_text()
                      for k in ("additionalContext", "systemMessage"))
-             and "ANTIGRAVITY_AGENT" not in
+             and 'environ.get("ANTIGRAVITY_AGENT")' not in
                  (pathlib.Path("hooks") / x).read_text()))
+# ['flag-add-a-outside-pathspec.py', 'no-fable-subagent.py',
+#  'warn-stale-review-diff-base.py']
 ```
+
+The test is the gating **expression**, not the bare name, and the difference
+is not cosmetic.
+Keying on the name alone counts a hook that merely *mentions* the variable ---
+`warn-stale-review-diff-base.py`'s own docstring says it lacks the gate ---
+so the disclosure would delete that hook from the census disclosing it, and
+the query would print two names under a paragraph naming three.
 
 - **Do:** gate the `systemMessage` whenever the same payload also carries
   `additionalContext`.
+- **Do:** key a census like this one on the expression that does the work, and
+  paste the output beside the query.
 - **Don't:** state the gate as repo-wide fact --- re-derive the census, since
   the three hooks above still warn twice under Antigravity.
+- **Don't:** key it on a bare identifier --- prose about the absence of a gate
+  reads as the gate itself.
 
 Every hook must ship a companion `test-<name>.py` beside it in the same change before pushing;
 `scripts/test_hooks.py` runs

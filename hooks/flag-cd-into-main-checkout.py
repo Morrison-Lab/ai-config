@@ -157,8 +157,11 @@ def main() -> int:
     }
     # Antigravity's adapter prints `additionalContext` itself AND separately
     # prints every collected `systemMessage`, so carrying both there emits the
-    # warning twice. Every sibling that emits `systemMessage` gates it this
-    # way.
+    # warning twice. Most siblings emitting both channels gate it this way;
+    # three registered hooks (`flag-add-a-outside-pathspec.py`,
+    # `no-fable-subagent.py`, `warn-stale-review-diff-base.py`) do not yet,
+    # and warn twice under Antigravity. README.md's warn-only hook section
+    # carries that census and the query deriving it.
     if not os.environ.get("ANTIGRAVITY_AGENT"):
         out["systemMessage"] = (
             "This `cd` targets the MAIN checkout of this session's own "

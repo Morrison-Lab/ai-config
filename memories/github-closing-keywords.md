@@ -55,15 +55,19 @@ There the squash body carried a keyword the author had not wanted;
 here the keyword the merger expected was absent, and the absence was
 right.
 
-Under a squash merge, what closes an issue is the squash body as entered
-plus the PR body, both parsed.
+Under a squash merge, what closes an issue is the whole squash commit
+message as entered, title included, plus the PR body, all parsed.
+This repo fills the squash title from the PR title
+(`squash_merge_commit_title` read as `COMMIT_OR_PR_TITLE` on 2026-09-04),
+so a keyword in the PR title reaches `main` without anyone typing it at
+merge time.
 The branch's commit messages reach the parser only through the default
 squash body, which this repo builds by concatenating them
 (`squash_merge_commit_message` read as `COMMIT_MESSAGES` on 2026-09-04),
 and a body written by hand at merge time replaces that concatenation
 entirely.
 So a grep over the branch answers what the *default* body would carry, and
-the body actually entered is what to read once it exists.
+the message actually entered is what to read once it exists.
 The repo also allows merge commits and rebase merges (read 2026-09-04);
 either lands every branch commit message on `main` unchanged, where the
 parser reads each one.
@@ -75,37 +79,41 @@ carried the closing keyword.
 The sentence entered the loop's brief on 2026-09-03, in the r1 script, and
 was copied into each later script through r5 without anyone re-reading
 the branches.
-It was never true for `fix/3102-memory-size-approach`: seven of that
-branch's nine commits carry `Refs #3102` and the other two are generated
-merge-commit lines, because PR #3215 shipped one of the issue's two parts.
+It was never true for `fix/3102-memory-size-approach`, which says
+`Refs #3102` because PR #3215 shipped one of the issue's two parts;
+seven of that branch's nine commits carry the `Refs`, and the other two
+are generated merge-commit lines.
 It was true for `fix/3068-flag-cd-stderr` on 2026-09-03 and false by
-03:57Z on 2026-09-04, thirteen hours before the r5 script was written: a
-rebase reworded the keyword out of the branch's first commit on purpose,
-recorded by the empty commit `78fda241`, because the issue's first "done
-when" item (the warning surfaces in a live session) is one no diff can
-meet.
+03:57Z on 2026-09-04, thirteen hours before the r5 script was written.
+A rebase reworded the keyword out of the branch's first commit on purpose,
+because the issue's first "done when" item (the warning surfaces in a live
+session) is one no diff can meet;
+the empty commit `78fda241` records the rebase and the reason.
 Both PRs merged with hand-written squash bodies carrying `Refs`, and both
 issues stayed open, which was the intended outcome in each case.
 The mistake came after: issue #3068 was closed by hand on the strength of
 the test item plus an item the issue marks optional, and reopened twenty
-minutes later once the branch's own commit was read.
+minutes later once `78fda241` and `a92de7b4` on the branch were read.
 
-Pattern and anti-pattern for this case, apart from the file-wide list
-below:
+Pattern and anti-pattern for this case, apart from the file-wide
+`Do / Don't` list:
 
 - **Do:** before opening the PR, read what the branch's commits would
   contribute to a default squash body, with a case-insensitive grep that
-  matches every spelling the parser accepts (and some ordinary words such
-  as `prefixes #`, so read each hit):
-  `git log --format=%B origin/main..HEAD | grep -niE '(close[sd]?|fix(es|ed)?|resolve[sd]?):? *#[0-9]+'`;
+  matches every spelling and both issue forms the parser accepts (and some
+  ordinary words such as `prefixes #`, so read each hit):
+  `git log --format=%B origin/main..HEAD | grep -niE '(close[sd]?|fix(es|ed)?|resolve[sd]?):? *([A-Za-z0-9._-]+/[A-Za-z0-9._-]+)?#[0-9]+'`;
   then put whatever keyword the merge should carry in the PR body, scoped
   per [`issue-first.md`](../shared/workflow/issue-first.md), and read the
-  squash body you enter at merge time as the surface that decides.
+  PR title and the squash message you enter at merge time as the surfaces
+  that decide.
 - **Do:** when a branch carries `Refs` where a `Closes` was expected, read
   its commit messages for the reason before treating the absence as an
-  omission;
-  the message that records a deliberate removal names the acceptance item
-  the branch cannot meet.
+  omission, and look for the acceptance item a deliberate removal names.
+- **Do:** when a brief asserts what a branch's commits carry, run the grep
+  above on that branch and paste its output beside the claim, per
+  [`challenge-the-assignment.md`](../shared/workflow/challenge-the-assignment.md)
+  (`hooks/remind-brief-premises.py` is its mechanism).
 - **Do:** close an issue by hand only when every required acceptance item
   is met, by the merged diff or by the evidence the item asks for (a
   transcript line, for an observation), with a comment naming that

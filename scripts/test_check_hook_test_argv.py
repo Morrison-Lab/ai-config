@@ -9,11 +9,12 @@ directory, verifying that:
   4. A shell stub is judged on its own forms ("$@"), not on Python ones.
   5. A stub split across an f-string is read whole, not per literal,
      and an enclosing block mentioning sys.argv does not mask a blind stub.
-  6. A shebang in fixture content, with no stub installed, is not a finding.
+  6. A shebang in fixture content is not a stub, even beside an unrelated chmod.
   7. A shell-hook subject is examined rather than dropped for its extension.
   8. A path named argv_log does not, by itself, count as reading argv.
   9. Unparseable test source fails loudly; a missing directory exits 2.
- 10. The live repository is clean, and the report names how many stubs it saw.
+ 10. One argv-aware stub does not clear a blind one in the same suite.
+ 11. The live sweep is advisory, and the report names how many stubs it saw.
 """
 from __future__ import annotations
 
@@ -204,20 +205,25 @@ case(
     needle="never reads its own argv",
 )
 
-# --- 6. A shebang in fixture content, with no stub installed, is not a finding ---
-FIXTURE_ONLY_TEST = '''HUNK = """@@ -1,3 +1,3 @@
+# --- 6. A shebang in fixture content is not a stub, chmod in the file or not ---
+FIXTURE_ONLY_TEST = '''import os, tempfile
+HUNK = """@@ -1,3 +1,3 @@
  #!/bin/bash
 -old
 +new
 """
 assert "#!/bin/bash" in HUNK
+with tempfile.TemporaryDirectory() as tmp:
+    p = os.path.join(tmp, "pre-commit")
+    open(p, "a").close()
+    os.chmod(p, 0o755)
 '''
 
 case(
     "a shebang in diff-hunk fixture content is not a stub",
     {"warn.py": HOOK_SRC, "test-warn.py": FIXTURE_ONLY_TEST},
     want_exit=0,
-    needle="0 of which install an executable stub",
+    needle="holding 0 executable stub(s)",
 )
 
 # --- 7. A shell-hook subject is examined rather than dropped ---
@@ -270,27 +276,72 @@ check(
     f"rc={rc} out={out!r}",
 )
 
-# --- 10. Live repository, and the negative control the report carries ---
+# --- 10. One argv-aware stub does not clear a blind one in the same suite ---
+MIXED_TEST = '''import os, tempfile
+GIT_SHIM = """#!/bin/sh
+if [ "$1" = rev-parse ]; then echo main; fi
+"""
+GH_SHIM = """#!/bin/sh
+echo fixture
+"""
+with tempfile.TemporaryDirectory() as tmp:
+    g = os.path.join(tmp, "git")
+    open(g, "w").write(GIT_SHIM)
+    os.chmod(g, 0o755)
+    h = os.path.join(tmp, "gh")
+    open(h, "w").write(GH_SHIM)
+    os.chmod(h, 0o755)
+'''
+
+case(
+    "an argv-aware stub does not clear a blind one in the same suite",
+    {"warn.py": HOOK_SRC, "test-warn.py": MIXED_TEST},
+    want_exit=1,
+    needle="GH_SHIM",
+    strict=True,
+)
+
+case(
+    "the blind stub is named and the argv-aware one is not",
+    {"warn.py": HOOK_SRC, "test-warn.py": MIXED_TEST},
+    want_exit=0,
+    needle="holding 2 executable stub(s): 1 ignore argv",
+    absent="GIT_SHIM",
+)
+
+# --- 11. Live repository, and the negative control the report carries ---
 proc = subprocess.run(
-    [sys.executable, str(SCRIPT), "--strict"],
+    [sys.executable, str(SCRIPT)],
     capture_output=True,
     text=True,
     cwd=str(ROOT),
 )
 check(
-    "the real repository has no argv-blind stub",
+    "the live sweep is advisory",
     proc.returncode == 0,
     f"\n{proc.stdout}{proc.stderr}",
 )
+strict_proc = subprocess.run(
+    [sys.executable, str(SCRIPT), "--strict"],
+    capture_output=True,
+    text=True,
+    cwd=str(ROOT),
+)
+want_strict = 1 if "FINDING:" in proc.stdout else 0
 check(
-    "the report names how many suites install a stub",
-    "of which install an executable stub" in proc.stdout,
+    "--strict exit agrees with the live findings",
+    strict_proc.returncode == want_strict,
+    f"rc={strict_proc.returncode} want={want_strict}",
+)
+check(
+    "the report names how many stubs it examined",
+    "executable stub(s)" in proc.stdout,
     f"out={proc.stdout!r}",
 )
 # A zero finding count over zero stubs is indistinguishable from a detector
 # that never ran, so the live sweep must actually have inspected some stubs.
-stub_line = [ln for ln in proc.stdout.splitlines() if "install an executable stub" in ln]
-saw_stubs = bool(stub_line) and " 0 of which install" not in stub_line[0]
+stub_line = [ln for ln in proc.stdout.splitlines() if "executable stub(s)" in ln]
+saw_stubs = bool(stub_line) and "holding 0 executable stub(s)" not in stub_line[0]
 check(
     "the live sweep inspected at least one stub",
     saw_stubs,

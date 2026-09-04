@@ -138,6 +138,9 @@ Blocking hooks prevent the turn from ending until the missing artifact or requir
 When authoring a new hook:
 1. Place the implementation script in `hooks/<name>.py` (or `.sh`).
 2. Add comprehensive unit tests in `hooks/test-<name>.py`.
+   A test that stubs a command on `PATH` must log `sys.argv` from the stub and assert the query the hook issued, not only the decision it reached.
+   - **Do:** assert on the logged argv alongside the hook's decision.
+   - **Don't:** return one fixture whatever the stub is handed.
 3. Register the hook in [`hooks/hooks.json`](../hooks/hooks.json) under the correct event and matcher.
 4. Add a row to the README hooks table in [`README.md`](../README.md#enforcement-hooks-hooks).
    The row's matcher list must equal the `hooks.json` groups for that script joined by `, `, in file order:
@@ -148,5 +151,6 @@ When authoring a new hook:
    ```bash
    python3 scripts/check-hook-catalog.py
    python3 scripts/check-hook-output-shape.py
+   python3 scripts/check-hook-test-argv.py
    python3 scripts/test_hooks.py
    ```

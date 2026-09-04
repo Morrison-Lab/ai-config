@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import argparse
 import ast
-import json
 import sys
 from pathlib import Path
 
@@ -42,30 +41,12 @@ USAGE_EXIT = 2
 ARGV_MARKERS = ("sys.argv", "$@", "$1", "$2", "$*")
 
 # A shebang inside a test file is not by itself a stub: diff-hunk fixtures carry
-# `#!/bin/bash` as ordinary content. An install signal is what separates the two.
+# `#!/bin/bash` as ordinary content. A stub is a shebang the file writes out, in a
+# suite that also marks something executable; this marker is the coarse pre-filter.
 INSTALL_MARKERS = ("chmod",)
 
 # A hook is a Python script or a shell script; both take a `test-<name>.py` suite.
 SUBJECT_SUFFIXES = (".py", ".sh")
-
-
-def load_registered_hooks(hooks_json_path: Path) -> set[str]:
-    """Return the set of hook script names bound in hooks.json."""
-    if not hooks_json_path.is_file():
-        return set()
-    try:
-        with open(hooks_json_path, encoding="utf-8") as fh:
-            data = json.load(fh)
-    except (json.JSONDecodeError, OSError):
-        return set()
-    names = set()
-    for groups in data.get("hooks", {}).values():
-        for group in groups:
-            for entry in group.get("hooks", []):
-                script = entry.get("script")
-                if script:
-                    names.add(script)
-    return names
 
 
 def _shebang_constants(tree: ast.AST) -> list[ast.AST]:
@@ -89,6 +70,10 @@ def stub_statements(source: str) -> tuple[list[str], str | None]:
     and misses the argv marker. The innermost one rather than any enclosing
     one, because an outer `with` block holding both a blind stub and unrelated
     code that happens to mention `sys.argv` would otherwise read as clean.
+
+    A shebang the file never writes out is fixture content rather than a stub,
+    so the statement must either call a write itself or bind a name that a
+    simple write statement elsewhere in the file mentions.
     """
     try:
         tree = ast.parse(source)
@@ -100,6 +85,7 @@ def stub_statements(source: str) -> tuple[list[str], str | None]:
         for child in ast.iter_child_nodes(node):
             parents[id(child)] = node
 
+    written = _written_names(tree, source)
     segments = []
     for literal in _shebang_constants(tree):
         node: ast.AST | None = literal
@@ -108,9 +94,47 @@ def stub_statements(source: str) -> tuple[list[str], str | None]:
         if node is None:
             continue
         segment = ast.get_source_segment(source, node)
-        if segment:
-            segments.append(segment)
+        if not segment:
+            continue
+        if "write" not in segment and not (_bound_names(node) & written):
+            continue
+        segments.append(segment)
     return segments, None
+
+
+def _written_names(tree: ast.AST, source: str) -> set[str]:
+    """Names mentioned by a simple statement whose text calls a write.
+
+    Compound statements are skipped, so an enclosing block does not mark
+    every name inside it as written.
+    """
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.stmt) or hasattr(node, "body"):
+            continue
+        segment = ast.get_source_segment(source, node) or ""
+        if "write" not in segment:
+            continue
+        for sub in ast.walk(node):
+            if isinstance(sub, ast.Name):
+                names.add(sub.id)
+    return names
+
+
+def _bound_names(node: ast.AST) -> set[str]:
+    """Names this statement assigns to."""
+    targets: list[ast.AST] = []
+    if isinstance(node, ast.Assign):
+        targets = list(node.targets)
+    elif isinstance(node, (ast.AnnAssign, ast.AugAssign)):
+        targets = [node.target]
+    return {t.id for t in targets if isinstance(t, ast.Name)}
+
+
+def stub_label(segment: str) -> str:
+    """A short identifying slice of a stub statement: its first line."""
+    first = segment.strip().splitlines()[0].strip()
+    return first if len(first) <= 60 else first[:57] + "..."
 
 
 def inspects_argv(segment: str) -> bool:
@@ -128,31 +152,32 @@ def subject_exists(hooks_dir: Path, test_path: Path) -> bool:
     return any((hooks_dir / f"{stem}{ext}").is_file() for ext in SUBJECT_SUFFIXES)
 
 
-def check_test_file(path: Path) -> tuple[str | None, str | None, bool]:
-    """Return (finding, parse_error, installs_stub) for one hook test suite."""
+def check_test_file(path: Path) -> tuple[list[str], str | None, int]:
+    """Return (findings, parse_error, stub count) for one hook test suite.
+
+    Each stub is judged on its own text, so an argv-aware shim does not clear
+    a blind one installed beside it.
+    """
     source = path.read_text(encoding="utf-8")
     if not any(marker in source for marker in INSTALL_MARKERS):
-        return None, None, False
+        return [], None, 0
 
     stub_segments, parse_err = stub_statements(source)
     if parse_err:
-        return None, f"{path.name} {parse_err}", False
+        return [], f"{path.name} {parse_err}", 0
 
-    if not stub_segments:
-        return None, None, False
-
-    if any(inspects_argv(seg) for seg in stub_segments):
-        return None, None, True
-
-    return (
-        f"{path.name} installs an executable stub that never reads its own argv. "
+    findings = [
+        f"{path.name}: the stub at `{stub_label(seg)}` never reads its own argv. "
         "A stub returning one fixture whatever it is asked leaves the hook's "
         "query unconstrained, so a mutated query ships green."
-    ), None, True
+        for seg in stub_segments
+        if not inspects_argv(seg)
+    ]
+    return findings, None, len(stub_segments)
 
 
 def collect_findings(hooks_dir: Path) -> tuple[list[str], list[str], int, int]:
-    """Return (findings, parse_errors, suites examined, suites installing a stub).
+    """Return (findings, parse_errors, suites examined, stubs installed).
 
     The stub count is the negative control. Zero findings over zero stubs is
     indistinguishable from a detector that never ran, so both numbers are
@@ -161,21 +186,19 @@ def collect_findings(hooks_dir: Path) -> tuple[list[str], list[str], int, int]:
     findings: list[str] = []
     errors: list[str] = []
     examined = 0
-    with_stub = 0
+    stubs = 0
 
     for test_path in sorted(hooks_dir.glob("test-*.py")):
         if not subject_exists(hooks_dir, test_path):
             continue
         examined += 1
-        finding, error, installs_stub = check_test_file(test_path)
-        if installs_stub:
-            with_stub += 1
+        file_findings, error, stub_count = check_test_file(test_path)
+        stubs += stub_count
         if error:
             errors.append(error)
-        if finding:
-            findings.append(finding)
+        findings.extend(file_findings)
 
-    return findings, errors, examined, with_stub
+    return findings, errors, examined, stubs
 
 
 def main() -> int:
@@ -198,12 +221,10 @@ def main() -> int:
         print(f"FAIL: no hooks directory at {hooks_dir}")
         return USAGE_EXIT
 
-    findings, errors, examined, with_stub = collect_findings(hooks_dir)
+    findings, errors, examined, stubs = collect_findings(hooks_dir)
     if not examined:
         print(f"FAIL: no hook test suites found in {hooks_dir}")
         return USAGE_EXIT
-
-    registered = load_registered_hooks(hooks_dir / "hooks.json")
 
     for error in errors:
         print(f"FAIL: {error}")
@@ -213,8 +234,7 @@ def main() -> int:
 
     print(
         f"\nExamined {examined} hook test suite(s) "
-        f"({len(registered)} registered hook(s)), "
-        f"{with_stub} of which install an executable stub: "
+        f"holding {stubs} executable stub(s): "
         f"{len(findings)} ignore argv, {len(errors)} unparseable."
     )
 

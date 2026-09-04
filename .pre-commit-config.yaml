@@ -140,6 +140,7 @@ repos:
         language: python
         pass_filenames: false
         always_run: true
+        verbose: true
       - id: hook-test-argv-tests
         name: hook-test-argv check tests
         entry: python scripts/test_check_hook_test_argv.py

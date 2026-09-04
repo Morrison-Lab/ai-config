@@ -634,12 +634,15 @@ and the suite asserts on that log alongside the decision ---
 - **Don't:** return one fixture regardless of arguments and read a green suite
   as evidence the query is right.
 
-`scripts/check-hook-test-argv.py` reports this per suite.
+`scripts/check-hook-test-argv.py` reports the first half of this,
+one finding per stub --- whether the stub reads its own argv at all.
+It cannot see whether the suite then asserts on the log,
+so a passing sweep is a floor rather than a verdict.
 It is advisory rather than gating,
 because a stub whose only job is to exist on `PATH` legitimately needs no argv,
 so a finding is a prompt to read the suite rather than a proven defect;
 `--strict` exits non-zero on any finding.
-The report names how many suites installed a stub alongside how many were flagged,
+The report names how many stubs it examined alongside how many were flagged,
 since zero findings over zero stubs is indistinguishable from a detector that never ran.
 
 Every hook must ship a companion `test-<name>.py` beside it in the same change before pushing;

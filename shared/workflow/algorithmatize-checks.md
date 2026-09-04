@@ -1575,7 +1575,8 @@ at the same moment the guard was holding a compaction-replayed stale verdict
 so the refusal was wrong and its documented remedy unreachable together.
 The unblock was to satisfy the guard honestly ---
 dispatch a second review so a fresher record lands last ---
-rather than to keep rephrasing the override, per Pattern 43.
+rather than to keep rephrasing the override,
+per [`mistake-patterns`](../../memories/mistake-patterns.md) Pattern 43.
 
 - **Do:** key a "most recent" reader on each record's own timestamp, and say in the code why position is not enough.
 - **Do:** run the instrument's own parsing function against the live artifact, printing what it held, before writing down a mechanism-level explanation.

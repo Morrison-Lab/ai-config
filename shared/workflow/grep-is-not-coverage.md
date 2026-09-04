@@ -200,9 +200,8 @@ Morrison-Lab/ai-config#1174.)
 The section above routes between repos;
 the same miss happens inside one repo when the dupe check is scoped to a directory the owner is not in.
 
-- **Do:** grep the paths skill-builder step 0 runs,
-  `skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md`,
-  not the one the destination sits in.
+- **Do:** grep the paths [`skill-builder`](../../skills/skill-builder/SKILL.md) step 0 runs,
+  not only the directory the destination sits in.
 - **Don't:** read "the whole `memories/` directory", step 3's wording at `3935bfff`, as thorough;
   the word doing the damage was `memories/`, not "whole".
 
@@ -219,7 +218,7 @@ What step 3's own directory-wide grep would have done is checkable:
 and the owner is not among them,
 because the owner is `shared/writing/semantic-line-breaks.md`,
 which a search of `memories/` cannot reach.
-What skill-builder's step 0 query would have done is checkable too:
+What the [`skill-builder`](../../skills/skill-builder/SKILL.md) step 0 query would have done is checkable too:
 `git grep -ril "issue reference" 3935bfff -- skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md` returns eight files at that ref ---
 `hooks/test-no-unauthorized-merge.py`, `hooks/warn-stale-issue-edit.py`, `memories/github.md`, `memories/preferences.md`, `memories/r-quarto.md`, `shared/workflow/address-every-comment.md`, `shared/writing/semantic-line-breaks.md` and `skills/promote-memory/SKILL.md` ---
 with the owner among them.

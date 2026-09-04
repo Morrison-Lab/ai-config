@@ -39,6 +39,19 @@ The PR body of #1718 used `Refs #1717` and did not contain the closing
 keyword.
 The squash message did.
 
+## Do / Don't
+
+- **Do:** if you must mention a closing keyword you are not using, keep the
+  number off the keyword (`the closing keyword was not used for #1717`;
+  `Refs #1717` only).
+- **Do:** read the squash / merge commit message, not only the PR body,
+  before assuming a tracker stayed open.
+- **Don't:** write `Closes #N is deliberately NOT used` (or any
+  `Closes` / `Fixes` / `Resolves` `#N` substring) in a commit message or
+  PR body.
+- **Don't:** treat a following dash, or a later `Refs #N`, as protection
+  --- the keyword-plus-number substring is enough.
+
 ## Distinct from two nearby `Closes` traps
 
 - An **invented** number filling a habitual `Closes` slot
@@ -54,15 +67,15 @@ The mirror of the #1718 case above.
 There the squash body carried a keyword the author had not wanted;
 here the keyword the merger expected was absent, and the absence was right.
 
-Under a squash merge, what closes an issue is the whole squash commit message as entered,
-title included, plus the PR body, all parsed.
+Under a squash merge, what closes an issue is the whole squash commit message as entered, plus the PR body.
+The title counts: the docs cited above say a keyword in a commit message merged to the default branch closes the issue, and the subject is part of the message.
 This repo sets `squash_merge_commit_title` to `COMMIT_OR_PR_TITLE` (read 2026-09-04),
 which GitHub documents as the sole commit's subject on a one-commit PR and the PR title otherwise;
-so a keyword in either of those reaches `main` without anyone typing it at merge time.
+so a keyword in either of those reaches `main` unless the merger edits the prefilled title.
 The branch's commit messages reach the squash *body* only through the default body,
-which this repo builds by concatenating them (`squash_merge_commit_message` read as `COMMIT_MESSAGES` on 2026-09-04),
-and a body written by hand at merge time replaces that concatenation entirely.
-So a grep over the branch answers what the default body would carry,
+which GitHub builds from them as a bullet list when `squash_merge_commit_message` is `COMMIT_MESSAGES` (read 2026-09-04),
+and a body written by hand at merge time replaces that default entirely.
+So a listing of the branch's keyword-carrying commits answers what the default body would carry,
 and the message actually entered is what to read once it exists.
 The repo also allows merge commits and rebase merges (read 2026-09-04);
 either lands every branch commit message on `main` unchanged, where the parser reads each one.
@@ -74,37 +87,43 @@ and on a run of `hooks/remind-brief-premises.py`.
 The fixer brief asserted for every branch that its first commit already carried the closing keyword.
 The sentence entered the loop's brief on 2026-09-03, in the first wave-1 script,
 and was copied into each later script through r5 without anyone re-reading the branches.
-It was never true for `fix/3102-memory-size-approach`,
+The assertion was never true for `fix/3102-memory-size-approach`,
 which says `Refs #3102` because PR #3215 shipped one of the issue's two parts;
 seven of that branch's nine commits carry the `Refs`, and the other two are generated merge-commit lines.
-It was true for `fix/3068-flag-cd-stderr` on 2026-09-03 and false by 03:57Z on 2026-09-04,
+The assertion was true for `fix/3068-flag-cd-stderr` on 2026-09-03 and false by 03:57Z on 2026-09-04,
 thirteen hours before the r5 script was written.
 A rebase reworded the keyword out of the branch's first commit on purpose,
-because the issue's first "done when" item (the warning surfaces in a live session) is one no diff can meet;
+because the issue's first "done when" item (the warning surfaces in a live session) is one that branch could not evidence;
 the empty commit `78fda241` records the rebase and the reason.
 Both PRs merged with hand-written squash bodies carrying `Refs`,
 and both issues stayed open, which was the intended outcome in each case.
 The mistake came after:
-issue #3068 was closed by hand on the strength of the test item plus an item the issue marks optional,
+issue #3068 was closed by hand on the strength of the item asking for a test that pins the `additionalContext` emission plus an item the issue marks optional,
 and reopened twenty minutes later once `78fda241` and `a92de7b4` on the branch were read.
 The hook did not fire on the brief's sentence, and cannot:
 it keys on a corpus path or a count, and a claim about a branch's commits carries neither.
 
 - **Do:** before opening the PR, list the branch commits whose messages carry a closing keyword,
-  in every spelling and both issue forms the parser accepts
-  (the pattern also matches some ordinary words, such as `prefixes #`, so read each hit):
-  `git log --regexp-ignore-case --extended-regexp --grep='(close[sd]?|fix(es|ed)?|resolve[sd]?):? *([A-Za-z0-9._-]+/[A-Za-z0-9._-]+)?#[0-9]+' --format='%h %s' origin/main..HEAD`.
-- **Don't:** treat having written the PR body as having read the squash body;
+  in every spelling and both issue forms the parser accepts,
+  with the PR's base resolved rather than assumed
+  (`base="$(git remote show origin | sed -n 's/.*HEAD branch: //p')"`, or the branch a stacked PR targets):
+  `pat='(close[sd]?|fix(es|ed)?|resolve[sd]?):? *([A-Za-z0-9._-]+/[A-Za-z0-9._-]+)?#[0-9]+'`, then
+  `git log --regexp-ignore-case --extended-regexp --grep="$pat" --format='== %h %s%n%b' "origin/$base..HEAD" | grep -iE "^== |$pat"`;
+  each `==` line names a matching commit and the lines under it are its matching body lines,
+  which is where this repo's keywords sit,
+  and the pattern also matches some ordinary words (`prefixes #`), so read each hit.
+- **Don't:** open the PR having written its body but not read what the branch's commits would land;
   the #1718 case above is a `Refs` PR body over a `Closes` squash body.
 - **Do:** put whatever keyword the merge should carry in the PR body, scoped per [`issue-first.md`](../shared/workflow/issue-first.md),
   then read every surface the parser will see for the merge method in use.
   Under a squash merge whose body you write: the PR body, the squash title, and the squash body you write.
-  Under a squash merge with the default body: the same three, with the branch commits concatenated into the body.
-  Under a merge commit: the PR body, the branch commits, and the merge commit's body,
-  which this repo fills from the PR title (`merge_commit_message` read as `PR_TITLE` on 2026-09-04).
+  Under a squash merge with the default body: the same three, with the branch commits listed in the body.
+  Under a merge commit: the PR body, the branch commits, the merge commit's subject
+  (`merge_commit_title` read as `MERGE_MESSAGE` on 2026-09-04, the generated "Merge pull request #N" line),
+  and the merge commit's body, which defaults to the PR title (`merge_commit_message` read as `PR_TITLE` on 2026-09-04) and is editable in the dialog.
   Under a rebase merge: the PR body and the branch commits.
 - **Don't:** read only the squash body you typed;
-  the title the squash commit inherits from the PR or the sole commit is parsed without any human having read it.
+  the title arrives prefilled from the PR or the sole commit and reaches `main` unless you edit it.
 - **Do:** when a branch carries `Refs` where a `Closes` was expected,
   read its commit messages for the reason before treating the absence as an omission,
   and look for the acceptance item a deliberate removal names.
@@ -120,14 +139,3 @@ it keys on a corpus path or a count, and a claim about a branch's commits carrie
   with a comment naming that evidence.
 - **Don't:** close an issue by hand because its PR merged,
   or because the required items that remain unmet are the hard ones.
-
-## Do / Don't for the negated-keyword case
-
-- **Do:** if you must mention a closing keyword you are not using, keep the
-  number off the keyword (`the closing keyword was not used for #1717`;
-  `Refs #1717` only).
-- **Don't:** write `Closes #N is deliberately NOT used` (or any
-  `Closes` / `Fixes` / `Resolves` `#N` substring) in a commit message or
-  PR body.
-- **Don't:** treat a following dash, or a later `Refs #N`, as protection
-  --- the keyword-plus-number substring is enough.

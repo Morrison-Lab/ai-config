@@ -412,7 +412,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h2 class="anchored" data-anchor-id="step-3-post-the-handoff-on-the-relevant-forge-threads">Step 3 — Post the handoff on the relevant forge thread(s)</h2>
 <p>Post the handoff every time, including when no PR/MR is in play. The forge is the one place a later session, a reviewer, and the user all already look, so it is where the pick-up state belongs. Route by what the work actually has:</p>
 <ul>
-<li><strong>An open PR/MR</strong> — comment on it, in the paused-claim form below.</li>
+<li><strong>An open PR/MR you’ve claimed, still in scope</strong> — comment on it, in the paused-claim form below; otherwise route the handoff to the issue.</li>
 <li><strong>An issue and no PR/MR</strong> — comment on the issue.</li>
 <li><strong>Neither</strong> — file an issue whose body is the handoff, per <a href="../../shared/workflow/issue-first.md"><code>issue-first</code></a>.</li>
 <li><strong>State that outlives the thread</strong> — commit it to a file in the repo (a runbook, a design note) and link that file from the comment.</li>

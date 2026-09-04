@@ -992,6 +992,38 @@ Prefer a recent run, since an older one may predate the definition you just read
 
 See [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md), "A merged pull request's check names written into a live ruleset".
 
+## A PR's `MERGED` status is another shape, and it is not corroboration of content
+
+The sections above each name a claim about a PR that outlives the moment it was true.
+This one is the claim made *at* the merge itself: that a PR reading `MERGED` is evidence your reviewed, verdict-clean diff reached the default branch.
+
+It is not, for an ordinary reason that has nothing to do with the merge going wrong.
+A PR branch can be merged while carrying a stale head --- another session, an `@claude` auto-sync, a rebase gone half-finished --- so the commit that lands on `main` is not the commit whose review you read.
+Nothing about the merge fails: CI is green, the merge commit exists, GitHub reports success, and the PR page shows `MERGED` exactly as it would for a clean landing.
+The status is real; it answers "did a merge happen", not "did my content land".
+Confusing the two is the same substitution [`The four shapes`](#the-four-shapes) names elsewhere: the adjacent artifact (the PR's own state field) stands in for the one the claim is actually about (the tree at `origin/<default-branch>`).
+
+The detector is cheap and belongs right after every merge you drive, not only when something looks wrong:
+
+```bash
+git merge-base --is-ancestor <your-last-pushed-sha> origin/<default-branch> && echo ok
+git grep -c '<distinctive symbol from your diff>' origin/<default-branch> -- <path>
+```
+
+The ancestry check answers whether your commit is even in the merged history at all; the content grep answers the sharper question, since a squash merge can be an ancestor-check false negative (the SHA changes on squash) while still needing the grep to confirm the actual lines survived.
+Pick a symbol distinctive enough that a match means your specific change, not a coincidentally similar one nearby.
+
+Recovery is not "push the stale branch again."
+A branch that has drifted this far shows the merged base's *own* subsequent work as deletions when diffed against it, so reusing it re-proposes reverting content that was never yours to touch.
+Cut a fresh branch off the current default branch and re-apply just the lost pieces instead.
+
+- **Do:** after driving a PR to merge, grep `origin/<default-branch>` for a distinctive symbol from your diff and confirm your last pushed SHA is an ancestor of it.
+- **Do:** cut a fresh branch off the current default branch to recover lost content, rather than reusing a branch that has drifted behind it.
+- **Don't:** read `MERGED` as proof your content landed --- it is proof *a* merge happened, which is a claim about the PR's state field, not about the tree.
+- **Don't:** diff a long-stale branch against the current default branch and treat what it shows as your own missing work --- some of it is the default branch's newer content read backwards.
+
+(Measured 2026-09-04 on `Morrison-Lab/ai-config#3024`: the PR showed `MERGED`, but at another session's head commit rather than the one this session had pushed and had reviewed clean. Three pieces of reviewed work were silently lost --- an enumeration, two corrected docstrings, and a test arm --- with nothing red anywhere. Recovery was `Morrison-Lab/ai-config#3179`, cut fresh off `main` rather than off the stale branch, whose own diff against `main` showed `main`'s newer work as deletions.)
+
 ## Existence of a mechanism is not reachability of it
 
 [`The four shapes`](#the-four-shapes) above names a counterpart that is **missing** ---

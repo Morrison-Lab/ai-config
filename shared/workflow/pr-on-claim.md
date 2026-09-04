@@ -99,6 +99,14 @@ That is the one chaining form that silently satisfies the guard while making no 
 - **Do:** narrow the response with a flag on the POST itself rather than a downstream pipe.
 - **Don't:** pipe the POST anywhere, including to `tail`, `head`, or `jq` --- the hook cannot tell a formatting pipe from a chained verification, because the shell does not either.
 
+**Recent, detailed familiarity with this exact rule does not protect you from breaking it at the moment of acting.**
+
+A session that had just merged a fix diagnosing precisely this shape (a non-last reviewer request satisfying the guard) issued its own reviewer request four turns later as `cd <dir> && gh api ... | tail -3` --- a `cd` prefix and a trailing pipe, non-last on both counts at once, in the same call.
+Reciting the rule correctly is a different skill from applying it while composing a command under time pressure; the two do not transfer automatically, and treating recent authorship of the fix as inoculation is the failure mode itself.
+
+- **Do:** issue the reviewer-request command as the sole line, with no `cd` prefix and no trailing pipe, checking the literal command you are about to run against this shape --- even, especially, right after fixing a guard for it.
+- **Don't:** assume that having just diagnosed or fixed this exact bug makes you immune to committing it in the next few turns.
+
 **Third occurrence, 2026-09-02, and the new fact is that the hook's own blocking message never states this constraint for the request, though it states it for a neighbouring command.**
 
 The two rules above tell you to run the POST alone.

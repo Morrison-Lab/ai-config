@@ -201,7 +201,7 @@ The section above routes between repos;
 the same miss happens inside one repo
 when the dupe check is scoped to a directory the owner is not in.
 
-- **Do:** grep the paths [`skill-builder`](../../skills/skill-builder/SKILL.md) step 0 runs,
+- **Do:** grep [`skill-builder`](../../skills/skill-builder/SKILL.md) step 0's path list,
   not only the directory the destination sits in.
 - **Don't:** read "the whole `memories/` directory", step 3's wording at `3935bfff`, as thorough;
   the word doing the damage was `memories/`, not "whole".
@@ -209,9 +209,9 @@ when the dupe check is scoped to a directory the owner is not in.
 (Recorded 2026-09-03 on [ai-config#3060](https://github.com/Morrison-Lab/ai-config/pull/3060),
 where a markdownlint entry was added to `memories/markdownlint.md`
 while `shared/writing/semantic-line-breaks.md` already mentioned the same collision in three regions,
-at `eb0cf15e` (the commit on #3060's branch that added the duplicate entry) and unchanged at `3935bfff` (`origin/main` when this was measured):
-`grep -n MD018` over that file returns five lines at each ref ---
-274, 288, 295, 842 and 976 at `eb0cf15e`, and 274, 288, 295, 861 and 995 at `3935bfff` ---
+at `3935bfff` (`origin/main` before #3060 merged) and unchanged at `2156b439` (its squash merge):
+`grep -n MD018` over that file returns the same five lines at each ref ---
+274, 288, 295, 861 and 995 ---
 of which the first three sit inside one bold-lead block with its own `Do`/`Don't` pair.
 What step 3's own directory-wide grep would have done is checkable:
 `git grep -ril "issue reference" 3935bfff -- memories/` returns three files ---
@@ -223,11 +223,12 @@ What the [`skill-builder`](../../skills/skill-builder/SKILL.md) step 0 query wou
 `git grep -ril "issue reference" 3935bfff -- skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md` returns eight files at that ref ---
 `hooks/test-no-unauthorized-merge.py`, `hooks/warn-stale-issue-edit.py`, `memories/github.md`, `memories/preferences.md`, `memories/r-quarto.md`, `shared/workflow/address-every-comment.md`, `shared/writing/semantic-line-breaks.md` and `skills/promote-memory/SKILL.md` ---
 with the owner among them.
-The same `memories/` query returns four at `eb0cf15e`:
-the three above plus `memories/markdownlint.md`, the file the duplicate entry was added to.
-At `5f2dab94`, #3060's head when this was measured, the count is still four,
-but that file's MD018 bullet is now a cross-link, its body replaced by `1732000a`, a later commit on the same branch ---
-so the number outlived the thing it was measuring.
+The same `memories/` query returns four at `2156b439`:
+the three above plus `memories/markdownlint.md`, the file the entry was added to,
+where the entry is a cross-link to the owner rather than a restatement ---
+so the count rose by one either way, and a hit count cannot tell an owner from a pointer.
+The branch's own commits are reachable from no remote ref since the branch was rebased before merge,
+which is why this record anchors on `main` refs only.
 Note also why the wrong-corpus section's `Do` could not have caught it.
 It reads "grep the ai-config corpus as well as the destination repo's docs,
 whenever step 2 routes an item anywhere other than ai-config",

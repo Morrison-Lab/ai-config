@@ -39,7 +39,7 @@ Actively review recent session context and update all relevant memory files and 
 
 - Read the target file first (skill or memory) to understand current state
 
-- **Grep the corpus for the item’s specific subject** – the tool name, the API call, the error string – before appending anything. Reading the region you’re editing is not enough: a topical memory file runs to hundreds or a thousand-plus lines, so an existing entry on the same subject can sit far away in an unrelated cluster and never enter your view. Grep the paths [`skill-builder`](../../skills/skill-builder/SKILL.llms.md) step 0 runs rather than one file, and rather than only `memories/`:
+- **Grep the corpus for the item’s specific subject** – the tool name, the API call, the error string – before appending anything. Reading the region you’re editing is not enough: a topical memory file runs to hundreds or a thousand-plus lines, so an existing entry on the same subject can sit far away in an unrelated cluster and never enter your view. Grep [`skill-builder`](../../skills/skill-builder/SKILL.llms.md) step 0’s path list rather than one file, and rather than only `memories/`:
 
   ``` bash
   (

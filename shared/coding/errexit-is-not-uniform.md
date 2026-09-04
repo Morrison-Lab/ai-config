@@ -437,6 +437,17 @@ markdownlint reported a real MD018 failure, `tail` exited 0, and the chain
 continued through the remaining checks and reported them all passing.
 The failure surfaced only on a later run that did not pipe.)
 
+(Recurred 2026-09-03 on Morrison-Lab/ai-config#3154, with this section loaded:
+two heads were pushed red, `73de53a9` with a `new-line-breaks` violation and
+`33673a01` with an MD018 hit, each after a chain of the form
+`markdownlint-cli2 ... | tail -2 && ... gha-check-new-line-breaks.py | tail -2 && ...`
+printed the gate's own red line and continued.
+Each cost a follow-up commit and a CI round.
+That is the third occurrence, so a `PreToolUse` guard is filed as
+[#3184](https://github.com/Morrison-Lab/ai-config/issues/3184):
+a gate name on the left of a pipe into `tail`, `head`, or `grep`,
+an `&&` after it, and no `set -o pipefail` earlier in the command.)
+
 ## An explicit `exit` escapes the capture group
 
 The capture idioms above (`|| rc=$?` on a region, a status consumed by an

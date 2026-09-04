@@ -959,6 +959,42 @@ the paragraph's content was "split at the clause boundary",
 and the honest form carries no numbers at all.
 Tracked as [#3158](https://github.com/Morrison-Lab/ai-config/issues/3158).)
 
+## A quoted tool output in a commit message is written after the output, not before
+
+The section above covers a figure in a commit message.
+This covers a quotation: the error text a tool printed, or the exit status it returned,
+written into the body as the reason for the change.
+
+A commit message is usually drafted before the commit,
+and often before the measurement the message describes has been read,
+because the change was made to answer a reviewer's finding
+and the finding already says what the tool does.
+So the body inherits the reviewer's phrasing of the tool's behaviour,
+and the phrasing is checked against nothing:
+the reviewer paraphrased, the author copied, and the tool's own output never entered the text.
+Rewriting a message destroys the copy a later reader would check,
+so the wrong quotation is what the history keeps.
+
+- **Do:** run the command, read its output and status on screen, and only then write the sentence that quotes them.
+- **Do:** when the change answers a reviewer's description of a tool's behaviour,
+  treat that description as a claim to measure before it becomes the commit's own.
+- **Don't:** write a tool's error text or exit status into a commit body from a reviewer's wording
+  or from the result you expect.
+- **Don't:** draft the body before the gate chain runs and leave it untouched after the chain prints something else.
+
+(Morrison-Lab/ai-config#3154, 2026-09-03, three times in one afternoon on grep alone.
+`75829fad`'s body said a `-zz` subject makes grep "exit 2 with invalid option";
+on GNU grep 3.11 `-zz` is two valid flags, so grep took the first path as its pattern and exited 0 with the wrong result, and `-Q` is the case that exits 2.
+`a51a170f`'s body quoted the error for a `[` subject as "Unmatched [", the reviewer's wording, where the tool prints "Invalid regular expression".
+The same body and the prepared squash body said a bare `(` motivates `-F`;
+`(` is a literal in grep's default BRE mode and only `[` errors, which `27bb9588` corrected.
+Each was caught by an adversarial verdict that ran the command,
+and each correction lived on the PR and in the squash body rather than in an amend,
+per the section above.
+The same day's fourth case was not grep:
+`e698c456`'s body called three commits "not fetchable" from a short-SHA fetch on a shallow clone,
+which [`memories/git.md`](../../memories/git.md) records.)
+
 ## An elapsed-time claim is a computation, not a memory
 
 The section on claims inherited from upstream discussion covers a figure you

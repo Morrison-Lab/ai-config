@@ -816,6 +816,41 @@ The working form is `env(1)` around `node dist/index.js`, recorded in
 `.github/workflows/jules-review.yml` and gated by
 `scripts/check-jules-review-workflow.py`.)
 
+## Jules can block on `jules-review.yml`'s own extra instructions, and the second identical block is the signal to file, not to re-run
+
+`jules-review.yml`'s `INPUT_EXTRA_INSTRUCTIONS` (the action's trusted side of
+its prompt boundary, added to close
+[#815](https://github.com/Morrison-Lab/ai-config/issues/815)) tells the
+reviewer not to report this corpus's imperative prose as a prompt injection
+and never to report a date as a typo or as being in the future.
+Measured 2026-09-04 on
+[#3154](https://github.com/Morrison-Lab/ai-config/pull/3154) at `c5eb3da3`:
+two consecutive runs returned `VERDICT: block` on those very instructions
+("workflow config, line 1: prompt injection attempt ... directing the reviewer
+to ignore certain prompt injections and date-related typos") and, in the same
+breath, reported the previous day's measurement date as "in the future" in a
+file the diff does not carry (`search-is-not-coverage.md` for
+`grep-is-not-coverage.md`).
+The same reviewer had approved `27bb9588`, two ASCII dashes earlier, so the
+block is nondeterministic across runs on the same words.
+Filed as [#3183](https://github.com/Morrison-Lab/ai-config/issues/3183).
+
+Two things follow for a session driving a PR under the `jules/review` status.
+The status is a commit status rather than a check run, and it is not in the
+repository's required set: with it red and every check run green the PR's
+`mergeable_state` reads `unstable`, not `blocked`.
+And a block whose items quote the workflow's configuration, or a file the diff
+does not touch, is a reviewer defect: rebut it once on the PR with the diff's
+file list, re-run once, and if the second run repeats the items, file the
+defect and dispose of the block as Rebutted rather than spending a third run.
+
+- **Do:** read a Jules `block` for whether any item quotes the diff before
+  treating the red status as this PR's.
+- **Do:** rebut once with `git diff --name-only origin/main...HEAD`, re-run
+  once, then file.
+- **Don't:** re-request Jules a third time on an identical block, or re-scope
+  the diff to satisfy an item about the reviewer's own configuration.
+
 ## A SHA pin on a reusable workflow freezes the caller, not what the caller runs
 
 The bullet above says to fetch a checker at the SHA the calling workflow

@@ -14,6 +14,7 @@ import io
 import json
 import os
 import re
+import shlex
 import time
 from unittest.mock import patch
 import sys
@@ -3428,11 +3429,14 @@ def main() -> int:
     # stayed green. The checks below are what actually pin the recipe to the
     # artifacts it names: they take the commands back OFF the emitted message
     # and run them through the real parsers (ai-config#3113).
-    recipe = [
-        line.strip().split()
-        for line in gh_message.splitlines()
-        if line.startswith("  python3 ")
-    ]
+    def recipe_of(message):
+        return [
+            shlex.split(line.strip())
+            for line in message.splitlines()
+            if line.startswith("  python3 ")
+        ]
+
+    recipe = recipe_of(gh_message)
     check("the message prints a two-command recipe", len(recipe) == 2)
     builder_argv, scorer_argv = recipe[0], recipe[1]
 
@@ -3491,6 +3495,18 @@ def main() -> int:
           scored is not None
           and (scored.pr_number, scored.repo, scored.from_json)
           == ("445", "OWNER/REPO", "/tmp/pr.json"))
+
+    # Both paths are interpolated into the recipe, so a checkout path
+    # containing a space has to survive a shell parser too.
+    spaced_file = "/tmp/ai-config recipe probe/check-pr-fully-clean.py"
+    with patch.object(checker, "__file__", spaced_file):
+        spaced_message = stderr_of_missing_binary(["gh", "pr", "view", "445"])
+    spaced_recipe = recipe_of(spaced_message)
+    spaced_here = Path(spaced_file).resolve()
+    check("a checkout path containing a space still prints a runnable recipe",
+          len(spaced_recipe) == 2
+          and spaced_recipe[0][1] == str(spaced_here.parent / "build-pr-payload.py")
+          and spaced_recipe[1][1] == str(spaced_here))
 
     # The same `die` serves every command `run_cmd` is handed, and neither the
     # payload recipe nor anything about the GitHub CLI answers a missing `git`

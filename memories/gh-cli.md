@@ -82,9 +82,7 @@
 
   ```text
   `gh` is not installed or not on PATH.
-  `-R` alone cannot substitute for it, but the GitHub CLI is not required:
-  score a JSON payload instead. `build-pr-payload.py` assembles one from
-  plain REST, and needs GITHUB_TOKEN or GH_TOKEN set:
+  `-R` alone cannot substitute for it, but the GitHub CLI is not required: score a JSON payload instead. `build-pr-payload.py` assembles one from plain REST, and needs GITHUB_TOKEN or GH_TOKEN set:
     python3 <scripts>/build-pr-payload.py OWNER/REPO N /tmp/pr.json
     python3 <scripts>/check-pr-fully-clean.py N -R OWNER/REPO --from-json /tmp/pr.json
   ```

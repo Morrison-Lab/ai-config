@@ -38,6 +38,7 @@ import argparse
 import json
 import re
 import bisect
+import shlex
 import subprocess
 import sys
 import unicodedata
@@ -134,9 +135,8 @@ def run_cmd(cmd: List[str]) -> str:
             #
             # Two details the recipe cannot omit and stay executable. The
             # paths are derived from `__file__` rather than written relative
-            # to the repo root, because this script is location-independent
-            # (`get_pr_info` inserts its own parent onto sys.path) and is
-            # routinely invoked by absolute path from an unrelated cwd, where
+            # to the repo root, because this script is routinely invoked by
+            # absolute path from an unrelated cwd, where
             # `scripts/build-pr-payload.py` resolves to nothing. And the token
             # is named because `build-pr-payload.py`'s `_token()` dies without
             # GITHUB_TOKEN or GH_TOKEN, so a recipe that omitted it would send
@@ -151,9 +151,10 @@ def run_cmd(cmd: List[str]) -> str:
                 " not required: score a JSON payload instead."
                 " `build-pr-payload.py` assembles one from plain REST, and"
                 " needs GITHUB_TOKEN or GH_TOKEN set:\n"
-                f"  python3 {here.parent / 'build-pr-payload.py'}"
+                f"  python3 {shlex.quote(str(here.parent / 'build-pr-payload.py'))}"
                 " OWNER/REPO N /tmp/pr.json\n"
-                f"  python3 {here} N -R OWNER/REPO --from-json /tmp/pr.json"
+                f"  python3 {shlex.quote(str(here))}"
+                " N -R OWNER/REPO --from-json /tmp/pr.json"
             )
         else:
             message += "\nInstall it, or put it on PATH, and re-run."

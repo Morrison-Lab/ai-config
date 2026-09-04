@@ -1274,6 +1274,15 @@ DIFF_QUOTING_CLOSED = (
 COMMENT_QUOTING_CLOSED = (
     'claude: the fixture reads {"number":7,'
     '"closed_at":"2026-01-01T00:00:00Z"}\n')
+# The PR BODY, rendered the way `gh pr view <N>` prints it with no selection
+# at all: gh's non-TTY plain output is tab-separated headers, then `--`, then
+# the description verbatim. The header line reads `state:\tOPEN`, which
+# RX_TERMINAL_STATE cannot match in any case, so the only terminal literal such
+# a body can carry is one the DESCRIPTION quotes -- and PR descriptions in this
+# corpus quote API responses as freely as comments do (ai-config#3086 review).
+BODY_QUOTING_CLOSED = (
+    "title:\tSome PR\nstate:\tOPEN\nnumber:\t1038\n--\n"
+    'The fixture reads {"number":7,"closed_at":"2026-01-01T00:00:00Z"}\n')
 
 case(create("c") + [bash("gh pr merge 1038 --squash", tid="m"), res("m", "{}"),
                     say("Merged.")], False,
@@ -1383,6 +1392,18 @@ case(create("c") + [bash("gh pr view 1038 --comments", tid="v"),
                     res("v", COMMENT_QUOTING_CLOSED), say("Read the thread.")],
      True,
      "`--comments` is not a status read, whatever a comment quotes")
+# The selection-less form, which is the same hole reached by asking for
+# nothing rather than by asking for the wrong thing. A `gh pr view <N>` with no
+# `--json` prints the PR body, so it carries free text for the same reason
+# `--comments` does -- and it cannot discharge legitimately either, since its
+# plain `state:` header is not the JSON shape RX_TERMINAL_STATE matches. A
+# selection is therefore REQUIRED, which is also the form the block message
+# prescribes (ai-config#3086 review).
+case(create("c") + [bash("gh pr view 1038", tid="v"),
+                    res("v", BODY_QUOTING_CLOSED), say("Read it.")],
+     True,
+     "a selection-less `gh pr view` is not a status read -- its output "
+     "carries the PR body")
 # The same text reached through `--json comments`, with `--jq` unwrapping the
 # body to raw prose. The `--jq` is load-bearing: gh escapes a comment's inner
 # quotes once inside its own JSON, so the un-projected form does not match

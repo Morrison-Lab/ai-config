@@ -778,6 +778,15 @@ def _probe_selection(rest):
     field in the selection is the second half: `--json number` reports no
     state at all, so reading it is not the observation that discharges.
 
+    A selection is REQUIRED, so a bare `gh pr view <N>` is not a status read
+    either. gh's non-TTY output for that form is not JSON at all: it prints
+    tab-separated headers -- `state:` carrying a bare `OPEN` that
+    RX_TERMINAL_STATE can never match -- and then the PR BODY verbatim. So the
+    unselected form can only ever discharge on free text the description
+    quotes, which is the `--comments` hole reached by asking for nothing rather
+    than for the wrong thing (ai-config#3086 review). Requiring the selection
+    also matches what the block message prescribes: `--json state,closed`.
+
     `--jq`/`--template` need no separate handling: both project from whatever
     `--json` selected, so the allowlist already bounds what they can emit.
     """
@@ -790,7 +799,7 @@ def _probe_selection(rest):
         elif a.startswith("--json="):
             fields = a.split("=", 1)[1]
     if fields is None:
-        return True
+        return False
     sel = {f.strip().lower() for f in fields.split(",") if f.strip()}
     return sel <= _PROBE_SAFE_FIELDS and bool(sel & _PROBE_STATE_FIELDS)
 

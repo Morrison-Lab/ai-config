@@ -94,9 +94,14 @@ LEADING_MARKUP_RE = re.compile(r"^[\s*_~`#>+-]+")
 # such structure, so its first line is arbitrary prose and a conditional or
 # interrogative sentence ("Ready for merge once you rebase", "I'd approve
 # if...") would otherwise read as an approval it explicitly withholds.
+# The second half of the alternation is the *qualifier* family, which the
+# first half missed: "Ready for merge but please fix the typo" and
+# "Approved, though the docstring drifts" each withhold approval in the
+# same breath as granting it, and are the commonest way a reviewer does so.
 CONDITIONAL_HEADLINE_RE = re.compile(
     r"\?|'d\b|\b(?:if|once|after|before|unless|until|when|would|assuming"
-    r"|pending|provided|modulo)\b",
+    r"|pending|provided|modulo"
+    r"|but|though|although|except|aside|apart|save)\b",
     re.IGNORECASE,
 )
 # The clean bar (skills/pr-status/SKILL.md): an approving headline with
@@ -168,9 +173,13 @@ def human_review_body_approves(body, head_oid=""):
     Only the headline can approve -- the first non-empty line, or the first
     line under a `### Verdict` heading when the body carries one -- so a
     review whose prose merely mentions an "approved" helper does not read
-    as an approval. Not-clean phrasing anywhere in the body vetoes first,
-    the *whole* body rather than just the verdict section, so a review
-    stating a blocker above its own heading cannot approve either.
+    as an approval. Every veto below reads the *whole* body rather than
+    the verdict section alone, so a review stating a blocker above its own
+    heading cannot approve either. That bound is load-bearing because this
+    corpus's own review layout puts the findings first (`### Findings`
+    above `### Verdict`, per shared/workflow/self-review-fallback.md), so a
+    veto scoped to the post-heading text would be defeated by section order
+    rather than by substance.
     Blockquoted and fenced regions are blanked exactly as
     `evaluate_verdict` blanks them, so a review quoting someone else's
     approval is not itself one.
@@ -191,11 +200,16 @@ def human_review_body_approves(body, head_oid=""):
       binding that does is the review's own `commit.oid`, in
       `body_approval_is_admissible`;
     - the headline must *begin* with an approval phrase and carry no
-      conditional or interrogative marker, so "Ready for merge once you
-      rebase" and "Two questions before I approve" do not approve;
-    - any follow-on bullet, numbered item, or heading vetoes, per the
-      zero-findings bar in skills/pr-status/SKILL.md, whatever its
-      wording.
+      conditional, qualifier, or interrogative marker, so "Ready for merge
+      once you rebase", "Ready for merge but fix the typo", and "Two
+      questions before I approve" do not approve. The same test runs over
+      any prose *above* a `### Verdict` heading, so a lead-in withholding
+      approval ("I'd want tests first.") vetoes the heading's own
+      headline;
+    - any bullet, numbered item, or heading anywhere in the body other
+      than the headline vetoes, per the zero-findings bar in
+      skills/pr-status/SKILL.md, whatever its wording and whichever side
+      of the heading it sits on.
     """
     if not body:
         return False
@@ -207,20 +221,26 @@ def human_review_body_approves(body, head_oid=""):
     shas = REVIEWED_COMMIT_RE.findall(blanked)
     if shas and head_oid and not head_oid.startswith(shas[-1]):
         return False
+    lead = ""
     if VERDICT_MARKER_RE.search(blanked):
-        blanked = VERDICT_MARKER_RE.split(blanked, maxsplit=1)[1]
+        lead, blanked = VERDICT_MARKER_RE.split(blanked, maxsplit=1)
     lines = [ln.strip() for ln in blanked.splitlines() if ln.strip()]
     if not lines:
         return False
+    # Everything above the heading is the reviewer's own prose, so it is
+    # held to the same two bars as the headline and its followers.
+    lead_lines = [ln.strip() for ln in lead.splitlines() if ln.strip()]
     headline = LEADING_MARKUP_RE.sub("", lines[0])
     if CONDITIONAL_HEADLINE_RE.search(headline):
+        return False
+    if any(CONDITIONAL_HEADLINE_RE.search(line) for line in lead_lines):
         return False
     if not CLEAN_VERDICT_RE.match(headline):
         return False
     return not any(
         FINDINGS_STRUCTURE_RE.match(line)
         or (line.endswith(":") and FINDINGS_VOCAB_RE.search(line))
-        for line in lines[1:]
+        for line in lead_lines + lines[1:]
     )
 
 
@@ -276,9 +296,11 @@ def latest_human_review_states(reviews, head_oid="", pr_author=""):
     It is also genuinely *latest* rather than sticky: a later
     non-approving review from the same human retracts it, since GitHub
     never dismisses a COMMENTED review and `evaluate_verdict` reads issue
-    comments only, so nothing else would see the retraction. Only
-    body-derived approvals are tracked for retraction, so chatty
-    follow-up prose cannot clobber a formal APPROVED.
+    comments only, so nothing else would see the retraction. Retraction is
+    keyed on the approval a body *established*, not on every body that
+    approves, so a formal APPROVED that a later approving COMMENTED review
+    merely restates stays formal, and chatty follow-up prose cannot clobber
+    it.
 
     The PR author's own body-derived approval never counts. GitHub itself
     forbids an author approving their own PR, which is why the formal
@@ -305,10 +327,15 @@ def latest_human_review_states(reviews, head_oid="", pr_author=""):
             if (body_approval_is_admissible(r, head_oid)
                     and human_review_body_approves(
                         r.get("body", "") or "", head_oid)):
+                # Only an approval this body established is retractable.
+                # Marking the login inferred while a formal APPROVED already
+                # stands would let the next chatty review pop that formal
+                # state, which is a false deny.
+                if states.get(login) != "APPROVED" or login in inferred:
+                    inferred.add(login)
                 states[login] = (
                     "SELF_APPROVED" if login == pr_author else "APPROVED"
                 )
-                inferred.add(login)
             elif login in inferred:
                 states.pop(login, None)
                 inferred.discard(login)

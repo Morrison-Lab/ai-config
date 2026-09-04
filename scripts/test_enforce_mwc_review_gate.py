@@ -297,7 +297,10 @@ class TestEvaluate(unittest.TestCase):
                      "Who approved this design?",
                      "I'd approve if the tests covered the empty case.",
                      "Ready for merge once you rebase.",
-                     "Ready to merge after the NEWS bullet lands."):
+                     "Ready to merge after the NEWS bullet lands.",
+                     "Ready for merge but please fix the typo in the docstring.",
+                     "Approved, though the docstring drifts from the code.",
+                     "Approved except for the missing NEWS bullet."):
             state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
             self.assertEqual(
                 gate.evaluate(MERGE_CMD, state)["decision"], "deny", body)
@@ -314,6 +317,30 @@ class TestEvaluate(unittest.TestCase):
             state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
             self.assertEqual(
                 gate.evaluate(MERGE_CMD, state)["decision"], "deny", body)
+
+    def test_findings_above_the_verdict_heading_do_not_approve(self):
+        """This corpus's own review layout puts `### Findings` *above*
+        `### Verdict` (shared/workflow/self-review-fallback.md), so a veto
+        scoped to the post-heading text would be defeated by section order
+        rather than by substance. The lead-in is held to the conditional
+        bar too, so prose withholding approval above the heading vetoes the
+        heading's own headline."""
+        for body in ("### Findings\n\n- the migration lacks a down-step\n"
+                     "- the parser drops tokens\n\n### Verdict\n\n"
+                     "**Ready for merge**",
+                     "Open items:\n\n### Verdict\n\nReady for merge.",
+                     "I'd want tests first.\n\n### Verdict\nReady for merge."):
+            state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+            self.assertEqual(
+                gate.evaluate(MERGE_CMD, state)["decision"], "deny", body)
+
+    def test_innocuous_lead_in_above_the_verdict_heading_still_allows(self):
+        """The control for the case above: widening the veto to the whole
+        body must not deny every review that writes a sentence before its
+        heading, or the allow-path ai-config#3062 revived dies again."""
+        body = "I read the whole diff.\n\n### Verdict\n\nReady for merge."
+        state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "allow")
 
     def test_agent_disclosure_in_a_quoted_or_fenced_region_still_denies(self):
         """The marker test reads the raw body: blanking exists to stop a
@@ -378,13 +405,26 @@ class TestEvaluate(unittest.TestCase):
         self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "deny")
 
     def test_chatty_follow_up_does_not_retract_formal_approval(self):
-        """Only body-derived approvals are retractable, so follow-up prose
-        cannot clobber a formal APPROVED state."""
+        """Only the approval a body *established* is retractable, so
+        follow-up prose cannot clobber a formal APPROVED state.
+
+        The second sequence is the one with teeth: an approving COMMENTED
+        review *between* the two makes the retraction branch reachable for
+        a login whose standing is formal, so without the guard the chatty
+        third review pops the APPROVED and the gate denies a merge GitHub
+        itself records as approved. The first sequence passes either way."""
         state = pr(reviews=[
             review("d-morrison", "APPROVED"),
             review("d-morrison", "COMMENTED", "Thanks for the quick turnaround."),
         ])
         self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "allow")
+        restated = pr(reviews=[
+            review("d-morrison", "APPROVED"),
+            review("d-morrison", "COMMENTED", "Ready for merge."),
+            review("d-morrison", "COMMENTED", "Thanks for the quick turnaround."),
+        ])
+        self.assertEqual(
+            gate.evaluate(MERGE_CMD, restated)["decision"], "allow")
 
     def test_bot_suffix_login_ignored_but_botlike_human_counts(self):
         """`talbot` is a human: their CHANGES_REQUESTED must deny even with a

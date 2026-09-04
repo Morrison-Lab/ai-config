@@ -136,6 +136,24 @@ def _diverged_peer_worktree(path, branch):
     return wt
 
 
+def _wrong_repo_worktree(path, bare, branch):
+    """A second worktree whose push is an ordinary fast-forward, while the
+    session's own directory diverges from `origin/<branch>`.
+
+    The mirror of `_diverged_peer_worktree`: there a reading taken in the
+    session's directory is a false NEGATIVE, here it is a false POSITIVE. Any
+    case built on this one is silent only if the guard read the right
+    repository, or declined to read at all.
+    """
+    _remote_advances(path, bare, keep_object=False)
+    _local_advances(path)
+    wt = _second_worktree(path, branch)
+    _commit(wt, "first.txt", "first\n")
+    _run(wt, "push", "-q", "origin", branch)
+    _commit(wt, "second.txt", "second\n")
+    return wt
+
+
 # --- should DENY ---------------------------------------------------------
 
 def incident_case(path, bare):
@@ -300,6 +318,14 @@ def dash_c_worktree_case(path, bare):
     return f"git -C {wt} push origin HEAD:peer-c"
 
 
+def subshell_push_case(path, bare):
+    """`(cd <worktree> && git push)` -- the `cd` and the push are in the SAME
+    subshell, so the `cd` does apply. The counterpart to S21, which is the
+    same `cd` with the push outside the parentheses."""
+    wt = _diverged_peer_worktree(path, "peer-inner")
+    return f"(cd {wt} && git push origin HEAD:peer-inner)"
+
+
 def payload_cwd_case(path, bare):
     """The Bash call's own `cwd` names a different directory from the hook
     process's, with no `cd` and no `-C` to reveal it."""
@@ -373,13 +399,37 @@ def cross_worktree_fast_forward_case(path, bare):
     pushing session's own commits as somebody else's, and prescribed a
     `git merge origin/<branch>` that would have merged a branch into itself.
     """
-    _remote_advances(path, bare, keep_object=False)
-    _local_advances(path)
-    wt = _second_worktree(path, "ums-lessons")
-    _commit(wt, "first.txt", "first\n")
-    _run(wt, "push", "-q", "origin", "ums-lessons")
-    _commit(wt, "second.txt", "second\n")
+    wt = _wrong_repo_worktree(path, bare, "ums-lessons")
     return f"cd {wt} && git push origin HEAD:ums-lessons"
+
+
+def git_dir_option_case(path, bare):
+    """`--git-dir`/`--work-tree` move the repository a push reads without
+    moving any directory, so resolving the directory alone reads the
+    session's. Declining is the answer, as for `pushd`."""
+    wt = _wrong_repo_worktree(path, bare, "gitdir-opt")
+    return (f"git --git-dir {wt}/.git --work-tree {wt} "
+            "push origin HEAD:gitdir-opt")
+
+
+def git_dir_env_case(path, bare):
+    """The same redirection spelled as an env prefix, which `_lead_prefix`
+    skips along with every other assignment."""
+    wt = _wrong_repo_worktree(path, bare, "gitdir-env")
+    return (f"GIT_DIR={wt}/.git GIT_WORK_TREE={wt} "
+            "git push origin HEAD:gitdir-env")
+
+
+def subshell_cd_case(path, bare):
+    """A `cd` inside a subshell dies at the `)`, so this push runs in the
+    call's own directory.
+
+    Reading it in the subshell's directory is a warning about a repository the
+    push never touches -- the wrong-repository reading of ai-config#2451, and
+    one this guard introduced for itself when it started tracking `cd` at all.
+    """
+    wt = _diverged_peer_worktree(path, "peer-subshell")
+    return f"(cd {wt} && true) && git push origin HEAD:peer-subshell"
 
 
 def indeterminate_cd_case(path, bare):
@@ -502,6 +552,9 @@ SHOULD_WARN = [
      "`git -C <worktree> push` moves the push without a `cd`"),
     ("W10", payload_cwd_case,
      "the Bash call's own `cwd`, with no `cd` and no `-C` to reveal it"),
+    ("W11", subshell_push_case,
+     "`(cd <worktree> && git push)` -- the `cd` shares the subshell, so it "
+     "does apply"),
 ]
 
 SHOULD_STAY_SILENT = [
@@ -530,6 +583,13 @@ SHOULD_STAY_SILENT = [
     ("S18", indeterminate_cd_case,
      "`cd -` is indeterminate -- decline rather than read the session's own "
      "directory"),
+    ("S19", git_dir_option_case,
+     "`--git-dir`/`--work-tree` name a repository, not a directory -- "
+     "decline"),
+    ("S20", git_dir_env_case,
+     "`GIT_DIR=`/`GIT_WORK_TREE=` redirect the same way as an env prefix"),
+    ("S21", subshell_cd_case,
+     "`(cd <worktree> && true) && git push` -- the `cd` dies at the `)`"),
 ]
 
 
@@ -561,15 +621,31 @@ LABEL_EXPECT = {
     # is what `local..tip` contains only when `local` was resolved in the
     # worktree the push runs from. Asserting the branch name alone would pass
     # on a reading taken in the session's own directory.
-    "W8": (["your local HEAD", "git log --oneline HEAD..origin/peer",
-            "add shared.txt"],
-           ["git checkout "]),
-    "W9": (["your local HEAD", "git log --oneline HEAD..origin/peer-c",
-            "add shared.txt"],
-           ["git checkout "]),
+    #
+    # W8, W9 and W11 additionally pin the DIRECTORY the reading was taken in.
+    # The reader's shell is still where the Bash call started, so a bare
+    # `git merge origin/peer` typed there merges into whatever is checked out
+    # THERE -- the branch-into-itself merge of ai-config#2451 with the
+    # directory axis substituted for the ref one. Asserting the bare form's
+    # ABSENCE is the half that catches a regression: `read in` could be added
+    # while the commands stayed unqualified.
+    "W8": (["your local HEAD", "log --oneline HEAD..origin/peer",
+            "add shared.txt", "read in `", "git -C "],
+           ["git checkout ", "git log --oneline HEAD..origin/peer",
+            "git fetch origin peer"]),
+    "W9": (["your local HEAD", "log --oneline HEAD..origin/peer-c",
+            "add shared.txt", "read in `", "git -C "],
+           ["git checkout ", "git log --oneline HEAD..origin/peer-c",
+            "git fetch origin peer-c"]),
+    "W11": (["your local HEAD", "log --oneline HEAD..origin/peer-inner",
+             "add shared.txt", "read in `", "git -C "],
+            ["git checkout ", "git log --oneline HEAD..origin/peer-inner",
+             "git fetch origin peer-inner"]),
+    # W10 is the opposite pin: the push runs in the call's OWN directory, so
+    # naming it would be noise and `git -C` would be wrong.
     "W10": (["your local HEAD", "git log --oneline HEAD..origin/peer-payload",
              "add shared.txt"],
-            ["git checkout "]),
+            ["git checkout ", "read in `", "git -C "]),
 }
 
 
@@ -780,9 +856,9 @@ MUTATIONS = {
     "reconcile_uses_the_pushed_ref": (
         "the remediation commands operate on the ref being pushed",
         [("        if on_source:\n"
-          '            reconcile = (f"    git fetch origin {branch}\\n"',
+          '            reconcile = (f"    {gitc}fetch origin {branch}\\n"',
           "        if True:\n"
-          '            reconcile = (f"    git fetch origin {branch}\\n"')],
+          '            reconcile = (f"    {gitc}fetch origin {branch}\\n"')],
         {"W6"},
     ),
     "warning_names_the_pushed_ref": (
@@ -816,18 +892,21 @@ MUTATIONS = {
         "a `cd` earlier in the compound command moves the directory the push "
         "runs in",
         [("        if head and head[0] in CD_WORDS:\n"
-          "            cwd = _resolve_cd(head, cwd)\n"
+          "            stack[depth] = _resolve_cd(head, stack[depth])\n"
           "            continue",
           "        if head and head[0] in CD_WORDS:\n"
           "            continue")],
-        {"S17", "S18", "W8"},
+        {"S17", "S18", "W8", "W11"},
     ),
     "indeterminate_cd_declines": (
         "a `cd` that cannot be resolved declines the reading rather than "
         "falling back to the hook's own directory",
         [("        if cwd is None:\n            continue",
           "        if cwd is None:\n            cwd = os.getcwd()")],
-        {"S18"},
+        # S19 and S20 reach the same gate by a different route: their
+        # directory is indeterminate because the REPOSITORY was redirected,
+        # not because a `cd` was.
+        {"S18", "S19", "S20"},
     ),
     "dash_c_moves_the_push": (
         "the push's own `-C` values are read out, not skipped as option noise",
@@ -843,6 +922,40 @@ MUTATIONS = {
         [('        verdict = evaluate(command, payload.get("cwd"))',
           "        verdict = evaluate(command)")],
         {"W10"},
+    ),
+    "subshell_scopes_cd": (
+        "a subshell's parentheses are counted, so a `cd` inside one does not "
+        "leak onto a push outside it",
+        [("            for ch in t:\n"
+          '                if ch == "(":\n'
+          "                    depth += 1\n"
+          '                elif ch == ")":\n'
+          "                    depth = max(depth - 1, 0)",
+          "            pass")],
+        # W11's `cd` shares the subshell with its push, so it still applies
+        # when every depth reads as 0 -- which is what makes the pair a
+        # two-sided pin rather than one case asserting silence.
+        {"S21"},
+    ),
+    "git_dir_option_declines": (
+        "`--git-dir`/`--work-tree` name a repository, so the reading is "
+        "declined rather than taken in the session's",
+        [('GIT_REPO_OPTS = {"--git-dir", "--work-tree"}',
+          "GIT_REPO_OPTS = set()")],
+        {"S19"},
+    ),
+    "git_dir_env_declines": (
+        "the `GIT_DIR=`/`GIT_WORK_TREE=` env spellings decline the same way",
+        [('GIT_ENV_REDIRECT = ("GIT_DIR=", "GIT_WORK_TREE=")',
+          "GIT_ENV_REDIRECT = ()")],
+        {"S20"},
+    ),
+    "warning_names_the_directory": (
+        "a reading taken somewhere other than the call's own directory says "
+        "where, and qualifies every remediation command with `git -C`",
+        [("        moved = os.path.realpath(cwd) != os.path.realpath(base)",
+          "        moved = False")],
+        {"W8", "W9", "W11"},
     ),
     "heredoc_blanking": (
         "a heredoc body is blanked before parsing, so a mention inside one "

@@ -110,30 +110,51 @@ INDETERMINATE and the reading is declined, because a reading taken in the
 wrong repository is worse than no reading at all. That is the same choice
 `_target` already makes when the destination is not a single named branch.
 
-Two gaps remain, stated rather than papered over.
+A subshell scopes a `cd` to itself, so `(cd elsewhere && true) && git push`
+leaves the push in the CALLING directory. `_simple_commands` therefore counts
+the parentheses `shlex` has already separated from quoted text, and `evaluate`
+keeps one directory per nesting level: entering a subshell inherits the
+caller's, and leaving one discards whatever it moved to. Reading such a push in
+`elsewhere` is the wrong-repository reading of ai-config#2451 again, and this
+file introduced it before the count was added (measured 2026-09-04).
 
-The first is a parse. `_simple_commands` models no nesting, so a `cd` inside a
-subshell --- `(cd elsewhere && git push)` --- is applied to that push,
-correctly, and then leaks past the closing parenthesis onto any later push in
-the same command. `no-push-without-self-review.py` tracks parenthesis depth for
-exactly this and is the fuller treatment; matching it here means a second
-structural parser, so this file resolves the unnested case and carries the leak
-knowingly.
+`--git-dir`, `--work-tree`, and their `GIT_DIR=` / `GIT_WORK_TREE=` env
+spellings move the repository a push reads WITHOUT moving the directory, so
+resolving the directory alone reads the session's `HEAD` for a push aimed at
+another repository -- the same failure by another route (measured 2026-09-04,
+in both the `--opt value` and `--opt=value` spellings). They are
+DECLINED rather than resolved, which is the answer `pushd` already gets: this
+guard reports on one branch in one repository, and honouring them means
+threading a repository through every read below rather than a directory.
 
-The second is a premise. The payload's `cwd` is TAKEN to be the directory this
-Bash call starts in, and no test here can settle whether it is: a test supplies
-that field itself, so `test-no-clobbering-push.py`'s W10 shows the value is
-threaded through every read rather than where the harness got it
+Where the reading ends up somewhere other than the directory the Bash call
+started in, the warning says where, and prefixes each of its remediation
+commands with `git -C <that directory>`. The reader's shell is still in the
+call's own directory, so a bare `git merge origin/<branch>` handed to it merges
+into whatever is checked out THERE -- ai-config#2451's branch-into-itself merge
+with the directory axis substituted for the ref one.
+
+The gaps that remain include a premise. The payload's `cwd` is TAKEN to be the
+directory this Bash call starts in, and no test here can settle whether it is:
+a test supplies that field itself, so `test-no-clobbering-push.py`'s
+W10 shows the value is threaded through every read rather than where it came
+from
 (`shared/workflow/fixtures-are-not-evidence.md`). On one path it measurably is
 not the call's directory: `.cursor/hooks/adapt-claude-hooks.py` fills `cwd` in
 from `CURSOR_PROJECT_DIR` whenever Cursor supplies none, which is a fixed root.
 Where the field is a session or project root, a `cd` from an EARLIER Bash call
 --- whose effect persists into this one --- is invisible from here, and the
 push is read where the session started rather than where it runs: the
-wrong-repository reading of ai-config#2451, arriving by a second route. One
+wrong-repository reading of ai-config#2451, arriving by another route. One
 measurement settles it, and is worth taking before this paragraph is trusted
 either way: a Bash call that `cd`s into a second worktree, a later call
 carrying a bare `git push`, and a record of the `cwd` the hook received.
+
+The other gap is an assignment that outlives its own simple command --- a bare
+`GIT_DIR=...` command, or `export GIT_DIR=...`, either earlier in this compound
+command or in an earlier Bash call. Only the per-command prefix form is
+recognized, so the persistent form is invisible here and the reading is taken
+in the session's repository rather than declined.
 
 When the payload carries no `cwd` at all the fallback is the hook process's own
 directory, deliberately, rather than the `CLAUDE_PROJECT_DIR` that
@@ -146,7 +167,9 @@ cannot be the worktree a push runs in.
 
   M1  the tool is `Bash` and `tool_input.command` parses into simple commands
   M2  one of those is `git push`, after skipping env assignments, lead words,
-      and `git`'s own global options (`-C <dir>`, `-c <cfg>`, `--git-dir=...`)
+      and `git`'s own global options (`-C <dir>`, `-c <cfg>`, `--git-dir=...`).
+      Skipping is only about FINDING `push`; `-C` is additionally read back
+      out, and `--git-dir` / `--work-tree` additionally decline the reading
   M3  it is not a `--dry-run` / `-n` push (which transfers nothing)
   M4  it is not a `--delete` / `-d` push (branch deletion is
       `skills/clean-branches`' territory, not this guard's)
@@ -190,6 +213,12 @@ OVERRIDE = "ALLOW_FORCE_PUSH"
 GIT_VALUE_OPTS = {"-C", "-c", "--git-dir", "--work-tree", "--namespace",
                   "--exec-path"}
 
+# The two of those that name a REPOSITORY rather than a directory, plus their
+# env spellings. `HEAD` is per-repository as well as per-worktree, so either
+# one makes the directory an answer to the wrong question.
+GIT_REPO_OPTS = {"--git-dir", "--work-tree"}
+GIT_ENV_REDIRECT = ("GIT_DIR=", "GIT_WORK_TREE=")
+
 # `git push` long options that consume the FOLLOWING token when written without
 # `=`. `--repo` is in here AND is read back out in `_target`, because its value
 # IS the remote -- skipping it as a mere value was a defect: `git push --repo
@@ -222,11 +251,21 @@ LONG_FLAG = {
 
 
 def _simple_commands(cmd):
-    """Split a shell command into simple-command argv lists; None on error.
+    """Split a shell command into `(subshell depth, argv)` pairs; None on error.
 
     Same construction as `flag-reset-hard-uncommitted-work.py`'s
     `_simple_commands`: join backslash-continued lines, blank heredoc bodies,
     turn unquoted newlines into `;`, then let `shlex` split and dequote.
+
+    The depth is this file's own addition, and it costs no second parser
+    because `shlex` has already decided which parentheses are operators:
+    `git commit -m "fix (typo)"` hands back one token containing them, while
+    `(cd /a && true) && git push` hands back `(` and `)` on their own
+    (measured 2026-09-04). Counting those is what stops a subshell's `cd`
+    leaking onto a later push. `no-push-without-self-review.py`'s
+    `_depth_segments` computes the same fact character by character, for a
+    caller that needs the segment TEXT rather than an argv, so neither can be
+    written in terms of the other.
     """
     cmd = re.sub(r"\\\r?\n", " ", cmd)
     cmd = RX_HEREDOC.sub("<<", cmd)
@@ -237,21 +276,26 @@ def _simple_commands(cmd):
         toks = list(lex)
     except ValueError:
         return None
-    cmds, cur = [], []
+    cmds, cur, depth = [], [], 0
     for t in toks:
         if t and set(t) <= _SHELL_OPS:
             if cur:
-                cmds.append(cur)
+                cmds.append((depth, cur))
                 cur = []
+            for ch in t:
+                if ch == "(":
+                    depth += 1
+                elif ch == ")":
+                    depth = max(depth - 1, 0)
         else:
             cur.append(t)
     if cur:
-        cmds.append(cur)
+        cmds.append((depth, cur))
     return cmds
 
 
 def _lead_prefix(argv):
-    """`(index of the first real word, whether the override was assigned)`.
+    """`(index of the first real word, override assigned, git redirected)`.
 
     Shared with the `cd` scan in `evaluate`, which has to skip the same env
     assignments and shell lead words. `_simple_commands` splits on operators
@@ -259,14 +303,22 @@ def _lead_prefix(argv):
     attached: `if [ -d w ]; then cd w; git push; fi` yields the argv
     `["then", "cd", "w"]` (measured 2026-09-04). The prefix has to come off
     before the `cd` is visible at all.
+
+    The third element reports a `GIT_DIR=` / `GIT_WORK_TREE=` assignment in
+    that prefix rather than merely skipping it, for the reason `_push_argv`
+    reads `-C`'s values back out: it moves the repository the push reads, and
+    every comparison below is against a ref resolved in one.
     """
     i = 0
     override = False
+    redirected = False
     while i < len(argv) and (ASSIGNMENT.match(argv[i]) or argv[i] in LEAD_WORDS):
         if argv[i].startswith(OVERRIDE + "="):
             override = argv[i].split("=", 1)[1].strip() == "1"
+        if argv[i].startswith(GIT_ENV_REDIRECT):
+            redirected = True
         i += 1
-    return i, override
+    return i, override, redirected
 
 
 def _push_argv(argv):
@@ -279,15 +331,25 @@ def _push_argv(argv):
     `git -C <other-worktree> push origin HEAD` resolved against the session's
     own `HEAD` reads an unrelated branch. Git applies each `-C` relative to the
     last, so they are kept in order rather than reduced to the first.
+
+    `--git-dir` and `--work-tree` move the same reading and are NOT resolvable
+    the same way, because what they name is a repository rather than a
+    directory. A `None` in the returned tuple marks that, and `_push_cwd`
+    turns it into the indeterminate answer `cd -` already gets. Both spellings
+    are recognized: `--git-dir <dir>` consumes the following token, while
+    `--git-dir=<dir>` does not.
     """
-    i, override = _lead_prefix(argv)
+    i, override, redirected = _lead_prefix(argv)
     if i >= len(argv) or argv[i] != "git":
         return None, False, ()
     i += 1
     # Skip git's own global options, keeping the `-C` values.
-    cdirs = []
+    cdirs = [None] if redirected else []
     while i < len(argv) and argv[i].startswith("-"):
-        if argv[i] in GIT_VALUE_OPTS:
+        if argv[i].split("=", 1)[0] in GIT_REPO_OPTS:
+            cdirs.append(None)
+            i += 2 if argv[i] in GIT_VALUE_OPTS else 1
+        elif argv[i] in GIT_VALUE_OPTS:
             if argv[i] == "-C" and i + 1 < len(argv):
                 cdirs.append(argv[i + 1])
             i += 2
@@ -350,6 +412,10 @@ def _resolve_cd(argv, cur):
 def _push_cwd(cur, cdirs):
     """Where a push carrying `cdirs` runs, or `None` for indeterminate."""
     for d in cdirs:
+        # `--git-dir`/`--work-tree`/`GIT_DIR=` name a repository, which no
+        # directory can stand in for -- so the answer is indeterminate.
+        if d is None:
+            return None
         if os.path.isabs(d):
             cur = os.path.normpath(d)
         elif cur is None:
@@ -546,7 +612,7 @@ DENY = (
 
 WARN_HEAD = (
     "Checked `{remote}/{branch}` just now with `git ls-remote`: its tip is "
-    "**{tip}**, which is NOT an ancestor of {srclabel} ({local}).\n\n"
+    "**{tip}**, which is NOT an ancestor of {srclabel} ({local}){where}.\n\n"
     "  command:  {segment}\n\n"
 )
 
@@ -601,6 +667,17 @@ def evaluate(command, base_cwd=None):
     below rather than left to the hook process's own directory, because `HEAD`
     is per-worktree and this guard's whole output is a comparison against it.
 
+    A `cd` is scoped to its subshell, so the directory is kept per nesting
+    level rather than as one value: entering a level inherits the caller's
+    directory and leaving one discards it. Without that, a `cd` inside
+    `(...)` leaked onto every later push in the command.
+
+    Where the reading ends up in a different directory from `base_cwd`, the
+    warning SAYS so and emits its remediation commands with `git -C`, because
+    the reader's shell is still in `base_cwd`: a bare `git merge origin/<b>`
+    handed to a shell sitting somewhere else merges the wrong branch, which is
+    the harm ai-config#2451 reported rather than a wording preference.
+
     TWO passes over the compound command, deliberately, and the refusal pass
     runs first.
 
@@ -618,18 +695,22 @@ def evaluate(command, base_cwd=None):
         return None
 
     parsed = []
-    cwd = base_cwd or os.getcwd()
-    for argv in cmds:
+    base = base_cwd or os.getcwd()
+    stack = [base]
+    for depth, argv in cmds:
+        while len(stack) <= depth:
+            stack.append(stack[-1])  # a subshell inherits the caller's cwd
+        del stack[depth + 1:]        # and its `cd` dies at the `)`
         head = argv[_lead_prefix(argv)[0]:]
         if head and head[0] in CD_WORDS:
-            cwd = _resolve_cd(head, cwd)
+            stack[depth] = _resolve_cd(head, stack[depth])
             continue
         rest, override, cdirs = _push_argv(argv)
         if rest is None:
             continue
         flags, positionals, repo_opt, ok = _parse_push(rest)
         parsed.append((argv, flags, positionals, repo_opt, ok, override,
-                       _push_cwd(cwd, cdirs)))
+                       _push_cwd(stack[depth], cdirs)))
 
     # Pass 1 -- refusal. Lexical, so no network read, and any command in the
     # compound counts. It is deliberately blind to the directory: `--force` is
@@ -704,9 +785,19 @@ def evaluate(command, base_cwd=None):
         # tip as HEAD, so a reader would reconcile against the wrong branch.
         srclabel = ("your local HEAD" if source == "HEAD"
                     else f"your local `{source}`")
+        # The reading was taken where the PUSH runs, which is not where the
+        # READER's shell is when a `cd` or a `-C` moved it. Naming the
+        # directory once, and prefixing every remediation command with it, is
+        # what makes the advice runnable from the call's own directory:
+        # `git merge origin/<branch>` typed there merges into whatever is
+        # checked out THERE, which is the branch-into-itself merge of
+        # ai-config#2451 with the directory axis substituted for the ref one.
+        moved = os.path.realpath(cwd) != os.path.realpath(base)
+        where = f", read in `{cwd}`" if moved else ""
+        gitc = f"git -C {cwd} " if moved else "git "
         body = WARN_HEAD.format(remote=remote, branch=branch, tip=tip[:12],
                                 local=local[:12], segment=segment,
-                                srclabel=srclabel)
+                                srclabel=srclabel, where=where)
         described = _describe(local, tip, cwd)
         if described:
             n, commits = described
@@ -719,16 +810,16 @@ def evaluate(command, base_cwd=None):
         # `feature-x`'s remote content INTO `main` -- wrong branch, and
         # destructive, in precisely the scenario this guard exists for.
         if on_source:
-            reconcile = (f"    git fetch origin {branch}\n"
-                         f"    git log --oneline {source}..origin/{branch}\n"
-                         f"    git merge origin/{branch}"
+            reconcile = (f"    {gitc}fetch origin {branch}\n"
+                         f"    {gitc}log --oneline {source}..origin/{branch}\n"
+                         f"    {gitc}merge origin/{branch}"
                          "      # or rebase, if the branch is yours alone\n")
         else:
-            reconcile = (f"    git fetch origin {branch}\n"
-                         f"    git log --oneline {source}..origin/{branch}\n"
-                         f"    git checkout {source}"
+            reconcile = (f"    {gitc}fetch origin {branch}\n"
+                         f"    {gitc}log --oneline {source}..origin/{branch}\n"
+                         f"    {gitc}checkout {source}"
                          "      # you are not on the branch being pushed\n"
-                         f"    git merge origin/{branch}"
+                         f"    {gitc}merge origin/{branch}"
                          "      # or rebase, if the branch is yours alone\n")
         body += WARN_TAIL.format(branch=branch, reconcile=reconcile)
         return "warn", body

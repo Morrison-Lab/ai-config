@@ -264,6 +264,34 @@ class TestConsumerLeftovers(unittest.TestCase):
         self.assertIn("symlink -> ", res["leftovers"][0])
         self.assertEqual(res["doubled_skills"], [])
 
+    def test_reports_whole_skills_directory_symlinked_into_checkout(self):
+        # ai-config#2405's own shape: `~/.claude/skills` is itself the
+        # symlink, so every skill lists twice. Settled provenance, so it is
+        # one leftover rather than a name match per skill.
+        self.symlink(REPO_ROOT / "skills", self.home / "skills")
+        self.enable_plugin()
+        res = doctor.check_consumer_leftovers()
+        self.assertEqual(res["status"], "WARN")
+        self.assertEqual(len(res["leftovers"]), 1)
+        self.assertIn(str(self.home / "skills"), res["leftovers"][0])
+        self.assertIn("symlink -> ", res["leftovers"][0])
+        self.assertEqual(res["doubled_skills"], [])
+
+    def test_personal_skill_inside_claude_home_is_not_a_leftover(self):
+        # `~/.claude/CLAUDE.md` is the standard user memory file and a
+        # leftover `hooks/` copy supplies `hooks/hooks.json`, so an
+        # unbounded parent walk reads the Claude home itself as a checkout.
+        self.enable_plugin()
+        (self.home / "CLAUDE.md").write_text("user memory", encoding="utf-8")
+        (self.home / "hooks").mkdir()
+        (self.home / "hooks" / "hooks.json").write_text("{}", encoding="utf-8")
+        (self.home / "personal" / "my-skill").mkdir(parents=True)
+        (self.home / "skills").mkdir()
+        self.symlink(self.home / "personal" / "my-skill", self.home / "skills" / "my-skill")
+        res = doctor.check_consumer_leftovers()
+        self.assertFalse(any("my-skill" in item for item in res["leftovers"]))
+        self.assertEqual(res["leftovers"], [f"{self.home / 'hooks'} (copy)"])
+
     def test_ignores_client_sync_bucket_and_personal_skills(self):
         self.enable_plugin()
         synced = self.home / "skills" / "synced" / "bucket-id"

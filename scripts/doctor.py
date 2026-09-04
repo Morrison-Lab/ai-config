@@ -339,7 +339,8 @@ def check_ai_clis() -> Dict[str, Any]:
 
 # `bootstrap.sh` placed these three under `~/.claude` before the plugin
 # install replaced it, and no plugin equivalent has landed (ai-config#2352),
-# so a copy or symlink found there today was placed by an earlier install.
+# so a copy or symlink found there today was placed by an earlier install,
+# or by the manual step README.md documents while that issue is open.
 LEFTOVER_NAMES = ("shared", "hooks", "memories")
 
 # The client populates this bucket under `~/.claude/skills` with an
@@ -356,9 +357,17 @@ def claude_home() -> Path:
 def read_settings(path: Path) -> tuple[Dict[str, Any], Optional[str]]:
     """Return (settings, parse_error) for a Claude Code settings file.
 
-    A missing file is not an error -- it simply enables no plugin. A file
-    that exists and does not parse is reported rather than swallowed: it
-    leaves the sweep unable to say whether the plugin route is in use.
+    A missing file is not an error -- it simply enables no plugin *here*.
+    A file that exists and does not parse is reported rather than
+    swallowed: it leaves the sweep unable to say whether the plugin route
+    is in use.
+
+    Single-scope by design, like `install-hooks.py`'s sibling reader: user
+    settings are the lowest of the five scopes, so managed settings, a
+    project `.claude/settings.json`, or `.claude/settings.local.json` can
+    each enable the plugin without appearing in this file. Reading only
+    this one keeps the answer free of false positives, at the cost of a
+    skip that cannot claim the machine has no plugin.
     """
     if not path.is_file():
         return {}, None
@@ -385,12 +394,24 @@ def points_into_ai_config(path: Path) -> bool:
     Provenance, not a name or content test: the account-level skill sync
     carries this repo's skill names and differing contents alike, so only a
     link that lands in a checkout identifies a leftover install.
+
+    The walk stops at the Claude home rather than climbing through it,
+    because that directory reaches the checkout shape on exactly the
+    machines this sweep targets: `~/.claude/CLAUDE.md` is the standard
+    user memory file, and a leftover `hooks/` copy supplies
+    `~/.claude/hooks/hooks.json`. A candidate must also carry `.git`, so
+    a directory merely holding both files is not read as a checkout.
     """
     try:
         resolved = path.resolve()
     except OSError:
         return False
+    home = claude_home().resolve()
     for candidate in (resolved, *resolved.parents):
+        if candidate == home:
+            return False
+        if not (candidate / ".git").exists():
+            continue
         if (candidate / "CLAUDE.md").is_file() and (candidate / "hooks" / "hooks.json").is_file():
             return True
     return False
@@ -451,7 +472,7 @@ def check_consumer_leftovers() -> Dict[str, Any]:
             "plugin_enabled": False,
             "leftovers": [],
             "doubled_skills": [],
-            "details": f"Skipped: {settings_path} enables no ai-config plugin, so a ~/.claude copy may be this machine's only install.",
+            "details": f"Skipped: {settings_path} enables no ai-config plugin (higher-precedence scopes are not read), so a ~/.claude copy may be this machine's only install.",
         }
 
     leftovers = [
@@ -487,7 +508,7 @@ def check_consumer_leftovers() -> Dict[str, Any]:
         "plugin_enabled": True,
         "leftovers": leftovers,
         "doubled_skills": doubled_skills,
-        "details": f"Under {home}: {'. '.join(parts)}. Reported only -- inspect each by hand before removing anything, since ~/.claude/skills also holds your own skills (see shared/workflow/keep-checkouts-fresh.md).",
+        "details": f"Under {home}: {'. '.join(parts)}. Reported only -- inspect each by hand before removing anything: ~/.claude/skills also holds your own skills, and README.md documents placing ~/.claude/shared by hand while ai-config#2352 is open (see shared/workflow/keep-checkouts-fresh.md).",
     }
 
 

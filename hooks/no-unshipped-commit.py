@@ -149,15 +149,36 @@ BRANCH_CMD = re.compile(
     r"(?:^|[;&|\n])\s*" + _ENV + r"git\s+(?:checkout|switch|branch)\s+([^;&|\n]+)",
     re.MULTILINE
 )
+# Calls that MOVE the repo to another branch, as opposed to merely naming
+# one. `git branch feature` creates without switching, so it is absent here.
+# Matched for its own sake rather than for the names it carries: `git
+# checkout -` switches back and names nothing, and a switch that names
+# nothing still has to supersede the branch a commit would otherwise inherit
+# (ai-config#2422).
+SWITCH_CMD = re.compile(
+    r"(?:^|[;&|\n])\s*" + _ENV + r"git\s+(?:checkout|switch|worktree\s+add)\b",
+    re.MULTILINE
+)
 
 
-def extract_touched_paths(command):
-    """Extract worktree paths touched by cd, git -C, or git worktree add."""
+def extract_cd_paths(command):
+    """Directories this command's `cd` calls leave the shell standing in.
+
+    A subset of `extract_touched_paths`: `git -C` and `git worktree add`
+    name a directory without moving the shell into it, so only a `cd`
+    target carries forward to the next tool call.
+    """
     paths = set()
     for m in CD_CMD.finditer(command):
         p = m.group(1).strip("\"'").strip()
         if p and not p.startswith("-"):
             paths.add(p)
+    return paths
+
+
+def extract_touched_paths(command):
+    """Extract worktree paths touched by cd, git -C, or git worktree add."""
+    paths = extract_cd_paths(command)
     for m in GIT_C_CMD.finditer(command):
         p = m.group(1).strip("\"'").strip()
         if p:
@@ -239,8 +260,11 @@ def scan_transcript(path):
 
     `commit_paths` collects the directories a commit-bearing call named ---
     its `git -C` targets, its own `cd` targets, and the harness-recorded
-    working directory of that call. `commit_branches` carries the branch the
-    repo was on when the commit ran: the branch names in the commit's own
+    working directory of that call --- and otherwise the directory the shell
+    is standing in, since a `cd` persists across tool calls and the
+    three-call shape `cd /worktree` / `git add -A` / `git commit` names no
+    directory on the call that commits. `commit_branches` carries the branch
+    the repo was on when the commit ran: the branch names in the commit's own
     call when it has any, and otherwise those of the most recent
     checkout/switch/worktree-add call before it. Attribution is per commit
     rather than per session, so a later checkout away --- the switched-branch
@@ -248,10 +272,13 @@ def scan_transcript(path):
     commit, while a checkout that no commit followed reports nothing.
     """
     saw, pending, commit_branches, commit_paths = False, None, set(), set()
-    # The branches of the last checkout-ish call, awaiting a commit to claim
-    # them. A later checkout supersedes it, so inspecting a dormant branch
-    # and then switching back leaves the dormant one unattributed.
-    recent_branches = set()
+    # The shell's running state, awaiting a commit to claim it: the branch of
+    # the last switching call, and the directory of the last `cd`. Each is
+    # SUPERSEDED by a later call of its kind even when that call names
+    # nothing, because `git checkout -` and `cd -` both move away while
+    # yielding no name --- so inspecting a dormant worktree or branch and
+    # then returning leaves the dormant one unattributed (ai-config#2422).
+    recent_branches, recent_dirs = set(), set()
     try:
         with open(path, encoding="utf-8", errors="ignore") as stream:
             for line in stream:
@@ -283,23 +310,28 @@ def scan_transcript(path):
                 for name, inp in tool_calls:
                     if name not in {"Bash", "bash", "run_command", "terminal", "execute_command", "shell"}:
                         continue
-                    call_dirs = set()
+                    harness_dirs = set()
                     for k in ("cwd", "workdir", "Cwd", "WorkingDirectory", "path"):
                         val = inp.get(k)
                         if isinstance(val, str) and val:
-                            call_dirs.add(val)
+                            harness_dirs.add(val)
                     command = str(inp.get("command") or inp.get("cmd") or inp.get("CommandLine") or inp.get("script") or "")
                     command = unwrap_command(command)
                     scanned = strip_quoted(command)
                     call_branches = extract_touched_branches(scanned)
-                    call_dirs |= extract_touched_paths(scanned)
+                    call_dirs = harness_dirs | extract_touched_paths(scanned)
                     if COMMIT.search(scanned):
                         saw = True
                         pending = command
-                        commit_paths |= call_dirs
+                        commit_paths |= call_dirs or recent_dirs
                         commit_branches |= call_branches or recent_branches
-                    elif call_branches:
+                    # Update the carried state AFTER attributing the commit:
+                    # `git commit -m x && cd /elsewhere` commits where the
+                    # shell already stood, not where it ends up.
+                    if SWITCH_CMD.search(scanned) or call_branches:
                         recent_branches = call_branches
+                    if CD_CMD.search(scanned) or harness_dirs:
+                        recent_dirs = harness_dirs | extract_cd_paths(scanned)
                     if pending and (PUSH.search(scanned) or CREATE.search(scanned)):
                         pending = None
     except Exception:

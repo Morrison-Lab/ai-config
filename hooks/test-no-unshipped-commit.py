@@ -690,19 +690,39 @@ try:
     dormant_run("git commit --allow-empty -m gone-leftover", cwd=gone_wt)
     dormant_run("git fetch -q --prune origin", cwd=gone_wt)
 
+    # A `cd` persists across tool calls, so a session that visits a dormant
+    # worktree and then commits its own work `cd`s back first --- which is
+    # what makes the visit stop counting.
     visit_only = transcript([
         f"cd {dormant_wt} && git status",
         f"git -C {gone_wt} log -1 --oneline",
-        "git commit -m hook",
+        f"cd {dormant_root} && git commit -m hook",
         "git push origin main",
     ])
     visit_then_pending = transcript([
         f"cd {gone_wt} && git log -1 --oneline",
-        "git commit -m hook",
+        f"cd {dormant_root} && git commit -m hook",
     ])
     commit_in_dormant = transcript([
         f"cd {dormant_wt} && git status",
         f"git -C {dormant_wt} commit -m hook",
+    ])
+    # The `cd` that persists: the commit call names no directory of its own,
+    # so the shell's running directory is what attributes it. Dropping that
+    # carry-forward silently disabled the linked-worktree scan for a commit
+    # the session unambiguously made itself.
+    cd_then_commit_later = transcript([
+        f"cd {dormant_wt}",
+        "git add -A",
+        "git commit -m mine",
+    ])
+    # `git checkout -` switches back while naming no branch, so it has to
+    # supersede the dormant branch rather than leave it standing.
+    checkout_back = transcript([
+        "git checkout agy-dormant && git log -1",
+        "git checkout -",
+        "git commit -m mine",
+        "git push origin main",
     ])
     try:
         # Reading a dormant foreign worktree is not committing in it.
@@ -716,10 +736,20 @@ try:
         _d_reason = subject.decide(dormant_root, commit_in_dormant)
         assert "agy-dormant" in _d_reason, _d_reason
         assert _d_reason.startswith("1 commit(s) on worktree"), _d_reason
+        # Negative control: a `cd` in an EARLIER call still attributes the
+        # commit, so the narrowing did not blind the worktree scan.
+        _cd_reason = subject.decide(dormant_root, cd_then_commit_later)
+        assert "agy-dormant" in _cd_reason, _cd_reason
+        assert _cd_reason.startswith("1 commit(s) on worktree"), _cd_reason
+        # Inspecting a dormant branch and switching back with `git checkout -`
+        # leaves it unattributed, the branch-side twin of the `cd` route.
+        assert subject.decide(dormant_root, checkout_back) == "", \
+            "a dormant branch switched away from with `git checkout -` must not block (ai-config#2422)"
     finally:
         for _p in (dormant_root, dormant_bare, dormant_wt, gone_wt):
             shutil.rmtree(_p, ignore_errors=True)
-        for _p in (visit_only, visit_then_pending, commit_in_dormant):
+        for _p in (visit_only, visit_then_pending, commit_in_dormant,
+                   cd_then_commit_later, checkout_back):
             os.unlink(_p)
 finally:
     for _root in (dropped_root, unpushed_root, pushed_root, no_upstream_root,

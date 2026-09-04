@@ -87,14 +87,12 @@ resolution is needed there.
 
 `-f`/`--force` removes the refusal that makes an unforced switch safe, and
 nothing else about the command announces it. Measured 2026-09-04 on git
-2.43.0, over a tree carrying ` M f.txt`: `git checkout other` printed
-`Switched to branch 'other'` and left the edit in place, while
-`git checkout -f other`, `git checkout -f -b feature`, and `git checkout -f`
-with no operand at all each printed the same one line (or nothing) at exit 0
-with the edit gone. The ref-less form is the widest of the three -- it
-reverts EVERY tracked file to HEAD, not only the ones a target ref would
-collide with -- so a forced `checkout` that resolves to no pathspec is
-scoped to the whole tracked tree, exactly like `reset --hard`.
+2.43.0, over a tree carrying ` M f.txt` and ` M g.txt`: `git checkout other`
+left both edits in place, while `git checkout -f other`,
+`git checkout --force -b feature`, and `git checkout -f` with no operand at
+all each exited 0 with both edits gone. Every forced form is whole-tree, so
+a forced `checkout` that resolves to no pathspec is scoped to the whole
+tracked tree, exactly like `reset --hard`.
 
 `git switch -f`/`--discard-changes` does the same thing and is NOT matched:
 `switch` is a fourth command this hook does not read at all, and reading it
@@ -125,6 +123,7 @@ import sys
 RX_HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1.*?\n[ \t]*\2\b", re.S)
 
 ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+SHORT_CLUSTER = re.compile(r"-[A-Za-z]+")
 LEAD_WORDS = {"then", "do", "else", "!", "time", "sudo", "command", "exec",
               "nohup", "env"}
 
@@ -211,7 +210,7 @@ def _checkout_restore_targets(subcommand, args):
             saw_worktree = True
             i += 1
             continue
-        if tok in ("-f", "--force"):
+        if tok == "--force" or (SHORT_CLUSTER.fullmatch(tok) and "f" in tok):
             saw_force = True
             i += 1
             continue

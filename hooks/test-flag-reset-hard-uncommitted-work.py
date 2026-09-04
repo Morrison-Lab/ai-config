@@ -356,6 +356,17 @@ def checkout_force_new_branch_case(path):
     return "git checkout --force -b feature"
 
 
+def checkout_force_bundled_case(path):
+    """`git checkout -qf <ref>` -- the force flag bundled into a short
+    cluster rather than written as its own token."""
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _run(path, "branch", "other")
+    _write(path, "tracked.txt", content="dirty\n")
+    return "git checkout -qf other"
+
+
 def checkout_ref_dirty_case(path):
     """`git checkout <ref>`, UNFORCED, over a dirty tracked file. Measured
     on git 2.43.0: the change is carried across to the new branch and the
@@ -452,6 +463,8 @@ SHOULD_WARN += [
      "`git checkout -f` with no operand reverts every tracked file to HEAD"),
     ("W15", checkout_force_new_branch_case,
      "`git checkout --force -b <new>` still discards the working tree"),
+    ("W16", checkout_force_bundled_case,
+     "`git checkout -qf <ref>` -- force bundled into a short cluster"),
 ]
 
 SHOULD_STAY_SILENT += [
@@ -581,10 +594,10 @@ MUTATIONS = {
         "pathspec",
         [("    return _resolves_as_ref(arg) is False",
           "    return True")],
-        # W13 rides on this clause too: misreading `other` as a pathspec
-        # scopes the status query to a path that does not exist, so the
-        # forced switch reports nothing rather than the whole tree.
-        {"S9", "W13"},
+        # W13 and W16 ride on this clause too: misreading `other` as a
+        # pathspec scopes the status query to a path that does not exist,
+        # so the forced switch reports nothing rather than the whole tree.
+        {"S9", "W13", "W16"},
     ),
     "M3_forced_checkout": (
         "a forced `git checkout` that resolves to no pathspec is scoped to "
@@ -592,7 +605,7 @@ MUTATIONS = {
         [('            if sub == "checkout" and saw_force:\n'
           '                return "checkout-force", " ".join(argv), None',
           "            pass")],
-        {"W13", "W14", "W15"},
+        {"W13", "W14", "W15", "W16"},
     ),
     "M4_status_gate": (
         "only a status report with at least one non-untracked entry warns",

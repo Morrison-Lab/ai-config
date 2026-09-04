@@ -481,3 +481,87 @@ def git_subcommand(argv):
     if i >= len(rest):
         return None  # bare `git`, or global options only
     return rest[i], rest[i + 1:], env
+
+
+def resolve_cd_target(rest: list[str], cur_dir: str | None) -> str | None:
+    """The directory a `cd`, `pushd`, or `popd` leaves the shell in.
+
+    `rest` is one simple command's argv, `strip_env`-normalized, whose first
+    token is `cd`, `pushd`, or `popd`. `cur_dir` is where the shell stood
+    before it. `None` comes back when the move is INDETERMINATE rather than
+    absent -- `cd -` goes to `OLDPWD`, `popd` pops a stack this scan does not
+    simulate, and a `$VAR` target expands at runtime -- so a caller must
+    treat `None` as "somewhere I cannot name", never as "unchanged".
+
+    Adapted verbatim from `hooks/no-push-without-self-review.py`'s
+    `_resolve_cd_target`, which is the tested in-repo implementation.
+    That guard is NOT rewired onto this copy here: it can refuse a push, and
+    migrating a deny-capable guard is its own change with its own review ---
+    the same call this module's header makes for the eight `_simple_commands`
+    copies (ai-config#2993). New callers import from here.
+    """
+    cmd_name = rest[0]
+    if cmd_name == "popd":
+        # `popd -n` suppresses the directory change, leaving cur_dir untouched.
+        if any(tok.startswith("-") and "n" in tok and tok != "-" for tok in rest[1:]):
+            return cur_dir
+        # Without a full dirstack simulation across commands, popd without -n clears the hint.
+        return None
+
+    # For `cd` and `pushd`: parse flags and positional directory target.
+    i = 1
+    target = None
+    suppress_chdir = False
+    while i < len(rest):
+        tok = rest[i]
+        if tok == "--":
+            # End of options; next token (if present) is the target directory.
+            if i + 1 < len(rest):
+                target = rest[i + 1]
+            break
+        if tok == "-":
+            # `cd -` switches to OLDPWD, which is indeterminate without shell state.
+            return None
+        if tok.startswith("+") or (tok.startswith("-") and tok[1:].isdigit()):
+            # `pushd +N` or `pushd -N` rotates the directory stack.
+            return None
+        if tok.startswith("-"):
+            # Flags like -P, -L, -e, -@ for cd, or -n for pushd
+            if cmd_name == "pushd" and "n" in tok:
+                suppress_chdir = True
+            i += 1
+            continue
+        target = tok
+        break
+
+    if cmd_name == "pushd" and suppress_chdir:
+        # `pushd -n <dir>` rotates/modifies stack without changing current working directory.
+        return cur_dir
+
+    if target is None:
+        # Bare `cd` or `cd -P` with no directory defaults to $HOME (~).
+        # For pushd with no args, it swaps top 2 stack entries (indeterminate -> None).
+        if cmd_name == "pushd":
+            return None
+        target = "~"
+
+    # Expand ~ and ~/path
+    if target == "~" or target.startswith("~/"):
+        target = os.path.expanduser(target)
+    elif target.startswith("$HOME/") or target == "$HOME" or target.startswith("${HOME}/") or target == "${HOME}":
+        home = os.path.expanduser("~")
+        if target in ("$HOME", "${HOME}"):
+            target = home
+        elif target.startswith("$HOME/"):
+            target = os.path.join(home, target[len("$HOME/"):])
+        elif target.startswith("${HOME}/"):
+            target = os.path.join(home, target[len("${HOME}/"):])
+    elif "$" in target or "`" in target:
+        # Unexpanded shell variables/substitutions cannot be resolved statically.
+        return None
+
+    if os.path.isabs(target):
+        return os.path.normpath(target)
+    if cur_dir is not None:
+        return os.path.normpath(os.path.join(cur_dir, target))
+    return os.path.normpath(target)

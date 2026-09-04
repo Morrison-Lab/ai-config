@@ -1006,13 +1006,20 @@ See ai-config#694 for the precedent.
   its ten runs on the bot's claim comments failed the association alone,
   and eleven more on the bot's issue comments (ten link-backs and one
   wave summary) failed the pull-request and mention conjuncts as well.
-  `antigravity-review.yml` requires the same pull-request and association
-  conjuncts plus an `@agy` or `@antigravity` mention, so it skipped under
-  every sender, the user's included, on the mention.
-  Read the `if:` before naming the gate.
+  `antigravity-review.yml` accepts a `workflow_dispatch` outright and
+  otherwise requires the same pull-request and association conjuncts plus
+  an `@agy` or `@antigravity` mention, so on the mention it skipped under
+  every sender, the user's included.
+  `jules-review.yml` declares only `issue_comment`, so it has no dispatch
+  route and needed the re-posted mention where `claude-review.yml` and
+  `antigravity-review.yml` could be dispatched.
+  Read the `on:` and the `if:` before naming the gate.
 
-  The MCP tools dispatch where the proxy's raw `POST .../dispatches` is
-  refused: `mcp__github__actions_run_trigger` with `inputs.pr_number`
+  The MCP tools write where the raw route fails for two different
+  reasons: GitHub refuses the raw `POST .../dispatches` outright (the
+  App token lacks `actions: write`), while a raw mention comment is
+  accepted and then ignored by the association gate.
+  `mcp__github__actions_run_trigger` with `inputs.pr_number`
   queued `claude-review.yml` for nine PRs under `d-morrison` in one batch
   (eight verdicts; #3220's run was cancelled by the push that followed
   it), and `mcp__github__add_issue_comment` re-posted the mention so Jules
@@ -1023,19 +1030,29 @@ See ai-config#694 for the precedent.
   `@claude review` comment" bullet describes the raw-API route, and this
   is the MCP route it does not cover.
 
-  A dispatched run is not attached to the head commit's check-runs, which
-  keep the bot-sender run's `skipped` rows.
+  Where a dispatched run's check-runs land depends on the `ref` the
+  dispatch passed, not on its being a dispatch.
+  The nine runs above were dispatched on `main` with the PR named only by
+  `inputs.pr_number`, so their check-runs attached to `main`'s tip and
+  the PR heads kept the bot-sender run's `skipped` rows;
+  a run dispatched on the PR's own branch as `ref` (#3239, run
+  33925727681, 2026-09-04) attached its check-runs to that PR head.
   #3228 merged with the head's `require-clean-verdict` reading `skipped`
   while the dispatch run's copy had failed on `verdict: unrecognized`
   (ai-config#3233).
-  For a review that arrived by dispatch, read that run's jobs, not the
+  For a review dispatched on another ref, read that run's jobs, not the
   head's check-runs.
 
   - **Do:** open PRs and post reviewer mentions through the client whose
     writes carry the user's login.
-  - **Do:** read the dispatch run's jobs when a review arrived by dispatch.
+  - **Do:** dispatch on the PR's branch as `ref`, and read the dispatch
+    run's jobs when a review was dispatched on any other ref.
+  - **Do:** read each review workflow's `on:` and `if:` before naming
+    why it skipped.
+  - **Don't:** attribute a skip to the sender's association alone, or
+    assume every review workflow has a dispatch route.
   - **Don't:** open PRs by raw REST for the convenience of a loop; the
-    entry from the day before already said what follows.
+    entry from the day before already said what that costs.
   - **Don't:** read a head check-run row after a dispatch as that
     dispatch's verdict gate.
 

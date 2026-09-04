@@ -181,7 +181,7 @@ RESTORE_VALUE_SHORTS = "s"
 def _cluster_forces(tok, value_shorts):
     """Whether short cluster `tok` carries `-f`. A value-taking short option
     swallows the rest of the cluster as its value, so only an `f` before the
-    first such letter is `--force` rather than part of a branch name."""
+    first such letter is `--force` rather than part of that option's value."""
     if not SHORT_CLUSTER.fullmatch(tok):
         return False
     cluster = tok[1:]
@@ -200,7 +200,7 @@ def _checkout_restore_targets(subcommand, args):
     whether `--staged` appeared without `--worktree` -- that combination
     only rewrites the index, so it carries no risk to the working tree.
     `saw_force` is whether `--force`, or a short cluster whose `f` precedes
-    any value-taking short option, appeared before any `--`.
+    the first value-taking short option in it, if any, appeared before any `--`.
     """
     value_flags = (CHECKOUT_VALUE_FLAGS if subcommand == "checkout"
                    else RESTORE_VALUE_FLAGS)

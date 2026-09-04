@@ -152,13 +152,16 @@ RX_SENTENCE_BREAK = re.compile(r"[.!?;][\"'\)\]*_`]*(?:\s|$)|\n")
 # a figure rarely carries an explicit "incorrectly"), plus four terms that file
 # does not carry: `inaccurate`, `premature`, `misstated`, `misspoke`.
 #
-# What is NOT taken from it is its first-person anchor. That file requires an
-# explicit `I`/`my` subject in every alternative, because its job is to detect
-# an admission and "the review was wrong" is a statement about someone else.
-# This guard's job is different, and the issue's own measured sentence proves
-# the anchor cannot transfer: in `But "fully clean" was wrong too` the subject
-# is the quoted claim, not a person. Attachment does that work here instead --
-# see RX_CLAUSE_SEPARATOR below.
+# What is NOT taken from it is its first-person anchor. That file anchors most
+# of its alternatives on an explicit `I`/`my` subject -- `correcting this` and
+# `retracting that claim` are the exceptions -- because its job is to detect an
+# admission, and "the review was wrong" is a statement about someone else.
+# (The source file's own header states the anchor without those exceptions;
+# measured against its live regex, both alternatives above match a string
+# carrying neither `I` nor `my`.) This guard's job is different, and the issue's
+# own measured sentence proves the anchor cannot transfer: in `But "fully clean"
+# was wrong too` the subject is the quoted claim, not a person. Attachment does
+# that work here instead -- see RX_CLAUSE_SEPARATOR below.
 #
 # The copula is required for the adjective forms, because bare `wrong` is most
 # often attributive ("the wrong branch", "the wrong file") and says nothing
@@ -192,13 +195,30 @@ RX_RETRACTION = re.compile(
 # Attachment replaces the character window an earlier round used. A window
 # cannot tell "green -- the badge is wrong" from "green was wrong", since both
 # put the retraction within a few characters; a clause separator can.
-RX_CLAUSE_SEPARATOR = re.compile(
+# Two of the separators are direction-asymmetric, so the set is split rather
+# than shared. A retraction that LEADS its claim states that claim as its own
+# object, and both `:` and `when` are ordinary ways to introduce that object --
+# "I overstated it: 11 pass was the pre-push reading." and "I was wrong when I
+# said all checks green." are each one clause, not two. The same two characters
+# and words after the claim introduce a DIFFERENT clause instead: "All checks
+# green: the earlier reviewer was wrong." says the reviewer was wrong, not the
+# claim, and reading it as a retraction silently disabled the guard on a
+# genuine stale-clean assertion -- the invisible failure, since a suppressed
+# guard emits nothing.
+#
+# Nothing else moves. `because`, `since`, `after`, `before`, `once`, `unless`,
+# and `if` introduce a reason or a time rather than the retraction's object, so
+# a retraction reaching across one of them is about a different proposition and
+# STAYS blocked in both directions -- "All checks green because the earlier
+# reading was wrong." still asserts green.
+_CLAUSE_SEPARATORS = (
     r"--|[,;()|]"
     r"|\n[ \t]*[-*+>#]"
     r"|\b(?:but|and|or|so|yet|however|though|although|while|whereas"
-    r"|after|before|since|because|once|when|unless|if)\b",
-    re.I,
+    r"|after|before|since|because|once|unless|if)\b"
 )
+RX_CLAUSE_SEPARATOR = re.compile(_CLAUSE_SEPARATORS + r"|:|\bwhen\b", re.I)
+RX_LEADING_SEPARATOR = re.compile(_CLAUSE_SEPARATORS, re.I)
 
 # The trailing scan deliberately does NOT treat a bare newline as a sentence
 # end, mirroring `scripts/check-pr-fully-clean.py`'s SENTENCE_END. This corpus
@@ -226,20 +246,32 @@ def _trailing_end(text, hit):
     return end.start() if end else len(text)
 
 
-def _attaches(connector):
+def _attaches(connector, separators=RX_CLAUSE_SEPARATOR):
     """True when nothing in `connector` breaks a retraction off the claim."""
-    return not RX_CLAUSE_SEPARATOR.search(connector)
+    return not separators.search(connector)
 
 
 def _is_retracted(text, hit):
-    """True if a retraction attaches to the ASSERT match, either side of it."""
+    """True if a retraction attaches to the ASSERT match, either side of it.
+
+    The trailing scan falls THROUGH when its match does not attach, rather than
+    returning that verdict. A trailing retraction belonging to another clause
+    says nothing about a leading one that does attach, and returning on it
+    suppressed the leading retraction whenever an unrelated retraction word
+    followed in the same clause -- "I was wrong that #1689 is fully clean, and
+    the count was overstated too." blocked, which is the very class this guard
+    was widened to stop blocking.
+    """
     for after in RX_RETRACTION.finditer(text, hit.end(), _trailing_end(text, hit)):
-        return _attaches(text[hit.end():after.start()])
+        if _attaches(text[hit.end():after.start()]):
+            return True
+        break
     start = _sentence_start(text, hit)
     before = None
     for before in RX_RETRACTION.finditer(text, start, hit.start()):
         pass
-    return before is not None and _attaches(text[before.end():hit.start()])
+    return before is not None and _attaches(
+        text[before.end():hit.start()], RX_LEADING_SEPARATOR)
 
 
 def _is_negated(text, hit):
@@ -254,6 +286,7 @@ def _is_negated(text, hit):
     if RX_NEGATION.search(text[_sentence_start(text, hit):hit.start()]):
         return True
     return _is_retracted(text, hit)
+
 
 def all_unnegated_asserts(text):
     """Every un-negated ASSERT match, in textual order.

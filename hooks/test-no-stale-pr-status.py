@@ -159,6 +159,34 @@ CASES = [
                        "variable name.")], True,
      "an unrelated 'wrong' several clauses away must not suppress a genuine claim"),
 
+    # Attachment reads the two directions separately, and each direction has
+    # its own failure. Trailing first: a retraction that does not attach says
+    # nothing about a LEADING one that does, so the trailing verdict must not
+    # short-circuit the leading scan. Make the trailing scan return its verdict
+    # instead of falling through and this stops allowing.
+    ([QUERY, PUSH, say("I was wrong that #1689 is fully clean, and the count "
+                       "was overstated too.")], False,
+     "a leading retraction survives an unrelated trailing retraction word in "
+     "the same clause"),
+    # Leading second: a retraction states its claim as its own object, and
+    # `when` is the complementizer for that, so the leading scan alone drops it.
+    # Set RX_LEADING_SEPARATOR to RX_CLAUSE_SEPARATOR and this stops allowing.
+    ([QUERY, PUSH, say("I was wrong when I said all checks green.")], False,
+     "'wrong when I said' is one clause -- the plainest correction there is"),
+    # `because` deliberately still breaks, in BOTH directions: it introduces a
+    # reason rather than the retraction's object, so the claim still stands.
+    ([QUERY, PUSH, say("All checks green because the earlier reading was "
+                       "wrong.")], True,
+     "a reason clause is not a retraction of the claim it explains"),
+    # `:` and `when` are the two direction-asymmetric separators, so each needs
+    # a case on BOTH sides. Trailing colon: an elaboration after the claim is
+    # its own clause. Delete `:` from RX_CLAUSE_SEPARATOR and this stops
+    # blocking -- silently, since a suppressed guard emits nothing. The leading
+    # colon is already pinned by the "I overstated it: 11 pass" case above,
+    # which stops allowing if `:` is put in RX_LEADING_SEPARATOR too.
+    ([QUERY, PUSH, say("All checks green: the earlier reviewer was wrong.")], True,
+     "a colon separates a trailing retraction from the claim"),
+
     # The copula guard. Attributive "wrong" sits in the SAME clause as the
     # claim, so attachment cannot rule it out; only the copula requirement can.
     # Delete the `(?:was|were|is|are)\s+` prefix from RX_RETRACTION and this

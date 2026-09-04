@@ -126,9 +126,13 @@ and only the first of them can ever appear on `PATH`:
 
 1. **A local CLI**, probed with `command -v` --- `agy`, `opencode`, `codex`, `claude`, `cursor`.
 2. **A forge-side bot**, which runs on the forge and so is invisible to `PATH` in principle.
-3. **An API key** for a provider with no CLI installed, probed in the environment ---
-   `OPENROUTER_API_KEY` and `GEMINI_API_KEY` among them,
-   with the rest of the ladder in [`delegation.md`](../../memories/delegation.md).
+3. **An API key** for a provider reachable without its CLI,
+   probed in the environment rather than on `PATH` ---
+   `OPENROUTER_API_KEY`, whose destination
+   [`delegation.md`](../../memories/delegation.md) documents,
+   and `GEMINI_API_KEY`, which
+   [`model_adapters.py`](../../scripts/orchestrator/model_adapters.py)
+   falls back to when the `gemini` binary is absent.
 
 A null `command -v` sweep is therefore evidence about `PATH` and about nothing else.
 That is [`grep-is-not-coverage`](grep-is-not-coverage.md)'s shape,
@@ -159,19 +163,23 @@ and Copilot review is switched on and off per repository by a ruleset rule
 and per user by quota,
 so derive that row from the repository's rulesets.
 
-**Copilot is a fourth state the other rows do not have: reachable and withheld.**
+**Copilot carries a state the other two rows do not: reachable and withheld.**
 A standing maintainer directive forbids requesting Copilot code review
 on any pull request in any repository while the moratorium stands.
 Read its live expiry from the `MORATORIUM_END` constant
 in [`no-unreviewed-pr.py`](../../hooks/no-unreviewed-pr.py),
 never from a date copied into prose,
 per [`avoid-hardcoding-external-data`](../coding/avoid-hardcoding-external-data.md);
-that constant read 2026-12-01 when this section was written on 2026-09-03,
+that constant was still in the future when this section was written on 2026-09-03,
 so the moratorium was live and the row's recorded state was "reachable, withheld".
 The full statement and its measurements are in [`gh-cli`](../../memories/gh-cli.md).
 
-Each of these runs on a harness distinct from the authoring session's.
-Whether any of them satisfies the **merge** gate is a separate question this section does not settle:
+Whether a forge-side reviewer's harness and model differ from the authoring session's
+is a per-session question,
+settled by the ladder above rather than by this table ---
+a session authoring under the `agy` CLI and reviewed by an Antigravity workflow
+shares a model family with its reviewer.
+Whether any of the three rows satisfies the **merge** gate is a separate question this section does not settle:
 the ladder and its Do bullet above are unchanged by this inventory,
 and the multi-backend rule stated there still has to be applied per provider,
 since a caller that passes an empty model input resolves that model downstream
@@ -188,17 +196,22 @@ and what a single failed sweep never establishes.
   a provider that is reachable but withheld by policy included.
 - **Do:** re-derive every forge-side row against the repository in hand,
   since a workflow, a ruleset rule, and a quota each turn one of them on or off.
+- **Do:** settle a forge-side reviewer's merge-gate qualification against the ladder above,
+  per provider and per authoring session.
 - **Don't:** read a null `command -v` sweep as an availability verdict;
   it reports what is on `PATH` and stops there.
 - **Don't:** treat the machine inventory above as the provider population, since a forge-side reviewer cannot appear in it.
 - **Don't:** record a withheld provider as available,
   or read its row as licence to dispatch it.
+- **Don't:** read a row in this table as evidence that its harness or its model
+  differs from the authoring session's.
 
 (Measured 2026-09-03 on ai-config#3105:
 a session held two green PRs for roughly seven hours as
 "blocked on reviewer availability",
 on a `command -v` sweep over eight CLIs that correctly found none of them installed.
-Jules and Antigravity were reachable and permitted throughout.
+Jules was measured reachable, replying within a minute of a mention comment.
+Antigravity carried a review workflow and was permitted, and was not probed.
 Copilot was reachable and withheld:
 the moratorium had been extended the previous day and was read as expired,
 so the Copilot request made on #3084 that day was a breach of the directive

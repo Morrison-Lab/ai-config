@@ -115,7 +115,7 @@ committed pass.
      rather than one file, and rather than only `memories/`:
      ```bash
      (
-       repo="${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/ums rev-parse --show-toplevel 2>/dev/null || pwd)}"
+       repo="${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/ums rev-parse --show-toplevel 2>/dev/null || git rev-parse --show-toplevel 2>/dev/null || pwd)}"
        test -f "$repo/CLAUDE.md" && test -d "$repo/shared" || { echo "not an ai-config checkout: $repo" >&2; exit 1; }
        cd "$repo" && grep -rilIF -- "<subject>" skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md
      )

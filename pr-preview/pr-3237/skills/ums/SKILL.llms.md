@@ -12,7 +12,7 @@ Actively review recent session context and update all relevant memory files and 
 - **At the start of `/clear`** — a backstop, not the primary trigger: catch anything accumulated since the last proactive pass before context is lost
 - After a workflow reveals a gap (e.g., a skill was followed but missed a step, or a preference wasn’t encoded)
 - When the user says “did you update memories?” (the answer should be “let me do that now”)
-- **While paused waiting on a subagent or a long-running background process to complete.** That idle stretch is exactly when there’s time to survey what’s accumulated so far and persist it, rather than only running UMS at a hard stop. Don’t let a real wait sit fully idle when a useful pass is available to run alongside it.
+- **Before ending a turn to wait on anything** — a subagent, a long-running background process, CI, a review round, or an answer from the user. Run the pass before the turn ends, not once the wait turns out to be long: a wait’s length is not knowable when it begins, and the learnings sit in conversation state until it ends. A dispatched subagent or background job is the case where the pass runs alongside the wait rather than delaying it, so don’t let a real wait sit fully idle. The pass is owed at the first pause and again only once new learnings accumulate, rather than once per wait or once per re-arm of a timer. See [`run-ums-proactively`](../../shared/workflow/run-ums-proactively.md).
 
 ## Procedure
 

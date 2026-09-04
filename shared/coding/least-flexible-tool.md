@@ -189,7 +189,8 @@ A sample of what the rounds found, which is how [#3126](https://github.com/Morri
 - `locate` matching because the word contains `cat`;
 - a verb and an operand in two different commands, where the second one *deletes* the manifest.
 
-The layer change is again filed rather than shipped --- `shlex` the command, then ask whether a read verb's argv holds a manifest under a targeted root --- which is #2189's disposition arriving a second time and is not what this occurrence adds.
+The layer change is again filed rather than shipped --- `shlex` the command, then ask whether a read verb's argv holds a manifest under a targeted root --- which is [ai-config#2189](https://github.com/Morrison-Lab/ai-config/issues/2189)'s disposition arriving a second time
+and is not what this occurrence adds.
 
 **What it adds is the ceiling, written into the artifact.**
 Three parts, and none of them stands alone.

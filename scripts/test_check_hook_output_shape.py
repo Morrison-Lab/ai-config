@@ -363,8 +363,8 @@ case(
     want_exit=0,
 )
 
-# The decision arm's edge: it reads the emitted decision VALUE, so a
-# `permissionDecision` of "allow" blocks nothing and does not exempt.
+# The decision arm's edge: a hook whose only decision literal is "allow"
+# blocks nothing and does not exempt.
 ALLOW_DECISION_PRETOOL_FILES = dict(CLEAN_FILES)
 ALLOW_DECISION_PRETOOL_FILES["hooks/warn-pretool.py"] = (
     "import json\n"

@@ -596,7 +596,8 @@ gh api repos/<owner>/<repo>/issues/<N>/comments --paginate \
 **Also check formal GitHub reviews, not just issue-style comments --- a review's findings can sit where a comments-only scan never looks, whoever posted it and whatever state it carries.**
 A review submitted via GitHub's review UI (as opposed to a plain PR comment) shows up in `gh pr view N --json reviews`, and its top-level `body` is frequently **empty** --- the actual finding lives entirely in a per-line inline comment, which only appears via `gh api repos/<owner>/<repo>/pulls/N/comments` (a different endpoint from issue comments).
 The mirror case is a finding in the top-level `body` itself, plainly or inside a collapsed `<details>` suppression block: neither shape produces a comment object, so `pulls/N/comments` and a thread query both return nothing over it.
-A bot's `COMMENTED` review carrying such findings vetoes a merge exactly as a human's `CHANGES_REQUESTED` does --- the blind spot is about *where the finding sits* --- and [`fully-clean`](shared/workflow/fully-clean.md) carries the matcher for the collapsed block.
+A bot's `COMMENTED` review carrying such findings vetoes a merge under [`fully-clean`](shared/workflow/fully-clean.md), which carries the matcher for the collapsed block, exactly as a human's `CHANGES_REQUESTED` does.
+The forge enforces only `CHANGES_REQUESTED`, though, so a `COMMENTED` review blocks no merge on its own.
 Checking `--json comments` alone can miss the review's existence entirely.
 Before declaring a PR ready, also run:
 ```

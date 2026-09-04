@@ -691,3 +691,12 @@ the classifier's heading to name `origin` (its examples did) and an em dash in t
 Applied, plus the two other em dashes inside that region so the hunk-scoped reviewer has nothing pre-existing left there, and pushed as `89fcfa2f`;
 Copilot re-requested, `@jules review` posted, PR body moved to the head.
 [#3154](https://github.com/Morrison-Lab/ai-config/pull/3154) at `73ced6bf`: Jules approved `3f8f2fd9`, the check suite on `3f8f2fd9` completed green, and the reviewers for `73ced6bf` are running.
+
+## 17:52 PDT --- #3154 at `f6b9f7f3` after Copilot's sixth round
+
+At `73ced6bf` the claude-review run returned Ready for merge (it re-fetched the three retired SHAs and confirmed they are unreachable) and Jules approved.
+Copilot's sixth round asked for two things:
+the case record's MD018 measurement was written as a plain `grep -n` while claiming a two-ref comparison, so it is now `git grep -n MD018 <ref> -- <path>`, which reruns as written and gives 274, 288, 295, 861, 995 at both refs;
+and the anti-patterns entry's quoted "check existing notes" step, which #3164 had deferred, sat in the touched hunk, so the `ums` half is fixed here and #3164 keeps the `consolidate-memory` half (noted on the issue).
+Pushed as `f6b9f7f3` after a fresh `ls-remote` read `73ced6bf`;
+Copilot re-requested, `@jules review` posted, PR body moved to the head.

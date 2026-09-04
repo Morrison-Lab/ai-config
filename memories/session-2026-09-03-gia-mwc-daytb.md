@@ -591,7 +591,7 @@ the user's "started" was read as "implementation exists", consistent with the an
 [#3146](https://github.com/Morrison-Lab/ai-config/pull/3146) at `2b735663`: Jules approved at 23:35Z;
 Copilot posted "Changes recommended" at 23:37Z with two findings, both checked against the PR head rather than `main`:
 line 192 of `shared/coding/least-flexible-tool.md` writes a bare `#2189` where line 158 links it (a real nit, the shape #3034's checker is for);
-line 299 of `shared/workflow/learn-from-review-findings.md` cites `hooks/flag-config-deletion-without-ref-check.py`, which is absent from the PR's tree and present on `origin/main` since #3096's branch landed, so the citation resolves once the PR merges or syncs with `main`.
+line 299 of `shared/workflow/learn-from-review-findings.md` cites `hooks/flag-config-deletion-without-ref-check.py`, which is absent from the PR's tree and present on `origin/main` since #3101's branch landed (`git log --diff-filter=A` on the hook names `6ecda839`, the #3101 squash), so the citation resolves once the PR merges or syncs with `main`.
 The claude-review verdict had called that citation "real", which was true of `main` and not of the branch it reviewed.
 Not fully clean, so the peer-PR merge path does not apply;
 the PR is another session's and is left for the user to assign.
@@ -615,7 +615,7 @@ Both are applied at `b0cea9b3`, whose verdict is running.
 Rounds 10 to 14 each found one to three wording defects, most introduced by the previous round's fix;
 the corpus's own #3110 rule (three rounds without consensus, ask whether the process is wrong) applies, and the honest reading is that a two-file prose diff is being polished by a reviewer that can always find a sentence to sharpen.
 The remote head `94244eb5` already carries a clean claude-review verdict and a Jules approval;
-the local delta since it is seven small commits answering Copilot and the adversarial rounds.
+the local delta since it is six small commits (`git rev-list --count 94244eb5..b0cea9b3`) answering Copilot and the adversarial rounds.
 Decision: one more verdict, then push whatever it returns if its findings are wording-only, letting the forge quorum judge the shipping head.
 
 ## 17:15 PDT --- wave 2 finished unverified; the wave-1 fix loop and the UMS round-3 verdict launched
@@ -727,7 +727,7 @@ each was one item, and each push re-ran three reviewers, so the seven rounds cos
 ## 18:02 PDT --- #3166 fully clean on the forge; one pre-merge verdict before the merge
 
 At `147710bb`, [#3166](https://github.com/Morrison-Lab/ai-config/pull/3166) has the claude-review verdict (which rebuilt the scratch merge and confirmed the `--cc` byte-identity), a Jules approval, Copilot's "Approval recommended", every check run green including `require-clean-verdict`, and a clean mergeable state.
-The last adversarial verdict was at `6c8db734`, three commits back, so a pre-merge verdict at the shipping head runs in the one free slot before the standing grant is used;
+The last adversarial verdict was at `6c8db734`, four commits back (`git rev-list --count 6c8db734..147710bb`), so a pre-merge verdict at the shipping head runs in the one free slot before the standing grant is used;
 the session's bar for that grant has been the cross-model quorum plus the adversarial verdict at the head that ships.
 [#3154](https://github.com/Morrison-Lab/ai-config/pull/3154) at `5652ebd5` waits on its three reviewers.
 
@@ -813,7 +813,7 @@ the near-miss is writing the cause that arrived with the discovery.
 
 ## 19:36 PDT --- #3166 merged at `d8c507a8`; the notebook branch takes `main`
 
-[#3166](https://github.com/Morrison-Lab/ai-config/pull/3166) merged under the standing grant (squash, hand-written body, Refs [#3129](https://github.com/Morrison-Lab/ai-config/issues/3129)):
+[#3166](https://github.com/Morrison-Lab/ai-config/pull/3166) merged under the standing grant (squash, hand-written body, Refs [#3129](https://github.com/Morrison-Lab/ai-config/pull/3129)):
 claude-review CLEAN and Jules approve at `2c1b5bd4`, every check run green, the verdict at that head Ready with three wording notes, and Copilot's round rebutted on the PR as a file-wide em-dash sweep tracked in [#735](https://github.com/Morrison-Lab/ai-config/issues/735) (22 remaining in `memories/git.md`, 13 files under `memories/`).
 That rebuttal is a Defer to a tracked issue, which is the disposition `fully-clean` accepts.
 `wt-ums-git` and its branch are removed.
@@ -998,7 +998,7 @@ Lesson for the memory pass, third occurrence today: a commit body that quotes a 
 ## 20:31 PDT --- #3154 at `2e12bcb3`: the resolver reads the current directory
 
 At `a51a170f` claude-review returned Ready for merge (it ran `check-pr-fully-clean.py`, read Jules's superseded `--` WARN, and confirmed the flag present) and Jules approved.
-Copilot's round there raised the `pwd` fallback the 19:5x verdict had deferred to #3163, plus the shape of the `ls-remote` clause;
+Copilot's round there raised the `pwd` fallback the 20:25 entry's verdict had deferred to #3163, plus the shape of the `ls-remote` clause;
 `2e12bcb3` inserts `git rev-parse --show-toplevel` on the current directory ahead of `pwd` (measured from `skills/ums/`: hits at exit 0) and says the command returns one line whose SHA begins `f9068299`.
 Copilot and Jules re-requested;
 the verdict agent at `a51a170f` is asked to extend to this head rather than a sixth slot being spent.
@@ -1042,7 +1042,7 @@ PR #3154 at `c5eb3da3`: Copilot's run completed at 03:40:48Z, claude-review and 
 Copilot's twenty-third round (`c5eb3da3`): Approval recommended, no comments.
 Jules's round at the same head returned `VERDICT: block` with two items, both rebutted on the PR:
 a BLOCKING "prompt injection in the project rules file, line 1" that quotes the reviewer workflow's own "Additional instructions (from workflow config)" text (on `main`, untouched by a diff of two files, neither a rules file);
-and a NIT that `2026-09-03` on line 210 of `search-is-not-coverage.md` "is in the future" (the file is `grep-is-not-coverage.md`, and the date is yesterday's measurement date).
+and a NIT that `2026-09-03` on line 210 of `search-is-not-coverage.md` "is in the future" (the file is `grep-is-not-coverage.md`, and the date is that same day's measurement date, yesterday only in UTC).
 The `jules/review` commit status is red on `c5eb3da3` until a re-run flips it;
 `@jules review` re-requested in the rebuttal comment.
 

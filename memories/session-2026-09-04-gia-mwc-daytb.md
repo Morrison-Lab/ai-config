@@ -1,7 +1,7 @@
 # Session notebook: GIA sweep, continued on 2026-09-04
 
 Continues [`session-2026-09-03-gia-mwc-daytb.md`](session-2026-09-03-gia-mwc-daytb.md) after the quota pause at 21:44 PDT;
-same session, same mandate (`gia mwc daytb` on this repo), split here because the 09-03 file reached the 1250-line gate.
+same session, same mandate (`gia mwc daytb` on this repo), split here because the 09-03 file stood at 1310 lines at `d504cb98`, over the 1250-line gate, before the split.
 Times are PDT on 2026-09-04 unless a heading says otherwise.
 
 ## 00:34 PDT (2026-09-04) --- resumed after the quota reset; r4 loops and both memory reviews launched
@@ -90,7 +90,7 @@ Round 10 at `6a8f4a49` re-measured everything (including `--depth=3000` on the P
 the PR body says so, and Copilot, Jules, and claude-review review the head on the forge.
 Ten local rounds on a 65-line memory entry (its added lines at `0242210f`): rounds 1 and 2 on wording and causes, 3 to 7 on protocol mechanics the point never needed, 8 to 10 on the remedy's own claims.
 
-## 01:16 PDT --- #3193 opened for the fetch-by-SHA entry; wave-4 loop launched
+## 01:15 PDT --- #3193 opened for the fetch-by-SHA entry; wave-4 loop launched
 
 `ums/2026-09-03-fetch-by-sha` pushed fast-forward from the `4af1f1ea` snapshot to `0242210f` and opened as [#3193](https://github.com/Morrison-Lab/ai-config/pull/3193);
 claim comment posted, Copilot requested, `@jules review` posted, subscription on.
@@ -178,7 +178,7 @@ the four characters named) and no eighth local round was run;
 pushed fast-forward from the `012c3d1c` snapshot and opened as a PR for Copilot, Jules, and claude-review.
 Seven local rounds on a six-file memory pass (`git diff --name-only 9578d66b...c8acdfc2`): rounds 1 and 2 on attributions, 3 on the owned rule, 4 and 5 on the rebuttal's evidence and the file cap, 6 on the move's residue and an untracked file, 7 on the case cited for the deletion lesson.
 
-## 02:19 PDT --- #3195 opened for the recurrences branch
+## 02:20 PDT --- #3195 opened for the recurrences branch
 
 `ums/2026-09-03-recurrences` at `c8acdfc2` opened as [#3195](https://github.com/Morrison-Lab/ai-config/pull/3195);
 claim comment, Copilot requested (may quota-skip), `@jules review`, subscription on, squash body prepared.
@@ -200,11 +200,12 @@ Merge-time memory pass: the two lessons this branch's rounds taught that the cor
 the untracked-file blind spot of the diff-scoped gates recurred with the rule loaded (an instrument is owed), and the `ums` dupe check ran on the incident's vocabulary rather than on the rule being recorded (step 3 wants a second query on the rule).
 Filed as [#3196](https://github.com/Morrison-Lab/ai-config/issues/3196) (the diff-scoped gates' untracked-file blind spot wants an instrument) and [#3197](https://github.com/Morrison-Lab/ai-config/issues/3197) (`ums` step 3 dupe-checks the rule, not only the incident).
 
-## 03:29 PDT --- notebook branch: four adversarial rounds before the PR opens, and the per-round entries are cut
+## 03:29 PDT --- notebook branch: adversarial rounds before the PR opens, and the per-round entries are cut
 
-Rounds at `95d6a96c`, `de94b4cd`, `c01aa15d`, and `eea02bba` returned eleven, six, four, and four findings.
+Each review-answering commit after `95d6a96c` in `git log origin/main..HEAD` answers one round;
+the finding counts live in the transcripts, not here.
 Round 1's were nine figures and mechanism claims written from recollection where the instrument was one command away (line counts, a character count, a PR's `updated_at` written as its open time, a grep search target, a `rev-list` direction, a bare UTC stamp, an index row) and two ambiguous references.
 The 84 that should have been 82 was also in #3196's body, corrected there at 02:50 PDT.
-Rounds 2 to 4 found defects in older entries (dangling "the HH:MM entry" pointers, a merge heading a minute late against its commit, an ancestry parenthetical left uncorrected in place) and, in growing share, in the entry each round appended to narrate its own fixes: a wrong entry named, an unmeasured line distance, a miscount, a self-description the same entry contradicted, a claim about #3196's body that went stale within the minute, and a citation of the `ums` anti-pattern for a shape it does not record.
+Later rounds found defects in older entries (dangling "the HH:MM entry" pointers, a merge heading a minute late against its commit, an ancestry parenthetical left uncorrected in place) and, in growing share, in the entry each round appended to narrate its own fixes: a wrong entry named, an unmeasured line distance, a miscount, a self-description the same entry contradicted, a claim about #3196's body that went stale within the minute, and a citation of the `ums` anti-pattern for a shape it does not record.
 Those narrating entries are deleted rather than patched.
-This entry replaces them and states only what `git log` on the branch and the four review transcripts settle.
+This entry replaces them and states only what `git log` on the branch and the review transcripts settle.

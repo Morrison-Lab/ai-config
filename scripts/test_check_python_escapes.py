@@ -102,7 +102,7 @@ def main() -> int:
         copied.write_bytes(SCRIPT.read_bytes())
         write(repo, "offender.py", 'PATTERN = "^a\\s+b$"\n')
         for cmd in (
-            ["git", "init", "-q"],
+            ["git", "init", "-q", "-b", "main"],
             ["git", "add", "-A"],
         ):
             subprocess.run(cmd, cwd=repo, check=True, capture_output=True)

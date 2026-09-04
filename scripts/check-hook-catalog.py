@@ -70,7 +70,16 @@ README = os.path.join(ROOT, "README.md")
 # silent gap -- mirroring KNOWN_UNTESTED in scripts/test_hooks.py. This list
 # should only ever shrink: registering a hook, or dropping its README row,
 # means removing it from here.
-KNOWN_UNREGISTERED = {}
+KNOWN_UNREGISTERED = {
+    # Parked unregistered, not abandoned. The hook is complete and its suite
+    # passes, but the `_GIT_FLAGS` regex it copies from no-unshipped-commit.py
+    # backtracks catastrophically -- measured on this hook's own COMMIT
+    # pattern at 12/14/16/18 flag-shaped tokens: 0.033s, 0.246s, 0.579s,
+    # 8.305s. A PreToolUse guard runs before every Bash call, so shipping that
+    # would let a flag-heavy command stall a session. Register it once #3172
+    # fixes the regex in both copies.
+    "flag-positional-figure-in-commit-message.py": 3172,
+}
 
 # Public repo (measured 2026-08-26); unauthenticated GET works. A token is
 # used only when it is scoped to this repo: a fork `push` sets

@@ -110,13 +110,37 @@ INDETERMINATE and the reading is declined, because a reading taken in the
 wrong repository is worse than no reading at all. That is the same choice
 `_target` already makes when the destination is not a single named branch.
 
-One narrower gap remains, stated rather than papered over: `_simple_commands`
-models no nesting, so a `cd` inside a subshell --- `(cd elsewhere && git
-push)` --- is applied to that push, correctly, and then leaks past the closing
-parenthesis onto any later push in the same command.
-`no-push-without-self-review.py` tracks parenthesis depth for exactly this and
-is the fuller treatment; matching it here means a second structural parser, so
-this file resolves the unnested case and carries the leak knowingly.
+Two gaps remain, stated rather than papered over.
+
+The first is a parse. `_simple_commands` models no nesting, so a `cd` inside a
+subshell --- `(cd elsewhere && git push)` --- is applied to that push,
+correctly, and then leaks past the closing parenthesis onto any later push in
+the same command. `no-push-without-self-review.py` tracks parenthesis depth for
+exactly this and is the fuller treatment; matching it here means a second
+structural parser, so this file resolves the unnested case and carries the leak
+knowingly.
+
+The second is a premise. The payload's `cwd` is TAKEN to be the directory this
+Bash call starts in, and no test here can settle whether it is: a test supplies
+that field itself, so `test-no-clobbering-push.py`'s W10 shows the value is
+threaded through every read rather than where the harness got it
+(`shared/workflow/fixtures-are-not-evidence.md`). On one path it measurably is
+not the call's directory: `.cursor/hooks/adapt-claude-hooks.py` fills `cwd` in
+from `CURSOR_PROJECT_DIR` whenever Cursor supplies none, which is a fixed root.
+Where the field is a session or project root, a `cd` from an EARLIER Bash call
+--- whose effect persists into this one --- is invisible from here, and the
+push is read where the session started rather than where it runs: the
+wrong-repository reading of ai-config#2451, arriving by a second route. One
+measurement settles it, and is worth taking before this paragraph is trusted
+either way: a Bash call that `cd`s into a second worktree, a later call
+carrying a bare `git push`, and a record of the `cwd` the hook received.
+
+When the payload carries no `cwd` at all the fallback is the hook process's own
+directory, deliberately, rather than the `CLAUDE_PROJECT_DIR` that
+`flag-cd-into-main-checkout.py` prefers: `plugins/ai-config/codex-hook-adapter.py`
+runs each hook with its subprocess `cwd` set to the payload's, so the process
+directory tracks the call there, while a project root is a fixed point that
+cannot be the worktree a push runs in.
 
 ## The match condition
 
@@ -230,9 +254,11 @@ def _lead_prefix(argv):
     """`(index of the first real word, whether the override was assigned)`.
 
     Shared with the `cd` scan in `evaluate`, which has to skip the same env
-    assignments and shell lead words: a `cd` behind a keyword
-    (`while true; do cd other; git push`) is the retry-loop shape
-    `skills/push/SKILL.md` prescribes, so it is reachable by ordinary use.
+    assignments and shell lead words. `_simple_commands` splits on operators
+    only, so a `cd` behind a shell keyword arrives with that keyword still
+    attached: `if [ -d w ]; then cd w; git push; fi` yields the argv
+    `["then", "cd", "w"]` (measured 2026-09-04). The prefix has to come off
+    before the `cd` is visible at all.
     """
     i = 0
     override = False

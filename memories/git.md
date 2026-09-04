@@ -91,8 +91,9 @@ See [`git-diffing.md`](git-diffing.md) for diff-range selection
 (`..` vs `...` vs the working tree), diff-scoped check pitfalls
 (no-op-ing on an uncommitted diff, blindness to untracked files, an
 untracked copy shadowing a tracked script), `git rev-parse <ref>:<path>`
-echoing its own input on a missing path, and the pathspec-vs-glob /
-`for-each-ref`-vs-`ls-files` matcher mismatches.
+echoing its own input on a missing path, the pathspec-vs-glob /
+`for-each-ref`-vs-`ls-files` matcher mismatches, and which reads show a merge
+commit's own content (`git diff A...B` does, `git log -p` does not).
 
 ## Git tags
 
@@ -148,17 +149,90 @@ See [`git-tags.md`](git-tags.md) for tag management (force-moving/sliding tags a
 - Flagged on ai-config#186: the first draft of the harness-override instruction included
   `git branch -r` as the fallback; reviewer (claude-review bot) caught it.
 
+## Classify a bare `#NNNN` as issue or PR with `git ls-remote origin refs/pull/NNNN/head`
+
+Linking a bare `#NNNN` needs the right path segment,
+and the clone can decide it without `gh` and without an API token:
+GitHub keeps a `refs/pull/NNNN/head` ref for every pull request and none for an
+issue, so the remote answers the question directly;
+[`git-branches`](git-branches.md)'s
+"GitHub keeps `refs/pull/N/head` forever" section owns the persistence half
+and its measurement;
+the absence of such a ref for an issue is measured here.
+Measured 2026-09-03 against `origin` = `https://github.com/Morrison-Lab/ai-config`,
+on a machine with no `gh` on `PATH`:
+
+```console
+$ git ls-remote origin refs/pull/3129/head
+0137e26179d817dbc1d8af829d06f72dfc8e4760  refs/pull/3129/head   # non-empty -> PR
+$ git ls-remote origin refs/pull/3095/head
+                                                              # empty     -> issue
+```
+
+**Test the output for the classification, and the exit status for whether the query ran.**
+An empty result means **not a PR**, which for a reference you know exists means an issue;
+a number that exists as neither also comes back empty (`refs/pull/999999/head`, empty, exit 0),
+so confirm the number is real before writing the `/issues/` path.
+Both calls in the console block above exit 0.
+`ls-remote` reports "no such ref" as an empty result rather than as a failure,
+so `if git ls-remote ...; then` classifies every number as a PR.
+A non-zero exit means the query never answered:
+measured the same day, an unreachable host and a repository the credentials cannot read
+both exit 128 with empty output,
+so a classifier that reads only the output turns a network or credential failure
+into "issue" for every number.
+Stop on a non-zero exit instead of falling through.
+
+**The wrong path still resolves, which is why the distinction has to be
+derived rather than guessed.**
+GitHub 302-redirects in **both** directions ---
+measured the same day, `/issues/3129` to `/pull/3129`
+and `/pull/3095` to `/issues/3095`.
+So a mislabeled link is undetectable by following it,
+and a link checker that only asks whether a URL resolves can never report one.
+
+Two mechanics for the rewrite itself.
+Skip any number inside a code span, which is normally a quoted literal rather
+than a citation.
+And a bare `#NNNN` at column 0 is `markdownlint`'s MD018
+(`no-missing-space-atx`, "No space after hash on atx style heading"),
+measured with `markdownlint-cli2@0.23.0`;
+the link form `[#NNNN](...)` at line start avoids it,
+since the line no longer begins with `#`.
+
+This settles the **path** only.
+Which **repository** a bare `#NNNN` belongs to is a separate question, owned by
+[`citations`](../shared/writing/citations.md)'s
+"A bare `#NNN` is repo-relative" section and
+[`ambiguous-reference`](../shared/writing/ambiguous-reference.md)'s
+"A bare `#N` takes its repo from context";
+qualify as `owner/repo#NNNN` per those before choosing a path.
+
+- **Do:** classify with `git ls-remote origin refs/pull/NNNN/head`,
+  branching on whether the output is empty.
+- **Do:** write a line-initial reference as `[#NNNN](...)`, which keeps MD018
+  quiet.
+- **Do:** stop on a non-zero exit, which means the remote never answered.
+- **Don't:** branch on a zero exit --- it is 0 for a hit and for a miss alike.
+- **Don't:** treat a resolving link as confirmation of the path;
+  GitHub redirects both ways.
+- **Don't:** rewrite a `#NNNN` that sits inside a code span.
+
+(Refs [ai-config#3129](https://github.com/Morrison-Lab/ai-config/pull/3129),
+the source PR;
+the classification was derived while linking that PR's bare references.)
+
 ## Git branch create/reset (`git switch -C`)
 - `git switch -C "$BRANCH"` is already safe against flag-shaped branch names: `$BRANCH` is the argument *to* `-C`, so a value like `--weird` fails cleanly as `fatal: '--weird' is not a valid branch name` rather than being parsed as an option.
-- Do NOT "harden" it to `git switch -C -- "$BRANCH"` — that form is **broken**:
+- Do NOT "harden" it to `git switch -C -- "$BRANCH"` --- that form is **broken**:
   the `--` is consumed as the branch name (the required argument to `-C`), so `$BRANCH` is parsed as the start-point instead and the command fails without creating the branch.
   (Verified on git 2.x;
 a review bot suggested the broken form on Morrison-Lab/gha#58.)
 
-## Git — `merge --continue` takes no arguments
+## Git --- `merge --continue` takes no arguments
 - `git merge --continue --no-edit` fails with `fatal: --continue expects no arguments`.
 - After resolving conflicts and staging (`git add <files>`), use `git merge --continue` alone.
-- In a non-interactive (headless) session git uses the auto-generated merge commit message without prompting — no editor opens.
+- In a non-interactive (headless) session git uses the auto-generated merge commit message without prompting --- no editor opens.
 
 ## Git merge --- editing away the conflict markers is not resolving the conflict
 - Rewriting a conflicted file to remove `<<<<<<<`/`=======`/`>>>>>>>` leaves it

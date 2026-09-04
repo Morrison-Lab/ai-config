@@ -143,7 +143,7 @@ and only the first of them can ever appear on `PATH`:
    and `agy` is the worked case,
    since [`delegation.md`](../../memories/delegation.md)'s ladder routes dispatchable work to it
    while the adapter named after it probes `gemini`,
-   so probe the union of that set with the ladder's own entries above.
+   so probe the union of that set with the 2026-08-25 machine inventory above.
 2. **A forge-side bot**, which runs on the forge and so is invisible to `PATH` in principle.
 3. **An API key** for a provider reachable without its CLI,
    probed in the environment rather than on `PATH`.
@@ -159,6 +159,14 @@ and only the first of them can ever appear on `PATH`:
    Not every variable the derivation returns gates an adapter's `is_available()`,
    since some are read only when a call is made,
    so a hit names a provider to probe rather than one to record available.
+
+Both derivations read a path that exists in `ai-config`'s own checkout.
+Where that file is absent --- a consumer repository,
+or the lab manual's transclusion of this fragment ---
+each command returns nothing,
+and that null is a missing source rather than an empty population.
+Fall back to the machine inventory above for the local-CLI route,
+and record the API-key route as underivable in that repository rather than as empty.
 
 A null `command -v` sweep is therefore evidence about `PATH` and about nothing else.
 That is [`grep-is-not-coverage`](grep-is-not-coverage.md)'s shape,
@@ -239,11 +247,16 @@ and what a single failed sweep never establishes.
 - **Do:** derive the API-key route from the adapters that read those variables,
   since they are its source of truth and a copied list drifts from them.
 - **Do:** derive the local-CLI route from the adapters' own probes,
-  then probe the union of that set with the ladder's own entries,
+  then probe the union of that set with the 2026-08-25 machine inventory above,
   since each source drops what the other carries ---
   the derivation drops `agy`, and the inventory drops `gemini`.
 - **Do:** read the commenting identity's `author_association` back
   before recording a comment-triggered forge reviewer as dispatched.
+- **Do:** read an empty derivation as a missing source
+  wherever `model_adapters.py` is not in the checkout,
+  and fall back to the machine inventory above.
+- **Don't:** read an empty derivation as an empty population;
+  that is this section's own thesis failing on the section itself.
 - **Don't:** read a null `command -v` sweep as an availability verdict;
   it reports what is on `PATH` and stops there.
 - **Don't:** record a CLI as available on a `command -v` hit alone;
@@ -251,9 +264,9 @@ and what a single failed sweep never establishes.
   which is a state the probe never reports.
 - **Don't:** enumerate the API-key route from a list written out in prose,
   here or anywhere else; that list is a subset the moment an adapter is added.
-- **Don't:** enumerate the local-CLI route from a list written out in prose either;
-  that list is a subset the moment an adapter is added,
-  and the inventory above already drops `gemini`.
+- **Don't:** treat either local-CLI source alone as that route's population;
+  the derivation drops `agy` and the inventory drops `gemini`,
+  so a probe of one of them misses a route the other names.
 - **Don't:** record a comment-triggered forge reviewer as dispatched on a posted mention alone;
   an `author_association` allowlist skips the job with no error.
 - **Don't:** treat the machine inventory above as the provider population, since a forge-side reviewer cannot appear in it.

@@ -351,7 +351,7 @@ python3 scripts/check-leadin-counts.py memories/foo.md # just these files
 Exit `0` every lead-in count matches, `1` at least one mismatch, `2` the scan examined no files (a check that examined nothing reports clean otherwise).
 
 Gated in `validate.yml`, over every tracked markdown file.
-The corpus reads clean at 0 findings across 711 files, measured on this branch.
+The corpus reads clean at 0 findings across all 715 tracked markdown files, measured 2026-09-04 on this branch.
 The one stale count the checker found on its first run --- `memories/claude-code-permissions.md` said two above three bullets --- is fixed in the same commit that gates it.
 
 False positives, rather than recall, are what bound the design: a checker that flagged every numeral would be switched off, taking the real cases with it.
@@ -360,7 +360,7 @@ It skips a lead-in ending on a conditional subordinator, since "Two changes are 
 And it discounts a bold-header run that overshoots the stated count by more than one, since body prose between such headers gives that shape no structural end.
 
 Those bounds are positional rather than semantic, so one shape stays a known false positive: a count that opens its sentence and then names a property of itself ("Two variables at once is hard:").
-No bound separates that from "Three answers are legitimate, and only the first is ...", which is a genuine lead-in of the same shape, and a rule keyed on the copula alone suppresses 21 of the 83 accepted lead-ins in this corpus.
+No bound separates that from "Three answers are legitimate, and only the first is ...", which is a genuine lead-in of the same shape, and a rule keyed on the copula alone suppresses 21 of the 89 accepted lead-ins in this corpus.
 `scripts/test_check_leadin_counts.py` pins it as accepted rather than claiming coverage it does not have.
 
 - **Do:** run it over a file whose bulleted or bold-header sections you have just split or merged.

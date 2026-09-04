@@ -32,12 +32,12 @@ measured against the live corpus rather than guessed:
   accepted false positive. No bound separates it from "Three answers are
   legitimate, and only the first is ...", which is a genuine lead-in of the
   same shape; measured on the corpus, a rule keyed on the copula alone
-  suppresses 21 of the 83 accepted lead-ins, most of them real.
+  suppresses 21 of the 89 accepted lead-ins, most of them real.
 - The lead-in sentence does not end on a conditional subordinator ("if",
   "when", "unless"). "Two changes are independent if:" enumerates the
   CONDITIONS below it rather than the two changes, which is the issue's "the
   number refers to something other than the list" class. Measured on the
-  corpus, this bound suppresses exactly one lead-in of 83, and that one is
+  corpus, this bound suppresses exactly one lead-in of 89, and that one is
   the false positive.
 - That count is followed within three tokens by a plural-looking noun, so
   "two variables" is a candidate and "two of those runs" is not.
@@ -68,8 +68,8 @@ Exit codes: 0 clean, 1 at least one mismatch, 2 the scan examined no files
 one that passed).
 
 Gated in `.github/workflows/validate.yml` over every tracked markdown file.
-The corpus reads clean at 0 findings across 711 files, measured on the branch
-that gates it.
+The corpus reads clean at 0 findings across all 715 tracked markdown files,
+measured 2026-09-04 on the branch that gates it.
 """
 from __future__ import annotations
 

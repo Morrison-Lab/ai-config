@@ -212,7 +212,7 @@ def main():
     # count. The SENTENCE-INITIAL form still fires, and no bound separates it
     # from "Three answers are legitimate, and only the first is ..." -- a
     # genuine lead-in of the same shape. Measured on the corpus, a rule keyed
-    # on the copula suppresses 21 of the 83 accepted lead-ins. So this case
+    # on the copula suppresses 21 of the 89 accepted lead-ins. So this case
     # is pinned as accepted rather than silently claimed to be handled: if a
     # later bound fixes it, this line turns red and gets deleted deliberately.
     check(

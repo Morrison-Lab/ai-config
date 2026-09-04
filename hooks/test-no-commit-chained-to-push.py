@@ -491,19 +491,29 @@ check("bare git", fires("git; git push"), False)
 
 # ----------------------------------------------------------------- registry
 
-# `tool-mappings.yml` is the registry `CLAUDE.md` calls the single source of
-# truth for the CLI-to-MCP mapping, and it is the one place a model is most
-# likely to copy a command from verbatim -- especially a remote session, which
-# has no `gh` at all and cannot fall back to a skill's own examples. Its
-# `WRITE_FILE` entry prescribed a chained commit-and-push this guard refuses
-# (ai-config#3002), and the sweep that shipped the guard could not reach it:
-# that sweep read fenced code blocks, while this value is a YAML scalar and a
-# generated table cell.
+# `tool-mappings.md` -- generated from `tool-mappings.yml` -- is the registry
+# `CLAUDE.md` calls the single source of truth for the gh/glab-to-MCP mapping,
+# and the one it points every agent at in a remote or web session where
+# `gh`/`glab` is not on `PATH`. That makes it a registry a model copies a
+# command from verbatim. Its `WRITE_FILE` entry prescribed a chained
+# commit-and-push this guard refuses (ai-config#3002), and the sweep that
+# shipped the guard could not reach it: that sweep read fenced code blocks,
+# while this value is a YAML scalar and a generated table cell.
 #
 # So sweep the registry itself, and report how many command fields were
 # examined alongside how many were refused -- a zero with no denominator is
 # indistinguishable from a sweep that never ran.
-import yaml  # noqa: E402  (a hard dependency of this repo's checkers)
+#
+# PyYAML is guarded the way every other consumer in this repo guards it
+# (scripts/validate-skills.py, scripts/sync-codex-skill-wrappers.py,
+# scripts/test_validate_workflow.py), so a missing dependency names itself
+# rather than arriving as a traceback -- this is the only third-party import
+# under `hooks/`.
+try:
+    import yaml  # noqa: E402
+except ImportError:  # pragma: no cover
+    sys.exit("test-no-commit-chained-to-push: PyYAML is required "
+             "--- run `pip install pyyaml`.")
 
 REGISTRY = os.path.join(os.path.dirname(HERE), "tool-mappings.yml")
 registry = yaml.safe_load(open(REGISTRY, encoding="utf-8").read())

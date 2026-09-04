@@ -324,12 +324,16 @@ FINDINGS_VALUE = re.compile(r"FINDINGS_COUNT\s*:\s*(\d+)")
 # The noun alone does not scope the claim to this session's review history --
 # "reviews" and "findings" both have ordinary uses the printed values say
 # nothing about. AGG_INTENT, AGG_NOT_YET and AGG_FOREIGN below SUBTRACT three
-# of those uses: an intention, work not yet done, and a count about ANOTHER
-# repository's forge item. Subtracting is not scoping, and the difference is
-# worth stating rather than leaving to a reader: a count about somebody else's
-# review history that names no PR or issue number ("we got seven reviews from
-# the bot") is a residual this clause cannot tell from its own, and the
-# reminder it prints there points at values the claim has nothing to do with.
+# of those uses: an intention, work not yet done, and a count about somebody
+# else's forge item. Subtracting is not scoping, and the difference is worth
+# stating rather than leaving to a reader. Two residuals this clause still
+# cannot tell from its own, in both of which the reminder points at values the
+# claim has nothing to do with: a count about somebody else's review history
+# that names no PR or issue number at all ("we got seven reviews from the
+# bot"), and one naming a sibling item by a BARE number ("#4242 came back with
+# eight findings"), which `foreign_reference` cannot attribute either way and
+# which the incident brief's own "Measured on #3107:" form requires it to read
+# as the session's own.
 AGGREGATE_NOUNS = {"findings", "rounds", "reviews"}
 
 # The command that discharges clause C must NAME the token, exactly as
@@ -393,10 +397,17 @@ AGG_NOT_YET = re.compile(
 # qualified -- `README.md` and this file's own docstring both say
 # `ai-config#3117` -- so "The five adversarial rounds on ai-config#3107
 # produced ten findings." is a claim about THIS session's history wearing a
-# repo name. `own_repo` is what tells the two apart: a reference naming the
-# repository the session is working in is not foreign, and everything else is.
+# repo name.
+#
+# The repo alone is not enough either, and reading it that way traded one
+# misfire for its mirror image. This corpus's briefs name SIBLING items
+# constantly, so "Address the eleven findings on ai-config#4242." was read as
+# this session's own review history and the reminder pointed at values from a
+# PR the claim is not about. Both halves have to match: a reference is the
+# session's own when `own_repo` names its repository AND `own_items` names its
+# number, and everything else is foreign.
 AGG_FOREIGN = re.compile(
-    r"\b(?:([\w.-]+)/)?([\w.-]+)#\d|\b(?:PR|MR|issue)\s+\d", re.I,
+    r"\b(?:([\w.-]+)/)?([\w.-]+)#(\d+)|\b(?:PR|MR|issue)\s+\d", re.I,
 )
 
 # `origin`'s URL, parsed the way `gh` itself infers a repo when none is named
@@ -443,21 +454,73 @@ def own_repo():
     return _OWN_REPO
 
 
+# The item number this session is working, for the second half of the test
+# above. `GITHUB_REF` carries it outright on a pull-request workflow run; the
+# branch name carries it otherwise, because this corpus's own issue-first flow
+# cuts branches named for the issue they were cut for
+# (`fix/3117-brief-premises-cardinality`). Two digits minimum, so a `v2` or an
+# `mk3` in a branch name does not claim every two-digit item in the repo.
+GH_REF_ITEM = re.compile(r"^refs/(?:pull|merge-requests)/(\d+)/")
+BRANCH_ITEM = re.compile(r"\d{2,}")
+
+_OWN_ITEMS = None
+
+
+def own_items():
+    """The PR/issue numbers this session is demonstrably working, as strings.
+
+    `GITHUB_REF` first, then the branch name -- `GITHUB_HEAD_REF` where a run
+    sets it, else `git rev-parse --abbrev-ref HEAD`.
+
+    Empty when nothing resolves, and `foreign_reference` then treats every
+    qualified reference as somebody else's. That is the same safe direction
+    `own_repo` takes for the same reason: a missed reminder costs less than one
+    pointing at a PR the claim is not about.
+
+    Resolved once per process and cached, including the empty result, so a
+    brief naming several forge items does not shell out once per match.
+    """
+    global _OWN_ITEMS
+    if _OWN_ITEMS is not None:
+        return _OWN_ITEMS
+    items = set()
+    m = GH_REF_ITEM.match(os.environ.get("GITHUB_REF") or "")
+    if m:
+        items.add(m.group(1))
+    branch = os.environ.get("GITHUB_HEAD_REF") or ""
+    if not branch:
+        try:
+            out = subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                capture_output=True, text=True, timeout=5)
+            branch = out.stdout.strip() if out.returncode == 0 else ""
+        except (OSError, subprocess.SubprocessError):
+            branch = ""
+    items.update(BRANCH_ITEM.findall(branch))
+    _OWN_ITEMS = frozenset(items)
+    return _OWN_ITEMS
+
+
 def foreign_reference(text):
     """True when `text` names a forge item belonging to somebody else.
 
     A match with no repo qualifier (`PR 4242`) is foreign by construction --
     the number names an item this hook cannot attribute. A qualified one is
-    foreign unless its repo is the one the session is working in.
+    foreign unless BOTH halves are the session's own: its repo is the one the
+    session is working in, and its number is one this session is working. The
+    repo alone let a count about a sibling PR in the SAME repository read as
+    this session's own review history.
     """
     for m in AGG_FOREIGN.finditer(text):
-        owner, repo = m.group(1), m.group(2)
+        owner, repo, number = m.group(1), m.group(2), m.group(3)
         if repo is None:
             return True
         mine_owner, mine_repo = own_repo()
         if mine_repo is None or repo.lower() != mine_repo:
             return True
         if owner and mine_owner and owner.lower() != mine_owner:
+            return True
+        if number not in own_items():
             return True
     return False
 
@@ -1066,11 +1129,13 @@ def aggregate_note(tpath):
     hook has fired --- so it prescribed a figure the hook would then accept as
     the derivation while disagreeing with the hook's own arming set. Measured
     against a transcript holding rounds 2, 3, 3, 1, 0 plus one foreign PR
-    result carrying two more values: the bare grep summed 16 across 6, where
+    result carrying two more values: the bare grep summed 16 across 7, where
     the values this clause is about are 9 across 5. Reading only the
     `tool_result` blocks whose `tool_use_id` belongs to an `Agent`/`Task` call
-    returns 9 across 5, and the test suite pins that agreement rather than
-    leaving it to this comment.
+    returns 9 across 5. The test suite RUNS both commands on that fixture and
+    prints each figure, so neither half of the contrast is left to this
+    comment --- an earlier revision typed "16 across 6" here, which is the very
+    failure this clause detects.
     """
     t = tpath or "$HOME/.claude/projects/<this session>.jsonl"
     return (

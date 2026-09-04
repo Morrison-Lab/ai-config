@@ -508,15 +508,27 @@ CONTRACT_EXTRA = 1
 # set. A bare `grep` over the transcript does not: it counts every
 # `FINDINGS_COUNT` in the file, including values a `gh pr view` pasted in from
 # another PR's review bodies, and including this note once the hook has fired.
-# Measured on the fixture below, that grep sums 16 across 6 where the values
-# this clause is about are 9 across 5, and running it would then discharge the
-# clause on the wrong figure. So run the prescribed command for real and
-# compare its output against `transcript_derivations`, rather than asserting
-# the agreement in a comment.
+# Running it would then discharge the clause on the wrong figure. So run BOTH
+# commands on the fixture and print what each one says, rather than asserting
+# either figure in a comment: an earlier revision of this comment typed "16
+# across 6" where the bare grep sums 16 across 7 -- an aggregate over
+# transcript values recalled instead of read back, which is the exact failure
+# this clause detects, asserted in its own justification.
+_BARE_GREP = (
+    """grep -o 'FINDINGS_COUNT: [0-9]*' {t}"""
+    """ | awk '{n++; s+=$2} END {print n" rounds, "s" findings"}'"""
+)
 _tp3 = transcript(ROUNDS + FOREIGN_PR)
 try:
     _vals = hook.transcript_derivations(_tp3)[2][0]
     _want = f"{len(_vals)} rounds, {sum(_vals)} findings"
+    _bare = subprocess.run(_BARE_GREP.replace("{t}", _tp3), shell=True,
+                           capture_output=True, text=True)
+    ok = _bare.returncode == 0 and _bare.stdout.strip() != _want
+    wrong += not ok
+    print(f"  {'ok    ' if ok else 'WRONG '} the bare grep DISAGREES with "
+          f"agg_vals (bare {_bare.stdout.strip()!r}, scoped {_want!r})")
+    CONTRACT_EXTRA += 1
     if shutil.which("jq"):
         _cmd = hook.AGGREGATE_DERIVATION.replace("{t}", _tp3)
         _ran = subprocess.run(_cmd, shell=True, capture_output=True, text=True)
@@ -532,22 +544,34 @@ try:
 finally:
     os.unlink(_tp3)
 
-# ------------------------------------------------------------- own-repo scope
+# ------------------------------------------------------------- own-item scope
 #
-# AGG_FOREIGN subtracts a count about ANOTHER repository's forge item. This
-# corpus names its own items qualified -- `README.md` and the hook's own
-# docstring both write `ai-config#3117` -- so the qualifier alone cannot decide
-# it, and reading it that way silenced the target case in its commonest
-# phrasing. `GITHUB_REPOSITORY` pins what the session's repo is, so neither row
-# depends on the remote this checkout points at.
-print("\nown-repo scope (a qualified self-reference is not foreign):")
+# AGG_FOREIGN subtracts a count about somebody else's forge item. This corpus
+# names its own items qualified -- `README.md` and the hook's own docstring
+# both write `ai-config#3117` -- so the qualifier alone cannot decide it, and
+# reading it that way silenced the target case in its commonest phrasing. The
+# repo alone cannot decide it either: this corpus's briefs name SIBLING items
+# just as constantly, and reading only the repo made a count about
+# `ai-config#4242` read as this session's own review history. Both halves are
+# pinned by environment (`GITHUB_REPOSITORY`, `GITHUB_REF`), so no row depends
+# on the remote or the branch this checkout happens to be on.
+print("\nown-item scope (own repo AND own item, not either alone):")
 SELF_REF = ("The five adversarial rounds on ai-config#3107 produced "
             "ten findings.")
+SIBLING_REF = "Address the eleven findings on ai-config#4242."
+MINE = {"GITHUB_REPOSITORY": "Morrison-Lab/ai-config",
+        "GITHUB_REF": "refs/pull/3107/merge"}
 OWN_REPO = [
-    (run(SELF_REF, ROUNDS, env={"GITHUB_REPOSITORY": "Morrison-Lab/ai-config"}),
-     "REMIND", "the session's own repo, qualified -- still its own history"),
-    (run(SELF_REF, ROUNDS, env={"GITHUB_REPOSITORY": "sparta-lab/sparta"}),
+    (run(SELF_REF, ROUNDS, env=MINE),
+     "REMIND", "the session's own repo AND item -- still its own history"),
+    (run(SELF_REF, ROUNDS,
+         env=dict(MINE, GITHUB_REPOSITORY="sparta-lab/sparta")),
      "silent", "the same sentence when the repo named is somebody else's"),
+    (run(SIBLING_REF, ROUNDS, env=MINE),
+     "silent", "the session's own repo but a SIBLING item -- not its history"),
+    (run(SIBLING_REF.replace("ai-config#", "Morrison-Lab/ai-config#"),
+         ROUNDS, env=MINE),
+     "silent", "same sibling item, owner-qualified"),
 ]
 for got, want, desc in OWN_REPO:
     wrong += got != want
@@ -689,10 +713,13 @@ def kinds(prompt):
     return [k for k, _ in hook.evaluate(prompt, "")]
 
 
-# `own_repo` reads `GITHUB_REPOSITORY` or `git remote get-url origin`, so an
-# in-process probe would otherwise depend on which remote this checkout points
-# at. Pinned here; the subprocess rows above exercise the real resolution.
+# `own_repo` reads `GITHUB_REPOSITORY` or `git remote get-url origin`, and
+# `own_items` reads `GITHUB_REF` or the checked-out branch, so an in-process
+# probe would otherwise depend on which remote this checkout points at and
+# which branch it is on. Both pinned here; the subprocess rows above exercise
+# the real resolution.
 hook._OWN_REPO = ("morrison-lab", "ai-config")
+hook._OWN_ITEMS = frozenset({"3107"})
 
 
 def _two_matching_digits(text, values, line):
@@ -860,6 +887,14 @@ MUTANTS = [
      "own_repo", staticmethod(lambda: (None, None)),
      lambda: bool(hook.aggregate_claims(SELF_REF)),
      True, False),
+
+    # The other half of the same carve-out, mutation-checked alone: widening
+    # `own_items` to every number is what made a SIBLING item in the same repo
+    # read as this session's own review history.
+    ("clause C: the carve-out needs the session's own ITEM, not just its repo",
+     "own_items", staticmethod(lambda: frozenset({"3107", "4242"})),
+     lambda: bool(hook.aggregate_claims(SIBLING_REF)),
+     False, True),
 
     ("clause C: the addends must sit beside the claim",
      "NEAR_LINES", 10 ** 6,

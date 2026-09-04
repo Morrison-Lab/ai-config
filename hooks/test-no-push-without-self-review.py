@@ -93,7 +93,8 @@ OTHER_HEAD = _git(OTHER, "rev-parse", "HEAD")
 
 
 def run_hook(cmd: str, transcript_events: list | None = None,
-             extra_env: dict | None = None) -> tuple[int, dict]:
+             extra_env: dict | None = None,
+             payload_extra: dict | None = None) -> tuple[int, dict]:
     tpath = None
     if transcript_events is not None:
         tf = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False)
@@ -104,6 +105,8 @@ def run_hook(cmd: str, transcript_events: list | None = None,
     try:
         payload = {"tool_name": "Bash", "tool_input": {"command": cmd},
                    "transcript_path": tpath or ""}
+        if payload_extra:
+            payload.update(payload_extra)
         res = subprocess.run([sys.executable, HOOK], input=json.dumps(payload),
                              capture_output=True, text=True, cwd=REPO,
                              env={**os.environ, **(extra_env or {})})
@@ -1666,6 +1669,105 @@ def fallback_cases() -> tuple[int, int]:
     return failures, ran
 
 
+def omo_cases() -> tuple[int, int]:
+    """oh-my-openagent's flat OpenCode transcript records (ai-config#2875).
+
+    OMO's bridge appends `{"type":"tool_use","tool_name":...,"tool_input":...}`
+    and `{"type":"tool_result","tool_name":...,"tool_output":...}` with no
+    message nesting and no call IDs (measured 4.19.4), and its PreToolUse
+    hook context never sets transcript_path -- so the fallback resolved from
+    the payload's session_id is the only transcript the guard can read there.
+    The pairing pin is positional: a result answers its name's nearest
+    outstanding use.
+    """
+    failures = 0
+    ran = 0
+
+    def check(label, ok):
+        nonlocal failures, ran
+        ran += 1
+        print(f"{'PASS' if ok else 'FAIL'}: {label}")
+        failures += not ok
+
+    def omo_use(name, inp):
+        return {"type": "tool_use", "timestamp": "2026-09-03T00:00:00Z",
+                "tool_name": name, "tool_input": inp}
+
+    def omo_result(name, output):
+        return {"type": "tool_result", "timestamp": "2026-09-03T00:00:01Z",
+                "tool_name": name, "tool_input": {}, "tool_output": output}
+
+    def omo_reviewed(commit=None, agent="adversarial-reviewer", prompt="Review the diff"):
+        return [
+            omo_use("task", {"subagentType": agent, "description": "review",
+                             "prompt": prompt}),
+            omo_result("task", body(commit=commit)),
+        ]
+
+    # 1. OMO-shaped clean review allows the push it names.
+    rc, out = run_hook(PUSH, omo_reviewed(HEAD))
+    blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+    check("OMO flat reviewer records allow the reviewed push", rc == 0 and not blocked)
+
+    # 2. An OMO clean verdict for an earlier commit still blocks -- the same
+    #    subject rule the native path enforces.
+    rc, out = run_hook(PUSH, omo_reviewed(PREV))
+    blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+    check("OMO verdict naming an earlier commit does not authorize push",
+          rc == 0 and blocked)
+
+    # 3. No reviewer dispatch anywhere in the OMO transcript blocks.
+    rc, out = run_hook(PUSH, [omo_use("bash", {"command": "echo hi"}),
+                              omo_result("bash", "hi")])
+    blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+    check("OMO transcript with no reviewer dispatch blocks push", rc == 0 and blocked)
+
+    # 4. A result with no outstanding use pairs with nothing, so a verdict in
+    #    an orphan OMO tool_result is not consulted.
+    rc, out = run_hook(PUSH, [omo_result("task", body())])
+    blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+    check("unpaired OMO tool_result cannot authorize push", rc == 0 and blocked)
+
+    # 5. The fallback persona reaches the OMO path through the same dispatch
+    #    predicate: subagentType general-purpose + an adversarial-review prompt.
+    rc, out = run_hook(PUSH, omo_reviewed(
+        agent="general-purpose",
+        prompt="Perform an adversarial review of the committed diff and report Findings and a Verdict."))
+    blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+    check("OMO fallback persona with adversarial prompt allows push",
+          rc == 0 and not blocked)
+
+    # 6. The transcript resolved from session_id: OMO's PreToolUse payload
+    #    carries no transcript_path at all, and the session file lives under
+    #    CLAUDE_CONFIG_DIR/transcripts.
+    d = tempfile.mkdtemp(prefix="npwsr-omo-")
+    try:
+        sid = "ses_testfallback"
+        tdir = os.path.join(d, "transcripts")
+        os.makedirs(tdir)
+        with open(os.path.join(tdir, f"{sid}.jsonl"), "w") as f:
+            for ev in omo_reviewed(HEAD):
+                f.write(json.dumps(ev) + "\n")
+        rc, out = run_hook(
+            PUSH, [], payload_extra={"session_id": sid, "transcript_path": ""},
+            extra_env={"CLAUDE_CONFIG_DIR": d})
+        blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+        check("session_id fallback finds the OMO transcript", rc == 0 and not blocked)
+
+        # 7. A session_id that is not a bare filename component resolves to no
+        #    transcript rather than to a traversal.
+        rc, out = run_hook(
+            PUSH, [], payload_extra={"session_id": "../escape", "transcript_path": ""},
+            extra_env={"CLAUDE_CONFIG_DIR": d})
+        blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+        check("path-traversal session_id resolves to no transcript",
+              rc == 0 and blocked)
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+    return failures, ran
+
+
 def main():
     failed = 0
     extra = 0
@@ -1696,7 +1798,7 @@ def main():
                    valueless_bool_cases, budget_cases,
                    fixture_branch_cases, windows_path_cases,
                    structured_payload_cases, transcript_scoping_cases,
-                   cd_tracking_cases, fallback_cases):
+                   cd_tracking_cases, fallback_cases, omo_cases):
             f, r = fn()
             failed += f
             extra += r

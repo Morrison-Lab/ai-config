@@ -847,6 +847,7 @@ def _parse_push(argv: list[str]) -> tuple[list[str], str | None] | None:
 BUDGET_SECONDS = float(os.environ.get("NPWSR_BUDGET_SECONDS", "6.0"))
 PER_CALL_SECONDS = 3.0
 _DEADLINE = [0.0]
+_OMO_SEQ = [0]
 
 
 def _run_git(directory: str | None, env: list[str], *args: str) -> str | None:
@@ -1260,6 +1261,41 @@ def parse_report(text: str) -> tuple[str | None, str | None]:
 
 
 
+def _agent_subtypes(inp: dict) -> list[str]:
+    """Subagent names an Agent/Task dispatch names, from any observed key."""
+    sub_types: list[str] = []
+    for k in ("subagent_type", "subagentType", "agent_type", "TypeName", "name", "Role"):
+        if inp.get(k):
+            sub_types.append(str(inp.get(k)))
+    if isinstance(inp.get("Subagents"), list):
+        for sa in inp["Subagents"]:
+            if isinstance(sa, dict):
+                for k in ("TypeName", "Role", "name"):
+                    if sa.get(k):
+                        sub_types.append(str(sa.get(k)))
+    return sub_types
+
+
+def _is_reviewer_dispatch(inp: dict) -> bool:
+    """True when this Agent/Task dispatch dispatches the reviewer persona.
+
+    The adversarial persona by name, or a fallback persona whose prompt reads
+    as an adversarial review prompt. OMO's flat `tool_use` records and the
+    Claude-native `tool_use` blocks must agree on what counts (ai-config#2875),
+    so both paths call this instead of carrying two copies of the predicate.
+    """
+    sub_types = _agent_subtypes(inp)
+    if any(ADVERSARIAL_AGENT_NAME.match(st) for st in sub_types):
+        return True
+    prompt = str(inp.get("prompt") or inp.get("Prompt") or inp.get("instruction")
+                 or inp.get("description") or "")
+    return bool(
+        sub_types
+        and any(FALLBACK_AGENT_NAME.match(st) for st in sub_types)
+        and REVIEW_PROMPT_RE.search(prompt)
+    )
+
+
 def _is_reviewer_record(record: dict) -> bool:
     """True if this transcript record is attributed to the adversarial reviewer."""
     candidates: list[str] = []
@@ -1294,12 +1330,23 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
     look identical to a clean one. Transient tool call errors during a subagent's
     exploration (e.g. bash command syntax retry) do not invalidate an otherwise
     clean final review verdict.
+
+    Two transcript shapes are read. Claude-native JSONL carries tool calls as
+    `message.content` blocks paired by `tool_use_id`. oh-my-openagent's OpenCode
+    bridge appends flat records with no message nesting and no call IDs
+    (measured 4.19.4, ai-config#2875): `{"type":"tool_use","tool_name":...,
+    "tool_input":...}` and `{"type":"tool_result","tool_name":...,
+    "tool_output":...}`. Those are paired positionally per tool name -- opencode
+    runs tools sequentially per session, so the nearest outstanding use of that
+    name is the result's partner -- and fed through the same dispatch predicate
+    and report parser as the native path.
     """
     reviewer_call_ids: set[str] = set()
     reviewer_task_ids: set[str] = set()
     saw_reviewer_call = False
     verdict: str | None = None
     reviewed_commit: str | None = None
+    pending_omo_uses: dict[str, list[str]] = {}
 
     with open(transcript_path, "r", encoding="utf-8", errors="ignore") as f:
         for line in f:
@@ -1311,6 +1358,35 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
             except Exception:
                 continue
             if not isinstance(record, dict):
+                continue
+
+            r_type = record.get("type")
+            omo_tool_name = record.get("tool_name")
+            if r_type in ("tool_use", "tool_result") and isinstance(omo_tool_name, str):
+                # OMO's flat record shapes (see docstring). Record-level
+                # tool_use/tool_result with a `tool_name` key is never a
+                # Claude-native shape -- there the block sits inside
+                # `message.content` -- so this branch is unambiguous.
+                name = omo_tool_name.lower()
+                if r_type == "tool_use":
+                    _OMO_SEQ[0] += 1
+                    call_id = f"omo-{_OMO_SEQ[0]}"
+                    pending_omo_uses.setdefault(name, []).append(call_id)
+                    inp = record.get("tool_input")
+                    if name in AGENT_TOOLS and isinstance(inp, dict):
+                        if _is_reviewer_dispatch(inp):
+                            saw_reviewer_call = True
+                            reviewer_call_ids.add(call_id)
+                else:
+                    queue = pending_omo_uses.get(name)
+                    call_id = queue.pop(0) if queue else None
+                    if call_id is not None and call_id in reviewer_call_ids:
+                        if not record.get("is_error"):
+                            found, sha = parse_report(
+                                _result_text({"content": record.get("tool_output")})
+                            )
+                            if found:
+                                verdict, reviewed_commit = found, sha
                 continue
 
             is_assistant = (
@@ -1339,27 +1415,7 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                     inp = b.get("input") or {}
 
                     if tool_name in AGENT_TOOLS:
-                        sub_types = []
-                        for k in ("subagent_type", "subagentType", "agent_type", "TypeName", "name", "Role"):
-                            if inp.get(k):
-                                sub_types.append(str(inp.get(k)))
-                        if isinstance(inp.get("Subagents"), list):
-                            for sa in inp["Subagents"]:
-                                if isinstance(sa, dict):
-                                    for k in ("TypeName", "Role", "name"):
-                                        if sa.get(k):
-                                            sub_types.append(str(sa.get(k)))
-
-                        prompt = str(inp.get("prompt") or inp.get("Prompt") or inp.get("instruction") or inp.get("description") or "")
-
-                        is_adversarial = any(ADVERSARIAL_AGENT_NAME.match(st) for st in sub_types)
-                        is_fallback = bool(
-                            sub_types
-                            and any(FALLBACK_AGENT_NAME.match(st) for st in sub_types)
-                            and REVIEW_PROMPT_RE.search(prompt)
-                        )
-
-                        if is_adversarial or is_fallback:
+                        if _is_reviewer_dispatch(inp):
                             saw_reviewer_call = True
                             if isinstance(call_id, str) and call_id:
                                 reviewer_call_ids.add(call_id)
@@ -1417,6 +1473,29 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                             verdict, reviewed_commit = found, sha
 
     return verdict, reviewed_commit, saw_reviewer_call
+
+
+def _opencode_transcript_fallback(session_id) -> str:
+    """oh-my-openagent's per-session transcript for this session_id.
+
+    OMO's OpenCode bridge runs the catalog from ~/.claude/settings.json but
+    never sets transcriptPath in its PreToolUse hook context (measured 4.19.4,
+    ai-config#2875), so an OpenCode session's push guard reads nothing. OMO
+    maintains its own JSONL per session under the Claude config dir, keyed by
+    the payload's session_id. Claude Code payloads always carry an existing
+    transcript_path, so the fallback fires only where the primary path is
+    absent or missing; a session_id that is not a bare filename component
+    resolves to no file rather than to a traversal.
+    """
+    if not session_id:
+        return ""
+    raw = str(session_id)
+    if "/" in raw or "\\" in raw or raw in (".", "..") or raw != os.path.basename(raw):
+        return ""
+    base = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(
+        os.path.expanduser("~"), ".claude"
+    )
+    return os.path.join(base, "transcripts", f"{raw}.jsonl")
 
 
 def verify_review(transcript_path: str, directory: str | None,
@@ -1604,8 +1683,13 @@ def main() -> int:
                      "(`--git-dir`/`--work-tree`/`GIT_DIR`/`GIT_WORK_TREE`), "
                      "so a verdict naming a commit in this one cannot cover it")
                 return 0
+            transcript_path = payload.get("transcript_path") or ""
+            if not transcript_path or not os.path.exists(transcript_path):
+                transcript_path = _opencode_transcript_fallback(
+                    payload.get("session_id")
+                )
             is_clean, reason = verify_review(
-                payload.get("transcript_path") or "", directory, argv, env
+                transcript_path, directory, argv, env
             )
             if not is_clean:
                 deny(reason)

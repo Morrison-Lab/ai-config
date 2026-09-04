@@ -135,11 +135,8 @@ with tempfile.TemporaryDirectory() as tmp:
     # where its guarantee stops.
     def reports_only(header: str) -> bool:
         return (
-            header.count(".") == 1
-            and header.endswith(".")
-            and not any(c in header for c in ":;")
+            not any(c in header for c in ":;")
             and " and " not in header
-            and header.count(",") <= 1
             and not any(
                 word in header.lower()
                 for word in ("split", "prefer", "reroute", "trim", "recover", "append")
@@ -147,24 +144,28 @@ with tempfile.TemporaryDirectory() as tmp:
         )
 
     check(
-        "the band header carries no separator, conjunction, or retired verb",
+        "the band header carries no colon, semicolon, conjunction, or retired verb",
         reports_only(cmfs.BAND_HEADER),
     )
     for label, rejected in (
-        ("after a colon", "Headroom before the cap, least first: split first."),
         (
-            "after a semicolon",
+            "an order appended after a colon",
+            "Headroom before the cap, least first: act on the fullest file.",
+        ),
+        (
+            "an order appended after a semicolon",
             "Headroom before the cap, least first; act on the fullest file.",
         ),
         (
-            "after a conjunction",
-            "Headroom before the cap, least first, and start with the top entry.",
+            "an order joined by a conjunction",
+            "Headroom before the cap and start with the top entry.",
+        ),
+        (
+            "an order carrying a retired verb",
+            "Headroom before the cap, split first.",
         ),
     ):
-        check(
-            f"rejects an order appended to the header {label}",
-            not reports_only(rejected),
-        )
+        check(f"rejects {label}", not reports_only(rejected))
     # "least first" is a claim the header makes about the listing, so check it:
     # near.md has 5 lines of headroom and edge.md has 8.
     check(
@@ -177,6 +178,10 @@ with tempfile.TemporaryDirectory() as tmp:
     check(
         "the approaching file is not reported as a breach",
         "near.md: 95 lines\n" not in out,
+    )
+    check(
+        "the breached file is not listed in the band",
+        "big.md: 122 lines (" not in out,
     )
     check(
         "warns on a file at exactly the warn threshold",

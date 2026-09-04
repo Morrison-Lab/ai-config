@@ -1435,7 +1435,7 @@ An inflated ratio reports a regression that is not there, and reads as a finding
 A compressed one reports that the control cannot discriminate, and reads as a broken control --- so the instrument accuses itself, and the tempting repair is to loosen a bound that was working.
 
 Two repairs are on offer, and which one fits turns on whether the distortion is additive or multiplicative.
-That is measurable rather than assumable, so measure it --- and measure it under the condition the distortion appears in, which is the step that fails quietly.
+That is measurable rather than assumable, so measure it --- and measure it under the load the distortion appears under, since an idle reading of the same quantity looks like the same number and answers a different question.
 Here it could not be: the fixed cost timeable off the runner is 0.62ms of a 6.2ms baseline, for the loop plus one zero-length scan call, which bounds the *interpreter's* share and says nothing about the runner's, since scheduler latency and a cold cache are load-dependent by construction.
 So the distortion's shape stayed a hypothesis, and the repair was chosen for surviving either shape rather than for ruling one out.
 Widening the input-size gap does that, because the quadratic term outruns the bound: at a size step of `s` the reading is `s ** 2` and the halfway bound is `s ** 1.5`, so the margin is `sqrt(s)` --- 1.9x at a 4x step against 3.6-3.7x at a 16x step, measured.
@@ -1465,8 +1465,8 @@ A timing figure is a claim about a machine, so re-measure rather than porting th
 
 ## A slow wall-clock reading is a claim about the machine before it is a finding about the code
 
-The two sections above govern a timing **bound written into a test** --- which clock it uses, and whether a ratio cancels the noise it is meant to cancel.
-Neither reaches the reading you take **once**, by hand, in the middle of diagnosing something, and then report as a defect.
+The three sections above govern a timing **bound written into a test** --- which clock it uses, and whether a ratio cancels the noise it is meant to cancel or instead inflates or compresses it.
+None of them reaches the reading you take **once**, by hand, in the middle of diagnosing something, and then report as a defect.
 No assertion is being authored there and no threshold is being chosen, so nothing about the moment resembles the situation those sections describe.
 
 **The reading is self-authenticating in a way a wrong value is not**, and that is the whole of the trap.
@@ -1544,7 +1544,7 @@ rather than a decaying average over a window you did not choose.
 A reading you cannot reproduce is not a measurement of the code, and a spread that
 spans an order of magnitude names its own cause.
 
-**A timing assertion written as a regression guard is the same exposure, and the two sections above answer it** --- they are about exactly this, a busy machine inflating a wall-clock reading.
+**A timing assertion written as a regression guard is the same exposure, and the sections above answer it** --- they are about exactly this, a busy machine distorting a timed reading in either direction.
 What those sections do not separate, and what a session that has just learned its own machine was loaded most needs, is **which question the assertion asks**.
 
 A **regression bound** asks whether the code got slower.

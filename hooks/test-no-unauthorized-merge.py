@@ -605,11 +605,13 @@ SCAN_FLOOR_SECONDS = 0.001
 # A liveness ceiling, deliberately absurd rather than a runtime budget: the
 # ratio is blind to a constant-factor blowup, and this hook runs before EVERY
 # Bash call, so a scan burning half a minute of CPU is broken whatever its
-# shape. The slowest reading this file takes is the negative control's
-# quadratic scan over 96000 characters, 1.5s on the 4-core container these
-# figures come from, so the ceiling leaves about 20x of headroom. Load eats
-# into that, so read a breach as a claim about the machine before one about
-# the scanner.
+# shape. Every timed case is read against it, `report_growth` and
+# `report_control` alike. The slowest of them is the negative control's
+# quadratic scan over 96000 characters, 1.45-1.54s of CPU over three runs on
+# a 4-core Linux container at load average ~3.5, against 315ms for the
+# slowest scanner case there, so the ceiling leaves about 20x of headroom.
+# Load eats into that, so read a breach as a claim about the machine before
+# one about the scanner.
 SCAN_ABSURD_SECONDS = 30.0
 
 
@@ -765,8 +767,14 @@ def report_control(label, scan, expect_above):
     Reports the ratio and its margin whichever way the comparison goes: a
     bound whose margin is only printed on failure fails suddenly, where one
     whose margin is printed on every run drifts visibly first (#3098).
+
+    The liveness ceiling gates this case too. The negative control is the
+    slowest scan the file runs, and `fastest_scan` bails out of a breach with
+    a truncated minimum whose ratio still lands on the expected side, so an
+    ungated control would print `allow` over a machine that had blown the
+    ceiling -- a silent failure where the ceiling exists to be loud.
     """
-    growth, _, base = growth_of(
+    growth, large, base = growth_of(
         lambda n: "x" * n, small=SCAN_CONTROL_SMALL, scan=scan,
         step=SCAN_CONTROL_STEP)
     if base < SCAN_FLOOR_SECONDS:
@@ -775,18 +783,23 @@ def report_control(label, scan, expect_above):
               f"platform's CPU clock cannot measure the growth")
         return False
     if expect_above:
-        ok = growth > SCAN_CONTROL_BOUND
+        separated = growth > SCAN_CONTROL_BOUND
     else:
-        ok = growth < SCAN_CONTROL_BOUND
+        separated = growth < SCAN_CONTROL_BOUND
+    live = large <= SCAN_ABSURD_SECONDS
+    ok = separated and live
     side = "above" if expect_above else "below"
     margin = (growth / SCAN_CONTROL_BOUND if expect_above
               else SCAN_CONTROL_BOUND / growth)
+    ceiling = "" if live else f", OVER the {SCAN_ABSURD_SECONDS:g}s ceiling"
     print(f"  {'allow' if ok else 'WRONG':<6} "
           f"{label} {SCAN_CONTROL_SMALL} -> "
           f"{SCAN_CONTROL_SMALL * SCAN_CONTROL_STEP} grew {growth:.1f}x, "
-          f"{'' if ok else 'NOT '}{side} the {SCAN_CONTROL_BOUND:g}x bound "
+          f"{'' if separated else 'NOT '}{side} the "
+          f"{SCAN_CONTROL_BOUND:g}x bound "
           f"(linear ~{SCAN_CONTROL_STEP}x, "
-          f"quadratic ~{SCAN_CONTROL_STEP ** 2}x, margin {margin:.1f}x)")
+          f"quadratic ~{SCAN_CONTROL_STEP ** 2}x, margin {margin:.1f}x, "
+          f"{large * 1000:.0f}ms CPU{ceiling})")
     return ok
 
 

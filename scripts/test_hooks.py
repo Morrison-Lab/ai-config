@@ -46,9 +46,12 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HOOKS = os.path.join(ROOT, "hooks")
 
-# Per-suite deadline. Measured 2026-08-26 on a Linux cloud runner: the
-# slowest suite (test-no-clobbering-push: 32 scratch git repos plus 17
-# mutation rounds) finished in 178s. 900s is about 5x that, so a slow
+# Per-suite deadline. The slowest suite is test-no-clobbering-push, and its
+# population is what the number below is derived from, so re-state both
+# whenever the suite grows rather than leaving a stale count behind: 32
+# scratch git repos plus 17 mutation rounds finished in 178s on a Linux cloud
+# runner (2026-08-26), and 44 repos plus 28 rounds finished in 92s on another
+# one (2026-09-04). 900s is about 5x the slower reading, so a slow
 # Windows box has headroom past the 420s kill of the hang that never
 # produced output (ai-config#2098) while still FAILing an infinite
 # stall. Override with HOOK_TEST_SUITE_TIMEOUT.

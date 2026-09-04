@@ -111,12 +111,26 @@ wrong repository is worse than no reading at all. That is the same choice
 `_target` already makes when the destination is not a single named branch.
 
 A subshell scopes a `cd` to itself, so `(cd elsewhere && true) && git push`
-leaves the push in the CALLING directory. `_simple_commands` therefore counts
-the parentheses `shlex` has already separated from quoted text, and `evaluate`
-keeps one directory per nesting level: entering a subshell inherits the
-caller's, and leaving one discards whatever it moved to. Reading such a push in
-`elsewhere` is the wrong-repository reading of ai-config#2451 again, and this
-file introduced it before the count was added (measured 2026-09-04).
+leaves the push in the CALLING directory. `_simple_commands` therefore labels
+each simple command with the SUBSHELL it runs in, using the parentheses `shlex`
+has already separated from quoted text, and `evaluate` keeps one directory per
+subshell: a subshell inherits its caller's directory when it opens, and nothing
+it does is ever read back out. Reading such a push in `elsewhere` is the
+wrong-repository reading of ai-config#2451 again, and this file introduced it
+before the parentheses were tracked at all (measured 2026-09-04).
+
+The label is an IDENTITY rather than a nesting depth, which is not a
+refinement: two sibling subshells sit at the same depth, so a depth-keyed
+directory let the first one's `cd` leak into the second and
+`(cd elsewhere && true) && (git push)` read `elsewhere` -- the same
+wrong-repository reading, arriving by the very mechanism added to prevent it
+(measured 2026-09-04).
+
+A brace group is the opposite case and needs the opposite treatment: `{ ... ; }`
+runs in the CURRENT shell, so a `cd` inside one outlives the closing brace.
+`{` and `}` are therefore stripped as lead words rather than counted, which
+leaves `{ cd elsewhere; } && git push` reading `elsewhere` -- where a real
+shell runs it (measured 2026-09-04).
 
 `--git-dir`, `--work-tree`, and their `GIT_DIR=` / `GIT_WORK_TREE=` env
 spellings move the repository a push reads WITHOUT moving the directory, so
@@ -198,7 +212,13 @@ RX_HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1.*?\n[ \t]*\2\b", re.S)
 
 ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 LEAD_WORDS = {"then", "do", "else", "!", "time", "sudo", "command", "exec",
-              "nohup", "env"}
+              "nohup", "env",
+              # A brace group runs in the CURRENT shell rather than forking, so
+              # its `cd` outlives the closing brace. Stripping the braces as
+              # lead words is what makes `{ cd elsewhere; } && git push` read
+              # `elsewhere`; counting them the way parentheses are counted
+              # would scope the `cd` to the group and be wrong.
+              "{", "}"}
 
 _SHELL_OPS = set("();|&")
 
@@ -251,21 +271,28 @@ LONG_FLAG = {
 
 
 def _simple_commands(cmd):
-    """Split a shell command into `(subshell depth, argv)` pairs; None on error.
+    """Split a shell command into `(subshell path, argv)` pairs; None on error.
 
     Same construction as `flag-reset-hard-uncommitted-work.py`'s
     `_simple_commands`: join backslash-continued lines, blank heredoc bodies,
     turn unquoted newlines into `;`, then let `shlex` split and dequote.
 
-    The depth is this file's own addition, and it costs no second parser
-    because `shlex` has already decided which parentheses are operators:
-    `git commit -m "fix (typo)"` hands back one token containing them, while
-    `(cd /a && true) && git push` hands back `(` and `)` on their own
-    (measured 2026-09-04). Counting those is what stops a subshell's `cd`
-    leaking onto a later push. `no-push-without-self-review.py`'s
-    `_depth_segments` computes the same fact character by character, for a
-    caller that needs the segment TEXT rather than an argv, so neither can be
-    written in terms of the other.
+    The subshell path is this file's own addition, and it costs no second
+    parser because `shlex` has already decided which parentheses are
+    operators: `git commit -m "fix (typo)"` hands back one token containing
+    them, while `(cd /a && true) && git push` hands back `(` and `)` on their
+    own (measured 2026-09-04). Tracking those is what stops a subshell's `cd`
+    leaking onto a later push.
+
+    The path is a tuple of serial numbers, one per enclosing `(`, so it
+    IDENTIFIES the subshell rather than merely counting how deep it sits. A
+    depth alone gives two sibling subshells one label, and the first one's
+    `cd` then leaks into the second (measured 2026-09-04) --- the leak the
+    parentheses were tracked to stop, one shape further along.
+    `no-push-without-self-review.py`'s `_depth_segments` counts depth
+    character by character, for a caller that needs the segment TEXT rather
+    than an argv; it answers the weaker question and neither can be written in
+    terms of the other.
     """
     cmd = re.sub(r"\\\r?\n", " ", cmd)
     cmd = RX_HEREDOC.sub("<<", cmd)
@@ -276,21 +303,22 @@ def _simple_commands(cmd):
         toks = list(lex)
     except ValueError:
         return None
-    cmds, cur, depth = [], [], 0
+    cmds, cur, scopes, opened = [], [], [()], 0
     for t in toks:
         if t and set(t) <= _SHELL_OPS:
             if cur:
-                cmds.append((depth, cur))
+                cmds.append((scopes[-1], cur))
                 cur = []
             for ch in t:
                 if ch == "(":
-                    depth += 1
-                elif ch == ")":
-                    depth = max(depth - 1, 0)
+                    opened += 1
+                    scopes.append(scopes[-1] + (opened,))
+                elif ch == ")" and len(scopes) > 1:
+                    scopes.pop()
         else:
             cur.append(t)
     if cur:
-        cmds.append((depth, cur))
+        cmds.append((scopes[-1], cur))
     return cmds
 
 
@@ -667,10 +695,12 @@ def evaluate(command, base_cwd=None):
     below rather than left to the hook process's own directory, because `HEAD`
     is per-worktree and this guard's whole output is a comparison against it.
 
-    A `cd` is scoped to its subshell, so the directory is kept per nesting
-    level rather than as one value: entering a level inherits the caller's
-    directory and leaving one discards it. Without that, a `cd` inside
-    `(...)` leaked onto every later push in the command.
+    A `cd` is scoped to its subshell, so the directory is kept per SUBSHELL
+    rather than as one value: a subshell inherits its caller's directory the
+    first time a command runs inside it, and nothing it does is read back out.
+    Without that, a `cd` inside `(...)` leaked onto every later push in the
+    command; keyed on nesting depth instead of on identity, it leaked into the
+    next sibling subshell rather than out of the parentheses.
 
     Where the reading ends up in a different directory from `base_cwd`, the
     warning SAYS so and emits its remediation commands with `git -C`, because
@@ -696,21 +726,25 @@ def evaluate(command, base_cwd=None):
 
     parsed = []
     base = base_cwd or os.getcwd()
-    stack = [base]
-    for depth, argv in cmds:
-        while len(stack) <= depth:
-            stack.append(stack[-1])  # a subshell inherits the caller's cwd
-        del stack[depth + 1:]        # and its `cd` dies at the `)`
+    # `subshell path -> directory`. A path is entered ONCE, inheriting its
+    # caller's directory as of that moment, and is never revisited after the
+    # `)` closes: a later sibling `(` gets a fresh serial number, so it starts
+    # from the caller's directory rather than from what its predecessor moved
+    # to.
+    dirs = {(): base}
+    for scope, argv in cmds:
+        for n in range(1, len(scope) + 1):
+            dirs.setdefault(scope[:n], dirs[scope[:n - 1]])
         head = argv[_lead_prefix(argv)[0]:]
         if head and head[0] in CD_WORDS:
-            stack[depth] = _resolve_cd(head, stack[depth])
+            dirs[scope] = _resolve_cd(head, dirs[scope])
             continue
         rest, override, cdirs = _push_argv(argv)
         if rest is None:
             continue
         flags, positionals, repo_opt, ok = _parse_push(rest)
         parsed.append((argv, flags, positionals, repo_opt, ok, override,
-                       _push_cwd(stack[depth], cdirs)))
+                       _push_cwd(dirs[scope], cdirs)))
 
     # Pass 1 -- refusal. Lexical, so no network read, and any command in the
     # compound counts. It is deliberately blind to the directory: `--force` is
@@ -794,7 +828,11 @@ def evaluate(command, base_cwd=None):
         # ai-config#2451 with the directory axis substituted for the ref one.
         moved = os.path.realpath(cwd) != os.path.realpath(base)
         where = f", read in `{cwd}`" if moved else ""
-        gitc = f"git -C {cwd} " if moved else "git "
+        # `shlex.quote`, because a worktree path may carry a space: an
+        # unquoted `git -C /home/u/My Worktrees/wt` is read by git as
+        # `-C /home/u/My` plus stray arguments, so the advice this block
+        # exists to make runnable is not.
+        gitc = f"git -C {shlex.quote(cwd)} " if moved else "git "
         body = WARN_HEAD.format(remote=remote, branch=branch, tip=tip[:12],
                                 local=local[:12], segment=segment,
                                 srclabel=srclabel, where=where)

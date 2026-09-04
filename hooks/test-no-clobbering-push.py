@@ -20,6 +20,7 @@ Run:  python3 hooks/test-no-clobbering-push.py hooks/no-clobbering-push.py
 """
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -50,6 +51,13 @@ def bash(command, payload_cwd=None):
     if payload_cwd is not None:
         payload["cwd"] = payload_cwd
     return payload
+
+
+# `case_id -> directory`, filled in by the fixture that builds it. For each
+# entry, every `git -C ...` line the warning emits must survive `shlex.split`
+# and name that directory as one argument. A substring check cannot see this:
+# `git -C /tmp/a b/wt fetch ...` contains `git -C ` and is still unrunnable.
+ROUNDTRIP = {}
 
 
 # ---------------------------------------------------------------- fixtures
@@ -103,22 +111,26 @@ def _named_remote(path, bare, name):
     _run(path, "remote", "add", name, bare)
 
 
-def _second_worktree(path, branch, start="HEAD"):
+def _second_worktree(path, branch, start="HEAD", leaf="wt"):
     """A second worktree of `path`, checked out on a new `branch`.
 
     `HEAD` is per-worktree; branch refs are not. That asymmetry is why every
     cross-worktree case below pushes `HEAD:<branch>` rather than a named
     source ref: a named branch resolves identically in both directories, so it
     could not tell the two readings apart.
+
+    `leaf` names the directory inside the holder. Every other caller leaves it
+    alone; the one that does not passes a name carrying a SPACE, which is the
+    only way to tell a quoted remediation command from an unquoted one.
     """
     holder = tempfile.mkdtemp()
     _TMPDIRS.append(holder)
-    target = os.path.join(holder, "wt")
+    target = os.path.join(holder, leaf)
     _run(path, "worktree", "add", "-q", "-b", branch, target, start)
     return target
 
 
-def _diverged_peer_worktree(path, branch):
+def _diverged_peer_worktree(path, branch, leaf="wt"):
     """A second worktree whose HEAD diverges from `origin/<branch>`, while the
     session's own HEAD equals that remote tip exactly.
 
@@ -129,7 +141,7 @@ def _diverged_peer_worktree(path, branch):
     """
     _commit(path, "shared.txt", "shared\n")
     _run(path, "push", "-q", "origin", "main")
-    wt = _second_worktree(path, branch, "HEAD~1")
+    wt = _second_worktree(path, branch, "HEAD~1", leaf)
     _commit(wt, "peer.txt", "peer\n")
     _run(wt, "push", "-q", "origin", branch)
     _run(path, "push", "-q", "-f", "origin", f"main:{branch}")
@@ -326,6 +338,34 @@ def subshell_push_case(path, bare):
     return f"(cd {wt} && git push origin HEAD:peer-inner)"
 
 
+def brace_group_case(path, bare):
+    """`{ cd <worktree>; } && git push` -- a brace group runs in the CURRENT
+    shell rather than forking, so its `cd` outlives the closing brace.
+
+    `_simple_commands` splits on operators only, so the opening brace arrives
+    attached to the `cd` as a word; without stripping it the `cd` is invisible
+    and the push is read in the session's own repository -- ai-config#2451's
+    wrong-repository reading by a third route.
+    """
+    wt = _diverged_peer_worktree(path, "peer-brace")
+    return f"{{ cd {wt}; }} && git push origin HEAD:peer-brace"
+
+
+def spaced_worktree_case(path, bare):
+    """The worktree the push runs in lives under a directory carrying a space.
+
+    The verdict is the same warning W8 gets; what this case pins is that the
+    emitted `git -C <dir>` survives a round trip through `shlex.split`.
+    Unquoted, git reads the first word as the directory and the rest as stray
+    arguments, so advice whose whole purpose is to be runnable is not -- and
+    every other fixture here uses a `tempfile.mkdtemp()` path with no space,
+    which is what kept the omission invisible.
+    """
+    wt = _diverged_peer_worktree(path, "peer-space", leaf="my worktree")
+    ROUNDTRIP["W13"] = wt
+    return f"cd {shlex.quote(wt)} && git push origin HEAD:peer-space"
+
+
 def payload_cwd_case(path, bare):
     """The Bash call's own `cwd` names a different directory from the hook
     process's, with no `cd` and no `-C` to reveal it."""
@@ -430,6 +470,21 @@ def subshell_cd_case(path, bare):
     """
     wt = _diverged_peer_worktree(path, "peer-subshell")
     return f"(cd {wt} && true) && git push origin HEAD:peer-subshell"
+
+
+def sibling_subshell_cd_case(path, bare):
+    """`(cd <worktree> && true) && (git push ...)` -- two SIBLING subshells.
+
+    Both sit at the same nesting depth, so a directory kept per depth hands
+    them one slot and the first one's `cd` leaks into the second. That is the
+    wrong-repository reading of ai-config#2451 arriving through the very
+    mechanism added to stop it, which is why the pair with S21 is the pin
+    rather than S21 alone: S21's push sits OUTSIDE the parentheses, so it is
+    silent under either keying.
+    """
+    wt = _diverged_peer_worktree(path, "peer-sibling")
+    return (f"(cd {wt} && true) && "
+            "(git push origin HEAD:peer-sibling)")
 
 
 def indeterminate_cd_case(path, bare):
@@ -555,6 +610,12 @@ SHOULD_WARN = [
     ("W11", subshell_push_case,
      "`(cd <worktree> && git push)` -- the `cd` shares the subshell, so it "
      "does apply"),
+    ("W12", brace_group_case,
+     "`{ cd <worktree>; } && git push` -- a brace group does not fork, so "
+     "the `cd` outlives it"),
+    ("W13", spaced_worktree_case,
+     "a worktree path carrying a space -- the emitted `git -C` must still "
+     "parse as one argument"),
 ]
 
 SHOULD_STAY_SILENT = [
@@ -590,6 +651,9 @@ SHOULD_STAY_SILENT = [
      "`GIT_DIR=`/`GIT_WORK_TREE=` redirect the same way as an env prefix"),
     ("S21", subshell_cd_case,
      "`(cd <worktree> && true) && git push` -- the `cd` dies at the `)`"),
+    ("S22", sibling_subshell_cd_case,
+     "`(cd <worktree> && true) && (git push)` -- a sibling subshell starts "
+     "from the caller's directory, not its predecessor's"),
 ]
 
 
@@ -641,12 +705,43 @@ LABEL_EXPECT = {
              "add shared.txt", "read in `", "git -C "],
             ["git checkout ", "git log --oneline HEAD..origin/peer-inner",
              "git fetch origin peer-inner"]),
+    "W12": (["your local HEAD", "log --oneline HEAD..origin/peer-brace",
+             "add shared.txt", "read in `", "git -C "],
+            ["git checkout ", "git log --oneline HEAD..origin/peer-brace",
+             "git fetch origin peer-brace"]),
+    "W13": (["your local HEAD", "log --oneline HEAD..origin/peer-space",
+             "add shared.txt", "read in `", "git -C "],
+            ["git checkout ", "git log --oneline HEAD..origin/peer-space",
+             "git fetch origin peer-space"]),
     # W10 is the opposite pin: the push runs in the call's OWN directory, so
     # naming it would be noise and `git -C` would be wrong.
     "W10": (["your local HEAD", "git log --oneline HEAD..origin/peer-payload",
              "add shared.txt"],
             ["git checkout ", "read in `", "git -C "]),
 }
+
+
+def _reconcile_runs(context, want_dir):
+    """True when every `git -C ...` line in `context` names `want_dir`.
+
+    Vacuously true when the case declared no directory, so this costs the
+    other cases nothing. `comments=True` drops the trailing `# or rebase, ...`
+    the reconcile block appends, which is a shell comment rather than an
+    argument.
+    """
+    if want_dir is None:
+        return True
+    for line in context.splitlines():
+        line = line.strip()
+        if not line.startswith("git -C "):
+            continue
+        try:
+            argv = shlex.split(line, comments=True)
+        except ValueError:
+            return False
+        if len(argv) < 3 or argv[2] != want_dir:
+            return False
+    return True
 
 
 def verdict(hook_path, repo, command, case_id=None, payload_cwd=None):
@@ -687,6 +782,8 @@ def verdict(hook_path, repo, command, case_id=None, payload_cwd=None):
     want, unwanted = LABEL_EXPECT.get(case_id, ([], []))
     if any(w not in context for w in want) or any(u in context for u in unwanted):
         return "WARN-WRONGLABEL"
+    if not _reconcile_runs(context, ROUNDTRIP.get(case_id)):
+        return "WARN-UNRUNNABLE"
     return "WARN"
 
 
@@ -892,11 +989,11 @@ MUTATIONS = {
         "a `cd` earlier in the compound command moves the directory the push "
         "runs in",
         [("        if head and head[0] in CD_WORDS:\n"
-          "            stack[depth] = _resolve_cd(head, stack[depth])\n"
+          "            dirs[scope] = _resolve_cd(head, dirs[scope])\n"
           "            continue",
           "        if head and head[0] in CD_WORDS:\n"
           "            continue")],
-        {"S17", "S18", "W8", "W11"},
+        {"S17", "S18", "W8", "W11", "W12", "W13"},
     ),
     "indeterminate_cd_declines": (
         "a `cd` that cannot be resolved declines the reading rather than "
@@ -924,18 +1021,43 @@ MUTATIONS = {
         {"W10"},
     ),
     "subshell_scopes_cd": (
-        "a subshell's parentheses are counted, so a `cd` inside one does not "
+        "a subshell's parentheses are tracked, so a `cd` inside one does not "
         "leak onto a push outside it",
         [("            for ch in t:\n"
           '                if ch == "(":\n'
-          "                    depth += 1\n"
-          '                elif ch == ")":\n'
-          "                    depth = max(depth - 1, 0)",
+          "                    opened += 1\n"
+          "                    scopes.append(scopes[-1] + (opened,))\n"
+          '                elif ch == ")" and len(scopes) > 1:\n'
+          "                    scopes.pop()",
           "            pass")],
         # W11's `cd` shares the subshell with its push, so it still applies
-        # when every depth reads as 0 -- which is what makes the pair a
+        # when every command reads as root -- which is what makes the pair a
         # two-sided pin rather than one case asserting silence.
-        {"S21"},
+        {"S21", "S22"},
+    ),
+    "subshells_have_identities": (
+        "a subshell is identified, not merely counted, so a `cd` in one does "
+        "not leak into its next SIBLING",
+        [("                    opened += 1\n"
+          "                    scopes.append(scopes[-1] + (opened,))",
+          "                    scopes.append(scopes[-1] + (len(scopes),))")],
+        # S21's push sits outside the parentheses, so a depth-shaped label
+        # leaves it correct; only the sibling shape can see the difference.
+        {"S22"},
+    ),
+    "brace_group_is_transparent": (
+        "a brace group's punctuation is stripped as a lead word, so the `cd` "
+        "inside one is visible and outlives the closing brace",
+        [('              "{", "}"}', "              }")],
+        {"W12"},
+    ),
+    "remediation_quotes_the_directory": (
+        "the directory is shell-quoted, so a `git -C` line naming a path with "
+        "a space is still runnable",
+        [("        gitc = f\"git -C {shlex.quote(cwd)} \" if moved else "
+          '"git "',
+          '        gitc = f"git -C {cwd} " if moved else "git "')],
+        {"W13"},
     ),
     "git_dir_option_declines": (
         "`--git-dir`/`--work-tree` name a repository, so the reading is "
@@ -955,7 +1077,7 @@ MUTATIONS = {
         "where, and qualifies every remediation command with `git -C`",
         [("        moved = os.path.realpath(cwd) != os.path.realpath(base)",
           "        moved = False")],
-        {"W8", "W9", "W11"},
+        {"W8", "W9", "W11", "W12", "W13"},
     ),
     "heredoc_blanking": (
         "a heredoc body is blanked before parsing, so a mention inside one "

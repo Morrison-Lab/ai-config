@@ -647,3 +647,13 @@ they sit in the hunk the anti-patterns edit touched, and Copilot reviews hunks.
 Replaced with `---` and pushed as `2b3bd51c` after a fresh `ls-remote` read `15287fbf`;
 Copilot re-requested, `@jules review` posted, the PR body's checks section moved to the new head.
 Lesson for the fold: a hunk-scoped reviewer will report pre-existing defects adjacent to any edit, so sweep the touched hunk for the corpus's mechanical rules before the first push, not only the added lines.
+
+## 17:39 PDT --- #3154 at `3f8f2fd9`: the hunk chase, round two
+
+Jules approved `2b3bd51c` and the claude-review run returned Ready for merge for `15287fbf`.
+Copilot's fourth round found the three em dashes left in the anti-patterns hunk (lines 458, 464, 465, pre-existing) and asked for one clause per line on step 3's lead sentence and the subsection's opening sentence;
+the line-break gate then flagged the two-sentence line the dash edit had touched, so it is split too.
+Pushed as `3f8f2fd9` after a fresh `ls-remote` read `2b3bd51c`;
+Copilot re-requested, `@jules review` posted, PR body moved to the head.
+The commit failed once because the message file is written after the gates in the script, and a gate failure skipped it;
+write the message file before the gates.

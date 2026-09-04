@@ -87,6 +87,16 @@ def test_skips_call_site_inside_a_multiline_string():
         target.write_text(inside, encoding="utf-8")
         r = run(str(target))
 
+    if r.returncode != 0:
+        print("FAIL: a file whose only call site is inside a string should pass:")
+        print(r.stdout)
+        return False
+
+    if "could not tokenize" in r.stdout:
+        print("FAIL: the file was not parsed:")
+        print(r.stdout)
+        return False
+
     if examined(0) not in r.stdout:
         print("FAIL: a call site inside a multi-line string should not be examined:")
         print(r.stdout)

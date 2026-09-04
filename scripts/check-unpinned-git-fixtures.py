@@ -95,7 +95,7 @@ def main(argv):
             failures += 1
 
     print(f"Examined {call_sites_examined} git init/clone call sites.")
-    if call_sites_examined == 0:
+    if call_sites_examined == 0 and not argv:
         print("ERROR: No call sites examined. Negative-control failure.")
         return 1
 

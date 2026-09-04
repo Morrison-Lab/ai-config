@@ -1000,6 +1000,8 @@ def _argv_open(argv):
     """
     if not argv or argv[0] != "gh" or len(argv) < 3 or argv[1] != "pr":
         return False, None, None
+    if _has_flag(argv[2:], "--help", "-h"):
+        return False, None, None
     if argv[2] == "create":
         _, repo = _verb_ident(argv)
         return True, None, repo          # a create's number is in its result
@@ -1010,25 +1012,27 @@ def _argv_open(argv):
 
 
 def open_ident(cmd):
-    """(num, repo) from the actual `gh pr create`/`gh pr ready` simple command.
+    """(is_open, num, repo) from the actual `gh pr create`/`gh pr ready` simple command.
 
     Mirrors draft_ident/request_ident: the OPEN identity is located
     structurally from the create/ready command, never from the whole raw string.
-    A whole-string search (the old cmd_ident) matched a decoy PR number from an
-    unrelated verb chained ahead (`gh pr checks 1029 && gh pr ready`), mislabeled
-    the obligation, and let a later unrelated request for that decoy PR silently
-    discharge the real one. Returns (None, None) when no open command carries a
-    number -- the bare `gh pr ready` case -- so the number backfills from the
-    open's own result instead. Fails toward no-identity on a parse error.
+    A whole-string search (the old cmd_ident) matched a decoy PR number chained ahead
+    (`gh pr checks 1029 && gh pr ready`), mislabeled the obligation, and let a later
+    unrelated request for that decoy PR silently discharge the real one. Returns
+    (True, None, repo) when no open command carries a number -- the bare `gh pr ready`
+    case -- so the number backfills from the open's own result instead. Returns
+    (False, None, None) when no open command matches. On a parse error, falls back
+    to RX_OPEN string search with no identity (is_open, None, None).
     """
     cmds = _simple_commands(cmd)
     if cmds is None:
-        return None, None
+        cmd_open = _scrub_all(cmd)
+        return bool(RX_OPEN.search(cmd_open)), None, None
     for argv in cmds:
         ok, num, repo = _argv_open(argv)
         if ok:
-            return num, repo
-    return None, None
+            return True, num, repo
+    return False, None, None
 
 
 # Tools whose input is a SHELL COMMAND. Matching CLI patterns against any
@@ -1616,8 +1620,8 @@ def scan(path):
                         #     (num-None) obligation when the create truly failed --
                         #     a safe over-warn, per shared/principles/fail-fast.md,
                         #     chosen over a silent discharge.
-                        if failed and rnum is None and ob["num"] is None \
-                                and not ob["self"]:
+                        if rnum is None and ob["num"] is None \
+                                and (not failed or not ob["self"]):
                             continue
                         if ob["num"] is None and rnum:
                             ob["num"] = rnum
@@ -1652,6 +1656,9 @@ def scan(path):
                             keep.append(ob)
                             continue
                         keep.append(ob)
+                    opened_tid = any(ob["tid"] == rid for ob in obligations)
+                    if opened_tid and rnum:
+                        keep[:] = [o for o in keep if o["num"] is not None]
                     obligations[:] = keep
                     # Discharge the reviewer request that produced this result.
                     # A discharge is the DANGEROUS action -- it asserts the PR
@@ -1752,6 +1759,9 @@ def scan(path):
                             # this session re-arms review for it.
                             live.pop(xnum, None)
                             uncertain.discard(xnum)
+                            if not live:
+                                obligations[:] = [o for o in obligations
+                                                  if o["num"] is not None]
                         elif failed:
                             uncertain.discard(xnum or rnum)
                         else:
@@ -1770,6 +1780,9 @@ def scan(path):
                         if plast and not failed and RX_TERMINAL_STATE.search(body):
                             _clear(obligations, pnum, prepo)
                             live.pop(pnum, None)
+                            if not live:
+                                obligations[:] = [o for o in obligations
+                                                  if o["num"] is not None]
                     # A `no-ai-review` label exempts a redaction PR from the
                     # reviewer request, but only once the label has actually
                     # landed: a repo with no such label fails the add outright
@@ -1882,8 +1895,8 @@ def scan(path):
                 # (`gh pr view 42 && gh pr ready`) and mislabeled the obligation.
                 cmd_open = _scrub_all(cmd_raw)
                 draft = bool(RX_DRAFT.search(cmd_open))
-                opened = bool(RX_OPEN.search(cmd_open)) and not draft
-                onum, orepo = open_ident(cmd_raw)
+                is_open, onum, orepo = open_ident(cmd_raw)
+                opened = is_open and not draft
                 reqs_parsed = _requests_in(cmd_raw)
                 requested, rnum, rrepo, rlast = request_ident(cmd_raw, _reqs=reqs_parsed)
                 _dok, dnum, drepo, dlast = draft_ident(cmd_raw)

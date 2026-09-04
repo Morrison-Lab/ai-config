@@ -348,7 +348,7 @@ the labels on my replies were not, and the drift reached eleven minutes.
 The rule's remedy is the same as ever: run the clock command before typing a time, and the `no-unmeasured-clock-claim` hook is not active in this remote session to catch it.
 The wave-1 lesson (a `Refs` first commit closes nothing at squash time, and the fixer brief asserted otherwise for all six branches, true for four) goes into `memories/github-closing-keywords.md` on branch `ums/2026-09-04-refs-first-commit-closes-nothing` (worktree `wt-ums5`).
 
-### 13:34 PDT --- UMS round 2 dispatched; waves 2-4 near the end
+## 13:34 PDT --- UMS round 2 dispatched; waves 2-4 near the end
 
 The wt-ums5 entry was rewritten after round 1's five findings (every-commit grep, pointer to `issue-first.md`, the premature close of #3068 named), and the gate chain passed once the line beginning with an issue number was reworded for MD018.
 Committed as 494495d7 on top of bc791949;
@@ -389,7 +389,7 @@ the grep carries `%h`;
 the section is one sentence per line.
 Rewritten as 10671c78; round 6 (opus) running.
 
-### 2026-09-04 14:19 PDT --- wave 2 done, ten PRs open, one backtick corruption repaired
+## 2026-09-04 14:19 PDT --- wave 2 done, ten PRs open, one backtick corruption repaired
 
 Wave 2 (`wf_ea4fb2c4-1cb`) finished: 10 items, 44 agents, 6,612,301 tokens;
 6 verified (#3121, #3038, #3050, #3111, #3108, #3034), 4 ended on history-only findings (#3105 trailer-less sync merge, #3098 and #3114 stale commit bodies, #3110 a `Closes` in a commit body with an unmet bullet).
@@ -405,20 +405,20 @@ Copilot requested and this session subscribed on all ten;
 each carries `@jules review` in its claim comment.
 Result comment on #3203 and a status comment on each of the ten issues posted.
 
-### 2026-09-04 14:21 PDT --- two UMS branches under review
+## 2026-09-04 14:21 PDT --- two UMS branches under review
 
 Round 6 on wt-ums5 found the `%h %B` grep drops the hash from body-line hits (the listing now uses `git log --grep` with `%h %s`) and that "the three surfaces that decide" presupposed a hand-written squash body;
 rewritten as b2f5f3aa, round 7 running.
 The heredoc lesson is its own branch `ums/2026-09-04-unquoted-heredoc-runs-backticks` (worktree wt-ums6, 23098cab, `memories/git.md`), round 1 running.
 Waves 3 and 4 each have one agent in flight.
 
-### 2026-09-04 14:22 PDT --- #3229 validate red, fixed
+## 2026-09-04 14:22 PDT --- #3229 validate red, fixed
 
 `check-unpinned-git-fixtures.py` flagged the tracked-tree fixture on the #3114 branch (`git init -q` without `-b main`);
 reproduced locally (rc=1), pinned, suite 31/31, pushed a29e449c on top of the verified head.
 The other nine wave-2 PRs are being read for check state now.
 
-### 2026-09-04 14:29 PDT --- heredoc entry was a duplicate; moved into claude-code.md
+## 2026-09-04 14:29 PDT --- heredoc entry was a duplicate; moved into claude-code.md
 
 The wt-ums6 reviewer found `memories/claude-code.md` already carries the unquoted-heredoc rule (measured 2026-08-23);
 a `grep -rni heredoc` over the corpus before authoring would have shown it.
@@ -426,7 +426,7 @@ The new git.md section is dropped;
 the recurrence goes into the existing section as a second-occurrence paragraph with the stderr signal and the read-one-body-back pair (111473dc, Refs #3230, filed for the recurrence).
 Round 2 (opus) running.
 
-### 2026-09-04 14:31 PDT --- review workflows skipped the bot-authored wave-2 PRs
+## 2026-09-04 14:31 PDT --- review workflows skipped the bot-authored wave-2 PRs
 
 The claude-review runs for #3220-#3228 completed with every reusable-workflow job skipped, and the twelve latest jules-review and antigravity-review runs were all skipped with actor `claude[bot]`.
 Cause: a REST call through the session proxy posts as `claude[bot]` (PR author and comment author), while the MCP tools post as `d-morrison`;
@@ -434,7 +434,7 @@ the review workflows gate on the actor. #3229 got its review only because my git
 Remedy applied: `claude-review.yml` dispatched by MCP with `pr_number` for the nine, and `@jules review` re-posted by MCP on all ten.
 Learning to record (after wt-ums6 round 2 returns): REST-via-proxy versus MCP identity, and which workflows skip a bot actor.
 
-### 2026-09-04 14:33 PDT --- closing-keywords round 7; #3231 filed
+## 2026-09-04 14:33 PDT --- closing-keywords round 7; #3231 filed
 
 Round 7 (on b2f5f3aa) found the surfaces bullet still carried squash-only surfaces into the merge-commit and rebase cases, the merge commit body this repo fills from the PR title (`merge_commit_message` = `PR_TITLE`) was unlisted, and "nobody reads the title" contradicted the section's own parser claim.
 Rewritten as fc5672d2 with a per-method surface list;
@@ -442,7 +442,7 @@ the file-level read-the-squash-message bullet folded in;
 round 8 (opus) running.
 The reviewer's out-of-scope observation (fail-fast.rationale.md:1432 says a squash subject is always the PR title) is filed as #3231.
 
-### 2026-09-04 14:36 PDT --- Jules nits on #3220 fixed; wt-ums6 round 3
+## 2026-09-04 14:36 PDT --- Jules nits on #3220 fixed; wt-ums6 round 3
 
 Jules returned `comment` on #3220 with two nits (the `pulls/<N>/comments` fetch inside the per-review loop in `skills/ardi/SKILL.md` and `skills/pr-status-all/SKILL.md`);
 hoisted the fetch, verified the jq shape on a fixture, pushed 1d7ddeee, re-mentioned Jules.
@@ -454,7 +454,7 @@ rewritten as cab3bcfc, which also adds the bot-actor review-skip bullet to `memo
 the consequence for the review workflows was not).
 Round 3 (opus) running.
 
-### 2026-09-04 14:38 PDT --- four wave-2 PRs merged
+## 2026-09-04 14:38 PDT --- four wave-2 PRs merged
 
 PR #3221 (d2bf4f93, Closes #3105), #3224 (01e86fdc, Closes #3050), #3226 (65b538bd, Closes #3111), #3229 (ed4ca957, Closes #3114) squash-merged with hand-written bodies under the standing grant: claude Ready at head, Jules approve, Copilot quota-skip, checks green.
 Issues confirmed closed;
@@ -465,7 +465,7 @@ PR #3220 nits fixed, both reviews pending;
 PR #3222, #3223, #3225 waiting on claude-review;
 wave 4 finished (47/47), result not yet read.
 
-### 2026-09-04 14:41 PDT --- three more wave-2 merges; #3232 filed; #3222 fix pushed
+## 2026-09-04 14:41 PDT --- three more wave-2 merges; #3232 filed; #3222 fix pushed
 
 PR #3223 (661b382b, Closes #3098), #3225 (996e2a81, Refs #3110, residual #3219), #3228 (25ae1e27, Closes #3034) merged;
 worktrees removed;
@@ -474,7 +474,7 @@ merged on the prose and the green check, so the two hook gaps (substring label m
 closed to a list, two nouns pinned blocking, 108/108, pushed. #3220 review running on 1d7ddeee (Jules approved twice);
 PR #3227 re-dispatch pending (Jules approved).
 
-### 2026-09-04 14:42 PDT --- nine of ten wave-2 PRs merged
+## 2026-09-04 14:42 PDT --- nine of ten wave-2 PRs merged
 
 PR #3220 (eb5047a5, Closes #3121) and #3227 (540daf3b, Refs #3108) merged;
 worktrees removed;
@@ -482,7 +482,7 @@ main at 540daf3b.
 Only #3222 (fix/3038) remains from wave 2, with the adverb-slot fix 0cadc427 under review.
 Waves 3 and 4 each have one agent left (47/46, 48/47).
 
-### 2026-09-04 14:47 PDT --- #3228 merged over an off-head red check; #3233 filed
+## 2026-09-04 14:47 PDT --- #3228's 14:41 merge found to have gone out over an off-head red check; #3233 filed
 
 wt-ums6 round 3 found the bot-actor bullet's mechanism wrong for two of three workflows (Jules gates on `author_association`, Antigravity on a mention) and the counts wrong (21 per workflow, 11 on mention-less link-back comments).
 Verifying the nine dispatch runs showed #3228's `require-clean-verdict` failed (`verdict: unrecognized`, a doubled `### Verdict` heading) on the dispatch run, which is not attached to the head's check-runs;
@@ -492,7 +492,7 @@ the check was red off-head;
 filed as #3233 and recorded in the bullet.
 Rewritten as the new wt-ums6 head; round 4 (opus) running.
 
-### 2026-09-04 14:50 PDT --- closing-keywords round 8 applied
+## 2026-09-04 14:50 PDT --- closing-keywords round 8 applied
 
 Round 8 (on fc5672d2) returned eleven findings, three should-fix: the listing hid the matched body lines and hard-coded `origin/main`, and "no diff can meet" overgeneralized.
 The listing now restricts to matching commits, prints header plus matching body lines, and resolves the base from the remote;
@@ -500,26 +500,26 @@ the #1718 Do/Don't list moved up beside its case with its post-merge bullet rest
 Rewritten as 4b117ddb;
 round 9 (opus) running. #3222 Ready on 0cadc427, Jules re-mentioned for the new head.
 
-### 2026-09-04 14:51 PDT --- #3232 fix pushed
+## 2026-09-04 14:51 PDT --- #3232 fix pushed
 
 Branch `fix/3232-label-token-and-backtick` (worktree wt-3232, a991b17f): the authorship label is compared as a comma-split token on all three paths and the separator class carries the backtick;
 41/41;
 PR opened through the MCP tool so the review workflows see the user as sender.
 
-### 2026-09-04 14:55 PDT --- wave 2 fully merged
+## 2026-09-04 14:55 PDT --- wave 2 fully merged
 
 PR #3222 (5d4a2631, Closes #3038) merged: claude Ready at 0cadc427, Copilot skip, checks green;
 Jules's approve sits on the prior head 8f77347e and the re-mention's run finished without a new verdict, so the merge went on the head verdict plus the earlier approve (the delta was the five-line adverb list the head review verified).
 All ten wave-2 PRs are merged;
 PR #3234 (the #3232 fix) has Jules approve and waits on claude-review and validate.
 
-### 2026-09-04 14:56 PDT --- #3234 round 2
+## 2026-09-04 14:56 PDT --- #3234 round 2
 
 claude-review Ready on a991b17f with two non-blocking findings (the backtick separator made a single-quoted prose mention fire;
 one blank line short);
 fixed at 1e0a8d2c by blanking single-quoted spans before the position match only, 42/42, pushed, Jules re-mentioned.
 
-### 2026-09-04 14:59 PDT --- wt-ums6 round 4: the bullet duplicated two existing entries
+## 2026-09-04 14:59 PDT --- wt-ums6 round 4: the bullet duplicated two existing entries
 
 Round 4 found the bot-actor bullet re-derived what `memories/github-remote-sessions.md` recorded on 2026-09-03 (a raw-REST PR gets no automatic review;
 read the run's jobs) and `memories/claude-bot-workflows.md` carries too, and that "only the jobs endpoint shows the skips" was false (the head's check-runs show them;
@@ -528,7 +528,7 @@ Rewritten as b83a664c: a recurrence note that cross-links both entries and keeps
 The recurrence with the rule loaded is itself the finding: a grep for the mechanism before authoring would have found the day-old entry.
 Round 5 (opus) running.
 
-### 2026-09-04 15:01 PDT --- closing-keywords round 9 applied
+## 2026-09-04 15:01 PDT --- closing-keywords round 9 applied
 
 Round 9 (on 4b117ddb): the PR-body surface fires only on a PR targeting the default branch (a stacked PR's body keyword never fires;
 its commits' keywords do once on main), and the listing needed a range count as its negative control.
@@ -536,20 +536,20 @@ Both added, plus the merge-commit subject's real form and editability and the re
 df0025e0;
 round 10 (opus) running.
 
-### 2026-09-04 15:02 PDT --- #3234 merged
+## 2026-09-04 15:02 PDT --- #3234 merged
 
 PR #3234 (b8908d6a, Closes #3232) merged: claude Ready at 1e0a8d2c, checks green, Copilot skip;
 Jules approved the prior head and its re-mention run (21:56:57) finished without a new verdict or status, the same shape as on #3222.
 Worktree wt-3232 and branch removed; main at b8908d6a.
 Open on this session: wt-ums5 (round 10), wt-ums6 (round 5), the notebook branch, and waves 3 and 4 with one agent each.
 
-### 2026-09-04 15:03 PDT --- #3234's second review kept the blank-line nit open
+## 2026-09-04 15:03 PDT --- #3234's second review kept the blank-line nit open
 
 The round-2 review on 1e0a8d2c (posted after the merge) said the second blank line was still missing, because the new `strip_single_quoted` function moved the gap rather than closing it;
 I merged with that nit open.
 One-line follow-up branch `fix/3232-blank-line` (worktree wt-3232b, 8e2d34bc) pushed and opened as a PR through the MCP tool.
 
-### 2026-09-04 15:12 PDT --- wave 4 done; nine PRs open (#3236-#3244)
+## 2026-09-04 15:12 PDT --- wave 4 done; nine PRs open (#3236-#3244)
 
 Wave 4 (`wf_7a2c1144-332`): 11 items, 51 agents, 7,827,059 tokens;
 8 verified, #2510 history-only, #3001 a real finding (substring projection check), #2981 conflicts with main.
@@ -561,7 +561,7 @@ status comments on the eleven issues.
 wt-ums6 round 5 applied (de714541): all three conjuncts of each review gate named, the old remote-sessions Don't scoped to the raw API with a pointer;
 round 6 running.
 
-### 2026-09-04 15:13 PDT --- closing-keywords round 10 applied
+## 2026-09-04 15:13 PDT --- closing-keywords round 10 applied
 
 Round 10 (on df0025e0): the zero-count rationale was wrong (a wrong base fails loudly;
 zero means an empty range), and the opening rule lacked the default-branch condition the later bullet carried.
@@ -569,7 +569,7 @@ Both fixed, plus the count of branches the brief's assertion held for (four of s
 5dc3db06;
 round 11 (opus) running.
 
-### 2026-09-04 15:14 PDT --- #3235 merged; nine wave-4 PRs under review
+## 2026-09-04 15:14 PDT --- #3235 merged; nine wave-4 PRs under review
 
 PR #3235 (d94c7dcd, Refs #3232) merged on Ready plus Jules approve plus green checks;
 wt-3232b removed;
@@ -577,7 +577,7 @@ main at d94c7dcd.
 Wave-4 PRs #3236-#3244 all show author d-morrison with claude-review and validate in progress on open, which is the MCP path working as the recurrence bullet says.
 Wave 3 still has one agent in flight (50/49).
 
-### 2026-09-04 15:15 PDT --- check-in re-armed; wave-4 merges begin
+## 2026-09-04 15:15 PDT --- check-in re-armed; wave-4 merges begin
 
 Check-in fired at 15:13 PDT and was re-armed for 16:16 PDT with the wave-4 state.
 PRs #3238 (2528), #3240 (2905), #3241 (2921, Refs) had claude Ready at head, Jules approve, and green checks;

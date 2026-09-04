@@ -129,11 +129,20 @@ asks when it requires every exclusion to be recorded with its reason.
 A reviewer is reachable by any of three routes,
 and only the first of them can ever appear on `PATH`:
 
-1. **A local CLI**, probed with `command -v` --- `agy`, `opencode`, `codex`, `claude`, `cursor`.
+1. **A local CLI**, probed with `command -v`.
+   The binaries the adapters probe are derivable,
+   so start from them rather than from a list copied into this sentence,
+   per [`avoid-hardcoding-external-data`](../coding/avoid-hardcoding-external-data.md):
+   `grep -o 'shutil.which("[a-z0-9-]*")' scripts/orchestrator/model_adapters.py | sort -u`.
+   That set is a floor rather than the population:
+   a CLI no adapter probes never appears in it,
+   and `agy` is the worked case,
+   since [`delegation.md`](../../memories/delegation.md)'s ladder routes dispatchable work to it
+   while the adapter named after it probes `gemini`.
 2. **A forge-side bot**, which runs on the forge and so is invisible to `PATH` in principle.
 3. **An API key** for a provider reachable without its CLI,
    probed in the environment rather than on `PATH`.
-   The variables are the ones each adapter falls back to when its binary is absent,
+   The variables are every API-key variable the adapters read,
    so derive them from
    [`model_adapters.py`](../../scripts/orchestrator/model_adapters.py)
    rather than from a subset copied into this sentence,
@@ -142,6 +151,9 @@ and only the first of them can ever appear on `PATH`:
    A subset written out here once left a reader probing fewer variables
    than the adapters read,
    which is this section's own failure one route over.
+   Not every variable the derivation returns gates an adapter's `is_available()`,
+   since some are read only when a call is made,
+   so a hit names a provider to probe rather than one to record available.
 
 A null `command -v` sweep is therefore evidence about `PATH` and about nothing else.
 That is [`grep-is-not-coverage`](grep-is-not-coverage.md)'s shape,
@@ -155,8 +167,8 @@ so its providers are enumerated here rather than left to be inferred:
 | provider | how it is reached |
 | --- | --- |
 | Copilot | a reviewer request on the pull request, where the repository has Copilot review enabled |
-| Jules | a mention comment, where the repository carries a Jules review workflow |
-| Antigravity | a mention comment or a manual workflow run, where the repository carries an Antigravity review workflow |
+| Jules | a mention comment from an account the workflow's `author_association` allowlist admits, where the repository carries a Jules review workflow |
+| Antigravity | such a mention comment, or a manual workflow run, where the repository carries an Antigravity review workflow |
 
 The concrete dispatch mechanism behind each row --- the endpoint, the tool name, the workflow file ---
 varies by harness and by repository,
@@ -171,6 +183,17 @@ so derive those rows from the repository's own `on:` blocks,
 and Copilot review is switched on and off per repository by a ruleset rule
 and per user by quota,
 so derive that row from the repository's rulesets.
+
+**A comment-triggered row also depends on who posts the mention, which is a property of the session rather than of the repository.**
+Both comment-triggered workflows gate their job on
+`author_association` being one of `OWNER`, `MEMBER`, or `COLLABORATOR`,
+and a session whose comment writes land under a bot identity posts as `CONTRIBUTOR`,
+so the job skips with no error and no verdict
+([ai-config#1433](https://github.com/Morrison-Lab/ai-config/issues/1433),
+and [`self-review-fallback`](self-review-fallback.md)'s own statement of the same gate).
+A posted mention is therefore not a dispatch:
+read the created comment's `author_association` back,
+and read the workflow's own `if:` for the allowlist it applies.
 
 **Copilot carries a state the other two rows do not: reachable and withheld.**
 A standing maintainer directive forbids requesting Copilot code review
@@ -187,7 +210,8 @@ Whether a forge-side reviewer's harness and model differ from the authoring sess
 is a per-session question,
 settled by the ladder above rather than by this table ---
 a session authoring under the `agy` CLI and reviewed by an Antigravity workflow
-shares a model family with its reviewer.
+shares a harness family with its reviewer,
+and whether it shares a model is not readable from this table either.
 Whether any of the three rows satisfies the **merge** gate is a separate question this section does not settle:
 the ladder and its Do bullet above are unchanged by this inventory,
 and the multi-backend rule stated there still has to be applied per provider,
@@ -209,6 +233,11 @@ and what a single failed sweep never establishes.
   per provider and per authoring session.
 - **Do:** derive the API-key route from the adapters that read those variables,
   since they are its source of truth and a copied list drifts from them.
+- **Do:** derive the local-CLI route from the adapters' own probes,
+  and treat the result as a floor,
+  since a CLI no adapter probes never appears in it.
+- **Do:** read the commenting identity's `author_association` back
+  before recording a comment-triggered forge reviewer as dispatched.
 - **Don't:** read a null `command -v` sweep as an availability verdict;
   it reports what is on `PATH` and stops there.
 - **Don't:** record a CLI as available on a `command -v` hit alone;
@@ -216,6 +245,10 @@ and what a single failed sweep never establishes.
   which is a state the probe never reports.
 - **Don't:** enumerate the API-key route from a list written out in prose,
   here or anywhere else; that list is a subset the moment an adapter is added.
+- **Don't:** enumerate the local-CLI route from a list written out in prose either;
+  it drops every CLI the adapters do not probe.
+- **Don't:** record a comment-triggered forge reviewer as dispatched on a posted mention alone;
+  an `author_association` allowlist skips the job with no error.
 - **Don't:** treat the machine inventory above as the provider population, since a forge-side reviewer cannot appear in it.
 - **Don't:** record a withheld provider as available,
   or read its row as licence to dispatch it.

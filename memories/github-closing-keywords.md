@@ -82,16 +82,17 @@ which GitHub builds from them as a bullet list
 when `squash_merge_commit_message` is `COMMIT_MESSAGES` (read 2026-09-04),
 and a body written by hand at merge time replaces that default entirely.
 So a listing of the branch's keyword-carrying commits answers what the default body would carry,
-and the message actually entered is what to read once it exists;
-the Do bullet below enumerates the surfaces per merge method.
+and the message actually entered is what to read once it exists.
 
 Measured 2026-09-04 on the six wave-1 PRs,
+[#3211](https://github.com/Morrison-Lab/ai-config/pull/3211) through [#3216](https://github.com/Morrison-Lab/ai-config/pull/3216),
+whose first commits carry `Closes` in bd5f0400, 6bd132d3, 38222457, and 6ef32462 and `Refs` in 70caac00 and f30d108e,
 on the fix-loop scripts from the first wave-1 script through r5
 (r5 alone carries the shape ai-config#3203 proposed),
 on issue #3068's timeline,
 and on a run of `hooks/remind-brief-premises.py`.
 The fixer brief asserted for every branch that its first commit already carried the closing keyword;
-the assertion held for four of the six and failed for the two below.
+the assertion held for four of the six and failed for two.
 The sentence entered the loop's brief on 2026-09-03, in the first wave-1 script,
 and was copied into each later script through r5 without anyone re-reading the branches.
 The assertion was never true for `fix/3102-memory-size-approach`,
@@ -120,8 +121,8 @@ so a count in a claim about a branch's commits reaches neither.
   with the PR's base resolved rather than assumed
   (`base="$(git remote show origin | sed -n 's/.*HEAD branch: //p')"`, or the branch a stacked PR targets):
   `git rev-list --count "origin/$base..HEAD"` first,
-  since a zero says HEAD is not ahead of that base (wrong ref, uncommitted work, or a branch already merged),
-  and it separates nothing-to-search from searched-and-found-nothing;
+  since a zero says HEAD is not ahead of that base (wrong ref, uncommitted work, or a branch merged by a merge commit or fast-forward),
+  and the count separates nothing-to-search from searched-and-found-nothing;
   then
   `pat='(close[sd]?|fix(es|ed)?|resolve[sd]?):? *([A-Za-z0-9._-]+/[A-Za-z0-9._-]+)?#[0-9]+'` and
   `git log --regexp-ignore-case --extended-regexp --grep="$pat" --format='== %h %s%n%b' "origin/$base..HEAD" | grep -iE "^== |$pat"`;

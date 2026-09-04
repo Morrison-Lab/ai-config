@@ -175,6 +175,7 @@ import hashlib
 import json
 import os
 import re
+import subprocess
 import sys
 import tempfile
 
@@ -323,12 +324,12 @@ FINDINGS_VALUE = re.compile(r"FINDINGS_COUNT\s*:\s*(\d+)")
 # The noun alone does not scope the claim to this session's review history --
 # "reviews" and "findings" both have ordinary uses the printed values say
 # nothing about. AGG_INTENT, AGG_NOT_YET and AGG_FOREIGN below SUBTRACT three
-# of those uses: an intention, work not yet done, and a count about another
-# forge item. Subtracting is not scoping, and the difference is worth stating
-# rather than leaving to a reader: a count about somebody else's review history
-# that names no PR or issue number ("we got seven reviews from the bot") is a
-# residual this clause cannot tell from its own, and the reminder it prints
-# there points at values the claim has nothing to do with.
+# of those uses: an intention, work not yet done, and a count about ANOTHER
+# repository's forge item. Subtracting is not scoping, and the difference is
+# worth stating rather than leaving to a reader: a count about somebody else's
+# review history that names no PR or issue number ("we got seven reviews from
+# the bot") is a residual this clause cannot tell from its own, and the
+# reminder it prints there points at values the claim has nothing to do with.
 AGGREGATE_NOUNS = {"findings", "rounds", "reviews"}
 
 # The command that discharges clause C must NAME the token, exactly as
@@ -386,7 +387,98 @@ AGG_NOT_YET = re.compile(
 # this clause exists for opens "Measured on #3107:", naming the PR the session
 # is working. What marks a reference as somebody else's is the repo or owner
 # glued to it, or the explicit "PR 4242" form.
-AGG_FOREIGN = re.compile(r"\b\w+#\d|\b(?:PR|MR|issue)\s+\d", re.I)
+#
+# The qualifier alone is not enough, though, and reading it that way silenced
+# the target case in its commonest phrasing. This corpus writes its own items
+# qualified -- `README.md` and this file's own docstring both say
+# `ai-config#3117` -- so "The five adversarial rounds on ai-config#3107
+# produced ten findings." is a claim about THIS session's history wearing a
+# repo name. `own_repo` is what tells the two apart: a reference naming the
+# repository the session is working in is not foreign, and everything else is.
+AGG_FOREIGN = re.compile(
+    r"\b(?:([\w.-]+)/)?([\w.-]+)#\d|\b(?:PR|MR|issue)\s+\d", re.I,
+)
+
+# `origin`'s URL, parsed the way `gh` itself infers a repo when none is named
+# on the command line -- the same shape `hooks/flag-uncited-rebuttal.py`
+# already uses, rather than a second parser for the same string.
+GIT_REMOTE = re.compile(r"[:/]([\w.-]+)/([\w.-]+?)(?:\.git)?$")
+
+_OWN_REPO = ()
+
+
+def own_repo():
+    """(owner, repo) for the repository this session is working in, lowercased.
+
+    `GITHUB_REPOSITORY` first, because a workflow run sets it and it needs no
+    subprocess; `git remote get-url origin` otherwise. Either half may be
+    absent, and the pair is `(None, None)` when neither resolves -- in which
+    case AGG_FOREIGN keeps its old behaviour and treats every qualified
+    reference as somebody else's. That is the safe direction here: it costs a
+    missed reminder rather than a wrong one.
+
+    Resolved once per process and cached, including the failure, so a brief
+    naming several forge items does not shell out once per match.
+    """
+    global _OWN_REPO
+    if _OWN_REPO != ():
+        return _OWN_REPO
+    _OWN_REPO = (None, None)
+    slug = os.environ.get("GITHUB_REPOSITORY") or ""
+    if "/" in slug:
+        owner, _, repo = slug.partition("/")
+        _OWN_REPO = (owner.lower(), repo.lower())
+        return _OWN_REPO
+    try:
+        out = subprocess.run(
+            ["git", "remote", "get-url", "origin"],
+            capture_output=True, text=True, timeout=5)
+    except (OSError, subprocess.SubprocessError):
+        return _OWN_REPO
+    if out.returncode != 0:
+        return _OWN_REPO
+    m = GIT_REMOTE.search(out.stdout.strip())
+    if m:
+        _OWN_REPO = (m.group(1).lower(), m.group(2).lower())
+    return _OWN_REPO
+
+
+def foreign_reference(text):
+    """True when `text` names a forge item belonging to somebody else.
+
+    A match with no repo qualifier (`PR 4242`) is foreign by construction --
+    the number names an item this hook cannot attribute. A qualified one is
+    foreign unless its repo is the one the session is working in.
+    """
+    for m in AGG_FOREIGN.finditer(text):
+        owner, repo = m.group(1), m.group(2)
+        if repo is None:
+            return True
+        mine_owner, mine_repo = own_repo()
+        if mine_repo is None or repo.lower() != mine_repo:
+            return True
+        if owner and mine_owner and owner.lower() != mine_owner:
+            return True
+    return False
+
+
+# A forge reference: a numeral that is an item's NAME rather than a count of
+# anything. Without it "Measured on #3107 the five rounds gave ten findings."
+# reported `3107 the five rounds` as an undischarged claim, and 3107 can never
+# equal a printed value, so no per-round-figure suppression could ever reach
+# it. Worse, that bogus match CONSUMED the sentence's real claim: `finditer`
+# resumes after the span it returned, so "ten findings" was never scanned.
+#
+# Hence a length-preserving MASK rather than a skip inside the loop. The digits
+# are blanked for the count scan only; every suppression still reads the
+# original text, where `PR 4242` is intact and AGG_FOREIGN can see it.
+REF_NUMBER = re.compile(r"((?:#|\b(?:PR|MR|issue)\s+))(\d[\d,]*)", re.I)
+
+
+def mask_references(text):
+    """`text` with forge-reference digits blanked, same length throughout."""
+    return REF_NUMBER.sub(lambda m: m.group(1) + " " * len(m.group(2)), text)
+
 
 # Word forms `COUNT` accepts, so a claim's numeral can be compared against
 # the values the transcript actually printed.
@@ -654,16 +746,25 @@ def aggregate_claims(prompt):
     - AGG_NOT_YET, because "There are three reviews pending on the stack."
       counts work not yet done, which no `FINDINGS_COUNT` value is about.
     - AGG_FOREIGN, because "sparta#1375 had 8 findings." counts another PR's
-      review history, and this session's own values say nothing about it.
+      review history, and this session's own values say nothing about it. A
+      reference naming the session's OWN repository is not foreign; see
+      `foreign_reference`.
+
+    One further exclusion, which is not a suppression but a parse fix: a
+    numeral directly after a forge marker is an item's name, so `#3107` must
+    not be read as the claim's cardinality. See `mask_references`.
 
     `value` is the integer the claim states, carried out so `evaluate` can
     tell an aggregate from a per-round figure quoted straight off a review.
     """
     text = visible_prose(prompt)
+    # Scanned masked, suppressed against the original. The two are the same
+    # length, so every offset below indexes both.
+    scan = mask_references(text)
     found, seen = [], set()
     for m in re.finditer(
         rf"\b({COUNT})\s+(?:[A-Za-z][\w'-]*\s+){{0,2}}?([A-Za-z][\w-]*s)\b",
-        text, re.I,
+        scan, re.I,
     ):
         if m.group(2).lower() not in AGGREGATE_NOUNS:
             continue
@@ -676,7 +777,7 @@ def aggregate_claims(prompt):
             continue
         if AGG_NOT_YET.match(text[m.end():m.end() + 60]):
             continue
-        if AGG_FOREIGN.search(text[start:segment_end(text, m.end())]):
+        if foreign_reference(text[start:segment_end(text, m.end())]):
             continue
         quote = " ".join(m.group(0).split())
         if quote.lower() in seen:
@@ -745,47 +846,45 @@ def aggregate_derivations(prompt):
             if DERIVE_AGGREGATE.search(seg)]
 
 
-# Digits that carry no count, and so cannot be an addend. A numbered
-# instruction list ("1. Read the diff.") and a forge reference ("PR 2",
-# "#3117") both put small integers into a brief, and a per-round
-# `FINDINGS_COUNT` value is a small integer too -- real ones run 0 to 3 -- so
-# an unfiltered scan reads either as the addends written out.
-LIST_MARKER = re.compile(r"^[\s>*+-]*\d+[.)]\s")
-REF_NUMBER = re.compile(r"(?:#|\b(?:PR|MR|issue)\s+)\d[\d,]*", re.I)
-
-
 def enumerates(text, values, line):
-    """True when the brief pastes at least two of the transcript's own values.
+    """True when the brief writes out EVERY one of the transcript's values.
 
     A brief that writes out "the five rounds returned 2, 3, 3, 1 and 0
     findings" carries its own derivation: the addends are in front of the
     reader, so telling it to go derive them is noise.
 
+    Every value, not two of them, and that threshold is the whole rule. Real
+    `FINDINGS_COUNT` values run 0 to 3, so "at least two digits equal to a
+    printed value" is satisfied by any two ordinary small integers near the
+    claim: a date ("2026-09-03"), a version ("markdownlint-cli2@0.23.1"), a
+    pair of `path:line` references, an inline "1) ... 2) ... 3)" step list.
+    Each silenced the clause outright, which is this file's own named failure
+    direction -- an over-broad discharge, whose symptom is silence, and silence
+    is indistinguishable from compliance. Requiring the FULL multiset is also
+    the only threshold that matches what the discharge claims: a reader can
+    check a total against the addends only when all of them are present.
+
     Scoped to NEAR_LINES around the claim, exactly as `aggregate_derivations`
-    is, and filtered by LIST_MARKER and REF_NUMBER. Both narrowings answer the
-    same fault: the discharge was a whole-brief scan for any two digits equal
-    to a printed value, so an ordinary numbered instruction list, or two PR
-    references, silenced the clause outright. That is this file's own named
-    failure direction -- an over-broad discharge, whose symptom is silence, and
-    silence is indistinguishable from compliance.
+    is, and pooled across that window rather than per line, so a brief that
+    lists one round per line still carries its own derivation.
 
     Digits only. The word forms `COUNT` accepts are ordinary English -- "no",
     "one", "two" -- so matching them would let unrelated prose discharge the
-    clause wholesale. The identical argument is what rules out a list marker
-    and a forge reference, which are digits with no count behind them at all.
+    clause wholesale.
     """
-    pool = list(values)
-    hits = 0
+    pool = []
     for n, raw in enumerate(text.splitlines()):
         if abs(n - line) > NEAR_LINES:
             continue
-        seg = REF_NUMBER.sub(" ", LIST_MARKER.sub("", raw))
-        for tok in re.findall(r"\b\d[\d,]*\b", seg):
+        for tok in re.findall(r"\b\d[\d,]*\b", raw):
             v = numeral(tok)
-            if v in pool:
-                pool.remove(v)
-                hits += 1
-    return hits >= 2
+            if v is not None:
+                pool.append(v)
+    for want in values:
+        if want not in pool:
+            return False
+        pool.remove(want)
+    return True
 
 
 def near(table, base, line):
@@ -812,10 +911,12 @@ def transcript_derivations(path):
 
     The values are taken ONLY from `Agent`/`Task` results, which is where a
     review returns one. Scanning every tool result armed the clause off other
-    people's PRs: `scripts/check-pr-fully-clean.py` writes `[FINDINGS_COUNT: N]`
-    into review comment BODIES, so one `gh pr view <other-PR> --json comments`
-    carrying two of them was enough to make this session's brief answer for a
-    review history it had no part in.
+    people's PRs: `.claude/agents/adversarial-reviewer.md` requires the
+    reviewer to append `[FINDINGS_COUNT: N]` to its review, which lands in the
+    review comment BODY, and `scripts/check-pr-fully-clean.py` then MATCHES
+    that token as a not-clean marker. So one `gh pr view <other-PR> --json
+    comments` carrying two of them was enough to make this session's brief
+    answer for a review history it had no part in.
     """
     any_p, count_p = set(), set()
     agg_vals, agg_derived_at = [], -1
@@ -928,6 +1029,23 @@ NOTE = (
     "If you already derived these, say so in the brief and launch unchanged."
 )
 
+# The command `aggregate_note` prescribes, with `{t}` standing in for the
+# transcript path. A module constant rather than an inline literal so the test
+# suite can RUN the exact string the note hands the user and compare its output
+# against this hook's own `agg_vals` -- a prescribed derivation that disagrees
+# with the arming set is the defect this constant exists to keep pinned.
+AGGREGATE_DERIVATION = (
+    "jq -rn '[inputs] as $r"
+    " | [$r[]|select(.type==\"assistant\")|.message.content[]?"
+    "|select(.type==\"tool_use\" and (.name==\"Agent\" or .name==\"Task\"))|.id]"
+    " as $a | $r[]|select(.type==\"user\")|.message.content[]?"
+    "|select(.type==\"tool_result\" and (.tool_use_id as $i | $a|index($i)))"
+    "|.content|tostring' \"{t}\""
+    " | grep -o 'FINDINGS_COUNT: [0-9]*'"
+    " | awk '{n++; s+=$2} END {print n\" rounds, \"s\" findings\"}'"
+)
+
+
 def aggregate_note(tpath):
     """The clause-C addendum, naming the transcript the values are actually in.
 
@@ -940,17 +1058,28 @@ def aggregate_note(tpath):
     prescribed derivation that cannot be run derives nothing, which is this
     hook's own complaint about a brief that asserts without deriving. The hook
     already holds the path, so there was nothing to leave to the reader.
+
+    The command is scoped the way `transcript_derivations` is, and for the same
+    reason. A bare `grep` over the transcript counts every `FINDINGS_COUNT` in
+    it, including values pasted from another PR's review bodies by a
+    `gh pr view ... --json comments`, and including this note itself once the
+    hook has fired --- so it prescribed a figure the hook would then accept as
+    the derivation while disagreeing with the hook's own arming set. Measured
+    against a transcript holding rounds 2, 3, 3, 1, 0 plus one foreign PR
+    result carrying two more values: the bare grep summed 16 across 6, where
+    the values this clause is about are 9 across 5. Reading only the
+    `tool_result` blocks whose `tool_use_id` belongs to an `Agent`/`Task` call
+    returns 9 across 5, and the test suite pins that agreement rather than
+    leaving it to this comment.
     """
     t = tpath or "$HOME/.claude/projects/<this session>.jsonl"
     return (
         "\n\nThis session's reviews printed `[FINDINGS_COUNT: N]` values, and "
         "no command has read them back since. If a count above aggregates "
-        "those values, derive it rather than recalling it. They are in this "
-        "session's transcript:\n"
-        "  grep -o 'FINDINGS_COUNT: [0-9]*' \"" + t + "\""
-        " | awk '{s+=$2} END {print s}'\n"
-        "sums the findings, and `grep -c FINDINGS_COUNT \"" + t + "\"` counts "
-        "the rounds. Put the derived figure in the brief."
+        "those values, derive it rather than recalling it. This reads back "
+        "only the values THIS session's own `Agent`/`Task` calls returned:\n"
+        "  " + AGGREGATE_DERIVATION.replace("{t}", t) + "\n"
+        "Put the derived figures in the brief."
     )
 
 

@@ -124,12 +124,14 @@ def review(n, tid):
 ROUNDS = (review(2, "a1") + review(3, "a2") + review(3, "a3")
           + review(1, "a4") + review(0, "a5"))
 # Both discharges NAME the token, which is the whole of the rule: a command
-# that counts something else counted something else. The command the appended
-# note actually prescribes is the summing one.
+# that counts something else counted something else. The first is the command
+# the appended note actually prescribes, taken from the hook rather than
+# retyped, so a note that stops discharging its own advice fails here.
 ROUNDS_SUMMED = ROUNDS + [
-    tool("Bash", {"command": "grep -o 'FINDINGS_COUNT: [0-9]*' t.jsonl "
-                             "| awk '{s+=$2} END {print s}'"}, "b9"),
-    result("9", "b9"),
+    tool("Bash",
+         {"command": hook.AGGREGATE_DERIVATION.replace("{t}", "t.jsonl")},
+         "b9"),
+    result("5 rounds, 9 findings", "b9"),
 ]
 ROUNDS_COUNTED = ROUNDS + [
     tool("Bash", {"command": "grep -c FINDINGS_COUNT /tmp/rounds.txt"}, "b9"),
@@ -155,9 +157,11 @@ ROUNDS_UNRELATED = ROUNDS + [
     tool("Bash", {"command": "find . -name '*.jsonl' | wc -l"}, "b9"),
     result("77", "b9"),
 ]
-# `[FINDINGS_COUNT: N]` also appears in PR review comment BODIES, which
-# `scripts/check-pr-fully-clean.py` writes, so reading another PR's comments
-# must not arm a clause about THIS session's review history.
+# `[FINDINGS_COUNT: N]` also appears in PR review comment BODIES: the
+# adversarial reviewer appends it to its review (`.claude/agents/
+# adversarial-reviewer.md`) and `scripts/check-pr-fully-clean.py` matches it
+# there as a not-clean marker. So reading another PR's comments must not arm a
+# clause about THIS session's review history.
 FOREIGN_PR = [
     tool("Bash", {"command": "gh pr view 4242 -R o/r --json comments"}, "g1"),
     result("**Claude finished**\n[FINDINGS_COUNT: 4]\n---\n[FINDINGS_COUNT: 3]",
@@ -251,6 +255,24 @@ REMIND = [
      ROUNDS, "C: a numbered instruction list is not the addends written out"),
     (AGGREGATE_BRIEF + " See PR 1 and PR 2.", ROUNDS,
      "C: forge references are not the addends written out"),
+    # Round 2 finding, second half: scoping the scan to NEAR_LINES and naming
+    # two forms left the rule "any two digits equal to a printed value", and
+    # real values run 0 to 3, so any two ordinary small integers beside the
+    # claim still silenced it. These four are the residual class, and each was
+    # measured silent before the threshold moved to the WHOLE multiset.
+    (AGGREGATE_BRIEF + "\nMeasured 2026-09-03 at 13:02 PDT.", ROUNDS,
+     "C: a date and a clock time are not the addends written out"),
+    (AGGREGATE_BRIEF + "\nRun markdownlint-cli2@0.23.1 before pushing.", ROUNDS,
+     "C: a version string is not the addends written out"),
+    (AGGREGATE_BRIEF + "\nSee hooks/remind-brief-premises.py:3 and README.md:1.",
+     ROUNDS, "C: path:line references are not the addends written out"),
+    (AGGREGATE_BRIEF + "\nSteps: 1) rebase 2) push 3) watch.", ROUNDS,
+     "C: an INLINE step list is not the addends written out"),
+    # Round 2 finding: a numeral directly after a forge marker is an item's
+    # name, and the bogus claim it produced also consumed the sentence's real
+    # one, since `finditer` resumes past the span it returned.
+    ("Measured on #3107 the five rounds gave ten findings.", ROUNDS,
+     "C: an issue number is not the claim's cardinality"),
     (AGGREGATE_BRIEF + "\n" * 20 + "The rounds returned 2, 3, 3, 1 and 0.",
      ROUNDS, "C: addends 20 lines away are not beside the claim"),
     # Clause A's own coverage, which widening IMPERATIVE with `sum`/`tally`
@@ -379,8 +401,13 @@ SILENT = [
 # ------------------------------------------------------------------- runner
 
 
-def run(prompt, recs, sentinel_dir=None, tool_name="Agent"):
-    """Run the hook as a subprocess and return 'REMIND' or 'silent'."""
+def run(prompt, recs, sentinel_dir=None, tool_name="Agent", env=None):
+    """Run the hook as a subprocess and return 'REMIND' or 'silent'.
+
+    `env` overlays the child's environment, which is how the own-repo cases
+    below pin what repository the session is working in without depending on
+    the remote this checkout happens to point at.
+    """
     tpath = transcript(recs) if recs else None
     own = sentinel_dir is None
     if own:
@@ -397,7 +424,8 @@ def run(prompt, recs, sentinel_dir=None, tool_name="Agent"):
     try:
         p = subprocess.run([sys.executable, HOOK], input=json.dumps(payload),
                            capture_output=True, text=True,
-                           env=dict(os.environ, TMPDIR=sentinel_dir))
+                           env=dict(os.environ, TMPDIR=sentinel_dir,
+                                    **(env or {})))
     finally:
         if tpath:
             os.unlink(tpath)
@@ -420,6 +448,10 @@ def run(prompt, recs, sentinel_dir=None, tool_name="Agent"):
 
 
 wrong = 0
+# Counted and reported separately: a check that could not run is not a
+# check that passed, and a silent skip is the failure this suite exists
+# to make visible.
+skipped = 0
 print("should REMIND:")
 for prompt, recs, desc in REMIND:
     v = run(prompt, recs)
@@ -471,6 +503,55 @@ wrong += not ok
 print(f"  {'ok    ' if ok else 'WRONG '} the aggregate note names the real "
       "transcript, not an unset $T")
 CONTRACT_EXTRA = 1
+
+# The note must also prescribe a command that AGREES with the hook's own arming
+# set. A bare `grep` over the transcript does not: it counts every
+# `FINDINGS_COUNT` in the file, including values a `gh pr view` pasted in from
+# another PR's review bodies, and including this note once the hook has fired.
+# Measured on the fixture below, that grep sums 16 across 6 where the values
+# this clause is about are 9 across 5, and running it would then discharge the
+# clause on the wrong figure. So run the prescribed command for real and
+# compare its output against `transcript_derivations`, rather than asserting
+# the agreement in a comment.
+_tp3 = transcript(ROUNDS + FOREIGN_PR)
+try:
+    _vals = hook.transcript_derivations(_tp3)[2][0]
+    _want = f"{len(_vals)} rounds, {sum(_vals)} findings"
+    if shutil.which("jq"):
+        _cmd = hook.AGGREGATE_DERIVATION.replace("{t}", _tp3)
+        _ran = subprocess.run(_cmd, shell=True, capture_output=True, text=True)
+        ok = _ran.returncode == 0 and _ran.stdout.strip() == _want
+        wrong += not ok
+        print(f"  {'ok    ' if ok else 'WRONG '} the prescribed derivation "
+              f"agrees with agg_vals (want {_want!r}, got "
+              f"{_ran.stdout.strip()!r})")
+        CONTRACT_EXTRA += 1
+    else:
+        skipped += 1
+        print("  SKIP    the prescribed derivation needs jq, which is absent")
+finally:
+    os.unlink(_tp3)
+
+# ------------------------------------------------------------- own-repo scope
+#
+# AGG_FOREIGN subtracts a count about ANOTHER repository's forge item. This
+# corpus names its own items qualified -- `README.md` and the hook's own
+# docstring both write `ai-config#3117` -- so the qualifier alone cannot decide
+# it, and reading it that way silenced the target case in its commonest
+# phrasing. `GITHUB_REPOSITORY` pins what the session's repo is, so neither row
+# depends on the remote this checkout points at.
+print("\nown-repo scope (a qualified self-reference is not foreign):")
+SELF_REF = ("The five adversarial rounds on ai-config#3107 produced "
+            "ten findings.")
+OWN_REPO = [
+    (run(SELF_REF, ROUNDS, env={"GITHUB_REPOSITORY": "Morrison-Lab/ai-config"}),
+     "REMIND", "the session's own repo, qualified -- still its own history"),
+    (run(SELF_REF, ROUNDS, env={"GITHUB_REPOSITORY": "sparta-lab/sparta"}),
+     "silent", "the same sentence when the repo named is somebody else's"),
+]
+for got, want, desc in OWN_REPO:
+    wrong += got != want
+    print(f"  {got:<7} {desc}")
 
 # ------------------------------------------------------------ sentinel scope
 print("\nsentinel (one shared dir):")
@@ -608,6 +689,32 @@ def kinds(prompt):
     return [k for k, _ in hook.evaluate(prompt, "")]
 
 
+# `own_repo` reads `GITHUB_REPOSITORY` or `git remote get-url origin`, so an
+# in-process probe would otherwise depend on which remote this checkout points
+# at. Pinned here; the subprocess rows above exercise the real resolution.
+hook._OWN_REPO = ("morrison-lab", "ai-config")
+
+
+def _two_matching_digits(text, values, line):
+    """Round 2's `enumerates`, kept as the mutant for the threshold it set.
+
+    At least two digits within NEAR_LINES of the claim equal to a printed
+    value. Real values run 0 to 3, so any two ordinary small integers beside
+    the claim satisfied it.
+    """
+    pool = list(values)
+    hits = 0
+    for n, raw in enumerate(text.splitlines()):
+        if abs(n - line) > hook.NEAR_LINES:
+            continue
+        for tok in re.findall(r"\b\d[\d,]*\b", raw):
+            v = hook.numeral(tok)
+            if v in pool:
+                pool.remove(v)
+                hits += 1
+    return hits >= 2
+
+
 MUTANTS = [
     ("clause A: the path matcher",
      "PATH", re.compile(r"(?<![\w./-])(zzz-never-matches)"),
@@ -726,16 +833,32 @@ MUTANTS = [
                    ROUNDS),
      False, True),
 
-    ("clause C: a numbered list marker is not an addend",
-     "LIST_MARKER", re.compile(r"zzz-never-matches"),
-     lambda: fires(AGGREGATE_BRIEF
-                   + "\n\n1. Read the diff.\n2. Address each finding.\n3. Push.",
+    # The threshold itself, reverted to what round 2 shipped: at least two
+    # digits near the claim equal to a printed value. An inline step list
+    # supplies two such digits and nothing more, so it isolates the threshold
+    # rather than any of the narrowings that used to sit beside it.
+    ("clause C: the addends are the WHOLE multiset, not any two matching digits",
+     "enumerates", staticmethod(_two_matching_digits),
+     lambda: fires(AGGREGATE_BRIEF + "\nSteps: 1) rebase 2) push 3) watch.",
                    ROUNDS),
      True, False),
 
-    ("clause C: a forge reference is not an addend",
-     "REF_NUMBER", re.compile(r"zzz-never-matches"),
-     lambda: fires(AGGREGATE_BRIEF + " See PR 1 and PR 2.", ROUNDS),
+    # The mask, isolated on the parse it fixes rather than on fire/silent:
+    # without it the sentence reports `3107 the five rounds` AND loses its
+    # real claim to the consumed span.
+    ("clause C: a forge reference is not the claim's cardinality",
+     "REF_NUMBER", re.compile(r"(zzz-never-matches)(zzz)"),
+     lambda: [q for _, q, _, _ in hook.aggregate_claims(
+         "Measured on #3107 the five rounds gave ten findings.")]
+     == ["five rounds", "ten findings"],
+     True, False),
+
+    # AGG_FOREIGN's own-repo carve-out. `own_repo` is pinned rather than
+    # resolved from the checkout, so the case does not depend on which remote
+    # this suite happens to run against.
+    ("clause C: a qualified reference to the session's OWN repo is not foreign",
+     "own_repo", staticmethod(lambda: (None, None)),
+     lambda: bool(hook.aggregate_claims(SELF_REF)),
      True, False),
 
     ("clause C: the addends must sit beside the claim",
@@ -804,8 +927,10 @@ ok = diff == {","}
 wrong += not ok
 print(f"  {'ok   ' if ok else 'WRONG'}  the two windows differ by exactly ',' (got {diff or 'nothing'})")
 
-total = (1 + len(REMIND) + len(SILENT) + len(CONTRACT) + 1 + CONTRACT_EXTRA + len(seq)
+total = (1 + len(REMIND) + len(SILENT) + len(CONTRACT) + 1 + CONTRACT_EXTRA
+         + len(OWN_REPO) + len(seq)
          + len(SM_REMIND) + len(SM_SILENT) + SM_EXTRA + len(MUTANTS))
 print(f"\n{total - wrong}/{total} correct"
-      + ("" if wrong == 0 else f"  ({wrong} WRONG)"))
+      + ("" if wrong == 0 else f"  ({wrong} WRONG)")
+      + ("" if skipped == 0 else f"  ({skipped} SKIPPED)"))
 sys.exit(1 if wrong else 0)

@@ -5,13 +5,13 @@ Worked-example case records for the rules in
 auto-loaded `CLAUDE.md` context.
 Each heading names the rule the record supports.
 
-## Run the reviewer POST as the sole (or last) command
+## Run the reviewer POST as the sole command
 
 (Morrison-Lab/rpt#181, 2026-08-03: the POST was chained ahead of `gh pr view`/`gh pr checks` in one call across six turns, so the hook re-fired every Stop;
 running the POST bare discharged it.
 The failure was misread as the hook not recognizing a Copilot quota refusal, which it was not about.)
 
-## "Nothing chained after it" includes a formatting pipe
+## "Nothing chained before or after it" includes a formatting pipe
 
 (Morrison-Lab/ai-config#1139, 2026-08-04: the pipe variant, in a session that had already cited this rule's reasoning aloud earlier in the same hour.
 The request was written `gh api -X POST .../requested_reviewers -f 'reviewers[]=...' 2>&1 | tail -3`, and it genuinely succeeded --- the response named `Copilot` in `requested_reviewers`, and Copilot posted its quota refusal at `07:22:15Z`.

@@ -205,7 +205,7 @@ Both write to the same destinations. `ums` fires proactively, as soon as a learn
 - ❌ Saying “I’ll remember that” without actually writing it down
 - ❌ Updating memories but not pushing skill changes to origin
 - ❌ Recording vague lessons (“be more careful”) instead of specific ones (“always poll for new review after pushing — check commit SHA matches”)
-- ❌ Skipping the “check existing notes” step and creating duplicates – specifically, reading only the region you’re appending to instead of grepping the corpus for the subject (step 3)
+- ❌ Skipping step 3’s dupe check and creating duplicates – specifically, reading only the region you’re appending to instead of grepping the corpus for the subject (step 3)
 - ❌ Updating only preferences when a skill also needs the fix
 - ❌ `git add -A` — it sweeps unrelated in-flight edits (the user’s work, other draft skills) into your commit/PR. Stage the specific files you touched.
 - ❌ Creating `memories/repo/<repo>.md` for any repo — this pattern is retired. Put repo-specific lore in the repo’s own agent docs (`.github/agents/`, `CLAUDE.md`, `.github/instructions/`, `.github/copilot-instructions.md`, or checked-in `.claude/memories/`) via a PR; if the repo has no agent-doc infrastructure yet, this session’s own local project-memory mechanism (Claude Code: `~/.claude/projects/<project-path>/memory/` — substitute the equivalent for a non-Claude agent) is short-lived staging only — hand off that a PR adding those agent docs is still required. See the checklist item above and `memories/preferences.md` for the full rule.

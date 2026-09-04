@@ -540,7 +540,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li>❌ Saying “I’ll remember that” without actually writing it down</li>
 <li>❌ Updating memories but not pushing skill changes to origin</li>
 <li>❌ Recording vague lessons (“be more careful”) instead of specific ones (“always poll for new review after pushing — check commit SHA matches”)</li>
-<li>❌ Skipping the “check existing notes” step and creating duplicates – specifically, reading only the region you’re appending to instead of grepping the corpus for the subject (step 3)</li>
+<li>❌ Skipping step 3’s dupe check and creating duplicates – specifically, reading only the region you’re appending to instead of grepping the corpus for the subject (step 3)</li>
 <li>❌ Updating only preferences when a skill also needs the fix</li>
 <li>❌ <code>git add -A</code> — it sweeps unrelated in-flight edits (the user’s work, other draft skills) into your commit/PR. Stage the specific files you touched.</li>
 <li>❌ Creating <code>memories/repo/&lt;repo&gt;.md</code> for any repo — this pattern is retired. Put repo-specific lore in the repo’s own agent docs (<code>.github/agents/</code>, <code>CLAUDE.md</code>, <code>.github/instructions/</code>, <code>.github/copilot-instructions.md</code>, or checked-in <code>.claude/memories/</code>) via a PR; if the repo has no agent-doc infrastructure yet, this session’s own local project-memory mechanism (Claude Code: <code>~/.claude/projects/&lt;project-path&gt;/memory/</code> — substitute the equivalent for a non-Claude agent) is short-lived staging only — hand off that a PR adding those agent docs is still required. See the checklist item above and <code>memories/preferences.md</code> for the full rule.</li>

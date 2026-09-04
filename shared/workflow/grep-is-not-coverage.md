@@ -212,7 +212,9 @@ where a markdownlint entry was added to `memories/markdownlint.md`
 while `shared/writing/semantic-line-breaks.md` already covered the same rule in three regions
 (a bare `#NNNN` at column 1 parses as an ATX heading, markdownlint's MD018),
 at `3935bfff` (`origin/main` before #3060 merged) and unchanged at `2156b439` (its squash merge):
-`git grep -n MD018 3935bfff -- shared/writing/semantic-line-breaks.md` and the same query at `2156b439` return the same five lines ---
+`git grep -n MD018 3935bfff -- shared/writing/semantic-line-breaks.md`
+and the same query at `2156b439`
+return the same five lines ---
 274, 288, 295, 861 and 995 ---
 of which the first three sit inside one bold-lead block with its own `Do`/`Don't` pair.
 What step 3's own directory-wide grep would have done is checkable:

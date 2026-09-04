@@ -51,11 +51,11 @@ The squash message did.
 ## A `Refs` on a branch is a decision to read, not a gap to fill
 
 The mirror of the #1718 case above.
-There a keyword the author did not want reached `main` through the squash
-body; here a keyword the merger expected was absent, and the absence was
+There the squash body carried a keyword the author had not wanted;
+here the keyword the merger expected was absent, and the absence was
 right.
 
-What closes an issue at squash-merge time is the squash body as entered
+Under a squash merge, what closes an issue is the squash body as entered
 plus the PR body, both parsed.
 The branch's commit messages reach the parser only through the default
 squash body, which this repo builds by concatenating them
@@ -64,18 +64,26 @@ and a body written by hand at merge time replaces that concatenation
 entirely.
 So a grep over the branch answers what the *default* body would carry, and
 the body actually entered is what to read once it exists.
+The repo also allows merge commits and rebase merges (read 2026-09-04);
+either lands every branch commit message on `main` unchanged, where the
+parser reads each one.
 
 Measured 2026-09-04 on the six wave-1 PRs of the r5 fix loop
 (ai-config#3203).
 The fixer brief asserted for every branch that its first commit already
 carried the closing keyword.
-That was false from the start for `fix/3102-memory-size-approach`, whose
-nine commits carry `Refs #3102` throughout because PR #3215 shipped one of
-the issue's two parts.
-It was true when written for `fix/3068-flag-cd-stderr` and stale by merge
-time: commit `78fda241` on that branch reworded the keyword out on purpose,
-because the issue's first "done when" item (the warning surfaces in a live
-session) is one the branch cannot meet.
+The sentence entered the loop's brief on 2026-09-03, in the r1 script, and
+was copied into each later script through r5 without anyone re-reading
+the branches.
+It was never true for `fix/3102-memory-size-approach`: seven of that
+branch's nine commits carry `Refs #3102` and the other two are generated
+merge-commit lines, because PR #3215 shipped one of the issue's two parts.
+It was true for `fix/3068-flag-cd-stderr` on 2026-09-03 and false by
+03:57Z on 2026-09-04, thirteen hours before the r5 script was written: a
+rebase reworded the keyword out of the branch's first commit on purpose,
+recorded by the empty commit `78fda241`, because the issue's first "done
+when" item (the warning surfaces in a live session) is one no diff can
+meet.
 Both PRs merged with hand-written squash bodies carrying `Refs`, and both
 issues stayed open, which was the intended outcome in each case.
 The mistake came after: issue #3068 was closed by hand on the strength of
@@ -86,18 +94,22 @@ Pattern and anti-pattern for this case, apart from the file-wide list
 below:
 
 - **Do:** before opening the PR, read what the branch's commits would
-  contribute to a default squash body, with a case-insensitive grep over
-  every spelling the parser accepts:
+  contribute to a default squash body, with a case-insensitive grep that
+  matches every spelling the parser accepts (and some ordinary words such
+  as `prefixes #`, so read each hit):
   `git log --format=%B origin/main..HEAD | grep -niE '(close[sd]?|fix(es|ed)?|resolve[sd]?):? *#[0-9]+'`;
   then put whatever keyword the merge should carry in the PR body, scoped
   per [`issue-first.md`](../shared/workflow/issue-first.md), and read the
   squash body you enter at merge time as the surface that decides.
 - **Do:** when a branch carries `Refs` where a `Closes` was expected, read
   its commit messages for the reason before treating the absence as an
-  omission; a keyword removed on purpose names the acceptance item it
-  cannot meet.
+  omission;
+  the message that records a deliberate removal names the acceptance item
+  the branch cannot meet.
 - **Do:** close an issue by hand only when every required acceptance item
-  is met by the merged diff, with a comment naming the merge.
+  is met, by the merged diff or by the evidence the item asks for (a
+  transcript line, for an observation), with a comment naming that
+  evidence.
 - **Don't:** assert in a brief that a commit carries a closing keyword the
   brief's author never read, or read once and never re-read after the
   loop rewrote history.

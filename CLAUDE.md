@@ -593,12 +593,25 @@ gh api repos/<owner>/<repo>/issues/<N>/comments --paginate \
 
 `memories/gh-cli.md` carries the full statement, including the placeholder-wording trap when polling a run still in flight.
 
-**Also check formal GitHub reviews, not just issue-style comments — a human's `CHANGES_REQUESTED` can be invisible to a comments-only scan.** A review submitted via GitHub's review UI (as opposed to a plain PR comment) shows up in `gh pr view N --json reviews`, and its top-level `body` is frequently **empty** — the actual finding lives entirely in a per-line inline comment, which only appears via `gh api repos/<owner>/<repo>/pulls/N/comments` (a different endpoint from issue comments). Checking `--json comments` alone can miss the review's existence entirely. Before declaring a PR ready, also run:
+**Also check formal GitHub reviews, not just issue-style comments --- a review's findings can sit where a comments-only scan never looks, whoever posted it and whatever state it carries.**
+A review submitted via GitHub's review UI (as opposed to a plain PR comment) shows up in `gh pr view N --json reviews`, and its top-level `body` is frequently **empty** --- the actual finding lives entirely in a per-line inline comment, which only appears via `gh api repos/<owner>/<repo>/pulls/N/comments` (a different endpoint from issue comments).
+The mirror case is a finding in the top-level `body` itself, plainly or inside a collapsed `<details>` suppression block: neither shape produces a comment object, so `pulls/N/comments` and a thread query both return nothing over it.
+[`fully-clean`](shared/workflow/fully-clean.md) carries the matcher for the collapsed block, and what fails that bar is the finding rather than the state.
+So a bot's `COMMENTED` review carrying a finding fails that bar exactly as a human's `CHANGES_REQUESTED` does.
+Checking `--json comments` alone can miss the review's existence entirely.
+Before declaring a PR ready, also run:
 ```
+gh pr view N --json reviews --jq '.reviews[] | [.state, .author.login, .submittedAt, ((.body // "") | split("\n") | map(select(length > 0)) | .[0] // "(empty body)")] | @tsv'
 gh pr view N --json reviews --jq '.reviews[] | select(.state == "CHANGES_REQUESTED") | "\(.author.login) \(.submittedAt)"'
 gh api repos/<owner>/<repo>/pulls/N/comments --jq '.[] | "\(.path):\(.line // .original_line // "?") \(.user.login) \(.body)"'
 ```
 A `CHANGES_REQUESTED` state is blocking regardless of whether an automated re-review later says "Ready for merge" — that bot verdict doesn't clear a human's own review state, which only the human (or an explicit dismissal) can resolve.
+The unfiltered listing comes first: the state filter answers only whether a review *state* blocks the merge button, which the forge lets `CHANGES_REQUESTED` alone do.
+
+- **Do:** read every formal review's state and body, whoever posted it, and treat a finding in a review body --- a collapsed suppression block included --- as blocking.
+- **Don't:** pass over a review because its author is a bot or its state is `COMMENTED`, nor read that state as blocking on its own.
+
+See [`CLAUDE.cases.md`](CLAUDE.cases.md), "A bot's `COMMENTED` review is the same blind spot".
 
 (A specific case of the standing **never assume; always verify** rule in `memories/preferences.md` — confirm the verdict with a fresh query, don't recall it.)
 

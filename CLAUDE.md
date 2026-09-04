@@ -746,6 +746,16 @@ Actionable work is an issue.
 An open-ended policy question whose deliverable is a decision, and which has a real do-nothing option, is a discussion --- in an answerable category (`Q&A`) so the resolution can be marked as the answer.
 Its second half is the general principle: best practice outranks repo precedent when choosing venue or method, and "the board is unused, so nobody would find it there" is circular reasoning that can never permit anyone to start using it.
 
+## Triage the backlog weekly; closing as not-planned is licensed
+
+[shared/workflow/triage-backlog.md](shared/workflow/triage-backlog.md)
+
+The counterweight to the filing rules around it.
+Every open issue ends the weekly pass carrying one of `P1`, `P2`, `P3`, or closed, and a bare aphorism, a filing-mechanism test, or a duplicate may be closed as not-planned on the pass's own judgment.
+A new symptom of a tracked defect family is a comment on that family's issue, not a new issue.
+`scripts/triage-backlog.py` is the instrument and the `triage` skill runs it.
+(Measured 2026-09-03: 15 to 410 open issues in six weeks with 14 not-planned closes in the repo's history, ai-config#3134.)
+
 ## If you see something, say something — file an issue for every noticed mistake
 
 [shared/workflow/report-mistakes-proactively.md](shared/workflow/report-mistakes-proactively.md)

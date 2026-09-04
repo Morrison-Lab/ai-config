@@ -75,10 +75,14 @@ jobs:
         run: python3 scripts/test_check_unpinned_git_fixtures.py
       - name: Run check-pr-fully-clean tests
         run: python3 scripts/test_check_pr_fully_clean.py
+      - name: Run check-review-body tests
+        run: python3 scripts/test_check_review_body.py
       - name: Check regex patterns for catastrophic backtracking
         run: python3 scripts/check_regex_patterns.py
       - name: Run regex pattern check tests
         run: python3 scripts/test_check_regex_patterns.py
+      - name: Run git command regex helper tests
+        run: python3 scripts/test_git_cmd.py
       - name: Run orchestrator tests
         # ai-config#2627: this suite existed and ran nowhere, so the
         # orchestrator's own behaviour was unpinned -- which is how a literal
@@ -119,7 +123,7 @@ jobs:
         run: python3 scripts/test_check_pr_body_figures.py
       - name: Run semantic-line-break tool tests
         run: python3 scripts/test_slb.py
-      - name: Run sync-nlb-checker fetch tests
+      - name: Run sync-nlb-checker fetch and CLI tests
         run: python3 scripts/test_sync_nlb_checker.py
       - name: Run memory-file-size check tests
         run: python3 scripts/test_check_memory_file_size.py
@@ -399,6 +403,8 @@ jobs:
         # seen to produce a non-zero, a zero from the corpus scan below is not
         # evidence of anything.
         run: python3 scripts/test_check_bare_fragment_mentions.py
+      - name: Run backlog-triage instrument tests
+        run: python3 scripts/test_triage_backlog.py
       - name: Check for stale and orphaned records (advisory)
         # ai-config#1544. Non-blocking, and for two separate reasons.
         #

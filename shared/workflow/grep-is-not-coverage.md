@@ -157,9 +157,10 @@ Deciding where a learning belongs is a real step ---
 [`ums`](../../skills/ums/SKILL.md) step 2 routes each item either to ai-config
 or to the owning repo's own agent docs --- and once an item is routed to a repo
 we own, every later instruction reads as relative to *that* repo.
-Step 3's "grep the whole `memories/` directory" then means the destination's
-`memories/`, so the dupe check runs to completion, finds nothing, and never
-looked at ai-config at all.
+Step 3 read "the whole `memories/` directory" at `3935bfff`,
+and that wording meant the destination's,
+so the dupe check ran to completion, found nothing,
+and never looked at ai-config at all.
 
 The asymmetry is why this needs naming separately from the null-result case.
 A repo-local memory in some other repo is precisely the place nobody thinks to
@@ -194,9 +195,128 @@ The verification half of the same incident --- attempting the base form of a
 command and generalizing to a flag never passed --- is recorded separately in
 Morrison-Lab/ai-config#1174.)
 
+### The same failure has a same-repo sibling: the wrong directory
+
+The section above routes between repos;
+the same miss happens inside one repo
+when the dupe check is scoped to a directory
+that does not hold the file already owning the idea being recorded.
+
+- **Do:** grep [`skill-builder`](../../skills/skill-builder/SKILL.md) step 0's path list,
+  not only the directory the destination sits in.
+- **Don't:** read "the whole `memories/` directory", step 3's wording at `3935bfff`, as thorough;
+  the word doing the damage was `memories/`, not "whole".
+
+(Recorded 2026-09-03 on [ai-config#3060](https://github.com/Morrison-Lab/ai-config/pull/3060),
+where a markdownlint entry was added to `memories/markdownlint.md`
+while `shared/writing/semantic-line-breaks.md` already covered the same rule in three regions
+(a bare `#NNNN` at column 1 parses as an ATX heading, markdownlint's MD018),
+at `3935bfff` (`origin/main` before #3060 merged) and unchanged at `2156b439` (its squash merge):
+`git grep -n MD018 3935bfff -- shared/writing/semantic-line-breaks.md`
+and the same query at `2156b439`
+return the same five lines ---
+274, 288, 295, 861 and 995 ---
+of which the first three sit inside one bold-lead block with its own `Do`/`Don't` pair.
+What step 3's own directory-wide grep would have done is checkable:
+`git grep -il "issue reference" 3935bfff -- memories/` returns three files ---
+`memories/github.md`, `memories/preferences.md` and `memories/r-quarto.md` ---
+and the owner is not among them,
+because the owner is `shared/writing/semantic-line-breaks.md`,
+which a search of `memories/` cannot reach.
+What the [`skill-builder`](../../skills/skill-builder/SKILL.md) step 0 query
+would have done is checkable too:
+`git grep -il "issue reference" 3935bfff -- skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md`
+returns eight files at that ref ---
+`hooks/test-no-unauthorized-merge.py`,
+`hooks/warn-stale-issue-edit.py`,
+`memories/github.md`,
+`memories/preferences.md`,
+`memories/r-quarto.md`,
+`shared/workflow/address-every-comment.md`,
+`shared/writing/semantic-line-breaks.md`
+and `skills/promote-memory/SKILL.md` ---
+with the owner among them.
+The same `memories/` query returns four at `2156b439`:
+the three above plus `memories/markdownlint.md`, the file the entry was added to,
+where the entry is a cross-link to the owner rather than a restatement ---
+so the count rose by one either way,
+and a hit count cannot tell an owner from a pointer.
+Every commit on #3060's branch is still reachable on `origin` from `refs/pull/3060/head`
+(`git ls-remote origin refs/pull/3060/head` returns one line whose SHA begins `f9068299`,
+and after `git fetch --depth=200 origin refs/pull/3060/head`, `git rev-list --count 3935bfff..FETCH_HEAD` returns 33).
+The default refspec does not bring `refs/pull/3060/head` down
+(`git config --get-all remote.origin.fetch` returns `+refs/heads/*:refs/remotes/origin/*` in the measuring clone),
+and a shallow clone walks only to its fetch depth,
+so this record anchors on `main` commits, which a full fetch of `main` brings down
+(`git merge-base --is-ancestor 3935bfff origin/main` and the same for `2156b439` both exit 0).
+Note also why the wrong-corpus section's `Do` could not have caught it.
+It reads "grep the ai-config corpus as well as the destination repo's docs,
+whenever step 2 routes an item anywhere other than ai-config",
+and this item was routed to ai-config, so its trigger did not fire.)
+
+## Searching only the rendered output is the same error one layer down
+
+The wrong-corpus section above governs searching the wrong **repo**,
+and its subsection the wrong **directory** within one.
+This one governs searching the wrong **layer within the right repo**:
+a sweep whose file filter reaches the generated artifact and not the generator that produces it.
+
+The filter is what hides it, and it is chosen for a good reason.
+A sweep for a bad *prose* pattern naturally scopes to `*.md`,
+because prose is what Markdown files hold.
+That scope is exactly right for finding the symptom and exactly wrong for finding the cause,
+since the cause lives in a `.yml`, a `.json`, a template, or a script ---
+a file extension the sweep never asked for.
+The sweep therefore succeeds: it enumerates every affected line,
+in the file where a reader would meet it,
+and nothing about its output suggests it was looking at a projection.
+
+Two consequences, and the second is worse than an ordinary miss.
+Editing the rendered file is editing a cache,
+so the repo's own drift check goes red --- which at least fails loudly.
+The quieter one is that the next regeneration restores the exact content the sweep removed,
+and it does so in a commit whose stated purpose is "regenerate",
+so nobody reads it as a revert.
+
+The remedy is one question asked before the sweep rather than a wider pattern after it:
+**is any file I am about to edit derived from another one?**
+Answer it from the repo's own drift checks rather than from a header grep,
+because a header grep has this fragment's defect built in.
+Measured in `ai-config` on 2026-09-03:
+`grep -rl 'generated by' .` returns 8 files and misses all 201 `codex-skills/*/SKILL.md` wrappers,
+which announce themselves as "a generated Codex wrapper" instead;
+widening to `grep -rilE 'generated by|auto-?generated|do not edit|generated .{0,20}wrapper'` returns 232 and does reach them,
+but only because the pattern was extended after the miss was known,
+which is the one condition a real sweep never has.
+What does enumerate the derived trees without guessing at wording is the set of paths the repo's own generators write ---
+here `scripts/sync-codex-skill-wrappers.py`,
+whose `--check` mode `scripts/validate-skills.py` shells out to.
+Read a marker grep as a prompt to go find those generators, never as the answer.
+[`ardi.rationale.md`](ardi.rationale.md)'s "When regenerating a generated tree makes it most of the diff" covers the editing half.
+This section is about the *search* half, which that passage does not reach:
+the file you never opened cannot warn you with a header.
+
+- **Do:** ask which files in the search space are generated,
+  before running a corpus-wide sweep, and widen the filter to their sources.
+- **Do:** derive the generated set from the generators the repo runs in CI,
+  rather than from a grep for whatever phrase you expect their headers to use.
+- **Do:** report the sweep's file filter alongside its hits,
+  so a reader can see which layer it examined.
+- **Don't:** read a complete-looking enumeration of a symptom as an enumeration of its cause.
+- **Don't:** treat a red drift check as the only cost ---
+  the silent restoration on the next regeneration is the one that survives review.
+
+(Measured 2026-09-02/03 on `Morrison-Lab/ai-config`.
+A sweep for a `git commit && git push` prescription scoped to `*.md` found the row in [`tool-mappings.md`](../../tool-mappings.md) and it was hand-edited out.
+That file's own header says it is generated from [`tool-mappings.yml`](../../tool-mappings.yml) by `scripts/sync-codex-skill-wrappers.py`,
+and the YAML still carried the prescription, so `scripts/validate-skills.py` ---
+which shells out to that generator's `--check` mode at line 435 --- went red,
+and the next regeneration would have restored the exact shape the same PR's own hook was being written to deny.)
+
 ## An unmerged PR is part of the corpus a citation can be corroborated against, and no default-branch search reaches it
 
-The section above governs searching the wrong **repo**.
+The wrong-corpus section above governs searching the wrong **repo**,
+and its subsection the wrong **directory** within one.
 This one governs searching the wrong **branch state within the right repo**: a citation to content that ships only in an open PR, checked by grepping the default branch.
 
 The null result here is not merely inconclusive --- it is guaranteed whether or not the cited content is genuine.

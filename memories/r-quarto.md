@@ -1,24 +1,34 @@
 # R, Quarto & the R toolchain
 
-Every pull request and issue cited below is a clickable link,
+Every pull request and issue *cited* below is a clickable link,
 because a bare `owner/repo#123` makes even a reader with access assemble the URL by hand.
+A `#NNN` shown as an illustrative token rather than a citation stays bare
+--- the `#629` in the `commented_code_linter` entry, and the `d-morrison/altdoc#26` in the spellcheck entry ---
+because linking it would change what the entry demonstrates.
 
-Most of the cited repositories are public, so most of those links resolve for any reader.
-Four are private --- `ucdavis/bcs`, `ucdavis/epi204`, `ucdavis/hac.sap`, and `ucdavis/matt.contracts` ---
-so a link into one of those resolves only for a reader with access.
-Measured 2026-09-04 with an unauthenticated `git ls-remote https://github.com/<owner>/<repo>`,
-which succeeds on a public repository and asks for a username on a private one.
+Twelve of the sixteen cited repositories resolve anonymously, so their links resolve for any reader.
+Four do not: `ucdavis/bcs`, `ucdavis/epi204`, `ucdavis/hac.sap`, and `ucdavis/matt.contracts`.
+Measured 2026-09-04 with an unauthenticated `git ls-remote https://github.com/<owner>/<repo>`.
+That probe settles one direction only.
+Resolving anonymously means the repository is public.
+Failing to resolve means private, renamed, moved, or absent,
+because GitHub answers all four the same way to an unauthenticated caller.
+`ucdavis/rampp`, named elsewhere in this file, fails the probe too,
+and which of the four it is went unmeasured.
+Separating them takes an authenticated `gh api repos/<owner>/<repo> --jq .private`, which was not run here.
 
-A public repository's citation carries the verified form:
+A citation into one of the twelve carries a verified form:
 `git ls-remote https://github.com/<owner>/<repo> refs/pull/N/head` resolves for a pull request
 and returns nothing for an issue.
-A citation into one of the four private repositories keeps the form it was written with, unverified here.
-GitHub redirects `/issues/N` to `/pull/N` when the number is a pull request,
-so either form resolves for a reader who has access.
+A citation into one of the four uses whichever of `/issues/N` or `/pull/N` it already carried,
+or `/issues/N` where it carried neither.
+Which of the two is correct is unverified here,
+and GitHub redirects `/issues/N` to `/pull/N` when the number is a pull request.
 
-- **Do:** cite a pull request or issue as a clickable link, private repository or not.
-- **Do:** treat a 404 from a public repository's link as a wrong number, and re-derive the number.
-- **Don't:** read a 404 from one of the four private repositories as a broken reference --- it is an access boundary.
+- **Do:** cite a pull request or issue as a clickable link, whether or not its repository resolves anonymously.
+- **Do:** read a 404 as a wrong number, and re-derive the number, whenever you have access to the repository.
+- **Don't:** read a 404 from one of the four as a wrong number when you lack access --- there it is an access boundary.
+- **Don't:** infer that a repository is private from an anonymous `git ls-remote` failure --- renamed, moved, and absent fail identically.
 
 ## Conda activation before Quarto validation
 

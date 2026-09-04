@@ -347,13 +347,28 @@ def _argv_request(argv):
     # `gh api`/`curl`/`wget` hitting the requested_reviewers endpoint with a
     # POST. The same endpoint is read via GET (to CHECK who is requested), and
     # a GET must NOT discharge, which is why the method is required.
+    #
+    # The endpoint has to BE the request path, exactly as in _argv_probe: a
+    # scan over every argv token read `gh api repos/o/r/issues/9/comments -X
+    # POST -f 'body=asked at repos/o/r/pulls/1038/requested_reviewers'` -- a
+    # comment-posting WRITE -- as a reviewer request for whatever pull its
+    # prose quoted, discharging that PR without a reviewer ever being added
+    # (ai-config#3086 review). So the candidates come from _api_path_tokens
+    # and the pattern is `.match()`-anchored to the token start.
     api = (a0 == "gh" and len(argv) >= 2 and argv[1] == "api") \
         or a0 in ("curl", "wget")
-    if api:
-        url = next((t for t in argv if "requested_reviewers" in t), None)
-        if url and _post_method(argv):
-            num, repo = _url_ident(url)
-            return True, num, repo
+    if api and _post_method(argv):
+        for t in _api_path_tokens(argv):
+            m = RX_CMD_REVIEWERS.match(t)
+            if m:
+                return True, m.group(3), f"{m.group(1)}/{m.group(2)}"
+            # A path token built from shell variables
+            # (`"repos/$O/$R/pulls/$N/requested_reviewers"`) is a genuine
+            # request whose identity the command cannot supply; the result
+            # backfills it. Anchored like its sibling rather than tested as a
+            # substring, so this arm cannot re-admit the payload it replaced.
+            if RX_CMD_REVIEWERS_ANY.match(t):
+                return True, None, None
     return False, None, None
 
 
@@ -751,9 +766,16 @@ def _argv_probe(argv):
     state=closed`, which is neither a `gh pr` verb nor a structured tool and so
     reached no other path: the guard stayed armed on a PR the session had just
     closed (ai-config#3086 review). Method is deliberately NOT constrained here,
-    unlike _argv_request's POST requirement, because reading and writing the
-    state both return the state -- and the discharge is gated on the RESULT
-    reporting a terminal one, so a GET against a still-open PR clears nothing.
+    unlike _argv_request's POST requirement, because every JSON method of that
+    path returns the state -- and the discharge is gated on the RESULT reporting
+    a terminal one, so a GET against a still-open PR clears nothing. What the
+    method does not settle is the REPRESENTATION: the same path serves the
+    pull's raw diff under an `Accept: application/vnd.github.diff` header, whose
+    body is diff text and says nothing about the PR's state, so that header
+    disqualifies the probe (RX_DIFF_MEDIA). Without it a PR whose diff touches
+    an API fixture or a JSON snapshot discharged itself merely by having that
+    diff read -- the shell twin of the MCP `get_diff` hole, reached through the
+    REST spelling rather than through `gh pr diff` (ai-config#3086 review).
     The path must name the pull ITSELF, with no sub-resource, so
     `pulls/<N>/requested_reviewers` is not a probe. And it must be the request
     PATH: scanning every token instead let a `-f body=...` payload quoting a
@@ -770,6 +792,11 @@ def _argv_probe(argv):
     api = (argv[0] == "gh" and len(argv) >= 2 and argv[1] == "api") \
         or argv[0] in ("curl", "wget")
     if api:
+        # Scanned over the WHOLE argv, unlike the path: the header is a value
+        # _api_path_tokens deliberately skips, and refusing a probe is the
+        # armed direction anyway, so a stray media type costs a warning.
+        if any(RX_DIFF_MEDIA.search(t) for t in argv):
+            return False, None, None
         for t in _api_path_tokens(argv):
             m = RX_CMD_PULL.match(t)
             if m:
@@ -1105,6 +1132,31 @@ RX_CMD_API = re.compile(r"repos/([\w.-]+)/([\w.-]+)/pulls?/(\d+)", re.I)
 RX_CMD_PULL = re.compile(
     r"(?:https?://[^/\s]+)?/?(?:api/v3/)?"
     r"repos/([\w.-]+)/([\w.-]+)/pulls?/(\d+)(?:[?#]|$)", re.I)
+
+# The same path with `/requested_reviewers` after the number, used by
+# _argv_request for the same reason and with the same anchoring: the endpoint
+# has to BE the request path, not a string quoted inside a `-f body=` payload.
+RX_CMD_REVIEWERS = re.compile(
+    r"(?:https?://[^/\s]+)?/?(?:api/v3/)?"
+    r"repos/([\w.-]+)/([\w.-]+)/pulls?/(\d+)/requested_reviewers(?:[?#]|$)",
+    re.I)
+
+# The same endpoint with the owner, repo, and number left unread, for the path
+# a session assembled from shell variables (`repos/$O/$R/pulls/$N/...`). That
+# is a genuine request whose identity the command cannot supply, so it is
+# recorded number-less and the result backfills it.
+RX_CMD_REVIEWERS_ANY = re.compile(
+    r"(?:https?://[^/\s]+)?/?(?:api/v3/)?"
+    r"repos/\S*/requested_reviewers(?:[?#]|$)", re.I)
+
+# An `Accept:` media type asking for a pull's DIFF or PATCH instead of its JSON.
+# GitHub selects the representation by header alone, so `.../pulls/<N>` with
+# `application/vnd.github.diff` (or the versioned `...github.v3.diff`, or the
+# `.patch` sibling) returns raw diff text from the very path a status read uses
+# -- which is why _argv_probe cannot decide on the path alone. `+json` does not
+# match, so the ordinary `application/vnd.github+json` probe is unaffected.
+RX_DIFF_MEDIA = re.compile(
+    r"application/vnd\.github(?:\.[\w.+-]+)?\.(?:diff|patch)", re.I)
 
 # A PR identity carried by a tool RESULT: the PR URL (owner/repo/number), gh's
 # `Pull request owner/repo#N` success line, or a bare `"number"` field.

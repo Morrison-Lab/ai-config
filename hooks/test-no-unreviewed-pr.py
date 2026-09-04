@@ -1323,6 +1323,15 @@ case(create("c") + [bash("curl -s -H 'Accept: application/vnd.github+json' "
                          tid="x"),
                     res("x", REST_CLOSED), say("Read it with curl.")], False,
      "a curl read of one pull is a probe, host and all")
+# `--url` is the one request-carrying flag deliberately absent from
+# `_API_VALUE_FLAGS`, since its value IS the path. Nothing else exercises it,
+# so adding it to that set would otherwise turn no case red (ai-config#3086
+# review).
+case(create("c") + [bash("curl -s --url "
+                         "https://api.github.com/repos/o/r/pulls/1038",
+                         tid="x"),
+                    res("x", REST_CLOSED), say("Read it with --url.")], False,
+     "`--url` carries the request path, so its value stays a probe candidate")
 
 # ... and the fail-safe direction, which must survive all of the above.
 case(create("c") + [bash("gh pr merge 1038 --squash", tid="m"),
@@ -1356,11 +1365,48 @@ case(create("c") + [use("mcp__github__pull_request_read", tid="v", owner="o",
      True,
      "an MCP read of a PR's DIFF is not a status read, whatever the diff "
      "quotes -- the twin of `gh pr diff`, which is not a probe either")
+# A call carrying NO method at all. The tool's schema marks `method` required,
+# so this is malformed rather than legitimate -- and the guard treats it as
+# not-a-probe, the direction that stays armed. Pinned because relaxing the
+# absent-method default to `get` would otherwise turn no case red
+# (ai-config#3086 review).
+case(create("c") + [use("mcp__github__pull_request_read", tid="v", owner="o",
+                        repo="r", pullNumber=1038),
+                    res("v", REST_CLOSED), say("Read it, method-less.")],
+     True,
+     "an MCP read with no method is not a probe, so a missing method leaves "
+     "the guard armed")
 case(create("c") + [bash("gh api repos/o/r/issues/9/comments "
                          "-f 'body=status of repos/o/r/pulls/1038'", tid="x"),
                     res("x", REST_CLOSED), say("Posted a comment.")], True,
      "a pull path quoted in a PAYLOAD is not the request path, so a "
      "comment-posting write is not a probe")
+# The REST spelling of `gh pr diff`: the SAME path as a status read, with the
+# representation selected by the `Accept:` header alone, so the body is diff
+# text. The shell twin of the MCP `get_diff` case above (ai-config#3086
+# review).
+case(create("c") + [bash("gh api repos/o/r/pulls/1038 "
+                         "-H 'Accept: application/vnd.github.diff'", tid="x"),
+                    res("x", DIFF_QUOTING_CLOSED), say("Read the diff.")],
+     True,
+     "a diff media type on the pull path is not a status read, whatever the "
+     "diff quotes")
+case(create("c") + [bash("curl -s -H 'Accept: application/vnd.github.diff' "
+                         "https://api.github.com/repos/o/r/pulls/1038",
+                         tid="x"),
+                    res("x", DIFF_QUOTING_CLOSED), say("Read the diff.")],
+     True,
+     "the curl spelling of that diff read is not a status read either")
+# The mirror image of the payload case above, on the REQUEST side: a
+# comment-posting POST whose body quotes the reviewers endpoint must not
+# discharge the obligation it names (ai-config#3086 review).
+case(create("c") + [bash("gh api repos/o/r/issues/9/comments -X POST "
+                         "-f 'body=asked at "
+                         "repos/o/r/pulls/1038/requested_reviewers'", tid="x"),
+                    res("x", '{"requested_reviewers":[{"login":"Copilot"}]}'),
+                    say("Posted a comment.")], True,
+     "the reviewers endpoint quoted in a PAYLOAD is not the request path, so "
+     "a comment-posting write requests nobody")
 case(create("c") + [bash("curl -s https://api.github.com/repos/o/r/pulls/1038"
                          "/requested_reviewers", tid="x"),
                     res("x", REST_CLOSED), say("Read the reviewers.")], True,

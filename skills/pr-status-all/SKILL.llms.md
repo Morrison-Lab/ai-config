@@ -56,20 +56,23 @@ A subagent starts **fresh** — it sees only this prompt, not this skill file �
 >     ``` bash
 >     set -o pipefail
 >     head="$(gh pr view "<N>" --json headRefOid -q .headRefOid)"
->     review_id="$(gh api "repos/<owner>/<repo>/pulls/<N>/reviews" --paginate \
->       | jq -s --arg h "$head" \
->       '[.[][] | select(.user.login=="copilot-pull-request-reviewer[bot]" and .commit_id==$h)] | last | .id')"
->     if [ -n "$review_id" ] && [ "$review_id" != "null" ]; then
->       gh api "repos/<owner>/<repo>/pulls/<N>/reviews/$review_id" --jq '{state, body}'
->       gh api "repos/<owner>/<repo>/pulls/<N>/comments" --paginate \
->         | jq -s --arg rid "$review_id" \
->         '[.[][] | select(.pull_request_review_id == ($rid | tonumber))] | .[] | {line: (.line // .original_line), body}'
+>     review_ids="$(gh api "repos/<owner>/<repo>/pulls/<N>/reviews" --paginate \
+>       | jq -r -s --arg h "$head" \
+>       '[.[][] | select(.user.login=="copilot-pull-request-reviewer[bot]" and .commit_id==$h)] | .[].id')"
+>     if [ -n "$review_ids" ]; then
+>       comments="$(gh api "repos/<owner>/<repo>/pulls/<N>/comments" --paginate | jq -s '[.[][]]')"
+>       for rid in $review_ids; do
+>         gh api "repos/<owner>/<repo>/pulls/<N>/reviews/$rid" --jq '{state, body}'
+>         jq --arg rid "$rid" \
+>           '.[] | select(.pull_request_review_id == ($rid | tonumber)) | {line: (.line // .original_line), body}' \
+>           <<<"$comments"
+>       done
 >     else
 >       echo "no Copilot review exists at the current head"
 >     fi
 >     ```
 >
->     Clean requires **three** things: an affirmative zero-new-findings overview (e.g. “generated no new comments” – never a literally empty body), zero matched inline comments, **and no suppression block in the body**. Match inside the `<summary>` heading, case-insensitively on `suppressed` – not on either exact phrase, and not anywhere in the body. A stub-like non-answer (“ineligible”, “reached their quota limit”) is not a verdict either. **A human’s formal review at the current head counts as an external verdict too** – check for one whenever the Copilot half found no clean verdict, before settling on `no verdict at head`:
+>     Clean requires **three** things: an affirmative zero-new-findings overview (e.g. “generated no new comments” – never a literally empty body), zero matched inline comments, **and no suppression block in the body**. Match on the block’s heading — a `<summary>` element, or an ATX heading inside a collapsed `<details>` region — case-insensitively on `suppressed`, not on either exact phrase, not on `<summary>` alone, and not anywhere in the body. Measured 2026-09-03 on ai-config#3084 review `5098574802`, the block sits as a `### Suppressed comments (1)` heading under `<summary>Review details</summary>`, which a `<summary>`-only match misses entirely; that same review collapses its `Pull request overview` and `File summaries` prose too, so a collapsed region no longer implies “not overview prose”. A region-wide match has one measured false positive: ai-config#1036 review `4837539268`, whose collapsed `Show a summary per file` table reads “Detects suppressed Copilot findings.” while the body carries no suppression block (137 Copilot review bodies enumerated 2026-09-04, and the set is in [`fully-clean.cases.md`](../../shared/workflow/fully-clean.cases.md)). Keep it as a fallback behind the heading anchor on the cost asymmetry — a false zero merges over real findings, a false positive costs one re-read — and treat a hit only the fallback finds as probably spurious, with a collapsed per-file summary table as the shape to expect when you re-read that region. Apply all three to **every** Copilot review at the head, which is why the block above loops rather than reducing the id list with `| last`. Copilot posts more than one review per head, and each carries its own suppression block — three at head `6f10014` on ai-config#3084 (`5098574802`, `5098854246`, `5098881593`), each with a `### Suppressed comments (1)` block of its own (measured 2026-09-03), so reducing to one of them scans only that review’s block and silently drops the other two’s findings — and reports `clean` outright whenever the review the reduction keeps is the finding-free one. No per-author grouping rescues that reduction here, because every Copilot review shares one login. A stub-like non-answer (“ineligible”, “reached their quota limit”) is not a verdict either. **A human’s formal review at the current head counts as an external verdict too** – check for one whenever the Copilot half found no clean verdict, before settling on `no verdict at head`:
 >
 >     ``` bash
 >     set -o pipefail

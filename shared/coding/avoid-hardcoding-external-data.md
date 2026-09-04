@@ -247,7 +247,8 @@ Measured 2026-09-03 on `origin/main`, `python3 scripts/test_check_pr_fully_clean
 The suite fetches a prior revision of the checker with `git show`, trying `origin/main` first, and emits one extra case only when some revision resolves.
 So the total turns on whether **any** of those revisions resolves, not on where the tree sits.
 A `git archive` export reports 753, having no repository at all.
-A depth-1 clone reports 754 on `origin/main`, and a full clone with its remote removed still reports 754 by falling through to `HEAD~40`.
+A depth-1 clone reports 754, because it still carries `origin/main`.
+So does a full clone with its remote removed, because the loop falls through to `HEAD~40`, which resolves independently of any remote.
 
 That is the discriminator, and it was one command away throughout.
 What the three wrong explanations share is that none of them varied an input.

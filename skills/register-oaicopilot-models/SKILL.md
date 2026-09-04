@@ -1,6 +1,6 @@
 ---
 name: register-oaicopilot-models
-description: "Register models in the OAICopilot VS Code extension (rom)."
+description: "Register models in the OAICopilot extension."
 user-invocable: true
 allowed-tools:
   - Bash

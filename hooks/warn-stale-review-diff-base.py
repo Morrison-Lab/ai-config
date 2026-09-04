@@ -520,8 +520,13 @@ def _emit(note, summary):
         print(len(c), sum("systemMessage" in
                           (pathlib.Path("hooks") / x).read_text() for x in c))
 
-    This hook is also one of the three that do not yet gate `systemMessage` on
+    This hook is also one of those that do not yet gate `systemMessage` on
     `ANTIGRAVITY_AGENT`, so under that adapter its warning prints twice.
+    How many such hooks there are is deliberately not repeated here. Unlike
+    the 16/15 tally above, which ships its deriving snippet and its date, a
+    bare count carries nothing a reader could re-derive, so it goes stale
+    silently on every unrelated hook addition -- as this docstring's previous
+    one did, within a day of being written.
     `README.md`'s warn-only hook section carries that census and the snippet
     deriving it.
     """

@@ -73,13 +73,16 @@ committed pass.
 - **Before ending a turn to wait on anything** --- a subagent,
   a long-running background process, CI, a review round,
   or an answer from the user.
-  Run the pass before the pause rather than alongside it,
-  and not only once the wait turns out to be long:
+  Run the pass before the turn ends,
+  not once the wait turns out to be long:
   a wait's length is not knowable when it begins,
   and the learnings sit in conversation state until it ends.
-  The pass is owed once per wait rather than once per timer,
-  so a monitoring loop gets it at the loop's first pause
-  and again only once new learnings accumulate.
+  A dispatched subagent or background job is the case
+  where the pass runs alongside the wait rather than delaying it,
+  so don't let a real wait sit fully idle.
+  The pass is owed at the first pause
+  and again only once new learnings accumulate,
+  rather than once per wait or once per re-arm of a timer.
   See
   [`run-ums-proactively`](../../shared/workflow/run-ums-proactively.md).
 

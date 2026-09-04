@@ -170,20 +170,22 @@ was wrong.
 
 ## Run UMS before every pause
 
-Before ending a turn to wait on anything external --- CI, a review round,
+Before ending a turn to wait on anything --- CI, a review round,
 a subagent, or an answer from the user --- run `ums` first.
 A wait's length is not knowable when it begins, so the learnings sit in
 conversation state for however long it runs, and a pause is the likeliest
 point for compaction or a session nobody resumes.
-The pass is owed once per wait rather than once per timer, so a monitoring
-loop gets it at the loop's first pause and again only once new learnings
-accumulate.
+"Resume every non-clean pause" above obliges a wake mechanism at this same
+moment; this obliges the pass alongside it.
+The pass is owed by accumulated learnings rather than by the number of waits,
+so a monitoring loop and a run of separately posed questions each get it at
+the first pause and again only once new learnings accumulate.
 The full rule, including the rationale and the other pairs, is
 [`shared/workflow/run-ums-proactively.md`](shared/workflow/run-ums-proactively.md).
 
-- **Do:** run the pass before the pause, not once the wait turns out to be long.
-- **Do:** run it at a monitoring loop's first pause, then again only once new learnings accumulate.
-- **Don't:** re-run it at every re-arm of a monitoring timer.
+- **Do:** run the pass before the pause, not once the wait turns out to be long, whenever learnings have accumulated since the last pass.
+- **Do:** run it at the first pause, whether the waits that follow are a monitoring loop's re-arms or a run of separately posed questions.
+- **Don't:** re-run it at a second consecutive pause that has learned nothing since the first.
 - **Don't:** defer the pass to when the wait ends --- the resumption may land in another session or never come.
 
 ## Help your subagents improve over time

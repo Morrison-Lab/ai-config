@@ -624,3 +624,17 @@ the recheck left 3 to 9 findings on each (#3121, #3105, #3098, #3038, #3050, #31
 The three branches carrying the placeholder author (#3121, #3105, #3038) were reset the way wave 1's were, before their fix-loop script was generated from the run's result.
 The freed slots went to the wave-1 serial fix loop (run `wf_c4f6e28c-623`, one agent at a time) and to the UMS branch's round-3 verdict at `3011644c`;
 with wave 3 and #3154's verdict that fills the cap, so the wave-2 loop and wave 4 wait.
+
+## 17:28 PDT --- #3154 pushed at `15287fbf` after round 15; UMS branch through round 3
+
+Round 15 on #3154 returned three findings, all wording:
+"not the one the destination sits in" read partitively against the six-path list, so the Do bullet now points at skill-builder step 0 by link and says "not only the directory";
+the copied path list is gone from the bullet and lives in the recipe alone;
+`skill-builder` is linked at each of its three mentions.
+Applied at `15287fbf` and pushed without a further private round, per the decision recorded two entries up:
+`ls-remote` read `94244eb5`, the fast-forward was confirmed, and the push landed.
+The PR body's checks section now names `15287fbf` and lists the four deferrals (#3161, #3163, #3164, #3165);
+the Copilot thread on the `exit 1` guard is resolved, Copilot re-requested, and `@jules review` posted.
+The UMS branch's round 3 reproduced every count and exit code and left one finding, a provenance parenthetical crediting #3129's review with a catch made by the round-one verdict on `fix/ums-step3-corpus-scope`;
+fixed at `6c8db734`, whose round-4 verdict is running.
+The wave-2 fix loop launched into the last free slot.

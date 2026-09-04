@@ -229,10 +229,10 @@ the classification was derived while linking that PR's bare references.)
   (Verified on git 2.x;
 a review bot suggested the broken form on Morrison-Lab/gha#58.)
 
-## Git — `merge --continue` takes no arguments
+## Git --- `merge --continue` takes no arguments
 - `git merge --continue --no-edit` fails with `fatal: --continue expects no arguments`.
 - After resolving conflicts and staging (`git add <files>`), use `git merge --continue` alone.
-- In a non-interactive (headless) session git uses the auto-generated merge commit message without prompting — no editor opens.
+- In a non-interactive (headless) session git uses the auto-generated merge commit message without prompting --- no editor opens.
 
 ## Git merge --- editing away the conflict markers is not resolving the conflict
 - Rewriting a conflicted file to remove `<<<<<<<`/`=======`/`>>>>>>>` leaves it

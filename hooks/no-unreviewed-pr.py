@@ -357,24 +357,96 @@ def _argv_request(argv):
     return False, None, None
 
 
-def request_ident(cmd):
+def _requests_in(cmd):
+    """([(index, num, repo)], simple_commands) for every request in `cmd`.
+
+    One enumeration for the two callers that need it. `request_ident` takes
+    the first hit and asks whether it is last; `undischargeable_requests`
+    takes them all and applies its own exclusion. Written twice at first,
+    which left a future change to what counts as a request free to land in
+    one loop only (adversarial review on ai-config#3071).
+
+    Returns `([], [])` on a parse failure, so a caller testing the list gets
+    the same "nothing to act on" answer either way.
+    """
+    cmds = _simple_commands(cmd)
+    if cmds is None:
+        return [], []
+    found = []
+    for i, argv in enumerate(cmds):
+        ok, num, repo = _argv_request(argv)
+        if ok:
+            found.append((i, num, repo))
+    return found, cmds
+
+
+def request_ident(cmd, _reqs=None):
     """(is_request, num, repo, last): does `cmd` genuinely request a reviewer?
 
     `last` is True when the matched request is the LAST simple command in the
     chain. That is exactly when the harness `is_error` exit status (which
-    reflects the WHOLE call, i.e. its last command) is authoritative for the
-    request's own outcome -- so the discharge can trust `err` only then. A
-    request chained AHEAD of other commands has an is_error that belongs to a
-    later command, so the discharge treats it as ambiguous and does not fire.
+    reflects the WHOLE call) is authoritative for the request's own outcome.
+    In last position after `;`, the request always runs and its status is the
+    call's own exit status. In last position after `&&`, either the request ran
+    and its status is the call's, or an earlier command failed and
+    short-circuited it away, leaving a failure status the discharge withholds
+    on. Both are safe.
+
+    A last-position request after `||` is NOT safe, and this is a known hole
+    rather than an impossibility: `gh pr view ... || <POST>` exits 0 when the
+    read succeeds and the POST never runs, so the discharge clears an
+    obligation on a request that did not happen. Closing it needs operator
+    awareness, which `_simple_commands` discards by design. Tracked in
+    ai-config#3139; do not read the two-case enumeration above as covering it.
+
+    A request chained AHEAD of other commands shares one status with them, and
+    which command produced it is not recoverable here -- `_simple_commands`
+    discards the operators, and a failing request short-circuits a following
+    `&&` so the status can be the request's own. The discharge therefore
+    treats a non-last request as unattributable and does not fire.
     """
-    cmds = _simple_commands(cmd)
-    if cmds is None:
+    found, cmds = _requests_in(cmd) if _reqs is None else _reqs
+    if not found:
         return False, None, None, False
-    for i, argv in enumerate(cmds):
-        ok, num, repo = _argv_request(argv)
-        if ok:
-            return True, num, repo, (i == len(cmds) - 1)
-    return False, None, None, False
+    i, num, repo = found[0]
+    return True, num, repo, (i == len(cmds) - 1)
+
+
+def undischargeable_requests(cmd, _reqs=None):
+    """Every reviewer request in `cmd` this call's discharge cannot credit.
+
+    `request_ident` stops at the first match, which is right for the discharge
+    -- one call yields one exit status, so one request can be credited by it.
+    It is wrong for the diagnostic: a call requesting reviewers for two PRs and
+    then verifying them names only the first, and the block leaves the second
+    out (Copilot on ai-config#3024).
+
+    Returns a list of (num, repo).
+
+    A request in the LAST position is excluded only when it is the chain's
+    ONLY request, which is the case the discharge can speak to: after `&&` or
+    `;` the status is then either the request's own or a short-circuit failure
+    that never ran it, and the discharge is safe under both, so
+    `request_ident` reports it with `last` True. (Not "the status is the
+    request's own" -- that is the unqualified attribution this file corrects
+    elsewhere.) The `||` case is unsafe and is `request_ident`'s hole, not
+    this exclusion's; see there, and ai-config#3139.
+
+    It is NOT excluded when an earlier request exists. `pending` is keyed from
+    `request_ident`, which returns the FIRST match -- so on `POST #A && POST #B`
+    the discharge is offered #A with `last` False and fires for neither. #B
+    would then be discharged by nothing and named by nothing, which is the
+    failure this function was added to fix, one token away from where it was
+    fixed (adversarial review on ai-config#3071).
+
+    Including it over-warns at worst, since nothing on this path discharges.
+    """
+    found, cmds = _requests_in(cmd) if _reqs is None else _reqs
+    if not found:
+        return []
+    if len(found) == 1 and found[0][0] == len(cmds) - 1:
+        return []
+    return [(num, repo) for _i, num, repo in found]
 
 
 def _argv_draft(argv):
@@ -425,11 +497,12 @@ def draft_ident(cmd):
     Mirrors request_ident exactly: it locates the draft action STRUCTURALLY (the
     first simple command that is a gh draft invocation) and reports whether THAT
     command is last -- which is exactly when the harness is_error (the whole
-    call's exit status) is authoritative for the transition's own outcome. A
-    draft action chained AHEAD of another command has an is_error belonging to a
-    later command, so the discharge treats it as AMBIGUOUS and keeps the PR
-    tracked (the safe over-warn direction). Fails toward not-a-draft on a parse
-    error, so it never fabricates a clear.
+    call's exit status) is authoritative for the transition's own outcome.
+    A draft action chained AHEAD of another command shares one is_error with
+    it, and which command produced that status is not recoverable here, so the
+    discharge treats it as AMBIGUOUS and keeps the PR tracked (the safe
+    over-warn direction). Fails toward not-a-draft on a parse error, so it
+    never fabricates a clear.
     """
     cmds = _simple_commands(cmd)
     if cmds is None:
@@ -1328,9 +1401,11 @@ def _resolve_arm(pending_arm, rid, failed, obligations, live, uncertain=()):
         the push that re-headed it still owes a reviewer. Arm.
       * SUCCEEDED -- the PR is drafted or retired and owes nothing. Withhold.
       * AMBIGUOUS -- a transition chained ahead of another command shares one
-        combined exit status, which belongs to the LAST command, so this call
-        cannot attribute an outcome to the transition at all (the combined
-        -result rule in shared/principles/fail-fast.md). Withhold, which is what
+        combined exit status with them, and which command produced it is not
+        recoverable here (the operators are discarded, and a failing transition
+        short-circuits a following `&&`), so this call cannot attribute an
+        outcome to the transition at all (the combined-result rule in
+        shared/principles/fail-fast.md). Withhold, which is what
         the draft and terminal discharges in this same call already do on the
         same input: an ambiguous call changes nothing in either direction
         rather than acting on ambiguity in one of them.
@@ -1353,7 +1428,13 @@ def _repo_ok(a, b):
 
 
 def _mark_nonlast(obligations, num, repo, seq=None, tid=None):
-    """Flag every obligation a non-last request for (num, repo) speaks about.
+    """Flag every obligation an undischargeable request for (num, repo) names.
+
+    "Undischargeable", not "non-last": `undischargeable_requests` keeps a
+    LAST-position request when an earlier request took `pending`'s slot, so
+    position no longer describes what reaches here. The parameter names and
+    the `nonlast` key keep their old spelling only because they are read in
+    several places; the meaning is the function's, not the name's.
 
     Message-only: nothing here discharges or arms.
 
@@ -1418,9 +1499,12 @@ def scan(path):
     two PRs, or the same number in two repositories, are two obligations.
     """
     obligations = []
-    # (num, repo) per non-last reviewer request, applied once after the loop:
-    # see the `nonlast_reqs.append` site for why the marking cannot be applied
-    # where the request is seen.
+    # (num, repo) per UNDISCHARGEABLE reviewer request, applied once after the
+    # loop: see the `nonlast_reqs.append` site for why the marking cannot be
+    # applied where the request is seen.
+    #
+    # Not "per non-last request", which this used to say: a last-position
+    # request is kept when an earlier one took `pending`'s slot.
     nonlast_reqs = []
     pending = {}        # tool_use_id -> (num, repo) for reviewer requests
     pending_clear = {}  # tool_use_id -> (num, repo) for draft transitions
@@ -1581,8 +1665,8 @@ def scan(path):
                     # for the request ONLY when the request is that last command
                     # (`last`), or when the call is a single structured tool
                     # (atomic, recorded with last=True). A request chained AHEAD
-                    # of anything else has an is_error belonging to a later
-                    # command, and no other signal recovers the request's own
+                    # of anything else shares its is_error with that command,
+                    # and no other signal recovers the request's own
                     # outcome from the one combined result blob -- RX_REQ_FAILED
                     # catches a 4xx body but not a network error, a timeout, a
                     # 5xx, or a GraphQL/auth failure. Such a call is therefore
@@ -1609,8 +1693,8 @@ def scan(path):
                     # action is the last simple command (`clast`) or an atomic
                     # structured tool. A `gh pr ready --undo` that genuinely
                     # fails but is chained AHEAD of a succeeding command (e.g.
-                    # `... --undo; echo done`, or `... --undo || true`) has an
-                    # is_error belonging to that later command -- so such a call
+                    # `... --undo; echo done`, or `... --undo || true`) shares
+                    # its is_error with that command -- so such a call
                     # is AMBIGUOUS and must NOT discharge (keep the PR tracked --
                     # the safe over-warn direction), never silently clear a
                     # still-ready, unreviewed PR.
@@ -1800,7 +1884,8 @@ def scan(path):
                 draft = bool(RX_DRAFT.search(cmd_open))
                 opened = bool(RX_OPEN.search(cmd_open)) and not draft
                 onum, orepo = open_ident(cmd_raw)
-                requested, rnum, rrepo, rlast = request_ident(cmd_raw)
+                reqs_parsed = _requests_in(cmd_raw)
+                requested, rnum, rrepo, rlast = request_ident(cmd_raw, _reqs=reqs_parsed)
                 _dok, dnum, drepo, dlast = draft_ident(cmd_raw)
                 pushed = push_ident(cmd_raw)
                 # Draft is checked first: `gh pr ready --undo` matches RX_OPEN
@@ -1862,19 +1947,32 @@ def scan(path):
                 # separate pending request here.
                 if requested and not opened:
                     pending[tid] = (rnum, rrepo, rlast)
-                if requested and not rlast:
-                    # A request APPEARS in the chain and will NOT discharge:
-                    # it is followed by another simple command, so the status
-                    # the discharge reads is that chain's combined status and
-                    # cannot be attributed to the request. Whether it ran at
-                    # all is unknown here -- an earlier failure in a `&&`
-                    # chain short-circuits it away. That
+                for _rn, _rr in undischargeable_requests(cmd_raw, _reqs=reqs_parsed):
+                    # EVERY request in the chain that will not discharge,
+                    # not just the first: `request_ident` returns one match,
+                    # so a call requesting reviewers for two PRs named only
+                    # one of them (Copilot on ai-config#3024).
+                    #
+                    # Each is undischargeable for one of two reasons. It is
+                    # followed by another simple command, so the status the
+                    # discharge reads is that chain's combined status and
+                    # cannot be attributed to the request -- and whether it ran
+                    # at all is unknown here, since an earlier failure in a
+                    # `&&` chain short-circuits it away. Or it sits last but is
+                    # not the request `pending` was keyed on, because an
+                    # earlier request in the same chain took that slot, so
+                    # nothing offers it a status to be judged by. That
                     # is indistinguishable, from inside the turn, from a request
                     # that failed -- the POST returns 200, the reviewer may even
                     # review -- and the block message otherwise names only
                     # failure as the cause, so the reader re-issues the same
-                    # shape and the guard re-fires unchanged. Record it so the
-                    # message can name which of the two actually happened
+                    # shape and the guard re-fires unchanged. Record it so
+                    # the message can say that a request was made at all,
+                    # rather than naming failure as the only possibility
+                    # -- it deliberately does NOT claim which of chaining and
+                    # failure occurred, since the transcript cannot tell them
+                    # apart, and neither does it distinguish the two reasons
+                    # above, which differ in nothing the reader would act on
                     # (ai-config#3017).
                     #
                     # DEFERRED to after the loop rather than applied here: the
@@ -1884,7 +1982,7 @@ def scan(path):
                     # from the RESULT, which arrives in a later block). Only a
                     # sweep at the end sees every obligation in its final
                     # state (Copilot on ai-config#3024).
-                    nonlast_reqs.append((rnum, rrepo, _OBL_SEQ, tid))
+                    nonlast_reqs.append((_rn, _rr, _OBL_SEQ, tid))
                 # Terminal actions and status reads are registered regardless of
                 # the branches above: `gh pr merge` is neither an open nor a
                 # draft transition, and a `gh pr view` chained after a create
@@ -2015,26 +2113,33 @@ def main() -> int:
     # sentence over several flagged numbers is wrong twice -- grammatically,
     # and about how many requests were made (Copilot on ai-config#3024).
     names = ", ".join("#" + n for n in flagged)
+    # "shared a call", not "chained AHEAD of another command". The latter was
+    # true of every flagged request until `undischargeable_requests` began
+    # keeping a LAST-position request whose slot `pending` had already given to
+    # an earlier one -- nothing follows that request, so the message sent the
+    # reader looking for an operator that is not there. That is the same harm
+    # the `sole_failed` arm exists to prevent, arriving through the other door
+    # (adversarial review on ai-config#3071).
+    #
+    # One sentence rather than a branch per reason: the two differ in WHY the
+    # status is unattributable, and not at all in what the reader does about
+    # it, so a second branch would buy a distinction with no action behind it.
     chained = ((
         "A reviewer request for %s appears in the transcript and was not "
-        "credited: it was chained AHEAD of another command, so the "
-        "discharge reads a combined exit status that cannot be "
-        "attributed to the request. What the request itself did is "
-        "therefore "
-        "unknown from here -- it may have returned 200 with a review "
-        "landing, it may have failed, and a `&&` chain may have "
-        "short-circuited before it ran at all. That is why this looks "
+        "credited: it shared a call with another command, so this guard "
+        "does not attribute that call's exit status to it. What the request "
+        "itself did is therefore unknown from here -- it may have returned "
+        "200 with a review landing, it may have failed, and a `&&` chain may "
+        "have short-circuited before it ran at all. That is why this looks "
         "identical to a request that failed.\n\n" % names
     ) if len(flagged) == 1 else (
         "Reviewer requests for %s appear in the transcript and none was "
-        "credited: each was chained AHEAD of another command, so the "
-        "discharge reads a combined exit status that cannot be "
-        "attributed to any one of them. What each request did is "
-        "therefore unknown "
-        "from here -- one may have returned 200 with a review landing, one "
-        "may have failed, and a `&&` chain may have short-circuited before "
-        "it ran at all. That is why this looks identical to requests that "
-        "failed.\n\n" % names
+        "credited: each shared a call with another command, so this guard "
+        "does not attribute any call's exit status to its own request. What "
+        "each request did is therefore unknown from here -- one may have "
+        "returned 200 with a review landing, one may have failed, and a `&&` "
+        "chain may have short-circuited before it ran at all. That is why "
+        "this looks identical to requests that failed.\n\n" % names
     )) if flagged else ""
 
     print(json.dumps({

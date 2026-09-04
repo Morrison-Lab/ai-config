@@ -450,7 +450,7 @@ add a review gate for the cases that need one.
 - ❌ Updating memories but not pushing skill changes to origin
 - ❌ Recording vague lessons ("be more careful") instead of specific ones
   ("always poll for new review after pushing --- check commit SHA matches")
-- ❌ Skipping the "check existing notes" step and creating duplicates --
+- ❌ Skipping step 3's dupe check and creating duplicates --
   specifically, reading only the region you're appending to instead of
   grepping the corpus for the subject (step 3)
 - ❌ Updating only preferences when a skill also needs the fix

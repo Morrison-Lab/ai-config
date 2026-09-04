@@ -741,6 +741,44 @@ try:
         "git commit -m mine",
         "git push origin main",
     ])
+    # The SAME-CALL spelling of the case above, which the multi-call fixture
+    # cannot see: supersession has to read the text before the commit, not
+    # only whole earlier calls, or the inspect-then-return route stays open
+    # whenever it is written as one call. The directory half already read it
+    # that way, so the two halves disagreed about a shape this corpus writes
+    # routinely.
+    checkout_back_same_call = transcript([
+        "git checkout agy-dormant && git log -1",
+        "git checkout - && git commit -m mine",
+    ])
+    # `git branch` names a branch without switching to it, so a commit that
+    # follows one lands wherever the shell already stood. Reading these as
+    # switches made `git branch -d agy-dormant` --- the cleanup a
+    # squash-merged leftover invites --- claim the next commit, and a delete
+    # git refuses as unmerged left the session blocked on a branch it never
+    # committed on.
+    branch_delete_attributes_nothing = transcript([
+        "git branch -d agy-dormant",
+        "git commit -m mine",
+    ])
+    branch_contains_attributes_nothing = transcript([
+        "git branch --contains agy-dormant",
+        "git commit -m mine",
+    ])
+    # The other direction on the same axis: `git branch` moves HEAD nowhere,
+    # so it must not CLEAR a genuinely carried branch either.
+    branch_subcommand_keeps_branch = transcript([
+        "git checkout agy-dormant && git log -1",
+        "git branch -d some-other",
+        "git commit -m mine",
+    ])
+    # A call can commit, move, and commit again. Attributing only the first
+    # match left the second unclaimed, so an unshipped commit went unreported
+    # and the Stop was allowed --- fail-open, and invisible to every fixture
+    # that puts one commit in a call.
+    two_commits_one_call = transcript([
+        f"cd {dormant_root} && git commit -m mine && cd {dormant_wt} && git commit -m mine",
+    ])
     # A `cd` AFTER the commit in the same call names where the shell ends up,
     # never where it stood when the commit ran. Attributing the commit to it
     # is the same false attribution to a merely-visited directory that the
@@ -883,6 +921,24 @@ try:
         # leaves it unattributed, the branch-side twin of the `cd` route.
         assert subject.decide(dormant_root, checkout_back) == "", \
             "a dormant branch switched away from with `git checkout -` must not block (ai-config#2422)"
+        # The same, written as one call: supersession reads the text before
+        # the commit, not only whole earlier calls.
+        assert subject.decide(dormant_root, checkout_back_same_call) == "", \
+            "`git checkout - && git commit` must supersede the inspected branch (ai-config#2422)"
+        # `git branch` names a branch without moving HEAD, so no commit may
+        # be attributed to one it merely mentions.
+        for _name, _t in (("git branch -d", branch_delete_attributes_nothing),
+                          ("git branch --contains", branch_contains_attributes_nothing)):
+            assert subject.decide(dormant_root, _t) == "", \
+                f"`{_name}` names a branch without committing on it (ai-config#2422)"
+        # Negative control on that axis: it must not clear a carried branch
+        # either, or the switched-branch attribution of ai-config#2737 is lost.
+        _b_reason = subject.decide(dormant_root, branch_subcommand_keeps_branch)
+        assert "agy-dormant" in _b_reason, _b_reason
+        # Every commit in a call is attributed, not only the first.
+        _two_reason = subject.decide(dormant_root, two_commits_one_call)
+        assert "agy-dormant" in _two_reason, _two_reason
+        assert _two_reason.startswith("1 commit(s) on worktree"), _two_reason
         # A `cd` after the commit in the same call attributes nothing.
         assert subject.decide(dormant_root, commit_then_cd_away) == "", \
             "a `cd` AFTER the commit must not attribute the commit to where the shell ended up (ai-config#2422)"
@@ -934,7 +990,12 @@ try:
             shutil.rmtree(_p, ignore_errors=True)
         shutil.rmtree(f"{gone_wt}-extra", ignore_errors=True)
         for _p in (visit_only, visit_then_pending, commit_in_dormant,
-                   cd_then_commit_later, checkout_back, commit_then_cd_away,
+                   cd_then_commit_later, checkout_back,
+                   checkout_back_same_call,
+                   branch_delete_attributes_nothing,
+                   branch_contains_attributes_nothing,
+                   branch_subcommand_keeps_branch, two_commits_one_call,
+                   commit_then_cd_away,
                    patch_mode_keeps_branch, worktree_add_keeps_branch,
                    checkout_index_keeps_branch,
                    bare_cd_moves_home, pushd_supersedes, popd_supersedes,

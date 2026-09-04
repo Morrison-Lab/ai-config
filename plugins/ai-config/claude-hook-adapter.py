@@ -410,8 +410,8 @@ def main():
                     tasks_to_run.append((extract_hook_list(group), task_payload, tool_cwd, "define_subagent"))
 
         elif tool_name == "call_mcp_tool":
-            server = args.get("ServerName") or args.get("serverName") or args.get("server") or ""
-            sub_tool = args.get("ToolName") or args.get("toolName") or args.get("tool") or ""
+            server = (args.get("ServerName") or args.get("serverName") or args.get("server") or "").strip()
+            sub_tool = (args.get("ToolName") or args.get("toolName") or args.get("tool") or "").strip()
             mcp_args = args.get("Arguments") or args.get("arguments") or {}
             if isinstance(mcp_args, str):
                 try:

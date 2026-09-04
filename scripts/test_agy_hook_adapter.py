@@ -179,15 +179,17 @@ class TestAgyHookAdapter(unittest.TestCase):
 
     def test_plugins_hooks_json_run_command_split_into_its_own_group(self):
         # De-risk regression guard: "run_command" must sit in its own
-        # literal-matcher group, separate from the newer tool names' regex
-        # alternation, so a wrong assumption about Antigravity treating
-        # `matcher` as a regex costs only the newer coverage and never the
-        # pre-existing merge-control gate on run_command.
+        # literal-matcher group, separate from the newer tool names.
+        # Furthermore, each newer tool name must have its own discrete
+        # single-tool matcher block to prevent silent fail-open if
+        # Antigravity does not support regex alternation in matcher.
         with open(PLUGIN_HOOKS_JSON, "r", encoding="utf-8") as f:
             data = json.load(f)
         pre_tool_use = data["enforce-merge-control"]["PreToolUse"]
         matchers = [group.get("matcher") for group in pre_tool_use]
         self.assertIn("run_command", matchers, "run_command must have its own literal-matcher group")
+        for tool in ["invoke_subagent", "send_message", "define_subagent", "call_mcp_tool", "write_to_file", "replace_file_content", "mcp__github__.*"]:
+            self.assertIn(tool, matchers, f"{tool} must have its own discrete matcher group in hooks.json")
         run_command_group = next(g for g in pre_tool_use if g.get("matcher") == "run_command")
         run_command_commands = [h.get("command", "") for h in run_command_group.get("hooks", [])]
         self.assertTrue(
@@ -196,8 +198,8 @@ class TestAgyHookAdapter(unittest.TestCase):
         )
         for matcher in matchers:
             self.assertNotIn(
-                "run_command|", matcher or "",
-                "run_command must not be combined into a regex alternation with other tool names",
+                "|", matcher or "",
+                f"matcher {matcher} must not use regex alternation (pipes)",
             )
 
     @patch('os.path.exists', return_value=False)
@@ -426,6 +428,37 @@ class TestAgyHookAdapter(unittest.TestCase):
                     "ServerName": "github",
                     "ToolName": "get_commit",
                     "Arguments": json.dumps({"owner": "foo", "repo": "bar"})
+                }
+            }
+        }
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
+        self.adapter.main()
+
+        out = json.loads(mock_stdout.getvalue())
+        self.assertEqual(out.get("decision"), "allow")
+
+        call_input = json.loads(mock_run.call_args_list[0].kwargs['input'])
+        self.assertEqual(call_input["tool_name"], "mcp__github__get_commit")
+        self.assertEqual(call_input["tool_input"], {"owner": "foo", "repo": "bar"})
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    @patch('subprocess.run')
+    def test_call_mcp_tool_whitespace_stripping(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        mock_result = MagicMock(returncode=0, stdout=json.dumps({"hookSpecificOutput": {}}), stderr="")
+        mock_run.return_value = mock_result
+
+        payload = {
+            "toolCall": {
+                "name": "call_mcp_tool",
+                "args": {
+                    "ServerName": "  github  ",
+                    "ToolName": "  get_commit  ",
+                    "Arguments": {"owner": "foo", "repo": "bar"}
                 }
             }
         }

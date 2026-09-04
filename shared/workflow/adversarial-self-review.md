@@ -641,7 +641,8 @@ The sentinel puts a non-hex line between the fingerprint and anything the harnes
 
 It is not free, though, and both its cost and its protection belong to the **consumer** reading the report rather than to the report's shape.
 Its cost falls unevenly across the two report contracts [`scripts/pre-push-review.py`](../../scripts/pre-push-review.py) validates,
-and falls nowhere at all on [`hooks/no-push-without-self-review.py`](../../hooks/no-push-without-self-review.py)'s own guard, which runs no trailing-content check on either shape.
+and falls nowhere at all on [`hooks/no-push-without-self-review.py`](../../hooks/no-push-without-self-review.py)'s own guard or on [`scripts/cursor-self-review-check.py`](../../scripts/cursor-self-review-check.py), the Cursor Cloud recovery gate that calls that same `parse_report`, neither of which runs a trailing-content check on either shape.
+Those three are the whole consumer set as of 2026-09-04, derived rather than recalled: `grep -rln parse_report hooks scripts --include='*.py' | grep -v test`.
 On that script's own four-section contract --- Summary Verdict, Critical Findings, Observations, Verification Steps --- it strips HTML comments and then scans whatever follows the last fingerprint.
 What `_TRAILING_AFTER_FINGERPRINT` admits there is a status banner, an `=` rule, a disclosure footer, a stopping-point line, or a restated verdict.
 `--- end of report ---` is none of those, so a sentinel is refused outright with "Reviewed-Commit fingerprint must be at the very end of the report".
@@ -656,7 +657,7 @@ Measured 2026-09-04 on the persona contract, over a report whose fingerprint was
 without the sentinel `parse_review_verdict` returned a `Fingerprint SHA mismatch` refusal naming `b9dc14ba` against an expected sha beginning `b9dc14b0`, and with the sentinel appended it returned `(True, True, 'Clean (persona contract)')`.
 The same abbreviated, reordered, glued report, measured the same day against the pre-push guard's own `parse_report`, returned `('clean', 'b9dc14ba')` without the sentinel and `('clean', 'b9dc14b')` with it --- for the four-section report shape as well as the persona one, since that guard checks no trailing content under either.
 `verify_review` then tests `c.startswith(reviewed_commit)`, so against a real `b9dc14b0...` commit the sentinel-free form refuses the push with the misparsed-sha message and the sentinel form passes it.
-So the sentence above about the fingerprint's length ceasing to matter is right wherever no trailing-content check runs --- `pre-push-review.py`'s persona contract and the pre-push guard's own `parse_report` alike --- over a fingerprint that is both abbreviated and last.
+So the sentence above about the fingerprint's length ceasing to matter is right wherever no trailing-content check runs --- `pre-push-review.py`'s persona contract, the pre-push guard's own `parse_report`, and the Cursor Cloud recovery gate alike --- over a fingerprint that is both abbreviated and last.
 What settled [#3050](https://github.com/Morrison-Lab/ai-config/issues/3050) against the sentinel is therefore not that it protects nothing.
 It is that a conforming report never reaches the situation it protects: payload-last means the fingerprint is not the last line, and the mandated full sha stops `REVIEWED_COMMIT`'s capture at the boundary under either trailer shape.
 What is left is the cost --- outright refusal on the four-section contract --- which a report gains nothing by taking on.
@@ -682,7 +683,8 @@ It is adjacent to [#2483](https://github.com/Morrison-Lab/ai-config/issues/2483)
 - **Do:** state the fingerprint as the **full 40-character** sha, which is what actually protects it.
 - **Do:** read a "verdict is for commit X, but this push would ship Y" refusal as possibly a *misparsed* fingerprint rather than only a stale one --- print what the guard captured before concluding.
 - **Do:** fix the brief rather than keeping a sentinel you meet in the wild.
-  It does protect an abbreviated fingerprint that is the report's last line, on `pre-push-review.py`'s persona contract and on the pre-push guard's own `parse_report` --- the two consumers measured to run no trailing-content check, and the two situations it is not inert in.
+  It does protect an abbreviated fingerprint that is the report's last line, on every consumer that runs no trailing-content check on the shape it is handed --- `pre-push-review.py`'s persona contract, the pre-push guard's own `parse_report`, and [`scripts/cursor-self-review-check.py`](../../scripts/cursor-self-review-check.py), the Cursor Cloud recovery gate, which calls that same `parse_report` and then compares prefix-tolerantly.
+  Measured on that gate 2026-09-04, over the same abbreviated, reordered, glued report: without the sentinel it printed `REFUSE: fingerprint b9dc14ba does not match expected head b9dc14b0...` and exited 1, and with the sentinel sitting between the fingerprint and the trailer it printed `PASS: clean verdict at the expected head` and exited 0.
   The payload-last full-sha tail removes those situations instead of insuring against them.
 - **Don't:** write a brief that puts the verdict and the fingerprint after the payload, or that asks for a trailing sentinel.
 - **Don't:** reach for the sentinel as insurance --- a conforming report puts the payload last, so the fingerprint is never the last line, and the full sha closes the truncation hazard under either trailer shape.

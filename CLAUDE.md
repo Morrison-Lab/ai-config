@@ -597,8 +597,8 @@ gh api repos/<owner>/<repo>/issues/<N>/comments --paginate \
 A review submitted via GitHub's review UI (as opposed to a plain PR comment) shows up in `gh pr view N --json reviews`, and its top-level `body` is frequently **empty** --- the actual finding lives entirely in a per-line inline comment, which only appears via `gh api repos/<owner>/<repo>/pulls/N/comments` (a different endpoint from issue comments).
 The mirror case a threads-only check misses just as completely is a finding stated in the top-level `body`, either as plain text or inside a collapsed `<details>` suppression block.
 Neither shape produces an inline comment object, so both the `pulls/N/comments` endpoint and a review-thread query return nothing over it.
-The block has moved as well as changed wording, so match case-insensitively on `suppressed` in a `<summary>` element or in an ATX heading inside a collapsed `<details>` region --- not on any literal, not on `<summary>` alone, and not region-wide.
-[`shared/workflow/fully-clean.md`](shared/workflow/fully-clean.md) and its cases file carry the measurement behind each of those three exclusions.
+The block has moved as well as changed wording, so no literal phrase finds it;
+[`shared/workflow/fully-clean.md`](shared/workflow/fully-clean.md) and its cases file carry the matcher and the measurements behind it.
 Checking `--json comments` alone can miss the review's existence entirely.
 A bot's `COMMENTED` review **carrying findings in its body** vetoes a merge under [`fully-clean`](shared/workflow/fully-clean.md) exactly as a human's `CHANGES_REQUESTED` does, whatever headline that body carries --- "Changes recommended", "Needs a closer look", and "generated no new comments" have each introduced a body carrying real findings --- because the blind spot is about *where the finding sits*.
 The forge enforces only `CHANGES_REQUESTED`, though: a `COMMENTED` review sets no blocking state and needs no dismissal, which is precisely why nothing stops you merging over its findings.

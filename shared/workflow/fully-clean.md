@@ -700,14 +700,28 @@ and the verdict's own conclusion every round.**
   `<details>` suppression block in the review body.
   Match case-insensitively on `suppressed` **in a `<summary>` element, or
   in an ATX heading inside a collapsed `<details>` region** --- not
-  anywhere in the body, and not anywhere in the region either.
+  anywhere in the body, which flags ordinary overview prose.
   Measured 2026-09-03 on ai-config#3084 review `5098574802`, the block
   arrives as `### Suppressed comments (1)` under
   `<summary>Review details</summary>`, which a `<summary>`-only match
   returns zero against, while that same body wraps its `Pull request
   overview` and `File summaries` prose in collapsed `<details>` regions of
-  their own --- so the region is no longer a proxy for "not ordinary
-  overview prose".
+  their own --- so a collapsed region is no longer a proxy for "not
+  ordinary overview prose".
+  That is a reason to prefer the heading anchor, not to forbid the wider
+  match: on every body measured so far a region-wide match produces no
+  false positive at all, since neither of `5098574802`'s collapsed
+  overview regions contains the word and 4837572117's table is
+  uncollapsed.
+  So keep the region-wide match as a fallback behind the heading anchor,
+  and read a hit only the fallback finds as a prompt to read that region
+  rather than as a finding.
+  Every measured failure of this matcher has been a false zero, and a
+  false zero merges over real findings while a false positive costs one
+  re-read;
+  what would settle the choice is a body whose collapsed overview mentions
+  suppressed findings while its own block sits elsewhere, and none exists
+  yet.
   See [`fully-clean.cases.md`](fully-clean.cases.md),
   "The collapsed-block case (Morrison-Lab/ai-config#1029)".
 - **"No verdict" is its own state, distinct from "a verdict with no
@@ -737,6 +751,9 @@ and the verdict's own conclusion every round.**
 - **Do:** read all review surfaces before calling a PR clean,
   every round,
   including collapsed suppressed-comments blocks.
+- **Do:** run the region-wide match as a fallback behind the heading
+  anchor, and read a hit only the fallback finds as a prompt to read that
+  region.
 - **Do:** distinguish "no findings" from "no verdict" explicitly, and treat
   the latter as unreviewed.
 - **Don't:** report clean on a zero thread count, however many checks are
@@ -747,10 +764,11 @@ and the verdict's own conclusion every round.**
   until every `<summary>` element and every ATX heading inside a collapsed
   `<details>` region has been checked case-insensitively for `suppressed`
   --- not until the whole body has, which flags ordinary overview prose
-  that merely mentions suppressed findings, not until the whole region
-  has, which would flag that same prose now that Copilot collapses its
-  overview too, and not `<summary>` alone, which misses a block nested one
-  heading deeper.
+  that merely mentions suppressed findings, and not `<summary>` alone,
+  which misses a block nested one heading deeper.
+- **Don't:** rule the region-wide match out on the strength of that
+  proxy's failure --- no measured body turns it into a false positive, so
+  it is the weaker anchor rather than a wrong one.
 - **Don't:** read a reviewer's silence as a verdict --- a job that posted
   nothing leaves the same zero counts as a job that found nothing.
 - **Don't:** act on a review wake's own payload --- it is one comment out of

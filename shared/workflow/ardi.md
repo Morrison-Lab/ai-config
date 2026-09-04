@@ -327,18 +327,24 @@ things:
   A forge round is metered and slower than a local one --- the three rounds on
   ai-config#2442 cost $4.60 between them, per
   [`fully-clean`](fully-clean.md) --- so spend the forge round on what survives
-  the cheaper reviewer.
+  the local one.
   Dispatch in [`adversarial-self-review`](adversarial-self-review.md)'s
-  independence-and-availability order: the `agy` CLI or
-  [`delegate-to-opencode`](../../skills/delegate-to-opencode/SKILL.md)'s
-  unbilled hosted tier first, then
-  [`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md), which is
-  separately billed.
-  [`adv`](../../skills/adv/SKILL.md) and
-  [`pre-push-review`](../../skills/pre-push-review/SKILL.md) run this from the
-  machine, but point `--engine` at a cheap or free engine: their default `auto`
-  chain starts at `claude`, so an unqualified invocation buys neither cost nor
-  independence.
+  independence-and-availability order --- the `agy` CLI or
+  [`delegate-to-opencode`](../../skills/delegate-to-opencode/SKILL.md) first,
+  then [`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md) --- which
+  overrides the cost-first delegation order rather than expressing it.
+  A rung qualifies only when both its model and its harness differ from the
+  authoring session, and the dispatch waits rather than falling through to a
+  same-model or same-harness reviewer.
+  Route the `opencode` rung to an OpenCode Go tier or an OpenRouter stealth or
+  frontier id, since
+  [`delegate-to-opencode`](../../skills/delegate-to-opencode/SKILL.md)'s "When
+  NOT to delegate" section bars the hosted-free Zen ids from judgment-bearing
+  work.
+  `scripts/pre-push-review.py` defaults to `--engine auto`, whose chain starts
+  at `claude`, so name an engine rather than invoking it unqualified;
+  [`adv`](../../skills/adv/SKILL.md) already names one:
+  `--engine alternate --exclude-engine "$AGENT_NAME"`.
 
 Read the three rounds' findings together rather than round by round, because
 the classes are the evidence and no single round carries them.
@@ -375,9 +381,7 @@ we're doing something wrong", asking whether more local checks belong before
 the push, whether the whole approach is wrong, and whether cheap or free
 models run through CLIs could give a rough preliminary review before a more
 expensive forge review.
-Tracked as ai-config#3110, whose remaining bullet --- an audit of which
-additional standing checks belong in the pre-push checklist --- this section
-does not perform.)
+Tracked as ai-config#3110.)
 
 ### Pre-push checklist
 

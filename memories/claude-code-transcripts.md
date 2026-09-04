@@ -97,9 +97,15 @@ Two practical consequences.
 Sort by each record's own timestamp rather than by position when the question is "most recent".
 And when a position-keyed tool has already held the wrong record,
 appending a fresher one is a remedy available to you:
-dispatching a second, redundant review makes a newer record land last.
+a fresh review of the current head makes a newer record land last.
+That remedy has a precondition, and it is the whole of what separates it from overwriting a verdict you dislike:
+run the reader's own parser against the transcript first and print what it holds,
+so the held record is shown to be a replayed one rather than a current refusal.
 
 - **Do:** read a record's own timestamp when the question is which came last.
-- **Do:** unblock a position-keyed reader by producing a fresh record, when fixing the reader is not available in the moment.
+- **Do:** unblock a position-keyed reader by producing a fresh record,
+  once its own parser has been run and shown to hold a replayed one,
+  and when fixing the reader is not available in the moment.
+- **Don't:** append a fresher record before establishing that the held one is stale --- a current refusal is a finding, not an ordering artifact.
 - **Don't:** treat append-only as a guarantee of chronological order --- a compaction replays records carrying their original timestamps.
 - **Don't:** key a tool you write on "the last X in the transcript".

@@ -1579,6 +1579,9 @@ rather than to keep rephrasing the override, per Pattern 43.
 
 - **Do:** key a "most recent" reader on each record's own timestamp, and say in the code why position is not enough.
 - **Do:** run the instrument's own parsing function against the live artifact, printing what it held, before writing down a mechanism-level explanation.
-- **Do:** produce a fresh record to satisfy a position-keyed guard honestly, when both the guard and its override are unavailable at once.
+- **Do:** produce a fresh record to satisfy a position-keyed guard honestly,
+  once its own parser has been run and shown to hold a replayed record,
+  and when both the guard and its override are unavailable at once.
+- **Don't:** append a fresher record before that check --- a guard holding a current verdict is refusing on the merits, and appending over it is not an unblock.
 - **Don't:** treat an append-only log as sorted --- that is an assumption about the writer, not a property of the file.
 - **Don't:** diagnose a last-wins reader's wrong answer as a matcher bug without first checking the order of what it read.

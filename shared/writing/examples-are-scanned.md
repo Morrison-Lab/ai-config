@@ -99,7 +99,7 @@ Everything above is about the *example* ---
 a quoted instance of the pattern, which a line-oriented scanner reads as bytes.
 A negated sentence is a second way to write the pattern without meaning it,
 and it is easier to miss because nothing about it looks like an example.
-A sentence beginning "no issue is worth filing" contains the assertion a declarative-claim detector exists to catch,
+A sentence beginning `no issue is worth filing` contains the assertion a declarative-claim detector exists to catch,
 and the word that reverses its meaning is a word the detector cannot read.
 
 The two are not the same case, and the difference decides the remedy.
@@ -116,7 +116,7 @@ closing an issue on `KEYWORD #N` inside a sentence written to say the keyword is
 see [`issue-first`](../workflow/issue-first.md)'s
 "A closing keyword plus #N closes #N even when the sentence negates it".
 
-**Which direction it fails in decides how much it is worth, and "safe direction" is not the same as "cheap".**
+**Which direction it fails in decides how much fixing it is worth, and "safe direction" is not the same as "cheap".**
 GitHub's parser fails destructively and invisibly:
 it closes somebody's live work, and the sentence's author gets no signal at all.
 `no-unfiled-finding.py` fails in the safe direction and still `block`s the reply,

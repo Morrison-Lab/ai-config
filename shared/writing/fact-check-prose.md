@@ -945,8 +945,11 @@ One message said a re-wrap brought a line "into the corpus's 60-to-80 range"
 when the three resulting lines measured 54, 84 and 81, none of them in range.
 Its replacement said the split "replaced a 143-character line with three of 54, 84 and 81"
 when it produced two, the third having pre-existed --- `git show --stat` on `f9068299` reporting 2 insertions and 1 deletion.
-Both wrong figures described the line the commit did not touch,
-and each cost a message-only amend to repair.
+The two errors have different causes, and only the second is about neighbouring state:
+the first misread a range against the two lines the commit created,
+while the second counted a line the commit never touched as one it had produced ---
+a claim about surrounding text the commit had no standing to make.
+Each cost a message-only amend to repair.
 The amends are why this record cites the quoted messages rather than counting the rounds:
 rewriting a message destroys the copy a later reader would check,
 so a count of them is a figure this section's own rule would refuse.

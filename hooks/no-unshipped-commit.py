@@ -288,7 +288,8 @@ def _scope_dir(dirs, scope, cur_dir):
 
 
 def shell_dir_after(text, cur_dir, parent_only=False):
-    """The directory the shell stands in WHERE `text` ENDS, given `cur_dir`.
+    """The directory the shell stands in WHERE `text` ENDS, given `cur_dir`,
+    or, with `parent_only`, the caller's own shell wherever `text` stopped.
 
     `None` means INDETERMINATE, never "unchanged": `cd -`, `popd`, a `$VAR`
     target, and an unparseable command each move the shell somewhere this
@@ -296,21 +297,6 @@ def shell_dir_after(text, cur_dir, parent_only=False):
     left. That is the whole of ai-config#2422's directory half --- a session
     that visits a dormant foreign worktree and then returns must not attribute
     its own later commit to the worktree it visited.
-
-    WHERE THE TEXT ENDS is what lets one function answer both of the two
-    questions this file asks it. The between-call carry passes
-    `parent_only`, which reads the caller's own shell whether or not the text
-    closed every `(` --- so `(cd /other-worktree && git status)`, the routine
-    way to read another checkout without leaving your own, leaves the parent
-    where it stood and never claims a later commit, and the truncated
-    `(cd /other-worktree && git st` leaves it there too. The commit
-    attribution passes the text up to the commit, which ends wherever that
-    commit runs --- so
-    `(cd /other-worktree && git commit -m x)` reports the worktree the commit
-    really ran in. An earlier revision instead skipped every `cd` at a depth
-    above 0, which answered the first question and silently lost the second:
-    a commit made in another checkout via the subshell one-liner was
-    attributed to no directory at all and never reported.
 
     One directory per SUBSHELL, keyed on the scope
     `simple_commands_with_scope` reports rather than on nesting depth alone:

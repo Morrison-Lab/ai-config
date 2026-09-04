@@ -1004,11 +1004,11 @@ the unquoted-delimiter case was written down nowhere.
 - **Don't:** choose an unquoted delimiter for the convenience of variable interpolation when the body carries markdown code spans --- each backtick span becomes a command substitution and vanishes silently on success.
 
 **Second occurrence, 2026-09-04, with the rule above loaded (ai-config#3230).**
-The payload this time was not a file but twenty-one forge bodies:
-a Python script under `python3 - <<PY`, unquoted to interpolate one scratchpad path,
+The payload this time was not a file but twenty-one forge bodies (one issue, ten PR bodies, ten claim comments).
+A Python script under `python3 - <<PY`, unquoted to interpolate one scratchpad path,
 filed issue ai-config#3219, opened PRs #3220 through #3229, and posted their claim comments.
 Every backtick span in those bodies ran as a shell command and was replaced by its empty output,
-so #3219 read "The branch  records ... in  and performs no such audit".
+so #3219 read `The branch  records ... in  and performs no such audit`, with a double space where each code span had been.
 All twenty-one were repaired by PATCH from a quoted-delimiter rerun,
 with the path passed as `export S=...` and read by `os.environ['S']`.
 
@@ -1019,14 +1019,14 @@ to stderr in the same tool result as the script's own output, before any body wa
 so those lines are a detector usable before posting rather than after.
 The detector is one-sided:
 it fires only when a substituted command fails and prints;
-a backtick span or `$(...)` naming a command that succeeds quietly, and any `$VAR` expansion, substitute with empty stderr,
+a backtick span or `$(...)` naming a command that succeeds quietly, and any `$VAR` expansion, are substituted with nothing printed to stderr,
 so silence proves nothing and the read-back below stays required.
 And a loop that posts to a forge should read one posted body back before posting the rest,
 since the first body is where the corruption shows.
 
 No guard was built at this occurrence.
 Issue #3230's done-when names a stderr-conditioned check;
-the decidable half is a `PreToolUse` regex over the Bash command for an unquoted delimiter with a backtick or dollar sign in the heredoc body,
+the half of that a hook can decide before the damage is a `PreToolUse` regex over the Bash command for an unquoted delimiter with a backtick or dollar sign in the heredoc body,
 which fires before the damage, and that is the shape to build at the third occurrence, per `shared/principles/deterministic-tools.md`.
 
 - **Do:** treat `command not found` or `No such file or directory` on stderr from a heredoc-fed script as the payload probably having been substituted, and stop before posting.

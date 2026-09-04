@@ -984,62 +984,52 @@ See ai-config#694 for the precedent.
     author-equals-reviewer collision, and it does not arise when the two
     logins differ.
 
-- **A PR opened, or an `@jules review` posted, through the raw REST API got
-  no review on 2026-09-04, and each of the three review workflows declined
-  for its own reason.**
-  The identity split above has a consequence the table does not state.
-  Ten PRs (ai-config#3220 through #3229) opened by `POST /pulls` through the
-  session proxy carried `claude[bot]` as author and as the `pull_request`
-  event's sender.
-  `Morrison-Lab/gha`'s reusable `claude-code-review.yml@v2` gates its jobs
-  on `github.event.sender.type != 'Bot'` (or a `workflow_dispatch`), so each
-  PR's `claude-review.yml` run concluded `success` at the run level while
-  every reusable-workflow job was `skipped`;
-  only `/actions/runs/<id>/jobs` shows the skips.
-  `jules-review.yml` gates on the comment's `author_association` being
-  OWNER, MEMBER, or COLLABORATOR;
-  the raw-API claim comments carried `CONTRIBUTOR`, so its ten runs on them
-  were skipped, as were eleven more on issue link-back comments that
-  carried no mention at all.
-  `antigravity-review.yml` requires an `@agy` or `@antigravity` mention, so
-  it skipped under every sender, the user included.
-  One PR got a verdict anyway, because a later `git push` (a `synchronize`
-  event whose sender was the user) re-triggered the review.
-  The six wave-1 PRs opened the same day through
-  `mcp__github__create_pull_request` were reviewed on open.
+- **Recurrence of the raw-REST no-review trap, with the rule loaded, and
+  what the recurrence added (2026-09-04).**
+  [`github-remote-sessions.md`](github-remote-sessions.md)'s "Two
+  consequences follow" bullet already records, from the day before, that a
+  PR created by `POST /pulls` sends `pull_request.opened` as the bot, gets
+  no automatic review, shows a green run with every `review /` job
+  skipped, and that a bot comment's `author_association` is `CONTRIBUTOR`;
+  [`claude-bot-workflows.md`](claude-bot-workflows.md)'s "A bot-sender push
+  never triggers the ai-config review workflow" bullet carries the same
+  run-green-jobs-skipped shape.
+  Ten PRs (ai-config#3220 through #3229) were opened by `POST /pulls`
+  anyway, for the convenience of a loop, and the claim comments posted the
+  same way.
+  Three things those entries do not say:
 
-  The remedy is the client, not a re-run.
-  In this container on 2026-09-04 the MCP tools' writes carried
-  `d-morrison` (re-derive that per the entry above rather than carrying it),
-  so: open PRs and post mention comments through them, or, for a PR already
-  opened by the raw API, dispatch `claude-review.yml` through
-  `mcp__github__actions_run_trigger` with `inputs.pr_number` and re-post the
-  mention through `mcp__github__add_issue_comment`.
-  Nine dispatches ran under `d-morrison`: eight posted a verdict, and the
-  ninth (#3220's) was cancelled by the push that followed it;
-  Jules started on all ten within a minute of the re-posted mentions.
-
-  A dispatched run is not attached to the head commit's check-runs, which
-  keep the bot-sender run's skipped rows.
-  So a check-runs read at the head shows `require-clean-verdict` as
-  `skipped` while the dispatch's own copy of that job may have failed;
-  #3228 merged with the head reading green and the dispatch run's
-  `require-clean-verdict` red on `verdict: unrecognized`
-  (ai-config#3233).
-  Read the dispatch run's jobs, not the head's check-runs, for a review
-  that arrived by dispatch.
+  - Each workflow declines on its own `if:`.
+    `jules-review.yml` requires `github.event.issue.pull_request` and an
+    `author_association` of OWNER, MEMBER, or COLLABORATOR, so its ten runs
+    on the bot's claim comments skipped on the association and eleven more
+    on issue link-back comments skipped on the pull-request conjunct;
+    `antigravity-review.yml` requires an `@agy` or `@antigravity` mention,
+    so it skipped under every sender, the user's included.
+    Read the `if:` before naming the gate.
+  - The MCP tools dispatch where the proxy's raw `POST .../dispatches`
+    is refused: `mcp__github__actions_run_trigger` with `inputs.pr_number`
+    queued `claude-review.yml` for nine PRs under `d-morrison` in one
+    batch (eight verdicts; #3220's run was cancelled by the push that
+    followed it), and `mcp__github__add_issue_comment` re-posted the
+    mention so Jules started on all ten within a minute.
+    The MCP writes carried `d-morrison` in this container on 2026-09-04;
+    re-derive that per the entry above rather than carrying it.
+  - A dispatched run is not attached to the head commit's check-runs,
+    which keep the bot-sender run's `skipped` rows.
+    #3228 merged with the head's `require-clean-verdict` reading `skipped`
+    while the dispatch run's copy had failed on `verdict: unrecognized`
+    (ai-config#3233).
+    For a review that arrived by dispatch, read that run's jobs, not the
+    head's check-runs.
 
   - **Do:** open PRs and post reviewer mentions through the client whose
-    writes carry the user's login, re-derived per the entry above.
-  - **Do:** read each workflow's own `if:` before naming the gate;
-    three workflows skipped here for three different reasons.
-  - **Do:** read `/actions/runs/<id>/jobs` for a claude-review run under a
-    bot sender, and the dispatch run's jobs for a review that arrived by
-    dispatch.
-  - **Don't:** open PRs by raw REST for the convenience of a loop and expect
-    the `opened` event to review them.
-  - **Don't:** read a run-level `success`, or a head check-run read after a
-    dispatch, as the review having run and passed its verdict gate.
+    writes carry the user's login.
+  - **Do:** read the dispatch run's jobs when a review arrived by dispatch.
+  - **Don't:** open PRs by raw REST for the convenience of a loop; the
+    entry from the day before already said what follows.
+  - **Don't:** read a head check-run row after a dispatch as that
+    dispatch's verdict gate.
 
 - **The REST-backed reads can 404 while the GraphQL-backed ones succeed in the
   same container, against the same PR --- so a review verdict can be

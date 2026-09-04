@@ -166,7 +166,14 @@ or the lab manual's transclusion of this fragment ---
 each command returns nothing,
 and that null is a missing source rather than an empty population.
 Fall back to the machine inventory above for the local-CLI route,
-and record the API-key route as underivable in that repository rather than as empty.
+reading it there as a floor rather than as that route's population,
+and record the shortfall alongside the probe result.
+Record the API-key route as underivable in that repository rather than as empty.
+An underivable route is a recorded exclusion carrying its reason,
+which [`Query all available providers sequentially`](#query-all-available-providers-sequentially) already requires,
+rather than a satisfied enumeration ---
+so the status names the route that could not be derived
+rather than reading as a bare block.
 
 A null `command -v` sweep is therefore evidence about `PATH` and about nothing else.
 That is [`grep-is-not-coverage`](grep-is-not-coverage.md)'s shape,
@@ -254,7 +261,11 @@ and what a single failed sweep never establishes.
   before recording a comment-triggered forge reviewer as dispatched.
 - **Do:** read an empty derivation as a missing source
   wherever `model_adapters.py` is not in the checkout,
-  and fall back to the machine inventory above.
+  fall back to the machine inventory above as a floor,
+  and record the shortfall alongside the probe result.
+- **Do:** record an underivable route as an explicit exclusion carrying its reason,
+  per [`Query all available providers sequentially`](#query-all-available-providers-sequentially),
+  and name that route in the status line.
 - **Don't:** read an empty derivation as an empty population;
   that is this section's own thesis failing on the section itself.
 - **Don't:** read a null `command -v` sweep as an availability verdict;
@@ -264,9 +275,16 @@ and what a single failed sweep never establishes.
   which is a state the probe never reports.
 - **Don't:** enumerate the API-key route from a list written out in prose,
   here or anywhere else; that list is a subset the moment an adapter is added.
-- **Don't:** treat either local-CLI source alone as that route's population;
+- **Don't:** treat either local-CLI source alone as that route's population
+  where both are readable;
   the derivation drops `agy` and the inventory drops `gemini`,
   so a probe of one of them misses a route the other names.
+- **Don't:** read the inventory-only fallback as that population either;
+  where `model_adapters.py` is absent the inventory is a floor,
+  so the shortfall is recorded rather than resolved.
+- **Don't:** count an underivable route as an enumerated one;
+  a route whose providers cannot be named is an exclusion,
+  so a bare "blocked on reviewer availability" over it is the unenumerated claim again.
 - **Don't:** record a comment-triggered forge reviewer as dispatched on a posted mention alone;
   an `author_association` allowlist skips the job with no error.
 - **Don't:** treat the machine inventory above as the provider population, since a forge-side reviewer cannot appear in it.

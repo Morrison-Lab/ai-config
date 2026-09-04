@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.18">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="description" content="Grab issues and implement in parallel.">
+
+<title>skill – ai-config</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<script src="../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dark-b85bc7c33db8c58e0ec93c3465666fed.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap-3e9b1289f5f353c49b617ce48ad2bc38.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-a515e054079012129989d5397ee3c9c1.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-3e9b1289f5f353c49b617ce48ad2bc38.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="../../styles.css">
+</head>
+
+<body class="nav-fixed quarto-light"><script id="quarto-html-before-body" type="application/javascript">
+    const toggleBodyColorMode = (bsSheetEl) => {
+      const mode = bsSheetEl.getAttribute("data-mode");
+      const bodyEl = window.document.querySelector("body");
+      if (mode === "dark") {
+        bodyEl.classList.add("quarto-dark");
+        bodyEl.classList.remove("quarto-light");
+      } else {
+        bodyEl.classList.add("quarto-light");
+        bodyEl.classList.remove("quarto-dark");
+      }
+    }
+    const toggleBodyColorPrimary = () => {
+      const bsSheetEl = window.document.querySelector("link#quarto-bootstrap:not([rel=disabled-stylesheet])");
+      if (bsSheetEl) {
+        toggleBodyColorMode(bsSheetEl);
+      }
+    }
+    const setColorSchemeToggle = (alternate) => {
+      const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+      for (let i=0; i < toggles.length; i++) {
+        const toggle = toggles[i];
+        if (toggle) {
+          if (alternate) {
+            toggle.classList.add("alternate");
+          } else {
+            toggle.classList.remove("alternate");
+          }
+        }
+      }
+    };
+    const toggleColorMode = (alternate) => {
+      // Switch the stylesheets
+      const primaryStylesheets = window.document.querySelectorAll('link.quarto-color-scheme:not(.quarto-color-alternate)');
+      const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+      manageTransitions('#quarto-margin-sidebar .nav-link', false);
+      if (alternate) {
+        // note: dark is layered on light, we don't disable primary!
+        enableStylesheet(alternateStylesheets);
+        for (const sheetNode of alternateStylesheets) {
+          if (sheetNode.id === "quarto-bootstrap") {
+            toggleBodyColorMode(sheetNode);
+          }
+        }
+      } else {
+        disableStylesheet(alternateStylesheets);
+        enableStylesheet(primaryStylesheets)
+        toggleBodyColorPrimary();
+      }
+      manageTransitions('#quarto-margin-sidebar .nav-link', true);
+      // Switch the toggles
+      setColorSchemeToggle(alternate)
+      // Hack to workaround the fact that safari doesn't
+      // properly recolor the scrollbar when toggling (#1455)
+      if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+        manageTransitions("body", false);
+        window.scrollTo(0, 1);
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+          manageTransitions("body", true);
+        }, 40);
+      }
+    }
+    const disableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        stylesheet.rel = 'disabled-stylesheet';
+      }
+    }
+    const enableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        if(stylesheet.rel !== 'stylesheet') { // for Chrome, which will still FOUC without this check
+          stylesheet.rel = 'stylesheet';
+        }
+      }
+    }
+    const manageTransitions = (selector, allowTransitions) => {
+      const els = window.document.querySelectorAll(selector);
+      for (let i=0; i < els.length; i++) {
+        const el = els[i];
+        if (allowTransitions) {
+          el.classList.remove('notransition');
+        } else {
+          el.classList.add('notransition');
+        }
+      }
+    }
+    const isFileUrl = () => {
+      return window.location.protocol === 'file:';
+    }
+    const hasAlternateSentinel = () => {
+      let styleSentinel = getColorSchemeSentinel();
+      if (styleSentinel !== null) {
+        return styleSentinel === "alternate";
+      } else {
+        return false;
+      }
+    }
+    const setStyleSentinel = (alternate) => {
+      const value = alternate ? "alternate" : "default";
+      if (!isFileUrl()) {
+        window.localStorage.setItem("quarto-color-scheme", value);
+      } else {
+        localAlternateSentinel = value;
+      }
+    }
+    const getColorSchemeSentinel = () => {
+      if (!isFileUrl()) {
+        const storageValue = window.localStorage.getItem("quarto-color-scheme");
+        return storageValue != null ? storageValue : localAlternateSentinel;
+      } else {
+        return localAlternateSentinel;
+      }
+    }
+    const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+      const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+      const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+      let newTheme = '';
+      if(authorPrefersDark) {
+        newTheme = isAlternate ? baseTheme : alternateTheme;
+      } else {
+        newTheme = isAlternate ? alternateTheme : baseTheme;
+      }
+      const changeGiscusTheme = () => {
+        // From: https://github.com/giscus/giscus/issues/336
+        const sendMessage = (message) => {
+          const iframe = document.querySelector('iframe.giscus-frame');
+          if (!iframe) return;
+          iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+        }
+        sendMessage({
+          setConfig: {
+            theme: newTheme
+          }
+        });
+      }
+      const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+      if (isGiscussLoaded) {
+        changeGiscusTheme();
+      }
+    };
+    const authorPrefersDark = false;
+    const darkModeDefault = authorPrefersDark;
+      document.querySelector('link#quarto-text-highlighting-styles.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+      document.querySelector('link#quarto-bootstrap.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+    let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+    // Dark / light mode switch
+    window.quartoToggleColorScheme = () => {
+      // Read the current dark / light value
+      let toAlternate = !hasAlternateSentinel();
+      toggleColorMode(toAlternate);
+      setStyleSentinel(toAlternate);
+      toggleGiscusIfUsed(toAlternate, darkModeDefault);
+      window.dispatchEvent(new Event('resize'));
+    };
+    // Switch to dark mode if need be
+    if (hasAlternateSentinel()) {
+      toggleColorMode(true);
+    } else {
+      toggleColorMode(false);
+    }
+  </script>
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../../index.html">
+    <span class="navbar-title">ai-config</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../setup.html"> 
+<span class="menu-text">Setup</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../skills.html"> 
+<span class="menu-text">Skills</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../agents.html"> 
+<span class="menu-text">Agents</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../workflow.html"> 
+<span class="menu-text">Workflow</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/Morrison-Lab/ai-config"> <i class="bi bi-github" role="img" aria-label="GitHub">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+  <a href="" class="quarto-reader-toggle quarto-navigation-tool px-1" onclick="window.quartoToggleReader(); return false;" title="Toggle reader mode">
+  <div class="quarto-reader-toggle-btn">
+  <i class="bi"></i>
+  </div>
+</a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#gip-grab-issues-in-parallel" id="toc-gip-grab-issues-in-parallel" class="nav-link active" data-scroll-target="#gip-grab-issues-in-parallel">GIP — Grab Issues in Parallel</a>
+  <ul class="collapse">
+  <li><a href="#when-this-fires" id="toc-when-this-fires" class="nav-link" data-scroll-target="#when-this-fires">When this fires</a></li>
+  <li><a href="#why-gii-is-serial-and-when-parallel-is-safe" id="toc-why-gii-is-serial-and-when-parallel-is-safe" class="nav-link" data-scroll-target="#why-gii-is-serial-and-when-parallel-is-safe">Why <code>gii</code> is serial — and when parallel is safe</a></li>
+  <li><a href="#procedure" id="toc-procedure" class="nav-link" data-scroll-target="#procedure">Procedure</a>
+  <ul class="collapse">
+  <li><a href="#establish-context-orchestrator-once" id="toc-establish-context-orchestrator-once" class="nav-link" data-scroll-target="#establish-context-orchestrator-once">0. Establish context (orchestrator, once)</a></li>
+  <li><a href="#enumerate-and-triage-orchestrator" id="toc-enumerate-and-triage-orchestrator" class="nav-link" data-scroll-target="#enumerate-and-triage-orchestrator">1. Enumerate and triage (orchestrator)</a></li>
+  <li><a href="#the-independence-gate-orchestrator-do-not-skip" id="toc-the-independence-gate-orchestrator-do-not-skip" class="nav-link" data-scroll-target="#the-independence-gate-orchestrator-do-not-skip">2. The independence gate (orchestrator — do NOT skip)</a></li>
+  <li><a href="#pick-the-concurrency-cap-orchestrator" id="toc-pick-the-concurrency-cap-orchestrator" class="nav-link" data-scroll-target="#pick-the-concurrency-cap-orchestrator">3. Pick the concurrency cap (orchestrator)</a></li>
+  <li><a href="#fan-out-one-worktree-isolated-subagent-per-issue-concurrent" id="toc-fan-out-one-worktree-isolated-subagent-per-issue-concurrent" class="nav-link" data-scroll-target="#fan-out-one-worktree-isolated-subagent-per-issue-concurrent">4. Fan out — one worktree-isolated subagent per issue (concurrent)</a></li>
+  <li><a href="#work-the-dependent-remainder-serially-orchestrator" id="toc-work-the-dependent-remainder-serially-orchestrator" class="nav-link" data-scroll-target="#work-the-dependent-remainder-serially-orchestrator">5. Work the dependent remainder serially (orchestrator)</a></li>
+  <li><a href="#combined-report-orchestrator" id="toc-combined-report-orchestrator" class="nav-link" data-scroll-target="#combined-report-orchestrator">6. Combined report (orchestrator)</a></li>
+  </ul></li>
+  <li><a href="#graceful-degradation-to-serial" id="toc-graceful-degradation-to-serial" class="nav-link" data-scroll-target="#graceful-degradation-to-serial">Graceful degradation to serial</a></li>
+  <li><a href="#orchestration" id="toc-orchestration" class="nav-link" data-scroll-target="#orchestration">Orchestration</a></li>
+  <li><a href="#relationship-to-other-skills" id="toc-relationship-to-other-skills" class="nav-link" data-scroll-target="#relationship-to-other-skills">Relationship to other skills</a></li>
+  <li><a href="#anti-patterns" id="toc-anti-patterns" class="nav-link" data-scroll-target="#anti-patterns">Anti-patterns</a></li>
+  </ul></li>
+  </ul>
+<div class="toc-actions"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/gip/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/gip/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"></header>
+
+
+
+
+
+<section id="gip-grab-issues-in-parallel" class="level1">
+<h1>GIP — Grab Issues in Parallel</h1>
+<p>Grab a batch of open issues and work them <strong>at the same time</strong> — one subagent per issue, each in its own git worktree, each running the full grab-issue flow (claim → check history → open draft PR → implement → mark ready → ARDI to clean). Then assemble one combined report.</p>
+<p>This is the <strong>parallel</strong> counterpart to <a href="../../skills/gii/SKILL.html"><code>gii</code></a>, which is <strong>deliberately serial</strong>. The whole job of this skill is to safely lift that serialization — and that is only safe for issues that are <strong>provably independent</strong>. Read <em>The independence gate</em> before fanning anything out; it is the load-bearing part.</p>
+<section id="when-this-fires" class="level2">
+<h2 class="anchored" data-anchor-id="when-this-fires">When this fires</h2>
+<ul>
+<li>“gip”, “grab issues in parallel”, “do these issues concurrently”</li>
+<li>“work several issues at once”, “parallelize the backlog”, “fan out the issue queue”, “spin up a worker per issue”</li>
+</ul>
+<p>It does <strong>not</strong> fire for a single issue (use <a href="../../skills/gi/SKILL.html"><code>gi</code></a>) or when the issues are interdependent / stacked (use <a href="../../skills/gii/SKILL.html"><code>gii</code></a>, which stacks).</p>
+</section>
+<section id="why-gii-is-serial-and-when-parallel-is-safe" class="level2">
+<h2 class="anchored" data-anchor-id="why-gii-is-serial-and-when-parallel-is-safe">Why <code>gii</code> is serial — and when parallel is safe</h2>
+<p><code>gii</code> runs one issue at a time on purpose, for three reasons:</p>
+<ol type="1">
+<li><strong>Base-branch stacking</strong> — a later issue’s branch may depend on a prior MR that hasn’t merged yet, so it must branch from that MR’s tip, not <code>&lt;default-branch&gt;</code>.</li>
+<li><strong>Same-file conflicts</strong> — two issues that edit the same files produce guaranteed merge conflicts if worked in parallel.</li>
+<li><strong>Shared working tree</strong> — a single checkout can’t hold two in-progress branches at once.</li>
+</ol>
+<p>Parallel is safe only when <strong>(1) and (2) don’t apply</strong> and <strong>(3) is removed by worktree isolation</strong>. So this skill fans out <strong>only the independent subset</strong> and sends everything else back to the serial path.</p>
+</section>
+<section id="procedure" class="level2">
+<h2 class="anchored" data-anchor-id="procedure">Procedure</h2>
+<section id="establish-context-orchestrator-once" class="level3">
+<h3 class="anchored" data-anchor-id="establish-context-orchestrator-once">0. Establish context (orchestrator, once)</h3>
+<p>Detect the forge (GitHub <code>gh</code> / GitLab <code>glab</code>) from <code>git remote get-url origin</code> and note the default branch. Resolve <code>&lt;owner&gt;/&lt;repo&gt;</code> once so you can pass it to every subagent. In a remote/web session, <code>gh</code> may be absent — use the GitHub MCP tools instead (e.g.&nbsp;<code>mcp__github__add_issue_comment</code>, <code>mcp__github__create_pull_request</code>, <code>mcp__github__search_pull_requests</code>).</p>
+</section>
+<section id="enumerate-and-triage-orchestrator" class="level3">
+<h3 class="anchored" data-anchor-id="enumerate-and-triage-orchestrator">1. Enumerate and triage (orchestrator)</h3>
+<p>List the open issues and prioritize them exactly as <a href="../../skills/gi/SKILL.html"><code>gi</code></a> does. Decide which issues are in scope for this batch (respect any the user named).</p>
+</section>
+<section id="the-independence-gate-orchestrator-do-not-skip" class="level3">
+<h3 class="anchored" data-anchor-id="the-independence-gate-orchestrator-do-not-skip">2. The independence gate (orchestrator — do NOT skip)</h3>
+<p>Partition the in-scope issues into an <strong>independent set</strong> (safe to parallelize) and a <strong>dependent remainder</strong> (must stay serial). An issue belongs in the independent set only if <strong>all</strong> hold:</p>
+<ul>
+<li><strong>No stacking dependency</strong> – it can branch straight from <code>origin/&lt;default-branch&gt;</code>; it doesn’t need another in-flight issue’s unmerged branch as its base.</li>
+<li><strong>No file overlap</strong> — its likely touched files don’t intersect any other in-batch issue’s likely files. When in doubt, read the issues and sketch each one’s probable file footprint; if two plausibly collide, treat them as dependent.</li>
+<li><strong>Not blocked</strong> — no “blocked by #N” / “depends on #N” marker pointing at another open item.</li>
+</ul>
+<p>Anything failing a check drops to the <strong>dependent remainder</strong>. If two issues overlap only with each other, keep one in the independent set and defer the other to the remainder — don’t fan out both.</p>
+<blockquote class="blockquote">
+<p><strong>When unsure, serialize.</strong> A false “independent” call costs a merge conflict and a confused review; a false “dependent” call only costs some wall-clock time. Bias toward the remainder.</p>
+</blockquote>
+<p>If the independent set has <strong>0 or 1</strong> issues, there’s nothing to parallelize — hand off to <a href="../../skills/gii/SKILL.html"><code>gii</code></a> (serial) and stop here.</p>
+</section>
+<section id="pick-the-concurrency-cap-orchestrator" class="level3">
+<h3 class="anchored" data-anchor-id="pick-the-concurrency-cap-orchestrator">3. Pick the concurrency cap (orchestrator)</h3>
+<p>Fan out <strong>at most N at once</strong> (default <strong>N = 3</strong>). Bound it because every subagent pushes commits, triggers a review workflow, and polls for the result — too many at once swamps shared CI runners and the review bot (the same runner-contention reason <a href="../../skills/ardia/SKILL.html"><code>ardia</code></a> processes PRs one at a time). If the independent set is larger than N, run it in waves of N.</p>
+</section>
+<section id="fan-out-one-worktree-isolated-subagent-per-issue-concurrent" class="level3">
+<h3 class="anchored" data-anchor-id="fan-out-one-worktree-isolated-subagent-per-issue-concurrent">4. Fan out — one worktree-isolated subagent per issue (concurrent)</h3>
+<p>Spawn the wave <strong>in a single message with multiple <code>Agent</code> calls</strong> so they run at once. Give <strong>every</strong> subagent <code>isolation: "worktree"</code> — that hands each one its own working directory over the shared <code>.git</code>, so concurrent edits, branches, and commits never collide on one checkout. (This is the subagent form of the same isolation <a href="../../skills/session-lock/SKILL.html"><code>session-lock</code></a> sets up for independent top-level sessions.)</p>
+<p><strong>That parameter errors when the session’s own cwd is not inside a git repository</strong> – <code>Cannot create agent worktree: not in a git repository and no WorktreeCreate hooks are configured</code> – which is the normal layout in a harness whose cwd merely <em>holds</em> repos as subdirectories. Don’t read that as isolation being unavailable and fall back to a shared checkout; create each worktree explicitly instead (<code>git -C &lt;repo&gt; fetch origin &lt;default-branch&gt;</code>, then <code>git -C &lt;repo&gt; worktree add --detach &lt;path&gt; origin/&lt;default-branch&gt;</code>) and hand the subagent its path. <code>&lt;default-branch&gt;</code> is the one step 0 above already had you note, not the literal string <code>main</code>: hard-coding it fails with <code>fatal: invalid reference: origin/main</code> on any repo whose default is named otherwise. Base every one of them on <code>origin/&lt;default-branch&gt;</code>, never on the bare branch name: <code>add &lt;path&gt; &lt;default-branch&gt;</code> succeeds for the first agent in a wave and refuses for every one after it, and when the wave is genuinely concurrent its guard can race and put several agents on that branch at once, silently costing the isolation this step exists to buy. Leave the branch to the subagent, which cuts its own inside the worktree. See <a href="../../memories/preferences.md"><code>memories/preferences.md</code></a> for the full precondition, the measured concurrency numbers, and the stale local base this form also avoids.</p>
+<p>A subagent starts <strong>fresh</strong> — it sees only the prompt you hand it, not this skill file — so <strong>inline the entire per-issue procedure</strong>. Don’t point it at <code>gi</code>/<code>ardi</code>; restate the steps. Fill in <code>&lt;N&gt;</code>, <code>&lt;title&gt;</code>, <code>&lt;owner&gt;</code>, <code>&lt;repo&gt;</code>, and the default branch for each issue:</p>
+<blockquote class="blockquote">
+Work GitHub issue <strong>#<n></n></strong> (“
+<title>
+&lt;p&gt;“) in &lt;code&gt;&lt;owner&gt;/&lt;repo&gt;&lt;/code&gt; end to end, on your own branch, in this worktree. You are one of several parallel workers — stay entirely within this worktree and touch only files relevant to this issue.&lt;/p&gt;
+&lt;ol type="1"&gt;
+&lt;li&gt;&lt;strong&gt;Claim it&lt;/strong&gt; so no one else double-works it: post a brief “Working on this — please hold off until I’m done.” comment on the issue (&lt;code&gt;gh issue comment &lt;N&gt; --body "..."&lt;/code&gt;, or the MCP &lt;code&gt;mcp__github__add_issue_comment&lt;/code&gt; equivalent in a remote session). End the body with the agent-disclosure marker every agent-posted comment carries: &lt;code&gt;_Posted by Claude Code (AI agent) --- not written by a human._&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Check history&lt;/strong&gt; — before writing code, scan merged/closed PRs that touched the same area so you don’t undo past work or reintroduce a fixed bug (&lt;code&gt;gh pr list --state all --search "&lt;keywords&gt;"&lt;/code&gt;). If a past PR already solved this, stop and report that instead of re-doing it.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Research before writing code (DRW check)&lt;/strong&gt; — before hand-rolling any custom code, helpers, or utilities, do a research step to verify DRW (don’t reinvent the wheel) and check for existing libraries, functions, or package solutions (in our own repos or upstream ecosystems like r-lib/tidyverse, PyPI, npm). Follow &lt;code&gt;prefer-upstream&lt;/code&gt;. If custom implementation is required, note what was searched in the PR.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Branch from current &lt;code&gt;&lt;default-branch&gt;&lt;/code&gt;&lt;/strong&gt;: &lt;code&gt;git fetch origin &lt;default-branch&gt; -q &amp;&amp; git checkout -b &lt;slug&gt; origin/&lt;default-branch&gt;&lt;/code&gt;. Use a descriptive &lt;code&gt;&lt;slug&gt;&lt;/code&gt;.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Open the draft PR now&lt;/strong&gt; — before implementing, so this worktree’s work is visible to the other parallel workers and no one double-grabs the issue (see &lt;a href="../../shared/workflow/pr-on-claim.md"&gt;&lt;code&gt;pr-on-claim&lt;/code&gt;&lt;/a&gt;). Give the branch a diff with an empty commit, push, and open a &lt;strong&gt;draft&lt;/strong&gt; PR into &lt;code&gt;&lt;default-branch&gt;&lt;/code&gt; referencing &lt;code&gt;Closes #&lt;N&gt;&lt;/code&gt;: &lt;code&gt;git commit --allow-empty -m "start: &lt;title&gt; (closes #&lt;N&gt;)"&lt;/code&gt;, then &lt;code&gt;git push -u origin HEAD&lt;/code&gt; (retry with backoff on a network error), then &lt;code&gt;gh pr create --draft …&lt;/code&gt; (or &lt;code&gt;mcp__github__create_pull_request&lt;/code&gt; with &lt;code&gt;draft: true&lt;/code&gt;). A draft doesn’t trigger the review bot on an empty diff.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Implement&lt;/strong&gt; the change. Keep the diff focused on this issue only — do &lt;strong&gt;not&lt;/strong&gt; touch files another issue owns. Follow the repo’s conventions (its &lt;code&gt;CLAUDE.md&lt;/code&gt; / lab manual). Run the repo’s pre-commit checks (render / lint / spell / tests) and fix what they flag.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Commit and push&lt;/strong&gt; the implementation onto the draft PR with a clear message referencing the issue (&lt;code&gt;Closes #&lt;N&gt;&lt;/code&gt; so the PR auto-closes it), then &lt;strong&gt;mark the PR ready for review&lt;/strong&gt; — &lt;code&gt;gh pr ready &lt;N&gt;&lt;/code&gt; (or &lt;code&gt;mcp__github__update_pull_request&lt;/code&gt; with &lt;code&gt;draft: false&lt;/code&gt;). Marking it ready is what kicks off review.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;ARDI to clean&lt;/strong&gt; — drive the PR to a clean review verdict: read the LATEST review, Address every finding / Rebut what’s wrong / Defer out-of-scope items to a tracked issue, push, re-request review, repeat until zero findings and CI is green. Don’t stop at “review-clean, needs approval.”&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;Return: the issue number, the PR number + URL, how many ARDI rounds it took, the final status (clean / blocked / needs-input), and a one-line summary of what you changed. If you hit something ambiguous or architecturally significant, stop and report it instead of guessing.&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Keep the cheap, once-per-run setup (enumerate, triage, the independence gate) in the orchestrator — never have each subagent re-do it.&lt;/p&gt;
+&lt;/section&gt;
+&lt;section id="work-the-dependent-remainder-serially-orchestrator" class="level3"&gt;
+&lt;h3&gt;5. Work the dependent remainder serially (orchestrator)&lt;/h3&gt;
+&lt;p&gt;After the parallel wave, run the &lt;strong&gt;dependent remainder&lt;/strong&gt; through the normal serial &lt;a href="../gii/SKILL.md"&gt;&lt;code&gt;gii&lt;/code&gt;&lt;/a&gt; loop — it stacks branches and handles same-file ordering correctly. Don’t try to parallelize it. GII keeps going through that remainder without pausing for merges — a clean-but-unmerged base is stacked on, not waited on (see &lt;a href="../../shared/workflow/stack-dont-pause.md"&gt;&lt;code&gt;stack-dont-pause&lt;/code&gt;&lt;/a&gt;).&lt;/p&gt;
+&lt;/section&gt;
+&lt;section id="combined-report-orchestrator" class="level3"&gt;
+&lt;h3&gt;6. Combined report (orchestrator)&lt;/h3&gt;
+&lt;p&gt;Collect each subagent’s returned row and print one summary:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;## GIP Session Summary — &lt;timestamp&gt;
+
+### Parallel wave (independent issues)
+| # | Issue | PR | Rounds | Status |
+|---|-------|----|--------|--------|
+| 1 | [#12](url) | [#30](url) | 2 | ✅ Clean |
+| 2 | [#15](url) | [#31](url) | 1 | ✅ Clean |
+
+### Serial remainder (dependent / overlapping issues)
+| # | Issue | PR | Rounds | Status |
+|---|-------|----|--------|--------|
+| 3 | [#18](url) | [#32](url) | 3 | ✅ Clean (stacked on #30) |&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Link every PR (&lt;code&gt;[#N](url)&lt;/code&gt;, never bare &lt;code&gt;#N&lt;/code&gt;). Call out anything a worker left blocked or flagged for input, and note any stack/merge order from the serial remainder.&lt;/p&gt;
+&lt;/section&gt;
+&lt;/section&gt;
+&lt;section id="graceful-degradation-to-serial" class="level2"&gt;
+&lt;h2&gt;Graceful degradation to serial&lt;/h2&gt;
+&lt;p&gt;If the &lt;code&gt;Agent&lt;/code&gt; tool isn’t available in the session, you can’t fan out — fall back to &lt;a href="../gii/SKILL.md"&gt;&lt;code&gt;gii&lt;/code&gt;&lt;/a&gt; and work the whole in-scope set serially. The per-issue work and the final report are the same; only the concurrency is lost.&lt;/p&gt;
+&lt;/section&gt;
+&lt;section id="orchestration" class="level2"&gt;
+&lt;h2&gt;Orchestration&lt;/h2&gt;
+&lt;p&gt;GIP already fans out — it is the manual form of this pattern, one worktree-isolated subagent per provably-independent issue. When the harness supports it, prefer driving that fan-out through a &lt;strong&gt;Workflow&lt;/strong&gt; (per &lt;code&gt;shared/workflow/when-to-orchestrate.md&lt;/code&gt;): the deterministic pipeline gives each issue the same implement — open-PR — ARDI chain plus worktree isolation, rather than ad-hoc subagents. The independence gate and the concurrency cap stay unchanged — only provably-independent issues run at once, and still capped (the shared-runner limit the fragment describes). Launch directly when an opt-in signal is present; otherwise propose with a cost estimate first.&lt;/p&gt;
+&lt;/section&gt;
+&lt;section id="relationship-to-other-skills" class="level2"&gt;
+&lt;h2&gt;Relationship to other skills&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;&lt;code&gt;gii&lt;/code&gt;&lt;/strong&gt; / &lt;strong&gt;&lt;code&gt;gis&lt;/code&gt;&lt;/strong&gt; — the &lt;strong&gt;serial&lt;/strong&gt; counterpart and the safe fallback. GIP is GII with the independent subset lifted out and run concurrently; everything GIP can’t prove independent goes back through GII. (gii : gip :: the write loop stays series, the safe subset fans out.)&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;&lt;code&gt;gi&lt;/code&gt;&lt;/strong&gt; / &lt;strong&gt;&lt;code&gt;grab-issue&lt;/code&gt;&lt;/strong&gt; — the per-issue flow each subagent runs (claim → history → open draft PR → implement → mark ready → ARDI). GIP restates it inline because subagents start fresh.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;&lt;code&gt;prefer-upstream&lt;/code&gt;&lt;/strong&gt; — search existing packages, standard libraries, and lab repos before writing custom code to avoid reinventing the wheel&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;&lt;code&gt;pr-on-claim&lt;/code&gt;&lt;/strong&gt; — the rule behind each subagent’s step 5: open the draft PR up front so parallel workers see the in-flight issue before implementing.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;&lt;code&gt;gia&lt;/code&gt;&lt;/strong&gt; — clears the whole queue (clean open PRs, then work issues); compose GIP into its issue phase when that phase’s issues are independent.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;&lt;code&gt;ardi&lt;/code&gt;&lt;/strong&gt; — each subagent ARDIs its own PR to clean.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;&lt;code&gt;ardia&lt;/code&gt;&lt;/strong&gt; — the whole-queue &lt;em&gt;PR&lt;/em&gt; write loop; it stays &lt;strong&gt;series&lt;/strong&gt; for the same runner-contention reason GIP caps its concurrency. Contrast, not overlap.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;&lt;code&gt;pr-status-all&lt;/code&gt;&lt;/strong&gt; — the read-only fan-out exemplar (one subagent per PR). GIP is the &lt;em&gt;write&lt;/em&gt; fan-out: same one-subagent-per-unit shape, but it needs worktree isolation and an independence gate because its units mutate state.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;&lt;code&gt;check-history&lt;/code&gt;&lt;/strong&gt; — each subagent runs it before implementing.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;&lt;code&gt;session-lock&lt;/code&gt;&lt;/strong&gt; — the worktree isolation GIP gives each subagent is the subagent form of the isolation session-lock sets up for top-level sessions.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;&lt;code&gt;defer-issue&lt;/code&gt;&lt;/strong&gt; / &lt;strong&gt;&lt;code&gt;split-concerns&lt;/code&gt;&lt;/strong&gt; — used inside a subagent when its issue spawns sub-tasks or grows too large.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/section&gt;
+&lt;section id="anti-patterns" class="level2"&gt;
+&lt;h2&gt;Anti-patterns&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;❌ Fanning out issues that touch the same files — guaranteed merge conflicts. Run them serially (gii) instead.&lt;/li&gt;
+&lt;li&gt;❌ Fanning out a stacked issue whose base is another unmerged in-batch branch. It belongs in the serial remainder.&lt;/li&gt;
+&lt;li&gt;❌ Hand-rolling custom code without researching existing libraries or lab packages first (violating DRW).&lt;/li&gt;
+&lt;li&gt;❌ Skipping &lt;code&gt;isolation: "worktree"&lt;/code&gt; — parallel subagents in one checkout clobber each other’s edits and branches.&lt;/li&gt;
+&lt;li&gt;❌ Skipping the independence gate and parallelizing the whole backlog blindly — the failure mode &lt;code&gt;gii&lt;/code&gt; exists to avoid.&lt;/li&gt;
+&lt;li&gt;❌ Unbounded fan-out — swamps CI runners and the review bot. Cap at ~3 and run in waves.&lt;/li&gt;
+&lt;li&gt;❌ Writing the subagent prompt as if it inherits this skill’s text — it doesn’t; restate the full per-issue procedure inline.&lt;/li&gt;
+&lt;li&gt;❌ Re-running the triage / independence gate inside each subagent — that’s once-per-run orchestrator work.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;div id="quarto-navigation-envelope" class="hidden"&gt;
+&lt;p&gt;&lt;span class="hidden quarto-markdown-envelope-contents" data-render-id="cXVhcnRvLWludC1zaWRlYmFyLXRpdGxl"&gt;ai-config&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span class="hidden quarto-markdown-envelope-contents" data-render-id="cXVhcnRvLWludC1uYXZiYXItdGl0bGU="&gt;ai-config&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span class="hidden quarto-markdown-envelope-contents" data-render-id="cXVhcnRvLWludC1uYXZiYXI6SG9tZQ=="&gt;Home&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span class="hidden quarto-markdown-envelope-contents" data-render-id="cXVhcnRvLWludC1uYXZiYXI6L2luZGV4Lmh0bWw="&gt;/index.html&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span class="hidden quarto-markdown-envelope-contents" data-render-id="cXVhcnRvLWludC1uYXZiYXI6U2V0dXA="&gt;Setup&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span class="hidden quarto-markdown-envelope-contents" data-render-id="cXVhcnRvLWludC1uYXZiYXI6L3NldHVwLmh0bWw="&gt;/setup.html&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span class="hidden quarto-markdown-envelope-contents" data-render-id="cXVhcnRvLWludC1uYXZiYXI6U2tpbGxz"&gt;Skills&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span class="hidden quarto-markdown-envelope-contents" data-render-id="cXVhcnRvLWludC1uYXZiYXI6L3NraWxscy5odG1s"&gt;/skills.html&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span class="hidden quarto-markdown-envelope-contents" data-render-id="cXVhcnRvLWludC1uYXZiYXI6QWdlbnRz"&gt;Agents&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span class="hidden quarto-markdown-envelope-contents" data-render-id="cXVhcnRvLWludC1uYXZiYXI6L2FnZW50cy5odG1s"&gt;/agents.html&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span class="hidden quarto-markdown-envelope-contents" data-render-id="cXVhcnRvLWludC1uYXZiYXI6V29ya2Zsb3c="&gt;Workflow&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span class="hidden quarto-markdown-envelope-contents" data-render-id="cXVhcnRvLWludC1uYXZiYXI6L3dvcmtmbG93Lmh0bWw="&gt;/workflow.html&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span class="hidden quarto-markdown-envelope-contents" data-render-id="cXVhcnRvLWludC1uYXZiYXI6aHR0cHM6Ly9naXRodWIuY29tL01vcnJpc29uLUxhYi9haS1jb25maWc="&gt;https://github.com/Morrison-Lab/ai-config&lt;/span&gt;&lt;/p&gt;
+&lt;div class="hidden quarto-markdown-envelope-contents" data-render-id="Zm9vdGVyLWNlbnRlcg=="&gt;
+&lt;p&gt;Built with &lt;a href="https://quarto.org/"&gt;Quarto&lt;/a&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div id="quarto-meta-markdown" class="hidden"&gt;
+&lt;p&gt;&lt;span class="hidden quarto-markdown-envelope-contents" data-render-id="cXVhcnRvLW1ldGF0aXRsZQ=="&gt;ai-config&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span class="hidden quarto-markdown-envelope-contents" data-render-id="cXVhcnRvLXR3aXR0ZXJjYXJkdGl0bGU="&gt;ai-config&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span class="hidden quarto-markdown-envelope-contents" data-render-id="cXVhcnRvLW9nY2FyZHRpdGxl"&gt;ai-config&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span class="hidden quarto-markdown-envelope-contents" data-render-id="cXVhcnRvLW1ldGFzaXRlbmFtZQ=="&gt;ai-config&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span class="hidden quarto-markdown-envelope-contents" data-render-id="cXVhcnRvLXR3aXR0ZXJjYXJkZGVzYw=="&gt;Grab issues and implement in parallel.&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span class="hidden quarto-markdown-envelope-contents" data-render-id="cXVhcnRvLW9nY2FyZGRkZXNj"&gt;Grab issues and implement in parallel.&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span class="hidden quarto-markdown-envelope-contents" data-render-id="cXVhcnRvLW1ldGFzaXRlZGVzYw=="&gt;Portable AI agent config — skills, memories, and commands synced across machines via git&lt;/span&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;/section&gt;
+&lt;/section&gt;
+
+&lt;/main&gt; &lt;!-- /main --&gt;
+&lt;script id = "quarto-html-after-body" type="application/javascript"&gt;
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    // Ensure there is a toggle, if there isn't float one in the top right
+    if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+      const a = window.document.createElement('a');
+      a.classList.add('top-right');
+      a.classList.add('quarto-color-scheme-toggle');
+      a.href = "";
+      a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+      const i = window.document.createElement("i");
+      i.classList.add('bi');
+      a.appendChild(i);
+      window.document.body.appendChild(a);
+    }
+    setColorSchemeToggle(hasAlternateSentinel())
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) =&gt; {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/Morrison-Lab\.github\.io\/ai-config\/");
+      var isInternal = (href) =&gt; {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i&lt;links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+            // default icon
+            link.classList.add("external");
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i&lt;noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) =&gt; {
+      // Strip column container classes
+      const stripColumnClz = (el) =&gt; {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children &amp;&amp; note.children.length &gt; 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i &lt; note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" &amp;&amp; child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i&lt;xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res =&gt; res.text())
+            .then(html =&gt; {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() =&gt; {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res =&gt; res.text())
+          .then(html =&gt; {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length &gt; 0 &amp;&amp; note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() =&gt; {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) =&gt; {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) =&gt; {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) =&gt; {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length &gt; 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length &gt; 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null &amp;&amp; height !== null &amp;&amp; parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () =&gt; {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) =&gt; {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() =&gt; {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) =&gt; {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() =&gt; {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) =&gt; {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) =&gt; {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i&lt;bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  &lt;/script&gt;
+&lt;/div&gt; &lt;!-- /content --&gt;
+&lt;footer class="footer"&gt;
+  &lt;div class="nav-footer"&gt;
+    &lt;div class="nav-footer-left"&gt;
+      &nbsp;
+    &lt;/div&gt;   
+    &lt;div class="nav-footer-center"&gt;
+      &lt;div class='footer-contents'&gt;Built with [Quarto](https://quarto.org/)&lt;/div&gt;  
+    &lt;/div&gt;
+    &lt;div class="nav-footer-right"&gt;
+      &nbsp;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/footer&gt;
+
+&lt;/body&gt;
+
+&lt;/html&gt;
+</title></blockquote></section></section></section><a onclick="window.scrollTo(0, 0); return false;" role="button" id="quarto-back-to-top"><i class="bi bi-arrow-up"></i> Back to top</a></main></div><footer class="footer"><div class="nav-footer"><div class="nav-footer-center"><div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/gip/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/gip/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></div></div></footer></body></html>

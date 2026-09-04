@@ -192,6 +192,10 @@ So the two resolved threads the pre-merge check reported were a reading taken be
 This section was loaded in context throughout and did not fire, because it named "a human's `CHANGES_REQUESTED`" and the reviewer was a bot.
 Filed as [ai-config#3121](https://github.com/Morrison-Lab/ai-config/issues/3121).)
 
+The headline is no filter either: "Changes recommended", "Needs a closer look", and "generated no new comments" have each led a body carrying real findings.
+Nor is the state --- the forge enforces only `CHANGES_REQUESTED`, so a `COMMENTED` review sets no blocking state and needs no dismissal, which is precisely why nothing stops a merge over its findings.
+[`skills/pr-status/SKILL.md`](skills/pr-status/SKILL.md)'s *Check for a blocking human CHANGES_REQUESTED* section carries what its per-review line does and does not settle, and why the full body of every review it names has to be read.
+
 ## Use the existing PR branch, not the harness-specified branch --- Prefer stacking the fix, not superseding the PR
 
 (Corrected on ai-config#493 → #498, 2026-07-05: first reflex was to supersede per the fallback below;

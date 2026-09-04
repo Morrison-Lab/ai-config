@@ -251,8 +251,17 @@ Prefer the heading anchor over the region, and keep the region as a fallback.
 The only false-positive control the corpus has is review 4837572117, whose summary table mentioned "suppressed Copilot findings" in uncollapsed text,
 and `5098574802` wraps its own `Pull request overview` and `File summaries` prose in collapsed `<details>` regions (measured 2026-09-03 from `get_reviews`),
 so a collapsed region is no longer a proxy for "not ordinary overview prose" --- it excluded 4837572117's only because that particular overview was not collapsed, and `5098574802`'s own collapsed overview happens to contain no occurrence of the word.
-Region-scoping therefore still excludes every case measured to date;
-it is the weaker anchor because the reason it worked has lapsed, not because anything measured turns it into a false positive.
+Re-fetched 2026-09-04 via `get_reviews`, no collapsed region on any review of ai-config#660, #1029, or #1031 contains `suppressed` outside a suppression block,
+and the same held on 2026-09-03 for `5098574802` and 4837572117.
+Region-scoping therefore excludes every body in that measured set;
+it is the weaker anchor because the reason it worked has lapsed, not because any body in the set turns it into a false positive.
+Nothing outside the set has been checked, so a collapsed overview that does mention suppressed findings remains possible.
+
+[ai-config#3170](https://github.com/Morrison-Lab/ai-config/issues/3170) asks `scripts/check-pr-fully-clean.py` to implement this check, quoting [`fully-clean.md`](fully-clean.md)'s pre-change wording,
+so its Ask prescribes matching strictly inside `<summary>` --- the form measured to return zero against `5098574802`.
+
+- **Do:** implement the heading anchor above when closing that issue.
+- **Don't:** build the `<summary>`-only matcher its Ask names.
 
 ## A review comment's header SHA can be stale
 

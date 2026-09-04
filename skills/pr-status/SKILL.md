@@ -226,6 +226,13 @@ section. The bar for reporting **clean**: "Looks good" / "no findings" /
 the reviewer is still disputing is **open**, not clean — a rebuttal counts only
 once it convinced the reviewer (they dropped the item).
 
+A collapsed suppression block carries findings too, and none of those keywords finds one.
+Match it case-insensitively on `suppressed` in a `<summary>` element or in an ATX heading inside a collapsed `<details>` region --- not on either literal phrase, not on `<summary>` alone, and not anywhere in the body.
+[`fully-clean.md`](../../shared/workflow/fully-clean.md)'s *A clean overview can hide a collapsed findings block* carries that matcher and the measurements behind it.
+
+- **Do:** run the heading match over every review body, whatever its overview says.
+- **Don't:** treat the keyword list above as the whole scan --- a suppression block's heading contains none of those words.
+
 ## Check for a blocking human CHANGES_REQUESTED
 
 **List every review first: this section's query is deliberately narrow, and its narrowness is not the clean bar.**
@@ -239,7 +246,7 @@ gh pr view "<N>" --json reviews \
 ```
 
 One line per review keeps a long PR's review history readable, and the last field is the body's first line.
-That line identifies a review rather than settling it, so read the full body of every review the listing names --- not only those whose first line looks unclean, since "generated no new comments" is the overview a suppression block hides behind --- and read a collapsed suppression block inside it as findings (see *Parse for findings before declaring clean* above).
+That line identifies a review rather than settling it, so read the full body of every review the listing names --- not only those whose first line looks unclean, since "generated no new comments" is the overview a suppression block hides behind --- and read a collapsed suppression block inside it as findings (see *Parse for findings before declaring clean* above for the matcher).
 
 - **Do:** list every review's state and body, whoever posted it, before running the state-filtered query below.
 - **Do:** read the full body of every review the listing names, whatever its first line says.

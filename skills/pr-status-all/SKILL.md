@@ -119,7 +119,8 @@ Fill in `<N>`, `<headRefName>`, `<isDraft>`, `<owner>`, `<repo>` for each PR (re
 >    Match on the block's heading --- a `<summary>` element, or an ATX heading inside a collapsed `<details>` region --- case-insensitively on `suppressed`, not on either exact phrase, not on `<summary>` alone, and not anywhere in the body.
 >    Measured 2026-09-03 on ai-config#3084 review `5098574802`, the block sits as a `### Suppressed comments (1)` heading under `<summary>Review details</summary>`, which a `<summary>`-only match misses entirely;
 >    that same review collapses its `Pull request overview` and `File summaries` prose too, so a collapsed region no longer implies "not overview prose".
->    No measured body turns a region-wide match into a false positive, though, so keep it as a fallback behind the heading anchor and read a hit only the fallback finds as a prompt to read that region.
+>    No body in the measured set turns a region-wide match into a false positive, though (the set and its re-fetch dates are in [`fully-clean.cases.md`](../../shared/workflow/fully-clean.cases.md)),
+>    so keep it as a fallback behind the heading anchor and read a hit only the fallback finds as a prompt to read that region.
 >    A stub-like non-answer ("ineligible", "reached their quota limit") is not a verdict either.
 >    **A human's formal review at the current head counts as an external verdict too** -- check for one whenever the Copilot half found no clean verdict, before settling on `no verdict at head`:
 >    ```bash

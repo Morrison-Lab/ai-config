@@ -21,7 +21,8 @@ This document records the load-bearing operational rationale, synthetic-fixture 
   A heading rather than `<summary>` alone, because ai-config#3084 review `5098574802` nests the block as a `### Suppressed comments (1)` heading under `<summary>Review details</summary>`;
   a heading rather than the whole `<details>` region, because that same review collapses its `Pull request overview` and `File summaries` prose into regions of their own (both measured 2026-09-03),
   so the collapsed region is no longer a proxy for "not ordinary overview prose" --- a region-wide match would readmit any collapsed overview that did mention suppressed findings.
-  The 4837572117 control cannot exercise that case, because its overview table is uncollapsed and a region-scoped match therefore excludes it, and neither does `5098574802`, whose collapsed overview regions contain no occurrence of the word.
+  No body in the measured set exercises that case, though: the 4837572117 control's overview table is uncollapsed, `5098574802`'s collapsed overview regions contain no occurrence of the word,
+  and re-fetching every review on ai-config#660, #1029 and #1031 on 2026-09-04 found no collapsed region carrying `suppressed` outside a suppression block.
   So the region-wide match is the weaker anchor rather than a wrong one, and it stays as a fallback: a hit only the fallback finds is a prompt to read that region, not a finding.
 - **Substance over State for Human Reviews**: Empirical measurements across this repository (measured 2026-07-30 on #668: 106 of 106 formal reviews across 60 merged PRs were submitted as `COMMENTED`, with zero `APPROVED`).
   Keying on `state == "APPROVED"` would produce a permanent false negative ("no verdict at head") on PRs humans actively approved in review comments.

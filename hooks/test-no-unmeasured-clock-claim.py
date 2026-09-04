@@ -75,6 +75,39 @@ CAPTURED_BRACE_GROUP = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "id": "call_brace", "input": {
         "command": "t=$(TZ=America/Los_Angeles date \"+%H:%M %Z\"); "
                    "{ echo \"## $t\"; } >> notebook.md"}}]}}
+# A format string carrying a literal parenthesis, which is what a paren-
+# excluding character class cannot span: the assignment goes unrecognized, its
+# text stays in the segment, and the read then reads as printed -- discharging
+# the guard on the very shape it exists to catch.
+CAPTURED_PAREN_FORMAT = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_paren", "input": {
+        "command": "t=$(TZ=America/Los_Angeles date \"+%H:%M (%Z)\"); "
+                   "cat >> notebook.md <<EOF\n## $t --- checkpoint\nEOF"}}]}}
+# The same parenthesized format string, with the value echoed. Walking the
+# substitution must still recover the NAME, or the echo no longer matches the
+# captured variable and the guard fires on a reading that did reach stdout.
+CAPTURED_PAREN_ECHOED = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_pecho", "input": {
+        "command": "t=$(TZ=America/Los_Angeles date \"+%H:%M (%Z)\"); "
+                   "echo \"$t\""}}]}}
+# A parenthesis inside a QUOTED span within the substitution, unbalanced on its
+# own. Counting depth without honouring quotes never returns to zero here, so
+# the assignment reads as unterminated and is skipped -- which is the same
+# discharge the character class produced, by a different route.
+CAPTURED_QUOTED_PAREN = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_qpar", "input": {
+        "command": "t=$(TZ=America/Los_Angeles date \"+%H:%M %Z\" "
+                   "| sed 's/(//'); echo \"## $t\" >> notebook.md"}}]}}
+# An explicitly numbered stdout redirect. Descriptor 1 is stdout, so `1>>`
+# sends the reading to a file exactly as a bare `>>` does.
+REDIRECTED_FD1_DATE = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_fd1", "input": {
+        "command": "TZ=America/Los_Angeles date \"+%H:%M %Z\" 1>>notebook.md"}}]}}
+# Only descriptors 2 through 9 are excluded: stderr going to a file leaves
+# stdout on the transcript.
+STDERR_REDIRECTED_DATE = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_fd2", "input": {
+        "command": "TZ=America/Los_Angeles date \"+%H:%M %Z\" 2>/dev/null"}}]}}
 # The same heading, with no intermediate variable.
 HEREDOC_DATE = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "id": "call_here", "input": {
@@ -383,6 +416,27 @@ CASES = [
     ([HEREDOC_PRINTED, say("Recap: 01:07 PDT")], False,
      "#2991: an unredirected heredoc puts the read on stdout, so it "
      "discharges"),
+
+    # --- review round 1 on #2991: the substitution and the redirect were each
+    #     matched by a character class that excluded the very characters the
+    #     real commands carry, so both shapes discharged the guard silently.
+    ([CAPTURED_PAREN_FORMAT, result("call_paren", ""),
+      say("Recap: 01:07 PDT")], True,
+     "#2991: a parenthesis in the format string does not end the "
+     "substitution -- the capture is still a capture"),
+    ([CAPTURED_PAREN_ECHOED, say("Recap: 00:59 PDT")], False,
+     "#2991: walking that substitution still recovers the variable, so "
+     "echoing it discharges"),
+    ([CAPTURED_QUOTED_PAREN, result("call_qpar", ""),
+      say("Recap: 01:07 PDT")], True,
+     "#2991: a parenthesis inside a quoted span does not change the "
+     "substitution's depth"),
+    ([REDIRECTED_FD1_DATE, result("call_fd1", ""),
+      say("Recap: 01:07 PDT")], True,
+     "#2991: `1>>` is a stdout redirect, so the reading went to the file "
+     "rather than the transcript"),
+    ([STDERR_REDIRECTED_DATE, say("Recap: 00:59 PDT")], False,
+     "#2991: `2>` is not a stdout redirect -- the reading still prints"),
 ]
 
 

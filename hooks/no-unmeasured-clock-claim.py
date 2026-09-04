@@ -123,15 +123,23 @@ RX_CLOCK_READ = re.compile(
 # clock read, never to arbitrary tool output.
 RX_VISIBLE_TIME = re.compile(r"\b(?:[01]?\d|2[0-3]):[0-5]\d\b")
 
-# `VAR=$(...)` / ``VAR=`...` `` -- the shape that hides a reading in a variable.
-RX_CAPTURE_ASSIGN = re.compile(r"([A-Za-z_]\w*)=(\$\([^()]*\)|`[^`]*`)")
+# The HEAD of a `VAR=$(...)` / ``VAR=`...` `` -- the shape that hides a reading
+# in a variable. Only the head is matched here: where the substitution ENDS is
+# decided by walking it (`_capture_assigns` below), because a character class
+# that excludes parentheses stops at the first one a format string contains,
+# and `date "+%H:%M (%Z)"` contains two. The assignment then goes unrecognized,
+# its text stays in the segment, and the read reads as printed -- discharging
+# the guard on exactly the capture-only shape it exists to catch.
+RX_CAPTURE_HEAD = re.compile(r"([A-Za-z_]\w*)=(\$\(|`)")
 
 # A heredoc operator and its delimiter word, quoted or not.
 RX_HEREDOC = re.compile(r"""<<-?\s*(['"]?)(\w+)\1""")
 
-# Stdout sent to a file, rather than to the transcript. Excludes stderr
-# (`2>`) and a descriptor duplication (`>&2`).
-RX_STDOUT_REDIRECT = re.compile(r"(?<![0-9&<>])>>?\s*(?![&>])\S")
+# Stdout sent to a file, rather than to the transcript. Excludes a named
+# descriptor other than stdout (`2>` through `9>`) and a descriptor duplication
+# (`>&2`). Descriptor 1 is stdout, so `1>` and `1>>` redirect exactly as a bare
+# `>` and `>>` do and must not be excluded.
+RX_STDOUT_REDIRECT = re.compile(r"(?<![2-9&<>])>>?\s*(?![&>])\S")
 
 # Where one command in a compound command ends and the next begins.
 RX_SEGMENT_SPLIT = re.compile(r";|&&|\|\|")
@@ -275,6 +283,96 @@ def _split_command(command):
     return out
 
 
+def _substitution_end(text, pos):
+    """Index just past the `)` closing a `$(` whose body starts at `pos`.
+
+    Depth is counted rather than matched, and quoting and backslash escapes are
+    honoured the way `_mask_nested` honours them, so a parenthesis inside a
+    quoted format string neither opens nor closes the substitution. None when
+    the substitution is unterminated.
+    """
+    depth = 1
+    stack = []
+    escaped = False
+    for i in range(pos, len(text)):
+        ch = text[i]
+        top = stack[-1] if stack else None
+        if escaped:
+            escaped = False
+        elif top == "'":
+            if ch == "'":
+                stack.pop()
+        elif ch == "\\":
+            escaped = True
+        elif top == '"':
+            if ch == '"':
+                stack.pop()
+        elif ch in ("'", '"'):
+            stack.append(ch)
+        elif ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+            if depth == 0:
+                return i + 1
+    return None
+
+
+def _backtick_end(text, pos):
+    """Index just past the backtick closing a span whose body starts at `pos`.
+
+    A backslash escapes the next character, so an escaped backtick does not
+    close the span. None when the span is unterminated.
+    """
+    escaped = False
+    for i in range(pos, len(text)):
+        ch = text[i]
+        if escaped:
+            escaped = False
+        elif ch == "\\":
+            escaped = True
+        elif ch == "`":
+            return i + 1
+    return None
+
+
+def _capture_assigns(segment):
+    """`[(name, body, start, end), ...]` for each capture assignment.
+
+    `start`/`end` bound the whole `NAME=$(...)` or ``NAME=`...` ``, so the
+    caller can blank it out of the segment; `body` is what the substitution
+    runs. An unterminated substitution is skipped, and a head found INSIDE a
+    span already claimed is skipped too, so a nested assignment is not reported
+    a second time.
+    """
+    out = []
+    consumed = 0
+    for m in RX_CAPTURE_HEAD.finditer(segment):
+        if m.start() < consumed:
+            continue
+        if m.group(2) == "$(":
+            end = _substitution_end(segment, m.end())
+        else:
+            end = _backtick_end(segment, m.end())
+        if end is None:
+            continue
+        out.append((m.group(1), segment[m.end():end - 1], m.start(), end))
+        consumed = end
+    return out
+
+
+def _blank(segment, spans):
+    """`segment` with each `(_, _, start, end)` span replaced by a space."""
+    out = []
+    prev = 0
+    for _name, _body, start, end in spans:
+        out.append(segment[prev:start])
+        out.append(" ")
+        prev = end
+    out.append(segment[prev:])
+    return "".join(out)
+
+
 def _capture_only(command):
     """True when `command` reads the clock and no read's value reaches stdout.
 
@@ -282,15 +380,16 @@ def _capture_only(command):
     `echo`/`printf` of the variable holding it, is not redirected to a file.
     """
     segments = _split_command(command)
+    assigns = [_capture_assigns(segment) for segment, _ in segments]
     captured = set()
-    for segment, _ in segments:
-        for m in RX_CAPTURE_ASSIGN.finditer(segment):
-            if RX_CLOCK_READ.search(m.group(2)):
-                captured.add(m.group(1))
+    for spans in assigns:
+        for name, body, _start, _end in spans:
+            if RX_CLOCK_READ.search(body):
+                captured.add(name)
     saw_read = bool(captured)
-    for segment, bodies in segments:
+    for (segment, bodies), spans in zip(segments, assigns):
         prints = not RX_STDOUT_REDIRECT.search(segment)
-        rest = RX_CAPTURE_ASSIGN.sub(" ", segment)
+        rest = _blank(segment, spans)
         if RX_CLOCK_READ.search(rest) or any(
                 RX_CLOCK_READ.search(body) for body in bodies):
             saw_read = True

@@ -22,6 +22,23 @@ def transcript(commands):
     return path
 
 
+def timestamped_transcript(pairs):
+    """Records carrying their own timestamps, written in the given FILE order.
+
+    A context compaction replays earlier records, appending them below newer
+    ones while they keep their original timestamps, so file order and time
+    order disagree (`memories/claude-code-transcripts.md`).
+    """
+    handle, path = tempfile.mkstemp()
+    with os.fdopen(handle, "w") as stream:
+        for stamp, command in pairs:
+            record = {"type": "assistant", "timestamp": stamp, "message": {"content": [{
+                "type": "tool_use", "name": "Bash", "input": {"command": command}
+            }]}}
+            stream.write(json.dumps(record) + "\n")
+    return path
+
+
 def antigravity_transcript(commands, assistant_text=""):
     handle, path = tempfile.mkstemp()
     with os.fdopen(handle, "w") as stream:
@@ -724,6 +741,69 @@ try:
         "git commit -m mine",
         "git push origin main",
     ])
+    # A `cd` AFTER the commit in the same call names where the shell ends up,
+    # never where it stood when the commit ran. Attributing the commit to it
+    # is the same false attribution to a merely-visited directory that the
+    # whole of ai-config#2422 is about.
+    commit_then_cd_away = transcript([
+        f"cd {dormant_root}",
+        f"git commit -m mine && cd {dormant_wt}",
+    ])
+    # `git checkout -p` stages hunks and switches nothing, and
+    # `git worktree add <path> <branch>` creates a second checkout while
+    # leaving this one where it stood. Neither may clear the carried branch:
+    # doing so drops the switched-branch detection of ai-config#2737.
+    patch_mode_keeps_branch = transcript([
+        "git checkout agy-dormant && git log -1",
+        "git checkout -p",
+        "git commit -m mine",
+    ])
+    worktree_add_keeps_branch = transcript([
+        "git checkout agy-dormant && git log -1",
+        f"git worktree add {gone_wt}-extra main",
+        "git commit -m mine",
+    ])
+    # `git checkout-index` is plumbing that copies files out of the index and
+    # moves HEAD nowhere --- the hyphenated-sibling trap this file already
+    # records for `git commit-tree`, now on the switch side.
+    checkout_index_keeps_branch = transcript([
+        "git checkout agy-dormant && git log -1",
+        "git checkout-index -a -f",
+        "git commit -m mine",
+    ])
+    # A bare `cd` goes home, `pushd` moves, and `popd` moves somewhere this
+    # scan cannot name. All three leave the dormant worktree behind, and none
+    # of them names a directory the way `cd <dir>` does.
+    bare_cd_moves_home = transcript([
+        f"cd {dormant_wt}",
+        "cd",
+        "git commit -m mine",
+    ])
+    pushd_supersedes = transcript([
+        f"cd {dormant_wt}",
+        f"pushd {dormant_root}",
+        "git commit -m mine",
+    ])
+    popd_supersedes = transcript([
+        f"cd {dormant_wt}",
+        "popd",
+        "git commit -m mine",
+    ])
+    # A compaction replays the first record below the second, carrying its
+    # original timestamp, so the last `cd` IN FILE ORDER is one the session
+    # left minutes earlier. Sorting by each record's own timestamp is what
+    # keeps the commit attributed to where the shell actually stood.
+    replay_commands = [
+        f"cd {dormant_wt} && git status",
+        f"cd {dormant_root}",
+        f"cd {dormant_wt} && git status",
+        "git commit -m mine",
+    ]
+    replayed_cd = timestamped_transcript(list(zip(
+        ["2026-09-03T10:00:00.000Z", "2026-09-03T10:01:00.000Z",
+         "2026-09-03T10:00:00.000Z", "2026-09-03T10:02:00.000Z"],
+        replay_commands)))
+    unstamped_replay = transcript(replay_commands)
     try:
         # Reading a dormant foreign worktree is not committing in it.
         assert subject.decide(dormant_root, visit_only) == "", "a dormant foreign worktree the session only visited must not block (ai-config#2422)"
@@ -745,11 +825,40 @@ try:
         # leaves it unattributed, the branch-side twin of the `cd` route.
         assert subject.decide(dormant_root, checkout_back) == "", \
             "a dormant branch switched away from with `git checkout -` must not block (ai-config#2422)"
+        # A `cd` after the commit in the same call attributes nothing.
+        assert subject.decide(dormant_root, commit_then_cd_away) == "", \
+            "a `cd` AFTER the commit must not attribute the commit to where the shell ended up (ai-config#2422)"
+        # Negative controls on the branch axis: neither a patch-mode checkout
+        # nor a `git worktree add` moves HEAD, so the carried branch stands.
+        for _name, _t in (("git checkout -p", patch_mode_keeps_branch),
+                          ("git worktree add", worktree_add_keeps_branch),
+                          ("git checkout-index", checkout_index_keeps_branch)):
+            _reason = subject.decide(dormant_root, _t)
+            assert "agy-dormant" in _reason, f"{_name}: {_reason}"
+        # Bare `cd`, `pushd` and `popd` all move the shell off the dormant
+        # worktree while naming it nowhere.
+        for _name, _t in (("cd", bare_cd_moves_home), ("pushd", pushd_supersedes),
+                          ("popd", popd_supersedes)):
+            assert subject.decide(dormant_root, _t) == "", \
+                f"`{_name}` must supersede the visited worktree (ai-config#2422)"
+        # File order is not time order after a compaction replay.
+        assert subject.decide(dormant_root, replayed_cd) == "", \
+            "a replayed `cd` carrying an older timestamp must not claim a later commit"
+        # Negative control: the same commands with no timestamps have no total
+        # order to impose, so file order stands and the replayed `cd` does
+        # claim the commit --- which is what the sort above is fixing.
+        _u_reason = subject.decide(dormant_root, unstamped_replay)
+        assert "agy-dormant" in _u_reason, _u_reason
     finally:
         for _p in (dormant_root, dormant_bare, dormant_wt, gone_wt):
             shutil.rmtree(_p, ignore_errors=True)
+        shutil.rmtree(f"{gone_wt}-extra", ignore_errors=True)
         for _p in (visit_only, visit_then_pending, commit_in_dormant,
-                   cd_then_commit_later, checkout_back):
+                   cd_then_commit_later, checkout_back, commit_then_cd_away,
+                   patch_mode_keeps_branch, worktree_add_keeps_branch,
+                   checkout_index_keeps_branch,
+                   bare_cd_moves_home, pushd_supersedes, popd_supersedes,
+                   replayed_cd, unstamped_replay):
             os.unlink(_p)
 finally:
     for _root in (dropped_root, unpushed_root, pushed_root, no_upstream_root,

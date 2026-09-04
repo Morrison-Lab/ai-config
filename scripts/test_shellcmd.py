@@ -285,6 +285,32 @@ check("and still records its value",
       shellcmd.env_value(shellcmd.strip_env(["FOO=1", "git", "push"])[0],
                          "FOO"), "1")
 
+# ------------------------------------------------- resolve_cd_target
+#
+# A CALLER MUST BE ABLE TO TELL "MOVED SOMEWHERE I CANNOT NAME" FROM
+# "DID NOT MOVE". `hooks/no-unshipped-commit.py` attributes a commit to the
+# directory the shell stands in, so reading `cd -` as "unchanged" leaves a
+# dormant worktree the session merely visited standing as the answer --- the
+# false block ai-config#2422 reports. Each indeterminate spelling is pinned
+# here rather than left to that hook's own suite.
+
+check("an absolute target is the new directory",
+      shellcmd.resolve_cd_target(["cd", "/srv/repo"], "/home/me"), "/srv/repo")
+check("a relative target resolves against where the shell stood",
+      shellcmd.resolve_cd_target(["cd", "hooks"], "/srv/repo"), "/srv/repo/hooks")
+check("`cd -` is indeterminate, not unchanged",
+      shellcmd.resolve_cd_target(["cd", "-"], "/srv/repo"), None)
+check("`popd` is indeterminate without a simulated stack",
+      shellcmd.resolve_cd_target(["popd"], "/srv/repo"), None)
+check("`popd -n` moves nothing",
+      shellcmd.resolve_cd_target(["popd", "-n"], "/srv/repo"), "/srv/repo")
+check("bare `cd` goes home rather than staying put",
+      shellcmd.resolve_cd_target(["cd"], "/srv/repo"), os.path.expanduser("~"))
+check("`pushd <dir>` moves like `cd`",
+      shellcmd.resolve_cd_target(["pushd", "/srv/other"], "/srv/repo"), "/srv/other")
+check("an unexpanded variable target is indeterminate",
+      shellcmd.resolve_cd_target(["cd", "$WT"], "/srv/repo"), None)
+
 # ------------------------------------------------- source-level hygiene
 #
 # THIS MODULE QUOTES REGEX SOURCE IN ITS PROSE, so a docstring can carry an

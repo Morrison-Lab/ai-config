@@ -28,7 +28,7 @@ This document records the load-bearing operational rationale, synthetic-fixture 
   - **Do:** treat a hit only the region-wide fallback finds as probably spurious, and re-read the region before recording a finding.
   - **Don't:** justify the fallback by saying no measured body turns it into a false positive --- `4837539268` does.
 - **Every Copilot Review at the Head, Not the Last One**: Copilot submits more than one review per head, and a suppression block sits in each of them independently --- three reviews at head `6f10014` on ai-config#3084 (`5098574802`, `5098854246`, `5098881593`) each carried a `### Suppressed comments (1)` block (measured 2026-09-03 from `get_reviews`).
-  A `| last` reduction over that id list therefore scans one block and reports `clean` over the other two, which is the blind spot the skill exists to close.
+  A `| last` reduction over that id list therefore scans only the last review's block and never reads the other two's, and it reports `clean` outright in the case where the review it keeps is the finding-free one.
   The `group_by(.user.login)` guard used for human reviews does not help, because every Copilot review shares the one bot login.
   - **Do:** loop the body and inline-comment fetch over every Copilot review whose `commit_id` matches the head.
   - **Don't:** reduce that id list to a single review before scanning it for findings.

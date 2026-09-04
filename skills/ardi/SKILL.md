@@ -106,14 +106,16 @@ sits unread.
      ```bash
      set -o pipefail
      head="$(gh pr view "<N>" --json headRefOid -q .headRefOid)"
-     review_id="$(gh api "repos/<owner>/<repo>/pulls/<N>/reviews" --paginate \
-       | jq -s --arg head "$head" \
-       '[.[][] | select(.user.login=="copilot-pull-request-reviewer[bot]" and .commit_id==$head)] | last | .id')"
-     if [ -n "$review_id" ] && [ "$review_id" != "null" ]; then
-       gh api "repos/<owner>/<repo>/pulls/<N>/reviews/$review_id" --jq '{state, body}'
-       gh api "repos/<owner>/<repo>/pulls/<N>/comments" --paginate \
-         | jq -s --arg rid "$review_id" \
-         '[.[][] | select(.pull_request_review_id == ($rid | tonumber))] | .[] | {line: (.line // .original_line), body}'
+     review_ids="$(gh api "repos/<owner>/<repo>/pulls/<N>/reviews" --paginate \
+       | jq -r -s --arg head "$head" \
+       '[.[][] | select(.user.login=="copilot-pull-request-reviewer[bot]" and .commit_id==$head)] | .[].id')"
+     if [ -n "$review_ids" ]; then
+       for rid in $review_ids; do
+         gh api "repos/<owner>/<repo>/pulls/<N>/reviews/$rid" --jq '{state, body}'
+         gh api "repos/<owner>/<repo>/pulls/<N>/comments" --paginate \
+           | jq -s --arg rid "$rid" \
+           '[.[][] | select(.pull_request_review_id == ($rid | tonumber))] | .[] | {line: (.line // .original_line), body}'
+       done
      else
        echo "no fresh review yet -- wait or re-request"
      fi
@@ -132,6 +134,8 @@ sits unread.
      Enumerating Copilot review bodies from the `reviews` endpoint on 2026-09-04 --- 137 bodies across 39 PRs, from ai-config PRs 1000 through 1100 and 3060 through 3130 plus ai-config#660, ai-config#2913 and ai-config#2976 --- that is the region-wide form's only false positive and its only disagreement with the heading anchor.
      Keep it as a fallback anyway, on the cost asymmetry rather than on a clean record: a false zero merges over real findings while a false positive costs one re-read.
      So read a hit only the fallback finds as probably spurious, and re-read the region before treating it as a finding.
+     Apply all three to **every** Copilot review at the head, which is why the block above loops rather than reducing the id list with `| last`.
+     No per-author grouping rescues that reduction here, because every Copilot review shares one login.
 
      The stakes are why this matters: from round 3 of ai-config#1029 onward *every* substantive finding arrived suppressed, under a "generated no new comments" overview with zero inline comments -- including CRLF silently disabling a failure path repo-wide.
      So a suppressed finding is not a lower-value one, on the evidence available here --- which is a run of valuable suppressed findings, not a measured correlation.

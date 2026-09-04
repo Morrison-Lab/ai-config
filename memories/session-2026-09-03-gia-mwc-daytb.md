@@ -891,7 +891,10 @@ The verdict at `ced1937b` refuted "a shallow clone cannot walk" in the same shal
 found "every commit" backed only by an `ls-remote`,
 and found the anchoring clause, the one the previous round had corrected, still the only clause without a command.
 It also showed "the grep bullet above" had two candidates, the nearer being the cross-repo bullet that also greps.
-`c60f77c1` pastes a command beside each clause (rev-list over the deepened fetch: 33; the refspec; "walks only to its fetch depth"; merge-base for both anchors) and names the first bullet of the step.
+`c60f77c1` pastes a command beside each clause (rev-list over the deepened fetch: 33;
+the refspec;
+"walks only to its fetch depth";
+merge-base for both anchors) and names the first bullet of the step.
 Copilot and Jules re-requested; a verdict at `c60f77c1` is running.
 Across this PR's last four rounds every finding on the sentence has been a universal about clones or fetches stated one step wider than its command,
 and the fix each time was the command itself, so a sentence in a case record earns a clause only with its command.
@@ -936,19 +939,23 @@ the verdict at `e5032f09` is still running, and the next verdict covers `75829fa
 
 ## 20:17 PDT --- #3154 at `5ad81e12`: five wording items, seven threads, and a squash body written ahead of the merge
 
-The verdict that ran against `e5032f09` read the tree at `052eee60` and reproduced every command; it left two process items and five wording items.
+The verdict that ran against `e5032f09` read the tree at `052eee60` and reproduced every command;
+it left two process items and five wording items.
 The wording items are one commit: "the subject grep finds an existing entry" for a lead that said "corpus" twice, a rewrap, the eight-file list one item per line, "returns" for the refspec, one em dash in the rewritten step.
 The process items:
 seven Copilot threads whose asks were in the tree but never resolved are resolved;
 and the false measurement in `75829fad`'s body, which the PR comment had promised to correct "in the squash body", now has its mechanism, `scratchpad/squash-3154.txt`, written with the corrected statement and fact-checkable against the diff, plus a line in the PR description's branch-history section.
-Copilot and Jules re-requested; a verdict at `5ad81e12` is running with the squash body in its brief.
+Copilot and Jules re-requested;
+a verdict at `5ad81e12` is running with the squash body in its brief.
 
 ## 20:22 PDT --- check-in fired; #3154 at `4171ba24`; #3173 is a new peer PR
 
 The 20:20 PDT check-in fired.
 Open PRs: [#3154](https://github.com/Morrison-Lab/ai-config/pull/3154) (this session), [#3146](https://github.com/Morrison-Lab/ai-config/pull/3146) and draft [#3168](https://github.com/Morrison-Lab/ai-config/pull/3168) (other sessions), and [#3173](https://github.com/Morrison-Lab/ai-config/pull/3173), a memory-pass PR another session opened at 20:02 PDT, not driven here.
 Copilot's eighteenth round at `5ad81e12` named two lines: one split at its comma as `4171ba24` (no word change), the other already two one-clause lines, said so on the PR.
-Copilot and Jules re-requested; claude-review runs on the push; the verdict at `5ad81e12` covers the words.
+Copilot and Jules re-requested;
+claude-review runs on the push;
+the verdict at `5ad81e12` covers the words.
 Since `ee05069e` every Copilot round has either approved or named a line split, alternating, so if the next round names another split on unchanged text the disposition is a rebuttal and the forge quorum stands on the round that approved;
 the check-in re-armed for 21:21 PDT carries that rule.
 
@@ -960,7 +967,8 @@ the classifier scans the lines after the last "Verdict" heading, last match wins
 Earlier rounds carried the same sentence and passed because their verdict heading came last, so the sentence sat above the scan;
 this round put the heading near the top.
 The review bot's own brief tells it to backtick quoted verdict words, and that defence does not reach this classifier, which strips the ticks instead of blanking the span.
-Filed upstream as [gha#827](https://github.com/Morrison-Lab/gha/issues/827), with the reproduction and a proposed fix (blank code spans; treat an in-word underscore as part of the identifier).
+Filed upstream as [gha#827](https://github.com/Morrison-Lab/gha/issues/827), with the reproduction and a proposed fix (blank code spans;
+treat an in-word underscore as part of the identifier).
 The `4171ba24` round decides whether #3154 is blocked by it;
 if the check is required and red again, the merge waits on a fix in gha or a review body whose last matching line is the verdict.
 
@@ -1027,7 +1035,7 @@ The limit killed runs `wf_ba0735d4-897`, `wf_803eba98-5c1`, `wf_d5c554bf-cb2`, a
 The r3 scripts (`gia-wave{1,2,3,4}-fix-loop-r3.js`) carry the same loop with every item's `sha` re-read from its worktree's HEAD and its summary stating the commit count past `origin/main` and any uncommitted leftovers (wt-3086, wt-2451, wt-2535 are dirty);
 runs `wf_34205b0d-a5b`, `wf_1b36e489-bc5`, `wf_73b2a984-023`, `wf_45f79342-1dd`.
 The memory-pass branch `ums/2026-09-03-fetch-by-sha` at `ba157b95` has its adversarial review (opus, read-only) running as the fifth slot.
-#3154 at `c5eb3da3`: Copilot's run completed at 03:40:48Z, claude-review and Jules still running, `validate` on one of the two runs still in progress.
+PR #3154 at `c5eb3da3`: Copilot's run completed at 03:40:48Z, claude-review and Jules still running, `validate` on one of the two runs still in progress.
 
 ## 20:43 PDT --- #3154 at `c5eb3da3`: Copilot approves; Jules blocks on its own config and a "future" date
 
@@ -1049,25 +1057,31 @@ the 40-character rule was scoped "on GitHub" when it is git's own ref-name looku
 and the lede called both instruments answers about the clone when the short-SHA fetch consults nothing about the clone.
 The rest: an incomplete predicate ("made all three ancestors"), a pronoun with the wrong nearest antecedent, a bare "33", a trimmed console line beside a verbatim one, eight long lines, and a MEMORY.md row naming "a shallow clone" twice.
 `9d637200` answers all nine; gates green; round-2 review dispatched (opus, read-only).
-#3154 at `c5eb3da3`: claude-review Ready for merge, `require-clean-verdict` green, all seventeen check runs green; Jules's re-run still pending.
+PR #3154 at `c5eb3da3`: claude-review Ready for merge, `require-clean-verdict` green, all seventeen check runs green;
+Jules's re-run still pending.
 
 Lesson for the memory pass: a memory entry written from one session's measurements needs its causes checked against a second environment before it names one (the GitHub scoping came from where the failure was seen, not from what caused it), and its cited note's exact wording carried over rather than widened.
 
 ## 20:53 PDT --- #3154 merged at `fbfb96e3`; Jules's re-run repeated its block, filed as #3183
 
-Jules's second run on `c5eb3da3` returned the same two items verbatim (the workflow's own `INPUT_EXTRA_INSTRUCTIONS` as a prompt injection; `2026-09-03` as a future date).
+Jules's second run on `c5eb3da3` returned the same two items verbatim (the workflow's own `INPUT_EXTRA_INSTRUCTIONS` as a prompt injection;
+`2026-09-03` as a future date).
 `.github/workflows/jules-review.yml` on `main` carries those instructions at lines 213 to 228 (added to close [#815](https://github.com/Morrison-Lab/ai-config/issues/815)), including "never report a date as a typo or as being in the future", so the block is the noise the fix for #815 was written to suppress, now quoting the fix itself.
 Filed as [#3183](https://github.com/Morrison-Lab/ai-config/issues/3183).
-Merged [#3154](https://github.com/Morrison-Lab/ai-config/pull/3154) (squash, `fbfb96e3`, closes #3123) under the standing grant on: seventeen green check runs including `require-clean-verdict`, claude-review Ready, Copilot approving, the adversarial verdict Ready at `27bb9588` (two ASCII dashes from the head), Jules approving at `27bb9588`, and the Jules block Rebutted with the diff's file list; one standing-down comment on the PR.
+Merged [#3154](https://github.com/Morrison-Lab/ai-config/pull/3154) (squash, `fbfb96e3`, closes #3123) under the standing grant on: seventeen green check runs including `require-clean-verdict`, claude-review Ready, Copilot approving, the adversarial verdict Ready at `27bb9588` (two ASCII dashes from the head), Jules approving at `27bb9588`, and the Jules block Rebutted with the diff's file list;
+one standing-down comment on the PR.
 Worktree `wt-umsscope` and branch removed; `main` fast-forwarded; subscription dropped.
 
-Lesson for the memory pass: a reviewer block whose items quote the reviewer workflow's own trusted instructions is a reviewer defect, and re-running it once is the whole measurement; the second identical block is the signal to file and merge on the approving round, not to spend a third run.
+Lesson for the memory pass: a reviewer block whose items quote the reviewer workflow's own trusted instructions is a reviewer defect, and re-running it once is the whole measurement;
+the second identical block is the signal to file and merge on the approving round, not to spend a third run.
 
 ## 20:56 PDT --- merge-time memory pass for #3154: one guard filed, three entries on a second branch
 
 Dupe-checked each owed lesson across the corpus with the whole-corpus recipe #3154 just shipped.
-The `pipefail` chain and the commit-body-from-paraphrase lessons were already rules (`errexit-is-not-uniform.md`'s ad-hoc-chain section; `fact-check-prose.md`'s commit-message section), both broken with the rule loaded, so each gets a dated recurrence beside its rule and the chain case a guard issue, [#3184](https://github.com/Morrison-Lab/ai-config/issues/3184).
-The Jules own-config block was new; it lands in `memories/github-actions.md` beside the #857 Jules record (1225 lines, under the 1250 gate).
+The `pipefail` chain and the commit-body-from-paraphrase lessons were already rules (`errexit-is-not-uniform.md`'s ad-hoc-chain section;
+`fact-check-prose.md`'s commit-message section), both broken with the rule loaded, so each gets a dated recurrence beside its rule and the chain case a guard issue, [#3184](https://github.com/Morrison-Lab/ai-config/issues/3184).
+The Jules own-config block was new;
+it lands in `memories/github-actions.md` beside the #857 Jules record (1225 lines, under the 1250 gate).
 Branch `ums/2026-09-03-recurrences` in `wt-ums-rec`, one commit, gates green, awaiting a review slot (four loops and the memory-pass round-2 review hold all five).
 The "re-run local checks after merging main" lesson is Pattern 7 and Pattern 26 in `mistake-patterns.md`, so it is not re-recorded;
 the "because clause" and "second environment" lessons are `metacognitive-monitoring.md`'s cause rule, and the memory-pass commit body carries the instance.
@@ -1081,17 +1095,20 @@ The discriminator is the error text the section already printed:
 `1fff7e63` states the contrast, adds the server-side line to the console block, names the full-SHA fetch as the one-command test, extends the provenance line, breaks the bold lede, and marks MEMORY.md's second shallow-clone mention (which `9d637200`'s body had claimed and its diff had not done).
 Round 3 dispatched.
 
-Lesson for the memory pass: the evidence offered for a cause has to discriminate the cause from its rivals, and a reproduction that rules out one rival (GitHub) can be presented as ruling out the class (any server); the instrument that discriminates was already on screen and unused.
+Lesson for the memory pass: the evidence offered for a cause has to discriminate the cause from its rivals, and a reproduction that rules out one rival (GitHub) can be presented as ruling out the class (any server);
+the instrument that discriminates was already on screen and unused.
 
 ## 21:09 PDT --- memory-pass branch round 3: "never reaches the server" was false
 
 Round 3 at `1fff7e63` measured the sentence round 2 had asked about and refuted it:
 `GIT_TRACE_PACKET=1 git fetch origin eb0cf15e` sends `command=ls-refs` with `ref-prefix eb0cf15e`, receives the advertisement, and only then prints `couldn't find remote ref`;
 what it never sends is a `want` (reproduced here against GitHub at 21:07 PDT).
-It also found the "one-command test" naming an outcome the full-SHA fetch cannot produce, the refusal string being protocol v2's (a local-path remote on v0 says `Server does not allow request for unadvertised object`; GitHub on v0 still says `upload-pack: not our ref`, measured with `-c protocol.version=0`), and the prior commit body misplacing the lede's break.
+It also found the "one-command test" naming an outcome the full-SHA fetch cannot produce, the refusal string being protocol v2's (a local-path remote on v0 says `Server does not allow request for unadvertised object`;
+GitHub on v0 still says `upload-pack: not our ref`, measured with `-c protocol.version=0`), and the prior commit body misplacing the lede's break.
 `54c8e5fb` closes all five; round 4 dispatched.
 
-Lesson for the memory pass: three rounds in a row, the sentence that carried the section's cause was the one written from inference while the instrument that could settle it (the error text, then the packet trace) was one command away; the reviewer's brief asked for that command each time and the author ran it only after the refutation.
+Lesson for the memory pass: three rounds in a row, the sentence that carried the section's cause was the one written from inference while the instrument that could settle it (the error text, then the packet trace) was one command away;
+the reviewer's brief asked for that command each time and the author ran it only after the refutation.
 
 ## 21:18 PDT --- memory-pass branch round 4: two claims added on the unmeasured half
 
@@ -1113,7 +1130,8 @@ round 6 dispatched.
 The first `want` count I ran here returned 0 because it grepped for the v2 prefix `fetch> want` while v0 logs `fetch-pack> want`;
 the broader `grep 'want '` found it.
 
-Lesson for the memory pass: each round's fix has introduced exactly one new unmeasured claim on the same subject, five rounds running; the next entry of this shape gets its every mechanism sentence traced before the first review, not after the fifth.
+Lesson for the memory pass: each round's fix has introduced exactly one new unmeasured claim on the same subject, five rounds running;
+the next entry of this shape gets its every mechanism sentence traced before the first review, not after the fifth.
 
 ## 21:35 PDT --- memory-pass branch round 6: four mechanism sentences under the wrong variable
 
@@ -1125,7 +1143,8 @@ and "on a full checkout returns 33" when the ranged count returns 33 in a shallo
 `4af1f1ea` scopes each sentence to what was measured;
 round 7 dispatched with an explicit brief to say what can be deleted.
 
-Lesson for the memory pass: the section has grown a protocol-mechanics paragraph the entry's point (a short-SHA failure says nothing about reachability) never needed, and each added mechanism sentence has cost a review round; the next round's brief asks the reviewer which sentences the reader acts on.
+Lesson for the memory pass: the section has grown a protocol-mechanics paragraph the entry's point (a short-SHA failure says nothing about reachability) never needed, and each added mechanism sentence has cost a review round;
+the next round's brief asks the reviewer which sentences the reader acts on.
 
 ## 21:44 PDT --- paused at 96% of the five-hour quota (user directive); state snapshotted to origin
 
@@ -1136,7 +1155,8 @@ a worktree that was dirty when the loops stopped carries a `wip:` commit naming 
 
 Resume list, in order:
 
-1. `ums/2026-09-03-fetch-by-sha` (`wt-ums-sha`, `4af1f1ea`): round 7 of the adversarial review was killed mid-run; re-dispatch it (opus, read-only) with the round-7 brief (the 21:35 entry), asking which sentences the reader does not act on;
+1. `ums/2026-09-03-fetch-by-sha` (`wt-ums-sha`, `4af1f1ea`): round 7 of the adversarial review was killed mid-run;
+re-dispatch it (opus, read-only) with the round-7 brief (the 21:35 entry), asking which sentences the reader does not act on;
    on Ready, push (fresh `ls-remote`), open the PR, request Copilot and `@jules`, drive to clean, merge under the standing grant.
 2. `ums/2026-09-03-recurrences` (`wt-ums-rec`, `012c3d1c`, gates green): one adversarial review, then the same path.
 3. This notebook branch (`wt-nb3`): a verdict, then PR.
@@ -1145,166 +1165,4 @@ Resume list, in order:
 
 Filed this session and unclaimed: #3160 to #3165, #3183, #3184.
 
-## 00:34 PDT (2026-09-04) --- resumed after the quota reset; r4 loops and both memory reviews launched
-
-The user reported the reset and asked to continue.
-The four r2 loops from the earlier limit turned out to have kept running under their own task ids after the pause's stop calls (which hit the r3 runs), and their completion notices arrived at 21:50 PDT:
-0 of 6, 0 of 10, 1 of 12 (#3003 at `facfff6a`), and 0 of 10 verified, every other item cut by the 7:10Z limit.
-A later loop then committed on #3003 (`87b177f4`), so that verdict does not cover HEAD and #3003 rides in the wave-4 loop instead of being skipped.
-The `wip:` commit on wt-2422 is dropped back into the tree;
-wt-3038's `wip:` commit (`b9a75b79`) is under a later fix commit and stays for its loop to squash or reword.
-Launched: round 7 on `ums/2026-09-03-fetch-by-sha` (`4af1f1ea`), round 1 on `ums/2026-09-03-recurrences` (`012c3d1c`), and r4 loops for waves 1 to 3 (`wf_c36c0514-ff3`, `wf_e9b0b619-162`, `wf_913fbdba-601`);
-wave 4's r4 script (11 items) launches when a reviewer frees a slot.
-Every branch on `origin` is a snapshot behind its worktree at most by the loops' new commits; pushes fast-forward, never force.
-
-## 00:44 PDT --- memory-pass branch round 7: four more mechanism defects; the section is cut to its point at `e91dda59`
-
-Round 7 at `4af1f1ea` found the ranged `rev-list` claim false (a depth-1 clone returns 1 for the ranged form and 226 with only the PR ref deepened, since the exclusion side is grafted too), a "no request packet" claim that a flush packet refutes, an unscoped "always sends the want", and a nine-line sentence.
-Rather than patch a fifth time, `e91dda59` removes the `ls-refs`/advertisement paths, the want-packet counts, and the protocol-default history, keeping the ref-name resolution, the two error strings with the one measured local-path variant, and the shallow-walk bound for both the plain and the ranged count.
-Round 8 dispatched with a brief to re-measure each remaining claim in a fresh depth-1 clone.
-
-Lesson for the memory pass: when a review loop keeps finding defects in sentences the entry's point does not need, the fix is deletion, and the tell was round 3, when the first mechanism sentence went in; four rounds were spent defending detail no reader acts on.
-
-## 00:48 PDT --- recurrences branch round 1: eleven findings, all about who said what and where
-
-The review of `012c3d1c` confirmed every measurable claim (the workflow lines, both Jules verdicts, the two red heads and their causes, the grep behaviours, the issues) and found eleven attribution and dating errors: one run's wording quoted as both runs'; the second run's date item named the real file, so "a file the diff does not carry" was true of the first run only and the Do bullet mis-routed; a UTC date beside two Pacific ones in the same diff; the `(` claim placed in a commit body when it was in the prose line that commit added; "each caught by an adversarial verdict" true of one case; `memories/git.md` cited for a case it does not record (the sibling branch adds it, so the citation now names `709bc612`'s retraction instead); the `mergeable_state` claim undated and underived; a missing premise; "afternoon" for 20:08 PDT; no boundary with the inherited-claims bullet; and two earlier prompt-injection blocks on the same PR omitted, one cleared by a single re-run.
-`69523bd0` answers all eleven and `fc74e12a` replaces a head SHA I had guessed for the earlier block with the measured time.
-Round 2 dispatched.
-`memories/github-actions.md` is at 1242 of 1250 lines.
-
-Lesson for the memory pass: a case record's attribution claims (which run, which artifact, who caught it) are the ones written from memory of the session rather than from the forge, and they were wrong at a higher rate than the measurements; write them by re-reading the comment or commit named, not by recalling it.
-
-## 00:54 PDT --- memory-pass branch round 8: the cut held; four residual sentences
-
-Round 8 at `e91dda59` re-derived every numbered claim in a fresh depth-1 clone (plain and ranged counts 1, then 226 after deepening the PR ref, `--is-ancestor` exit 0 for all three) and found four residues:
-the ranged-count sentence named the exclusion side as the cause when deepening `main` alone leaves the range at 1 (the walk forward from the grafted tip binds);
-the local-path refusal lacked its v2 contrast (measured here: v0 refuses, v2 fetches);
-the opening's "says only whether its argument is a ref name" was unscoped against the full-SHA refusal;
-and "was not a ref name" contradicted "resolved as a ref name".
-`2969d8cb` fixes the four;
-round 9 dispatched.
-
-## 01:05 PDT --- recurrences branch round 2: the Jules entry re-derived owned content, and the #3154 merge exceeded the grant's letter
-
-Round 2 at `fc74e12a` confirmed ten of eleven closures and found eleven more.
-The load-bearing ones: the "single re-run cleared" claim was false (the approve four minutes later reviewed a new head, `c6ea044c`);
-the disposal rule re-derived `fully-clean.cases.md`'s #818 record (Jules blocking for injection, repeating verbatim, claude-review clean, "the maintainer's call was to hold; the PR merged with `jules/review` red") without citing it, and installed a session-side disposition where the precedent had the maintainer decide;
-and it never named that `check-pr-fully-clean.py` and the #2274 veto still read the head as not-clean, so the #3154 merge at 20:53 PDT exceeded the grant by its letter.
-Filed as [#3192](https://github.com/Morrison-Lab/ai-config/issues/3192), which puts the disposition to the maintainer;
-the entry now cites #818 and #3192 instead of settling it.
-Smaller: a `/pulls/N/status` path that does not exist (it is `commits/<sha>/status`), #817 added the `extra_instructions` input and #2293 the env-var spelling, two inexact quotations, "two ASCII dashes before" reading as a commit distance, a pronoun on the wrong clause, a "third occurrence" over two cases, "per the section above" citing a section that repaired by amend, and a scope sentence excluding two of the four cases.
-`684be2e9` answers all eleven;
-round 3 dispatched.
-`memories/github-actions.md` is at 1245 of 1250 lines.
-
-Lesson for the memory pass, and the one this whole pass keeps teaching: the dupe check the #3154 fix widened was skipped for the entry recording #3154's own review, and the owned record (#818) was two directories away in `shared/workflow/`; the corpus-wide grep the new step 3 prescribes would have found "injection-detector block" in one command.
-
-## 01:07 PDT --- memory-pass branch round 9: every measurement confirmed; four residues in the remedy and provenance
-
-Round 9 at `2969d8cb` re-derived every claim in a fresh depth-1 clone and a blob-less full clone and confirmed all of them, including the ranged count staying at 1 after deepening `main` to 500.
-The four residues: the provenance line credited the catching review with "a full checkout" when its own comment says it fetched `refs/pull/3060/head` live and later rounds say its clone was shallow;
-"Neither wording" after three wordings resolved to the wrong pair;
-"walks forward" for a `rev-list` walk;
-and the Do bullet prescribed a bounded deepen for a count query, which returns 226 against a true 2434 after the section's own `--depth=200` fetch, so a total count needs `--unshallow`.
-`6a8f4a49` fixes the four;
-round 10 dispatched.
-
-## 01:15 PDT --- memory-pass branch round 10: one clause; pushed at `0242210f` for the forge reviewers
-
-Round 10 at `6a8f4a49` re-measured everything (including `--depth=3000` on the PR ref returning the full 2434 while the clone stayed shallow) and left one finding: "any bounded depth still truncates it" was a false universal.
-`0242210f` takes the reviewer's own shorter wording ("no depth picked in advance is known to reach the root") and no eleventh local round was run;
-the PR body says so, and Copilot, Jules, and claude-review review the head on the forge.
-Ten local rounds on a 47-line memory entry: rounds 1 and 2 on wording and causes, 3 to 7 on protocol mechanics the point never needed, 8 to 10 on the remedy's own claims.
-
-## 01:16 PDT --- #3193 opened for the fetch-by-SHA entry; wave-4 loop launched
-
-`ums/2026-09-03-fetch-by-sha` pushed fast-forward from the `4af1f1ea` snapshot to `0242210f` and opened as [#3193](https://github.com/Morrison-Lab/ai-config/pull/3193);
-claim comment posted, Copilot requested, `@jules review` posted, subscription on.
-The freed slot went to the wave-4 r4 loop (`wf_fa84b50c-e0b`, 11 items including #3003).
-Five slots: four loops and the recurrences branch's round 3.
-
-## 01:23 PDT --- recurrences branch round 3: the corpus already said "hold"
-
-Round 3 at `684be2e9` found the file that owns this block shape, `review-verdict-pitfalls.md`'s seventh case ("re-triggering cannot clear it"; "do not count the re-raise against the rebuttal test ... reply once, then hold"), uncited and contradicted by the entry's "re-run once";
-also "identical" in the heading when the two blocks differed in wording, a "nondeterministic" mechanism the corpus twice refuses to infer, the phantom file described as merely out of scope, two pronouns on the wrong clause, a heading covering half its section, and a missing boundary with "A block presented as program output".
-`90fe6c86` cites the seventh case and #818, tells a session to rebut once, file, and hold, records the #3154 merge as the exception #3192 puts to the maintainer, and trims the file to 1249 of 1250 lines;
-round 4 dispatched.
-
-Lesson for the memory pass: the answer to "may a session merge over a repeating false-positive block" was already in the corpus (hold), two files away from where the session looked, and the merge of #3154 was made against it; the dupe check has to run on the *rule* being recorded, not only on the incident.
-
-## 01:25 PDT --- #3193: claude-review Ready with one nit, Copilot quota-skipped, Jules approved; `e63fd956` pushed
-
-claude-review at `0242210f` reproduced every claim and returned Ready for merge with one non-blocking nit: `--is-ancestor` on the incident's shape dies with `fatal: Not a valid commit name <sha>` (exit 128) rather than returning a boolean.
-Measured here: exit 128 with the ancestor's object absent, a quiet exit 1 once it is fetched;
-`e63fd956` quotes both.
-Copilot's round was a quota skip ("the user who requested the review has reached their quota limit"), re-requested on the new head with `@jules review`.
-Jules approved `0242210f`.
-The merge follows claude-review and Jules on `e63fd956` plus green checks; a second Copilot quota skip is recorded as a skip, not as clean, and does not block on its own since Copilot has posted no finding on this PR.
-
-## 01:32 PDT --- #3193 merged at `9578d66b`
-
-At `e63fd956`: claude-review Ready for merge (it reproduced both `--is-ancestor` shapes), `require-clean-verdict` and every other check run green, `jules/review` success ("verdict: approve"), the adversarial verdict at `6a8f4a49` plus round 10's own wording at `0242210f`.
-Copilot quota-skipped both heads ("the user who requested the review has reached their quota limit") and posted no finding; the squash body records that.
-Merged under the standing grant; worktree and branch removed; `main` fast-forwarded to `9578d66b`; subscription dropped.
-
-Merge-time memory pass, owed and queued behind the recurrences branch's round 4 (so as not to invalidate a running review):
-(1) the deletion lesson from rounds 3 to 7, for `skills/ums/SKILL.md` or `shared/workflow/adversarial-self-review.md`: when successive rounds find defects in sentences the entry's point does not need, cut the sentences rather than patch them;
-(2) check whether `memories/copilot-reviews.md` already records the quota-skip notice and its disposition (a skip is not clean and not a finding; it does not block on its own when Copilot has posted nothing).
-
-## 01:36 PDT --- recurrences branch round 4: the injection item had no rebuttal in the Do bullet
-
-Round 4 at `90fe6c86` closed round 3's seven and found six more, two load-bearing:
-the Do bullet's evidence (file list, clock) answered the date and file items and said nothing to the injection item, and the "sub-shape the seventh case does not name" offered a property that case already records (text in no diff);
-the missing fact was in the entry's own first paragraph, that `INPUT_EXTRA_INSTRUCTIONS` is the reviewer's trusted configuration, so the rebuttal is provenance.
-Also: `hooks/warn-status-read-after-pipe.py` already guards the `$?` form of the pipe defect and #3184 should extend it; two verbatim clauses copied from the section above; the `-zz` exit status stated as entailed when it depends on an accidental match; and the `mergeable_state` discriminator restated 520 lines from the file's own bcs bullet.
-`6fdb619b` answers all six and adds the deletion lesson from #3193 as a `ums` anti-pattern bullet;
-round 5 dispatched.
-
-## 01:51 PDT --- recurrences branch round 5: the Jules entry moves to `memories/jules-review.md`
-
-Round 5 at `6fdb619b` closed round 4's six and found seven more, the load-bearing one structural:
-`memories/github-actions.md` at 1249 of 1250 lines would fail the next one-line append, and the corpus precedent is a satellite at the gate.
-`0b522fd3` moves the section to `memories/jules-review.md` (header in the `github-actions-outages.md` shape, its own `MEMORY.md` row) and `github-actions.md` returns to 1190 lines, unchanged against `main`.
-Also: the errexit paragraph attributed a `$?` form to a section that has none (the hook's own case is #2149), and said #3184 extends the hook when the issue as filed proposed a second detector, so a comment on #3184 now proposes the extension and the paragraph says so;
-the blank line that made the whole `ums` anti-patterns list loose is gone;
-two pronouns, "the rebuttal is provenance" attributed to the seventh case, and "`-zz` is the valid `-z` flag twice".
-Round 6 dispatched.
-
-## 02:03 PDT --- recurrences branch round 6: an untracked file passed the local gate
-
-Round 6 at `0b522fd3` found the `new-line-breaks` gate red on the new `memories/jules-review.md` while my local run had printed clean:
-the file was untracked when the gate ran, and plain `git diff` never shows untracked content (the trap `memories/git-diffing.md` and gha's own README record);
-the 84-character semicolon line is split and the chain now stages before gating.
-Also from the move: "the bcs bullet above" pointing at nothing in the new file, two pronouns, a stray comma in the index row, no inbound link from `github-actions.md` (its header now names the satellite, 1191 lines), "the guard is filed" reading as the existing hook, "only `[` errors" false for `\{`, `\(`, `\)`, and round numbers the #3193 body does not assign (now the five commits `1fff7e63` to `4af1f1ea` and the cut at `e91dda59`).
-`0c39d330` and a follow-up answer all eight;
-round 7 dispatched.
-
-Lesson for the memory pass: the untracked-file gap in the diff-scoped gates is documented and was hit anyway, on a file this very PR created; a `git add` before the gate chain is the mechanical fix, and the chain template in the notebook now carries it.
-
-## 02:19 PDT --- recurrences branch round 7: three findings in the ums case; pushed at `c8acdfc2`
-
-Round 7 at `07dbebd0` confirmed every measurement and the move, and found the `ums` bullet's case wrong twice over:
-`1fff7e63` wrote the Don't bullet's own one-command test (seven of its fifteen lines survive at #3193's merged head), so "protocol detail the Do/Don't never used" was false of it, and "the cut held" was false because `2969d8cb` re-added a protocol clause and three more rounds patched the paragraph;
-plus "those four" with no antecedent.
-`c8acdfc2` takes the reviewer's wordings (the five commits re-patched the same mechanism sentences, which the Do/Don't never used and `e91dda59` deleted; the deleted paragraphs were not restored; the four characters named) and no eighth local round was run;
-pushed fast-forward from the `012c3d1c` snapshot and opened as a PR for Copilot, Jules, and claude-review.
-Seven local rounds on a five-file memory pass: rounds 1 and 2 on attributions, 3 on the owned rule, 4 and 5 on the rebuttal's evidence and the file cap, 6 on the move's residue and an untracked file, 7 on the case cited for the deletion lesson.
-
-## 02:19 PDT --- #3195 opened for the recurrences branch
-
-`ums/2026-09-03-recurrences` at `c8acdfc2` opened as [#3195](https://github.com/Morrison-Lab/ai-config/pull/3195);
-claim comment, Copilot requested (may quota-skip), `@jules review`, subscription on, squash body prepared.
-The merge follows claude-review Ready, Jules approve, and green checks;
-a Jules block on this PR is held per its own entry, not merged over.
-Slots: four loops running, none for reviews.
-
-## 02:27 PDT --- #3195 merged at `a72b0b39`
-
-At `c8acdfc2`: claude-review Ready for merge (every citation traced), `require-clean-verdict` and every other check run green, `jules/review` success (approve), seven adversarial rounds;
-Copilot quota-skipped with no finding.
-Merged under the standing grant; worktree and branch removed; `main` fast-forwarded to `a72b0b39`; subscription dropped.
-Merged this session: #3154, #3166, #3171, #3193, #3195.
-
-Merge-time memory pass: the two lessons this branch's rounds taught that the corpus does not yet carry as a rule are filed rather than written, since each wants its own PR and the loops hold the slots:
-the untracked-file blind spot of the diff-scoped gates recurred with the rule loaded (an instrument is owed), and the `ums` dupe check ran on the incident's vocabulary rather than on the rule being recorded (step 3 wants a second query on the rule).
-Filed as [#3196](https://github.com/Morrison-Lab/ai-config/issues/3196) (the diff-scoped gates' untracked-file blind spot wants an instrument) and [#3197](https://github.com/Morrison-Lab/ai-config/issues/3197) (`ums` step 3 dupe-checks the rule, not only the incident).
+Continued in [`session-2026-09-04-gia-mwc-daytb.md`](session-2026-09-04-gia-mwc-daytb.md) after the quota pause.

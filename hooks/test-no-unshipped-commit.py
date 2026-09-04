@@ -796,6 +796,14 @@ try:
         f"git worktree add -b agy-gone {gone_wt} main",
         "git commit -m mine",
     ])
+    # The SAME-CALL spelling of that shape, which the multi-call fixture
+    # cannot see: the created branch and its checkout sit in the very call
+    # that commits, so the call's own text is what a false attribution reads.
+    # An additive branch source blocked here on a checkout the shell never
+    # entered, and the two spellings have to agree.
+    worktree_add_then_own_commit_same_call = transcript([
+        f"git worktree add -b agy-dormant {dormant_wt} main && git commit -m mine",
+    ])
     # The positive control on the same axis: entering the created checkout is
     # what attributes a commit to it, and the directory axis is what sees
     # that. Dropping the branch contribution must not cost this block.
@@ -1007,6 +1015,8 @@ try:
         # never entered it, so this session owes nothing there.
         assert subject.decide(dormant_root, worktree_adds_then_own_commit) == "", \
             "created subagent worktrees must not claim this session's own commit (ai-config#2422)"
+        assert subject.decide(dormant_root, worktree_add_then_own_commit_same_call) == "", \
+            "the same-call spelling must not claim it either (ai-config#2422)"
         # Negative control: a `cd` into the created checkout still attributes
         # the commit to it, so the narrowing did not disable the block.
         _wtcd_reason = subject.decide(dormant_root, worktree_add_then_cd_in)

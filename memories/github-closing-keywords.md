@@ -48,34 +48,41 @@ The squash message did.
   ([`issue-first.md`](../shared/workflow/issue-first.md)).
   The author here was trying *not* to close.
 
-## A `Refs` first commit closes nothing at merge time, whatever the brief said
+## A branch whose commits carry only `Refs` closes nothing at merge time, whatever the brief said
 
-The mirror of the case above: a branch whose commits carry only `Refs #N`
-leaves #N open when the PR squash-merges, and a brief that asserts "the
-branch's first commit already carries the closing keyword" does not make it
-so.
+The mirror of the #1718 case above: a branch whose commits carry only
+`Refs #N` leaves #N open when the PR squash-merges, and a brief that asserts
+"the branch's first commit already carries the closing keyword" does not
+make it so.
 Measured 2026-09-04 on the six wave-1 PRs of the r5 fix loop
 (ai-config#3203): the fixer brief carried that assertion for every branch,
-and `git log --reverse --format=%B origin/main..HEAD` showed `Refs` rather
-than `Closes` on two of the six (#3068 under #3211, #3102 under #3215).
-Both merged with their issues open;
-Issue #3068 was then closed by hand after its "done when" items were checked
-against the merged diff, and #3102 stayed open because only half its scope
-had shipped, which the `Refs` had been right about.
+and `git log --format=%B origin/main..HEAD | grep -nE '^(Closes|Fixes|Resolves|Refs) #'`
+showed `Refs` and no closing keyword on two of the six: issue #3068 under
+PR #3211, and issue #3102 under PR #3215.
+Both merged with their issues open.
+Issue #3102 stayed open because only half its scope had shipped, which the
+`Refs` had been right about.
+Issue #3068 was closed by hand on the strength of two of its three "done
+when" items and reopened the same hour, because the first item is a
+live-session observation the branch's own commits say it cannot supply;
+a merged diff that satisfies some of an issue's acceptance items is a
+`Refs`, not a close.
 
-- **Do:** before opening the PR, read the branch's first commit with
-  `git log --reverse --format=%B origin/main..HEAD | head` and put the
-  keyword the PR body needs in the body itself, `Closes #N` or `Refs #N`
-  by whether the diff covers the whole issue.
+- **Do:** before opening the PR, grep every commit on the branch for a
+  closing keyword, since a default squash body concatenates all of them:
+  `git log --format=%B origin/main..HEAD | grep -nE '^(Closes|Fixes|Resolves) #'`;
+  then put the keyword the PR body needs in the body itself, scoped per
+  [`issue-first.md`](../shared/workflow/issue-first.md).
 - **Do:** after a squash merge, read the issue's state rather than the
-  PR's, and close by hand with a comment naming the merge when the diff
-  covered it.
+  PR's, and close by hand only when every acceptance item is met by the
+  merged diff, with a comment naming the merge.
 - **Don't:** assert in a brief that a commit carries a closing keyword the
   brief's author never read;
   the assertion reads as a premise the recipient cannot check without the
   same command.
-- **Don't:** close an issue by hand because its PR merged;
-  close it because the merged diff satisfies its "done when".
+- **Don't:** close an issue by hand because its PR merged, or because most
+  of its acceptance items are met;
+  an unmet item keeps it open.
 
 ## Do / Don't
 

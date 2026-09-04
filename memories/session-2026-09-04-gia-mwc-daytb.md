@@ -585,3 +585,91 @@ merging.
 Jules's API returned a 404 on #3243;
 the one re-run was requested by re-mention.
 This notebook is committed and pushed at this checkpoint (wave 4 done, wave 2 fully merged).
+
+## 2026-09-04 15:20 PDT --- notebook part 3 opened as #3245; #3244 merged
+
+PR #3244 (3bbd2292, Closes #3003) merged: claude Ready at head, Jules approve, checks green;
+wt-3003 removed;
+main at 3bbd2292.
+The notebook branch part 3 is PR #3245 (e8f13191);
+this worktree (wt-nb6, branch part4) carries the same file forward so entries keep landing while #3245 is under review, and its PR will be opened from a fresh base after #3245 merges.
+Remaining wave-4 PRs: #3236 and #3243 (claude in progress, Jules pending or re-run), #3237 (Ready, Jules pending), #3239 and #3242 (Jules approve, claude in progress).
+Wave 3 has one agent left (51/50).
+
+## 15:23 PDT --- PR #3236 merged; PR #3243 finding addressed
+
+- Merged PR #3236 (squash 82ad26a2, Closes #2422) on claude Ready @ 385e0771 + Jules approve + 15/15 check runs green;
+  unsubscribed, main fast-forwarded to 82ad26a2, wt-2422 removed.
+- PR #3243: fixed the handoff Step 3 routing bullet (claimed-and-in-scope precondition, route-to-issue fallback), pushed 14d3642b fast-forward after a fresh ls-remote, commented on the PR.
+  Next: confirm a review run started on 14d3642b (dispatch claude-review.yml via MCP if the head only shows skipped rows), wait for Ready + Jules, merge (Closes #2985).
+- Still open: PR #3237 (Jules pending), PR #3239 and PR #3242 (claude review pending), PR #3245 (notebook part 3).
+  Adversarial rounds 11 (wt-ums5) and 6 (wt-ums6) still running;
+  wave 3 still running.
+
+## 15:33 PDT --- review rounds on PR #3237, PR #3239, PR #3242; UMS rounds 12 and 7 launched
+
+- PR #3239 (2789e278): claude-review "Needs more work" on PreModelSwitch/PostModelSwitch and the quoted mur/dls source, both derived from claude v2.1.246.
+  Rebutted with bytes from the 2.1.260 binary in this container (wide-matcher set of 21 carries both events;
+  mur/dls verbatim).
+  No code pushed;
+  claude-review.yml re-dispatched on the PR branch as ref (run 33925727681), which attached its check-runs to the PR head (measured;
+  comment on #3233).
+  Filed #3246 for the stale 27-event catalog (2.1.260 has 33).
+- PR #3242: nit fixed at 10f8275c (finish-wave snippet keeps only comments by env.me).
+  PR #3237: nit fixed at d31b3518 (defines "exact expected content").
+  Both pushed fast-forward, comments posted; reviews re-run on push.
+  Jules on #3237 still in progress (run 33924451549, started 22:11Z).
+- wt-ums5 head 192b97d7 (round-11 fixes), wt-ums6 head edca2bdb (round-6 fixes, includes the measured ref-dependence).
+  Rounds 12 and 7 running (opus).
+  Next: on Ready, fresh ls-remote, push, open PRs via MCP (Refs #3203 / Refs #3230), claim with @jules review, Copilot, subscribe.
+- Tasks tracked in the session task list (1-6).
+
+## 15:35 PDT --- PR #3243 merged; PR #3245 nits fixed
+
+- Merged PR #3243 (squash 6e5ba304, Closes #2985) on claude Ready @ 14d3642b + Jules approve (on 5a8f5272;
+  the delta was the one-bullet fix) + require-clean-verdict green;
+  unsubscribed, main fast-forwarded, wt-2985 removed.
+- PR #3245: claude Ready @ e8f13191 with two heading nits;
+  fixed at fc090214 (level-2 entry headings restored from 13:34 PDT on, the 14:47 heading names the 14:41 merge);
+  pushed, commented.
+  The same heading fix is applied to this file in wt-nb6.
+
+## 15:36 PDT --- PR #3247 opened for the #3238 nit; PR #3237 Ready, Jules re-mentioned
+
+- PR #3247 (branch fix/2528-test-doctor-skill-name, f6dfaeb9, Refs #2528): test_doctor's doubled-skill test picks the first checkout skill instead of "claim-pr";
+  claimed, Copilot requested, subscribed;
+  comment on #2528.
+- PR #3237: claude Ready @ d31b3518;
+  the first Jules run (33924451549) failed after 15 min with no verdict, so "@jules review" was re-posted on the new head.
+  Merge on Jules approve (Closes #2510; squash body must carry both trailers).
+- PR #3242 (10f8275c) and PR #3245 (fc090214): reviews re-running after the nit pushes.
+  PR #3239: dispatched review (run 33925727681) still running.
+
+## 15:43 PDT --- PR #3242 merged; wave 3 done, ten PRs opened
+
+- Merged PR #3242 (squash 45ccb3c8, Closes #2928) on claude Ready @ 10f8275c + Jules approve + green checks;
+  unsubscribed, main at 45ccb3c8, wt-2928 removed.
+- Wave 3 (wf_0400aa03-5ec) finished: 11 items, 53 agents, 8.2M tokens;
+  7 verified.
+  Result saved at scratchpad/wf/r5-wave3-result.json; posted on #3203.
+- Pushed fast-forward (remote tips were ancestors): 2451, 3005, 2986, 2991, 2997, 2919, 2404, 3015;
+  #3002 rebuilt linearly so pushed as fix/3002-write-file-mapping-chained-push-r5;
+  #2524 got a docstring fix (c564c172) before its push.
+- PRs opened via MCP, all Closes: #3248 (2451), #3249 (3005), #3250 (2986), #3251 (2991), #3252 (2997), #3253 (2919), #3254 (2404), #3255 (3015, history findings discharged in the body), #3256 (3002), #3257 (2524).
+  Each claimed with @jules review, Copilot requested, subscribed.
+- #2458 not pushed: two real findings in scripts/check-hook-test-argv.py, recorded on the issue;
+  wt-2458 kept at f69b0ee9.
+- Open PRs of this session now: #3237 (Jules re-running), #3239 (dispatched review running), #3245 (review on fc090214), #3247, #3248-#3257.
+  UMS rounds 12 and 7 still running.
+
+## 15:47 PDT --- PR #3245, PR #3247, PR #3239 merged; UMS entries pushed as PRs
+
+- Merged PR #3247 (c9454008, Refs #2528), PR #3245 (227ec5a4, notebook part 3), PR #3239 (8352b57e, Closes #2535;
+  the re-dispatched review re-extracted the 2.1.260 binary from npm and confirmed both rebuttals).
+  Unsubscribed, main at 8352b57e, worktrees wt-2528b, wt-nb5, wt-2535 removed.
+- PR #3237: Jules posted "comment" with one WARN (the two-line pointer in memories/delegation.md read as a leftover instruction);
+  reworded at dd809845, pushed, commented.
+  Merge on the next Ready (Closes #2510).
+- UMS rounds 12 (4 findings) and 7 (5 findings) both not-ready on small wording items;
+  fixed at b900b8a7 (wt-ums5) and 42237cd5 (wt-ums6) and pushed as PRs rather than running further self-review rounds: the repo's own reviewers take it from here.
+- This notebook (part 4) rebased onto main after PR #3245 merged: main's copy is a prefix of the working copy, so the new entries were carried over unchanged.

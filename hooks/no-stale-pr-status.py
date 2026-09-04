@@ -250,14 +250,21 @@ RX_RETRACTION = re.compile(
 # identical sentence in brackets did not. Both open an aside about something
 # other than the claim, so both break the TRAILING attachment.
 #
-# Before the claim the two part company, which is why the brackets are
-# trailing-only while the parens stay shared. A leading bracketed span in this
-# corpus is markdown rather than an aside -- a reference-style link
-# ("[#1689][pr]"), a footnote marker ("[^1]"), a shortcut link -- so reading it
-# as a clause break blocks the plain retraction it sits inside. Measured with
-# the brackets shared: "Retracting the status [#1689][pr] all checks green."
-# and "I misread [^1] all checks green." each flipped from ALLOW to BLOCK,
-# which is the false-block class this guard exists to stop.
+# The brackets stay SHARED, exactly as the parens do, and the leading direction
+# is handled by removing markdown rather than by exempting the character. A
+# leading bracketed span in this corpus is usually markdown rather than an
+# aside -- a reference-style link ("[#1689][pr]"), a footnote marker ("[^1]"),
+# an inline link -- so reading it as a clause break blocks the plain retraction
+# it sits inside: "Retracting the status [#1689][pr] all checks green." and "I
+# misread [^1] all checks green." both flipped from ALLOW to BLOCK when the
+# brackets were first shared, which is the false-block class this guard exists
+# to stop. Exempting the bracket CHARACTER instead is what an earlier round
+# tried, and it reintroduces the defect this same block was written to remove,
+# one direction over: with the brackets trailing-only, "[The earlier note was
+# wrong] all checks green." allowed while the identical sentence in parens
+# blocked, so the verdict turned on the bracket style again. RX_MARKDOWN_SPAN
+# below deletes the markdown shapes from the connector and leaves every other
+# bracket standing, which keeps the two families in step.
 #
 # Nothing else moves. `because`, `since`, `after`, `before`, `until`, `once`,
 # `unless`, `if`, and `now that` introduce a reason or a time rather than the
@@ -273,19 +280,27 @@ RX_RETRACTION = re.compile(
 # two-word `now that` has to be spelled out, since a bare `now` is no
 # separator at all.
 _CLAUSE_SEPARATORS = (
-    r"--|[,;:()|]"
+    r"--|[,;:()\[\]|]"
     r"|[\u2013\u2014\u2192\u2026]|\s[-/]\s"
     r"|\n[ \t]*[-*+>#]"
     r"|\b(?:but|and|or|so|yet|however|though|although|while|whereas"
     r"|after|before|until|since|because|once|unless|if|now\s+that)\b"
 )
-# The complementizers, the relative pronouns, and the square brackets, which
-# break attachment only AFTER the claim -- before it a pronoun can take the
-# claim as its own object, and a bracketed span is markdown rather than an
-# aside.
+# The complementizers and the relative pronouns, which break attachment only
+# AFTER the claim -- before it a pronoun can take the claim as its own object.
 _TRAILING_ONLY_SEPARATORS = (
-    r"|[\[\]]"
     r"|\b(?:when|that|where|which|who|whose|whom)\b"
+)
+
+# The markdown spans that are not clause breaks in either direction: a footnote
+# marker, a reference-style link, an inline link. They are deleted from the
+# connector before it is scanned, so the brackets can stay in the shared set
+# without a citation inside a retraction reading as an aside. A bare "[ci]" is
+# deliberately NOT here: nothing distinguishes a shortcut link from a bracketed
+# aside, and the aside is the reading that keeps the guard on.
+RX_MARKDOWN_SPAN = re.compile(
+    r"\[\^[^\[\]]*\]"
+    r"|\[[^\[\]]*\](?:\[[^\[\]]*\]|\([^()]*\))"
 )
 RX_CLAUSE_SEPARATOR = re.compile(
     _CLAUSE_SEPARATORS + _TRAILING_ONLY_SEPARATORS, re.I)
@@ -303,19 +318,33 @@ RX_LEADING_SEPARATOR = re.compile(_CLAUSE_SEPARATORS, re.I)
 # a separator anywhere else still breaks: "All checks green is a claim that
 # survives, though my count was wrong." still blocks on the comma, and "All
 # checks green because the note is a claim that was wrong." still blocks on
-# `because`. That is also why the pattern is unanchored: an ASSERT match often
-# ends mid-phrase (`\ball (checks|green)\b` matches only "All checks"), so the
-# connector opens with the tail of the claim rather than with the copula. The
-# residual cost is a sentence that uses the metalinguistic frame to assert the
-# claim rather than to withdraw it ("All checks green is the status that the
-# earlier note was wrong about."), which nobody writes.
+# `because`. The LEFT end stays unanchored because an ASSERT match often ends
+# mid-phrase (`\ball (checks|green)\b` matches only "All checks"), so the
+# connector opens with the tail of the claim rather than with the copula.
+#
+# The RIGHT end is anchored, and leaving it open was a fail-open. Keying on the
+# head noun alone never asks what the relative clause is ABOUT, so any sentence
+# putting the error on some other noun -- "#1689 is fully clean is the note
+# that the reviewer misread.", "All checks green is the reading that the
+# earlier reviewer overstated." -- had its head phrase stripped and went
+# silently ALLOW, which is the direction that emits nothing. The grammar
+# decides it: in a SUBJECT relative the pronoun IS the claim and the verb
+# follows it directly, while an OBJECT relative puts its own subject in
+# between. So the carve-out must reach the retraction, and only an auxiliary
+# may sit in the gap -- "is a claim that was overstated." keeps its "was",
+# where a bare `\Z` anchor would newly block it.
+#
+# The residual cost is an object relative that really is about the claim ("All
+# checks green is a claim that I was wrong about."), which now blocks. That is
+# the visible direction, and it is the one to be wrong in.
 RX_METALINGUISTIC_HEAD = re.compile(
     r"\b(?:is|was|were|are)\s+"
     r"(?:the|a|an|this|that|my|our|its)?\s*"
     r"(?:earlier|prior|previous|one|only|original)?\s*"
     r"(?:claim|statement|line|note|status|report|reading|call|verdict"
     r"|assertion|assessment|sentence|wording)\s+"
-    r"(?:that|which)\s+",
+    r"(?:that|which)\s+"
+    r"(?:(?:was|were|is|are|has|had|have|been)\s+)*\Z",
     re.I,
 )
 
@@ -363,7 +392,7 @@ def _is_retracted(text, hit):
     """
     for after in RX_RETRACTION.finditer(text, hit.end(), _trailing_end(text, hit)):
         connector = RX_METALINGUISTIC_HEAD.sub(
-            "", text[hit.end():after.start()], count=1)
+            "", RX_MARKDOWN_SPAN.sub("", text[hit.end():after.start()]), count=1)
         if _attaches(connector):
             return True
         break
@@ -372,7 +401,8 @@ def _is_retracted(text, hit):
     for before in RX_RETRACTION.finditer(text, start, hit.start()):
         pass
     return before is not None and _attaches(
-        text[before.end():hit.start()], RX_LEADING_SEPARATOR)
+        RX_MARKDOWN_SPAN.sub("", text[before.end():hit.start()]),
+        RX_LEADING_SEPARATOR)
 
 
 def _is_negated(text, hit):

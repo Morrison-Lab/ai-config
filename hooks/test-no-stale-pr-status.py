@@ -289,16 +289,43 @@ CASES = [
      "a parenthesized aside is about the note, not the claim"),
     ([QUERY, PUSH, say("All checks green [the earlier note was wrong].")], True,
      "so is the same aside in square brackets"),
-    # The brackets are trailing-only, and the parens are not, because BEFORE
-    # the claim a bracketed span in this corpus is markdown rather than an
-    # aside. Move them into _CLAUSE_SEPARATORS and both of these stop allowing,
-    # which blocks a plain retraction -- the class ai-config#3038 was filed to
-    # stop blocking.
+    # Before the claim a bracketed span is USUALLY markdown, so a citation
+    # inside a leading retraction must not read as an aside. RX_MARKDOWN_SPAN
+    # deletes the markdown shapes from the connector; delete that sub and all
+    # three of these stop allowing, which blocks a plain retraction -- the
+    # class ai-config#3038 was filed to stop blocking.
     ([QUERY, PUSH, say("Retracting the status [#1689][pr] all checks green.")], False,
      "a reference-style markdown link inside a leading retraction is not a "
      "clause break"),
     ([QUERY, PUSH, say("I misread [^1] all checks green.")], False,
      "nor is a footnote marker"),
+    ([QUERY, PUSH, say("I was wrong in [the note](http://x/y) that said all "
+                       "checks green.")], False,
+     "nor is an inline link, whose parens would otherwise break the "
+     "connector too"),
+    # Deleting the markdown rather than exempting the bracket CHARACTER is
+    # what keeps the two aside styles in step. Take the brackets back out of
+    # _CLAUSE_SEPARATORS and the first two stop blocking while the paren case
+    # keeps blocking, which is the same style-dependent verdict the trailing
+    # pair above was written to remove.
+    ([QUERY, PUSH, say("[The earlier note was wrong] all checks green.")], True,
+     "a leading bracketed aside is a clause break, exactly as the paren one "
+     "below is -- it retracts the note and then asserts a fresh green state"),
+    ([QUERY, PUSH, say("(The earlier note was wrong) all checks green.")], True,
+     "the identical sentence in parens, pinned beside it so the two families "
+     "cannot diverge again unnoticed"),
+    ([QUERY, PUSH, say("The earlier reading was wrong [ci] all checks green "
+                       "now.")], True,
+     "a bare bracketed token is not one of the markdown shapes, so it stays "
+     "an aside -- nothing distinguishes a shortcut link from one"),
+    # The sub runs on the trailing connector too, for the same reason: with the
+    # brackets shared, a citation between the claim and its retraction would
+    # read as an aside. Drop the sub from the trailing branch alone and this
+    # stops allowing.
+    ([QUERY, PUSH, say('My earlier "ready to merge" call [^1] was '
+                       'incorrect.')], False,
+     "a footnote marker between the claim and its retraction is not an aside "
+     "either"),
 
     # The head noun of a trailing relative clause is USUALLY some other noun,
     # which is what puts the relative pronouns in the trailing-only set. When
@@ -314,11 +341,24 @@ CASES = [
     ([QUERY, PUSH, say("All checks green is a claim which was wrong.")], False,
      "the hole predates 'that' -- the 'which' spelling blocked from the round "
      "that added the relative pronouns"),
+    ([QUERY, PUSH, say("All checks green is a claim that was overstated.")], False,
+     "an auxiliary may sit between the pronoun and the retraction -- a bare "
+     "\\Z anchor on RX_METALINGUISTIC_HEAD blocks this participle form"),
     # Only the head phrase is dropped, never the rest of the connector. Widen
     # the carve-out to swallow the whole connector and this stops blocking.
     ([QUERY, PUSH, say("All checks green is a claim that survives, though my "
                        "count was wrong.")], True,
      "a separator past the head phrase still breaks attachment"),
+    # The carve-out must also REACH the retraction. Unanchor its right end and
+    # both of these stop blocking: the head noun matches, so the phrase is
+    # stripped, while the relative clause is about a different noun entirely.
+    ([QUERY, PUSH, say("#1689 is fully clean is the note that the reviewer "
+                       "misread.")], True,
+     "an object relative puts its own subject after the pronoun, so the error "
+     "sits on the reviewer and the claim still stands"),
+    ([QUERY, PUSH, say("All checks green is the reading that the earlier "
+                       "reviewer overstated.")], True,
+     "same shape with a different head noun and retraction verb"),
 
     # The copula guard. Attributive "wrong" sits in the SAME clause as the
     # claim, so attachment cannot rule it out; only the copula requirement can.

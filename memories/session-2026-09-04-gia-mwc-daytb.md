@@ -202,6 +202,5 @@ Filed as [#3196](https://github.com/Morrison-Lab/ai-config/issues/3196) (the dif
 
 ## 03:29 PDT --- notebook branch: adversarial rounds with no PR open yet, and the per-round entries are cut
 
-As of `70d7aa97`, the head round 10 reviewed, ten adversarial rounds had run on this branch with no PR open, returning eleven, six, four, four, four, eleven, four, three, one, and two findings.
-The 84 that should have been 82 was also in #3196's body, corrected there at 02:50 PDT.
+As of `67b47a3d`, the head round 11 reviewed, eleven adversarial rounds had run on this branch with no PR open, returning eleven, six, four, four, four, eleven, four, three, one, two, and one findings.
 The three entries that narrated rounds 1 to 3, appended by the commits answering those rounds, were deleted rather than patched at `48380505`, the commit answering round 4, and this entry took their place.

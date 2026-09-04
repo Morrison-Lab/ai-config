@@ -433,11 +433,14 @@ check("an override on a later commit does not clear an already-matched chain",
 # a second, unprotected one" above red, so the compound is not what this case
 # adds either. Both mutants measured on scratch copies of the hook.
 #
-# The `return None` spelling never landed: `git log --follow origin/main --
-# hooks/no-commit-chained-to-push.py` returns one commit, and it ADDS the file
-# already carrying `continue`. It existed on the unmerged branch behind
-# ai-config#3023, which is what the hook's own "`continue`, never `return
-# None`" comment means by "Measured on this branch before the fix".
+# The `return None` spelling never landed on main. `git log --oneline --
+# hooks/no-commit-chained-to-push.py` returns exactly one commit, 673615a4 --
+# the squash of ai-config#3023, merged 2026-09-03 -- and `git show
+# 673615a4:hooks/no-commit-chained-to-push.py` already carries `continue`.
+# (Under a shallow clone, check that the boundary precedes 673615a4 before
+# trusting that one-commit history.) The spelling existed on a PRE-MERGE
+# revision of that branch, which is what the hook's own "`continue`, never
+# `return None`" comment means by "Measured on this branch before the fix".
 check("an override on a middle commit does not clear the first-matched chain",
       fires("git commit -m a && ALLOW_COMMIT_AND_PUSH=1 git commit -m b "
             "&& git push"), True)
@@ -454,13 +457,14 @@ check("an override on a middle commit does not clear the first-matched chain",
 # DENIES it too, by a DIFFERENT path from the shipped module. The mutant
 # enters the commit branch on that second commit, reads the override, and
 # takes the `continue`. The shipped clause is already False there, because
-# `commit_argv` holds the first commit, so it never reads the override at all
-# and falls through to the `elif`. Either way `commit_argv` still holds the
-# first commit when the push arrives. The clause changes only WHICH argv is
-# stored, never whether one is, so the two modules give the SAME deny/allow
-# answer on every input. The one observable difference is the
-# commit the refusal NAMES -- the command the message identifies as the one
-# about to be lost. M10 below is the matching mutation.
+# `commit_argv` holds the first commit, so it never reads the override at
+# all; the `elif` then tests `sub == "push"`, which is False on a commit, so
+# NEITHER branch runs and the loop advances to the next command. Either way
+# `commit_argv` still holds the first commit when the push arrives. The
+# clause changes only WHICH argv is stored, never whether one is, so the two
+# modules give the SAME deny/allow answer on every input. The one observable
+# difference is the commit the refusal NAMES -- the command the message
+# identifies as the one about to be lost. M10 below is the matching mutation.
 _TWO_COMMITS = hook.evaluate("git commit -m a && git commit -m b && git push") or ""
 check("the refusal names the first commit of a two-commit chain",
       "git commit -m a" in _TWO_COMMITS, True)
@@ -873,9 +877,12 @@ _mutate("fusing the heredoc marker with the separator goes silent",
 #        missing or duplicated anchor is a FAILURE of the test rather than a
 #        skip, and the count is asserted rather than mere presence, matching
 #        `test-no-handrolled-verdict-parse.py`'s own anchor check -- a bare
-#        `in` test plus `replace(..., 1)` would silently patch a docstring
-#        occurrence instead of the code, and this hook quotes its own source
-#        in docstrings heavily.
+#        `in` test plus `replace(..., 1)` would silently patch a PROSE
+#        occurrence instead of the code, and this hook quotes Python source
+#        in prose: `evaluate`'s comments carry the line
+#        `if sub not in ("commit", "push"): continue`, plus bare `continue`
+#        and `return None`. The count check does not care WHERE a second
+#        occurrence lives, only that one exists.
 _M10_CLAUSE = 'if sub == "commit" and commit_argv is None:'
 with open(HOOK, encoding="utf-8") as _handle:
     _hook_source = _handle.read()

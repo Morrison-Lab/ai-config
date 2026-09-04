@@ -306,7 +306,7 @@ The tool result already returns a clock time (e.g. "Next wakeup scheduled for 08
 
 ## Bare keyword directives
 
-Two families of slash skill read as directives when I write them **without** the leading slash: the **queue commands** that amend the task list, and the **judgment grants** that hand a decision back to you.
+Three families of slash skill read as directives when I write them **without** the leading slash: the **queue commands** that amend the task list, the **judgment grants** that hand a decision back to you, and the **orchestration commands** that cap a run already in flight.
 
 ### Queue commands
 
@@ -324,6 +324,15 @@ Read a bare "do as you think best" as `daytb`, not as `away` -- the session-wide
 `dmmhyh` ("don't make me hold your hand") is a correction rather than a proactive grant: it fires when I'm asking for more guidance than the moment calls for.
 It resolves the pending item like `daytb`, raises the decide-vs-ask threshold for the rest of the session like `away`'s judgment-call test, and -- unlike either -- writes the correction down as a memory entry so it doesn't have to be re-taught next session.
 See [`dmmhyh`](skills/dmmhyh/SKILL.md).
+
+### Orchestration commands
+
+`fw` ("finish the current wave but don't start a new one", longhand `finish-wave`) caps an orchestration run at the wave already in flight.
+It bounds *issue grabs* only, so the review rounds, fixes, and the owed UMS pass that finish the wave's PRs all run under it.
+See [`finish-wave`](skills/finish-wave/SKILL.md).
+
+- **Do:** read a bare "finish the current wave" as `fw`, hold every new grab, and drive the wave's open PRs to a terminal state.
+- **Don't:** read it as "open no more PRs" --- a UMS PR or a follow-up issue is not a grab from the backlog.
 
 ## Link PRs in tables
 

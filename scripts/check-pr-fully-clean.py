@@ -18,6 +18,21 @@ A later CLEAN from a different reviewer does not: any reviewer's standing
 not-clean vetoes, including under mwc (ai-config#2274).
 See shared/workflow/fully-clean.md.
 
+NOT COVERED. A `FULLY CLEAN` line here is not the whole of that fragment's
+"Findings hide on several surfaces" check, and the difference is mechanical
+rather than a matter of thoroughness. scripts/lib/payload_fetcher.py maps
+`gh pr view`, `gh repo view`, and two `gh api` reads (`/check-runs` and
+`/actions/runs/`) -- so `pulls/<N>/comments` is never queried and inline
+review comments are invisible here, resolved or not (ai-config#3079). No
+`<summary>`-scoped match on `suppressed` exists in this file either, so a
+Copilot finding inside a collapsed `<details>` block is invisible too
+(ai-config#3170): it creates no inline comment and states no verdict, so no
+count performed here can see it. Measured on ai-config#3167, where this
+script printed FULLY CLEAN twice over a standing finding -- an inline comment
+at head 16544c50, and a suppressed "previously missed" item at head 7e1294b0.
+A caller reporting a PR ready runs those two queries alongside this script;
+the fragment carries their exact form.
+
 Which repository is being asked about is resolved once, at startup, and threaded
 through every `gh` call. It is NOT hardcoded: the same value reaches the PR
 lookup and the check-runs query, so the two halves cannot describe different

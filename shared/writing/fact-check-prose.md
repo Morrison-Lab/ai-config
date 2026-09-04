@@ -959,6 +959,80 @@ the paragraph's content was "split at the clause boundary",
 and the honest form carries no numbers at all.
 Tracked as [#3158](https://github.com/Morrison-Lab/ai-config/issues/3158).)
 
+**The amend that repairs one such figure is where the next one enters, so the
+fix round is the exposure rather than the recovery.**
+The passage above treats the amend as a cost.
+What it does not say is that the amend is itself an act of composition,
+performed under exactly the conditions that produced the original ---
+describing what you just did, quickly, about a passage you are looking at
+rather than measuring.
+So the corrected message gets a fresh unmeasured figure, and the correction
+reads as diligence while carrying the same defect one layer down.
+
+Two things make this harder to catch than a first-draft error.
+The amend is *targeted*, so attention sits on the number that was wrong and a
+different number in the same sentence inherits the credibility of the fix.
+And the rewrite destroys its own evidence, per the case record above: there is
+no diff between a message and its predecessor, so nothing a later reader sees
+shows that the figure ever changed.
+
+**A *positional* figure is in scope here, not only a measurement of the
+change.**
+"Thirteen lines above", "the section three lines below", "the sibling 39 lines
+down" locate a passage rather than size an edit, so they slip past a reader
+applying the rule above, which is worded around counts of what the commit
+touched.
+They are worse than a size claim on two counts.
+They are load-bearing for nothing --- a reader who wants the passage searches
+for it --- and they go stale on the next insertion anywhere between the two
+points, so a figure that was true when written becomes false with nobody
+having edited it.
+The remedy is the one stated in
+[`An insertion asserts something about the whole file`](#an-insertion-asserts-something-about-the-whole-file-not-just-the-added-lines)'s
+own case record: naming a target beats counting to it.
+Name the section, or quote its heading, and the sentence survives every later
+edit.
+
+- **Do:** re-derive every figure in an amended message, including the ones the
+  amend was not about.
+- **Do:** name a passage by its heading or a quoted phrase, rather than by its
+  distance from where you are standing.
+- **Don't:** treat a message you are correcting as already checked --- the
+  correction is the first draft of a new sentence.
+- **Don't:** write a positional figure into a commit message on the grounds
+  that it is true right now; the next insertion falsifies it and nobody
+  re-reads it.
+
+(Morrison-Lab/ai-config#3167, 2026-09-03, recorded here rather than as a
+sibling section because it is this same rule failing rather than a second one.
+The PR that added the section above carried three unmeasured or false figures
+in its own commit messages, each introduced by the commit fixing the previous
+one: "into the corpus's 60-to-80 range" when the resulting lines measured 54,
+84 and 81 --- the case already recorded above, from #3060 --- then "three
+lines below" when the gap was ten, then "twelve lines above" when it was
+thirteen.
+All three were positional or dimensional, and none was load-bearing.
+
+That a rule gets broken while being authored is not itself the finding, and is
+already stated in this corpus three times over:
+[`learn-from-review-findings`](../workflow/learn-from-review-findings.md),
+[`no-empty-promises`](../workflow/no-empty-promises.md) and
+[`fully-clean.cases.md`](../workflow/fully-clean.cases.md) each put it as a
+rule consulted at read time and broken at composition time.
+The recordable remainder is the amend chain and the positional shape above.
+
+Whether the condition deserved a guard was measured rather than argued.
+`hooks/flag-positional-figure-in-commit-message.py` is the result, and
+[`deterministic-tools`](../principles/deterministic-tools.md)'s
+third-occurrence bar is what licensed building it: the pattern
+`\b\d+\s+(?:lines?|characters?|chars?|words?)\s+(?:above|below|earlier|later)\b`
+together with `\b\d+-to-\d+\s+range\b` matched 15 of this repository's 2412
+commit messages, and every one of the 15 was the decorative-positional shape,
+with no legitimate code-move description among them --- so the misfire the
+guard was expected to have does not appear in the population it runs against.
+It warns and never blocks, because whether a figure is load-bearing is not
+lexically decidable even where its shape is.)
+
 ## An elapsed-time claim is a computation, not a memory
 
 The section on claims inherited from upstream discussion covers a figure you

@@ -201,9 +201,35 @@ An unparsed verdict surfaces only as a `NOTE: ... has a format the verdict
 classifier cannot read` line, which is deliberately **non-blocking** --- so it
 prints among the notes rather than among the findings.
 
+**Ask the classifier before posting, rather than after.**
+Every rule in this section is one the classifier already enforces, and it can
+be run against a draft:
+
+```bash
+python3 scripts/check-review-body.py draft.md
+```
+
+It reports what `check-pr-fully-clean.py` would make of that body -- whether
+it is skipped as a notice, whether it reads as a structured report, what
+verdict it carries, and which finding pattern matches -- and exits 0 only for
+a body that would classify CLEAN.
+It answers about the BODY alone: quorum, reviewer identity and head-SHA
+matching are the caller's business, so a CLEAN answer is not a guarantee of
+admission.
+
+The reason to reach for it is that a rejected review is silent.
+A body the classifier skips leaves whatever verdict was standing before it
+still standing, with nothing on the PR saying why -- so the failure looks
+like a stale not-clean rather than like a review that did not land.
+Three self-reviews were posted to `ucdavis/hac.sap#37` on 2026-09-03 before
+one counted, and each rejection was diagnosed by guessing at a rule the
+classifier would have answered for free.
+
 - **Do:** open or close the comment with the agent's own marker line, so the
   first or last line resolves to an agent.
 - **Do:** write `### Verdict: Clean` on one line.
+- **Do:** run the draft through `check-review-body.py` before posting it,
+  rather than diagnosing a rejection afterwards.
 - **Do:** read a `NOTE:` about an unreadable review as being about *your own*
   fallback, since a bot's report is already in the parsed form.
 - **Don't:** bury the marker mid-body under a heading of your own --- that is

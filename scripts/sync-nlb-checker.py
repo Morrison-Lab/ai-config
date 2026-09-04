@@ -9,6 +9,7 @@ Run this after bumping the action pin. Do not hand-edit the vendored copy.
 """
 from __future__ import annotations
 
+import argparse
 import importlib.util
 import subprocess
 import sys
@@ -66,7 +67,27 @@ def _fetch(sha: str) -> bytes:
         ) from exc
 
 
-def main() -> int:
+def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    """Consume the command line so `--help` prints usage instead of syncing.
+
+    The sync fetches over the network and rewrites two tracked files, so a
+    reader who runs `--help` to learn the usage must not trigger it: before a
+    pin bump that is a surprise write, and over local edits to the vendored
+    copy it is a silent overwrite (ai-config#3095). The parser defines no
+    arguments beyond argparse's own `-h`/`--help`, and `parse_args` (not
+    `parse_known_args`) is what rejects an unrecognized one, so an unknown
+    argument exits 2 rather than being ignored.
+    """
+    parser = argparse.ArgumentParser(
+        prog=Path(__file__).name,
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    _parse_args(argv)
     sha = nlb_gate.parse_ci_nlb_sha()
     body = _fetch(sha)
     if b"classify_line" not in body or b"has_late_semicolon" not in body:

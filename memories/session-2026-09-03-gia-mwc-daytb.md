@@ -818,7 +818,7 @@ claude-review CLEAN and Jules approve at `2c1b5bd4`, every check run green, the 
 That rebuttal is a Defer to a tracked issue, which is the disposition `fully-clean` accepts.
 `wt-ums-git` and its branch are removed.
 `origin/main` merged into this notebook branch at `9f4d877b`;
-the one conflict was #3166's replacement of the 12:38 entry's "Wants promotion" line against this branch's 400 appended lines below it, resolved by taking the promoted line and keeping every later entry.
+the one conflict was #3166's replacement of the 12:38 entry's "Wants promotion" line against this branch's 407 appended lines below it (`git diff --numstat 3935bfff 8e3d7ac0` on the file), resolved by taking the promoted line and keeping every later entry.
 This branch's PR opens once [#3154](https://github.com/Morrison-Lab/ai-config/pull/3154) lands, so the merge entry rides in the same round.
 
 ## 19:39 PDT --- correction: the #3060 commits are reachable; two instruments answered a different question

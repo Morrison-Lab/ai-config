@@ -118,7 +118,7 @@ Jules approved `0242210f`.
 The merge follows claude-review and Jules on `e63fd956` plus green checks;
 a second Copilot quota skip is recorded as a skip, not as clean, and does not block on its own since Copilot has posted no finding on this PR.
 
-## 01:32 PDT --- #3193 merged at `9578d66b`
+## 01:31 PDT --- #3193 merged at `9578d66b`
 
 At `e63fd956`: claude-review Ready for merge (it reproduced both `--is-ancestor` shapes), `require-clean-verdict` and every other check run green, `jules/review` success ("verdict: approve"), the adversarial verdict at `6a8f4a49` plus round 10's own wording at `0242210f`.
 Copilot quota-skipped both heads ("the user who requested the review has reached their quota limit") and posted no finding;
@@ -176,7 +176,7 @@ plus "those four" with no antecedent.
 the deleted paragraphs were not restored;
 the four characters named) and no eighth local round was run;
 pushed fast-forward from the `012c3d1c` snapshot and opened as a PR for Copilot, Jules, and claude-review.
-Seven local rounds on a five-file memory pass: rounds 1 and 2 on attributions, 3 on the owned rule, 4 and 5 on the rebuttal's evidence and the file cap, 6 on the move's residue and an untracked file, 7 on the case cited for the deletion lesson.
+Seven local rounds on a six-file memory pass (`git diff --name-only 9578d66b...c8acdfc2`): rounds 1 and 2 on attributions, 3 on the owned rule, 4 and 5 on the rebuttal's evidence and the file cap, 6 on the move's residue and an untracked file, 7 on the case cited for the deletion lesson.
 
 ## 02:19 PDT --- #3195 opened for the recurrences branch
 
@@ -203,7 +203,7 @@ Filed as [#3196](https://github.com/Morrison-Lab/ai-config/issues/3196) (the dif
 ## 03:29 PDT --- notebook branch: four adversarial rounds before the PR opens, and the per-round entries are cut
 
 Rounds at `95d6a96c`, `de94b4cd`, `c01aa15d`, and `eea02bba` returned eleven, six, four, and four findings.
-Round 1's were figures written from recollection where the instrument was one command away: line counts, a character count, a PR's `updated_at` written as its open time, a grep search target, a `rev-list` direction, a bare UTC stamp, an index row, and two ambiguous references.
+Round 1's were nine figures and mechanism claims written from recollection where the instrument was one command away (line counts, a character count, a PR's `updated_at` written as its open time, a grep search target, a `rev-list` direction, a bare UTC stamp, an index row) and two ambiguous references.
 The 84 that should have been 82 was also in #3196's body, corrected there at 02:50 PDT.
 Rounds 2 to 4 found defects in older entries (dangling "the HH:MM entry" pointers, a merge heading a minute late against its commit, an ancestry parenthetical left uncorrected in place) and, in growing share, in the entry each round appended to narrate its own fixes: a wrong entry named, an unmeasured line distance, a miscount, a self-description the same entry contradicted, a claim about #3196's body that went stale within the minute, and a citation of the `ums` anti-pattern for a shape it does not record.
 Those narrating entries are deleted rather than patched.

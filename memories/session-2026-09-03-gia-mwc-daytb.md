@@ -596,3 +596,11 @@ Not fully clean, so the peer-PR merge path does not apply;
 the PR is another session's and is left for the user to assign.
 The #3154 verdict for `a0922b12` and waves 2 and 3 were still running.
 Next check-in armed for 17:25 PDT.
+
+## 17:06 PDT --- #3154 round 13: the list was called the corpus
+
+The verdict for `a0922b12` left one finding: the fragment's Do bullet called the six-path list "the directories the corpus spans" and `ums` step 3 called running it grepping "the whole corpus",
+while `AGENTS.md` and `.claude/agents/` sit outside the list (the reviewer measured three keywords, each with zero hits under the paths and an owner outside them).
+Both sentences now name the list as skill-builder step 0's at `a5751eee`, the list itself stays byte-identical per #3123, and the coverage gap is filed as its own issue.
+Lesson for the fold: a fix that documents a scope failure has to state its own scope as a measured set, not as "the whole" anything;
+the entry that teaches "the word doing the damage was `memories/`, not whole" had itself written "whole corpus" two files over.

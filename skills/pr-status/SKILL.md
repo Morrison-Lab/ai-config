@@ -268,6 +268,21 @@ says -- only the human (or an explicit dismissal) resolves it. Report it as
 open and name the reviewer; don't let a later "Ready for merge" bot comment
 paper over it.
 
+**That query is deliberately narrow, and its narrowness is not the clean bar.**
+It answers one question --- whether a GitHub review *state* is blocking the merge button --- and that question is indifferent to a bot's `COMMENTED` review carrying real findings in its body, which the forge never blocks and which vetoes merge under [`fully-clean`](../../shared/workflow/fully-clean.md) all the same.
+The blind spot is about *where the finding sits*, not about who posted it or which state they picked, so run an unfiltered listing of every review's state, author, and body **before** narrowing to the state question above:
+
+```bash
+gh pr view "<N>" --json reviews \
+  --jq '.reviews[] | "\(.state) \(.author.login) \(.submittedAt) \((.body // "")[0:400])"'
+```
+
+Truncating each body keeps a long PR's review history readable;
+re-fetch the full body of any review whose head line is not plainly clean, and read a collapsed suppression block inside it as findings (see *Parse for findings before declaring clean* above).
+
+- **Do:** list every review's state and body, whoever posted it, before running the state-filtered query.
+- **Don't:** read an empty `CHANGES_REQUESTED` result as evidence that no review carries findings.
+
 A PR is only **fully clean / ready to merge** when **at least one** of the
 `@claude` comment or an external reviewer's verdict (see *Check for a
 genuine external verdict* above) is clean at the current head -- the

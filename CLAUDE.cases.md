@@ -179,6 +179,13 @@ asked.)
 (Morrison-Lab/ai-config#1054, 2026-08-03: the round-3 verdict --- **Ready for merge**, all four findings independently re-verified --- posted as `github-actions[bot]` at `03:04:19Z`.
 The login-filtered query returned the round-2 comment from `02:12:52Z` instead, so a clean PR read as unreviewed.)
 
+## Re-check for latest review findings before reporting PR status --- A bot's `COMMENTED` review is the same blind spot
+
+(Morrison-Lab/ai-config#3084, 2026-09-03: three Copilot reviews, `5098574802` among them, were submitted in state `COMMENTED` with bodies reading "Changes recommended" and their findings under a suppression block, so they produced no review thread and no inline comment object.
+The pre-merge check queried review threads, got two threads and both resolved, reported clean, and the defect reached `main`.
+This section was loaded in context throughout and did not fire, because it named "a human's `CHANGES_REQUESTED`" and the reviewer was a bot.
+Filed as [ai-config#3121](https://github.com/Morrison-Lab/ai-config/issues/3121).)
+
 ## Use the existing PR branch, not the harness-specified branch --- Prefer stacking the fix, not superseding the PR
 
 (Corrected on ai-config#493 → #498, 2026-07-05: first reflex was to supersede per the fallback below;

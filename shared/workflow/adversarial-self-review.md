@@ -169,9 +169,11 @@ Fall back to the machine inventory above for the local-CLI route,
 reading it there as a floor rather than as that route's population,
 and record the shortfall alongside the probe result.
 Record the API-key route as underivable in that repository rather than as empty.
-An underivable route is a recorded exclusion carrying its reason,
-which [`Query all available providers sequentially`](#query-all-available-providers-sequentially) already requires,
-rather than a satisfied enumeration ---
+An underivable route is a recorded exclusion carrying its reason
+rather than a satisfied enumeration,
+extending [`Query all available providers sequentially`](#query-all-available-providers-sequentially)'s
+requirement that every exclusion of a known provider be recorded with its reason
+to the case where the providers themselves cannot be named ---
 so the status names the route that could not be derived
 rather than reading as a bare block.
 
@@ -259,12 +261,15 @@ and what a single failed sweep never establishes.
   the derivation drops `agy`, and the inventory drops `gemini`.
 - **Do:** read the commenting identity's `author_association` back
   before recording a comment-triggered forge reviewer as dispatched.
-- **Do:** read an empty derivation as a missing source
+- **Do:** read an empty local-CLI derivation as a missing source
   wherever `model_adapters.py` is not in the checkout,
   fall back to the machine inventory above as a floor,
   and record the shortfall alongside the probe result.
+- **Do:** record the API-key route as underivable rather than as empty
+  wherever that file is not in the checkout,
+  since the machine inventory names no API-key variable.
 - **Do:** record an underivable route as an explicit exclusion carrying its reason,
-  per [`Query all available providers sequentially`](#query-all-available-providers-sequentially),
+  by extension from [`Query all available providers sequentially`](#query-all-available-providers-sequentially),
   and name that route in the status line.
 - **Don't:** read an empty derivation as an empty population;
   that is this section's own thesis failing on the section itself.
@@ -287,6 +292,9 @@ and what a single failed sweep never establishes.
   so a bare "blocked on reviewer availability" over it is the unenumerated claim again.
 - **Don't:** record a comment-triggered forge reviewer as dispatched on a posted mention alone;
   an `author_association` allowlist skips the job with no error.
+- **Don't:** read the three forge-side rows as that route's population;
+  a repository can carry a review workflow this table does not name,
+  so derive the rows from its own `on:` blocks and rulesets rather than from this list.
 - **Don't:** treat the machine inventory above as the provider population, since a forge-side reviewer cannot appear in it.
 - **Don't:** record a withheld provider as available,
   or read its row as licence to dispatch it.

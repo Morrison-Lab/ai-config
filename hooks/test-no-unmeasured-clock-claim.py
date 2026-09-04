@@ -55,6 +55,29 @@ CAPTURED_AND_PRINTED = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "id": "call_both", "input": {
         "command": "stamp=$(date +%s); "
                    "TZ=America/Los_Angeles date '+%H:%M %Z'"}}]}}
+# The captured value echoed into a file rather than to the transcript.
+CAPTURED_ECHO_APPEND = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_appd", "input": {
+        "command": "t=$(TZ=America/Los_Angeles date \"+%H:%M %Z\"); "
+                   "echo \"## $t\" >> notebook.md"}}]}}
+CAPTURED_PRINTF_APPEND = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_prtf", "input": {
+        "command": "t=$(TZ=America/Los_Angeles date \"+%H:%M %Z\"); "
+                   "printf '%s' \"$t\" >> notebook.md"}}]}}
+# The same heading, with no intermediate variable.
+HEREDOC_DATE = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_here", "input": {
+        "command": "cat >> notebook.md <<EOF\n"
+                   "## $(TZ=America/Los_Angeles date \"+%H:%M %Z\") --- checkpoint\nEOF"}}]}}
+# A read whose own stdout is redirected into a file.
+REDIRECTED_DATE = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_redir", "input": {
+        "command": "TZ=America/Los_Angeles date \"+%H:%M %Z\" >> notebook.md"}}]}}
+# A heredoc that prints, because nothing redirects it.
+HEREDOC_PRINTED = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_hprt", "input": {
+        "command": "cat <<EOF\n"
+                   "## $(TZ=America/Los_Angeles date \"+%H:%M %Z\")\nEOF"}}]}}
 
 
 def result(tool_use_id, content):
@@ -329,6 +352,20 @@ CASES = [
     ([CAPTURED_DATE, result("call_other", "00:59 PDT"),
       say("Recap: 00:59 PDT")], True,
      "#2991: another call's output is not this read's output"),
+    ([CAPTURED_ECHO_APPEND, result("call_appd", ""), say("Recap: 01:07 PDT")],
+     True,
+     "#2991: an echo of the captured value into a file is not a print"),
+    ([CAPTURED_PRINTF_APPEND, result("call_prtf", ""), say("Recap: 01:07 PDT")],
+     True,
+     "#2991: printf into a file is not a print either"),
+    ([HEREDOC_DATE, result("call_here", ""), say("Recap: 01:07 PDT")], True,
+     "#2991: a read inside a redirected heredoc body never reaches the "
+     "transcript"),
+    ([REDIRECTED_DATE, result("call_redir", ""), say("Recap: 01:07 PDT")], True,
+     "#2991: a read whose own stdout goes to a file is not a reading"),
+    ([HEREDOC_PRINTED, say("Recap: 01:07 PDT")], False,
+     "#2991: an unredirected heredoc puts the read on stdout, so it "
+     "discharges"),
 ]
 
 

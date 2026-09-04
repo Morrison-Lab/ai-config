@@ -123,11 +123,21 @@ RX_CLOCK_READ = re.compile(
 # clock read, never to arbitrary tool output.
 RX_VISIBLE_TIME = re.compile(r"\b(?:[01]?\d|2[0-3]):[0-5]\d\b")
 
-# A command substitution, in either spelling.
-RX_SUBSTITUTION = re.compile(r"\$\([^()]*\)|`[^`]*`")
-
 # `VAR=$(...)` / ``VAR=`...` `` -- the shape that hides a reading in a variable.
 RX_CAPTURE_ASSIGN = re.compile(r"([A-Za-z_]\w*)=(\$\([^()]*\)|`[^`]*`)")
+
+# A heredoc operator and its delimiter word, quoted or not.
+RX_HEREDOC = re.compile(r"""<<-?\s*(['"]?)(\w+)\1""")
+
+# Stdout sent to a file, rather than to the transcript. Excludes stderr
+# (`2>`) and a descriptor duplication (`>&2`).
+RX_STDOUT_REDIRECT = re.compile(r"(?<![0-9&<>])>>?\s*(?![&>])\S")
+
+# Where one command in a compound command ends and the next begins.
+RX_SEGMENT_SPLIT = re.compile(r";|&&|\|\|")
+
+# `echo`/`printf` of a captured variable, which puts the value back on stdout.
+RX_PRINTED_VAR = r"\b(?:echo|printf|print)\b[^;&|\n]*\$\{?%s\b"
 
 # The harness's own injected reading. Quoting this is correct, so it counts as
 # a measurement -- otherwise the guard would fire on the one case the rule
@@ -199,30 +209,64 @@ def _skew(claimed, measured):
     return diff - 1440 if diff > 720 else diff
 
 
-def _capture_only(command):
-    """True when every clock read in `command` is captured and never printed.
+def _split_command(command):
+    """`[(segment, heredoc bodies fed by that segment), ...]`.
 
-    The target is `t=$(TZ=... date ...)` followed by a redirect into a file: the
-    reading happens, and nothing about it reaches the transcript. A second,
-    bare read elsewhere in the same command still prints, and so does an
-    `echo`/`printf` of the captured variable -- either one makes the value
-    quotable, which is all this guard asks for.
+    A heredoc body is lifted out of the command text and attached to the
+    segment whose redirection decides where its expansions go, so a `date`
+    inside one is not read as a command of its own.
     """
+    lines = command.split("\n")
+    kept = []
+    bodies_at = {}
+    i = 0
+    while i < len(lines):
+        idx = len(kept)
+        kept.append(lines[i])
+        for m in RX_HEREDOC.finditer(lines[i]):
+            i += 1
+            body = []
+            while i < len(lines) and lines[i].strip() != m.group(2):
+                body.append(lines[i])
+                i += 1
+            bodies_at.setdefault(idx, []).append("\n".join(body))
+        i += 1
+    out = []
+    for idx, line in enumerate(kept):
+        parts = RX_SEGMENT_SPLIT.split(line)
+        for k, part in enumerate(parts):
+            last = k == len(parts) - 1
+            out.append((part, bodies_at.get(idx, []) if last else []))
+    return out
+
+
+def _capture_only(command):
+    """True when `command` reads the clock and no read's value reaches stdout.
+
+    A value reaches stdout when a segment carrying the read, or an
+    `echo`/`printf` of the variable holding it, is not redirected to a file.
+    """
+    segments = _split_command(command)
     captured = set()
-    for m in RX_CAPTURE_ASSIGN.finditer(command):
-        if RX_CLOCK_READ.search(m.group(2)):
-            captured.add(m.group(1))
-    if not captured:
-        return False
-    remainder = RX_SUBSTITUTION.sub(" ", command)
-    if RX_CLOCK_READ.search(remainder):
-        return False
-    for var in captured:
-        printed = re.compile(
-            r"\b(?:echo|printf|print)\b[^;&|\n]*\$\{?" + re.escape(var) + r"\b")
-        if printed.search(remainder):
-            return False
-    return True
+    for segment, _ in segments:
+        for m in RX_CAPTURE_ASSIGN.finditer(segment):
+            if RX_CLOCK_READ.search(m.group(2)):
+                captured.add(m.group(1))
+    saw_read = bool(captured)
+    for segment, bodies in segments:
+        prints = not RX_STDOUT_REDIRECT.search(segment)
+        rest = RX_CAPTURE_ASSIGN.sub(" ", segment)
+        if RX_CLOCK_READ.search(rest) or any(
+                RX_CLOCK_READ.search(body) for body in bodies):
+            saw_read = True
+            if prints:
+                return False
+        if not prints:
+            continue
+        for var in captured:
+            if re.search(RX_PRINTED_VAR % re.escape(var), rest):
+                return False
+    return saw_read
 
 
 def _result_text(block):

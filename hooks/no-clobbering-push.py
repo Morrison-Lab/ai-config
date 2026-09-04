@@ -448,13 +448,20 @@ def _simple_commands(cmd):
                 cmds.append((scopes[-1], cur, sep, trailing))
                 cur = []
                 sep = ""
+            frozen = False
             for ch in t:
                 if ch == "(":
                     opened += 1
                     scopes.append(scopes[-1] + (opened,))
                 elif ch == ")" and len(scopes) > 1:
                     scopes.pop()
-                sep = _next_sep(sep, ch)
+                if ch in "()":
+                    sep, frozen = "", False
+                elif not frozen:
+                    if sep and ch != sep[-1]:
+                        frozen = True
+                    else:
+                        sep = _next_sep(sep, ch)
         else:
             cur.append(t)
     if cur:

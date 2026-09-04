@@ -619,6 +619,18 @@ def background_list_cd_case(path, bare):
     return f"cd {wt} && true & git push origin HEAD:peer-bg-list"
 
 
+def alternative_cd_newline_case(path, bare):
+    """S24 with the `||` at the END OF A LINE, so the run is `||;`."""
+    wt = _diverged_peer_worktree(path, "peer-alt-nl")
+    return f"true ||\ncd {wt}\ngit push origin HEAD:peer-alt-nl"
+
+
+def pipeline_rhs_cd_newline_case(path, bare):
+    """S31 with the `|` at the END OF A LINE, so the run is `|;`."""
+    wt = _diverged_peer_worktree(path, "peer-pipe-rhs-nl")
+    return f"echo x |\ncd {wt}\ngit push origin HEAD:peer-pipe-rhs-nl"
+
+
 def pipeline_rhs_cd_case(path, bare):
     """`echo x | cd <worktree>; git push` -- the same fork read from the other
     side, where the `|` PRECEDES the `cd` rather than following it."""
@@ -855,6 +867,12 @@ SHOULD_STAY_SILENT = [
     ("S35", background_list_cd_case,
      "`cd <worktree> && true & git push` -- the `&` backgrounds the whole "
      "AND-OR list"),
+    ("S36", alternative_cd_newline_case,
+     "`true ||` at the end of a line -- the newline joins the alternative "
+     "into one punctuation run"),
+    ("S37", pipeline_rhs_cd_newline_case,
+     "`echo x |` at the end of a line -- the same run with the fork operator "
+     "before the `cd`"),
 ]
 
 
@@ -992,9 +1010,10 @@ def verdict(hook_path, repo, command, case_id=None, payload_cwd=None):
 #
 # This is not a shortcut: the guard is read-only by construction (`ls-remote`,
 # `rev-parse`, `merge-base`, `cat-file`, `log`), so no variant can leave a
-# fixture in a state a later variant would see. Rebuilding per variant cost
-# 32 x 17 = 544 repo-plus-bare-remote constructions and pushed the suite past
-# two minutes; building once costs 32 and loses nothing.
+# fixture in a state a later variant would see. Rebuilding per variant cost one
+# repo-plus-bare-remote PAIR per case and per mutation clause, which pushed the
+# suite past two minutes; building once costs one pair per case and loses
+# nothing.
 _BUILT = {}
 
 
@@ -1224,7 +1243,7 @@ MUTATIONS = {
         "pipeline element -- makes the directory indeterminate rather than "
         "moving it",
         [('BRANCH_SEPS = {"||", "|"}', "BRANCH_SEPS = set()")],
-        {"S24", "S31"},
+        {"S24", "S31", "S36", "S37"},
     ),
     "forked_cd_declines": (
         "a `cd` the shell forks into a subshell of its own -- backgrounded, "
@@ -1238,10 +1257,25 @@ MUTATIONS = {
     "separator_is_tracked": (
         "each simple command carries the operator before it, which is what "
         "tells an `||` alternative from an `&&` chain",
-        [("                sep = _next_sep(sep, ch)", "                pass")],
+        [("                        sep = _next_sep(sep, ch)",
+          "                        pass")],
         # S23, S27 and S28 cannot see this: their decline comes from the
         # region an `if` opened, which no separator reports.
-        {"S24", "S31"},
+        {"S24", "S31", "S36", "S37"},
+    ),
+    "separator_reads_the_first_operator": (
+        "the leading punctuation run reports the operator it STARTS with, so "
+        "the `;` a newline leaves behind cannot overwrite the `||` or `|` "
+        "before it",
+        [("                    if sep and ch != sep[-1]:\n"
+          "                        frozen = True\n"
+          "                    else:\n"
+          "                        sep = _next_sep(sep, ch)",
+          "                    sep = _next_sep(sep, ch)")],
+        # Only the end-of-line spelling can see this: S24 and S31 write the
+        # operator and the `cd` on one line, so their runs are single
+        # characters.
+        {"S36", "S37"},
     ),
     "trailing_separator_is_tracked": (
         "each simple command also carries the operator after it, which is the "

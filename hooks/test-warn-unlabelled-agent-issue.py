@@ -29,6 +29,9 @@ BASH_FIRES = [
     ("glab issue create", 'glab issue create --title "t" --description "b"'),
     ("a different label only", 'gh issue create --title "t" --label bug'),
     ("command-substitution capture", 'URL=$(gh issue create --title "t" --body "b")'),
+    ("backtick command-substitution capture", 'URL=`gh issue create --title "t" --body "b"`'),
+    ("a label that only contains the authorship label", 'gh issue create --title "t" --label ai-authored-improvement'),
+    ("a model label that only contains the authorship label", 'gh issue create --title "t" --label "model:not-ai-authored-review"'),
     ("after &&", 'git status && gh issue create --title "t" --body "b"'),
     ("after a newline", 'set -e\ngh issue create --title "t" --body "b"'),
     ("env-assignment prefix", 'GH_TOKEN=x gh issue create --title "t"'),
@@ -71,6 +74,8 @@ BASH_QUIET = [
     ("labelled with -l and a quoted pair", 'gh issue create -l "ai-authored,model:x"'),
     ("labelled with --labels=", 'gh issue create --labels=ai-authored,model:x'),
     ("unbalanced quoting falls back to the regex", 'gh issue create --label ai-authored --title "t'),
+    ("the command quoted inline-code-style inside single quotes",
+     "git commit -m 'mentions of `gh issue create` in prose'"),
     ("not a create at all", "gh issue list --state all --search 'x'"),
     ("editing labels on an existing issue", 'gh issue edit 12 --add-label ai-authored'),
     ("a PR create", 'gh pr create --title "t" --body "b"'),
@@ -86,6 +91,11 @@ BASH_QUIET = [
 ]
 
 MCP_FIRES = [
+    (
+        "issue_write create with a label that only contains the authorship label",
+        "mcp__github__issue_write",
+        {"method": "create", "labels": ["ai-authored-improvement", "model:x"]},
+    ),
     ("issue_write create, no labels", "mcp__github__issue_write", {"method": "create", "title": "t"}),
     (
         "issue_write create, other labels",

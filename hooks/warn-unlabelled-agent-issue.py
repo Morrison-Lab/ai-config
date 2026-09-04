@@ -79,10 +79,11 @@ import shlex
 import sys
 
 # `gh issue create` / `glab issue create` at a command position. The separator
-# class includes `(` and `{` so `URL=$(gh issue create ...)` is a real create,
-# matching warn-pr-create-without-dupe-check.py's RX_ISSUE_CREATE.
+# class includes `(`, `{`, and the backtick so `URL=$(gh issue create ...)` and
+# URL=`gh issue create ...` are real creates, matching
+# warn-pr-create-without-dupe-check.py's RX_ISSUE_CREATE.
 RX_ISSUE_CREATE = re.compile(
-    r"(?:^|[;&|\n({])\s*"
+    r"(?:^|[;&|\n({`])\s*"
     r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
     r"(?:gh\s+issue\s+create|glab\s+issue\s+create)\b",
     re.MULTILINE,
@@ -97,6 +98,24 @@ RX_HEREDOC = re.compile(
 )
 
 AUTHORSHIP_LABEL = "ai-authored"
+
+
+def carries_authorship(value: str) -> bool:
+    """True when a label VALUE (one flag argument, possibly comma-joined) carries
+    the authorship label as a whole token. A substring match would let
+    `ai-authored-improvement` or `model:not-ai-authored` discharge the reminder."""
+    return AUTHORSHIP_LABEL in [part.strip() for part in value.split(",")]
+
+
+# Inside single quotes nothing is a command: a commit message or echo that
+# quotes `gh issue create` inline-code-style must not read as a create at
+# command position. Double-quoted spans stay, since a backtick runs there.
+RX_SINGLE_QUOTED = re.compile(r"'[^']*'")
+
+
+def strip_single_quoted(command: str) -> str:
+    """Blank single-quoted spans before position matching, keeping length."""
+    return RX_SINGLE_QUOTED.sub(lambda m: "'" + " " * (len(m.group(0)) - 2) + "'", command)
 
 LABEL_FLAGS = ("--label", "--labels", "-l")
 
@@ -144,15 +163,15 @@ def labels_authorship(command: str) -> bool:
     try:
         tokens = shlex.split(command)
     except ValueError:
-        return any(AUTHORSHIP_LABEL in v for v in RX_LABEL_FLAG.findall(command))
+        return any(carries_authorship(v) for v in RX_LABEL_FLAG.findall(command))
     for index, token in enumerate(tokens):
         for flag in LABEL_FLAGS:
             if token == flag:
                 following = tokens[index + 1] if index + 1 < len(tokens) else ""
-                if AUTHORSHIP_LABEL in following:
+                if carries_authorship(following):
                     return True
             elif token.startswith(flag + "="):
-                if AUTHORSHIP_LABEL in token[len(flag) + 1:]:
+                if carries_authorship(token[len(flag) + 1:]):
                     return True
     return False
 
@@ -162,7 +181,7 @@ def evaluate_bash(command: str) -> str | None:
     if not command:
         return None
     stripped = strip_heredocs(command)
-    if not RX_ISSUE_CREATE.search(stripped):
+    if not RX_ISSUE_CREATE.search(strip_single_quoted(stripped)):
         return None
     if labels_authorship(stripped):
         return None
@@ -188,7 +207,7 @@ def evaluate_mcp(tool_name: str, tool_input: dict) -> str | None:
     method = tool_input.get("method")
     if tool_name == "mcp__github__issue_write" and method != "create":
         return None
-    if any(AUTHORSHIP_LABEL in value for value in _label_values(tool_input)):
+    if any(carries_authorship(value) for value in _label_values(tool_input)):
         return None
     return NOTE
 

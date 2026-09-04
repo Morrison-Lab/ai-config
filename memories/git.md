@@ -233,18 +233,10 @@ that three commits were "fetchable from no remote ref",
 when every one of them was an ancestor of a ref that `origin` still advertised.
 
 **`git fetch origin <sha>` takes the full 40-character SHA and nothing shorter.**
-That is git's own resolution rather than a server policy:
-a non-40-hex argument is resolved as a ref name and never as a `want`
-(on protocol v2 as an `ls-refs` query whose answer carries no match,
-on v0 against the advertisement the server sends unsolicited, with no request packet at all),
-so the match fails client-side
-(`GIT_TRACE_PACKET=1` on v2 shows `fetch> ref-prefix eb0cf15e` and no `want` line),
-while a 40-hex object the remote will not serve is refused by the server,
-and the two error messages are what tell the cases apart
-(both shapes measured on git 2.43.0 against GitHub and against a plain local-path remote).
+A non-40-hex argument is resolved as a ref name, never as a `want`,
+so the failure is git's own and says nothing about whether the commit is on the remote.
 A short SHA fails with `fatal: couldn't find remote ref <sha>`,
-and it fails the same way for a commit that is the tip of an advertised ref,
-so the failure carries no information about reachability.
+and it fails the same way for a commit that is the tip of an advertised ref.
 The same fetch with the full SHA succeeds on GitHub for any commit reachable on the server,
 which is [`claude-code-consumer-wiring`](claude-code-consumer-wiring.md)'s
 "any reachable commit" note from the other side.
@@ -262,30 +254,20 @@ fatal: remote error: upload-pack: not our ref 0000000000000000000000000000000000
 So the fetch's own error text is the test:
 `couldn't find remote ref` means the argument was not a ref name (retry with all 40 characters),
 and `upload-pack: not our ref` means the remote would not serve that object.
-`upload-pack: not our ref` is what a server returns once a `want` reaches it, on either protocol version;
-a plain local-path remote on protocol v0 says `Server does not allow request for unadvertised object` instead,
-and neither wording means the object is absent:
-`not our ref` is the server refusing a `want`,
-while `Server does not allow request for unadvertised object` is git declining to send one,
-because that remote's advertisement carried no `allow-*-sha1-in-want` capability.
-On protocol v2 git always sends the `want`;
-on v0 it sends one only when the advertisement offers the capability,
-which GitHub does (`allow-tip-sha1-in-want`, `allow-reachable-sha1-in-want`) and a plain local-path remote does not
-(`GIT_TRACE_PACKET=1` shows one request `want` packet against GitHub on either version,
-spelled `fetch-pack> want` on v0 and `fetch> want` on v2,
-and none against the local-path remote on v0, where git sends no request packet at all).
-v2 has been git's default since 2.29 (2.26 promoted it and 2.27 demoted it, per git's release notes),
-so v2 is what a reader hits unless a config sets `protocol.version`.
+GitHub returns the second string on protocol v2 and v0 alike.
+A plain local-path remote on v0 says `Server does not allow request for unadvertised object` instead,
+because its advertisement carries no `allow-*-sha1-in-want` capability and git refuses before sending a `want`.
+Neither wording means the object is absent.
 
 **`git merge-base --is-ancestor A B` and `git rev-list --count B`
 on a shallow clone answer for the fetched depth.**
-`git rev-list --count f9068299` returned 1 in the incident's clone,
-where a walk from that tip has 33 commits above `main` alone
-(`git rev-list --count origin/main..f9068299` returns 33 in a shallow clone and a full one alike,
-because that range is bounded by `origin/main` rather than by the walk),
+In the incident's clone `git rev-list --count f9068299` returned 1
 and `--is-ancestor` returned non-zero for three real ancestors,
 because the walk stopped at the graft
 (the section above on `git log -S` describes the same stop).
+A ranged count is bounded the same way:
+`origin/main..f9068299` walks from the tip and excludes only the `main` history the clone holds,
+so it returned 1 in that clone too.
 `git fetch --depth=200 origin refs/pull/3060/head` made `--is-ancestor` succeed for all three,
 so the earlier answer was about what had been fetched.
 

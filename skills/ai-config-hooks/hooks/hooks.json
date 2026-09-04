@@ -512,6 +512,37 @@
               "Agent|Task|SendMessage briefs are prose with no command structure, so",
               "they use an unanchored pattern instead."
             ]
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/flag-positional-figure-in-commit-message.py\"'",
+            "timeout": 10,
+            "script": "flag-positional-figure-in-commit-message.py",
+            "why": "shared/writing/timestamp-volatile-claims.md, commit-message surface. Warns, never blocks, when a `git commit` message about to be written states a positional or dimensional figure about text -- \"13 lines above\", \"39 lines below\", \"77 lines earlier\", \"~130 lines later\", \"the 60-to-80 range\". A commit message is permanent history, so such a figure is asserted once and re-derived by nobody: true when typed, false as soon as anything above it changes, and never contradicted by a failing check. Measured on this repository's own history (re-derived 2026-09-03): the pattern matches 14 of 2412 commits (15 occurrences) and every one is decoration locating a passage, with no legitimate code-move description among them -- e.g. 4e1dea144, 593d25ccf, fcb4ee10d, f2f706fa1, 60edf4c1e, 0709c1a28. The warning says to DELETE the number rather than correct it, since naming the target beats counting to it and a recounted figure is a fresher instance of the same defect.",
+            "_note_scope_is_deliberately_narrow": [
+              "A bare dimensional count with no positional word is NOT matched.",
+              "Measured against the same 2412 commits, `\\d+ (characters|chars|words)`",
+              "alone matches 53, and they are overwhelmingly legitimate measured",
+              "facts -- a skill-listing context budget, GitHub's 65536-character",
+              "comment cap, a line length against the style guide. Warning on those",
+              "is the noise that costs a warn-only hook its credibility, so a",
+              "dimensional figure fires only alongside above/below/earlier/later.",
+              "Diffstats (`3 files changed`), version numbers, issue and PR numbers,",
+              "SHAs, dates and clock times are all out of scope for the same reason.",
+              "",
+              "`commit(?![\\w-])`, not `commit\\b`, per no-unshipped-commit.py: a word",
+              "boundary sits happily between `commit` and `-`, so `\\b` matches",
+              "`git commit-tree` and `git commit-graph write`, neither of which",
+              "writes a commit message at all."
+            ],
+            "_note_fails_silent": [
+              "Every parse failure -- unbalanced quotes, an unreadable or stdin `-F`",
+              "target, an unrecognised payload shape -- returns with no output. A",
+              "commit is the worst thing for a hook to break, and a missed warning",
+              "costs one stale figure in one commit message. An unreadable `-F` also",
+              "abandons the whole segment rather than judging the `-m` fraction it",
+              "can see, so the warning never asserts more than it observed."
+            ]
           }
         ]
       },

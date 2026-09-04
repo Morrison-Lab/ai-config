@@ -234,8 +234,16 @@ def check_missing_body_file():
     """A missing or stdin `-F` target fails silent, never loud."""
     missing = run(bash("git commit -F /nonexistent/path/to/msg-13-lines-above.txt"))
     stdin = run(bash("git commit -F -"))
-    ok = not fired(missing) and not fired(stdin)
-    print(f"{'ok  ' if ok else 'FAIL'}  an unreadable or stdin -F target is silent")
+    # An unreadable -F abandons the whole segment rather than judging the
+    # fraction of the message it CAN see: the figure may well live in the
+    # part that stayed invisible, so a verdict drawn from the rest would be
+    # asserting more than was observed. Pins the branch -- treating the
+    # unreadable file as empty text would let the -m half fire here.
+    partial = run(bash('git commit -F /nonexistent/msg.txt '
+                       '-m "the note 13 lines above"'))
+    ok = not fired(missing) and not fired(stdin) and not fired(partial)
+    print(f"{'ok  ' if ok else 'FAIL'}  an unreadable or stdin -F target is "
+          f"silent, and abandons the segment rather than judging part of it")
     return 0 if ok else 1
 
 

@@ -87,7 +87,8 @@ The forge is the one place a later session, a reviewer, and the user all
 already look, so it is where the pick-up state belongs.
 Route by what the work actually has:
 
-- **An open PR/MR** --- comment on it, in the paused-claim form below.
+- **An open PR/MR you've claimed, still in scope** --- comment on it, in the
+  paused-claim form below; otherwise route the handoff to the issue.
 - **An issue and no PR/MR** --- comment on the issue.
 - **Neither** --- file an issue whose body is the handoff, per
   [`issue-first`](../../shared/workflow/issue-first.md).

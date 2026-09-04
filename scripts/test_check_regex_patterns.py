@@ -127,6 +127,19 @@ def test_dynamic_probes() -> None:
         f"findings: {findings!r}",
     )
 
+    # Catastrophic backtracking pattern in copy-pasted _GIT_FLAGS (Issue #3172)
+    git_flags_vulnerable = (
+        r"(?:^|[;&|\n])\s*(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*git\s+"
+        r"(?:-(?:C\s*\S+|c\s*\S+|[a-zA-Z0-9_-]+(?:=\S*)?)\s+|--[a-zA-Z0-9_-]+(?:=\S*)?\s+)*"
+        r"commit(?![\w-])"
+    )
+    git_flags_findings = mod.check_dynamic_probes(git_flags_vulnerable, timeout=0.15)
+    check(
+        "dynamic probe detects catastrophic backtracking in unanchored _GIT_FLAGS alternatives",
+        any(f.kind == "dynamic_backtracking_timeout" for f in git_flags_findings),
+        f"findings: {git_flags_findings!r}",
+    )
+
     # Safe pattern passes dynamic probe quickly
     safe_pat = r"Reviewed-Commit:\s*[a-f0-9A-F]+"
     safe_findings = mod.check_dynamic_probes(safe_pat, timeout=0.15)

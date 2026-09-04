@@ -48,41 +48,61 @@ The squash message did.
   ([`issue-first.md`](../shared/workflow/issue-first.md)).
   The author here was trying *not* to close.
 
-## A branch whose commits carry only `Refs` closes nothing at merge time, whatever the brief said
+## A `Refs` on a branch is a decision to read, not a gap to fill
 
-The mirror of the #1718 case above: a branch whose commits carry only
-`Refs #N` leaves #N open when the PR squash-merges, and a brief that asserts
-"the branch's first commit already carries the closing keyword" does not
-make it so.
+The mirror of the #1718 case above.
+There a keyword the author did not want reached `main` through the squash
+body; here a keyword the merger expected was absent, and the absence was
+right.
+
+What closes an issue at squash-merge time is the squash body as entered
+plus the PR body, both parsed.
+The branch's commit messages reach the parser only through the default
+squash body, which this repo builds by concatenating them
+(`squash_merge_commit_message` read as `COMMIT_MESSAGES` on 2026-09-04),
+and a body written by hand at merge time replaces that concatenation
+entirely.
+So a grep over the branch answers what the *default* body would carry, and
+the body actually entered is what to read once it exists.
+
 Measured 2026-09-04 on the six wave-1 PRs of the r5 fix loop
-(ai-config#3203): the fixer brief carried that assertion for every branch,
-and `git log --format=%B origin/main..HEAD | grep -nE '^(Closes|Fixes|Resolves|Refs) #'`
-showed `Refs` and no closing keyword on two of the six: issue #3068 under
-PR #3211, and issue #3102 under PR #3215.
-Both merged with their issues open.
-Issue #3102 stayed open because only half its scope had shipped, which the
-`Refs` had been right about.
-Issue #3068 was closed by hand on the strength of two of its three "done
-when" items and reopened the same hour, because the first item is a
-live-session observation the branch's own commits say it cannot supply;
-a merged diff that satisfies some of an issue's acceptance items is a
-`Refs`, not a close.
+(ai-config#3203).
+The fixer brief asserted for every branch that its first commit already
+carried the closing keyword.
+That was false from the start for `fix/3102-memory-size-approach`, whose
+nine commits carry `Refs #3102` throughout because PR #3215 shipped one of
+the issue's two parts.
+It was true when written for `fix/3068-flag-cd-stderr` and stale by merge
+time: commit `78fda241` on that branch reworded the keyword out on purpose,
+because the issue's first "done when" item (the warning surfaces in a live
+session) is one the branch cannot meet.
+Both PRs merged with hand-written squash bodies carrying `Refs`, and both
+issues stayed open, which was the intended outcome in each case.
+The mistake came after: issue #3068 was closed by hand on the strength of
+the test item plus an item the issue marks optional, and reopened twenty
+minutes later once the branch's own commit was read.
 
-- **Do:** before opening the PR, grep every commit on the branch for a
-  closing keyword, since a default squash body concatenates all of them:
-  `git log --format=%B origin/main..HEAD | grep -nE '^(Closes|Fixes|Resolves) #'`;
-  then put the keyword the PR body needs in the body itself, scoped per
-  [`issue-first.md`](../shared/workflow/issue-first.md).
-- **Do:** after a squash merge, read the issue's state rather than the
-  PR's, and close by hand only when every acceptance item is met by the
-  merged diff, with a comment naming the merge.
+Pattern and anti-pattern for this case, apart from the file-wide list
+below:
+
+- **Do:** before opening the PR, read what the branch's commits would
+  contribute to a default squash body, with a case-insensitive grep over
+  every spelling the parser accepts:
+  `git log --format=%B origin/main..HEAD | grep -niE '(close[sd]?|fix(es|ed)?|resolve[sd]?):? *#[0-9]+'`;
+  then put whatever keyword the merge should carry in the PR body, scoped
+  per [`issue-first.md`](../shared/workflow/issue-first.md), and read the
+  squash body you enter at merge time as the surface that decides.
+- **Do:** when a branch carries `Refs` where a `Closes` was expected, read
+  its commit messages for the reason before treating the absence as an
+  omission; a keyword removed on purpose names the acceptance item it
+  cannot meet.
+- **Do:** close an issue by hand only when every required acceptance item
+  is met by the merged diff, with a comment naming the merge.
 - **Don't:** assert in a brief that a commit carries a closing keyword the
-  brief's author never read;
-  the assertion reads as a premise the recipient cannot check without the
-  same command.
-- **Don't:** close an issue by hand because its PR merged, or because most
-  of its acceptance items are met;
-  an unmet item keeps it open.
+  brief's author never read, or read once and never re-read after the
+  loop rewrote history.
+- **Don't:** close an issue by hand because its PR merged, or because the
+  required items that remain unmet are the hard ones.
 
 ## Do / Don't
 

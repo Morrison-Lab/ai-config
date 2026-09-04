@@ -199,7 +199,7 @@ Morrison-Lab/ai-config#1174.)
 
 The section above routes between repos;
 the same miss happens inside one repo
-when the dupe check is scoped to a directory that does not hold the file owning the rule.
+when the dupe check is scoped to a directory that does not hold the file already owning the idea being recorded.
 
 - **Do:** grep [`skill-builder`](../../skills/skill-builder/SKILL.md) step 0's path list,
   not only the directory the destination sits in.
@@ -209,7 +209,7 @@ when the dupe check is scoped to a directory that does not hold the file owning 
 (Recorded 2026-09-03 on [ai-config#3060](https://github.com/Morrison-Lab/ai-config/pull/3060),
 where a markdownlint entry was added to `memories/markdownlint.md`
 while `shared/writing/semantic-line-breaks.md` already covered the same rule in three regions
-(a bare `#NNNN` at column 0 parses as an ATX heading, markdownlint's MD018),
+(a bare `#NNNN` at column 1 parses as an ATX heading, markdownlint's MD018),
 at `3935bfff` (`origin/main` before #3060 merged) and unchanged at `2156b439` (its squash merge):
 `git grep -n MD018 3935bfff -- shared/writing/semantic-line-breaks.md` and the same query at `2156b439` return the same five lines ---
 274, 288, 295, 861 and 995 ---
@@ -228,9 +228,9 @@ The same `memories/` query returns four at `2156b439`:
 the three above plus `memories/markdownlint.md`, the file the entry was added to,
 where the entry is a cross-link to the owner rather than a restatement ---
 so the count rose by one either way, and a hit count cannot tell an owner from a pointer.
-Of the branch's own commits, only its final head survives on `origin`, as `refs/pull/3060/head` (`f9068299`);
-the earlier commits this record first cited are fetchable from no remote ref,
-which is why this record anchors on `main` refs only.
+The branch's own commits are still reachable on `origin` from `refs/pull/3060/head` (`f9068299`),
+which a default fetch does not bring down and a shallow clone cannot walk;
+this record anchors on `main` refs, which every clone carries.
 Note also why the wrong-corpus section's `Do` could not have caught it.
 It reads "grep the ai-config corpus as well as the destination repo's docs,
 whenever step 2 routes an item anywhere other than ai-config",

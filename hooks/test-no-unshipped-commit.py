@@ -751,6 +751,40 @@ try:
         "git checkout agy-dormant && git log -1",
         "git checkout - && git commit -m mine",
     ])
+    # The whole round trip in ONE call. Supersession is decided by the LAST
+    # head-moving command before the commit, not by all of them at once:
+    # unioning every match let the named checkout outvote the `git checkout -`
+    # that superseded it, so the branch the session only inspected claimed the
+    # commit anyway --- ai-config#2422's own false block, spelled inline.
+    checkout_back_whole_round_trip = transcript([
+        "git checkout agy-dormant && git log -1 && git checkout - && git commit -m mine",
+    ])
+    # The same two head-moving commands in one EARLIER call, with the commit
+    # in the next one. The carry has to fold in source order too, or the
+    # inspected branch survives the return and is carried into the commit.
+    checkout_back_two_moves_earlier = transcript([
+        "git checkout agy-dormant && git log -1 && git checkout -",
+        "git commit -m mine",
+    ])
+    # The `git checkout <base> && git pull --ff-only && git checkout -b <new>`
+    # opening this corpus writes constantly. The shell ends on the new branch,
+    # so the base must not be carried into the commit --- a base that happens
+    # to sit ahead of its upstream would otherwise block every Stop in the
+    # session over a branch nothing was committed on. `agy-dormant` stands in
+    # for that ahead-of-upstream base, since this repo's `main` is pushed.
+    base_then_new_branch = transcript([
+        "git checkout agy-dormant && git pull --ff-only && git checkout -b fix-x",
+        "git commit -m mine",
+    ])
+    # `git worktree add -b` creates the branch in a SECOND checkout and leaves
+    # this shell's HEAD where it stood, so its name is ADDITIVE. Reading it as
+    # a replacement dropped the branch the commit actually landed on --- a
+    # fail-open on a real unshipped commit --- and named one the shell never
+    # entered in its place.
+    worktree_add_b_keeps_branch = transcript([
+        "git checkout agy-dormant && git log -1",
+        f"git worktree add -b side {gone_wt}-side main && git commit -m mine",
+    ])
     # `git branch` names a branch without switching to it, so a commit that
     # follows one lands wherever the shell already stood. Reading these as
     # switches made `git branch -d agy-dormant` --- the cleanup a
@@ -925,6 +959,33 @@ try:
         # the commit, not only whole earlier calls.
         assert subject.decide(dormant_root, checkout_back_same_call) == "", \
             "`git checkout - && git commit` must supersede the inspected branch (ai-config#2422)"
+        # The fold is applied in SOURCE order across both sources, which is
+        # what a `decide` fixture cannot show: a clearing switch AFTER a
+        # `git worktree add -b` empties the created name too, while one
+        # BEFORE it leaves that name standing. Grouping the two patterns and
+        # unioning the worktree names last makes these two agree, and the
+        # disagreement is the whole content of the ordering.
+        assert subject.branches_after(
+            "git worktree add -b side /tmp/s main && git checkout -",
+            {"feature"}) == set(), "a clearing switch after the add empties it too"
+        assert subject.branches_after(
+            "git checkout - && git worktree add -b side /tmp/s main",
+            {"feature"}) == {"side"}, "an add after the clear still names its branch"
+        # The whole round trip in one call, and the same two moves in one
+        # earlier call: the LAST move before the commit decides, so the
+        # inspected branch is superseded in both spellings.
+        for _name, _t in (("one call", checkout_back_whole_round_trip),
+                          ("two moves, earlier call", checkout_back_two_moves_earlier)):
+            assert subject.decide(dormant_root, _t) == "", \
+                f"`git checkout -` must supersede an earlier named checkout ({_name}, ai-config#2422)"
+        # A base branch checked out, pulled, and then left for a new branch is
+        # not the branch the commit lands on.
+        assert subject.decide(dormant_root, base_then_new_branch) == "", \
+            "a base branch left for a new one must not claim the commit (ai-config#2422)"
+        # Negative control on the additive side: a `git worktree add -b` in the
+        # committing call must not displace the branch the commit landed on.
+        _wtb_reason = subject.decide(dormant_root, worktree_add_b_keeps_branch)
+        assert "agy-dormant" in _wtb_reason, _wtb_reason
         # `git branch` names a branch without moving HEAD, so no commit may
         # be attributed to one it merely mentions.
         for _name, _t in (("git branch -d", branch_delete_attributes_nothing),
@@ -989,9 +1050,13 @@ try:
         for _p in (dormant_root, dormant_bare, dormant_wt, gone_wt):
             shutil.rmtree(_p, ignore_errors=True)
         shutil.rmtree(f"{gone_wt}-extra", ignore_errors=True)
+        shutil.rmtree(f"{gone_wt}-side", ignore_errors=True)
         for _p in (visit_only, visit_then_pending, commit_in_dormant,
                    cd_then_commit_later, checkout_back,
                    checkout_back_same_call,
+                   checkout_back_whole_round_trip,
+                   checkout_back_two_moves_earlier, base_then_new_branch,
+                   worktree_add_b_keeps_branch,
                    branch_delete_attributes_nothing,
                    branch_contains_attributes_nothing,
                    branch_subcommand_keeps_branch, two_commits_one_call,

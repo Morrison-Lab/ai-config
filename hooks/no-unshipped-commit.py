@@ -168,7 +168,9 @@ WORKTREE_ADD_CMD = re.compile(
 # switches back and names nothing, and a switch that names nothing still has
 # to supersede the branch a commit would otherwise inherit (ai-config#2422).
 #
-# It is also the only source of the names a commit may INHERIT. An earlier
+# It is also the only source that REPLACES the names a commit may inherit
+# (`git worktree add -b` adds to them without displacing them; see
+# `_worktree_created`). An earlier
 # revision read those from a wider pattern that matched `git branch` too, so
 # `git branch -d agy-dormant` --- the cleanup this issue's own report
 # describes performing on a squash-merged leftover --- made that branch the
@@ -181,8 +183,8 @@ WORKTREE_ADD_CMD = re.compile(
 # attribution ai-config#2737 added. `git branch feature` creates without
 # switching. `git worktree add <path> <branch>` creates a second checkout and
 # leaves this one exactly where it stood, so it belongs beside `git branch`
-# rather than here --- and its `-b` form still supersedes, through the branch
-# name it names rather than through this pattern. `git checkout -p` stages
+# rather than here --- and its `-b` form contributes the branch it creates
+# without displacing the one the shell is on. `git checkout -p` stages
 # hunks interactively and switches nothing, so the argument list is read
 # rather than only the command word.
 #
@@ -226,20 +228,18 @@ DIR_MOVE = re.compile(r"(?:^|[;&|\n(]|\s)(?:cd|pushd|popd)(?![\w-])", re.MULTILI
 def _moves_head(args):
     """Whether a `git checkout`/`git switch` argument list actually moves HEAD.
 
-    Shared by `switches_branch` and `switch_branches` so the two cannot
-    disagree about which spellings move: one decides whether the carried
-    branch is cleared, the other decides what replaces it, and a form counted
-    by only one of them would clear the carry and name nothing, or name a
-    branch the shell never stood on.
+    The single gate `branches_after` consults before REPLACING the carried
+    branch: a form that moves supersedes whatever was carried even when it
+    names nothing, and a form that does not move must leave the carry alone.
+    An earlier revision asked that question in two places --- one deciding
+    whether to clear, the other deciding what replaces --- and they read
+    different patterns, so `git worktree add -b` replaced a carry it was
+    never counted as clearing. One caller is what makes that unrepresentable
+    rather than merely unlikely.
     """
     if any(a in PATCH_FLAGS for a in args):
         return False
     return PATHSPEC_SEP not in args
-
-
-def switches_branch(command):
-    """Whether this command moves HEAD, whether or not it names a branch."""
-    return any(_moves_head(m.group(1).split()) for m in SWITCH_CMD.finditer(command))
 
 
 def shell_dir_after(text, cur_dir):
@@ -314,50 +314,95 @@ def extract_named_paths(command):
     return paths
 
 
-def switch_branches(command):
-    """Branch names a command that MOVES HEAD leaves the shell standing on.
+def _switch_target(args):
+    """Branch names a head-moving `git checkout`/`git switch` leaves HEAD on.
 
-    `git branch` is deliberately absent: it names a branch without switching
-    to it, so a commit that follows it lands wherever the shell already
-    stood. `git worktree add -b` is deliberately present, matching the
-    SWITCH_CMD comment above --- it creates the branch in a second checkout
-    the session then works in, and dropping it would lose the attribution
-    ai-config#2737 added.
+    An empty set is a real answer, not a miss: `git checkout -` moves away
+    while naming nothing, and `branches_after` reads that emptiness as the
+    supersession ai-config#2422 requires.
 
     `git checkout [<tree-ish>] -- <paths>` restores files and moves HEAD
     nowhere, so it names no branch this scan may carry --- reading the
     pathspec as one replaced the real carried branch with a filename and lost
-    that same attribution. `_moves_head` is what excludes it, and the patch
-    forms beside it.
+    the switched-branch attribution ai-config#2737 added. `_moves_head` is
+    what excludes it, and the patch forms beside it, before this runs.
     """
     branches = set()
-    for m in SWITCH_CMD.finditer(command):
-        args = m.group(1).split()
-        if not _moves_head(args):
+    skip_next = False
+    for arg in args:
+        if skip_next:
+            skip_next = False
             continue
-        skip_next = False
-        for arg in args:
-            if skip_next:
-                skip_next = False
-                continue
-            if arg in ("-b", "-B", "-c", "-C", "-d", "-D", "-m", "-M", "--create", "--orphan"):
-                continue
-            if arg.startswith("-"):
-                if arg in ("-t", "--track", "--recurse-submodules", "--set-upstream-to", "-u"):
-                    skip_next = True
-                continue
-            if arg == "--":
-                continue
-            b = arg
-            if b.startswith("refs/heads/"):
-                b = b[len("refs/heads/"):]
-            if not b.startswith("-") and not b.startswith("@"):
-                branches.add(b)
-    for m in WORKTREE_ADD_CMD.finditer(command):
-        args = m.group(1).split()
-        for i, arg in enumerate(args):
-            if arg in ("-b", "-B") and i + 1 < len(args):
-                branches.add(args[i + 1])
+        if arg in ("-b", "-B", "-c", "-C", "-d", "-D", "-m", "-M", "--create", "--orphan"):
+            continue
+        if arg.startswith("-"):
+            if arg in ("-t", "--track", "--recurse-submodules", "--set-upstream-to", "-u"):
+                skip_next = True
+            continue
+        if arg == "--":
+            continue
+        b = arg
+        if b.startswith("refs/heads/"):
+            b = b[len("refs/heads/"):]
+        if not b.startswith("-") and not b.startswith("@"):
+            branches.add(b)
+    return branches
+
+
+def _worktree_created(args):
+    """Branch names `git worktree add -b` creates in a SECOND checkout.
+
+    Additive rather than replacing, because the command leaves THIS shell's
+    HEAD exactly where it stood: the session may commit on the branch it was
+    already on, and it may `cd` into the new checkout and commit there, so
+    both are live. Reading it as a replacement dropped the branch the commit
+    actually landed on --- a fail-open on a real unshipped commit --- and put
+    in its place a branch the shell never entered.
+
+    `git branch` is deliberately absent from both sources: it names a branch
+    without switching to it, so a commit that follows one lands wherever the
+    shell already stood.
+    """
+    branches = set()
+    for i, arg in enumerate(args):
+        if arg in ("-b", "-B") and i + 1 < len(args):
+            branches.add(args[i + 1])
+    return branches
+
+
+def branches_after(text, cur_branches):
+    """The branches a commit after `text` may sit on, given `cur_branches`.
+
+    The branch-side twin of `shell_dir_after`, and folded the same way: each
+    head-moving command is applied IN SOURCE ORDER, replacing the set rather
+    than adding to it, so the command the text ends on is the one that
+    decides. Unioning every match instead left the inspect-then-return route
+    ai-config#2422 reports open whenever both halves sat in one text ---
+    `git checkout agy-dormant && git log -1 && git checkout -` still yielded
+    the dormant branch, because the named checkout outvoted the `-` that
+    superseded it. The same union claimed `main` off the
+    `git checkout main && git pull --ff-only && git checkout -b fix/x`
+    opening this corpus writes constantly, so a local `main` sitting ahead of
+    its upstream blocked every Stop over a branch nothing was committed on.
+
+    A move that names nothing empties the set, which is the supersession
+    itself. It empties any `git worktree add -b` name carried alongside too:
+    the scan cannot tell which checkout the shell now stands in, and losing
+    an attribution costs a reminder where inventing one costs every Stop in
+    the session.
+    """
+    events = []
+    for m in SWITCH_CMD.finditer(text):
+        events.append((m.start(), True, m.group(1).split()))
+    for m in WORKTREE_ADD_CMD.finditer(text):
+        events.append((m.start(), False, m.group(1).split()))
+    branches = set(cur_branches)
+    for _, is_switch, args in sorted(events, key=lambda e: e[0]):
+        if is_switch:
+            if _moves_head(args):
+                branches = _switch_target(args)
+        else:
+            branches |= _worktree_created(args)
     return branches
 
 
@@ -471,8 +516,9 @@ def scan_transcript(path):
     harness-recorded working directory of that call, over the directory
     carried from the previous call --- so `git commit -m x && cd /elsewhere`
     attributes where the shell stood, not where it ends up. The branch is the
-    one a head-moving command named earlier in the same call, and otherwise
-    the branch carried forward.
+    one the LAST head-moving command earlier in the same call named, and
+    otherwise the branch carried forward: both axes fold their moves in
+    source order, so neither reports a state the shell had already left.
     A `git -C <dir>` on the committing invocation ITSELF names the repository
     the commit runs in and attributes on its own. A `git -C` elsewhere in the
     same call does not, whether it precedes the commit or follows it: it
@@ -512,7 +558,6 @@ def scan_transcript(path):
             command = unwrap_command(command)
             scanned = strip_quoted(command)
             start_dir = harness_cwd or cur_dir
-            call_branches = switch_branches(scanned)
             # EVERY commit in the call, not only the first: a call can commit
             # in one worktree, move, and commit in another, and attributing
             # only the first left the second unclaimed --- so an unshipped
@@ -531,23 +576,17 @@ def scan_transcript(path):
                 if commit_dir:
                     commit_paths.add(commit_dir)
                 # Supersession applies WITHIN the call as well as between
-                # calls: `git checkout - && git commit -m mine` moves away
-                # from the branch the previous call inspected while naming
-                # nothing, so the carried branch is cleared rather than
-                # inherited (ai-config#2422). The directory half already read
-                # `before` this way; reading the branch half from the whole
-                # call left the inspect-then-return route open whenever it
-                # was written as one call.
-                before_branches = switch_branches(before)
-                if before_branches or switches_branch(before):
-                    commit_branches |= before_branches
-                else:
-                    commit_branches |= recent_branches
+                # calls, and is decided by the LAST head-moving command
+                # before the commit rather than by all of them at once:
+                # `git checkout agy-dormant && git log -1 && git checkout -
+                # && git commit -m mine` ends on a move that names nothing,
+                # so the inspected branch is cleared rather than inherited
+                # (ai-config#2422).
+                commit_branches |= branches_after(before, recent_branches)
             # The carried state is updated AFTER the commit is attributed, so
             # `git commit -m x && git checkout -` reports the branch the
             # commit landed on rather than the one the call ended on.
-            if switches_branch(scanned) or call_branches:
-                recent_branches = call_branches
+            recent_branches = branches_after(scanned, recent_branches)
             cur_dir = absolute_dir(shell_dir_after(scanned, start_dir))
             if pending and (PUSH.search(scanned) or CREATE.search(scanned)):
                 pending = None

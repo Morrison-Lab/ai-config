@@ -129,17 +129,25 @@ RX_VISIBLE_TIME = re.compile(r"\b(?:[01]?\d|2[0-3]):[0-5]\d\b")
 # that excludes parentheses stops at the first one a format string contains,
 # and `date "+%H:%M (%Z)"` contains two. The assignment then goes unrecognized,
 # its text stays in the segment, and the read reads as printed -- discharging
-# the guard on exactly the capture-only shape it exists to catch.
-RX_CAPTURE_HEAD = re.compile(r"([A-Za-z_]\w*)=(\$\(|`)")
+# the guard on exactly the capture-only shape it exists to catch. The head
+# must open a shell word: at the start of the segment, or after whitespace, a
+# separator, or an opening parenthesis. Without that bound, `NAME=$(` inside a
+# quoted argument (`echo "stamp=$(date +%H:%M)"`) reads as an assignment, the
+# read is blanked out of a segment that in fact prints it, and the guard is
+# left to the tool-result fallback to discharge.
+RX_CAPTURE_HEAD = re.compile(r"(?<![^\s;&|(])([A-Za-z_]\w*)=(\$\(|`)")
 
 # A heredoc operator and its delimiter word, quoted or not.
 RX_HEREDOC = re.compile(r"""<<-?\s*(['"]?)(\w+)\1""")
 
 # Stdout sent to a file, rather than to the transcript. Excludes a named
 # descriptor other than stdout (`2>` through `9>`) and a descriptor duplication
-# (`>&2`). Descriptor 1 is stdout, so `1>` and `1>>` redirect exactly as a bare
-# `>` and `>>` do and must not be excluded.
-RX_STDOUT_REDIRECT = re.compile(r"(?<![2-9&<>])>>?\s*(?![&>])\S")
+# (`>&2`, caught by the lookahead on what FOLLOWS the operator). Descriptor 1
+# is stdout, so `1>` and `1>>` redirect exactly as a bare `>` and `>>` do and
+# must not be excluded. Nor may a preceding `&` be: `&>` and `&>>` send stdout
+# AND stderr to the file, so a `&` in the lookbehind would read the combined
+# redirect as a print and discharge the guard on exactly the #2991 shape.
+RX_STDOUT_REDIRECT = re.compile(r"(?<![2-9<>])>>?\s*(?![&>])\S")
 
 # Where one command in a compound command ends and the next begins.
 RX_SEGMENT_SPLIT = re.compile(r";|&&|\|\|")

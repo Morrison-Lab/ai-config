@@ -108,6 +108,25 @@ REDIRECTED_FD1_DATE = {"type": "assistant", "message": {"content": [
 STDERR_REDIRECTED_DATE = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "id": "call_fd2", "input": {
         "command": "TZ=America/Los_Angeles date \"+%H:%M %Z\" 2>/dev/null"}}]}}
+# The combined redirect sends stdout and stderr to the file together. The `&`
+# sits BEFORE the operator, unlike the `>&2` duplication it must not be
+# confused with, so a lookbehind excluding `&` reads this as a print.
+COMBINED_REDIRECTED_DATE = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_amp", "input": {
+        "command": "TZ=America/Los_Angeles date \"+%H:%M %Z\" &>notebook.md"}}]}}
+COMBINED_APPEND_DATE = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_ampa", "input": {
+        "command": "TZ=America/Los_Angeles date \"+%H:%M %Z\" &>>notebook.md"}}]}}
+# A descriptor duplication after the operator is still not a file redirect.
+DUPLICATED_FD_DATE = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_dup", "input": {
+        "command": "TZ=America/Los_Angeles date \"+%H:%M %Z\" 2>&1"}}]}}
+# `NAME=$(` inside a quoted argument is not an assignment: the read prints as
+# part of the echoed string, and the transcript carries it.
+QUOTED_HEAD_PRINTED = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_qhead", "input": {
+        "command": "echo \"stamp=$(TZ=America/Los_Angeles date +%H:%M) "
+                   "checkpoint\""}}]}}
 # The same heading, with no intermediate variable.
 HEREDOC_DATE = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "id": "call_here", "input": {
@@ -437,6 +456,21 @@ CASES = [
      "rather than the transcript"),
     ([STDERR_REDIRECTED_DATE, say("Recap: 00:59 PDT")], False,
      "#2991: `2>` is not a stdout redirect -- the reading still prints"),
+
+    # --- review round 2 on #2991: the lookbehind that excluded `>&2` by its
+    #     `&` also excluded `&>`, the combined redirect, which sends stdout to
+    #     the file; and a capture head matched inside a quoted argument.
+    ([COMBINED_REDIRECTED_DATE, result("call_amp", ""),
+      say("Recap: 01:07 PDT")], True,
+     "#2991: `&>` sends stdout to the file, so the reading never printed"),
+    ([COMBINED_APPEND_DATE, result("call_ampa", ""),
+      say("Recap: 01:07 PDT")], True,
+     "#2991: `&>>` is the append form of the same combined redirect"),
+    ([DUPLICATED_FD_DATE, say("Recap: 00:59 PDT")], False,
+     "#2991: `2>&1` duplicates a descriptor and redirects nothing to a file"),
+    ([QUOTED_HEAD_PRINTED, say("Recap: 00:59 PDT")], False,
+     "#2991: `NAME=$(` inside a quoted argument is not a capture -- the "
+     "echo prints the reading"),
 ]
 
 

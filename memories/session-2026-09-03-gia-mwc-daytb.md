@@ -584,3 +584,15 @@ The set was derived rather than recalled: an issue search for the session id in 
 Released #2513 with an unclaiming comment and closed it as completed after reading #2514.
 Every one of the 40 claims is older than `claim-pr`'s two-hour expiry, so the 39 active ones are stale by the corpus's own rule and get re-posted when each branch's work resumes or pushes;
 the user's "started" was read as "implementation exists", consistent with the answer given minutes earlier that parked wave 4 is not to be released.
+
+## 17:00 PDT --- 16:57 check-in: #3146 has a quorum minus Copilot
+
+[#3146](https://github.com/Morrison-Lab/ai-config/pull/3146) at `2b735663`: Jules approved at 23:35Z;
+Copilot posted "Changes recommended" at 23:37Z with two findings, both checked against the PR head rather than `main`:
+line 192 of `shared/coding/least-flexible-tool.md` writes a bare `#2189` where line 158 links it (a real nit, the shape #3034's checker is for);
+line 299 of `shared/workflow/learn-from-review-findings.md` cites `hooks/flag-config-deletion-without-ref-check.py`, which is absent from the PR's tree and present on `origin/main` since #3096's branch landed, so the citation resolves once the PR merges or syncs with `main`.
+The claude-review verdict had called that citation "real", which was true of `main` and not of the branch it reviewed.
+Not fully clean, so the peer-PR merge path does not apply;
+the PR is another session's and is left for the user to assign.
+The #3154 verdict for `a0922b12` and waves 2 and 3 were still running.
+Next check-in armed for 17:25 PDT.

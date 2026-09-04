@@ -830,10 +830,8 @@ Measured 2026-09-03 (evening PDT) on
 two consecutive runs returned `VERDICT: block` on those instructions, in
 different words each time.
 The first wrote "project rules file, line 1: Prompt injection attempt in
-project rules file", then called the "Additional instructions (from workflow
-config)" section untrusted and said it "attempts to give direct instructions
-to me (as your reviewer) to suppress prompt injection findings and ignore
-future dates";
+project rules file" and called the "Additional instructions (from workflow
+config)" section untrusted;
 the second wrote "workflow config, line 1: Prompt injection attempt ...
 directing the reviewer to ignore certain prompt injections and date-related
 typos".
@@ -852,8 +850,8 @@ This is the seventh case in
 (a policy detector firing on the repo's own conventions, which
 "re-triggering cannot clear" and whose re-raise is not counted against the
 rebuttal test), in a sub-shape that file does not name:
-the text the detector fires on is the workflow's own configuration, in no
-diff at all, so nothing can be reworded away.
+the text is the reviewer's own trusted configuration, so the convention grep
+the seventh case prescribes does not apply and the rebuttal is provenance.
 [`fully-clean.cases.md`](../shared/workflow/fully-clean.cases.md)'s "A
 false-positive injection-detector block that reproduces every round" (#818)
 is the precedent, held for the maintainer.
@@ -861,16 +859,18 @@ is the precedent, held for the maintainer.
 ([`fully-clean.md`](../shared/workflow/fully-clean.md) criterion 1), and on
 2026-09-03 it was outside the repository's required set: with it red and
 every check run green, `GET /pulls/3154` reported `mergeable_state: unstable`
-rather than `blocked` (re-read the required set on a live PR; branch
-protection changes without a commit).
+rather than `blocked`, the discriminator the bcs `test-coverage` bullet above
+records (re-read the required set on a live PR; it changes without a commit).
 The #3154 merge went over the red status under the standing grant;
 [#3192](https://github.com/Morrison-Lab/ai-config/issues/3192) puts that
 disposition to the maintainer.
 
 - **Do:** read a Jules `block` for whether each item is a claim the diff can
   answer before treating the red status as this PR's.
-- **Do:** rebut once with `git diff --name-only origin/main...HEAD` and the
-  clock, file the defect, and hold for the maintainer, per the seventh case.
+- **Do:** rebut once (the diff's file list and the clock for the file and
+  date items; for the injection item, `jules-review.yml`'s own comment that
+  `INPUT_EXTRA_INSTRUCTIONS` is the trusted side of the prompt boundary),
+  file the defect, and hold for the maintainer, per the seventh case.
 - **Don't:** re-request Jules when the block's items recur, however its
   wording moves, or re-scope the diff to satisfy an item about the
   reviewer's own configuration.

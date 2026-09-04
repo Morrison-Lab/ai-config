@@ -976,10 +976,10 @@ and the finding already says what the tool does.
 So the body inherits the reviewer's phrasing of the tool's behaviour,
 and the phrasing is checked against nothing:
 the reviewer paraphrased, the author copied, and the tool's own output never entered the text.
-Rewriting a message destroys the copy a later reader would check,
-so the correction goes on the PR and into the squash body rather than into an amend,
+For the reason the section above gives (rewriting destroys the copy a later reader would check),
+the correction goes on the PR and into the squash body rather than into an amend,
 and the wrong quotation stays in the history.
-[`address-every-comment`](../workflow/address-every-comment.md) recommends the amend for a wrong figure in an unmerged message;
+The same `address-every-comment` bullet the section above cites recommends the amend for a wrong figure;
 under squash merge the intermediate body never reaches `main`,
 so the squash body is the copy that rule is about, and the two agree.
 
@@ -992,7 +992,8 @@ so the squash body is the copy that rule is about, and the two agree.
 
 (Morrison-Lab/ai-config#3154, 2026-09-03, three times in one evening on grep alone.
 `75829fad`'s body said a `-zz` subject "exits 2 with \"invalid option\"";
-on GNU grep 3.11 `-zz` is two valid flags, so grep took the first path as its pattern and exited 0 with the wrong result, and `-Q` is the case that exits 2.
+on GNU grep 3.11 `-zz` is two valid flags, so grep took the first path as its pattern and searched the current directory instead,
+exiting on whether that accidental pattern matched; `-Q` is the case that exits 2.
 `a51a170f`'s body quoted the error for a `[` subject as "Unmatched [", the reviewer's wording, where the tool prints "Invalid regular expression".
 The prose line that same commit added, and the prepared squash body, said a bare `(` motivates `-F`;
 `(` is a literal in grep's default BRE mode and only `[` errors, which `27bb9588` corrected.

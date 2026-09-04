@@ -101,8 +101,8 @@ ABBREV_SHA_LEN = 7
 # so `**Ready for merge**.` reads as the phrase itself. Heading, quote, and
 # strikethrough markers are deliberately absent: a human approval must be
 # the bare phrase, and a quoted or struck-through line is not it.
-LIST_ITEM_RE = re.compile(r"^([-+*]|\d+[.)])\s")
 HEADLINE_TRIM_RE = re.compile(r"^[\s*_`]+|[\s*_`.!]+$")
+LIST_ITEM_RE = re.compile(r"^([-+*]|\d+[.)])\s")
 # The corpus-mandated agent-disclosure marker, plus the headers review
 # workflows post under. `gh pr review --comment` is a first-class agent
 # surface (hooks/require-agent-disclosure.py gates it), so a review body

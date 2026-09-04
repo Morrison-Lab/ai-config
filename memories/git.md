@@ -263,7 +263,9 @@ Neither `couldn't find remote ref` nor `Server does not allow request for unadve
 **`git merge-base --is-ancestor A B` and `git rev-list --count B`
 on a shallow clone answer for the fetched depth.**
 In the incident's clone `git rev-list --count f9068299` returned 1
-and `--is-ancestor` returned non-zero for three real ancestors,
+and `--is-ancestor` failed for three real ancestors
+(`fatal: Not a valid commit name <sha>` at exit 128 while the ancestor's object is absent from the clone,
+a quiet exit 1 once it is present),
 because the walk stopped at the graft
 (the section above on `git log -S` describes the same stop).
 A ranged count is bounded the same way:

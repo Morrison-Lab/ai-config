@@ -596,8 +596,8 @@ gh api repos/<owner>/<repo>/issues/<N>/comments --paginate \
 **Also check formal GitHub reviews, not just issue-style comments --- a review's findings can sit where a comments-only scan never looks, whoever posted it and whatever state it carries.**
 A review submitted via GitHub's review UI (as opposed to a plain PR comment) shows up in `gh pr view N --json reviews`, and its top-level `body` is frequently **empty** --- the actual finding lives entirely in a per-line inline comment, which only appears via `gh api repos/<owner>/<repo>/pulls/N/comments` (a different endpoint from issue comments).
 The mirror case is a finding in the top-level `body` itself, plainly or inside a collapsed `<details>` suppression block: neither shape produces a comment object, so `pulls/N/comments` and a thread query both return nothing over it.
-A bot's `COMMENTED` review carrying such findings vetoes a merge under [`fully-clean`](shared/workflow/fully-clean.md), which carries the matcher for the collapsed block, exactly as a human's `CHANGES_REQUESTED` does.
-The forge enforces only `CHANGES_REQUESTED`, though, so a `COMMENTED` review blocks no merge on its own.
+[`fully-clean`](shared/workflow/fully-clean.md) carries the matcher for the collapsed block, and what fails that bar is the finding rather than the state.
+So a bot's `COMMENTED` review carrying a finding fails that bar exactly as a human's `CHANGES_REQUESTED` does.
 Checking `--json comments` alone can miss the review's existence entirely.
 Before declaring a PR ready, also run:
 ```
@@ -606,7 +606,7 @@ gh pr view N --json reviews --jq '.reviews[] | select(.state == "CHANGES_REQUEST
 gh api repos/<owner>/<repo>/pulls/N/comments --jq '.[] | "\(.path):\(.line // .original_line // "?") \(.user.login) \(.body)"'
 ```
 A `CHANGES_REQUESTED` state is blocking regardless of whether an automated re-review later says "Ready for merge" — that bot verdict doesn't clear a human's own review state, which only the human (or an explicit dismissal) can resolve.
-The unfiltered listing comes first: the state filter answers only whether a review *state* blocks the merge button.
+The unfiltered listing comes first: the state filter answers only whether a review *state* blocks the merge button, which the forge lets `CHANGES_REQUESTED` alone do.
 
 - **Do:** read every formal review's state and body, whoever posted it, and treat a finding in a review body --- a collapsed suppression block included --- as blocking.
 - **Don't:** pass over a review because its author is a bot or its state is `COMMENTED`, nor read that state as blocking on its own.

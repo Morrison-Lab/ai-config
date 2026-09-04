@@ -710,16 +710,16 @@ and the verdict's own conclusion every round.**
   ordinary overview prose".
   That is a reason to prefer the heading anchor, not to forbid the wider
   match.
-  Across the measured set --- every review on ai-config#660, #1029 and
-  ai-config#1031, re-fetched 2026-09-04, plus `5098574802` and
-  4837572117, re-fetched 2026-09-03 --- no collapsed region contains
+  Across the measured set --- every review on ai-config#660,
+  ai-config#1029, ai-config#1031 and ai-config#3084, plus 4837572117,
+  all re-fetched 2026-09-03 --- no collapsed region contains
   `suppressed` outside a suppression block, so a region-wide match
   produces no false positive on any of them.
   That set is smaller than the population this corpus names:
-  ai-config#2913's rounds thirty-five and thirty-six, ai-config#2976,
-  and ai-config#3084's `5098854246` and `5098881593` all carry
-  suppression blocks and were not re-fetched, so a body outside the set
-  can still collapse an overview that mentions suppressed findings.
+  ai-config#2913's rounds thirty-five and thirty-six and
+  ai-config#2976 carry suppression blocks and were not re-fetched, so
+  a body outside the set can still collapse an overview that mentions
+  suppressed findings.
   So keep the region-wide match as a fallback behind the heading anchor,
   and read a hit only the fallback finds as a prompt to read that region
   rather than as a finding.

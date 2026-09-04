@@ -638,3 +638,12 @@ the Copilot thread on the `exit 1` guard is resolved, Copilot re-requested, and 
 The UMS branch's round 3 reproduced every count and exit code and left one finding, a provenance parenthetical crediting #3129's review with a catch made by the round-one verdict on `fix/ums-step3-corpus-scope`;
 fixed at `6c8db734`, whose round-4 verdict is running.
 The wave-2 fix loop launched into the last free slot.
+
+## 17:32 PDT --- #3154 at `2b3bd51c`: Copilot's third round reached into the touched hunk
+
+Jules approved `15287fbf` within three minutes of the re-request.
+Copilot's third round flagged two em dashes at `skills/ums/SKILL.md` lines 451 and 456, both pre-existing on `main` (the file carries 28) and neither in an added line, which is why the `--diff` ASCII gate had passed;
+they sit in the hunk the anti-patterns edit touched, and Copilot reviews hunks.
+Replaced with `---` and pushed as `2b3bd51c` after a fresh `ls-remote` read `15287fbf`;
+Copilot re-requested, `@jules review` posted, the PR body's checks section moved to the new head.
+Lesson for the fold: a hunk-scoped reviewer will report pre-existing defects adjacent to any edit, so sweep the touched hunk for the corpus's mechanical rules before the first push, not only the added lines.

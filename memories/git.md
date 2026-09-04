@@ -230,7 +230,7 @@ one says only whether its argument is a ref name,
 the other only what the *clone* has fetched.
 Both produced the same false claim twice on one PR,
 that three commits were "fetchable from no remote ref",
-when every one of them was an ancestor of a ref `origin` still advertised.
+when every one of them was an ancestor of a ref that `origin` still advertised.
 
 **`git fetch origin <sha>` takes the full 40-character SHA and nothing shorter.**
 That is git's own resolution rather than a server policy:
@@ -260,9 +260,13 @@ fatal: remote error: upload-pack: not our ref 0000000000000000000000000000000000
 So the fetch's own error text is the test:
 `couldn't find remote ref` means the argument was not a ref name (retry with all 40 characters),
 and `upload-pack: not our ref` means the remote would not serve that object.
-The second string is protocol v2's (git's default since 2.26, and what GitHub answers on v0 as well);
-a local-path remote on protocol v0 says `Server does not allow request for unadvertised object` instead,
-and either wording is refusal to serve, which is not the same as absence.
+The second string is protocol v2's, and GitHub answers it on v0 as well;
+v2 has been git's default since 2.29 (2.26 promoted it and 2.27 demoted it, per git's release notes).
+A local-path remote on protocol v0 says `Server does not allow request for unadvertised object` instead,
+and neither wording means the object is absent:
+v2's is the server refusing a `want`,
+while v0's is git declining to send one because the advertisement carried no `allow-*-sha1-in-want` capability
+(`GIT_TRACE_PACKET=1` shows no `want` line at all on v0, and one on v2).
 
 **`git merge-base --is-ancestor A B` and `git rev-list --count B`
 on a shallow clone answer for the fetched depth.**

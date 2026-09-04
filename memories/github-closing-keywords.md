@@ -65,24 +65,29 @@ The squash message did.
 
 The mirror of the #1718 case above.
 There the squash body carried a keyword the author had not wanted;
-here the keyword a brief asserted was absent, and the absence was right.
+here a brief asserted a keyword the branch did not carry,
+and the branch was right to lack it.
 
-Under a squash merge of a PR that targets the default branch, what closes an issue is the whole squash commit message as entered, plus the PR body;
+Under a squash merge of a PR that targets the default branch,
+what closes an issue is the whole squash commit message as entered, plus the PR body;
 a PR targeting any other branch has its body keywords ignored, per the docs cited above.
-The title counts: the docs cited above say a keyword in a commit message merged to the default branch closes the issue, and the subject is part of the message.
+The title counts:
+the docs cited above say a keyword in a commit message merged to the default branch closes the issue,
+and the subject is part of the message.
 This repo sets `squash_merge_commit_title` to `COMMIT_OR_PR_TITLE` (read 2026-09-04),
 which GitHub documents as the sole commit's subject on a one-commit PR and the PR title otherwise;
 so a keyword in either of those reaches `main` unless the merger edits the prefilled title.
 The branch's commit messages reach the squash *body* only through the default body,
-which GitHub builds from them as a bullet list when `squash_merge_commit_message` is `COMMIT_MESSAGES` (read 2026-09-04),
+which GitHub builds from them as a bullet list
+when `squash_merge_commit_message` is `COMMIT_MESSAGES` (read 2026-09-04),
 and a body written by hand at merge time replaces that default entirely.
 So a listing of the branch's keyword-carrying commits answers what the default body would carry,
-and the message actually entered is what to read once it exists.
-The repo also allows merge commits and rebase merges (read 2026-09-04);
-either lands every branch commit message on `main` unchanged, where the parser reads each one.
+and the message actually entered is what to read once it exists;
+the Do bullet below enumerates the surfaces per merge method.
 
 Measured 2026-09-04 on the six wave-1 PRs,
-on the fix-loop scripts from the first wave-1 script through r5 (r5 alone carries the shape ai-config#3203 proposed),
+on the fix-loop scripts from the first wave-1 script through r5
+(r5 alone carries the shape ai-config#3203 proposed),
 on issue #3068's timeline,
 and on a run of `hooks/remind-brief-premises.py`.
 The fixer brief asserted for every branch that its first commit already carried the closing keyword;
@@ -95,43 +100,58 @@ seven of that branch's nine commits carry the `Refs`, and the other two are gene
 The assertion was true for `fix/3068-flag-cd-stderr` on 2026-09-03 and false by 03:57Z on 2026-09-04,
 thirteen hours before the r5 script was written.
 A rebase reworded the keyword out of the branch's first commit on purpose,
-because the issue's first "done when" item (the warning surfaces in a live session) is one that branch could not show;
+because the issue's first "done when" item (the warning surfaces in a live session)
+is one that branch could not show;
 the empty commit `78fda241` records the rebase and the reason.
 Both PRs merged with hand-written squash bodies carrying `Refs`,
 and both issues stayed open, which was the intended outcome in each case.
 The mistake came after:
-issue #3068 was closed by hand on the strength of the item asking for a test that pins the `additionalContext` emission plus an item the issue marks optional,
+issue #3068 was closed by hand on the strength of the item asking for a test that pins the `additionalContext` emission
+plus an item the issue marks optional,
 and reopened twenty minutes later once `78fda241` and `a92de7b4` on the branch were read.
 The hook did not fire on the brief's sentence, and cannot:
-it keys on a corpus path or a count, and a claim about a branch's commits carries neither.
+its clauses A and B anchor a claim to a named corpus path,
+and clause C fires only on the `[FINDINGS_COUNT: N]` token over findings, rounds, or reviews,
+so a count in a claim about a branch's commits reaches neither.
 
 - **Do:** before opening the PR, list the branch commits whose messages carry a closing keyword,
   in every spelling and both issue forms the parser accepts,
   with the PR's base resolved rather than assumed
   (`base="$(git remote show origin | sed -n 's/.*HEAD branch: //p')"`, or the branch a stacked PR targets):
-  `git rev-list --count "origin/$base..HEAD"` first, since a zero means the range holds no commits and the empty listing below it says nothing about the branch, then
+  `git rev-list --count "origin/$base..HEAD"` first,
+  since a zero says HEAD is not ahead of that base (wrong ref, uncommitted work, or a branch already merged),
+  and it separates nothing-to-search from searched-and-found-nothing;
+  then
   `pat='(close[sd]?|fix(es|ed)?|resolve[sd]?):? *([A-Za-z0-9._-]+/[A-Za-z0-9._-]+)?#[0-9]+'` and
   `git log --regexp-ignore-case --extended-regexp --grep="$pat" --format='== %h %s%n%b' "origin/$base..HEAD" | grep -iE "^== |$pat"`;
   each `==` line names a matching commit and the lines under it are its matching body lines,
   which is where this repo's keywords sit,
-  and the pattern also matches some ordinary words (`prefixes #`), so read each hit.
+  and the pattern carries no word boundary,
+  so it also hits a word that merely ends in a keyword (`prefixes #`);
+  the substring claim at the top of this file is about the sentence around a keyword,
+  not about letters inside a word,
+  so read each hit.
 - **Don't:** open the PR having written its body but not read what the branch's commits would land;
   the #1718 case above is a `Refs` PR body over a `Closes` squash body.
-- **Do:** put whatever keyword the merge should carry in the PR body, scoped per [`issue-first.md`](../shared/workflow/issue-first.md),
+- **Do:** put whatever keyword the merge should carry in the PR body,
+  scoped per [`issue-first.md`](../shared/workflow/issue-first.md),
   then read every surface the parser will see for the merge method in use.
   The PR body counts only when the PR targets the default branch (the docs cited above say so);
-  on a stacked PR its keyword never fires, while the branch commits' keywords still fire once those commits reach the default branch.
+  on a stacked PR its keyword never fires,
+  while the branch commits' keywords still fire once those commits reach the default branch.
   Under a squash merge whose body you write: the PR body, the squash title, and the squash body you write.
-  Under a squash merge with the default body: the PR body, the squash title, and the default squash body with the branch commits listed in it.
+  Under a squash merge with the default body: the PR body, the squash title,
+  and the default squash body with the branch commits listed in it.
   Under a merge commit: the PR body, the branch commits, the merge commit's subject
-  (`merge_commit_title` read as `MERGE_MESSAGE` on 2026-09-04, the generated `Merge pull request #N from <owner>/<branch>` line),
-  and the merge commit's body, which defaults to the PR title (`merge_commit_message` read as `PR_TITLE` on 2026-09-04);
+  (`merge_commit_title` read as `MERGE_MESSAGE` on 2026-09-04,
+  the generated `Merge pull request #N from <owner>/<branch>` line),
+  and the merge commit's body, which defaults to the PR title
+  (`merge_commit_message` read as `PR_TITLE` on 2026-09-04);
   both merge-commit fields are editable in the dialog.
   Under a rebase merge: the PR body and the branch commits.
 - **Don't:** read only the squash body you typed;
   the title arrives prefilled from the PR or the sole commit and reaches `main` unless you edit it.
-- **Don't:** count a stacked PR's body keyword as what will close the issue;
-  that keyword never fires, and the branch commits' keywords fire later, once the commits reach the default branch.
+- **Don't:** count a stacked PR's body keyword as what will close the issue.
 - **Do:** when a branch carries `Refs` where a `Closes` was expected,
   read its commit messages for the reason before treating the absence as an omission,
   and look for the acceptance item a deliberate removal names.

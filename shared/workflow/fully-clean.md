@@ -715,11 +715,13 @@ and the verdict's own conclusion every round.**
   all re-fetched 2026-09-03 --- no collapsed region contains
   `suppressed` outside a suppression block, so a region-wide match
   produces no false positive on any of them.
-  That set is smaller than the population this corpus names:
-  ai-config#2913's rounds thirty-five and thirty-six and
-  ai-config#2976 carry suppression blocks and were not re-fetched, so
-  a body outside the set can still collapse an overview that mentions
-  suppressed findings.
+  That set is smaller than the population this corpus names.
+  A repo-wide grep for `suppressed` on 2026-09-03 found four further PRs
+  whose suppression block was not re-fetched: ai-config#1042,
+  ai-config#1079, ai-config#2913's rounds thirty-five and thirty-six, and
+  ai-config#2976.
+  Nothing outside the measured set has been checked, so a body outside it
+  can still collapse an overview that mentions suppressed findings.
   So keep the region-wide match as a fallback behind the heading anchor,
   and read a hit only the fallback finds as a prompt to read that region
   rather than as a finding.

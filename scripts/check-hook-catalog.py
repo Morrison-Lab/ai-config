@@ -40,7 +40,10 @@ This checks five things:
      row -- the catalog was blind to a double binding by construction
      (ai-config#2535). A double binding runs the hook twice on one call, which
      is merely wasteful for a warn-only hook and is not benign for a blocking
-     one.
+     one. This one is decidable only over tool names hooks.json itself spells
+     out, so a pair of two DIFFERENT regex matchers cannot be settled here at
+     all; such a pair is reported as a NOTE and counted apart from the compared
+     ones, rather than passing as clean.
 
 Check 3 is what stops the table drifting in a way the set comparison cannot see:
 a row can name every hook correctly and still tell a reader the wrong event.
@@ -185,12 +188,21 @@ def matcher_names(matcher):
 def overlapping_tools(first, second, vocabulary):
     """Tool names both matchers fire on, as a sorted list.
 
-    Returns `["every tool"]` when either matcher is the catch-all, and names
-    the shared matcher when two identical regex matchers match nothing in the
-    vocabulary -- identical matchers overlap whatever they match.
+    A catch-all overlaps the OTHER matcher exactly, not every tool, so it is
+    described in the other matcher's terms: the tools that one names, or a
+    phrase when it is a regex naming none. Saying "every tool" of a catch-all
+    paired with `mcp__github__.*` would overstate a real double binding's
+    extent, and the failure message quotes this list verbatim.
+
+    Two identical regex matchers that match nothing in the vocabulary are named
+    by the shared matcher -- identical matchers overlap whatever they match.
     """
-    if first in CATCH_ALL or second in CATCH_ALL:
+    if first in CATCH_ALL and second in CATCH_ALL:
         return ["every tool"]
+    if first in CATCH_ALL or second in CATCH_ALL:
+        other = second if first in CATCH_ALL else first
+        named = sorted(matcher_names(other))
+        return named or [f"every tool {other!r} fires on"]
     hits = sorted(tool for tool in vocabulary
                   if matcher_matches(tool, first)
                   and matcher_matches(tool, second))
@@ -410,6 +422,27 @@ def _show(matcher):
     return repr(matcher) if matcher else "(no matcher)"
 
 
+def undecidable_pair(first, second):
+    """Whether no tool name available here can settle if two matchers overlap.
+
+    A regex matcher names no tools literally, so it contributes nothing to the
+    vocabulary, which is built only from what hooks.json spells out. Two
+    DIFFERENT regexes are therefore not compared so much as skipped:
+    `mcp__github__.*` and `mcp__.*` share every `mcp__github__` tool, and this
+    check sees none of them.
+
+    A pair where either matcher names its tools IS decidable, because any
+    overlap lies inside that named set and every name in it is in the
+    vocabulary by construction. So is a pair of identical regexes, which
+    `overlapping_tools` settles without needing a tool name at all.
+    """
+    if first in CATCH_ALL or second in CATCH_ALL:
+        return False
+    if first == second:
+        return False
+    return not matcher_names(first) and not matcher_names(second)
+
+
 def check_double_bindings(binds):
     """Fail when one script is bound twice for the same event and tool.
 
@@ -419,9 +452,13 @@ def check_double_bindings(binds):
     one comma-joined matcher, so a hook bound once and a hook bound twice both
     compare equal to the same README row (ai-config#2535).
 
-    Returns (failure count, pairs examined). The second number is the negative
-    control: a detector that examined nothing reports the same zero failures as
-    a clean catalog, and only the count tells them apart.
+    Returns (failure count, pairs compared, pairs undecidable). The second
+    number is the negative control: a detector that examined nothing reports
+    the same zero failures as a clean catalog, and only the count tells them
+    apart. The third keeps that control honest -- a pair of two different
+    regexes cannot be decided from the tool names hooks.json spells out, so
+    counting it as compared would report a skip as a clean comparison. Such a
+    pair is named as a NOTE for a human to settle.
     """
     vocabulary = {name for _, _, matcher in binds
                   for name in matcher_names(matcher)}
@@ -431,9 +468,18 @@ def check_double_bindings(binds):
 
     failures = 0
     examined = 0
+    undecidable = 0
     for (script, event), matchers in sorted(by_key.items()):
         for i, first in enumerate(matchers):
             for second in matchers[i + 1:]:
+                if undecidable_pair(first, second):
+                    undecidable += 1
+                    print(f"NOTE: {script} is bound to {event} in two matcher "
+                          f"groups, {_show(first)} and {_show(second)}, and "
+                          "both are regexes, so no tool name hooks.json spells "
+                          "out can decide whether they overlap; read them by "
+                          "hand")
+                    continue
                 examined += 1
                 shared = overlapping_tools(first, second, vocabulary)
                 if not shared:
@@ -444,7 +490,7 @@ def check_double_bindings(binds):
                       "twice on one call. Merge the groups, or narrow one "
                       "matcher so they are disjoint")
                 failures += 1
-    return failures, examined
+    return failures, examined, undecidable
 
 
 def check(reg, doc):
@@ -505,14 +551,15 @@ def main() -> int:
     reg = registered(binds)
     doc = documented()
     failures = check(reg, doc)
-    double_failures, examined = check_double_bindings(binds)
+    double_failures, examined, undecidable = check_double_bindings(binds)
     failures += double_failures
     failures += check_tracker_states()
 
     print(f"\n{len(reg)} hooks registered in hooks.json; {len(doc)} documented "
           f"in README ({len(KNOWN_UNREGISTERED)} known unregistered); "
           f"{len(set(reg) & set(doc))} compared for event and matcher; "
-          f"{examined} matcher pair(s) compared for a double binding")
+          f"{examined} matcher pair(s) compared for a double binding, "
+          f"{undecidable} undecidable (both matchers are regexes)")
     return 1 if failures else 0
 
 

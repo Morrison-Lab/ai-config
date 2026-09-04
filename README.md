@@ -534,6 +534,10 @@ Deciding that needs the harness's own matcher semantics, which
 [`memories/claude-code-hooks.md`](memories/claude-code-hooks.md) records:
 a plain name is compared by equality, an alternation by membership, and only
 anything else is an unanchored regex.
+It decides that over the tool names `hooks.json` itself spells out, so a pair of
+two different regex matchers is beyond it;
+such a pair is printed as a `NOTE` and counted apart from the compared ones,
+rather than passing as clean.
 
 The Claude Code plugin (`.claude-plugin/plugin.json`, `source: "./"`) is the supported path for the full catalog: its loader auto-discovers [`hooks/hooks.json`](hooks/hooks.json) at the plugin root and registers every hook it names, no separate step needed.
 

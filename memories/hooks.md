@@ -143,6 +143,9 @@ When authoring a new hook:
    The row's matcher list must equal the `hooks.json` groups for that script joined by `, `, in file order:
    `check-hook-catalog.py` concatenates the groups as it meets them and compares the string, so `(Agent, Task, Workflow)` fails against a manifest that lists `Task` before `Agent`.
    Write the manifest first, then copy its order into the row (measured 2026-09-01, ai-config#2930).
+   An alternation matcher such as `Write|Edit|NotebookEdit` is ONE group, so it occupies one item of that list;
+   its pipes must be backslash-escaped in the README cell (`Write\|Edit\|NotebookEdit`), because a bare `|` ends a markdown table cell.
+   A bare pipe makes the row fail to parse at all, which surfaces as the unrelated-sounding "registered but undocumented" failure rather than as a row-syntax complaint (ai-config#2535).
 5. Update this catalog in [`memories/hooks.md`](hooks.md).
 6. Validate with:
    ```bash

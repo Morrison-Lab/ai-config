@@ -231,10 +231,61 @@ case("a regex matcher overlapping a plain one is a double binding",
      [("a.py", "PreToolUse", "Edit, Edit.*", "warns")] + ALLOW_ROWS,
      want_fail=True, needle="runs twice on one call")
 
+# A catch-all overlaps the OTHER matcher exactly, so the message has to name
+# that matcher's extent rather than claiming "every tool" of a narrow one. The
+# failure is real either way; what is asserted here is that it is not
+# overstated.
 case("a catch-all group beside a named group is a double binding",
      [("a.py", "PreToolUse", ""), ("a.py", "PreToolUse", "Bash")],
      [("a.py", "PreToolUse", "Bash", "warns")] + ALLOW_ROWS,
-     want_fail=True, needle="which both fire on every tool")
+     want_fail=True, needle="which both fire on Bash")
+
+case("a catch-all beside a regex group names the regex, not every tool",
+     [("a.py", "PreToolUse", ""),
+      ("a.py", "PreToolUse", "mcp__github__.*")],
+     [("a.py", "PreToolUse", "mcp__github__.*", "warns")] + ALLOW_ROWS,
+     want_fail=True,
+     needle="which both fire on every tool 'mcp__github__.*' fires on")
+
+# Two catch-alls really do overlap on everything, so the unqualified wording
+# survives for the one pair it is true of.
+case("two catch-all groups do fire on every tool",
+     [("a.py", "PreToolUse", ""), ("a.py", "PreToolUse", "*")],
+     [("a.py", "PreToolUse", "*", "warns")] + ALLOW_ROWS,
+     want_fail=True, needle="which both fire on every tool;")
+
+# --- pairs this check cannot decide (ai-config#2535) -----------------------
+# The vocabulary is built from tool names hooks.json spells out, and a regex
+# matcher spells out none -- so two DIFFERENT regexes are skipped rather than
+# compared. `mcp__github__.*` and `mcp__.*` share every `mcp__github__` tool
+# and this check sees none of them. Counting such a pair as compared would
+# report a skip as a clean comparison, which is exactly the vacuous-zero shape
+# the examined count exists to prevent.
+case("two different regex matchers are reported as undecidable, not clean",
+     [("a.py", "PreToolUse", "mcp__github__.*"),
+      ("a.py", "PreToolUse", "mcp__.*")],
+     [("a.py", "PreToolUse", "mcp__github__.*, mcp__.*", "warns")]
+     + ALLOW_ROWS,
+     want_fail=False, needle="both are regexes, so no tool name")
+
+case("an undecidable pair is counted apart from the compared ones",
+     [("a.py", "PreToolUse", "mcp__github__.*"),
+      ("a.py", "PreToolUse", "mcp__.*")],
+     [("a.py", "PreToolUse", "mcp__github__.*, mcp__.*", "warns")]
+     + ALLOW_ROWS,
+     want_fail=False,
+     needle="0 matcher pair(s) compared for a double binding, 1 undecidable")
+
+# The classifier itself, so each arm is pinned rather than inferred from the
+# two fixtures above.
+check("two different regexes are undecidable",
+      _catalog.undecidable_pair("mcp__github__.*", "mcp__.*") is True)
+check("a regex paired with a plain name is decidable",
+      _catalog.undecidable_pair("mcp__.*", "Bash") is False)
+check("two identical regexes are decidable",
+      _catalog.undecidable_pair("mcp__.*", "mcp__.*") is False)
+check("a catch-all is decidable against anything",
+      _catalog.undecidable_pair("", "mcp__.*") is False)
 
 # Two groups carrying the identical matcher -- the shape `hooks_json` cannot
 # build, and the one a reader is likeliest to create by appending a group

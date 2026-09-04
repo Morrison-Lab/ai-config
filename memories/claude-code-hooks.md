@@ -275,7 +275,8 @@ So:
 
 Two consequences that were previously open questions (ai-config#2535).
 A plain name is not a substring test, so binding one script to `Write`, `Edit`, and `NotebookEdit` as three groups is three disjoint bindings rather than a triple invocation on a `NotebookEdit` call.
-And an alternation is usable rather than silently inert, so those three groups collapse into one.
+And an alternation is usable rather than silently inert, so those three groups could be written as one.
+This repo keeps them apart anyway, per the Don't below.
 
 The fast-path character class is `[A-Za-z0-9_|]`.
 This note previously recorded it as `[A-Za-z0-9_\- ,|]`, which was wrong in the direction that matters:
@@ -287,13 +288,16 @@ The harness runs **every** group whose matcher fires, so one script named in two
 That is wasteful for a warn-only hook and is not benign for a blocking one.
 
 - **Do:** use `"mcp__github__.*"` (JavaScript regex) to match a whole MCP server's tools.
-- **Do:** write an alternation as one group, `"Write|Edit|NotebookEdit"`, when one hook covers several tools
+- **Do:** read an alternation, `"Write|Edit|NotebookEdit"`, as one group that fires rather than one that is silently inert
   (the table above escapes that pipe only because a bare `|` would end a markdown cell).
 - **Do:** run `python3 scripts/check-hook-catalog.py`, which reimplements the three branches and fails a script bound twice for the same event and tool.
 - **Don't:** use `"mcp__github__*"` (shell glob), which is a regex matching `mcp__github` followed by zero or more `_`.
 - **Don't:** expect a plain name to match a longer tool name --- it is compared by equality.
 - **Don't:** bind a comma-joined matcher such as `"Bash, Edit"`;
   that is the catalog's notation, and as a matcher it fires on nothing.
+- **Don't:** collapse a script's per-tool groups into one alternation on the strength of that being permitted.
+  One group per tool is this repo's convention, and `hooks/test-remind-brief-premises.py` asserts a per-tool matcher set,
+  `set(_matchers) >= {"Agent", "Task", "SendMessage"}`, which a single alternation group would fail.
 
 **Catalog validator:** `scripts/check-hook-catalog.py` parses compound matcher entries (e.g. `PreToolUse (Bash, mcp__github__.*)`) using `ROW` regex matcher class `[A-Za-z0-9_.*, -]`, plus a backslash-escaped pipe for an alternation cell, and aggregates multiple matcher groups for the same script and event.
 

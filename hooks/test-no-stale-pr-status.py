@@ -117,6 +117,28 @@ CASES = [
      "a semicolon-joined clause is its own sentence boundary too -- a "
      "negation before the ';' must not suppress an unrelated genuine "
      "stale-clean claim after it (ai-config#1770)"),
+
+    # ai-config#3038. A retraction puts the claim first and the correction
+    # after it, so a prefix-only negation scan reads a withdrawal as a fresh
+    # assertion -- and the retraction vocabulary is not negation vocabulary.
+    ([QUERY, PUSH, say('But "fully clean" was wrong too, and for a third reason.')], False,
+     "the measured sentence: a retraction quoting the phrase it retracts"),
+    ([QUERY, PUSH, say('My earlier "ready to merge" call was incorrect.')], False,
+     "retraction vocabulary AFTER the phrase, in the same sentence"),
+    ([QUERY, PUSH, say("I overstated it: 11 pass was the pre-push reading.")], False,
+     "retraction vocabulary BEFORE the phrase, with no sentence break between"),
+    ([QUERY, PUSH, say('The reviewer is wrong that #1689 is conflict-free.')], False,
+     "'is wrong' is a retraction even without a first-person subject"),
+
+    ([QUERY, PUSH, say("All checks green. My earlier count was wrong, but that is "
+                       "a separate claim.")], True,
+     "a retraction in a LATER sentence must not suppress an unnegated claim"),
+    ([QUERY, PUSH, say("#1689 is fully clean after the reviewer confirmed every "
+                       "finding was addressed, including the one about the wrong "
+                       "variable name.")], True,
+     "a retraction word beyond NEGATION_WINDOW must not suppress a genuine claim"),
+    ([QUERY, PUSH, say("Fixed the wrong path and pushed; all checks green.")], True,
+     "attributive 'wrong' is not a retraction -- the copula is required"),
 ]
 
 

@@ -137,6 +137,68 @@ RX_NEGATION = re.compile(
 # parse prose correctly.
 RX_SENTENCE_BREAK = re.compile(r"[.!?;][\"'\)\]*_`]*(?:\s|$)|\n")
 
+# Retraction vocabulary. A correction is rarely phrased as "the PR is not
+# fully clean"; it says the earlier claim "was wrong". `RX_NEGATION` matches
+# none of that, so a reply WITHDRAWING a cleanliness claim read as making one
+# and was blocked -- measured 2026-09-02 on the sentence: But "fully clean"
+# was wrong too, and for a third reason (ai-config#3038).
+#
+# Blocking a correction specifically is worse than an ordinary false positive:
+# the cheapest way to satisfy the guard is to stop mentioning the earlier
+# claim at all, which is the opposite of what CLAUDE.md asks for.
+#
+# Ported rather than re-derived, per `dont-reinvent-wheel`:
+# `hooks/remind-ums-after-error.py` already enumerates this family for the
+# same reason (ai-config#1210 -- a retraction of a figure rarely carries an
+# explicit "incorrectly"). The copula is required for the adjective forms,
+# because bare `wrong` is most often attributive ("the wrong branch", "the
+# wrong file") and says nothing about a claim being withdrawn.
+RX_RETRACTION = re.compile(
+    r"\b(?:was|were|is|are)\s+"
+    r"(?:wrong|incorrect|false|mistaken|inaccurate|premature)\b"
+    r"|\b(?:over|under)(?:stated|estimated|counted|reported|claimed)\b"
+    r"|\bretract(?:ing|ed|s)?\b"
+    r"|\bcorrecting\s+(?:myself|my|this|that)\b"
+    r"|\bmis(?:read|counted|stated|characterized|spoke)\b",
+    re.I,
+)
+
+# The scan after the match is BOUNDED as well as sentence-scoped, ported from
+# `scripts/check-pr-fully-clean.py`'s QUALIFIER_WINDOW, whose comment records
+# the same asymmetry: a negation BEFORE the phrase can sit anywhere earlier in
+# the sentence, while one AFTER it only retracts when it sits close. Unbounded,
+# a trailing clause about something else ("... including the one about the
+# wrong variable name") would silently suppress a genuine stale-clean claim --
+# the opposite failure, and the invisible one.
+NEGATION_WINDOW = 60
+
+
+def _sentence_bounds(text, hit):
+    """The span of the sentence containing `hit`, coarsely."""
+    start = 0
+    for boundary in RX_SENTENCE_BREAK.finditer(text, 0, hit.start()):
+        start = boundary.end()
+    end = RX_SENTENCE_BREAK.search(text, hit.end())
+    return start, (end.start() if end else len(text))
+
+
+def _is_negated(text, hit):
+    """True if the ASSERT match is negated or retracted within its sentence.
+
+    Three scans, deliberately asymmetric. Plain negation before the phrase is
+    sentence-wide, which is the pre-existing behaviour. Everything after the
+    phrase, and the retraction vocabulary before it, is bounded by
+    NEGATION_WINDOW.
+    """
+    start, end = _sentence_bounds(text, hit)
+    if RX_NEGATION.search(text[start:hit.start()]):
+        return True
+    trailing = text[hit.end():min(end, hit.end() + NEGATION_WINDOW)]
+    if RX_NEGATION.search(trailing) or RX_RETRACTION.search(trailing):
+        return True
+    leading = text[max(start, hit.start() - NEGATION_WINDOW):hit.start()]
+    return bool(RX_RETRACTION.search(leading))
+
 
 def all_unnegated_asserts(text):
     """Every un-negated ASSERT match, in textual order.
@@ -146,24 +208,13 @@ def all_unnegated_asserts(text):
     worded", because the strongest claim in a message is not always the
     earliest one.
     """
-    out = []
-    for hit in RX_ASSERT.finditer(text):
-        sentence_start = 0
-        for boundary in RX_SENTENCE_BREAK.finditer(text, 0, hit.start()):
-            sentence_start = boundary.end()
-        if not RX_NEGATION.search(text[sentence_start:hit.start()]):
-            out.append(hit)
-    return out
+    return [hit for hit in RX_ASSERT.finditer(text) if not _is_negated(text, hit)]
 
 
 def find_unnegated_assert(text):
-    """Return the first ASSERT match not negated earlier in its sentence."""
+    """Return the first ASSERT match not negated or retracted in its sentence."""
     for hit in RX_ASSERT.finditer(text):
-        sentence_start = 0
-        for boundary in RX_SENTENCE_BREAK.finditer(text, 0, hit.start()):
-            sentence_start = boundary.end()
-        preceding = text[sentence_start:hit.start()]
-        if not RX_NEGATION.search(preceding):
+        if not _is_negated(text, hit):
             return hit
     return None
 

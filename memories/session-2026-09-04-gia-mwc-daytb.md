@@ -213,3 +213,19 @@ Every wave worktree was clean and every branch fast-forwarded or already matched
 Each branch's issue now carries a status comment with its head SHA and the last recheck's findings verbatim, or a note that the recheck was cut, posted through the REST API from body files.
 [#3203](https://github.com/Morrison-Lab/ai-config/issues/3203) records the four loops' agent and token counts against the zero verified and proposes the restructuring.
 This branch merged `origin/main` at `6af715ec` with the gates green and opened as [#3202](https://github.com/Morrison-Lab/ai-config/pull/3202): claim comment with `@jules review`, Copilot requested, session subscribed.
+
+## 05:46 PDT --- #3202 at `c58e7172`: claude-review Ready, every check green, Jules blocks twice; held for #3192
+
+Jules approved the first head `6af715ec` at 12:39:52Z, then blocked `c58e7172` at 12:43:14Z and again at 12:46:16Z after one rebuttal-and-re-run, on its own `INPUT_EXTRA_INSTRUCTIONS` config and on line 1076 of the 09-03 file ("file and merge on the approving round"), a recorded conclusion about #3154 that Jules reads as an instruction to itself.
+The non-determinism (approve, block, block under one config) is posted on #3183;
+the second instance is posted on #3192.
+claude-review returned Ready for merge with no findings, `require-clean-verdict` and every check run are green, and Copilot quota-skipped on both heads.
+The PR is held unmerged with `jules/review` red, per the #3192 disposition being the maintainer's;
+this entry is appended locally and not pushed until that decision, since every push re-runs the reviewers.
+
+## 09:49 PDT --- the user overrules Jules on #3202 and endorses #3203
+
+User directive, verbatim:
+"daytb; 3203 sounds good.
+you can overrule jules and merge".
+So #3202 merges at its next claude-review-clean head with `jules/review` red, as a maintainer decision for this PR (recorded on #3192), and the wave branches proceed by #3203's route: restructure the recheck-and-fix loop first, then rerun it once over the 38 snapshots.

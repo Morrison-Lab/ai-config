@@ -38,10 +38,10 @@ A heredoc body is prose, so it is stripped before matching; the opener line's
 tail is still shell and is kept, since `gh issue create --body-file -` behind
 a heredoc is the idiomatic way to file with a long body.
 
-The discharge reads a label flag's value over that same heredoc-stripped
-text, covering `--label a --label b`, `--label a,b`, `--label=a`, `--labels`,
-and `-l a`. A title or body that names `ai-authored` therefore does not
-discharge it.
+The discharge splits that same heredoc-stripped text into shell tokens and
+reads a label flag's argument, covering `--label a --label b`, `--label a,b`,
+`--label=a`, `--labels`, and `-l a`. `ai-authored` quoted inside a title or a
+body sits at no argument position, so it does not discharge.
 
 WHY WARN RATHER THAN BLOCK
 --------------------------
@@ -75,6 +75,7 @@ from __future__ import annotations
 
 import json
 import re
+import shlex
 import sys
 
 # `gh issue create` / `glab issue create` at a command position. The separator
@@ -97,8 +98,10 @@ RX_HEREDOC = re.compile(
 
 AUTHORSHIP_LABEL = "ai-authored"
 
-# The value of a `--label` / `--labels` / `-l` flag, in every accepted
-# spelling: separated by `=` or whitespace, optionally quoted.
+LABEL_FLAGS = ("--label", "--labels", "-l")
+
+# Fallback for a command shlex cannot tokenize: the value of a `--label` /
+# `--labels` / `-l` flag, separated by `=` or whitespace, optionally quoted.
 RX_LABEL_FLAG = re.compile(r"(?:--labels?|(?<![-\w])-l)[=\s]+['\"]?([^'\"\s]+)")
 
 BASH_TOOLS = ("Bash", "bash", "run_command", "execute_command", "terminal", "shell")
@@ -137,8 +140,21 @@ def strip_heredocs(command: str) -> str:
 
 
 def labels_authorship(command: str) -> bool:
-    """True when a label flag's value carries the authorship label."""
-    return any(AUTHORSHIP_LABEL in value for value in RX_LABEL_FLAG.findall(command))
+    """True when a label flag's ARGUMENT carries the authorship label."""
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        return any(AUTHORSHIP_LABEL in v for v in RX_LABEL_FLAG.findall(command))
+    for index, token in enumerate(tokens):
+        for flag in LABEL_FLAGS:
+            if token == flag:
+                following = tokens[index + 1] if index + 1 < len(tokens) else ""
+                if AUTHORSHIP_LABEL in following:
+                    return True
+            elif token.startswith(flag + "="):
+                if AUTHORSHIP_LABEL in token[len(flag) + 1:]:
+                    return True
+    return False
 
 
 def evaluate_bash(command: str) -> str | None:

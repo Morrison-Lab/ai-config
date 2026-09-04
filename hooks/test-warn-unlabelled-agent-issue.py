@@ -50,6 +50,17 @@ BASH_FIRES = [
         "the label named in the body",
         'gh issue create --title "t" --body "issue-first.md says to pass ai-authored"',
     ),
+    (
+        "the label FLAG quoted inside the body",
+        'gh issue create --title "t" '
+        '--body "the rule is to pass --label ai-authored when filing"',
+    ),
+    (
+        "the label FLAG quoted inside the title",
+        'gh issue create '
+        '--title "warn-unlabelled-agent-issue: --label ai-authored in a body" '
+        '--body "b"',
+    ),
 ]
 
 BASH_QUIET = [
@@ -57,6 +68,9 @@ BASH_QUIET = [
     ("labelled, comma-separated glab form", 'glab issue create --title "t" --label "ai-authored,model:x"'),
     ("labelled with --label=", 'gh issue create --title "t" --label=ai-authored'),
     ("labelled with -l", 'gh issue create --title "t" -l ai-authored'),
+    ("labelled with -l and a quoted pair", 'gh issue create -l "ai-authored,model:x"'),
+    ("labelled with --labels=", 'gh issue create --labels=ai-authored,model:x'),
+    ("unbalanced quoting falls back to the regex", 'gh issue create --label ai-authored --title "t'),
     ("not a create at all", "gh issue list --state all --search 'x'"),
     ("editing labels on an existing issue", 'gh issue edit 12 --add-label ai-authored'),
     ("a PR create", 'gh pr create --title "t" --body "b"'),

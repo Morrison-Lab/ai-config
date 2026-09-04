@@ -158,7 +158,7 @@ committed pass.
      "Searching the wrong corpus is the same error with no grep in it".
    - **When that grep finds the corpus already covers this class, record the
      recurrence on the existing entry, not just the new fact.**
-     The bullet above already says to extend in place rather than add a
+     The grep bullet above already says to extend in place rather than add a
      sibling; what is missing is the count.
      Write it on the entry -- "3rd occurrence, 2026-08-16", with a pointer to
      each prior record -- so the entry carries evidence about whether the

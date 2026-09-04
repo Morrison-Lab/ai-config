@@ -665,3 +665,21 @@ the closing note duplicated the opening's provenance, the `git-branches` citatio
 All four applied at `d2b5db54`, pushed as a new branch, and opened as [#3166](https://github.com/Morrison-Lab/ai-config/pull/3166) (Refs #3129) with Copilot requested and `@jules review` posted, per the convergence decision;
 subscribed to its activity.
 [#3166](https://github.com/Morrison-Lab/ai-config/pull/3166) edits this notebook file's part-2 region, so this part-3 branch merges `main` after #3166 lands rather than before.
+
+## 17:46 PDT --- #3154 at `73ced6bf`: the case record cited commits GitHub no longer serves
+
+Copilot's fifth round made two points on `3f8f2fd9`.
+The wording one ("the paths skill-builder step 0 runs" implied the whole recipe is identical) is applied as "skill-builder step 0's path list".
+The suppressed one was the real catch:
+the case record cited `eb0cf15e`, `1732000a`, and `5f2dab94` from #3060's branch, and `git fetch origin <sha>` fails for all three,
+because #3060's branch was rebased before merge (its `refs/pull/3060/head` is `f9068299`, and none of the three is an ancestor of it).
+Fifteen adversarial rounds and two claude-review runs had "confirmed all four cited SHAs exist" against the local object store, which held them from the session's own fetches;
+the artifact they verified was the clone, not the remote.
+The record now measures at `3935bfff` and `2156b439`, both on `main`: three then four `memories/` hits, the same five MD018 lines at both, and the added entry a cross-link at the merge, so a hit count cannot tell an owner from a pointer.
+Pushed as `73ced6bf` after a fresh `ls-remote` read `3f8f2fd9`;
+Copilot re-requested, `@jules review` posted, PR body moved to the head.
+Also on `2b3bd51c`: `review / require-clean-verdict` went red because the claude-review body narrated the instrument's "NOT clean" reading unbackticked and the verdict parser read it as the verdict (the #2497 shape);
+the run on `3f8f2fd9` was green, so no action beyond noting it.
+Lessons for the fold:
+a SHA citation is checked with `git fetch origin <sha>` against the remote, not with `git cat-file` against a clone that may hold it;
+and a case record anchors on refs the remote keeps (`main`, or `refs/pull/N/head`), never on intermediate branch commits.

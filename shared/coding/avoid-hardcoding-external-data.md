@@ -245,7 +245,9 @@ The flake was the same in either location, and that explanation was retracted a 
 The other half of the point is that the total really is environment-dependent, and three successive attempts named the wrong cause.
 Measured 2026-09-03 on `origin/main`, `python3 scripts/test_check_pr_fully_clean.py` reports `754 passed, 0 failed` in an ordinary checkout and `753 passed, 0 failed` under `GIT_DIR=/nonexistent`.
 The suite fetches a prior revision of the checker with `git show`, trying `origin/main` first, and emits one extra case only when some revision resolves.
-So the total turns on whether that ref is reachable, not on where the tree sits: a `git archive` export reports 753 and a depth-1 clone reports 754, because the shallow clone still has `origin/main`.
+So the total turns on whether **any** of those revisions resolves, not on where the tree sits.
+A `git archive` export reports 753, having no repository at all.
+A depth-1 clone reports 754 on `origin/main`, and a full clone with its remote removed still reports 754 by falling through to `HEAD~40`.
 
 That is the discriminator, and it was one command away throughout.
 What the three wrong explanations share is that none of them varied an input.

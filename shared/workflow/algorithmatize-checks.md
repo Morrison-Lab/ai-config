@@ -1569,7 +1569,6 @@ And run the *unchanged* copy the same N times, so a green run has something to b
 
 See [`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md), "A repeated measurement is not a controlled one".
 
-
 ## Reading an instrument's PROSE instead of its exit status, generalized past the PR checker
 
 [`fully-clean`](fully-clean.md)'s "Calling the checker is not consuming it"

@@ -523,8 +523,8 @@ The routing rule this measurement licenses lives in
 "The one measured exception: authoring work a mechanical test can
 accept" section, which summarizes the measurement in one sentence and
 cites this section for the rest.
-Amend the measurement in this file;
-amend the routing rule in that section.
+A later measurement belongs in this file,
+and a change to the routing rule belongs in that section.
 
 - **Do:** read this as one data point for one model id on one task,
   not as a general claim about hosted-free-tier authoring capability.

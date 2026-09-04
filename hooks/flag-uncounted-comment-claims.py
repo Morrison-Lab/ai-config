@@ -282,9 +282,9 @@ _NUMBERED_SEGMENT = r"[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*"
 # so an item cannot be built from bare words alone: "Addressed, Rebutted,
 # or Deferred" matches nothing, and neither does an ordinary prose slash
 # pair (`and/or`, `CI/CD`, `input/output`) or a two-segment all-bare
-# directory (`shared/workflow`). What changes is
-# only WHERE the separator has to sit -- somewhere in the item, rather than
-# in every segment of it.
+# directory (`shared/workflow`). What changes is only WHERE the
+# separator has to sit -- somewhere in the item, rather than in every
+# segment of it.
 #
 # Both hop counts are bounded at 8 rather than left unbounded. A `/` can be
 # read either as an item's own segment separator or as the list separator

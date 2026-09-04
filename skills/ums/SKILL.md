@@ -135,20 +135,22 @@ committed pass.
      related `get_check_runs` guidance while an entry on the same tool already
      sat ~2000 lines below in the write-access cluster -- caught by the review
      bot, not by the author.)
-   - **Run `python3 scripts/check-memory-file-size.py` before choosing which
-     file the entry goes into, and read its warning band, not only its
-     pass/fail line.**
+   - **Run `python3 scripts/check-memory-file-size.py` before writing the
+     append, and read its warning band, not only its pass/fail line.**
      The band names every memory file near the cap and how many lines each
      has left (ai-config#3102), so a file with almost no
-     headroom is knowable here, where the target is still being chosen,
-     rather than by tripping the gate in step 4 once the append is written.
+     headroom is knowable here, while the entry can still be re-wrapped or the
+     file split, rather than by tripping the gate in step 4 once the append is
+     written.
      Read each listed file's headroom, not its membership: the band opens 100
      lines below the cap at the shipped default, so most of it is room rather
      than a warning.
-     - **Do:** send the entry to a file whose reported headroom comfortably
-       covers it, and split or reroute one whose headroom does not.
-     - **Don't:** redirect or split on band membership alone --- a file with
-       most of the band still ahead of it can take this entry.
+     - **Do:** read the reported headroom of the file the entry topically
+       belongs in, and recover lines or split that file when its headroom does
+       not comfortably cover the entry.
+     - **Don't:** pick the destination by headroom rather than by subject,
+       or redirect or split on band membership alone --- a file with most of
+       the band still ahead of it can take this entry.
    - **When the target memory file is already at the cap
      `scripts/check-memory-file-size.py` reports**, append elsewhere,
      recover lines (re-wrap or drop), or split the file.
@@ -235,8 +237,8 @@ committed pass.
    `python3 scripts/check-links.py`, and `markdownlint` on the changed files.
 
    `check-memory-file-size.py` prints its warning band here too, but this run
-   is the pass/fail one: the band is actionable in step 3, where the target
-   file is still being chosen, and by now the append already exists.
+   is the pass/fail one: the band is actionable in step 3, before the append is
+   written, and by now the append already exists.
 
    **If a push is rejected non-fast-forward:** fetch first and diff before
    assuming a real conflict -- the branch may have picked up another

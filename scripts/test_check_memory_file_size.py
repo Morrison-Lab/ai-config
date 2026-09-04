@@ -118,16 +118,25 @@ with tempfile.TemporaryDirectory() as tmp:
     # The header reports rather than instructs. A single imperative addressed
     # to the whole band would make the band the second gate the module
     # docstring rejects -- at the shipped default it opens 100 lines below the
-    # cap, so a file with most of that room left would be told to split. Pin
-    # both halves: the wording that points at the per-file headroom, and the
-    # absence of the band-wide order it replaced.
+    # cap, so a file with most of that room left would be told to split.
     check(
         "the band header points at the headroom",
-        "Headroom before the cap, least first:" in out,
+        cmfs.BAND_HEADER in out,
     )
+    # Assert that property against the header itself, rather than the absence
+    # of any one retired wording: a literal absent-string test passes for every
+    # order phrased in different words, so it would guard nothing. The wording
+    # this replaced attached its imperatives after a colon, which is why the
+    # punctuation half is checked alongside the verb list.
     check(
-        "the band header issues no band-wide split order",
-        "Split before appending" not in out,
+        "the band header is one clause carrying no directive verb",
+        cmfs.BAND_HEADER.count(".") == 1
+        and cmfs.BAND_HEADER.endswith(".")
+        and not any(c in cmfs.BAND_HEADER for c in ":;")
+        and not any(
+            word in cmfs.BAND_HEADER.lower()
+            for word in ("split", "prefer", "reroute", "trim", "recover", "append")
+        ),
     )
     # "least first" is a claim the header makes about the listing, so check it:
     # near.md has 5 lines of headroom and edge.md has 8.

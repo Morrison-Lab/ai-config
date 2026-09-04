@@ -73,6 +73,12 @@ DEFAULT_MAX_LINES = 1250
 # than a literal per `shared/coding/configurable-parameters.md`.
 DEFAULT_WARN_FRACTION = 0.92
 
+# The one line the warning band prints above its per-file listing. It reports
+# and does not instruct, for the reason `report_approaching` gives. Kept as a
+# named constant so `test_check_memory_file_size.py` can assert that property
+# against the string itself rather than scraping it back out of the output.
+BAND_HEADER = "Headroom before the cap, least first."
+
 # `MEMORY.md` is the index, not a memory file; `session/` holds
 # conversation-scoped notes that are never meant to persist or be split.
 #
@@ -202,7 +208,8 @@ def report_approaching(
     rejects: at the shipped default the band opens 100 lines below the cap, so
     a file with most of that room still ahead of it would be told to split.
     Urgency belongs to the per-file headroom the listing already carries, so
-    the header points at that number rather than at membership.
+    the header names that number and orders by it, and the procedure that acts
+    on it lives in `skills/ums/SKILL.md` step 3.
     """
     if not approaching:
         if announce_empty:
@@ -214,8 +221,7 @@ def report_approaching(
     print(
         f"\n{len(approaching)} memory file(s) are approaching the "
         f"{max_lines}-line cap ({warn_lines} lines or more).\n"
-        "Headroom before the cap, least first: prefer a file with room to "
-        "spare, and split one that has almost none.\n"
+        f"{BAND_HEADER}\n"
     )
     for rel_path, n_lines, headroom in approaching:
         print(f"  {rel_path}: {n_lines} lines ({headroom} lines of headroom)")

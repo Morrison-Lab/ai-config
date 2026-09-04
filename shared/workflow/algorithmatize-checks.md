@@ -527,7 +527,7 @@ picking the script whose name matches the property.
   that measures it.
 
 (Measured 2026-08-19 on ai-config.
-`scripts/check-memory-file-size.py` exits `0` while printing that
+`scripts/check-memory-file-size.py` exited `0` while printing that
 `memories/github-actions.md` was over its 1200-line threshold, so the crossing
 was reported here as advisory and pushed.
 `validate` went red on both parallel runs: `scripts/test_check_memory_file_size.py`

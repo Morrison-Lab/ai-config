@@ -39,7 +39,8 @@ gh issue create --title "..." --body-file <file> \
 
 ## The `glab` path
 
-`glab` takes one comma-separated `--label`, not a repeated flag:
+`glab` accepts either a comma-separated `--label` or a repeated flag;
+the comma-separated form is used here:
 
 ```sh
 glab issue create --title "..." --description "..." \

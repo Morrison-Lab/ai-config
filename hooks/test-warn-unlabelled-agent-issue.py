@@ -12,7 +12,9 @@ Run: python3 hooks/test-warn-unlabelled-agent-issue.py
 from __future__ import annotations
 
 import importlib.util
+import json
 import pathlib
+import subprocess
 import sys
 
 HERE = pathlib.Path(__file__).resolve().parent
@@ -35,6 +37,19 @@ BASH_FIRES = [
         "gh issue create --title 't' --body-file - <<'EOF'\nsome body\nEOF",
     ),
     ("--repo form", 'gh issue create --repo O/R --title "t" --body "b"'),
+    (
+        "the label named in a heredoc body, not in a flag",
+        "gh issue create --title 't' --body-file - <<'EOF'\n"
+        "We should require the ai-authored label on filed issues.\nEOF",
+    ),
+    (
+        "the label named in the title",
+        'gh issue create --title "warn-unlabelled-agent-issue misses ai-authored" --body "b"',
+    ),
+    (
+        "the label named in the body",
+        'gh issue create --title "t" --body "issue-first.md says to pass ai-authored"',
+    ),
 ]
 
 BASH_QUIET = [
@@ -140,6 +155,30 @@ def main() -> int:
         if needed not in message:
             print(f"::error::warning text omits {needed!r}", file=sys.stderr)
             failures += 1
+
+    # The harness reads a PreToolUse warning from hookSpecificOutput
+    # additionalContext; stderr is not injected into the model's context.
+    proc = subprocess.run(
+        [sys.executable, str(HERE / "warn-unlabelled-agent-issue.py")],
+        input=json.dumps(
+            {"tool_name": "Bash", "tool_input": {"command": 'gh issue create --title "t"'}}
+        ),
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    try:
+        emitted = json.loads(proc.stdout)["hookSpecificOutput"]["additionalContext"]
+    except (json.JSONDecodeError, KeyError, TypeError):
+        emitted = ""
+    if "ai-authored" not in emitted:
+        print(
+            "::error::end-to-end run emitted no additionalContext carrying the warning",
+            file=sys.stderr,
+        )
+        failures += 1
+    else:
+        print("OK   emits additionalContext")
 
     total = len(BASH_FIRES) + len(BASH_QUIET) + len(MCP_FIRES) + len(MCP_QUIET)
     if failures:

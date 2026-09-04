@@ -24,7 +24,7 @@ maintainer typed --- which is the whole defect.
 THE CHECK
 ---------
 Bash: `gh issue create` / `glab issue create` at a COMMAND POSITION, with
-heredoc bodies stripped, and no `ai-authored` anywhere in the command.
+heredoc bodies stripped, and no `ai-authored` in a label flag's value.
 
 MCP: `mcp__github__issue_write` with `method` == "create" (and the legacy
 `mcp__github__create_issue`), with no `ai-authored` in its `labels`.
@@ -38,12 +38,10 @@ A heredoc body is prose, so it is stripped before matching; the opener line's
 tail is still shell and is kept, since `gh issue create --body-file -` behind
 a heredoc is the idiomatic way to file with a long body.
 
-The `ai-authored` discharge is deliberately a plain substring over the whole
-command, not a parse of `--label`. The flag has too many accepted spellings
-(`--label a --label b`, `--label a,b`, `-l a`, `--label=a`, glab's
-comma-separated single flag) for a partial parser to be safer than a
-containment test, and the failure direction of an over-broad discharge here is
-one missed reminder rather than a wrong refusal.
+The discharge reads a label flag's value over that same heredoc-stripped
+text, covering `--label a --label b`, `--label a,b`, `--label=a`, `--labels`,
+and `-l a`. A title or body that names `ai-authored` therefore does not
+discharge it.
 
 WHY WARN RATHER THAN BLOCK
 --------------------------
@@ -99,6 +97,10 @@ RX_HEREDOC = re.compile(
 
 AUTHORSHIP_LABEL = "ai-authored"
 
+# The value of a `--label` / `--labels` / `-l` flag, in every accepted
+# spelling: separated by `=` or whitespace, optionally quoted.
+RX_LABEL_FLAG = re.compile(r"(?:--labels?|(?<![-\w])-l)[=\s]+['\"]?([^'\"\s]+)")
+
 BASH_TOOLS = ("Bash", "bash", "run_command", "execute_command", "terminal", "shell")
 
 MCP_ISSUE_CREATE_TOOLS = ("mcp__github__issue_write", "mcp__github__create_issue")
@@ -134,16 +136,19 @@ def strip_heredocs(command: str) -> str:
     return RX_HEREDOC.sub(lambda m: m.group(2), command)
 
 
-def creates_issue(command: str) -> bool:
-    """True when the command creates an issue at a command position."""
-    return bool(RX_ISSUE_CREATE.search(strip_heredocs(command)))
+def labels_authorship(command: str) -> bool:
+    """True when a label flag's value carries the authorship label."""
+    return any(AUTHORSHIP_LABEL in value for value in RX_LABEL_FLAG.findall(command))
 
 
 def evaluate_bash(command: str) -> str | None:
     """Return warning text when a Bash issue create carries no authorship label."""
-    if not command or not creates_issue(command):
+    if not command:
         return None
-    if AUTHORSHIP_LABEL in command:
+    stripped = strip_heredocs(command)
+    if not RX_ISSUE_CREATE.search(stripped):
+        return None
+    if labels_authorship(stripped):
         return None
     return NOTE
 
@@ -172,6 +177,15 @@ def evaluate_mcp(tool_name: str, tool_input: dict) -> str | None:
     return NOTE
 
 
+def _emit(note: str) -> None:
+    print(json.dumps({
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "additionalContext": note,
+        }
+    }))
+
+
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
@@ -198,7 +212,7 @@ def main() -> int:
         warning = evaluate_mcp(tool_name, tool_input)
 
     if warning:
-        print(warning, file=sys.stderr)
+        _emit(warning)
     return 0
 
 

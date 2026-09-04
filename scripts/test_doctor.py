@@ -12,6 +12,10 @@ from unittest.mock import MagicMock, patch
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
+# Any skill this checkout ships; the doubled-name test must not turn on one
+# skill directory staying in the repo under its current name.
+A_REPO_SKILL = sorted(p.name for p in (REPO_ROOT / "skills").iterdir() if p.is_dir())[0]
+
 import doctor
 
 
@@ -568,11 +572,11 @@ class TestConsumerLeftovers(unittest.TestCase):
 
     def test_name_match_reports_symptom_without_prescribing_removal(self):
         self.enable_plugin()
-        (self.home / "skills" / "claim-pr").mkdir(parents=True)
+        (self.home / "skills" / A_REPO_SKILL).mkdir(parents=True)
         res = doctor.check_consumer_leftovers()
         self.assertEqual(res["status"], "WARN")
         self.assertEqual(res["leftovers"], [])
-        self.assertEqual(res["doubled_skills"], ["claim-pr"])
+        self.assertEqual(res["doubled_skills"], [A_REPO_SKILL])
         self.assertIn("by hand", res["details"])
 
 

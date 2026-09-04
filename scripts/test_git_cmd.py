@@ -89,6 +89,14 @@ def test_redos_timing() -> None:
                 match is None and dur < 0.05,
                 f"dur={dur:.4f}s match={match}",
             )
+            t0 = time.perf_counter()
+            push_match = git_cmd.PUSH.search(probe)
+            push_dur = time.perf_counter() - t0
+            check(
+                f"PUSH probe '{tmpl.strip()}' * {n} rejects without ReDoS ({push_dur:.4f}s)",
+                push_match is None and push_dur < 0.05,
+                f"dur={push_dur:.4f}s match={push_match}",
+            )
 
 
 if __name__ == "__main__":

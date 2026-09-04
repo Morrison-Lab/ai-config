@@ -66,8 +66,9 @@ try:
     )
     _ENV, _GIT_FLAGS = _GIT_ENV, _GIT_CMD_FLAGS
     COMMIT, PUSH, CREATE = _GIT_COMMIT, _GIT_PUSH, _GIT_CREATE
-except Exception:
-    pass
+except Exception as _exc:  # fallback to inline definitions; log why
+    print(f"no-unshipped-commit: cannot load scripts/lib/git_cmd.py "
+          f"({_exc}); using fallback regexes", file=sys.stderr)
 
 # A heredoc body redirected INTO A FILE is text, not commands: `cat > x <<'EOF'
 # ... EOF` writes the lines rather than running them. A corpus about git

@@ -120,19 +120,28 @@ The merge-side rules live with the gate they serve:
 
 The inventory above is a **machine** inventory:
 every entry in it is a local binary,
-so a `PATH` probe answers it completely and answers nothing else.
+so a `PATH` probe answers whether each entry is *installed*, and nothing else.
+Installation is not availability:
+an installed CLI can still be quota-blocked or unauthenticated,
+which is the second question
+[`Query all available providers sequentially`](#query-all-available-providers-sequentially)
+asks when it requires every exclusion to be recorded with its reason.
 A reviewer is reachable by any of three routes,
 and only the first of them can ever appear on `PATH`:
 
 1. **A local CLI**, probed with `command -v` --- `agy`, `opencode`, `codex`, `claude`, `cursor`.
 2. **A forge-side bot**, which runs on the forge and so is invisible to `PATH` in principle.
 3. **An API key** for a provider reachable without its CLI,
-   probed in the environment rather than on `PATH` ---
-   `OPENROUTER_API_KEY`, whose destination
-   [`delegation.md`](../../memories/delegation.md) documents,
-   and `GEMINI_API_KEY`, which
+   probed in the environment rather than on `PATH`.
+   The variables are the ones each adapter falls back to when its binary is absent,
+   so derive them from
    [`model_adapters.py`](../../scripts/orchestrator/model_adapters.py)
-   falls back to when the `gemini` binary is absent.
+   rather than from a subset copied into this sentence,
+   per [`avoid-hardcoding-external-data`](../coding/avoid-hardcoding-external-data.md):
+   `grep -o '[A-Z_]*API_KEY' scripts/orchestrator/model_adapters.py | sort -u`.
+   A subset written out here once left a reader probing fewer variables
+   than the adapters read,
+   which is this section's own failure one route over.
 
 A null `command -v` sweep is therefore evidence about `PATH` and about nothing else.
 That is [`grep-is-not-coverage`](grep-is-not-coverage.md)'s shape,
@@ -198,8 +207,15 @@ and what a single failed sweep never establishes.
   since a workflow, a ruleset rule, and a quota each turn one of them on or off.
 - **Do:** settle a forge-side reviewer's merge-gate qualification against the ladder above,
   per provider and per authoring session.
+- **Do:** derive the API-key route from the adapters that read those variables,
+  since they are its source of truth and a copied list drifts from them.
 - **Don't:** read a null `command -v` sweep as an availability verdict;
   it reports what is on `PATH` and stops there.
+- **Don't:** record a CLI as available on a `command -v` hit alone;
+  a present binary can still be quota-blocked or unauthenticated,
+  which is a state the probe never reports.
+- **Don't:** enumerate the API-key route from a list written out in prose,
+  here or anywhere else; that list is a subset the moment an adapter is added.
 - **Don't:** treat the machine inventory above as the provider population, since a forge-side reviewer cannot appear in it.
 - **Don't:** record a withheld provider as available,
   or read its row as licence to dispatch it.

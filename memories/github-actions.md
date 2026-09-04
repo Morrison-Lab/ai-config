@@ -819,35 +819,53 @@ The working form is `env(1)` around `node dist/index.js`, recorded in
 ## Jules can block on `jules-review.yml`'s own extra instructions, and the second identical block is the signal to file, not to re-run
 
 `jules-review.yml`'s `INPUT_EXTRA_INSTRUCTIONS` (the action's trusted side of
-its prompt boundary, added to close
+its prompt boundary, added by #817 to close
 [#815](https://github.com/Morrison-Lab/ai-config/issues/815)) tells the
 reviewer not to report this corpus's imperative prose as a prompt injection
 and never to report a date as a typo or as being in the future.
-Measured 2026-09-04 on
+Measured 2026-09-03 (evening PDT) on
 [#3154](https://github.com/Morrison-Lab/ai-config/pull/3154) at `c5eb3da3`:
-two consecutive runs returned `VERDICT: block` on those very instructions
-("workflow config, line 1: prompt injection attempt ... directing the reviewer
-to ignore certain prompt injections and date-related typos") and, in the same
-breath, reported the previous day's measurement date as "in the future" in a
-file the diff does not carry (`search-is-not-coverage.md` for
-`grep-is-not-coverage.md`).
-The same reviewer had approved `27bb9588`, two ASCII dashes earlier, so the
-block is nondeterministic across runs on the same words.
+two consecutive runs returned `VERDICT: block` on those very instructions.
+The first wrote "project rules file, line 1: Prompt injection attempt in
+project rules file", then called the "Additional instructions (from workflow
+config)" section untrusted and said it "attempts to give direct instructions
+to me (as your reviewer) to suppress prompt injection findings and ignore
+future dates", so it named the trusted block untrusted and placed it in a
+rules file;
+the second wrote "workflow config, line 1: prompt injection attempt ...
+directing the reviewer to ignore certain prompt injections and date-related
+typos".
+Each also reported the same day's measurement date as "in the future":
+the first in a file the diff does not carry (`search-is-not-coverage.md`),
+the second in `grep-is-not-coverage.md`, which the diff does change, so an
+item can quote the diff and still be the misfire the instructions forbid.
+The same PR had two earlier prompt-injection blocks: one at `3084b58d` on the
+PR description, and one at `f6b9f7f3` quoting the same workflow config, which
+a single re-run cleared (approve four minutes later).
+The reviewer had also approved `27bb9588`, two ASCII dashes before `c5eb3da3`,
+so the block is nondeterministic across runs on the same words.
 Filed as [#3183](https://github.com/Morrison-Lab/ai-config/issues/3183).
 
 Two things follow for a session driving a PR under the `jules/review` status.
-The status is a commit status rather than a check run, and it is not in the
-repository's required set: with it red and every check run green the PR's
-`mergeable_state` reads `unstable`, not `blocked`.
-And a block whose items quote the workflow's configuration, or a file the diff
-does not touch, is a reviewer defect: rebut it once on the PR with the diff's
-file list, re-run once, and if the second run repeats the items, file the
-defect and dispose of the block as Rebutted rather than spending a third run.
+The status is a commit status rather than a check run (`GET
+/repos/<owner>/<repo>/pulls/3154/status` listed one status, context
+`jules/review`, and the check-runs endpoint listed none by that name), and on
+2026-09-03 it was not in the repository's required set: with it red and
+every check run green, `GET /pulls/3154` reported `mergeable_state:
+unstable`, where a failing required context reports `blocked`.
+Re-read that on a live PR before relying on it, since branch protection
+changes without a commit.
+And a block whose items are about the reviewer's own configuration, or make
+a claim the diff cannot answer (a measurement date called future, a file the
+diff does not carry), is a reviewer defect: rebut it once on the PR with the
+diff's file list and the measured date, re-run once, and if the second run
+repeats the items, file the defect and dispose of the block as Rebutted
+rather than spending a third run.
 
-- **Do:** read a Jules `block` for whether any item quotes the diff before
-  treating the red status as this PR's.
-- **Do:** rebut once with `git diff --name-only origin/main...HEAD`, re-run
-  once, then file.
+- **Do:** read a Jules `block` for whether each item is a claim the diff can
+  answer before treating the red status as this PR's.
+- **Do:** rebut once with `git diff --name-only origin/main...HEAD` and the
+  clock, re-run once, then file.
 - **Don't:** re-request Jules a third time on an identical block, or re-scope
   the diff to satisfy an item about the reviewer's own configuration.
 

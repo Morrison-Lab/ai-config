@@ -712,3 +712,13 @@ The flag is written out anyway at `147710bb` and the identity recorded in the me
 Copilot re-requested, `@jules review` posted.
 Loops at 17:54 PDT: wave 3 at 37 results, the wave-1 loop at 7, the wave-2 loop at 3.
 Lesson for the fold: a reviewer's claim about tool behaviour is measured before it is applied, and when the measurement refutes it, the fix can still make the text robust to the misreading.
+
+## 18:00 PDT --- #3154 at `5652ebd5`; #3166 one claude-review run from clean
+
+At `f6b9f7f3`, [#3154](https://github.com/Morrison-Lab/ai-config/pull/3154) had the claude-review verdict, Jules, CI (including `require-clean-verdict`), and a clean mergeable state;
+Copilot's seventh round asked that the MD018 command spell out its two refs instead of a `<ref>` placeholder,
+applied and pushed as `5652ebd5` with Copilot and Jules re-requested.
+[#3166](https://github.com/Morrison-Lab/ai-config/pull/3166) at `147710bb`: Jules approved and Copilot's third round read "Approval recommended";
+the claude-review run and `validate` for that head were in progress.
+Copilot's rounds on #3154 have run: recipe form, subshell, em dashes twice, unreachable SHAs, a placeholder;
+each was one item, and each push re-ran three reviewers, so the seven rounds cost about as much as the fifteen private ones.

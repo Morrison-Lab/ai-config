@@ -963,3 +963,53 @@ Reproducing at HEAD rather than at the reviewed commit is
 [`verify-the-right-artifact`](verify-the-right-artifact.md)'s "a checkout for
 the run" substitution --- the artifact in hand was real, was read carefully,
 and was not the one the claim was about.
+
+## "A peer's edge cases raised against a different implementation"
+
+Measured 2026-09-02 PT, recorded 2026-09-03.
+Re-derivable from two artifacts in the repository:
+[ai-config#3014](https://github.com/Morrison-Lab/ai-config/pull/3014)'s comment
+thread, and `hooks/warn-stale-review-diff-base.py`.
+This record has been cut twice for claiming more than those support;
+what is left is what they do.
+
+A peer session ran an adversarial pass on **its own** draft of a similar hook,
+raised two edge cases from it, and asked whether they applied here --- a flag
+between `diff` and the refs, and a long `git -C <path>` prefix.
+
+Both already passed, established by mutation rather than by reading.
+Regression cases were drafted for them and then **reverted as duplicates**:
+`hooks/test-warn-stale-review-diff-base.py` already carried a case for each
+shape.
+Nothing was pinned, and nothing needed to be.
+
+**The peer's reason for raising the second shape is the part worth keeping, and
+it was wrong about this implementation in an instructive way.**
+The peer said a long `git -C <path>` prefix "defeats any bounded gap between
+`git` and `diff`" --- a claim about the matcher, not about test coverage.
+Against a gap bounded by *characters* that would be right.
+This hook's gap is bounded by **option count**:
+`warn-stale-review-diff-base.py:96` allows `){0,12}` options between `git` and
+its subcommand, and its own comment puts the cost at "past 13 `-c k=v`
+options".
+Length is therefore not a dimension this implementation can respond to at all,
+so neither the worry nor a reassurance about it was about anything the code
+does.
+
+That is the transferable step, and it comes before measuring:
+**when a peer names the property that makes a shape matter, check that your
+implementation can see that property.**
+Where it cannot, the shape is not the question --- and running the cases would
+have returned a green that meant nothing.
+
+Two cautions about the evidence, since this record got both wrong before.
+
+Establishing coverage means **mutation**, not reading: a test asserting the
+guard stays *silent* on some input passes just as well when the guard stopped
+matching that input entirely, so a silent case read off the suite proves
+nothing about coverage on its own.
+
+And a mutation figure is only re-derivable against the suite it was taken from.
+The counts recorded for this episode were taken before later cases landed, so
+re-running the mutation on `main` today gives different denominators.
+They are omitted here for that reason.

@@ -755,27 +755,45 @@ and the verdict's own conclusion every round.**
   And no `<summary>`-scoped match on `suppressed` exists anywhere under
   `scripts/`, so the check prescribed by "A clean overview can hide a
   collapsed findings block" above is prescribed and not implemented.
-  A third surface sits outside it for a different reason: a review body
-  carrying findings under no parsable verdict is *fetched* --- the body is
-  read --- and simply not counted, because the verdict scan has nothing to
-  key on.
-  The second query below is what covers it, and covering it means reading
-  the body yourself rather than adding a query.
+  A third surface sits outside it for a different reason.
+  A body carrying findings under no parsable verdict *is* fetched, and
+  simply not counted, because the verdict scan has nothing to key on.
+  No query fixes that one --- only your reading the body does.
 
-  So run both of these beside the instrument, every round, and read their
-  output rather than the instrument's exit code as the answer to this
-  section.
-  The first reaches the inline comments.
-  The second returns the review bodies, which is where both the collapsed
-  suppressed block and the unparsed-verdict findings live --- so it answers
-  two of the three surfaces, and only by your reading what it prints:
+  So run these three beside the instrument, every round, and read what they
+  print rather than the instrument's exit code, as the answer to this
+  section:
 
   ```bash
-  gh api repos/<owner>/<repo>/pulls/<N>/comments \
-    --jq '.[] | "\(.id) \(.user.login) \(.path):\(.line // .original_line)"'
-  gh api repos/<owner>/<repo>/pulls/<N>/reviews \
-    --jq '.[] | select(.commit_id=="<head sha>") | .body'
+  # inline review comments -- never fetched by the instrument at all
+  gh api repos/<owner>/<repo>/pulls/<N>/comments --paginate \
+    --jq '.[] | "\(.user.login) \(.path):\(.line // .original_line)\n\(.body)\n"'
+  # formal review bodies -- where a collapsed suppressed block hides
+  gh api repos/<owner>/<repo>/pulls/<N>/reviews --paginate \
+    --jq '.[] | "\(.user.login) \(.commit_id[0:8]) \(.state)\n\(.body)\n"'
+  # issue comments -- where this repo's own review verdicts actually land
+  gh api repos/<owner>/<repo>/issues/<N>/comments --paginate \
+    --jq '.[] | "\(.user.login)\n\(.body)\n"'
   ```
+
+  Three deliberate choices in those, each of which a shorter form gets
+  wrong.
+  **Each prints `.body`**, because a projection of ids and paths tells you a
+  comment exists and never what it says, which is not something you can act
+  on.
+  **None filters on the head SHA.**
+  A standing not-clean from an earlier head still vetoes, per this file's
+  own rule, so a head-filtered query drops exactly the finding that has been
+  open longest --- and on #3167 it would have returned one of the two
+  findings and hidden the other, since they landed at different heads.
+  **The third query is not redundant with the second.**
+  `pulls/<N>/reviews` returns formal reviews only, while a completed
+  `@claude` run posts its verdict as an *issue* comment --- which is why
+  `CLAUDE.md`'s own verdict query reads `issues/<N>/comments`, and why the
+  instrument reads both.
+  Measured on #3167: its `issues` endpoint carries three
+  `**Claude finished review` bodies that appear nowhere in its `pulls`
+  reviews.
 
   Measured on [#3167](https://github.com/Morrison-Lab/ai-config/pull/3167),
   which the instrument called `FULLY CLEAN` twice over a standing finding:
@@ -795,9 +813,9 @@ and the verdict's own conclusion every round.**
   including collapsed suppressed-comments blocks.
 - **Do:** distinguish "no findings" from "no verdict" explicitly, and treat
   the latter as unreviewed.
-- **Do:** run the inline-comment and review-body queries above alongside
-  `scripts/check-pr-fully-clean.py`, and cite all three when reporting a PR
-  ready.
+- **Do:** run all three queries above alongside
+  `scripts/check-pr-fully-clean.py`, unfiltered by head SHA and printing
+  each body, and cite what they showed when reporting a PR ready.
 - **Don't:** report clean on a zero thread count, however many checks are
   green.
 - **Don't:** treat an empty review body as an all-clear without checking the

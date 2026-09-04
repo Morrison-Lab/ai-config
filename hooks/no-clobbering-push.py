@@ -110,12 +110,12 @@ INDETERMINATE and the reading is declined, because a reading taken in the
 wrong repository is worse than no reading at all. That is the same choice
 `_target` already makes when the destination is not a single named branch.
 
-A subshell scopes a `cd` to itself, so `(cd elsewhere && true) && git push`
-leaves the push in the CALLING directory. `_simple_commands` therefore labels
-each simple command with the SUBSHELL it runs in, using the parentheses `shlex`
-has already separated from quoted text, and `evaluate` keeps one directory per
-subshell: a subshell inherits its caller's directory when it opens, and nothing
-it does is ever read back out. Reading such a push in `elsewhere` is the
+A subshell written with PARENTHESES scopes a `cd` to itself, so
+`(cd elsewhere && true) && git push` leaves the push in the CALLING directory.
+`_simple_commands` therefore labels each simple command with the subshell it
+runs in, using the parentheses `shlex` has already separated from quoted text,
+and `evaluate` keeps one directory per subshell: a subshell inherits its
+caller's directory when it opens, and nothing it does is ever read back out. Reading such a push in `elsewhere` is the
 wrong-repository reading of ai-config#2451 again, and this file introduced it
 before the parentheses were tracked at all (measured 2026-09-04).
 
@@ -126,15 +126,29 @@ directory let the first one's `cd` leak into the second and
 wrong-repository reading, arriving by the very mechanism added to prevent it
 (measured 2026-09-04).
 
-A `cd` the shell may never REACH is declined as well, and the two shapes that
-produce one arrive here looking exactly like an ordinary `cd`: a branch body
-(`if ...; then cd elsewhere; fi`) and an alternative (`cd here || cd
-elsewhere`). `_simple_commands` splits on operators and models no
-short-circuiting, so applying their `cd` read the later push in `elsewhere`,
-where neither shell ever puts it -- ai-config#2451's wrong-repository warning
-once more, in both shapes (measured 2026-09-04). Each simple command therefore
-carries the OPERATOR that precedes it, and the directory goes indeterminate
-whenever a `cd` follows `||` or sits behind a `then` / `else` / `elif` / `do`.
+A `cd` the shell may never REACH, and one it reaches in a subshell of its
+own, are declined as well. Both arrive here looking exactly like an ordinary
+`cd`, because `_simple_commands` splits on operators and models neither
+short-circuiting nor forking, so applying them read the later push in
+`elsewhere` where no shell ever puts it -- ai-config#2451's wrong-repository
+warning once more, in each of the shapes below (measured 2026-09-04). Three
+things are tracked to decline them.
+
+A compound statement's body runs only when a branch is taken or an iteration
+begins, so `evaluate` counts the REGION one opens (`if`, `while`, `until`,
+`for`, `select`, `case`) and closes (`fi`, `done`, `esac`), and declines every
+`cd` inside. The region rather than the opening keyword, because a keyword
+attaches to a single simple command: `if ...; then echo no; cd elsewhere; fi`
+leaves that `cd` carrying no keyword at all, and it was applied while the
+one-command body beside it was declined.
+
+Each simple command carries the operator PRECEDING it, which is what tells an
+alternative from a chain: a `cd` after `||` runs only when what came before
+failed, and a `cd` after `|` is a pipeline element the shell forks.
+
+Each also carries the operator FOLLOWING it, because a fork is invisible from
+the operator before: `cd elsewhere & git push` and `cd elsewhere | cat; git
+push` both move a directory the pushing shell never sees.
 
 `&&` is deliberately NOT declined, because a `cd` and a later push joined by an
 unbroken `&&` chain are reached together: the push runs only if everything
@@ -192,6 +206,14 @@ anyway. Reaching that shape takes a `cd` guarded by a command that failed, and
 a push deliberately run outside the same chain, which is why the reading is
 kept rather than declined --- the `&&` shape it would cost is the common one.
 
+A fourth is a function body. `f() { cd elsewhere; }; git push` defines `f`
+without running it, and a brace group is transparent by the paragraph above,
+so the `cd` is applied to a push the shell runs where the call started
+(measured 2026-09-04). Declining it means recognizing a definition's `()` and
+then tracking brace depth to find where its body ends, which is more shell
+simulation than the shape earns: a definition and a push in one Bash call,
+whose body `cd`s and is never called.
+
 When the payload carries no `cwd` at all the fallback is the hook process's own
 directory, deliberately, rather than the `CLAUDE_PROJECT_DIR` that
 `flag-cd-into-main-checkout.py` prefers: `plugins/ai-config/codex-hook-adapter.py`
@@ -242,11 +264,26 @@ LEAD_WORDS = {"then", "do", "else", "elif", "!", "time", "sudo", "command",
               # would scope the `cd` to the group and be wrong.
               "{", "}"}
 
-# The lead words that make a simple command CONDITIONAL: it runs only when a
-# branch is taken, and which branch that is no static scan can decide. `{` and
-# `}` are deliberately absent -- a brace group runs in the current shell
-# whenever the command carrying it runs, so nothing about it is conditional.
-BRANCH_WORDS = {"then", "else", "elif", "do"}
+# The words that open and close a compound statement whose body runs only when
+# a branch is taken or an iteration begins. A REGION is tracked rather than the
+# `then` / `else` / `elif` / `do` keyword, because a keyword attaches to one
+# simple command and a body may hold several: in
+# `if ...; then echo no; cd elsewhere; fi` the `cd` carries no keyword at all
+# (measured 2026-09-04). `elif` opens nothing -- its `if` already did -- and
+# `{` / `}` open nothing either, since a brace group runs in the current shell
+# whenever the command carrying it runs.
+BLOCK_OPEN = {"if", "while", "until", "for", "select", "case"}
+BLOCK_CLOSE = {"fi", "done", "esac"}
+
+# The operator BEFORE a `cd` that means the pushing shell may never take its
+# effect: `||` runs its right side only when the left one failed, and `|` makes
+# the command a pipeline element the shell forks. `&&` is deliberately absent,
+# for the reason the module docstring gives.
+BRANCH_SEPS = {"||", "|"}
+
+# The operator AFTER a `cd` that forks it into a subshell of its own. A fork is
+# invisible from the operator before, so both directions are read.
+FORK_SEPS = {"&", "|"}
 
 _SHELL_OPS = set("();|&")
 
@@ -345,6 +382,11 @@ def _simple_commands(cmd):
     reach: this split knows nothing about short-circuiting, so `cd a || cd b`
     hands back two ordinary `cd` commands (measured 2026-09-04). `evaluate`
     reads it to decline the second rather than apply it.
+
+    The trailing operator is the one immediately AFTER, and it answers a
+    question the leading one cannot: `cd a & git push` and `cd a | cat` each
+    fork the `cd` into a subshell, and from the operator before it that `cd` is
+    indistinguishable from an ordinary one (measured 2026-09-04).
     """
     cmd = re.sub(r"\\\r?\n", " ", cmd)
     cmd = RX_HEREDOC.sub("<<", cmd)
@@ -358,8 +400,11 @@ def _simple_commands(cmd):
     cmds, cur, scopes, opened, sep = [], [], [()], 0, ""
     for t in toks:
         if t and set(t) <= _SHELL_OPS:
+            trailing = ""
+            for ch in t:
+                trailing = _next_sep(trailing, ch)
             if cur:
-                cmds.append((scopes[-1], cur, sep))
+                cmds.append((scopes[-1], cur, sep, trailing))
                 cur = []
                 sep = ""
             for ch in t:
@@ -372,13 +417,12 @@ def _simple_commands(cmd):
         else:
             cur.append(t)
     if cur:
-        cmds.append((scopes[-1], cur, sep))
+        cmds.append((scopes[-1], cur, sep, ""))
     return cmds
 
 
 def _lead_prefix(argv):
-    """`(index of the first real word, override assigned, git redirected,
-    conditional)`.
+    """`(index of the first real word, override assigned, git redirected)`.
 
     Shared with the `cd` scan in `evaluate`, which has to skip the same env
     assignments and shell lead words. `_simple_commands` splits on operators
@@ -392,23 +436,21 @@ def _lead_prefix(argv):
     reads `-C`'s values back out: it moves the repository the push reads, and
     every comparison below is against a ref resolved in one.
 
-    The fourth element reports a BRANCH keyword in that prefix rather than
-    merely skipping it. A `cd` behind one runs only when the branch is taken,
-    so applying it reports on a repository the push may never run in.
+    Whether the command sits inside a branch body is NOT reported here, and
+    deliberately: a keyword this prefix strips belongs to one simple command,
+    while the body it opens may hold several. `evaluate` counts the region
+    instead.
     """
     i = 0
     override = False
     redirected = False
-    conditional = False
     while i < len(argv) and (ASSIGNMENT.match(argv[i]) or argv[i] in LEAD_WORDS):
         if argv[i].startswith(OVERRIDE + "="):
             override = argv[i].split("=", 1)[1].strip() == "1"
         if argv[i].startswith(GIT_ENV_REDIRECT):
             redirected = True
-        if argv[i] in BRANCH_WORDS:
-            conditional = True
         i += 1
-    return i, override, redirected, conditional
+    return i, override, redirected
 
 
 def _push_argv(argv):
@@ -429,7 +471,7 @@ def _push_argv(argv):
     are recognized: `--git-dir <dir>` consumes the following token, while
     `--git-dir=<dir>` does not.
     """
-    i, override, redirected, _conditional = _lead_prefix(argv)
+    i, override, redirected = _lead_prefix(argv)
     if i >= len(argv) or argv[i] != "git":
         return None, False, ()
     i += 1
@@ -787,13 +829,20 @@ def evaluate(command, base_cwd=None):
     command; keyed on nesting depth instead of on identity, it leaked into the
     next sibling subshell rather than out of the parentheses.
 
-    A `cd` the shell may never REACH is declined rather than applied, which is
-    the answer `cd -` already gets. `_simple_commands` splits on operators and
-    models no short-circuiting, so a branch body and an alternative both
-    arrive as ordinary `cd` commands; applying them read
-    `if ...; then cd elsewhere; fi; git push` and `cd here || cd elsewhere;
-    git push` in `elsewhere`, where neither shell ever puts the push
-    (measured 2026-09-04).
+    A `cd` the shell may never REACH, and one it reaches in a subshell of its
+    own, are declined rather than applied, which is the answer `cd -` already
+    gets. `_simple_commands` splits on operators and models neither
+    short-circuiting nor forking, so each arrives as an ordinary `cd` command:
+    applying them read `if ...; then cd elsewhere; fi; git push`,
+    `cd here || cd elsewhere; git push`, `cd elsewhere & git push` and
+    `cd elsewhere | cat; git push` in `elsewhere`, where no shell ever puts
+    the push (measured 2026-09-04).
+
+    A compound statement's body is counted as a REGION rather than recognized
+    by its keyword, because a keyword attaches to one simple command while a
+    body may hold several: with the keyword alone,
+    `if ...; then echo no; cd elsewhere; fi` was applied while the
+    one-command body beside it was declined (measured 2026-09-04).
 
     Where the reading ends up in a different directory from `base_cwd`, the
     warning SAYS so and emits its remediation commands with `git -C`, because
@@ -825,13 +874,21 @@ def evaluate(command, base_cwd=None):
     # from the caller's directory rather than from what its predecessor moved
     # to.
     dirs = {(): base}
-    for scope, argv, sep in cmds:
+    # How many compound-statement bodies enclose the command being read. The
+    # count is flat rather than per-subshell because these regions nest
+    # lexically, in the order the split hands them back.
+    region = 0
+    for scope, argv, sep, after in cmds:
         for n in range(1, len(scope) + 1):
             dirs.setdefault(scope[:n], dirs[scope[:n - 1]])
-        lead, _override, _redirected, conditional = _lead_prefix(argv)
+        lead, _override, _redirected = _lead_prefix(argv)
         head = argv[lead:]
+        if head and head[0] in BLOCK_OPEN:
+            region += 1
+        elif head and head[0] in BLOCK_CLOSE:
+            region = max(region - 1, 0)
         if head and head[0] in CD_WORDS:
-            if conditional or sep == "||":
+            if region or sep in BRANCH_SEPS or after in FORK_SEPS:
                 dirs[scope] = None
             else:
                 dirs[scope] = _resolve_cd(head, dirs[scope])

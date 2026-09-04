@@ -50,8 +50,11 @@ HOOKS = os.path.join(ROOT, "hooks")
 # population is what the number below is derived from, so re-state both
 # whenever the suite grows rather than leaving a stale count behind: 32
 # scratch git repos plus 17 mutation rounds finished in 178s on a Linux cloud
-# runner (2026-08-26), and 44 repos plus 28 rounds finished in 92s on another
-# one (2026-09-04). 900s is about 5x the slower reading, so a slow
+# runner (2026-08-26), and 53 repos plus 35 rounds finished in 117s on another
+# one (2026-09-04). Restating it is no longer left to whoever grows the suite:
+# `scripts/test_test_hooks.py` derives both counts and FAILs on a stale one,
+# because two reviews in a row found this comment stale anyway
+# (ai-config#2451). 900s is about 5x the slower reading, so a slow
 # Windows box has headroom past the 420s kill of the hang that never
 # produced output (ai-config#2098) while still FAILing an infinite
 # stall. Override with HOOK_TEST_SUITE_TIMEOUT.

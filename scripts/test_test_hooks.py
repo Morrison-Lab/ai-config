@@ -20,6 +20,10 @@ check against hooks/test-no-clobbering-push.py (case #5), and generalized
 via a bare "python3", since the same suspect mechanism (ai-config#2098)
 applies to every one of them, not just this one file.
 
+Test case #5c derives the population the suite timeout was measured on, so a
+comment claiming a count the suite has since outgrown FAILs here rather than
+waiting for a reviewer to notice it a third time (ai-config#2451).
+
 Run: python3 scripts/test_test_hooks.py
 """
 from __future__ import annotations
@@ -295,6 +299,26 @@ offenders = [
 ]
 check('no hooks/test-*.py spawns its hook via a bare "python3"',
       not offenders, repr(offenders))
+
+
+# --- 5c. The timeout comment's stated population is derived, not trusted --
+# The comment deriving DEFAULT_SUITE_TIMEOUT_S names the population it was
+# measured on and instructs a maintainer to re-state it as the suite grows.
+# Two reviews in a row found it stale regardless (ai-config#2451), which is
+# the recurrence `shared/principles/deterministic-tools.md` says to turn into
+# an instrument: derive the counts here rather than trust the instruction.
+
+runner_src = SCRIPT.read_text(encoding="utf-8")
+declared = re.findall(r"(\d+) repos plus (\d+) rounds", runner_src)
+case_ids = set(re.findall(r'\(\s*"([DWS]\d+)"\s*,', src))
+clauses = re.findall(r'^    "\w+": \($',
+                     src[src.index("MUTATIONS = {"):], re.M)
+check("the timeout comment states the population it was measured on",
+      bool(declared), "no 'N repos plus M rounds' reading in the comment")
+measured = (str(len(case_ids)), str(len(clauses)))
+check("the timeout comment's latest population matches the suite",
+      bool(declared) and declared[-1] == measured,
+      f"comment says {declared[-1:]}, suite has {measured}")
 
 
 # --- 6. Coverage allowlist branches and the two-subject FAIL (#1080) ------

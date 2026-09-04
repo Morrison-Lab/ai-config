@@ -524,6 +524,57 @@ def alternative_cd_case(path, bare):
     return f"cd {path} || cd {wt}; git push origin HEAD:peer-alt"
 
 
+def branch_body_cd_case(path, bare):
+    """`if ...; then echo no; cd <worktree>; fi; git push` -- a branch body of
+    MORE than one command.
+
+    The keyword that opens a body attaches to that body's FIRST command, so
+    the `cd` here carries none at all. Recognizing the keyword declined S23
+    and applied this one, which is the same wrong-repository reading of
+    ai-config#2451 arriving one command further along (measured 2026-09-04).
+    """
+    wt = _diverged_peer_worktree(path, "peer-body")
+    return (f"if [ -d /nonexistent-ncp ]; then echo no; cd {wt}; fi; "
+            "git push origin HEAD:peer-body")
+
+
+def else_arm_cd_case(path, bare):
+    """`if [ -d / ]; then true; else true && cd <worktree>; fi; git push` --
+    the `then` branch is the one taken, so the `else` arm never runs.
+
+    Its `cd` follows `&&`, the one separator this guard deliberately keeps, so
+    no operator can decline it: only the region the `if` opened can.
+    """
+    wt = _diverged_peer_worktree(path, "peer-else")
+    return (f"if [ -d / ]; then true; else true && cd {wt}; fi; "
+            "git push origin HEAD:peer-else")
+
+
+def background_cd_case(path, bare):
+    """`cd <worktree> & git push` -- a backgrounded `cd` runs in a subshell,
+    so the push runs where the Bash call started.
+
+    The operator that reveals the fork FOLLOWS the `cd`. The one before it is
+    the start of the command, which is what an ordinary `cd` carries too.
+    """
+    wt = _diverged_peer_worktree(path, "peer-bg")
+    return f"cd {wt} & git push origin HEAD:peer-bg"
+
+
+def pipeline_cd_case(path, bare):
+    """`cd <worktree> | cat; git push` -- a pipeline element is forked as
+    well, so this `cd` moves no directory the push can see."""
+    wt = _diverged_peer_worktree(path, "peer-pipe")
+    return f"cd {wt} | cat; git push origin HEAD:peer-pipe"
+
+
+def pipeline_rhs_cd_case(path, bare):
+    """`echo x | cd <worktree>; git push` -- the same fork read from the other
+    side, where the `|` PRECEDES the `cd` rather than following it."""
+    wt = _diverged_peer_worktree(path, "peer-pipe-rhs")
+    return f"echo x | cd {wt}; git push origin HEAD:peer-pipe-rhs"
+
+
 def dash_c_unexpanded_case(path, bare):
     """`git -C "$WT" push` -- the variable is unexpanded, so no directory is
     named.
@@ -728,6 +779,19 @@ SHOULD_STAY_SILENT = [
     ("S26", dash_c_tilde_case,
      "`git -C ~ncp-nosuchuser/wt push` -- a `~` is expanded, not joined on "
      "as a literal path component"),
+    ("S27", branch_body_cd_case,
+     "`if ...; then echo no; cd <worktree>; fi` -- a branch body of more than "
+     "one command, whose `cd` carries no keyword"),
+    ("S28", else_arm_cd_case,
+     "`else true && cd <worktree>` -- an untaken arm whose `cd` follows the "
+     "one separator the guard keeps"),
+    ("S29", background_cd_case,
+     "`cd <worktree> & git push` -- a backgrounded `cd` forks"),
+    ("S30", pipeline_cd_case,
+     "`cd <worktree> | cat; git push` -- a pipeline element forks too"),
+    ("S31", pipeline_rhs_cd_case,
+     "`echo x | cd <worktree>; git push` -- the same fork with the `|` before "
+     "the `cd`"),
 ]
 
 
@@ -1063,35 +1127,57 @@ MUTATIONS = {
         "a `cd` earlier in the compound command moves the directory the push "
         "runs in",
         [("        if head and head[0] in CD_WORDS:\n"
-          '            if conditional or sep == "||":\n'
+          "            if region or sep in BRANCH_SEPS or after in "
+          "FORK_SEPS:\n"
           "                dirs[scope] = None\n"
           "            else:\n"
           "                dirs[scope] = _resolve_cd(head, dirs[scope])\n"
           "            continue",
           "        if head and head[0] in CD_WORDS:\n"
           "            continue")],
-        # S23 and S24 do NOT flip: their `cd` is declined rather than applied,
-        # and a `cd` that is not applied at all leaves the same directory.
+        # S23, S24 and S27-S31 do NOT flip: their `cd` is declined rather than
+        # applied, and a `cd` that is not applied at all leaves the same
+        # directory.
         {"S17", "S18", "W8", "W11", "W12", "W13"},
     ),
-    "conditional_cd_declines": (
-        "a `cd` the shell may never reach -- a branch body, or an `||` "
-        "alternative -- makes the directory indeterminate rather than moving "
-        "it",
-        [('            if conditional or sep == "||":\n'
-          "                dirs[scope] = None\n"
-          "            else:\n"
-          "                dirs[scope] = _resolve_cd(head, dirs[scope])",
-          "            dirs[scope] = _resolve_cd(head, dirs[scope])")],
-        {"S23", "S24"},
+    "branch_region_declines": (
+        "a compound statement opens a REGION, so every `cd` in its body is "
+        "declined rather than only the one carrying the keyword",
+        [('BLOCK_OPEN = {"if", "while", "until", "for", "select", "case"}',
+          "BLOCK_OPEN = set()")],
+        # S27 and S28 are the shapes a keyword-only test missed: their `cd` is
+        # not the body's first command, so no keyword reaches it.
+        {"S23", "S27", "S28"},
+    ),
+    "alternative_cd_declines": (
+        "a `cd` the shell may never reach -- an `||` alternative, or a "
+        "pipeline element -- makes the directory indeterminate rather than "
+        "moving it",
+        [('BRANCH_SEPS = {"||", "|"}', "BRANCH_SEPS = set()")],
+        {"S24", "S31"},
+    ),
+    "forked_cd_declines": (
+        "a `cd` the shell forks into a subshell of its own -- backgrounded, "
+        "or piped -- moves no directory the push can see",
+        [('FORK_SEPS = {"&", "|"}', "FORK_SEPS = set()")],
+        {"S29", "S30"},
     ),
     "separator_is_tracked": (
         "each simple command carries the operator before it, which is what "
         "tells an `||` alternative from an `&&` chain",
         [("                sep = _next_sep(sep, ch)", "                pass")],
-        # Only S24 can see this: S23's decline comes from the branch keyword,
-        # which `_lead_prefix` reports without any separator.
-        {"S24"},
+        # S23, S27 and S28 cannot see this: their decline comes from the
+        # region an `if` opened, which no separator reports.
+        {"S24", "S31"},
+    ),
+    "trailing_separator_is_tracked": (
+        "each simple command also carries the operator after it, which is the "
+        "only side a fork is visible from",
+        [('            trailing = ""\n'
+          "            for ch in t:\n"
+          "                trailing = _next_sep(trailing, ch)",
+          '            trailing = ""')],
+        {"S29", "S30"},
     ),
     "unexpanded_value_declines": (
         "a `$name` or a command substitution names no directory, so it is "

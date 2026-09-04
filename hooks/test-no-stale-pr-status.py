@@ -126,19 +126,57 @@ CASES = [
     ([QUERY, PUSH, say('My earlier "ready to merge" call was incorrect.')], False,
      "retraction vocabulary AFTER the phrase, in the same sentence"),
     ([QUERY, PUSH, say("I overstated it: 11 pass was the pre-push reading.")], False,
-     "retraction vocabulary BEFORE the phrase, with no sentence break between"),
+     "retraction vocabulary BEFORE the phrase, with no clause break between"),
     ([QUERY, PUSH, say('The reviewer is wrong that #1689 is conflict-free.')], False,
-     "'is wrong' is a retraction even without a first-person subject"),
+     "'is wrong' is a retraction even without a first-person subject -- the "
+     "measured sentence has none either, so the source hook's first-person "
+     "anchor cannot be ported"),
+    ([QUERY, PUSH, say('My earlier "fully clean" call\nwas wrong.')], False,
+     "a retraction wrapped onto the next line under semantic line breaks -- "
+     "the trailing scan must not stop at a bare newline"),
 
     ([QUERY, PUSH, say("All checks green. My earlier count was wrong, but that is "
                        "a separate claim.")], True,
      "a retraction in a LATER sentence must not suppress an unnegated claim"),
+
+    # The attachment guard. Each of these puts retraction vocabulary in the
+    # same sentence as a genuine stale-clean claim, in a DIFFERENT clause.
+    # Delete RX_CLAUSE_SEPARATOR and every one of them stops blocking.
+    ([QUERY, PUSH, say("PR #1689 is fully clean -- the earlier blocker was inaccurate.")], True,
+     "a prose dash separates the retraction from the claim"),
+    ([QUERY, PUSH, say("The reviewer was wrong about the lint failure, but all "
+                       "checks green.")], True,
+     "a comma and 'but' separate a leading third-person retraction from the claim"),
+    ([QUERY, PUSH, say("All checks green, but the reviewer overstated the risk.")], True,
+     "'overstated' in a trailing 'but' clause retracts nothing about the claim"),
+    ([QUERY, PUSH, say("All checks green after I misread the earlier log.")], True,
+     "a subordinating conjunction separates a first-person retraction too"),
+    ([QUERY, PUSH, say("| #1689 | fully clean |\n| #1690 | my count was wrong |")], True,
+     "a table cell boundary separates the rows -- the trailing scan crosses a "
+     "bare newline, so the markdown boundary is what has to stop it here"),
     ([QUERY, PUSH, say("#1689 is fully clean after the reviewer confirmed every "
                        "finding was addressed, including the one about the wrong "
                        "variable name.")], True,
-     "a retraction word beyond NEGATION_WINDOW must not suppress a genuine claim"),
-    ([QUERY, PUSH, say("Fixed the wrong path and pushed; all checks green.")], True,
-     "attributive 'wrong' is not a retraction -- the copula is required"),
+     "an unrelated 'wrong' several clauses away must not suppress a genuine claim"),
+
+    # The copula guard. Attributive "wrong" sits in the SAME clause as the
+    # claim, so attachment cannot rule it out; only the copula requirement can.
+    # Delete the `(?:was|were|is|are)\s+` prefix from RX_RETRACTION and this
+    # stops blocking.
+    ([QUERY, PUSH, say("All checks green with the wrong path fixed.")], True,
+     "attributive 'wrong' in the same clause is not a retraction -- the "
+     "copula is required"),
+
+    # Plain negation stays scoped to the text BEFORE the phrase. Reading it
+    # after the phrase too silently disabled the guard on the archetypal recap
+    # shape, where the negation is about something other than the claim.
+    ([QUERY, PUSH, say("All checks green at this head, and I have not merged it yet.")], True,
+     "a trailing plain negation about a different clause must not suppress "
+     "the claim"),
+    ([QUERY, PUSH, say("#1689 is fully clean and there are no findings I did not "
+                       "address.")], True,
+     "nor must a trailing 'did not' -- this is the phrasing the RX_NEGATION "
+     "comment says the guard must keep catching"),
 ]
 
 

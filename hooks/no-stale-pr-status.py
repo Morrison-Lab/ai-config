@@ -147,58 +147,113 @@ RX_SENTENCE_BREAK = re.compile(r"[.!?;][\"'\)\]*_`]*(?:\s|$)|\n")
 # the cheapest way to satisfy the guard is to stop mentioning the earlier
 # claim at all, which is the opposite of what CLAUDE.md asks for.
 #
-# Ported rather than re-derived, per `dont-reinvent-wheel`:
-# `hooks/remind-ums-after-error.py` already enumerates this family for the
-# same reason (ai-config#1210 -- a retraction of a figure rarely carries an
-# explicit "incorrectly"). The copula is required for the adjective forms,
-# because bare `wrong` is most often attributive ("the wrong branch", "the
-# wrong file") and says nothing about a claim being withdrawn.
+# The word list is taken from `hooks/remind-ums-after-error.py`, which already
+# enumerates this family for the same reason (ai-config#1210 -- a retraction of
+# a figure rarely carries an explicit "incorrectly"), plus four terms that file
+# does not carry: `inaccurate`, `premature`, `misstated`, `misspoke`.
+#
+# What is NOT taken from it is its first-person anchor. That file requires an
+# explicit `I`/`my` subject in every alternative, because its job is to detect
+# an admission and "the review was wrong" is a statement about someone else.
+# This guard's job is different, and the issue's own measured sentence proves
+# the anchor cannot transfer: in `But "fully clean" was wrong too` the subject
+# is the quoted claim, not a person. Attachment does that work here instead --
+# see RX_CLAUSE_SEPARATOR below.
+#
+# The copula is required for the adjective forms, because bare `wrong` is most
+# often attributive ("the wrong branch", "the wrong file") and says nothing
+# about a claim being withdrawn.
 RX_RETRACTION = re.compile(
     r"\b(?:was|were|is|are)\s+"
     r"(?:wrong|incorrect|false|mistaken|inaccurate|premature)\b"
     r"|\b(?:over|under)(?:stated|estimated|counted|reported|claimed)\b"
     r"|\bretract(?:ing|ed|s)?\b"
-    r"|\bcorrecting\s+(?:myself|my|this|that)\b"
+    r"|\bcorrecting\s+(?:myself|my|this)\b"
     r"|\bmis(?:read|counted|stated|characterized|spoke)\b",
     re.I,
 )
 
-# The scan after the match is BOUNDED as well as sentence-scoped, ported from
-# `scripts/check-pr-fully-clean.py`'s QUALIFIER_WINDOW, whose comment records
-# the same asymmetry: a negation BEFORE the phrase can sit anywhere earlier in
-# the sentence, while one AFTER it only retracts when it sits close. Unbounded,
-# a trailing clause about something else ("... including the one about the
-# wrong variable name") would silently suppress a genuine stale-clean claim --
-# the opposite failure, and the invisible one.
-NEGATION_WINDOW = 60
+# A retraction withdraws the ASSERT phrase only when it ATTACHES to it. This
+# is what keeps the widening from causing the opposite, invisible failure --
+# a genuine stale-clean claim silently suppressed because some other clause of
+# the same sentence happens to say "wrong". Every one of these blocks:
+#
+#   The reviewer was wrong about the lint failure, but all checks green.
+#   PR #1689 is fully clean -- the earlier blocker was inaccurate.
+#   All checks green, but the reviewer overstated the risk.
+#   All checks green after I misread the earlier log.
+#
+# In each, the retraction and the claim sit in DIFFERENT clauses, and the text
+# between them says so: a comma, a prose dash, a coordinating or subordinating
+# conjunction, or a markdown boundary (a table cell, a new list item). None of
+# those appears between the claim and its retraction in the measured sentence,
+# where the two are adjacent.
+#
+# Attachment replaces the character window an earlier round used. A window
+# cannot tell "green -- the badge is wrong" from "green was wrong", since both
+# put the retraction within a few characters; a clause separator can.
+RX_CLAUSE_SEPARATOR = re.compile(
+    r"--|[,;()|]"
+    r"|\n[ \t]*[-*+>#]"
+    r"|\b(?:but|and|or|so|yet|however|though|although|while|whereas"
+    r"|after|before|since|because|once|when|unless|if)\b",
+    re.I,
+)
+
+# The trailing scan deliberately does NOT treat a bare newline as a sentence
+# end, mirroring `scripts/check-pr-fully-clean.py`'s SENTENCE_END. This corpus
+# writes semantic line breaks, so a retraction routinely wraps onto the next
+# line ('My earlier "fully clean" call\nwas wrong'), and terminating on `\n`
+# would hide exactly the correction this guard must stop blocking. The prefix
+# scan keeps RX_SENTENCE_BREAK, where a bare newline IS a boundary because a
+# table row or list item is an independent clause (ai-config#1764); the
+# markdown alternatives in RX_CLAUSE_SEPARATOR above are what keep the trailing
+# scan from crossing one of those.
+RX_TRAILING_BREAK = re.compile(r"[.!?;]|\n[ \t]*\n")
 
 
-def _sentence_bounds(text, hit):
-    """The span of the sentence containing `hit`, coarsely."""
+def _sentence_start(text, hit):
+    """Start of the sentence containing `hit`, coarsely."""
     start = 0
     for boundary in RX_SENTENCE_BREAK.finditer(text, 0, hit.start()):
         start = boundary.end()
-    end = RX_SENTENCE_BREAK.search(text, hit.end())
-    return start, (end.start() if end else len(text))
+    return start
+
+
+def _trailing_end(text, hit):
+    """End of the clause following `hit`, for the retraction scan."""
+    end = RX_TRAILING_BREAK.search(text, hit.end())
+    return end.start() if end else len(text)
+
+
+def _attaches(connector):
+    """True when nothing in `connector` breaks a retraction off the claim."""
+    return not RX_CLAUSE_SEPARATOR.search(connector)
+
+
+def _is_retracted(text, hit):
+    """True if a retraction attaches to the ASSERT match, either side of it."""
+    for after in RX_RETRACTION.finditer(text, hit.end(), _trailing_end(text, hit)):
+        return _attaches(text[hit.end():after.start()])
+    start = _sentence_start(text, hit)
+    before = None
+    for before in RX_RETRACTION.finditer(text, start, hit.start()):
+        pass
+    return before is not None and _attaches(text[before.end():hit.start()])
 
 
 def _is_negated(text, hit):
     """True if the ASSERT match is negated or retracted within its sentence.
 
-    Three scans, deliberately asymmetric. Plain negation before the phrase is
-    sentence-wide, which is the pre-existing behaviour. Everything after the
-    phrase, and the retraction vocabulary before it, is bounded by
-    NEGATION_WINDOW.
+    Plain negation stays scoped to the text BEFORE the phrase, which is the
+    pre-existing behaviour and must not be widened: "All checks green at this
+    head, and I have not merged it yet" is a genuine stale-clean claim whose
+    trailing negation is about something else entirely. Only the retraction
+    vocabulary reads in both directions, and only when it attaches.
     """
-    start, end = _sentence_bounds(text, hit)
-    if RX_NEGATION.search(text[start:hit.start()]):
+    if RX_NEGATION.search(text[_sentence_start(text, hit):hit.start()]):
         return True
-    trailing = text[hit.end():min(end, hit.end() + NEGATION_WINDOW)]
-    if RX_NEGATION.search(trailing) or RX_RETRACTION.search(trailing):
-        return True
-    leading = text[max(start, hit.start() - NEGATION_WINDOW):hit.start()]
-    return bool(RX_RETRACTION.search(leading))
-
+    return _is_retracted(text, hit)
 
 def all_unnegated_asserts(text):
     """Every un-negated ASSERT match, in textual order.

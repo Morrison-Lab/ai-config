@@ -1012,20 +1012,22 @@ so #3219 read "The branch  records ... in  and performs no such audit".
 All twenty-one were repaired by PATCH from a quoted-delimiter rerun,
 with the path passed as `export S=...` and read by `os.environ['S']`.
 
-Two things the first case left implicit.
+Two things the first case did not draw out.
 The shell printed the substitution errors
 (`fix/3110-three-rounds-reflect: No such file or directory`, `check-links.py: command not found`)
 to stderr in the same tool result as the script's own output, before any body was posted,
 so those lines are a detector usable before posting rather than after.
 The detector is one-sided:
-it fires only when the substituted command fails,
-and a span naming a command that exists, a `$(...)`, or a `$VAR` substitutes with empty stderr,
+it fires only when a substituted command fails and prints;
+a backtick span or `$(...)` naming a command that succeeds quietly, and any `$VAR` expansion, substitute with empty stderr,
 so silence proves nothing and the read-back below stays required.
 And a loop that posts to a forge should read one posted body back before posting the rest,
 since the first body is where the corruption shows.
-No guard was built at this occurrence:
-the decidable half (an unquoted delimiter with a backtick or dollar sign in the heredoc body) is a `PreToolUse` regex over the Bash command,
-and #3230 holds that for the third occurrence, per `shared/principles/deterministic-tools.md`.
+
+No guard was built at this occurrence.
+Issue #3230's done-when names a stderr-conditioned check;
+the decidable half is a `PreToolUse` regex over the Bash command for an unquoted delimiter with a backtick or dollar sign in the heredoc body,
+which fires before the damage, and that is the shape to build at the third occurrence, per `shared/principles/deterministic-tools.md`.
 
 - **Do:** treat `command not found` or `No such file or directory` on stderr from a heredoc-fed script as the payload probably having been substituted, and stop before posting.
 - **Do:** read one posted body back before a script posts the rest of its batch.

@@ -159,19 +159,14 @@ GIT_C_CMD = re.compile(
     r"(?:^|[;&|\n])\s*" + _ENV + r"git\s+-C\s+([^\s;&|]+)",
     re.MULTILINE
 )
-WORKTREE_ADD_CMD = re.compile(
-    r"(?:^|[;&|\n])\s*" + _ENV + r"git\s+worktree\s+add\s+([^;&|\n]+)",
-    re.MULTILINE
-)
 # Calls that MOVE HEAD, as opposed to merely naming a branch. Matched for
 # their own sake rather than for the names they carry: `git checkout -`
 # switches back and names nothing, and a switch that names nothing still has
 # to supersede the branch a commit would otherwise inherit (ai-config#2422).
 #
-# It is also the only source that REPLACES the names a commit may inherit
-# (`git worktree add -b` adds to them without displacing them; see
-# `_worktree_created`). An earlier
-# revision read those from a wider pattern that matched `git branch` too, so
+# It is the ONLY source of the names a commit may inherit, and it replaces
+# them rather than adding to them. An earlier revision read those from a
+# wider pattern that matched `git branch` too, so
 # `git branch -d agy-dormant` --- the cleanup this issue's own report
 # describes performing on a squash-merged leftover --- made that branch the
 # one the next commit was attributed to, and a `git branch -d` git refuses as
@@ -183,8 +178,8 @@ WORKTREE_ADD_CMD = re.compile(
 # attribution ai-config#2737 added. `git branch feature` creates without
 # switching. `git worktree add <path> <branch>` creates a second checkout and
 # leaves this one exactly where it stood, so it belongs beside `git branch`
-# rather than here --- and its `-b` form contributes the branch it creates
-# without displacing the one the shell is on. `git checkout -p` stages
+# rather than here --- and so does its `-b` form, which names a branch in a
+# checkout this shell is not standing in. `git checkout -p` stages
 # hunks interactively and switches nothing, so the argument list is read
 # rather than only the command word.
 #
@@ -233,8 +228,8 @@ def _moves_head(args):
     names nothing, and a form that does not move must leave the carry alone.
     An earlier revision asked that question in two places --- one deciding
     whether to clear, the other deciding what replaces --- and they read
-    different patterns, so `git worktree add -b` replaced a carry it was
-    never counted as clearing. One caller is what makes that unrepresentable
+    different patterns, so a command counted as naming a branch was never
+    counted as clearing one. One caller is what makes that unrepresentable
     rather than merely unlikely.
     """
     if any(a in PATCH_FLAGS for a in args):
@@ -286,31 +281,27 @@ def absolute_dir(path):
 
 
 def extract_named_paths(command):
-    """Directories a command NAMES without moving the shell into them.
+    """Directories a `git -C <dir>` NAMES without moving the shell into them.
 
-    `git -C <dir>` and `git worktree add <path>` both point at a repository
-    while leaving the shell where it stood, so they attribute a commit on
-    their own and need no carrying forward. Where the shell IS standing is
-    tracked separately by `shell_dir_after`, because a `cd` persists across
-    tool calls while this function sees one call.
+    `-C` points the command at a repository while leaving the shell where it
+    stood, so a `-C` the COMMIT ITSELF carries attributes that commit on its
+    own and needs no carrying forward. Where the shell IS standing is tracked
+    separately by `shell_dir_after`, because a `cd` persists across tool calls
+    while this function sees one call.
 
-    Callers attributing a COMMIT pass the committing git invocation itself
-    rather than the whole call, so that only a `-C` the commit carries counts
-    --- see `scan_transcript`.
+    Callers attributing a commit pass the committing git invocation rather
+    than the whole call, so that only a `-C` the commit carries counts --- see
+    `scan_transcript`. `git worktree add <path>` is deliberately not read
+    here: it creates a checkout without moving the shell into it, so a commit
+    beside it lands where the shell already stood, and the only routes into
+    the new checkout --- a `cd` into it, or a `-C` naming it on the commit ---
+    are each already covered above.
     """
     paths = set()
     for m in GIT_C_CMD.finditer(command):
         p = m.group(1).strip("\"'").strip()
         if p:
             paths.add(p)
-    for m in WORKTREE_ADD_CMD.finditer(command):
-        args = m.group(1).split()
-        for arg in args:
-            if arg.startswith("-") or arg == "add":
-                continue
-            p = arg.strip("\"'").strip()
-            if p and ("/" in p or os.path.exists(p)):
-                paths.add(p)
     return paths
 
 
@@ -349,27 +340,6 @@ def _switch_target(args):
     return branches
 
 
-def _worktree_created(args):
-    """Branch names `git worktree add -b` creates in a SECOND checkout.
-
-    Additive rather than replacing, because the command leaves THIS shell's
-    HEAD exactly where it stood: the session may commit on the branch it was
-    already on, and it may `cd` into the new checkout and commit there, so
-    both are live. Reading it as a replacement dropped the branch the commit
-    actually landed on --- a fail-open on a real unshipped commit --- and put
-    in its place a branch the shell never entered.
-
-    `git branch` is deliberately absent from both sources: it names a branch
-    without switching to it, so a commit that follows one lands wherever the
-    shell already stood.
-    """
-    branches = set()
-    for i, arg in enumerate(args):
-        if arg in ("-b", "-B") and i + 1 < len(args):
-            branches.add(args[i + 1])
-    return branches
-
-
 def branches_after(text, cur_branches):
     """The branches a commit after `text` may sit on, given `cur_branches`.
 
@@ -386,23 +356,25 @@ def branches_after(text, cur_branches):
     its upstream blocked every Stop over a branch nothing was committed on.
 
     A move that names nothing empties the set, which is the supersession
-    itself. It empties any `git worktree add -b` name carried alongside too:
-    the scan cannot tell which checkout the shell now stands in, and losing
-    an attribution costs a reminder where inventing one costs every Stop in
-    the session.
+    itself.
+
+    `git worktree add -b <name>` is NOT a source here, and adding it was a
+    false-attribution bug of exactly the kind this issue exists to remove: it
+    creates the branch in a SECOND checkout and leaves this shell's HEAD
+    where it stood, so a commit beside it lands on whatever the shell was
+    already on. Contributing the name additively also made it permanent ---
+    nothing but a later head-moving switch removes it --- so a conductor
+    session that creates several subagent worktrees, this corpus's own
+    standard shape, had its Stop blocked by any subagent's unpushed commit.
+    The session's own route into such a checkout is a `cd` into it or a
+    `-C` naming it on the commit, and `shell_dir_after` and
+    `extract_named_paths` already attribute both.
     """
-    events = []
-    for m in SWITCH_CMD.finditer(text):
-        events.append((m.start(), True, m.group(1).split()))
-    for m in WORKTREE_ADD_CMD.finditer(text):
-        events.append((m.start(), False, m.group(1).split()))
     branches = set(cur_branches)
-    for _, is_switch, args in sorted(events, key=lambda e: e[0]):
-        if is_switch:
-            if _moves_head(args):
-                branches = _switch_target(args)
-        else:
-            branches |= _worktree_created(args)
+    for m in SWITCH_CMD.finditer(text):
+        args = m.group(1).split()
+        if _moves_head(args):
+            branches = _switch_target(args)
     return branches
 
 
@@ -527,7 +499,10 @@ def scan_transcript(path):
     --- the `cd`-after-the-commit misattribution spelled with a different
     flag. `git worktree add <path>` likewise creates a checkout without
     moving the shell into it, so a commit beside it lands where the shell
-    already stood.
+    already stood --- on neither axis, the `-b` form included: the path it
+    creates is not a commit path, and the branch it creates is not a commit
+    branch, until a `cd` into that checkout or a `-C` naming it on the commit
+    says the commit ran there.
 
     Both carried values are SUPERSEDED by a move that names nothing, whether
     it stands in its own call or precedes the commit inside one: `git

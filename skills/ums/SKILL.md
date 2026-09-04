@@ -99,21 +99,38 @@ committed pass.
    - Is it **cross-project or project-specific**? (`memories/preferences.md`'s
      "Memory and skill storage" rule: cross-project lessons commit to
      `Morrison-Lab/ai-config`; a convention/gotcha tied to one repo we own
-     commits to *that* repo's own agent docs instead — see the checklist
+     commits to *that* repo's own agent docs instead --- see the checklist
      item below for where. This changes step 4's target, not just the
      content.)
 
 3. **Apply updates.** For each item:
    - Read the target file first (skill or memory) to understand current state
-   - **Grep that file for the item's specific subject** -- the tool name, the
+   - **Grep the corpus for the item's specific subject** -- the tool name, the
      API call, the error string -- before appending anything.
      Reading the region you're editing is not enough: a topical memory file
      runs to hundreds or a thousand-plus lines, so an existing entry on the
      same subject can sit far away in an unrelated cluster and never enter
      your view.
-     Grep the whole `memories/` directory rather than one file --
-     a fact can plausibly sit in either of two adjacent topical files.
-     When one exists, extend it in place; don't add a second bullet.
+     Grep [`skill-builder`](../skill-builder/SKILL.md) step 0's path list
+     rather than one file, and rather than only `memories/`:
+     ```bash
+     (
+       repo="${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/ums rev-parse --show-toplevel 2>/dev/null || git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+       test -f "$repo/CLAUDE.md" && test -d "$repo/shared" || { echo "not an ai-config checkout: $repo" >&2; exit 1; }
+       cd "$repo" && grep -rilIF -- "<subject>" skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md
+     )
+     ```
+     The query runs over the files on disk,
+     so an entry that exists only on a branch not checked out there is out of reach
+     (see the unmerged-PR section of [`grep-is-not-coverage`](../../shared/workflow/grep-is-not-coverage.md)).
+     `-F` matches the subject as a fixed string,
+     so an error string carrying `[`, `.`, or `*` is searched for as written;
+     `-I` skips binary files, bytecode caches included,
+     which a plain `grep -r` would otherwise report as hits.
+     A rule can be owned by a `shared/` fragment or a skill as easily as by a memory,
+     and a `memories/`-only grep stays outside those paths.
+     When the grep finds an existing entry on the subject, extend that entry in place;
+     don't add a second bullet.
      (ai-config#689: a `list_workflow_runs` cost bullet went in next to the
      related `get_check_runs` guidance while an entry on the same tool already
      sat ~2000 lines below in the write-access cluster -- caught by the review
@@ -132,17 +149,20 @@ committed pass.
      +5-line append reddened `validate`.
      Prior: `shared/writing/semantic-line-breaks.md` ai-config#1291;
      `shared/workflow/review-verdict-pitfalls.md` ai-config#811).
-   - **When step 2 routed the item to a repo other than ai-config, grep the
-     ai-config corpus too** -- "the whole `memories/` directory" above means
-     the *destination's*, so a repo-local entry can duplicate or contradict a
-     fragment nobody thought to search from that repo.
+   - **When step 2 routed the item to a repo other than ai-config, grep both
+     corpora.**
+     The query above searches an ai-config checkout,
+     so run a second pass in the destination repo, over that repo's own doc paths ---
+     a repo-local entry can otherwise duplicate or contradict a fragment
+     nobody thought to search from that repo.
      See
      [`grep-is-not-coverage`](../../shared/workflow/grep-is-not-coverage.md)'s
      "Searching the wrong corpus is the same error with no grep in it".
-   - **When that grep finds the corpus already covers this class, record the
+   - **When the subject grep finds an existing entry covering this class, record the
      recurrence on the existing entry, not just the new fact.**
-     The bullet above already says to extend in place rather than add a
-     sibling; what is missing is the count.
+     The **Grep the corpus** bullet above already says to extend in place
+     rather than add a sibling;
+     what is missing is the count.
      Write it on the entry -- "3rd occurrence, 2026-08-16", with a pointer to
      each prior record -- so the entry carries evidence about whether the
      written rule is actually holding.
@@ -167,11 +187,11 @@ committed pass.
      The reverse reading -- an entry that has never recurred and is never cited
      is a retirement candidate -- has **no** consumer today, so treat it as a
      property the count makes available rather than as a step anything runs.
-   - Make the edit — concise bullet points, not prose
+   - Make the edit --- concise bullet points, not prose
    - If updating a skill: the change should be specific enough that following
      the skill next time would avoid the mistake
 
-4. **Commit and push — via a branch + PR, not direct to `main`, in whichever
+4. **Commit and push --- via a branch + PR, not direct to `main`, in whichever
    repo step 2 routed the item to.**
 
    If the work will dispatch an expensive external action from a pinned commit
@@ -435,22 +455,22 @@ add a review gate for the cases that need one.
 - ❌ Saying "I'll remember that" without actually writing it down
 - ❌ Updating memories but not pushing skill changes to origin
 - ❌ Recording vague lessons ("be more careful") instead of specific ones
-  ("always poll for new review after pushing — check commit SHA matches")
-- ❌ Skipping the "check existing notes" step and creating duplicates --
+  ("always poll for new review after pushing --- check commit SHA matches")
+- ❌ Skipping step 3's dupe check and creating duplicates --
   specifically, reading only the region you're appending to instead of
-  grepping the whole target file for the subject (step 3)
+  grepping the corpus for the subject
 - ❌ Updating only preferences when a skill also needs the fix
-- ❌ `git add -A` — it sweeps unrelated in-flight edits (the user's work, other
+- ❌ `git add -A` --- it sweeps unrelated in-flight edits (the user's work, other
   draft skills) into your commit/PR. Stage the specific files you touched.
-- ❌ Creating `memories/repo/<repo>.md` for any repo — this pattern is retired.
+- ❌ Creating `memories/repo/<repo>.md` for any repo --- this pattern is retired.
   Put repo-specific lore in the repo's own agent docs (`.github/agents/`,
   `CLAUDE.md`, `.github/instructions/`, `.github/copilot-instructions.md`, or
   checked-in `.claude/memories/`) via a PR;
   if the repo has no agent-doc infrastructure yet, this session's own local
   project-memory mechanism (Claude Code: `~/.claude/projects/<project-path>/memory/`
-  — substitute the equivalent for a non-Claude agent) is short-lived staging
-  only — hand off that a PR adding those agent docs is still required. See the checklist
-  item above and `memories/preferences.md` for the full rule.
+  --- substitute the equivalent for a non-Claude agent) is short-lived staging
+  only --- hand off that a PR adding those agent docs is still required.
+  See the checklist item above and `memories/preferences.md` for the full rule.
 - ❌ Naming a tool, flag, or API identifier that appears **nowhere else in the
   corpus** without anchoring it somewhere checkable. A lone mention reads
   identically whether it is correct or hallucinated, so a later session has
@@ -508,6 +528,13 @@ add a review gate for the cases that need one.
   of inside it. (Caught by `@claude` review on ai-config#335: a new 0-indent
   bullet landed between two sibling sub-bullets of an existing parent,
   breaking the nesting.)
+- ❌ Patching a sentence the entry's point does not need, round after round.
+  When successive review rounds find defects in mechanism prose no reader
+  acts on, delete the prose rather than repair it; the tell is the third
+  round on the same paragraph (ai-config#3193: five successive commits,
+  `1fff7e63` to `4af1f1ea`, each re-patched the same protocol-mechanism
+  sentences, which the entry's Do/Don't never used and `e91dda59` deleted;
+  the deleted paragraphs were not restored).
 
 ## Proactive hook compliance
 

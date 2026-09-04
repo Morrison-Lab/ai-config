@@ -242,7 +242,8 @@ and this item was routed to ai-config, so its trigger did not fire.)
 
 ## Searching only the rendered output is the same error one layer down
 
-The wrong-corpus section above governs searching the wrong **repo**, and its subsection the wrong **directory** within one.
+The wrong-corpus section above governs searching the wrong **repo**,
+and its subsection the wrong **directory** within one.
 This one governs searching the wrong **layer within the right repo**:
 a sweep whose file filter reaches the generated artifact and not the generator that produces it.
 
@@ -300,7 +301,8 @@ and the next regeneration would have restored the exact shape the same PR's own 
 
 ## An unmerged PR is part of the corpus a citation can be corroborated against, and no default-branch search reaches it
 
-The wrong-corpus section above governs searching the wrong **repo**, and its subsection the wrong **directory** within one.
+The wrong-corpus section above governs searching the wrong **repo**,
+and its subsection the wrong **directory** within one.
 This one governs searching the wrong **branch state within the right repo**: a citation to content that ships only in an open PR, checked by grepping the default branch.
 
 The null result here is not merely inconclusive --- it is guaranteed whether or not the cited content is genuine.

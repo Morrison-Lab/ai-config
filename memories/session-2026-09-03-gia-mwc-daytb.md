@@ -604,3 +604,15 @@ while `AGENTS.md` and `.claude/agents/` sit outside the list (the reviewer measu
 Both sentences now name the list as skill-builder step 0's at `a5751eee`, the list itself stays byte-identical per #3123, and the coverage gap is filed as [#3165](https://github.com/Morrison-Lab/ai-config/issues/3165).
 Lesson for the fold: a fix that documents a scope failure has to state its own scope as a measured set, not as "the whole" anything;
 the entry that teaches "the word doing the damage was `memories/`, not whole" had itself written "whole corpus" two files over.
+
+## 17:14 PDT --- #3154 round 14: the reword's own residue
+
+The verdict for `a5751eee` left two findings, both residue of round 13's reword:
+the case record still called skill-builder's query "corpus-wide" nineteen lines after the Do bullet stopped saying so,
+and moving the attribution into step 3's lead sentence left the sentence after the recipe repeating it.
+Both are applied at `b0cea9b3`, whose verdict is running.
+Rounds 10 to 14 each found one to three wording defects, most introduced by the previous round's fix;
+the corpus's own #3110 rule (three rounds without consensus, ask whether the process is wrong) applies, and the honest reading is that a two-file prose diff is being polished by a reviewer that can always find a sentence to sharpen.
+The remote head `94244eb5` already carries a clean claude-review verdict and a Jules approval;
+the local delta since it is seven small commits answering Copilot and the adversarial rounds.
+Decision: one more verdict, then push whatever it returns if its findings are wording-only, letting the forge quorum judge the shipping head.

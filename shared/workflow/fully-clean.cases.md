@@ -248,14 +248,15 @@ A literal match for either phrase can return a false zero.
 Matching case-insensitively on `suppressed` in a `<summary>` element or in an ATX heading inside a collapsed `<details>` region catches ai-config#3084 review `5098574802`,
 whose block is a `### Suppressed comments (1)` heading nested under `<summary>Review details</summary>` that a `<summary>`-only match returns zero against (measured 2026-09-03).
 Prefer the heading anchor over the region, and keep the region as a fallback.
-The only false-positive control the corpus has is review 4837572117, whose summary table mentioned "suppressed Copilot findings" in uncollapsed text,
-and `5098574802` wraps its own `Pull request overview` and `File summaries` prose in collapsed `<details>` regions (measured 2026-09-03 from `get_reviews`),
-so a collapsed region is no longer a proxy for "not ordinary overview prose" --- it excluded 4837572117's only because that particular overview was not collapsed, and `5098574802`'s own collapsed overview happens to contain no occurrence of the word.
-Re-fetched 2026-09-03 via `get_reviews`, no collapsed region on any review of ai-config#660, ai-config#1029, ai-config#1031, or ai-config#3084 --- `5098574802`, `5098854246` and `5098881593` included --- contains `suppressed` outside a suppression block,
-and the same held for 4837572117.
-Region-scoping therefore excludes every body in that measured set;
-it is the weaker anchor because the reason it worked has lapsed, not because any body in the set turns it into a false positive.
-Nothing outside the set has been checked, so a collapsed overview that does mention suppressed findings remains possible.
+The corpus has two measured false-positive controls, one per wider matcher form, and each belongs to a PR the citation has to name --- a review id does not carry its PR number, and an earlier version of this record cited `4837572117` without one.
+The body-wide control is ai-config#1038 review `4837572117`, whose "suppressed Copilot findings" sits in the uncollapsed overview sentence "Aligns ARDI-family guidance on deadlocks, sweep scheduling, and suppressed Copilot findings" --- not in its summary table, whose four rows contain no occurrence of the word (re-read 2026-09-04 from `get_reviews`).
+Both the heading anchor and the region-wide form exclude it.
+The region-wide control is ai-config#1036 review `4837539268`, whose only occurrences of the word sit inside a collapsed `<details>` region headed `<summary>Show a summary per file</summary>`, in table rows reading "Detects suppressed Copilot findings." and "Updates suppressed-comment detection.", while the body carries no suppression block at all (measured 2026-09-04 from `get_reviews`).
+Only the heading anchor excludes it.
+`5098574802` also wraps its own `Pull request overview` and `File summaries` prose in collapsed `<details>` regions (measured 2026-09-03), so a collapsed region is no longer a proxy for "not ordinary overview prose".
+Enumerating Copilot review bodies from the `reviews` endpoint on 2026-09-04 --- 137 bodies across 39 PRs, from ai-config PRs 1000 through 1100 and 3060 through 3130 plus ai-config#660, ai-config#2913 and ai-config#2976 --- the heading anchor hit 78, a `<summary>`-only match returned zero against 50 of those 78, and the only body the region-wide form flagged and the heading anchor did not is the `4837539268` control.
+Region-scoping is therefore the weaker anchor on measurement, not only in principle.
+The superseded claim that no body in the measured set turns it into a false positive was an artifact of deriving that set from a repo-wide prose grep, which enumerates the PRs this corpus happens to mention rather than the population of Copilot review bodies.
 
 [ai-config#3170](https://github.com/Morrison-Lab/ai-config/issues/3170) asks `scripts/check-pr-fully-clean.py` to implement this check, quoting [`fully-clean.md`](fully-clean.md)'s pre-change wording,
 so its Ask prescribes matching strictly inside `<summary>` --- the form measured to return zero against `5098574802`.

@@ -710,29 +710,30 @@ and the verdict's own conclusion every round.**
   ordinary overview prose".
   That is a reason to prefer the heading anchor, not to forbid the wider
   match.
-  Across the measured set --- every review on ai-config#660,
-  ai-config#1029, ai-config#1031 and ai-config#3084, plus 4837572117,
-  all re-fetched 2026-09-03 --- no collapsed region contains
-  `suppressed` outside a suppression block, so a region-wide match
-  produces no false positive on any of them.
-  That set is smaller than the population this corpus names.
-  A repo-wide grep for `suppressed` on 2026-09-03 found four further PRs
-  whose suppression block was not re-fetched: ai-config#1042,
-  ai-config#1079, ai-config#2913's rounds thirty-five and thirty-six, and
-  ai-config#2976.
-  Nothing outside the measured set has been checked, so a body outside it
-  can still collapse an overview that mentions suppressed findings.
-  Every measured false zero belongs to a narrower matcher --- a literal
-  phrase against the heading rewording between ai-config#660 and
-  ai-config#1029, and `<summary>`-only against `5098574802`'s nested
-  heading --- while the corpus's one measured false positive is the
-  body-wide match on 4837572117, and the region-wide match has produced
-  neither.
-  A false zero merges over real findings, while a false positive costs one
-  re-read.
-  What would settle the choice is a body whose collapsed overview mentions
-  suppressed findings while its own block sits elsewhere, and no body in
-  the measured set is one.
+  The comparison was measured on 2026-09-04 by enumerating Copilot review
+  bodies from the `reviews` endpoint, rather than by grepping this corpus's
+  own prose for `suppressed`: 137 bodies across 39 PRs, drawn from
+  ai-config PRs 1000 through 1100 and 3060 through 3130, plus
+  ai-config#660, ai-config#2913 and ai-config#2976.
+  Each wider form has exactly one measured false positive in that set.
+  Body-wide flags ai-config#1038 review `4837572117`, whose uncollapsed
+  overview sentence reads "Aligns ARDI-family guidance on deadlocks, sweep
+  scheduling, and suppressed Copilot findings" while its body carries no
+  suppression block.
+  Region-wide flags ai-config#1036 review `4837539268`, whose collapsed
+  `Show a summary per file` table reads "Detects suppressed Copilot
+  findings." and whose body likewise carries no suppression block --- the
+  settling counter-example an earlier version of this passage asserted the
+  measured set did not contain.
+  The heading anchor hit 78 bodies and excludes both controls, a
+  `<summary>`-only match returns zero against 50 of those 78, and the only
+  body the region-wide form flagged and the heading anchor did not is that
+  false positive.
+  So region-scoping buys no measured coverage and costs one false positive
+  in 137.
+  Keep it as a fallback on the cost asymmetry alone --- a false zero merges
+  over real findings, while a false positive costs one re-read --- and not
+  on any claim that it has never fired wrongly.
   See [`fully-clean.cases.md`](fully-clean.cases.md),
   "The collapsed-block case (Morrison-Lab/ai-config#1029)".
 - **"No verdict" is its own state, distinct from "a verdict with no
@@ -763,8 +764,9 @@ and the verdict's own conclusion every round.**
   every round,
   including collapsed suppressed-comments blocks.
 - **Do:** run the region-wide match as a fallback behind the heading
-  anchor, and read a hit only the fallback finds as a prompt to read that
-  region.
+  anchor, and re-read the region on a hit only the fallback finds ---
+  its one measured shape is a collapsed per-file summary table carrying
+  no block at all.
 - **Do:** distinguish "no findings" from "no verdict" explicitly, and treat
   the latter as unreviewed.
 - **Don't:** report clean on a zero thread count, however many checks are
@@ -778,8 +780,8 @@ and the verdict's own conclusion every round.**
   that merely mentions suppressed findings, and not `<summary>` alone,
   which misses a block nested one heading deeper.
 - **Don't:** rule the region-wide match out on the strength of that
-  proxy's failure --- no body in the measured set turns it into a false
-  positive, so it is the weaker anchor rather than a wrong one.
+  proxy's failure --- one false positive in 137 measured bodies makes it
+  the weaker anchor, not a wrong one.
 - **Don't:** read a reviewer's silence as a verdict --- a job that posted
   nothing leaves the same zero counts as a job that found nothing.
 - **Don't:** act on a review wake's own payload --- it is one comment out of

@@ -202,10 +202,9 @@ Filed as [#3196](https://github.com/Morrison-Lab/ai-config/issues/3196) (the dif
 
 ## 03:29 PDT --- notebook branch: adversarial rounds before the PR opens, and the per-round entries are cut
 
-Each review-answering commit after `95d6a96c` in `git log origin/main..HEAD` answers one round;
-the finding counts live in the transcripts, not here.
+Seven adversarial rounds ran on this branch before its PR opened, at `95d6a96c` and at each of the six commits that followed it, returning eleven, six, four, four, four, eleven, and four findings.
 Round 1's were nine figures and mechanism claims written from recollection where the instrument was one command away (line counts, a character count, a PR's `updated_at` written as its open time, a grep search target, a `rev-list` direction, a bare UTC stamp, an index row) and two ambiguous references.
 The 84 that should have been 82 was also in #3196's body, corrected there at 02:50 PDT.
-Later rounds found defects in older entries (dangling "the HH:MM entry" pointers, a merge heading a minute late against its commit, an ancestry parenthetical left uncorrected in place) and, in growing share, in the entry each round appended to narrate its own fixes: a wrong entry named, an unmeasured line distance, a miscount, a self-description the same entry contradicted, a claim about #3196's body that went stale within the minute, and a citation of the `ums` anti-pattern for a shape it does not record.
-Those narrating entries are deleted rather than patched.
-This entry replaces them and states only what `git log` on the branch and the review transcripts settle.
+Rounds 2 to 4 found defects in older entries (dangling "the HH:MM entry" pointers, a merge heading a minute late against its commit, an ancestry parenthetical left uncorrected in place) and, in growing share, in the entry each of those rounds appended to narrate its own fixes: a wrong entry named, an unmeasured line distance, a miscount, a self-description the same entry contradicted, a claim about #3196's body that went stale within the minute, and a citation of the `ums` anti-pattern for a shape it does not record.
+Those three narrating entries were deleted rather than patched at `48380505`, and this entry took their place.
+Rounds 5 to 7 found figures in older entries no round had re-measured (a file count, two commit distances, two opened-PR heading minutes, an issue number given a branch, a PR linked through the issues path, a placeholder pointer, a UTC-relative "yesterday", a line count attributed to the wrong commit) and wording in this entry that its own contents or the transcripts contradicted.

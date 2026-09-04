@@ -393,7 +393,7 @@ The event mapping is [docs/cursor-hook-mapping.md](docs/cursor-hook-mapping.md).
 | `remind-retry-before-declaring-blocked.py` | `UserPromptSubmit` | reminds, never blocks, when an auto-mode permission-classifier denial has no later re-attempt of the same command -- ai-config#2994 measured a byte-identical command succeeding after three denials (2026-09-02), so a denial is a sample rather than a wall; scoped to the classifier's own denial, never a user's rejection or a deterministic rule/hook refusal |
 | `flag-unassigned-worktree.py` | `PreToolUse` (Agent) | warns, never blocks, on a write-capable Agent launch with no `isolation` |
 | `no-fable-subagent.py` | `PreToolUse` (Agent, Task, Workflow) | denies an Agent launch that names Fable or that omits `model` while the session itself runs on Fable (inheriting is how the violation happens), unless `FABLE_SUBAGENT_OK=1` records the user's explicit grant for that launch; warns on a Workflow launch in a Fable session, whose `agent()` calls it cannot inspect -- user directive 2026-09-01 (ai-config#2927), after 8 of 10 launches in one session inherited Fable and the account hit its usage limit |
-| `no-unreviewed-pr.py` | `Stop` | blocks a reply ending a session after a PR was opened or readied with no reviewer requested, or after a push re-headed it with no reviewer requested since; deferred by draft status, or on a redaction PR by a `no-ai-review` label or an `ALLOW_UNREVIEWED_REDACTION_PR=1` assertion; wholly inert until its `MORATORIUM_END` (2026-12-01) while the standing directive forbids the Copilot request it would demand |
+| `no-unreviewed-pr.py` | `Stop` | blocks a reply ending a session after a PR was opened or readied with no reviewer requested, or after a push re-headed it with no reviewer requested since; deferred by draft status, by the PR having merged or closed once that transition is visible in the transcript (a terminal action, or a single-PR status read through `gh` or `pull_request_read`), or on a redaction PR by a `no-ai-review` label or an `ALLOW_UNREVIEWED_REDACTION_PR=1` assertion; wholly inert until its `MORATORIUM_END` (2026-12-01) while the standing directive forbids the Copilot request it would demand |
 | `no-unshipped-commit.py` | `Stop` | blocks a completion reply while the session's branch carries unpushed commits (derived from `git rev-list --count @{u}..HEAD`; a dropped commit no longer blocks) |
 | `no-report-unfixed-hook-test.py` | `Stop` | blocks a status-only reply after CI identifies a missing hook test, until that exact test is written |
 | `no-unmonitored-pr.py` | `Stop` | starts a detached two-minute `gh` poller when no model scheduler was used; blocks only when neither works |
@@ -401,7 +401,7 @@ The event mapping is [docs/cursor-hook-mapping.md](docs/cursor-hook-mapping.md).
 | `ensure-open-pr-monitor.py` | `UserPromptSubmit` | ensures the agent-independent all-open-PR monitor service (GitHub PRs and GitLab merge requests) is running when an agent session begins |
 | `monitor-open-prs.py` | detached timer | reconciles every open GitHub PR and GitLab merge request authored by the authenticated user every two minutes, including ones opened outside the current session; needs `gh` or `glab`, and polls whichever is installed |
 | `no-heavy-work-on-head-node.py` | `PreToolUse` (Bash) | blocks a heavy R/Quarto command run on a cluster's login node; inert off a cluster |
-| `remind-brief-premises.py` | `PreToolUse` (Agent, Task, SendMessage) | reminds, never blocks, when a brief asserts corpus state that nothing derived --- including a `SendMessage` follow-up to a running agent, where corrections and new premises land |
+| `remind-brief-premises.py` | `PreToolUse` (Agent, Task, SendMessage) | reminds, never blocks, when a brief asserts corpus state that nothing derived --- including a `SendMessage` follow-up to a running agent, where corrections and new premises land; also on the one PATHLESS count it can decide, an aggregate over `[FINDINGS_COUNT: N]` values already printed in the transcript that no command naming that token read back, and whose figure is not itself one of the printed values (ai-config#3117) |
 | `remind-both-sides-from-git.py` | `UserPromptSubmit` | reminds, never blocks, when a revision-qualified blob is compared against the working-tree copy of that path |
 | `remind-deserialize-before-binary-claim.py` | `UserPromptSubmit` | reminds, never blocks, when an escalation names a serialized artifact nobody deserialized |
 | `flag-unchained-branch-switch.py` | `PreToolUse` (Bash) | warns, never blocks, when a branch switch and a later mutating git command are not joined by `&&` |
@@ -469,11 +469,22 @@ That is the worst possible defect for a guard, and nothing catches it: the
 hook runs, exits 0, and its tests pass if they only assert that *something* was
 printed.
 
-Warn-only hooks here emit `systemMessage` (the `PreToolUse` ones pair it with
-`hookSpecificOutput.additionalContext`); the four blocking `Stop` hooks pair
-`reason` with `decision`.
+Most warn-only hooks here emit `systemMessage`, and the `PreToolUse` ones pair
+it with `hookSpecificOutput.additionalContext`;
+the blocking `Stop` hooks pair `reason` with `decision`.
 The trap is that a blocking hook is the natural model to copy, and it uses
 `reason` correctly.
+"Most" rather than all, derived over `hooks/hooks.json` rather than recalled:
+every registered warn-only `Stop` hook emits `systemMessage`, and so does
+every registered warn-only `PreToolUse` hook but one (measured 2026-09-04).
+The exception is `warn-pr-create-without-dupe-check.py`, which emits
+`additionalContext` alone --- accepted by the `PreToolUse` rule below, since
+that channel is surfaced on its own.
+Stated as a property rather than as a tally, because a tally goes stale on
+any unrelated hook addition: `no-underived-required-check.py` and
+`flag-config-deletion-without-ref-check.py` landed on the same day and moved
+the counts from 19 warn-only `PreToolUse` hooks to 20 and from two warn-only
+`Stop` hooks to three.
 
 So when adding a warn-only hook:
 
@@ -486,8 +497,120 @@ So when adding a warn-only hook:
 
 `scripts/check-hook-output-shape.py` enforces this on every run: it verifies that
 warn-only hooks never emit `reason` alone, that warn-only `Stop` hooks emit
+`systemMessage`, that warn-only `PreToolUse` hooks emit `additionalContext` or
 `systemMessage`, and that their test suites inspect the payload shape rather than
 checking non-empty output.
+
+The `PreToolUse` half was added after `flag-cd-into-main-checkout.py` shipped
+printing its warning to stderr and exiting 0
+([#3068](https://github.com/Morrison-Lab/ai-config/issues/3068)).
+On exit 0 stderr reaches the `--debug` log alone, and `PreToolUse` plain stdout
+is not surfaced either, so the guard fired correctly and warned nobody.
+A hook with *neither* channel used to fall through both rules above: the
+`Stop` rule does not apply, and the test-side rule only inspects hooks that
+already emit one of the two.
+`UserPromptSubmit` is deliberately out of scope, since its plain stdout is
+added to the context.
+"Warn-only" here means the hook neither emits a blocking decision nor exits
+with status 2, matching the derivation in that issue:
+a `PreToolUse` hook that exits 2 denies the tool call and has its stderr fed
+back to Claude, so it already has a surfaced channel and the rule leaves it
+alone.
+The exemption is deliberately narrow, because writing a non-zero status
+somewhere does not show that a hook blocks.
+It reads status 2 alone, since every other non-zero status is a non-blocking
+error and the near-universal "bail out on an unreadable payload" branch would
+otherwise exempt almost every hook.
+It ignores a status raised inside an `except` handler, which reports that the
+hook itself broke rather than that it denied a tool call.
+And it reads literal statuses only, since `sys.exit(main())` passes a computed
+one.
+
+The `except`-handler narrowing keys on the handler and nothing wider, so an
+error-path `return 2` written outside one still reads as a block and exempts
+the hook.
+Measured against the shipped checker on 2026-09-04, `blocks_by_exit_2` returns
+`True` for `if not path.exists(): return 2` and `False` for the same statement
+inside an `except` clause.
+Exactly one registered hook writes a literal status 2, and it is
+`flag-stale-adjacent-comment.py` inside an `except OSError` clause,
+so the exit-2 route exempted no registered hook when this was measured
+(2026-09-04).
+A hook that emits a blocking `decision` is exempt through the other arm of
+the same condition, which this narrowing does not touch.
+
+- **Do:** give a warn-only `PreToolUse` hook
+  `hookSpecificOutput.additionalContext`, and confirm it by reading the
+  printed payload.
+- **Don't:** treat an error-path `return 1` as a blocking channel --- the
+  checker reads status 2 alone.
+
+A **`PreToolUse`** hook that emits **both** channels should gate its
+`systemMessage` on `ANTIGRAVITY_AGENT` being unset.
+The event decides this, and the adapter is where to read it off.
+`plugins/ai-config/claude-hook-adapter.py`'s `PreToolUse` branch prints
+`hookSpecificOutput.additionalContext` to stderr as `Warning from <hook>: ...`
+and separately prints every collected `systemMessage` as
+`claude-hook-adapter [allow]: ...`, so a `PreToolUse` payload carrying both
+prints the warning twice there.
+Its `Stop` branch instead collapses the two into one, taking the first channel
+present through
+`msg = hook_out.get("systemMessage") or hook_out.get("additionalContext") or nested_context`
+and appending a single entry, so a warn-only `Stop` hook carrying both
+surfaces its warning once and owes no gate.
+A hook emitting one channel alone is unaffected on either event.
+Driving the shipped adapter with a synthetic hook that emits both channels
+returns those two stderr lines for a `PreToolUse` payload and the single
+`{"systemMessage": ...}` object for a `Stop` payload (measured 2026-09-04).
+Nothing enforces the gate, and several registered `PreToolUse` hooks do not
+yet carry it.
+That census is derived over `hooks/hooks.json` rather than recalled ---
+registered scripts whose source names both channels and never *gates* on
+`ANTIGRAVITY_AGENT`.
+It keys on the channels rather than on the event, so a `Stop` hook can appear
+in its output without owing the gate;
+`flag-config-deletion-without-ref-check.py` is registered under `Stop` alone
+and is there for that reason.
+Read the membership off the query below rather than off this paragraph, and
+check each name's registered event before acting on it.
+No sentence here states the count, because a tally in prose goes stale on any
+unrelated hook addition, and this one went stale twice in two days
+(output pasted below the snippet, measured 2026-09-04):
+
+```python
+import json, pathlib
+d = json.load(open("hooks/hooks.json"))
+s = {h["script"] for e in d["hooks"].values() for g in e for h in g["hooks"]}
+print(sorted(x for x in s if (pathlib.Path("hooks") / x).is_file()
+             and all(k in (pathlib.Path("hooks") / x).read_text()
+                     for k in ("additionalContext", "systemMessage"))
+             and 'environ.get("ANTIGRAVITY_AGENT")' not in
+                 (pathlib.Path("hooks") / x).read_text()))
+# ['flag-add-a-outside-pathspec.py',
+#  'flag-config-deletion-without-ref-check.py', 'no-fable-subagent.py',
+#  'no-underived-required-check.py', 'warn-stale-review-diff-base.py']
+```
+
+The test is the gating **expression**, not the bare name, and the difference
+is not cosmetic.
+Keying on the name alone counts a hook that merely *mentions* the variable ---
+`warn-stale-review-diff-base.py`'s own docstring says it lacks the gate ---
+so the disclosure would delete that hook from the census disclosing it.
+That is what happened here: the name-keyed query printed two names under a
+paragraph naming three.
+
+- **Do:** gate a `PreToolUse` hook's `systemMessage` whenever the same payload
+  also carries `additionalContext`.
+- **Do:** key a census like this one on the expression that does the work, and
+  paste the output beside the query.
+- **Don't:** state the gate as repo-wide fact, or read the census off the
+  prose --- re-run the query and check each name's registered event, since
+  only its `PreToolUse` members warn twice under Antigravity.
+- **Don't:** gate a warn-only `Stop` hook --- the adapter's `Stop` branch
+  picks one channel through an `or` chain, so only a `PreToolUse` payload
+  carrying both warns twice.
+- **Don't:** key it on a bare identifier --- prose about the absence of a gate
+  reads as the gate itself.
 
 Every hook must ship a companion `test-<name>.py` beside it in the same change before pushing;
 `scripts/test_hooks.py` runs

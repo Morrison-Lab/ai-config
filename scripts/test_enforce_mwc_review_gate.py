@@ -205,8 +205,9 @@ class TestEvaluate(unittest.TestCase):
                 gate.evaluate(MERGE_CMD, state)["decision"], "deny", body)
 
     def test_incidental_approval_word_in_review_body_does_not_approve(self):
-        """Only the headline can approve, so prose mentioning an approved
-        helper cannot launder itself into an approval."""
+        """The whole body must reduce to one non-empty line, so prose
+        mentioning an approved helper cannot launder itself into an
+        approval."""
         body = ("Two notes on the parser.\n\n"
                 "It reuses the approved validation helper, which is fine.")
         state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
@@ -311,9 +312,8 @@ class TestEvaluate(unittest.TestCase):
                 gate.evaluate(MERGE_CMD, state)["decision"], "deny", body)
 
     def test_approving_headline_over_findings_does_not_approve(self):
-        """The bar is an approving headline with zero follow-on bullets
-        (skills/pr-status/SKILL.md); NOT_CLEAN_VERDICT_RE matches verdict
-        phrasings only, so ordinary findings prose passes it."""
+        """Findings under an approving line leave more than one non-empty
+        line, so the body cannot reduce to the approval itself."""
         for body in ("Ready for merge.\n\n### Minor findings\n"
                      "- consider renaming `x`\n- the docstring drifts",
                      "No findings.\n\n- Findings: the migration is missing "
@@ -545,8 +545,8 @@ class TestEvaluate(unittest.TestCase):
         self.assertEqual(gate.evaluate(MERGE_CMD, allowed)["decision"], "allow")
 
     def test_unlabelled_follow_on_bullets_do_not_approve(self):
-        """The bar is structural, not lexical: a findings list whose wording
-        dodges the findings vocabulary is still the sparta#1427 shape."""
+        """The bar is emptiness, not vocabulary: a findings list whose
+        wording dodges the findings vocabulary still leaves extra lines."""
         for body in ("Ready for merge.\n\n## Notes\n\n"
                      "- the parser drops tokens\n- rename x",
                      "Approved.\n\n1. the migration lacks a down-step",
@@ -565,6 +565,60 @@ class TestEvaluate(unittest.TestCase):
             review("d-morrison", "COMMENTED", "Needs more work: found a blocker."),
         ])
         self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "deny")
+
+    def test_another_humans_not_clean_review_body_vetoes_an_approval(self):
+        """The reviews channel is read in both directions: one human's
+        stated blocker denies beside another human's body approval,
+        whichever order the two reviews arrive in."""
+        blocker = review("bob", "COMMENTED",
+                         "Needs more work: the parser drops tokens.")
+        approval = review("alice", "COMMENTED", "Ready for merge.")
+        for reviews in ([approval, blocker], [blocker, approval]):
+            decision = gate.evaluate(MERGE_CMD, pr(reviews=list(reviews)))
+            self.assertEqual(decision["decision"], "deny")
+            self.assertIn("not clean", decision["reason"])
+
+    def test_not_clean_body_denies_beside_another_humans_approval(self):
+        """A blocker from the human who approved earlier denies even with a
+        second human's approving review standing."""
+        state = pr(reviews=[
+            review("alice", "COMMENTED", "Ready for merge."),
+            review("bob", "COMMENTED", "Approved."),
+            review("alice", "COMMENTED", "Needs more work."),
+        ])
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "deny")
+
+    def test_struck_through_approval_does_not_approve(self):
+        """Strikethrough is a retraction, not emphasis, so `~~` must not be
+        trimmed back to the bare approval phrase."""
+        for body in ("~~Ready for merge~~", "~~Approved~~"):
+            state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+            self.assertEqual(
+                gate.evaluate(MERGE_CMD, state)["decision"], "deny", body)
+            self.assertFalse(gate.human_review_body_approves(body), body)
+
+    def test_body_approval_without_a_named_pr_author_denies(self):
+        """The self-approval bound fails closed like every other bound here:
+        a payload that cannot name the author cannot show the reviewer is
+        someone else."""
+        for author in (None, "absent"):
+            state = pr(reviews=[review("d-morrison", "COMMENTED",
+                                       "Ready for merge.")])
+            if author is None:
+                state["author"] = None
+            else:
+                del state["author"]
+            decision = gate.evaluate(MERGE_CMD, state)
+            self.assertEqual(decision["decision"], "deny", author)
+            self.assertIn("its own work", decision["reason"])
+
+    def test_one_character_review_commit_is_not_head_bound(self):
+        """The head binding is a sha-prefix test, so it needs a plausible
+        abbreviation: a single character prefixes almost every head."""
+        short = review("d-morrison", "COMMENTED", "Ready for merge.",
+                       commit=HEAD[0])
+        self.assertEqual(
+            gate.evaluate(MERGE_CMD, pr(reviews=[short]))["decision"], "deny")
 
     def test_chatty_follow_up_does_not_retract_formal_approval(self):
         """Only the approval a body *established* is retractable, so

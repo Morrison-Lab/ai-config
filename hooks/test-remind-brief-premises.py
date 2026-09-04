@@ -29,6 +29,7 @@ import importlib.util
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -563,14 +564,25 @@ def gh_stub(body):
     """A directory holding a `gh` that runs `body`, for prepending to `PATH`.
 
     `own_items` shells out to `gh` for the branch's PR number, so a row that
-    left it unpinned would move with whatever a real `gh` reported.
+    left it unpinned would move with whatever a real `gh` reported. Each
+    invocation's arguments are logged to `argv` beside the stub.
     """
     d = tempfile.mkdtemp()
     exe = os.path.join(d, "gh")
     with open(exe, "w") as fh:
-        fh.write("#!/bin/sh\n" + body + "\n")
+        fh.write("#!/bin/sh\necho \"$@\" >> "
+                 + shlex.quote(os.path.join(d, "argv")) + "\n" + body + "\n")
     os.chmod(exe, 0o755)
     return d
+
+
+def gh_calls(d):
+    """The distinct argument lines the stub in `d` was invoked with."""
+    path = os.path.join(d, "argv")
+    if not os.path.isfile(path):
+        return set()
+    with open(path, encoding="utf-8") as fh:
+        return {line.strip() for line in fh if line.strip()}
 
 
 _NO_PR = gh_stub("exit 1")
@@ -612,11 +624,16 @@ OWN_REPO = [
     (run(SELF_REF.replace("3107", "3117"), ROUNDS, env=BRANCH),
      "REMIND", "no `GITHUB_REF` item and no PR: the branch names it"),
 ]
+GH_QUERY = "pr view --json number --jq .number"
+_gh_ok = gh_calls(_PR_3107) == {GH_QUERY}
 shutil.rmtree(_NO_PR, ignore_errors=True)
 shutil.rmtree(_PR_3107, ignore_errors=True)
 for got, want, desc in OWN_REPO:
     wrong += got != want
     print(f"  {got:<7} {desc}")
+wrong += not _gh_ok
+print(f"  {'ok    ' if _gh_ok else 'WRONG '} `gh` was asked exactly "
+      f"`{GH_QUERY}`")
 
 # ------------------------------------------------------------ sentinel scope
 print("\nsentinel (one shared dir):")

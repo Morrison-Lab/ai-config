@@ -72,8 +72,8 @@ def stub_statements(source: str) -> tuple[list[str], str | None]:
     code that happens to mention `sys.argv` would otherwise read as clean.
 
     A shebang the file never writes out is fixture content rather than a stub,
-    so the statement must either call a write itself or bind a name that a
-    simple write statement elsewhere in the file mentions.
+    so the statement must either call a write itself or bind a name the file
+    later writes or passes to a call.
     """
     try:
         tree = ast.parse(source)
@@ -85,7 +85,7 @@ def stub_statements(source: str) -> tuple[list[str], str | None]:
         for child in ast.iter_child_nodes(node):
             parents[id(child)] = node
 
-    written = _written_names(tree, source)
+    written = _written_names(tree, source) | _call_argument_names(tree)
     segments = []
     for literal in _shebang_constants(tree):
         node: ast.AST | None = literal
@@ -118,6 +118,18 @@ def _written_names(tree: ast.AST, source: str) -> set[str]:
         for sub in ast.walk(node):
             if isinstance(sub, ast.Name):
                 names.add(sub.id)
+    return names
+
+
+def _call_argument_names(tree: ast.AST) -> set[str]:
+    """Names passed as an argument to any call in the file."""
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        for arg in list(node.args) + [kw.value for kw in node.keywords]:
+            if isinstance(arg, ast.Name):
+                names.add(arg.id)
     return names
 
 

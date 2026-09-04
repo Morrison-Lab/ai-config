@@ -9,12 +9,13 @@ directory, verifying that:
   4. A shell stub is judged on its own forms ("$@"), not on Python ones.
   5. A stub split across an f-string is read whole, not per literal,
      and an enclosing block mentioning sys.argv does not mask a blind stub.
-  6. A shebang in fixture content is not a stub, even beside an unrelated chmod.
+  6. A shebang in fixture content is not a stub, even beside an unrelated chmod,
+     while one installed through a helper that takes the body as a parameter is.
   7. A shell-hook subject is examined rather than dropped for its extension.
   8. A path named argv_log does not, by itself, count as reading argv.
   9. Unparseable test source fails loudly; a missing directory exits 2.
  10. One argv-aware stub does not clear a blind one in the same suite.
- 11. The live sweep is advisory, and the report names how many stubs it saw.
+ 11. The live repository holds no argv-blind stub, over a non-zero stub count.
 """
 from __future__ import annotations
 
@@ -226,6 +227,32 @@ case(
     needle="holding 0 executable stub(s)",
 )
 
+HELPER_INSTALL_TEST = '''import os, tempfile
+GH_SHIM = """#!/bin/sh
+echo fixture
+"""
+
+
+def install(dirpath, name, body):
+    p = os.path.join(dirpath, name)
+    with open(p, "w") as fh:
+        fh.write(body)
+    os.chmod(p, 0o755)
+    return p
+
+
+with tempfile.TemporaryDirectory() as tmp:
+    install(tmp, "gh", GH_SHIM)
+'''
+
+case(
+    "a stub installed through a helper is still flagged",
+    {"warn.py": HOOK_SRC, "test-warn.py": HELPER_INSTALL_TEST},
+    want_exit=1,
+    needle="never reads its own argv",
+    strict=True,
+)
+
 # --- 7. A shell-hook subject is examined rather than dropped ---
 case(
     "a shell hook's suite is examined",
@@ -311,27 +338,15 @@ case(
 
 # --- 11. Live repository, and the negative control the report carries ---
 proc = subprocess.run(
-    [sys.executable, str(SCRIPT)],
-    capture_output=True,
-    text=True,
-    cwd=str(ROOT),
-)
-check(
-    "the live sweep is advisory",
-    proc.returncode == 0,
-    f"\n{proc.stdout}{proc.stderr}",
-)
-strict_proc = subprocess.run(
     [sys.executable, str(SCRIPT), "--strict"],
     capture_output=True,
     text=True,
     cwd=str(ROOT),
 )
-want_strict = 1 if "FINDING:" in proc.stdout else 0
 check(
-    "--strict exit agrees with the live findings",
-    strict_proc.returncode == want_strict,
-    f"rc={strict_proc.returncode} want={want_strict}",
+    "the real repository has no argv-blind stub",
+    proc.returncode == 0,
+    f"\n{proc.stdout}{proc.stderr}",
 )
 check(
     "the report names how many stubs it examined",

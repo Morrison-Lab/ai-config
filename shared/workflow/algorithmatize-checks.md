@@ -901,6 +901,26 @@ A grep sees all three, so it does not matter that only the last is ever printed.
 The needle was the phrase `chained AHEAD`, and `git show origin/main:hooks/no-unreviewed-pr.py | grep -n 'chained AHEAD'` returns 6 hits the fix never touches: three docstrings (lines 356, 418, 672), two inline comments (1522, 1550), and the label-exemption message (1917).
 So the assertion passed against the unfixed script, and the pre-fix control that was supposed to fail did not.)
 
+**A live guard's own substring needle has the identical failure mode, and it fires on the message that discharges it rather than only on a test fixture.**
+
+The section above is about a test's needle matching the fixture's own pre-existing text.
+The same collision reaches a shipped `Stop`/`PreToolUse` hook whenever its trigger phrase is one the corpus has to be able to *discuss*: a guard keyed on a cleanliness phrase fires on the very message that **retracts** an earlier, unsupported use of that phrase, because the retraction has to name the phrase to withdraw it.
+The guard is technically correct that the string appears --- it is wrong that the string's *appearance* still means what the guard was built to catch, because the sentence containing it is doing the opposite job: undoing the claim rather than making it.
+
+`no-placeholder-reply.py`'s whole-message anchoring, already named above, is the general answer: match the **whole** stripped message rather than a substring, specifically because this corpus quotes its own banned strings constantly.
+The same fix generalizes past that one hook.
+
+- **Do:** anchor a guard's needle on the whole message (or an unambiguous structural position within it), not a bare substring, whenever the corpus must be able to discuss the phrase it flags.
+- **Do:** exempt a sentence carrying a first-person negation of the claim ("I never ran ...", "I said X --- I never verified it") from a substring match, when whole-message anchoring is not available.
+- **Don't:** ship a guard whose needle is a bare substring of the phrase its own remedy has to use --- the remedy then trips the guard it exists to satisfy.
+- **Don't:** assume a guard is safe because its test fixtures don't happen to include a retraction of the guard's own vocabulary;
+  write that fixture deliberately.
+
+(Measured 2026-09-02: `hooks/no-incomplete-check-enumeration.py` blocked a message asserting two PRs were "clean by every instrument" on nothing but `gh pr checks` --- correctly, that is the exact short surface the guard exists to catch.
+The **next** message retracted it ("I said #3010 and #3029 were 'clean by every instrument' at merge.
+I never ran `check-pr-fully-clean.py` on either.") and the same guard, on the same phrase, blocked that retraction too --- twice, across two consecutive turns.
+Tracked as [ai-config#3053](https://github.com/Morrison-Lab/ai-config/issues/3053).)
+
 **A tenth outcome: the property under test is enforced at more than
 one independent site, and mutating one leaves the others standing
 guard.**

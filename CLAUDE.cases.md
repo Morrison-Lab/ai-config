@@ -181,8 +181,14 @@ The login-filtered query returned the round-2 comment from `02:12:52Z` instead, 
 
 ## Re-check for latest review findings before reporting PR status --- A bot's `COMMENTED` review is the same blind spot
 
-(Morrison-Lab/ai-config#3084, 2026-09-03: three Copilot reviews at head `6f10014`, `5098574802` among them, were submitted in state `COMMENTED` --- two headed "Changes recommended", the third "Needs a closer look" --- with their findings under a suppression block, so they produced no review thread and no inline comment object.
-The pre-merge check queried review threads, got two threads and both resolved, reported clean, and the defect reached `main`.
+(Morrison-Lab/ai-config#3084, 2026-09-03.
+Re-derived from `get_reviews` and `get_review_comments` on 2026-09-04, because the issue body's own account of it was wrong in a way worth recording.
+Three Copilot reviews at head `6f10014` --- `5098574802`, `5098854246`, `5098881593` --- were submitted in state `COMMENTED`, two headed "Changes recommended" and the third "Needs a closer look".
+Each carried one finding in a collapsed `### Suppressed comments (1)` block, and a suppressed finding never becomes a comment object, so a review-thread query and `pulls/N/comments` both return nothing over it.
+Two of the three *also* posted an ordinary inline comment, which is what the issue body missed when it said the suppression block meant they "created no review thread":
+the visible comment and the suppressed finding sit in the same review, so a threads query sees the review and still under-reports it.
+At the 16:25:36Z merge the PR carried three threads, one of them --- `r3926471670`, opened at 16:20:48Z by review `5104271634` on the merged head `bf55824` --- unresolved and ordinary rather than suppressed.
+So the two resolved threads the pre-merge check reported were a reading taken before 16:20:48Z, and the defect reached `main` past a stale thread query as well as past the suppressed findings.
 This section was loaded in context throughout and did not fire, because it named "a human's `CHANGES_REQUESTED`" and the reviewer was a bot.
 Filed as [ai-config#3121](https://github.com/Morrison-Lab/ai-config/issues/3121).)
 

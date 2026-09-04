@@ -601,7 +601,7 @@ The block has moved as well as changed wording, so match case-insensitively on `
 Measured 2026-09-03 on ai-config#3084 review `5098574802`, it arrives as `### Suppressed comments (1)` under `<summary>Review details</summary>`, which a `<summary>`-only match returns zero against.
 Keep it scoped to that region, per [`skills/ardi/SKILL.md`](skills/ardi/SKILL.md): uncollapsed overview prose mentions the word, so a body-wide match keeps a clean PR permanently non-clean.
 Checking `--json comments` alone can miss the review's existence entirely.
-A bot's `COMMENTED` review vetoes a merge under [`fully-clean`](shared/workflow/fully-clean.md) exactly as a human's `CHANGES_REQUESTED` does, whatever headline its body carries --- "Changes recommended", "Needs a closer look", and "generated no new comments" have each introduced a body carrying real findings --- because the blind spot is about *where the finding sits*.
+A bot's `COMMENTED` review **carrying findings in its body** vetoes a merge under [`fully-clean`](shared/workflow/fully-clean.md) exactly as a human's `CHANGES_REQUESTED` does, whatever headline that body carries --- "Changes recommended", "Needs a closer look", and "generated no new comments" have each introduced a body carrying real findings --- because the blind spot is about *where the finding sits*.
 The forge enforces only `CHANGES_REQUESTED`, though: a `COMMENTED` review sets no blocking state and needs no dismissal, which is precisely why nothing stops you merging over its findings.
 Before declaring a PR ready, also run:
 ```
@@ -610,15 +610,13 @@ gh api repos/<owner>/<repo>/pulls/N/comments --jq '.[] | "\(.path):\(.line // .o
 ```
 A `CHANGES_REQUESTED` state is blocking regardless of whether an automated re-review later says "Ready for merge" — that bot verdict doesn't clear a human's own review state, which only the human (or an explicit dismissal) can resolve.
 The first command emits one line per review, so a long PR's history stays readable, and its last field is the body's first line.
-That line identifies a review;
-it never settles one, so read every listed review's full body rather than only those whose first line looks unclean.
-Gating on the first line skips the documented false-clean shape, since "generated no new comments" is the overview a suppression block hides behind.
+That line identifies a review and never settles one, so read every listed review's full body --- "generated no new comments" is the overview a suppression block hides behind.
 It is also deliberately unfiltered: add `select(.state == "CHANGES_REQUESTED")` only as a follow-up narrowing, after you have read every review's state and body.
 
 - **Do:** read every formal review's state and body, whoever posted it, and treat a finding in a review body --- a collapsed suppression block included --- as blocking.
 - **Do:** keep any state filter as a second, deliberately narrow query, run after the unfiltered listing rather than instead of it.
 - **Do:** read every listed review's full body --- its first line is an identifier, not a verdict.
-- **Don't:** pass over a review because its author is a bot or its state is `COMMENTED` --- neither attribute is why the blind spot exists.
+- **Don't:** pass over a review because its author is a bot or its state is `COMMENTED`, nor read that state as blocking on its own --- neither attribute is why the blind spot exists, and Copilot posts its finding-free reviews in that state too.
 - **Don't:** gate that read on a first line reading unclean --- a plainly clean one is the false-clean shape.
 - **Don't:** read an empty or fully-resolved thread list as an empty review population.
 

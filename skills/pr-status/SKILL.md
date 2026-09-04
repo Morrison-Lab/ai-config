@@ -228,9 +228,28 @@ once it convinced the reviewer (they dropped the item).
 
 ## Check for a blocking human CHANGES_REQUESTED
 
+**List every review first: this section's query is deliberately narrow, and its narrowness is not the clean bar.**
+That query answers one question --- whether a GitHub review *state* is blocking the merge button --- and that question is indifferent to a bot's `COMMENTED` review carrying real findings in its body, which the forge never blocks and which vetoes merge under [`fully-clean`](../../shared/workflow/fully-clean.md) all the same.
+The blind spot is about *where the finding sits*, not about who posted it or which state they picked, so take the unfiltered listing of every review's state, author, and body before narrowing to the state question below:
+
+```bash
+gh pr view "<N>" --json reviews \
+  --jq '.reviews[] | [.state, .author.login, .submittedAt,
+          ((.body // "") | split("\n") | map(select(length > 0)) | .[0] // "(empty body)")] | @tsv'
+```
+
+One line per review keeps a long PR's review history readable, and the last field is the body's first line.
+That line identifies a review rather than settling it, so read the full body of every review the listing names --- not only those whose first line looks unclean, since "generated no new comments" is the overview a suppression block hides behind --- and read a collapsed suppression block inside it as findings (see *Parse for findings before declaring clean* above).
+
+- **Do:** list every review's state and body, whoever posted it, before running the state-filtered query below.
+- **Do:** read the full body of every review the listing names, whatever its first line says.
+- **Don't:** read an empty `CHANGES_REQUESTED` result as evidence that no review carries findings.
+- **Don't:** gate the full-body read on a review's first line reading unclean --- a plainly clean first line is the false-clean shape.
+
 A bot's clean verdict does **not** clear a human's formal review state. A
 `CHANGES_REQUESTED` review submitted via GitHub's review UI is invisible to
-the comments query above -- it's a separate object, and often has an
+the `--json comments` query in *Read the LATEST review* above -- it's a
+separate object, and often has an
 **empty** top-level body with the actual finding in an inline comment
 (`READ_PR_REVIEWS` -- abstract operation token; resolve to your model's
 tool via [`tool-mappings.md`](../../tool-mappings.md)):
@@ -267,24 +286,6 @@ If this returns anything, the PR is **blocking** regardless of what any bot
 says -- only the human (or an explicit dismissal) resolves it. Report it as
 open and name the reviewer; don't let a later "Ready for merge" bot comment
 paper over it.
-
-**That query is deliberately narrow, and its narrowness is not the clean bar.**
-It answers one question --- whether a GitHub review *state* is blocking the merge button --- and that question is indifferent to a bot's `COMMENTED` review carrying real findings in its body, which the forge never blocks and which vetoes merge under [`fully-clean`](../../shared/workflow/fully-clean.md) all the same.
-The blind spot is about *where the finding sits*, not about who posted it or which state they picked, so run an unfiltered listing of every review's state, author, and body **before** narrowing to the state question above:
-
-```bash
-gh pr view "<N>" --json reviews \
-  --jq '.reviews[] | [.state, .author.login, .submittedAt,
-          ((.body // "") | split("\n") | map(select(length > 0)) | .[0] // "(empty body)")] | @tsv'
-```
-
-One line per review keeps a long PR's review history readable, and the last field is the body's first line.
-That line identifies a review rather than settling it, so read the full body of every review the listing names --- not only those whose first line looks unclean, since "generated no new comments" is the overview a suppression block hides behind --- and read a collapsed suppression block inside it as findings (see *Parse for findings before declaring clean* above).
-
-- **Do:** list every review's state and body, whoever posted it, before running the state-filtered query.
-- **Do:** read the full body of every review the listing names, whatever its first line says.
-- **Don't:** read an empty `CHANGES_REQUESTED` result as evidence that no review carries findings.
-- **Don't:** gate the full-body read on a review's first line reading unclean --- a plainly clean first line is the false-clean shape.
 
 A PR is only **fully clean / ready to merge** when **at least one** of the
 `@claude` comment or an external reviewer's verdict (see *Check for a

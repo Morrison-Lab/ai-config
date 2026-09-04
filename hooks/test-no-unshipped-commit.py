@@ -672,9 +672,50 @@ finally:
         os.unlink(_path)
     shutil.rmtree(hook_tmp, ignore_errors=True)
 
+# Verify that hooks/no-unshipped-commit.py's fallback constants stay in sync with scripts/lib/git_cmd.py
+lib_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib")
+if lib_dir not in sys.path:
+    sys.path.insert(0, lib_dir)
+import git_cmd  # noqa: E402
+
+# Read raw hook text to extract inline fallback values before import overwrite
+with open(sys.argv[1], "r", encoding="utf-8") as f:
+    hook_code = f.read()
+
+# Assert inline fallback definitions match git_cmd definitions
+import re  # noqa: E402
+m_env = re.search(r'_ENV = r"([^"]+)"', hook_code)
+assert m_env and m_env.group(1) == r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*", "fallback _ENV drifted"
+assert git_cmd._ENV == r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
+
+m_flags = re.search(r'_GIT_FLAGS = \(\s*(.*?)\s*\n\)', hook_code, re.DOTALL)
+assert m_flags, "could not parse fallback _GIT_FLAGS"
+# Extract and concatenate all raw strings within _GIT_FLAGS definition
+hook_git_flags = "".join(re.findall(r'r"([^"]+)"', m_flags.group(1)))
+git_cmd_flags = git_cmd._GIT_FLAGS
+assert hook_git_flags == git_cmd_flags, f"fallback _GIT_FLAGS drifted: {hook_git_flags} != {git_cmd_flags}"
+
+# Test fallback exception branch logs warning to stderr on import failure
+import subprocess  # noqa: E402
+hook_abs = os.path.abspath(sys.argv[1])
+proc = subprocess.run(
+    [sys.executable, "-c",
+     f"import sys; sys.modules['git_cmd'] = None; "
+     f"g = {{'__file__': {repr(hook_abs)}}}; "
+     f"exec(compile(open({repr(hook_abs)}).read(), {repr(hook_abs)}, 'exec'), g)"],
+    input="",
+    stderr=subprocess.PIPE,
+    stdout=subprocess.PIPE,
+    text=True,
+)
+assert "cannot load scripts/lib/git_cmd.py" in proc.stderr, f"expected warning on stderr, got: {proc.stderr}"
+assert "using fallback regexes" in proc.stderr, f"expected 'using fallback regexes' on stderr, got: {proc.stderr}"
+assert "import of git_cmd halted" in proc.stderr, f"expected import error in stderr, got: {proc.stderr}"
+
 print("PASS: a dropped commit no longer blocks, while unpushed work still does (ai-config#2727)")
 print("PASS: the derived count names itself, and state outranks a transcript discharge")
 print("PASS: no-upstream falls back to the transcript, and staleness is not unshippedness")
 print("PASS: without a cwd the verdict falls back to the transcript scan")
 print("PASS: main() blocks on the payload cwd's state once, then the sentinel holds")
 print("PASS: multi-worktree cross-checkout and branch-switch unpushed commits block accurately (ai-config#2737)")
+print("PASS: fallback regexes in hook match scripts/lib/git_cmd.py and stderr diagnostic logs on failure")

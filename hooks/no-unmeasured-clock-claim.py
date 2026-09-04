@@ -153,6 +153,12 @@ RX_STDOUT_REDIRECT = re.compile(r"(?<![2-9<>])>>?\s*(?![&>])\S")
 RX_SEGMENT_SPLIT = re.compile(r";|&&|\|\|")
 
 # `echo`/`printf` of a captured variable, which puts the value back on stdout.
+# The span between the command and the variable may not cross a REAL `|` or
+# `&` (a pipe hands the echo to another command, and `echo foo | grep $t` does
+# not print the variable), but the same characters inside a quoted argument
+# (`echo "a|b $t"`) are text, so the search runs over `_mask_quoted_operators`
+# rather than the raw segment. A `;` cannot be a boundary here at all, since
+# `_split_command` already split on it, so any `;` left is quoted.
 RX_PRINTED_VAR = r"\b(?:echo|printf|print)\b[^;&|\n]*\$\{?%s\b"
 
 # The harness's own injected reading. Quoting this is correct, so it counts as
@@ -291,6 +297,19 @@ def _split_command(command):
     return out
 
 
+def _mask_quoted_operators(text):
+    """`text` with each `;`, `&`, or `|` inside a quoted, substituted, or
+    grouped span replaced by a space, everything else left in place.
+
+    `_mask_nested` blanks whole spans, which would hide the variable this is
+    used to find; this keeps the variable and blanks only the operator
+    characters that could otherwise be read as a command boundary.
+    """
+    masked = _mask_nested(text)
+    return "".join(
+        " " if m == " " and o in ";&|" else o for o, m in zip(text, masked))
+
+
 def _substitution_end(text, pos):
     """Index just past the `)` closing a `$(` whose body starts at `pos`.
 
@@ -405,8 +424,9 @@ def _capture_only(command):
                 return False
         if not prints:
             continue
+        unquoted = _mask_quoted_operators(rest)
         for var in captured:
-            if re.search(RX_PRINTED_VAR % re.escape(var), rest):
+            if re.search(RX_PRINTED_VAR % re.escape(var), unquoted):
                 return False
     return saw_read
 

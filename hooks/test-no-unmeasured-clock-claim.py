@@ -121,6 +121,28 @@ COMBINED_APPEND_DATE = {"type": "assistant", "message": {"content": [
 DUPLICATED_FD_DATE = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "id": "call_dup", "input": {
         "command": "TZ=America/Los_Angeles date \"+%H:%M %Z\" 2>&1"}}]}}
+# A pipe character INSIDE the echoed string is text, not a pipe: the echo is
+# unredirected and prints the captured value. The weekday format keeps the
+# tool-result fallback from discharging on an HH:MM it would otherwise find,
+# so only the print classification can discharge these.
+QUOTED_PIPE_ECHOED = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_qpipe", "input": {
+        "command": "t=$(TZ=America/Los_Angeles date \"+%A\"); "
+                   "echo \"a|b today is $t\""}}]}}
+QUOTED_SEMI_ECHOED = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_qsemi", "input": {
+        "command": "t=$(TZ=America/Los_Angeles date \"+%A\"); "
+                   "echo \"steps done; today is $t\""}}]}}
+QUOTED_AMP_ECHOED = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_qamp", "input": {
+        "command": "t=$(TZ=America/Los_Angeles date \"+%A\"); "
+                   "echo \"a&b today is $t\""}}]}}
+# A REAL pipe between the echo and the variable: the echo feeds grep, and the
+# variable is grep's pattern, so the value never prints.
+PIPED_PAST_VAR = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_rpipe", "input": {
+        "command": "t=$(TZ=America/Los_Angeles date \"+%H:%M %Z\"); "
+                   "echo done | grep -c $t"}}]}}
 # `NAME=$(` inside a quoted argument is not an assignment: the read prints as
 # part of the echoed string, and the transcript carries it.
 QUOTED_HEAD_PRINTED = {"type": "assistant", "message": {"content": [
@@ -471,6 +493,20 @@ CASES = [
     ([QUOTED_HEAD_PRINTED, say("Recap: 00:59 PDT")], False,
      "#2991: `NAME=$(` inside a quoted argument is not a capture -- the "
      "echo prints the reading"),
+
+    # --- review round 3 on #2991: the echoed-variable search excluded `;`,
+    #     `&`, `|` from its span, which are text inside a quoted argument.
+    ([QUOTED_PIPE_ECHOED, say("Recap: 00:59 PDT")], False,
+     "#2991: a `|` inside the echoed string is text, so the echo prints "
+     "the captured value"),
+    ([QUOTED_SEMI_ECHOED, say("Recap: 00:59 PDT")], False,
+     "#2991: a `;` inside the echoed string is text too"),
+    ([QUOTED_AMP_ECHOED, say("Recap: 00:59 PDT")], False,
+     "#2991: and a `&` inside the echoed string"),
+    ([PIPED_PAST_VAR, result("call_rpipe", "0"), say("Recap: 01:07 PDT")],
+     True,
+     "#2991: a real pipe between the echo and the variable hands the echo "
+     "to grep, so the value never prints and the guard still fires"),
 ]
 
 

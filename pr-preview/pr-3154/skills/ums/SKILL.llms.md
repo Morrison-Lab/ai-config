@@ -39,19 +39,21 @@ Actively review recent session context and update all relevant memory files and 
 
 - Read the target file first (skill or memory) to understand current state
 
-- **Grep the corpus for the item’s specific subject** – the tool name, the API call, the error string – before appending anything. Reading the region you’re editing is not enough: a topical memory file runs to hundreds or a thousand-plus lines, so an existing entry on the same subject can sit far away in an unrelated cluster and never enter your view. Grep the whole corpus rather than one file, and rather than only `memories/`:
+- **Grep the corpus for the item’s specific subject** – the tool name, the API call, the error string – before appending anything. Reading the region you’re editing is not enough: a topical memory file runs to hundreds or a thousand-plus lines, so an existing entry on the same subject can sit far away in an unrelated cluster and never enter your view. Grep the paths [`skill-builder`](../../skills/skill-builder/SKILL.llms.md) step 0 runs rather than one file, and rather than only `memories/`:
 
   ``` bash
-  repo="${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/ums rev-parse --show-toplevel 2>/dev/null || pwd)}"
-  test -f "$repo/CLAUDE.md" && test -d "$repo/shared" || { echo "not an ai-config checkout: $repo" >&2; exit 1; }
-  (cd "$repo" && grep -rilI --exclude-dir=__pycache__ "<keywords>" skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md)
+  (
+    repo="${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/ums rev-parse --show-toplevel 2>/dev/null || pwd)}"
+    test -f "$repo/CLAUDE.md" && test -d "$repo/shared" || { echo "not an ai-config checkout: $repo" >&2; exit 1; }
+    cd "$repo" && grep -rilI "<keywords>" skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md
+  )
   ```
 
-  The path list is the one skill-builder step 0 runs, over the files on disk, so an entry that exists only on a branch not checked out there is out of reach (see the unmerged-PR section of [`grep-is-not-coverage`](../../shared/workflow/grep-is-not-coverage.md)). `-I` skips binary files and `--exclude-dir` skips bytecode caches, which a plain `grep -r` would otherwise report as hits. A rule can be owned by a `shared/` fragment or a skill as easily as by a memory, and a `memories/`-only grep stays outside those paths. When one exists, extend it in place; don’t add a second bullet. (ai-config#689: a `list_workflow_runs` cost bullet went in next to the related `get_check_runs` guidance while an entry on the same tool already sat ~2000 lines below in the write-access cluster – caught by the review bot, not by the author.)
+  The query runs over the files on disk, so an entry that exists only on a branch not checked out there is out of reach (see the unmerged-PR section of [`grep-is-not-coverage`](../../shared/workflow/grep-is-not-coverage.md)). `-I` skips binary files, bytecode caches included, which a plain `grep -r` would otherwise report as hits. A rule can be owned by a `shared/` fragment or a skill as easily as by a memory, and a `memories/`-only grep stays outside those paths. When one exists, extend it in place; don’t add a second bullet. (ai-config#689: a `list_workflow_runs` cost bullet went in next to the related `get_check_runs` guidance while an entry on the same tool already sat ~2000 lines below in the write-access cluster – caught by the review bot, not by the author.)
 
 - **When the target memory file is already at the 1200-line cap**, recover lines (re-wrap or drop) or split the file. A fold has two shapes and neither escapes every gate: a new source line trips `scripts/test_check_memory_file_size.py`, while folding the sentence into an existing line leaves the count flat but makes that line a changed line the new-line-breaks gate can flag. A net-positive append fails `scripts/test_check_memory_file_size.py` even when every new sentence is a real lesson (3rd occurrence, 2026-08-25 on `memories/preferences.md` in ai-config#2262: `origin/main` was exactly 1200 lines, and a +5-line append reddened `validate`. Prior: `shared/writing/semantic-line-breaks.md` ai-config#1291; `shared/workflow/review-verdict-pitfalls.md` ai-config#811).
 
-- **When step 2 routed the item to a repo other than ai-config, grep both corpora.** The query above searches an ai-config checkout, so add the destination repo’s own doc paths, run in that repo — a repo-local entry can otherwise duplicate or contradict a fragment nobody thought to search from that repo. See [`grep-is-not-coverage`](../../shared/workflow/grep-is-not-coverage.md)’s “Searching the wrong corpus is the same error with no grep in it”.
+- **When step 2 routed the item to a repo other than ai-config, grep both corpora.** The query above searches an ai-config checkout, so run a second pass in the destination repo, over that repo’s own doc paths — a repo-local entry can otherwise duplicate or contradict a fragment nobody thought to search from that repo. See [`grep-is-not-coverage`](../../shared/workflow/grep-is-not-coverage.md)’s “Searching the wrong corpus is the same error with no grep in it”.
 
 - **When that grep finds the corpus already covers this class, record the recurrence on the existing entry, not just the new fact.** The bullet above already says to extend in place rather than add a sibling; what is missing is the count. Write it on the entry – “3rd occurrence, 2026-08-16”, with a pointer to each prior record – so the entry carries evidence about whether the written rule is actually holding.
 
@@ -203,7 +205,7 @@ Both write to the same destinations. `ums` fires proactively, as soon as a learn
 - ❌ Saying “I’ll remember that” without actually writing it down
 - ❌ Updating memories but not pushing skill changes to origin
 - ❌ Recording vague lessons (“be more careful”) instead of specific ones (“always poll for new review after pushing — check commit SHA matches”)
-- ❌ Skipping the “check existing notes” step and creating duplicates – specifically, reading only the region you’re appending to instead of grepping the whole target file for the subject (step 3)
+- ❌ Skipping the “check existing notes” step and creating duplicates – specifically, reading only the region you’re appending to instead of grepping the corpus for the subject (step 3)
 - ❌ Updating only preferences when a skill also needs the fix
 - ❌ `git add -A` — it sweeps unrelated in-flight edits (the user’s work, other draft skills) into your commit/PR. Stage the specific files you touched.
 - ❌ Creating `memories/repo/<repo>.md` for any repo — this pattern is retired. Put repo-specific lore in the repo’s own agent docs (`.github/agents/`, `CLAUDE.md`, `.github/instructions/`, `.github/copilot-instructions.md`, or checked-in `.claude/memories/`) via a PR; if the repo has no agent-doc infrastructure yet, this session’s own local project-memory mechanism (Claude Code: `~/.claude/projects/<project-path>/memory/` — substitute the equivalent for a non-Claude agent) is short-lived staging only — hand off that a PR adding those agent docs is still required. See the checklist item above and `memories/preferences.md` for the full rule.

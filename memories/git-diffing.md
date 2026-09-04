@@ -149,8 +149,8 @@ the same history is reported differently by `git diff`, `git log -p`, and the
 combined diff, and only one of the three hides what the merge commit itself
 introduced.
 
-**The belief this corrects**, written into a branch and caught by an
-adversarial review:
+**The belief this corrects**, written into `fix/ums-step3-corpus-scope` and
+caught by the round-one adversarial verdict on that branch:
 *a squash-merging repo's three-dot diff excludes merge-commit content, so a
 conflict-resolution re-add is invisible to review.*
 **The fact:** `git diff A...B` is a **tree** diff between the merge base and
@@ -223,7 +223,9 @@ genuine conflict.
 - **Don't:** write a bare `--diff-merges`, which requires a value.
 
 (Refs [ai-config#3129](https://github.com/Morrison-Lab/ai-config/pull/3129),
-whose adversarial review caught the false belief on 2026-09-03.)
+whose notebook entry of 2026-09-03 records the correction;
+the false belief was written into `fix/ums-step3-corpus-scope`
+and caught by the round-one adversarial verdict on that branch.)
 
 ## A `git diff` self-check is blind to untracked files, whatever range you pick
 

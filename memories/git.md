@@ -234,10 +234,12 @@ when every one of them was an ancestor of a ref `origin` still advertised.
 
 **`git fetch origin <sha>` takes the full 40-character SHA and nothing shorter.**
 That is git's own resolution rather than a server policy:
-a non-40-hex argument is looked up as a ref name and never reaches the server,
-while a 40-hex object the remote does not hold is refused *by* the server,
+a non-40-hex argument is sent as a ref-name query (`ls-refs`) and never as a `want`,
+so the server answers with its ref advertisement and the match fails client-side
+(`GIT_TRACE_PACKET=1` shows `fetch> ref-prefix eb0cf15e` and no `want` line),
+while a 40-hex object the remote will not serve is refused by the server,
 and the two error messages are what tell the cases apart
-(both shapes reproduced on git 2.43.0 against GitHub and against a plain local-path remote).
+(both shapes measured on git 2.43.0 against GitHub and against a plain local-path remote).
 A short SHA fails with `fatal: couldn't find remote ref <sha>`,
 and it fails the same way for a commit that is the tip of an advertised ref,
 so the failure carries no information about reachability.
@@ -255,9 +257,12 @@ $ git fetch origin 0000000000000000000000000000000000000001
 fatal: remote error: upload-pack: not our ref 0000000000000000000000000000000000000001
 ```
 
-So the full-SHA fetch is itself the one-command test:
-`couldn't find remote ref` means the argument was not a ref name,
-and `upload-pack: not our ref` means the object is not on the remote.
+So the fetch's own error text is the test:
+`couldn't find remote ref` means the argument was not a ref name (retry with all 40 characters),
+and `upload-pack: not our ref` means the remote would not serve that object.
+The second string is protocol v2's (git's default since 2.26, and what GitHub answers on v0 as well);
+a local-path remote on protocol v0 says `Server does not allow request for unadvertised object` instead,
+and either wording is refusal to serve, which is not the same as absence.
 
 **`git merge-base --is-ancestor A B` and `git rev-list --count B`
 on a shallow clone answer for the fetched depth.**

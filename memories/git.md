@@ -264,14 +264,18 @@ The second string is protocol v2's, and GitHub answers it on v0 as well;
 v2 has been git's default since 2.29 (2.26 promoted it and 2.27 demoted it, per git's release notes).
 A local-path remote on protocol v0 says `Server does not allow request for unadvertised object` instead,
 and neither wording means the object is absent:
-v2's is the server refusing a `want`,
-while v0's is git declining to send one because the advertisement carried no `allow-*-sha1-in-want` capability
-(`GIT_TRACE_PACKET=1` shows no `want` line at all on v0, and one on v2).
+`not our ref` is the server refusing a `want`,
+while `Server does not allow request for unadvertised object` is git declining to send one,
+because that remote's advertisement carried no `allow-*-sha1-in-want` capability.
+On protocol v2 git always sends the `want`;
+on v0 it sends one only when the advertisement offers the capability,
+which GitHub does (`allow-tip-sha1-in-want`, `allow-reachable-sha1-in-want`) and a plain local-path remote does not
+(`GIT_TRACE_PACKET=1` shows one `want` line against GitHub on either version, and none against the local-path remote on v0).
 
 **`git merge-base --is-ancestor A B` and `git rev-list --count B`
 on a shallow clone answer for the fetched depth.**
-`git rev-list --count f9068299` returned 1
-for a commit whose branch carries 33 commits above `main`,
+`git rev-list --count f9068299` returned 1,
+while `git rev-list --count origin/main..f9068299` on a full checkout returns 33,
 and `--is-ancestor` returned non-zero for three real ancestors,
 because the walk stopped at the graft
 (the section above on `git log -S` describes the same stop).

@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="description" content="Snapshot session state to memory.">
+<meta name="description" content="Snapshot state to forge/memory.">
 
 <title>skill – ai-config</title>
 <style>
@@ -351,7 +351,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#when-this-fires" id="toc-when-this-fires" class="nav-link" data-scroll-target="#when-this-fires">When this fires</a></li>
   <li><a href="#step-1-snapshot-the-state" id="toc-step-1-snapshot-the-state" class="nav-link" data-scroll-target="#step-1-snapshot-the-state">Step 1 — Snapshot the state</a></li>
   <li><a href="#step-2-write-or-update-the-handoff-memory" id="toc-step-2-write-or-update-the-handoff-memory" class="nav-link" data-scroll-target="#step-2-write-or-update-the-handoff-memory">Step 2 — Write (or update) the handoff memory</a></li>
-  <li><a href="#step-3-post-a-paused-state-note-on-the-active-prmr" id="toc-step-3-post-a-paused-state-note-on-the-active-prmr" class="nav-link" data-scroll-target="#step-3-post-a-paused-state-note-on-the-active-prmr">Step 3 — Post a paused-state note on the active PR/MR</a></li>
+  <li><a href="#step-3-post-the-handoff-on-the-relevant-forge-threads" id="toc-step-3-post-the-handoff-on-the-relevant-forge-threads" class="nav-link" data-scroll-target="#step-3-post-the-handoff-on-the-relevant-forge-threads">Step 3 — Post the handoff on the relevant forge thread(s)</a></li>
   <li><a href="#step-4-confirm" id="toc-step-4-confirm" class="nav-link" data-scroll-target="#step-4-confirm">Step 4 — Confirm</a></li>
   <li><a href="#step-5-retire-a-handoff-once-its-state-is-resolved" id="toc-step-5-retire-a-handoff-once-its-state-is-resolved" class="nav-link" data-scroll-target="#step-5-retire-a-handoff-once-its-state-is-resolved">Step 5 — Retire a handoff once its state is resolved</a>
   <ul class="collapse">
@@ -371,7 +371,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <section id="handoff" class="level1">
 <h1>handoff</h1>
-<p>Capture everything the next session (or a context reset) needs to resume this work cleanly, then persist it as a <strong>project memory</strong> and — if a PR/MR is in play — a paused-state note on the thread.</p>
+<p>Capture everything the next session (or a context reset) needs to resume this work cleanly, then <strong>post it on the forge</strong> — GitHub, GitLab, or whichever tracker owns the work — and keep a copy as a <strong>project memory</strong>.</p>
+<p>The forge post is the required half, and the memory file is the backup. A memory file is readable only by this account on this machine, so a teammate, a remote session, a CI run, and the user reading the forge cannot see a handoff that exists only there.</p>
 <p>This is the manual trigger for the standing “always leave handoff notes proactively when pausing” policy in <code>memories/preferences.md</code>: <em>always</em> leave pick-up notes when pausing, especially with long-running jobs in flight. Run it on demand, or fire it yourself proactively when you’re about to pause and something is still running.</p>
 <section id="when-this-fires" class="level2">
 <h2 class="anchored" data-anchor-id="when-this-fires">When this fires</h2>
@@ -395,6 +396,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="step-2-write-or-update-the-handoff-memory" class="level2">
 <h2 class="anchored" data-anchor-id="step-2-write-or-update-the-handoff-memory">Step 2 — Write (or update) the handoff memory</h2>
+<p>This is the backup copy, and Step 3 posts the same content somewhere others can read it.</p>
 <p>Write to the project memory directory (<code>~/.claude/projects/&lt;project-slug&gt;/memory/</code>). Reuse an existing in-flight handoff file if one already covers this work (update it in place) rather than creating a duplicate. Frontmatter <code>type: project</code>. Convert relative dates to absolute. Capture, concretely:</p>
 <ul>
 <li><strong>Where things stand</strong> — current verdict/CI state, what’s done vs pending.</li>
@@ -406,21 +408,38 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </ul>
 <p>Link related memories with <code>[[name]]</code> (e.g.&nbsp;any runtime-quirk memory the pick-up steps depend on). Then add a one-line pointer to <code>MEMORY.md</code> (or update the existing one).</p>
 </section>
-<section id="step-3-post-a-paused-state-note-on-the-active-prmr" class="level2">
-<h2 class="anchored" data-anchor-id="step-3-post-a-paused-state-note-on-the-active-prmr">Step 3 — Post a paused-state note on the active PR/MR</h2>
-<p>If the work has an open PR/MR and you’ve <strong>claimed</strong> it (see <code>claim-pr</code>), post a short note so the <code>@claude</code> bot and other sessions don’t push conflicting changes — especially when you have unpushed local commits or running jobs. Post it only when that PR still passes <code>memories/reviewing-prs.md</code>’s scope test: a claim confers no scope, so if the PR has since fallen out of scope, skip the note and report the PR to the user instead.</p>
+<section id="step-3-post-the-handoff-on-the-relevant-forge-threads" class="level2">
+<h2 class="anchored" data-anchor-id="step-3-post-the-handoff-on-the-relevant-forge-threads">Step 3 — Post the handoff on the relevant forge thread(s)</h2>
+<p>Post the handoff every time, including when no PR/MR is in play. The forge is the one place a later session, a reviewer, and the user all already look, so it is where the pick-up state belongs. Route by what the work actually has:</p>
+<ul>
+<li><strong>An open PR/MR you’ve claimed, still in scope</strong> — comment on it, in the paused-claim form below; otherwise route the handoff to the issue.</li>
+<li><strong>An issue and no PR/MR</strong> — comment on the issue.</li>
+<li><strong>Neither</strong> — file an issue whose body is the handoff, per <a href="../../shared/workflow/issue-first.md"><code>issue-first</code></a>.</li>
+<li><strong>State that outlives the thread</strong> — commit it to a file in the repo (a runbook, a design note) and link that file from the comment.</li>
+</ul>
+<p>Combine these freely: a committed file for the long-lived detail, an issue for the open decisions, a PR comment for the paused claim. End every comment you post with the agent-disclosure marker, per <a href="../../shared/workflow/disclose-agent-authorship.md"><code>disclose-agent-authorship</code></a>. On GitLab, <code>glab</code> mirrors each <code>gh</code> command below. <a href="../../AGENTS.md"><code>AGENTS.md</code></a>’s membership gate still governs the post: verify membership in that repository first, and where it is unverified, keep the memory file and ask the user before posting.</p>
+<p>If the work has an open PR/MR and you’ve <strong>claimed</strong> it (see <code>claim-pr</code>), the note also stops the <code>@claude</code> bot and other sessions pushing conflicting changes — especially when you have unpushed local commits or running jobs. Post it only when that PR still passes <code>memories/reviewing-prs.md</code>’s scope test: a claim confers no scope, so if the PR has since fallen out of scope, skip the note, route the handoff to the issue instead, and report the PR to the user.</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> pr comment <span class="op">&lt;</span>N<span class="op">&gt;</span> --body <span class="st">"⏸️ **Local session paused** (&lt;local timestamp&gt;) — still claimed.</span></span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="st">&lt;2-4 bullets: in-flight jobs + IDs, unpushed local commits and why held, what runs next&gt;</span></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="st">Please hold off on pushing to this branch in the meantime.</span></span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="st">_Posted by Claude Code (AI agent) --- not written by a human._"</span>   <span class="co"># COMMENT_PR</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="st">&lt;the Step 2 handoff content: where things stand, in-flight jobs + IDs, unpushed</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="st">local commits and why held, open decisions, numbered pick-up steps&gt;</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="st">Please hold off on pushing to this branch in the meantime.</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="st">_Posted by Claude Code (AI agent) --- not written by a human._"</span>   <span class="co"># COMMENT_PR</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>If the work is genuinely <em>finished</em> (merged/closed, nothing outstanding), post a closing/unclaim note instead per <code>claim-pr</code> — don’t leave a stale “paused” claim.</p>
+<ul>
+<li><strong>Do:</strong> post the handoff to the forge thread that owns the work every time you pause, and keep the memory file as the backup copy.</li>
+<li><strong>Do:</strong> route to the issue — filing one when none exists — when the work has no open PR/MR to comment on.</li>
+<li><strong>Do:</strong> end each posted comment with the agent-disclosure marker.</li>
+<li><strong>Don’t:</strong> treat a written memory file as a completed handoff; nobody but this account on this machine can read it.</li>
+<li><strong>Don’t:</strong> skip the post because there is no PR — an issue thread, a committed file, or a new issue is the route.</li>
+<li><strong>Don’t:</strong> post to a repository whose membership is unverified — hold the handoff in memory and ask the user.</li>
+</ul>
 </section>
 <section id="step-4-confirm" class="level2">
 <h2 class="anchored" data-anchor-id="step-4-confirm">Step 4 — Confirm</h2>
-<p>Give the user a compact recap: what was snapshotted, where the memory lives, the PR note link, and the one-line pick-up summary. Include a local-time stamp.</p>
+<p>Give the user a compact recap: what was snapshotted, where the memory lives, links to every forge thread the handoff was posted on, and the one-line pick-up summary. Include a local-time stamp.</p>
 </section>
 <section id="step-5-retire-a-handoff-once-its-state-is-resolved" class="level2">
 <h2 class="anchored" data-anchor-id="step-5-retire-a-handoff-once-its-state-is-resolved">Step 5 — Retire a handoff once its state is resolved</h2>
@@ -439,9 +458,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p><strong>An open <em>issue</em> it references does not keep it alive.</strong> A handoff’s value is the in-flight state it captured; an issue is tracked in the tracker, which is where a reader should meet it. Judge on the in-flight items.</p>
 <section id="a-handoff-written-as-a-repo-root-file-is-a-staging-hazard" class="level3">
 <h3 class="anchored" data-anchor-id="a-handoff-written-as-a-repo-root-file-is-a-staging-hazard">A handoff written as a repo-root file is a staging hazard</h3>
-<p>The rest of this skill persists the snapshot as a <strong>project memory</strong>, which is outside the repo and cannot be committed by accident. A handoff written instead as a repo-root <code>HANDOFF-*.md</code> is untracked <strong>and</strong> usually unignored, which is precisely the combination that lets a bare <code>git add -A</code> sweep it into a PR.</p>
+<p>Step 2 persists the snapshot as a <strong>project memory</strong>, which is outside the repo and cannot be committed by accident, and Step 3’s committed-file route tracks the file deliberately. A handoff written instead as a repo-root <code>HANDOFF-*.md</code> is untracked <strong>and</strong> usually unignored, which is precisely the combination that lets a bare <code>git add -A</code> sweep it into a PR.</p>
 <p>That is not hypothetical. It is the shape of <code>ucdavis/bcs</code>’s 2026-07-30 incident, where an untracked-and-unignored directory was staged that way and pushed a credential.</p>
-<p>So prefer the project-memory form. Where a repo-root file already exists, either retire it under the rule above or add a <code>.gitignore</code> entry — and read its contents before doing either, since a stale handoff can carry a rule the project has since <strong>reversed</strong>, which is worse than one that is merely out of date.</p>
+<p>So prefer the project-memory form, or a file you track deliberately. Where a repo-root file already exists, either retire it under the rule above or add a <code>.gitignore</code> entry — and read its contents before doing either, since a stale handoff can carry a rule the project has since <strong>reversed</strong>, which is worse than one that is merely out of date.</p>
 <ul>
 <li><strong>Do:</strong> derive staleness from the state of every item a handoff names, and clear it once they have all resolved.</li>
 <li><strong>Do:</strong> read a stale handoff before deleting it, in case it states a convention the project has since changed.</li>
@@ -456,7 +475,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li><code>memories/preferences.md</code> (the “always leave handoff notes proactively” bullet) — the <em>policy</em> (when to hand off automatically); this skill is the <em>action</em>.</li>
 <li><code>memorize</code> / <code>remember</code> — general fact persistence; <code>handoff</code> is the specialized “save session state” case.</li>
 <li><code>claim-pr</code> — owns the claim/unclaim lifecycle; <code>handoff</code> posts the <em>paused</em> note within an existing claim.</li>
-<li><strong><code>checkpoint</code></strong> — a lighter, deliberate mid-task snapshot for a session that <em>isn’t</em> ending: plan state, decisions, next actions, no branch/job/PR mechanics. Run <code>handoff</code> when actually stopping; <code>checkpoint</code> when just banking progress mid-task.</li>
+<li><strong><code>checkpoint</code></strong> — a lighter, deliberate mid-task snapshot for a session that <em>isn’t</em> ending: plan state, decisions, next actions, no branch/job/forge-post mechanics. Run <code>handoff</code> when actually stopping; <code>checkpoint</code> when just banking progress mid-task.</li>
 <li><strong><code>compress-session</code></strong> — distills the conversation into auto memory before the context window fills up, so a compaction (not a session end) doesn’t lose what matters. <code>handoff</code> ends the session; <code>compress-session</code> keeps it going with a smaller, curated context.</li>
 </ul>
 

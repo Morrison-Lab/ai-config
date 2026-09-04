@@ -6,8 +6,9 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
+<meta name="description" content="Finish the current wave; start no new one.">
 
-<title>Skills – ai-config</title>
+<title>skill – ai-config</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -26,30 +27,65 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
 </style>
 
 
-<script src="site_libs/quarto-nav/quarto-nav.js"></script>
-<script src="site_libs/quarto-nav/headroom.min.js"></script>
-<script src="site_libs/clipboard/clipboard.min.js"></script>
-<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
-<script src="site_libs/quarto-search/fuse.min.js"></script>
-<script src="site_libs/quarto-search/quarto-search.js"></script>
-<meta name="quarto:offset" content="./">
-<script src="site_libs/quarto-html/quarto.js" type="module"></script>
-<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
-<script src="site_libs/quarto-html/popper.min.js"></script>
-<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
-<script src="site_libs/quarto-html/anchor.min.js"></script>
-<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-dark-b85bc7c33db8c58e0ec93c3465666fed.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
-<script src="site_libs/bootstrap/bootstrap.min.js"></script>
-<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="site_libs/bootstrap/bootstrap-3e9b1289f5f353c49b617ce48ad2bc38.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="site_libs/bootstrap/bootstrap-dark-a515e054079012129989d5397ee3c9c1.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="site_libs/bootstrap/bootstrap-3e9b1289f5f353c49b617ce48ad2bc38.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<script src="../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dark-b85bc7c33db8c58e0ec93c3465666fed.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap-3e9b1289f5f353c49b617ce48ad2bc38.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-a515e054079012129989d5397ee3c9c1.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-3e9b1289f5f353c49b617ce48ad2bc38.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -79,7 +115,7 @@ ul.task-list li input[type="checkbox"] {
 }</script>
 
 
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="../../styles.css">
 </head>
 
 <body class="nav-fixed quarto-light"><script id="quarto-html-before-body" type="application/javascript">
@@ -251,7 +287,7 @@ ul.task-list li input[type="checkbox"] {
     <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
-    <a class="navbar-brand" href="./index.html">
+    <a class="navbar-brand" href="../../index.html">
     <span class="navbar-title">ai-config</span>
     </a>
   </div>
@@ -262,23 +298,23 @@ ul.task-list li input[type="checkbox"] {
           <div class="collapse navbar-collapse" id="navbarCollapse">
             <ul class="navbar-nav navbar-nav-scroll me-auto">
   <li class="nav-item">
-    <a class="nav-link" href="./index.html"> 
+    <a class="nav-link" href="../../index.html"> 
 <span class="menu-text">Home</span></a>
   </li>  
   <li class="nav-item">
-    <a class="nav-link" href="./setup.html"> 
+    <a class="nav-link" href="../../setup.html"> 
 <span class="menu-text">Setup</span></a>
   </li>  
   <li class="nav-item">
-    <a class="nav-link active" href="./skills.html" aria-current="page"> 
+    <a class="nav-link" href="../../skills.html"> 
 <span class="menu-text">Skills</span></a>
   </li>  
   <li class="nav-item">
-    <a class="nav-link" href="./agents.html"> 
+    <a class="nav-link" href="../../agents.html"> 
 <span class="menu-text">Agents</span></a>
   </li>  
   <li class="nav-item">
-    <a class="nav-link" href="./workflow.html"> 
+    <a class="nav-link" href="../../workflow.html"> 
 <span class="menu-text">Workflow</span></a>
   </li>  
 </ul>
@@ -310,582 +346,134 @@ ul.task-list li input[type="checkbox"] {
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#how-to-invoke-a-skill" id="toc-how-to-invoke-a-skill" class="nav-link active" data-scroll-target="#how-to-invoke-a-skill">How to invoke a skill</a></li>
-  <li><a href="#skill-categories" id="toc-skill-categories" class="nav-link" data-scroll-target="#skill-categories">Skill categories</a>
+  <li><a href="#finish-wave-cap-the-run-at-the-wave-already-in-flight" id="toc-finish-wave-cap-the-run-at-the-wave-already-in-flight" class="nav-link active" data-scroll-target="#finish-wave-cap-the-run-at-the-wave-already-in-flight">finish-wave — cap the run at the wave already in flight</a>
   <ul class="collapse">
-  <li><a href="#pr-review-workflow" id="toc-pr-review-workflow" class="nav-link" data-scroll-target="#pr-review-workflow">PR / review workflow</a></li>
-  <li><a href="#issue-management" id="toc-issue-management" class="nav-link" data-scroll-target="#issue-management">Issue management</a></li>
-  <li><a href="#branch-sync" id="toc-branch-sync" class="nav-link" data-scroll-target="#branch-sync">Branch / sync</a></li>
-  <li><a href="#memory-and-skills-maintenance" id="toc-memory-and-skills-maintenance" class="nav-link" data-scroll-target="#memory-and-skills-maintenance">Memory and skills maintenance</a></li>
-  <li><a href="#writing-and-style" id="toc-writing-and-style" class="nav-link" data-scroll-target="#writing-and-style">Writing and style</a></li>
-  <li><a href="#repo-ci-utilities" id="toc-repo-ci-utilities" class="nav-link" data-scroll-target="#repo-ci-utilities">Repo / CI utilities</a></li>
-  <li><a href="#session-management" id="toc-session-management" class="nav-link" data-scroll-target="#session-management">Session management</a></li>
+  <li><a href="#when-this-fires" id="toc-when-this-fires" class="nav-link" data-scroll-target="#when-this-fires">When this fires</a></li>
+  <li><a href="#procedure" id="toc-procedure" class="nav-link" data-scroll-target="#procedure">Procedure</a>
+  <ul class="collapse">
+  <li><a href="#derive-the-wave-dont-enumerate-it" id="toc-derive-the-wave-dont-enumerate-it" class="nav-link" data-scroll-target="#derive-the-wave-dont-enumerate-it">1. Derive the wave, don’t enumerate it</a></li>
+  <li><a href="#hold-every-grab" id="toc-hold-every-grab" class="nav-link" data-scroll-target="#hold-every-grab">2. Hold every grab</a></li>
+  <li><a href="#drive-what-is-in-flight-to-a-terminal-state" id="toc-drive-what-is-in-flight-to-a-terminal-state" class="nav-link" data-scroll-target="#drive-what-is-in-flight-to-a-terminal-state">3. Drive what is in flight to a terminal state</a></li>
+  <li><a href="#know-what-still-runs-inside-the-cap" id="toc-know-what-still-runs-inside-the-cap" class="nav-link" data-scroll-target="#know-what-still-runs-inside-the-cap">4. Know what still runs inside the cap</a></li>
+  <li><a href="#report-the-boundary-then-stop-and-ask" id="toc-report-the-boundary-then-stop-and-ask" class="nav-link" data-scroll-target="#report-the-boundary-then-stop-and-ask">5. Report the boundary, then stop and ask</a></li>
   </ul></li>
-  <li><a href="#full-skill-list" id="toc-full-skill-list" class="nav-link" data-scroll-target="#full-skill-list">Full skill list</a></li>
+  <li><a href="#scope-and-limits" id="toc-scope-and-limits" class="nav-link" data-scroll-target="#scope-and-limits">Scope and limits</a></li>
+  <li><a href="#relationship-to-other-skills" id="toc-relationship-to-other-skills" class="nav-link" data-scroll-target="#relationship-to-other-skills">Relationship to other skills</a></li>
+  <li><a href="#anti-patterns" id="toc-anti-patterns" class="nav-link" data-scroll-target="#anti-patterns">Anti-patterns</a></li>
+  </ul></li>
   </ul>
-<div class="toc-actions"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills.qmd" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills.qmd" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
+<div class="toc-actions"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/finish-wave/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/finish-wave/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
     </div>
 <!-- main -->
-<main class="content" id="quarto-document-content">
-
-
-<header id="title-block-header" class="quarto-title-block default">
-<div class="quarto-title">
-<h1 class="title">Skills</h1>
-</div>
+<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"></header>
 
 
 
-<div class="quarto-title-meta">
-
-    
-  
-    
-  </div>
-  
 
 
-</header>
-
-
-<p>Skills are markdown files that teach Claude Code a reusable workflow. Each <code>skills/&lt;name&gt;/SKILL.md</code> file describes when to invoke the skill, what steps to follow, and which tools it may use. Claude Code discovers skills in <code>~/.claude/skills/</code> automatically.</p>
-<p>Codex uses generated wrappers in <code>codex-skills/&lt;name&gt;/SKILL.md</code>. Those wrappers keep Codex frontmatter strict and point back to the canonical Claude skill in <code>skills/</code>, so the workflow stays in one place.</p>
-<section id="how-to-invoke-a-skill" class="level2">
-<h2 class="anchored" data-anchor-id="how-to-invoke-a-skill">How to invoke a skill</h2>
-<table class="caption-top table">
-<thead>
-<tr class="header">
-<th>Surface</th>
-<th>Syntax</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>Local CLI</td>
-<td><code>/skill-name</code> or a bare keyword (e.g.&nbsp;<code>ardi</code>)</td>
-</tr>
-<tr class="even">
-<td>Plugin (other repos)</td>
-<td><code>/ai-config:skill-name</code></td>
-</tr>
-<tr class="odd">
-<td><code>@claude</code> bot on PRs</td>
-<td><code>@claude skill-name</code> in a PR comment</td>
-</tr>
-<tr class="even">
-<td>Codex</td>
-<td>skill trigger from <code>${CODEX_HOME:-$HOME/.codex}/skills</code></td>
-</tr>
-</tbody>
-</table>
-<p>Most skills also respond to plain-English triggers listed in their <code>description</code> field (e.g.&nbsp;“grab an issue”, “drive to clean”, “update memories and skills”).</p>
+<section id="finish-wave-cap-the-run-at-the-wave-already-in-flight" class="level1">
+<h1>finish-wave — cap the run at the wave already in flight</h1>
+<p>Cap an orchestration run at its current wave. Drive everything already in flight to a terminal state, grab nothing new, then hand the decision about a next wave back to the user.</p>
+<p>The cap bounds <em>issue grabs</em>, not activity. <a href="../../skills/gii/SKILL.html"><code>gii</code></a>’s wave boundary defines a wave as the issues taken from the backlog plus the PRs that ship them, so the work that finishes those PRs runs inside the cap rather than against it.</p>
+<section id="when-this-fires" class="level2">
+<h2 class="anchored" data-anchor-id="when-this-fires">When this fires</h2>
+<ul>
+<li>“finish the current wave but don’t start a new one”, “fw”</li>
+<li>“finish the wave”, “no new wave”, “last wave”, “wind down after this one”</li>
+<li>“finish what’s in flight, then stop”</li>
+<li>A <a href="../../skills/gii/SKILL.html"><code>gii</code></a> or <a href="../../skills/gia/SKILL.html"><code>gia</code></a> run reaching its own wave boundary, where this skill is the procedure for the hold</li>
+</ul>
 </section>
-<section id="skill-categories" class="level2">
-<h2 class="anchored" data-anchor-id="skill-categories">Skill categories</h2>
-<section id="pr-review-workflow" class="level3">
-<h3 class="anchored" data-anchor-id="pr-review-workflow">PR / review workflow</h3>
-<table class="caption-top table">
-<thead>
-<tr class="header">
-<th>Skill</th>
-<th>Aliases</th>
-<th>What it does</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td><a href="./skills/ardi/SKILL.html"><code>ardi</code></a></td>
-<td><code>dc</code>, <code>drive</code>, <code>clean</code>, <code>iterate</code></td>
-<td>Read the latest review, address/rebut/defer every finding, push, re-request review — loop until clean</td>
-</tr>
-<tr class="even">
-<td><a href="./skills/ard/SKILL.html"><code>ard</code></a></td>
-<td><code>adr</code></td>
-<td>Single ARD pass: address, rebut, defer, or acknowledge — without the iterate loop</td>
-</tr>
-<tr class="odd">
-<td><a href="./skills/resolve-pr-threads/SKILL.html"><code>resolve-pr-threads</code></a></td>
-<td></td>
-<td>Resolve inline review threads that are already settled, without a full ARD pass</td>
-</tr>
-<tr class="even">
-<td><a href="./skills/claim-pr/SKILL.html"><code>claim-pr</code></a></td>
-<td></td>
-<td>Post a claim comment before a work session; unclaim when done</td>
-</tr>
-<tr class="odd">
-<td><a href="./skills/request-pr-review/SKILL.html"><code>request-pr-review</code></a></td>
-<td></td>
-<td>Add a human reviewer and @-mention them with context</td>
-</tr>
-<tr class="even">
-<td><a href="./skills/pr-status/SKILL.html"><code>pr-status</code></a></td>
-<td></td>
-<td>Report the current PR’s CI and review state</td>
-</tr>
-<tr class="odd">
-<td><a href="./skills/pr-status-all/SKILL.html"><code>pr-status-all</code></a></td>
-<td></td>
-<td>Report status across all open PRs</td>
-</tr>
-<tr class="even">
-<td><a href="./skills/stack-prs/SKILL.html"><code>stack-prs</code></a></td>
-<td></td>
-<td>Branch a new PR off an unmerged base PR, keep it in sync, and re-target it to <code>main</code> once the base merges</td>
-</tr>
-</tbody>
-</table>
+<section id="procedure" class="level2">
+<h2 class="anchored" data-anchor-id="procedure">Procedure</h2>
+<section id="derive-the-wave-dont-enumerate-it" class="level3">
+<h3 class="anchored" data-anchor-id="derive-the-wave-dont-enumerate-it">1. Derive the wave, don’t enumerate it</h3>
+<p>Take the wave from a live query at every check-in, rather than freezing a list of numbers at the moment the cap arrives. A PR opened minutes ago, or one the review bot pushed to, belongs to the wave and never entered any list written earlier (<a href="../../shared/workflow/derive-dont-enumerate.md"><code>derive-dont-enumerate</code></a>).</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="va">me</span><span class="op">=</span><span class="va">$(</span><span class="ex">gh</span> api user <span class="at">-q</span> .login<span class="va">)</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="bu">export</span> <span class="va">me</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> scripts/pr-sweep.py <span class="at">-R</span> <span class="op">&lt;</span>owner<span class="op">&gt;</span>/<span class="op">&lt;</span>repo<span class="op">&gt;</span> --include-drafts <span class="at">--json</span> <span class="dt">\</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>  <span class="kw">|</span> <span class="ex">jq</span> <span class="at">--arg</span> me <span class="st">"</span><span class="va">$me</span><span class="st">"</span> <span class="st">'.repos[].prs[] | select(.author == $me)'</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> phrase <span class="kw">in</span> <span class="st">"hold off"</span> <span class="st">"paws off"</span> <span class="st">"back off"</span><span class="kw">;</span> <span class="cf">do</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>  <span class="ex">gh</span> issue list <span class="at">--state</span> open <span class="at">--json</span> number <span class="dt">\</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">--search</span> <span class="st">"commenter:</span><span class="va">$me</span><span class="st"> </span><span class="dt">\"</span><span class="va">$phrase</span><span class="dt">\"</span><span class="st"> in:comments"</span> <span class="at">-q</span> <span class="st">'.[].number'</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="cf">done</span> <span class="kw">|</span> <span class="fu">sort</span> <span class="at">-un</span> <span class="kw">|</span> <span class="cf">while</span> <span class="bu">read</span> <span class="at">-r</span> <span class="va">n</span><span class="kw">;</span> <span class="cf">do</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>  <span class="ex">gh</span> issue view <span class="st">"</span><span class="va">$n</span><span class="st">"</span> <span class="at">--json</span> number,title,url,comments <span class="at">-q</span> <span class="st">'</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="st">    select([.comments[] | select(.author.login == env.me)</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="st">      | select((.body | test("hold off|paws off|back off"; "i"))</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="st">      and (.body | test("unclaim|released|PR is free|now mergeable"; "i") | not))]</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="st">      | length &gt; 0) | [.number, .title, .url] | @tsv'</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="cf">done</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Where the script is unavailable, fall back to <code>gh pr list --state open --author @me --json number,title,url,headRefName,isDraft</code>. In a remote session without <code>gh</code> on <code>PATH</code>, substitute the GitHub MCP equivalents from <a href="../../tool-mappings.md"><code>tool-mappings.md</code></a>.</p>
+<ul>
+<li><strong>Do:</strong> re-run the queries each time you report the wave’s state.</li>
+<li><strong>Don’t:</strong> work from a list of PR numbers captured when the cap was issued.</li>
+</ul>
 </section>
-<section id="issue-management" class="level3">
-<h3 class="anchored" data-anchor-id="issue-management">Issue management</h3>
-<table class="caption-top table">
-<thead>
-<tr class="header">
-<th>Skill</th>
-<th>Aliases</th>
-<th>What it does</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td><a href="./skills/brainstorm/SKILL.html"><code>brainstorm</code></a></td>
-<td></td>
-<td>Socratic clarifying-question loop before any code/issue, ending in a plan file</td>
-</tr>
-<tr class="even">
-<td><a href="./skills/start-task/SKILL.html"><code>start-task</code></a></td>
-<td><code>st</code></td>
-<td>File a tracking issue (if none exists), branch, implement, open PR, ARDI to clean</td>
-</tr>
-<tr class="odd">
-<td><a href="./skills/grab-issue/SKILL.html"><code>grab-issue</code></a></td>
-<td><code>gi</code></td>
-<td>Pick the highest-priority open issue and work it end-to-end</td>
-</tr>
-<tr class="even">
-<td><a href="./skills/grab-issues-in-parallel/SKILL.html"><code>grab-issues-in-parallel</code></a></td>
-<td><code>gip</code></td>
-<td>Grab multiple issues and work them in parallel worktrees</td>
-</tr>
-<tr class="odd">
-<td><a href="./skills/defer-issue/SKILL.html"><code>defer-issue</code></a></td>
-<td></td>
-<td>File a follow-up issue for something out of scope in the current PR</td>
-</tr>
-<tr class="even">
-<td><a href="./skills/cancel-superseded/SKILL.html"><code>cancel-superseded</code></a></td>
-<td><code>cb</code></td>
-<td>Close issues/PRs that a merged PR made redundant</td>
-</tr>
-<tr class="odd">
-<td><a href="./skills/discussions/SKILL.html"><code>discussions</code></a></td>
-<td></td>
-<td>Read and respond to GitHub Discussions topics; mark Q&amp;A answers</td>
-</tr>
-<tr class="even">
-<td><a href="./skills/migrate-discussion/SKILL.html"><code>migrate-discussion</code></a></td>
-<td></td>
-<td>Move an item between Discussions and Issues when it fits the other tracker better</td>
-</tr>
-</tbody>
-</table>
+<section id="hold-every-grab" class="level3">
+<h3 class="anchored" data-anchor-id="hold-every-grab">2. Hold every grab</h3>
+<p>No new issue is claimed, no new branch is cut off the backlog, and no further <code>gi</code> / <code>gii</code> / <code>gip</code> iteration starts. An issue already claimed before the cap stays in the wave and gets finished.</p>
+<ul>
+<li><strong>Do:</strong> finish an issue claimed before the cap arrived.</li>
+<li><strong>Don’t:</strong> grab one more issue because it is small, adjacent, or already triaged.</li>
+</ul>
 </section>
-<section id="branch-sync" class="level3">
-<h3 class="anchored" data-anchor-id="branch-sync">Branch / sync</h3>
-<table class="caption-top table">
-<thead>
-<tr class="header">
-<th>Skill</th>
-<th>Aliases</th>
-<th>What it does</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td><a href="./skills/sync-pr-branch/SKILL.html"><code>sync-pr-branch</code></a></td>
-<td><code>sync</code>, <code>merge-main</code>, <code>resync-branch</code></td>
-<td>Fetch origin, merge main into the branch, push</td>
-</tr>
-<tr class="even">
-<td><a href="./skills/merge-it/SKILL.html"><code>merge-it</code></a></td>
-<td><code>merged</code></td>
-<td>Squash-merge a ready PR, then run post-merge cleanup</td>
-</tr>
-<tr class="odd">
-<td><a href="./skills/mwc/SKILL.html"><code>mwc</code></a></td>
-<td><code>merge-when-confident</code>, <code>maw</code>, <code>merge-at-will</code></td>
-<td>Grant session-scoped permission to merge fully-clean PRs without asking per PR</td>
-</tr>
-<tr class="even">
-<td><a href="./skills/post-merge/SKILL.html"><code>post-merge</code></a></td>
-<td></td>
-<td>After a merge: checkout main, pull, delete branch, run UMS</td>
-</tr>
-<tr class="odd">
-<td><a href="./skills/clean-branches/SKILL.html"><code>clean-branches</code></a></td>
-<td><code>cb</code>, <code>prune</code></td>
-<td>Delete local branches already merged or closed</td>
-</tr>
-<tr class="even">
-<td><a href="./skills/clean-worktrees/SKILL.html"><code>clean-worktrees</code></a></td>
-<td><code>cw</code></td>
-<td>Remove dead git worktrees left behind by merged PRs and ended sessions</td>
-</tr>
-<tr class="odd">
-<td><a href="./skills/clean-git/SKILL.html"><code>clean-git</code></a></td>
-<td></td>
-<td>Sweep dead worktrees then dead branches in one pass, in the order that works</td>
-</tr>
-<tr class="even">
-<td><a href="./skills/resolve-conflicts/SKILL.html"><code>resolve-conflicts</code></a></td>
-<td><code>rmc</code></td>
-<td>Resolve merge/rebase/cherry-pick conflicts by consolidating the best of both branches</td>
-</tr>
-</tbody>
-</table>
+<section id="drive-what-is-in-flight-to-a-terminal-state" class="level3">
+<h3 class="anchored" data-anchor-id="drive-what-is-in-flight-to-a-terminal-state">3. Drive what is in flight to a terminal state</h3>
+<p>Run <a href="../../skills/ardi/SKILL.html"><code>ardi</code></a> on each open PR in the wave until its verdict is clean, and merge only where a grant such as <a href="../../skills/mwc/SKILL.html"><code>mwc</code></a> already applies. A PR still in CI or review is not a finished wave, so the check-in loop that drives it to green continues uninterrupted. Where an item is blocked, surface it and keep driving the rest (<a href="../../shared/workflow/stack-dont-pause.md"><code>stack-dont-pause</code></a>).</p>
+<ul>
+<li><strong>Do:</strong> keep the monitoring loop running until every wave item is merged, closed, or explicitly escalated.</li>
+<li><strong>Don’t:</strong> read the cap as permission to stop babysitting the wave’s open PRs.</li>
+</ul>
 </section>
-<section id="memory-and-skills-maintenance" class="level3">
-<h3 class="anchored" data-anchor-id="memory-and-skills-maintenance">Memory and skills maintenance</h3>
-<table class="caption-top table">
-<thead>
-<tr class="header">
-<th>Skill</th>
-<th>Aliases</th>
-<th>What it does</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td><a href="./skills/ums/SKILL.html"><code>ums</code></a></td>
-<td><code>update-memories-and-skills</code></td>
-<td>Capture learnings from the session into memory files and skill definitions</td>
-</tr>
-<tr class="even">
-<td><a href="./skills/memorize/SKILL.html"><code>memorize</code></a></td>
-<td><code>remember</code>, <code>always</code></td>
-<td>Save a specific fact or preference to memory</td>
-</tr>
-<tr class="odd">
-<td><a href="./skills/push-memory/SKILL.html"><code>push-memory</code></a></td>
-<td></td>
-<td>Push a general-purpose memory into ai-config from a session working in another repo — on a branch + PR</td>
-</tr>
-<tr class="even">
-<td><a href="./skills/record-learnings/SKILL.html"><code>record-learnings</code></a></td>
-<td></td>
-<td>Structured post-mortem: extract lessons from a completed task</td>
-</tr>
-<tr class="odd">
-<td><a href="./skills/consolidate-memory/SKILL.html"><code>consolidate-memory</code></a></td>
-<td></td>
-<td>Merge or deduplicate memory files that have drifted</td>
-</tr>
-<tr class="even">
-<td><a href="./skills/skill-audit/SKILL.html"><code>skill-audit</code></a></td>
-<td></td>
-<td>Report which skills actually fire (and how often) vs.&nbsp;dead weight, and recommend pruning candidates</td>
-</tr>
-<tr class="odd">
-<td><a href="./skills/learn/SKILL.html"><code>learn</code></a></td>
-<td></td>
-<td>Stage a candidate learning without yet deciding if it’s durable enough to commit</td>
-</tr>
-<tr class="even">
-<td><a href="./skills/promote-memory/SKILL.html"><code>promote-memory</code></a></td>
-<td></td>
-<td>Review staged learnings and promote the durable ones into committed memory</td>
-</tr>
-</tbody>
-</table>
+<section id="know-what-still-runs-inside-the-cap" class="level3">
+<h3 class="anchored" data-anchor-id="know-what-still-runs-inside-the-cap">4. Know what still runs inside the cap</h3>
+<p>Four kinds of work are implied by the current wave rather than being a new one:</p>
+<ul>
+<li><p>A <strong>UMS pass and the PR it opens</strong>, owed at the wave’s clean verdicts and merges — see <a href="../../skills/gii/SKILL.html"><code>gii</code></a>’s “A UMS pass is not a new wave” paragraph and <a href="../../shared/workflow/run-ums-proactively.md"><code>run-ums-proactively</code></a>.</p></li>
+<li><p>A <strong>fix for a defect inside the wave’s own diff</strong>, which stays yours to fix now (<a href="../../shared/principles/dont-incur-technical-debt.md"><code>dont-incur-technical-debt</code></a>).</p></li>
+<li><p>A <strong>tracking issue filed</strong> for anything noticed or deferred, since filing is not grabbing (<a href="../../shared/workflow/issue-first.md"><code>issue-first</code></a>).</p></li>
+<li><p><strong>Syncing, conflict resolution, and re-review</strong> on a wave branch whose base moved.</p></li>
+<li><p><strong>Do:</strong> run the owed UMS pass and open its PR under the cap.</p></li>
+<li><p><strong>Don’t:</strong> count a UMS PR, a follow-up issue, or a sync as a grab from the backlog.</p></li>
+</ul>
 </section>
-<section id="writing-and-style" class="level3">
-<h3 class="anchored" data-anchor-id="writing-and-style">Writing and style</h3>
-<table class="caption-top table">
-<thead>
-<tr class="header">
-<th>Skill</th>
-<th>Aliases</th>
-<th>What it does</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td><a href="./skills/use-preferred-style/SKILL.html"><code>use-preferred-style</code></a></td>
-<td><code>style</code></td>
-<td>Apply the plain-prose writing guide to a draft</td>
-</tr>
-<tr class="even">
-<td><a href="./skills/find-ai-tells/SKILL.html"><code>find-ai-tells</code></a></td>
-<td><code>ai-tells</code></td>
-<td>Scan text for AI-sounding patterns and flag them</td>
-</tr>
-<tr class="odd">
-<td><a href="./skills/fact-check-prose/SKILL.html"><code>fact-check-prose</code></a></td>
-<td><code>fcp</code></td>
-<td>Check prose claims, reasoning, and computed values against sources and rendered output</td>
-</tr>
-<tr class="even">
-<td><a href="./skills/fix-forward-references/SKILL.html"><code>fix-forward-references</code></a></td>
-<td><code>ffr</code></td>
-<td>Detect and rearrange/reword forward-pointing references (“see below”) in prose</td>
-</tr>
-<tr class="odd">
-<td><a href="./skills/detect-informal-definitions/SKILL.html"><code>detect-informal-definitions</code></a></td>
-<td></td>
-<td>Find concepts defined with definitional precision that never got wrapped in a formal definition div</td>
-</tr>
-<tr class="even">
-<td><a href="./skills/detect-hypothetical-examples/SKILL.html"><code>detect-hypothetical-examples</code></a></td>
-<td></td>
-<td>Find worked examples using invented numbers when a real dataset is already available</td>
-</tr>
-<tr class="odd">
-<td><a href="./skills/use-math-macros/SKILL.html"><code>use-math-macros</code></a></td>
-<td><code>macroize</code></td>
-<td>Rewrite manuscript math onto the shared d-morrison/macros submodule</td>
-</tr>
-<tr class="even">
-<td><a href="./skills/tidy/SKILL.html"><code>tidy</code></a></td>
-<td></td>
-<td>Clean up code or prose without changing behavior</td>
-</tr>
-<tr class="odd">
-<td><a href="./skills/simplify/SKILL.html"><code>simplify</code></a></td>
-<td></td>
-<td>Reduce a file or function to its essential parts</td>
-</tr>
-</tbody>
-</table>
-</section>
-<section id="repo-ci-utilities" class="level3">
-<h3 class="anchored" data-anchor-id="repo-ci-utilities">Repo / CI utilities</h3>
-<table class="caption-top table">
-<thead>
-<tr class="header">
-<th>Skill</th>
-<th>Aliases</th>
-<th>What it does</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td><a href="./skills/convert-repo-format/SKILL.html"><code>convert-repo-format</code></a></td>
-<td><code>crf</code></td>
-<td>Convert a repo between the lab’s template formats (R package, Quarto website/book/manuscript)</td>
-</tr>
-<tr class="even">
-<td><a href="./skills/scout-peers/SKILL.html"><code>scout-peers</code></a></td>
-<td></td>
-<td>Survey comparable repos for ideas and conventions</td>
-</tr>
-<tr class="odd">
-<td><a href="./skills/check-dependency-updates/SKILL.html"><code>check-dependency-updates</code></a></td>
-<td><code>cdu</code></td>
-<td>Check for outdated dependencies and propose updates</td>
-</tr>
-<tr class="even">
-<td><a href="./skills/dependabot/SKILL.html"><code>dependabot</code></a></td>
-<td></td>
-<td>Add or update Dependabot config for a repo</td>
-</tr>
-<tr class="odd">
-<td><a href="./skills/send-upstream/SKILL.html"><code>send-upstream</code></a></td>
-<td><code>sup</code></td>
-<td>Open a PR or issue in an upstream repo for a bug found here</td>
-</tr>
-<tr class="even">
-<td><a href="./skills/reprexes/SKILL.html"><code>reprexes</code></a></td>
-<td></td>
-<td>Build minimal reproducible examples for a bug</td>
-</tr>
-<tr class="odd">
-<td><a href="./skills/r-pkg-spellcheck/SKILL.html"><code>r-pkg-spellcheck</code></a></td>
-<td></td>
-<td>Spell-check an R package’s documentation</td>
-</tr>
-<tr class="even">
-<td><a href="./skills/r-pkg-check/SKILL.html"><code>r-pkg-check</code></a></td>
-<td></td>
-<td>Run <code>devtools::check()</code>/<code>R CMD check</code> and triage the results</td>
-</tr>
-<tr class="odd">
-<td><a href="./skills/r-pkg-news/SKILL.html"><code>r-pkg-news</code></a></td>
-<td></td>
-<td>Draft a new NEWS.md entry for an R package</td>
-</tr>
-<tr class="even">
-<td><a href="./skills/r-pkg-cran-checklist/SKILL.html"><code>r-pkg-cran-checklist</code></a></td>
-<td></td>
-<td>Walk through the standard CRAN submission checklist</td>
-</tr>
-<tr class="odd">
-<td><a href="./skills/cran-extrachecks/SKILL.html"><code>cran-extrachecks</code></a></td>
-<td></td>
-<td>Check the ad-hoc CRAN requirements <code>devtools::check()</code> doesn’t catch</td>
-</tr>
-<tr class="even">
-<td><a href="./skills/create-release-checklist/SKILL.html"><code>create-release-checklist</code></a></td>
-<td></td>
-<td>File a GitHub issue with a release checklist for an R package</td>
-</tr>
-<tr class="odd">
-<td><a href="./skills/r-package-development/SKILL.html"><code>r-package-development</code></a></td>
-<td></td>
-<td>Day-to-day R package dev loop: load, test, document, format</td>
-</tr>
-<tr class="even">
-<td><a href="./skills/testing-r-packages/SKILL.html"><code>testing-r-packages</code></a></td>
-<td></td>
-<td>Full testthat reference: fixtures, mocking, snapshots, BDD-style tests</td>
-</tr>
-<tr class="odd">
-<td><a href="./skills/quarto-authoring/SKILL.html"><code>quarto-authoring</code></a></td>
-<td></td>
-<td>Author and convert Quarto documents</td>
-</tr>
-<tr class="even">
-<td><a href="./skills/lifecycle/SKILL.html"><code>lifecycle</code></a></td>
-<td></td>
-<td>Apply lifecycle badges and deprecation stages to R package functions</td>
-</tr>
-<tr class="odd">
-<td><a href="./skills/brand-yml/SKILL.html"><code>brand-yml</code></a></td>
-<td></td>
-<td>Configure a shared <code>_brand.yml</code> for Quarto, Shiny, and R Markdown</td>
-</tr>
-<tr class="even">
-<td><a href="./skills/cli/SKILL.html"><code>cli</code></a></td>
-<td></td>
-<td>Format CLI output with the R <code>{cli}</code> package</td>
-</tr>
-<tr class="odd">
-<td><a href="./skills/release-post/SKILL.html"><code>release-post</code></a></td>
-<td></td>
-<td>Draft a release announcement post for an R package</td>
-</tr>
-<tr class="even">
-<td><a href="./skills/reproducibility-audit/SKILL.html"><code>reproducibility-audit</code></a></td>
-<td></td>
-<td>Audit a project for reproducibility gaps: hidden deps, hardcoded paths, undocumented prerequisites, output traceability</td>
-</tr>
-<tr class="odd">
-<td><a href="./skills/measure-performance/SKILL.html"><code>measure-performance</code></a></td>
-<td><code>perf</code>, <code>benchmark</code></td>
-<td>Profile R code to find the real bottleneck, microbenchmark only that, then confirm the win survives end to end</td>
-</tr>
-<tr class="even">
-<td><a href="./skills/refresh-claude-token/SKILL.html"><code>refresh-claude-token</code></a></td>
-<td><code>rct</code></td>
-<td>Rotate <code>CLAUDE_CODE_OAUTH_TOKEN</code> across the repos that carry it, without <code>/install-github-app</code>’s workflow scaffolding, then verify the new token authenticates</td>
-</tr>
-</tbody>
-</table>
-</section>
-<section id="session-management" class="level3">
-<h3 class="anchored" data-anchor-id="session-management">Session management</h3>
-<table class="caption-top table">
-<thead>
-<tr class="header">
-<th>Skill</th>
-<th>Aliases</th>
-<th>What it does</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td><a href="./skills/session-lock/SKILL.html"><code>session-lock</code></a></td>
-<td></td>
-<td>Register/deregister this session to prevent parallel clobbering</td>
-</tr>
-<tr class="even">
-<td><a href="./skills/handoff/SKILL.html"><code>handoff</code></a></td>
-<td></td>
-<td>Snapshot work state (branch, jobs, open decisions) so the next session can resume cleanly</td>
-</tr>
-<tr class="odd">
-<td><a href="./skills/wrap-up/SKILL.html"><code>wrap-up</code></a></td>
-<td><code>done</code>, <code>merged</code></td>
-<td>Verify true PR/issue/branch state, report a linked summary, then run UMS</td>
-</tr>
-<tr class="even">
-<td><a href="./skills/select-model/SKILL.html"><code>select-model</code></a></td>
-<td><code>model-fit</code>, <code>assess-model-fit</code></td>
-<td>Choose the right Claude model for the task at hand</td>
-</tr>
-<tr class="odd">
-<td><a href="./skills/away/SKILL.html"><code>away</code></a></td>
-<td></td>
-<td>Grant session-scoped permission to stop asking clarifying questions, pick confident work, and consult a stronger model instead of blocking</td>
-</tr>
-<tr class="even">
-<td><a href="./skills/back/SKILL.html"><code>back</code></a></td>
-<td></td>
-<td>Cancel the <code>away</code> grant and surface a decision log of what was resolved unattended</td>
-</tr>
-<tr class="odd">
-<td><a href="./skills/daytb/SKILL.html"><code>daytb</code></a></td>
-<td><code>do-as-you-think-best</code></td>
-<td>Decide the question at hand yourself and report the choice – scoped to that task, unlike <code>away</code>’s whole-session grant</td>
-</tr>
-<tr class="even">
-<td><a href="./skills/delegate-to-codex/SKILL.html"><code>delegate-to-codex</code></a></td>
-<td><code>dtc</code></td>
-<td>Offload heavy read/draft/verify work to the <code>codex</code> CLI before spending Claude quota, with Claude fallback</td>
-</tr>
-<tr class="odd">
-<td><a href="./skills/delegate-to-opencode/SKILL.html"><code>delegate-to-opencode</code></a></td>
-<td><code>dto</code></td>
-<td>Offload work to OpenCode (Go subscription, hosted Zen free, local Ollama) or OpenRouter models</td>
-</tr>
-<tr class="even">
-<td><a href="./skills/rec/SKILL.html"><code>rec</code></a></td>
-<td><code>recommend</code></td>
-<td>Provide clear, actionable recommendations when presenting choices or questions</td>
-</tr>
-<tr class="odd">
-<td><a href="./skills/prompt-me/SKILL.html"><code>prompt-me</code></a></td>
-<td><code>pm</code></td>
-<td>Surface the single most pressing open question (or top N) waiting on user input</td>
-</tr>
-<tr class="even">
-<td><a href="./skills/prompt-me-all/SKILL.html"><code>prompt-me-all</code></a></td>
-<td><code>pma</code></td>
-<td>Restate every open question still waiting on user input, uncapped</td>
-</tr>
-<tr class="odd">
-<td><a href="./skills/pending-decisions/SKILL.html"><code>pending-decisions</code></a></td>
-<td><code>pd</code></td>
-<td>Sweep issues/PRs (not just this conversation) for ones waiting on a decision from you, and ask about them one at a time</td>
-</tr>
-<tr class="even">
-<td><a href="./skills/checkpoint/SKILL.html"><code>checkpoint</code></a></td>
-<td></td>
-<td>Save a deliberate mid-task snapshot without ending the session</td>
-</tr>
-<tr class="odd">
-<td><a href="./skills/finish-wave/SKILL.html"><code>finish-wave</code></a></td>
-<td><code>fw</code></td>
-<td>Cap an orchestration run at the wave already in flight: grab nothing new, drive the open wave to a terminal state, then ask before the next wave</td>
-</tr>
-<tr class="even">
-<td><a href="./skills/compress-session/SKILL.html"><code>compress-session</code></a></td>
-<td></td>
-<td>Distill the session into auto memory before context fills up</td>
-</tr>
-<tr class="odd">
-<td><a href="./skills/permission-check/SKILL.html"><code>permission-check</code></a></td>
-<td></td>
-<td>Diagnose why Claude Code is (or isn’t) prompting for permission on an action</td>
-</tr>
-</tbody>
-</table>
+<section id="report-the-boundary-then-stop-and-ask" class="level3">
+<h3 class="anchored" data-anchor-id="report-the-boundary-then-stop-and-ask">5. Report the boundary, then stop and ask</h3>
+<p>Report the wave as a table, each PR and issue linked per <code>CLAUDE.md</code>’s “Link PRs in tables” convention, with what was deferred and the issue that tracks it. Then stop and ask whether to continue into the next wave or archive the session, giving a recommendation either way. End with the stopping-point declaration (<a href="../../shared/workflow/flag-session-boundaries.md"><code>flag-session-boundaries</code></a>), which stays non-clean while any wave PR is unmerged.</p>
+<ul>
+<li><strong>Do:</strong> name the recommendation, then let the user decide the next wave.</li>
+<li><strong>Don’t:</strong> ask “what would you like next?” in place of the recommendation, or start the next wave on your own once the current one is finished.</li>
+</ul>
 </section>
 </section>
-<section id="full-skill-list" class="level2">
-<h2 class="anchored" data-anchor-id="full-skill-list">Full skill list</h2>
-<p>All 204+ canonical skills are in <a href="https://github.com/Morrison-Lab/ai-config/tree/main/skills"><code>skills/</code></a> on GitHub. Generated Codex wrappers live in <a href="https://github.com/Morrison-Lab/ai-config/tree/main/codex-skills"><code>codex-skills/</code></a>. Each canonical <code>SKILL.md</code> has a <code>description</code> field that lists the trigger phrases and a full procedure.</p>
+<section id="scope-and-limits" class="level2">
+<h2 class="anchored" data-anchor-id="scope-and-limits">Scope and limits</h2>
+<p>The cap is session-scoped and lasts until the user lifts it by authorizing a next wave. It grants nothing: merge authority still comes from <a href="../../skills/mwc/SKILL.html"><code>mwc</code></a> alone, and question-suppression still comes from <a href="../../skills/away/SKILL.html"><code>away</code></a> alone. It is not a stop order either — “stop” or “that’s enough” ends the loop where it stands, leaving PRs mid-flight, while this skill finishes them first.</p>
+</section>
+<section id="relationship-to-other-skills" class="level2">
+<h2 class="anchored" data-anchor-id="relationship-to-other-skills">Relationship to other skills</h2>
+<ul>
+<li><strong><a href="../../skills/gii/SKILL.html"><code>gii</code></a></strong> — owns the wave boundary this skill executes, including the default 5-issue max and the “A UMS pass is not a new wave” rule.</li>
+<li><strong><a href="../../skills/gia/SKILL.html"><code>gia</code></a></strong> — honors the same boundary in its Phase 2, and points here for the hold.</li>
+<li><strong><a href="../../skills/grab-issues-in-parallel/SKILL.html"><code>gip</code></a></strong> — the parallel grabber the cap also halts.</li>
+<li><strong><a href="../../skills/ardi/SKILL.html"><code>ardi</code></a></strong> — the loop that drives each wave PR to clean while the cap holds.</li>
+<li><strong><a href="../../skills/ums/SKILL.html"><code>ums</code></a></strong> — runs inside the cap, at the wave’s clean verdicts and merges.</li>
+<li><strong><a href="../../skills/wrap-up/SKILL.html"><code>wrap-up</code></a></strong> — the end-of-session sweep to run once the wave has closed and the user chooses to stop.</li>
+<li><strong><a href="../../skills/away/SKILL.html"><code>away</code></a></strong>, <strong><a href="../../skills/mwc/SKILL.html"><code>mwc</code></a></strong> — separate session-scoped grants this skill neither extends nor revokes.</li>
+</ul>
+</section>
+<section id="anti-patterns" class="level2">
+<h2 class="anchored" data-anchor-id="anti-patterns">Anti-patterns</h2>
+<ul>
+<li>❌ Reading the cap as “open no more PRs”, which strands the wave’s learnings by holding back the UMS PR.</li>
+<li>❌ Freezing the wave as a list of numbers instead of re-deriving it each check-in.</li>
+<li>❌ Declaring the wave finished while one of its PRs is still in CI or review.</li>
+<li>❌ Starting the next wave on your own judgment once the current one is fully finished.</li>
+<li>❌ Treating the cap as a merge grant, an <code>away</code> grant, or a reason to stop monitoring.</li>
+</ul>
 
 
+</section>
 </section>
 
 <a onclick="window.scrollTo(0, 0); return false;" role="button" id="quarto-back-to-top"><i class="bi bi-arrow-up"></i> Back to top</a></main> <!-- /main -->
@@ -1312,7 +900,7 @@ ul.task-list li input[type="checkbox"] {
     </div>   
     <div class="nav-footer-center">
 <p>Built with <a href="https://quarto.org/">Quarto</a></p>
-<div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills.qmd" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills.qmd" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></div>
+<div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/finish-wave/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/finish-wave/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></div>
     <div class="nav-footer-right">
       &nbsp;
     </div>

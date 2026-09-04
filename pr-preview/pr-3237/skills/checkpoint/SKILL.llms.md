@@ -1,6 +1,6 @@
 # checkpoint — deliberate mid-task snapshot
 
-Bank a durable snapshot of where a long task stands **without stopping the session** — the user keeps working, or the agent keeps going, right after writing it. This is the lightweight, frequent counterpart to [`handoff`](../../skills/handoff/SKILL.llms.md): `handoff` is a heavier session-end/pause snapshot (branch state, unpushed commits, running jobs, a PR note); `checkpoint` is a quick “here’s what’s been decided and done so far,” written mid-task so a crash, a context compaction, or a session restart doesn’t lose the plan.
+Bank a durable snapshot of where a long task stands **without stopping the session** — the user keeps working, or the agent keeps going, right after writing it. This is the lightweight, frequent counterpart to [`handoff`](../../skills/handoff/SKILL.llms.md): `handoff` is a heavier session-end/pause snapshot (branch state, unpushed commits, running jobs, a forge post); `checkpoint` is a quick “here’s what’s been decided and done so far,” written mid-task so a crash, a context compaction, or a session restart doesn’t lose the plan.
 
 ## When this fires
 
@@ -20,9 +20,9 @@ Three different triggers, three different jobs — don’t conflate them:
 |----|----|----|----|
 | `checkpoint` | Deliberate, mid-task | Yes | Plan state, decisions, next actions |
 | `compress-session` | Approaching auto-compaction | Yes (context shrinks) | A structured distillation of the whole conversation so far |
-| `handoff` | Ending/pausing the session | No | Full resumption state: branch, unpushed commits, running jobs, PR note |
+| `handoff` | Ending/pausing the session | No | Full resumption state: branch, unpushed commits, running jobs, forge post (PR or issue comment, or a committed file) |
 
-A `checkpoint` note is a strict subset of what `handoff` captures — it skips the branch/job/PR-note mechanics because the session isn’t ending. If you’re about to genuinely stop, run `handoff` instead (or in addition, if the checkpoint predates the stop by a while and the state has moved on).
+A `checkpoint` note is a strict subset of what `handoff` captures — it skips the branch/job/forge-post mechanics because the session isn’t ending. If you’re about to genuinely stop, run `handoff` instead (or in addition, if the checkpoint predates the stop by a while and the state has moved on).
 
 ## Procedure
 

@@ -673,7 +673,7 @@ Copilot's fifth round made two points on `3f8f2fd9`.
 The wording one ("the paths skill-builder step 0 runs" implied the whole recipe is identical) is applied as "skill-builder step 0's path list".
 The suppressed one was the real catch:
 the case record cited `eb0cf15e`, `1732000a`, and `5f2dab94` from #3060's branch, and `git fetch origin <sha>` fails for all three,
-because #3060's branch was rebased before merge (its `refs/pull/3060/head` is `f9068299`, and none of the three is an ancestor of it).
+because #3060's branch was rebased before merge (its `refs/pull/3060/head` is `f9068299`, and none of the three is an ancestor of it) --- both halves refuted in the 19:39 entry below: the reading was the shallow clone's, and all three are ancestors of `f9068299` in a full clone.
 Fifteen adversarial rounds and two claude-review runs had "confirmed all four cited SHAs exist" against the local object store, which held them from the session's own fetches;
 the artifact they verified was the clone, not the remote.
 The record now measures at `3935bfff` and `2156b439`, both on `main`: three then four `memories/` hits, the same five MD018 lines at both, and the added entry a cross-link at the merge, so a hit count cannot tell an owner from a pointer.
@@ -811,7 +811,7 @@ Copilot and Jules re-requested; a verdict at `e698c456` is running alongside #31
 Lesson for the memory pass: in a case record, a "because" clause is a claim like any other and needs its own command;
 the near-miss is writing the cause that arrived with the discovery.
 
-## 19:37 PDT --- #3166 merged at `d8c507a8`; the notebook branch takes `main`
+## 19:36 PDT --- #3166 merged at `d8c507a8`; the notebook branch takes `main`
 
 [#3166](https://github.com/Morrison-Lab/ai-config/pull/3166) merged under the standing grant (squash, hand-written body, Refs [#3129](https://github.com/Morrison-Lab/ai-config/issues/3129)):
 claude-review CLEAN and Jules approve at `2c1b5bd4`, every check run green, the verdict at that head Ready with three wording notes, and Copilot's round rebutted on the PR as a file-wide em-dash sweep tracked in [#735](https://github.com/Morrison-Lab/ai-config/issues/735) (22 remaining in `memories/git.md`, 13 files under `memories/`).
@@ -823,7 +823,7 @@ This branch's PR opens once [#3154](https://github.com/Morrison-Lab/ai-config/pu
 
 ## 19:39 PDT --- correction: the #3060 commits are reachable; two instruments answered a different question
 
-The 19:36 entry and the `e698c456` commit said the three earlier #3060 commits were fetchable from no remote ref.
+The 19:32 entry and the `e698c456` commit said the three earlier #3060 commits were fetchable from no remote ref.
 False.
 The claude-review round at `e698c456` walked `refs/pull/3060/head` and found all three in its history, and a deepened fetch here confirms it:
 `git fetch --depth=200 origin refs/pull/3060/head`, then `git merge-base --is-ancestor <full sha> FETCH_HEAD` returns 0 for each.
@@ -871,7 +871,7 @@ the recurring shape here is reading a gate's printed verdict while the shell rea
 ## 19:54 PDT --- five headings above carried invented times
 
 A clock read at 19:54 PDT against the commit times of the pushes each entry describes showed the last five headings running up to 31 minutes fast:
-the entries stamped 19:44, 19:52, 19:57, 20:12 and 20:22 were written at about 19:37, 19:39, 19:41, 19:46 and 19:51, the times of `d8c507a8`'s merge and of the `709bc612`, `7e7c80b0`, `ee05069e` and `ced1937b` pushes.
+the entries stamped 19:44, 19:52, 19:57, 20:12 and 20:22 were written at about 19:36, 19:39, 19:41, 19:46 and 19:51, the times of `d8c507a8`'s merge and of the `709bc612`, `7e7c80b0`, `ee05069e` and `ced1937b` pushes.
 Two chat recaps in the same stretch said 20:03 and 20:24 for the same reason.
 Each stamp was extrapolated from the sense of elapsed work since the 19:36 reading, which is the near-miss `CLAUDE.md`'s "Timestamp recaps in local time" section names in its 2026-09-01 measurement, recurring here on the same day it was last written down.
 The headings are corrected to the commit-anchored times;
@@ -975,7 +975,7 @@ if the check is required and red again, the merge waits on a fix in gha or a rev
 ## 20:25 PDT --- #3154's verdict at `5ad81e12`: Ready for merge, four wording notes left as they are
 
 The verdict re-derived every count, confirmed "the subject grep" has one referent (bullet 108) among the seven top-level bullets of step 3, confirmed the eight-file list and its one-paragraph rendering, ran the five gates, and fact-checked the prepared squash body by execution, including the `-zz` and `-Q` grep cases.
-Four wording-only notes remain undisposed by a push, on the convergence rule the 20:20 entry states:
+Four wording-only notes remain undisposed by a push, on the convergence rule the 20:22 entry states:
 a break inside "record the recurrence" and "grep both corpora" (the enforced rules pass);
 "(`origin/main` before #3060 merged)" reads as adjacent when `3935bfff` is six commits before the squash (true on the looser reading, and nothing depends on adjacency);
 the `pwd` fallback fails closed from a subdirectory of a checkout;

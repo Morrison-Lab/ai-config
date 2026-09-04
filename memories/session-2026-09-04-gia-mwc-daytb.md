@@ -202,10 +202,10 @@ Filed as [#3196](https://github.com/Morrison-Lab/ai-config/issues/3196) (the dif
 
 ## 02:49 PDT --- notebook branch at `95d6a96c`: adversarial round 1 returns eleven findings, all numbers written from recollection
 
-The reviewer (opus, read-only, 68 tool uses) confirmed every gate, every SHA, every heading time, and every forge claim, and found eleven defects of one class: figures typed from memory where the instrument was a command away.
+The reviewer (opus, read-only) reported confirming the gates, the cited SHAs, the heading times, and the forge claims it checked, and found eleven defects of one class: figures typed from memory where the instrument was a command away.
 Two line counts of `memories/github-actions.md` off by one (1243 and 1246, not 1242 and 1245);
 the fetch-by-SHA entry called 47 lines when its added lines at `0242210f` number 65;
-the split semicolon line called 84 characters when it was 82 (the same figure is wrong in #3196's body);
+the split semicolon line called 84 characters when it was 82 (the same figure was wrong in #3196's body and was corrected there at 02:50 PDT);
 PR #3173's open time given as its `updated_at` (20:02 PDT) instead of its `created_at` (19:55 PDT);
 the `-zz` mechanism said grep "searched the current directory" when five path arguments remained, so it searched those;
 "the walk forward" in a gloss on a `rev-list` range that walks back;
@@ -215,3 +215,15 @@ and two ambiguous references (an "it" whose nearest antecedent was "the preceden
 Each figure re-measured here before the fix (`wc -l` at the named SHAs, `git diff --numstat`, `awk '{print length}'`, the PR's `created_at`, the loop notices' own failure text "You've hit your session limit", "resets 7:10am (UTC)").
 Fixed in one pass;
 the round is the notebook's own lesson applied to the notebook.
+
+## 03:07 PDT --- notebook branch at `de94b4cd`: round 2 returns six findings, three of them present since `95d6a96c`
+
+A different class from round 1: cross-references that resolve to nothing, a mechanism claim the later correction never pointed back at, and a coverage claim in the notebook's own voice.
+Two "the HH:MM entry" pointers named entries that never existed (19:36 for the 19:32 entry;
+20:20 for the 20:22 entry, 20:20 being the check-in time that entry opens with);
+the 19:32 entry's "none of the three is an ancestor" parenthetical stood uncorrected in place while the 19:39 entry refuted it forty lines later (`git merge-base --is-ancestor` answers yes for all three in this full clone), so the pointer forward is now on the line itself;
+the #3166 merge heading and the re-anchored 19:37 both read a minute late against `d8c507a8`'s committer time of 19:36:26 PDT, where the other four anchors truncate to their minute;
+the 02:49 entry asserted round 1 "confirmed every gate, every SHA, every heading time, and every forge claim" as the notebook's own finding, with a tool-use count a reader cannot re-run, and this round refuted the "every heading time" part on content round 1 had read;
+and the same entry said #3196's body "is wrong" thirty-seven seconds before the issue was corrected, a present-tense claim about live state with no timestamp.
+All six fixed;
+the coverage sentence now attributes the report to the reviewer and drops the count.

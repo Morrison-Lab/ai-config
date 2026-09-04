@@ -533,8 +533,11 @@ Measured against the shipped checker on 2026-09-04, `blocks_by_exit_2` returns
 `True` for `if not path.exists(): return 2` and `False` for the same statement
 inside an `except` clause.
 Exactly one registered hook writes a literal status 2, and it is
-`flag-stale-adjacent-comment.py` inside an `except OSError` clause, so no
-registered hook was exempt when this was measured (2026-09-04).
+`flag-stale-adjacent-comment.py` inside an `except OSError` clause,
+so the exit-2 route exempted no registered hook when this was measured
+(2026-09-04).
+A hook that emits a blocking `decision` is exempt through the other arm of
+the same condition, which this narrowing does not touch.
 
 - **Do:** give a warn-only `PreToolUse` hook
   `hookSpecificOutput.additionalContext`, and confirm it by reading the

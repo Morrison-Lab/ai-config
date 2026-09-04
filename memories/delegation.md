@@ -518,16 +518,23 @@ under dot-prefixed directories,
 recovering only because the brief carried literal paths --- see that
 skill's step 2 ("Prepare the prompt").
 
-The routing rule this measurement licenses lives in that skill's
+The routing rule this measurement licenses lives in
+[`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md)'s
 "The one measured exception: authoring work a mechanical test can
-accept" section, which cites this section rather than restating it.
-Amend the measurement here and leave the rule there.
+accept" section, which summarizes the measurement in one sentence and
+cites this section for the rest.
+Amend the measurement in this file;
+amend the routing rule in that section.
 
 - **Do:** read this as one data point for one model id on one task,
   not as a general claim about hosted-free-tier authoring capability.
-- **Don't:** credit the model's own confidence for the result ---
-  what made it safe to trust was four independent test suites passing,
-  with nobody reading the diff.
+- **Do:** credit the deterministic validation step --- four
+  independent test suites passing --- when recording why a delegated
+  result was trusted.
+- **Don't:** generalize this measurement to another free-tier model id
+  or another task shape --- neither was measured here.
+- **Don't:** credit the model's own confidence for the result;
+  nobody read the returned diff.
 
 ## Conversation-inheriting subagent dispatch vs. clean-context dispatch for UMS and CAI
 

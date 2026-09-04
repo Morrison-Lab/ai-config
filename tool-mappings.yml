@@ -271,10 +271,8 @@ operations:
     description: >-
       Create or update file(s) on a branch. The MCP tools do it in one call;
       the CLI path is two Bash calls, never one --- stage and commit here,
-      then run the PUSH operation separately.
-      hooks/no-commit-chained-to-push.py refuses the two chained into one
-      call, because a PreToolUse deny rejects the whole invocation, so a
-      refused push discards the commit along with it.
+      then run the PUSH operation separately;
+      hooks/no-commit-chained-to-push.py refuses the chained form.
     cli: git add "<path>" && git commit -m "..."
     github_mcp: mcp__github__create_or_update_file (one file) / mcp__github__push_files (multiple)
   - id: LIST_SECRETS

@@ -683,3 +683,11 @@ the run on `3f8f2fd9` was green, so no action beyond noting it.
 Lessons for the fold:
 a SHA citation is checked with `git fetch origin <sha>` against the remote, not with `git cat-file` against a clone that may hold it;
 and a case record anchors on refs the remote keeps (`main`, or `refs/pull/N/head`), never on intermediate branch commits.
+
+## 17:50 PDT --- #3166's first forge round; #3154 waiting on its sixth Copilot pass
+
+[#3166](https://github.com/Morrison-Lab/ai-config/pull/3166) at `d2b5db54`: Jules approved, claude-review returned Ready for merge after reproducing every command in both sections, and Copilot asked for two things,
+the classifier's heading to name `origin` (its examples did) and an em dash in the touched region.
+Applied, plus the two other em dashes inside that region so the hunk-scoped reviewer has nothing pre-existing left there, and pushed as `89fcfa2f`;
+Copilot re-requested, `@jules review` posted, PR body moved to the head.
+[#3154](https://github.com/Morrison-Lab/ai-config/pull/3154) at `73ced6bf`: Jules approved `3f8f2fd9`, the check suite on `3f8f2fd9` completed green, and the reviewers for `73ced6bf` are running.

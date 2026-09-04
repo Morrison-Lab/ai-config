@@ -335,7 +335,7 @@ ul.task-list li input[type="checkbox"] {
 
 <section id="checkpoint-deliberate-mid-task-snapshot" class="level1">
 <h1>checkpoint — deliberate mid-task snapshot</h1>
-<p>Bank a durable snapshot of where a long task stands <strong>without stopping the session</strong> — the user keeps working, or the agent keeps going, right after writing it. This is the lightweight, frequent counterpart to <a href="../../skills/handoff/SKILL.html"><code>handoff</code></a>: <code>handoff</code> is a heavier session-end/pause snapshot (branch state, unpushed commits, running jobs, a PR note); <code>checkpoint</code> is a quick “here’s what’s been decided and done so far,” written mid-task so a crash, a context compaction, or a session restart doesn’t lose the plan.</p>
+<p>Bank a durable snapshot of where a long task stands <strong>without stopping the session</strong> — the user keeps working, or the agent keeps going, right after writing it. This is the lightweight, frequent counterpart to <a href="../../skills/handoff/SKILL.html"><code>handoff</code></a>: <code>handoff</code> is a heavier session-end/pause snapshot (branch state, unpushed commits, running jobs, a forge post); <code>checkpoint</code> is a quick “here’s what’s been decided and done so far,” written mid-task so a crash, a context compaction, or a session restart doesn’t lose the plan.</p>
 <section id="when-this-fires" class="level2">
 <h2 class="anchored" data-anchor-id="when-this-fires">When this fires</h2>
 <ul>
@@ -384,11 +384,11 @@ ul.task-list li input[type="checkbox"] {
 <td><code>handoff</code></td>
 <td>Ending/pausing the session</td>
 <td>No</td>
-<td>Full resumption state: branch, unpushed commits, running jobs, PR note</td>
+<td>Full resumption state: branch, unpushed commits, running jobs, forge post (PR or issue comment, or a committed file)</td>
 </tr>
 </tbody>
 </table>
-<p>A <code>checkpoint</code> note is a strict subset of what <code>handoff</code> captures — it skips the branch/job/PR-note mechanics because the session isn’t ending. If you’re about to genuinely stop, run <code>handoff</code> instead (or in addition, if the checkpoint predates the stop by a while and the state has moved on).</p>
+<p>A <code>checkpoint</code> note is a strict subset of what <code>handoff</code> captures — it skips the branch/job/forge-post mechanics because the session isn’t ending. If you’re about to genuinely stop, run <code>handoff</code> instead (or in addition, if the checkpoint predates the stop by a while and the state has moved on).</p>
 </section>
 <section id="procedure" class="level2">
 <h2 class="anchored" data-anchor-id="procedure">Procedure</h2>

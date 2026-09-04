@@ -116,28 +116,55 @@ with tempfile.TemporaryDirectory() as tmp:
     )
     check("reports the remaining headroom", "(5 lines of headroom)" in out)
     # The header reports rather than instructs. A single imperative addressed
-    # to the whole band would make the band the second gate the module
-    # docstring rejects -- at the shipped default it opens 100 lines below the
-    # cap, so a file with most of that room left would be told to split.
+    # to the whole band would advise every file in it identically -- at the
+    # shipped default it opens 100 lines below the cap, so a file with most of
+    # that room left would be told to split.
     check(
-        "the band header points at the headroom",
+        "the band header is printed above the listing",
         cmfs.BAND_HEADER in out,
     )
-    # Assert that property against the header itself, rather than the absence
-    # of any one retired wording: a literal absent-string test passes for every
-    # order phrased in different words, so it would guard nothing. The wording
-    # this replaced attached its imperatives after a colon, which is why the
-    # punctuation half is checked alongside the verb list.
+    # `reports_only` is a shape check, and its name says only what it checks:
+    # it pins the shape the retired wording had (an order appended to the
+    # report after a separator or a conjunction) plus that wording's verbs. It
+    # does NOT establish that the header cannot instruct -- any lexical rule is
+    # leaky, and a reworded order such as
+    # "Headroom before the cap, act on the fullest file." passes it. The
+    # general property is argued in `report_approaching`'s docstring, which is
+    # what a rewrite of the header has to be read against. The negative
+    # controls below are the forms this does reject, so a later edit can see
+    # where its guarantee stops.
+    def reports_only(header: str) -> bool:
+        return (
+            header.count(".") == 1
+            and header.endswith(".")
+            and not any(c in header for c in ":;")
+            and " and " not in header
+            and header.count(",") <= 1
+            and not any(
+                word in header.lower()
+                for word in ("split", "prefer", "reroute", "trim", "recover", "append")
+            )
+        )
+
     check(
-        "the band header is one clause carrying no directive verb",
-        cmfs.BAND_HEADER.count(".") == 1
-        and cmfs.BAND_HEADER.endswith(".")
-        and not any(c in cmfs.BAND_HEADER for c in ":;")
-        and not any(
-            word in cmfs.BAND_HEADER.lower()
-            for word in ("split", "prefer", "reroute", "trim", "recover", "append")
-        ),
+        "the band header carries no separator, conjunction, or retired verb",
+        reports_only(cmfs.BAND_HEADER),
     )
+    for label, rejected in (
+        ("after a colon", "Headroom before the cap, least first: split first."),
+        (
+            "after a semicolon",
+            "Headroom before the cap, least first; act on the fullest file.",
+        ),
+        (
+            "after a conjunction",
+            "Headroom before the cap, least first, and start with the top entry.",
+        ),
+    ):
+        check(
+            f"rejects an order appended to the header {label}",
+            not reports_only(rejected),
+        )
     # "least first" is a claim the header makes about the listing, so check it:
     # near.md has 5 lines of headroom and edge.md has 8.
     check(

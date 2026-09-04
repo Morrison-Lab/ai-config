@@ -152,8 +152,8 @@ committed pass.
        or redirect or split on band membership alone --- a file with most of
        the band still ahead of it can take this entry.
    - **When the target memory file is already at the cap
-     `scripts/check-memory-file-size.py` reports**, append elsewhere,
-     recover lines (re-wrap or drop), or split the file.
+     `scripts/check-memory-file-size.py` reports**,
+     recover lines (re-wrap or drop) or split the file.
      A fold has two shapes and neither escapes every gate: a new source
      line trips `scripts/test_check_memory_file_size.py`, while folding
      the sentence into an existing line leaves the count flat but makes

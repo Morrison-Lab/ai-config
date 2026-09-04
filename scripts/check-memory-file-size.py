@@ -75,7 +75,7 @@ DEFAULT_WARN_FRACTION = 0.92
 
 # The one line the warning band prints above its per-file listing. It reports
 # and does not instruct, for the reason `report_approaching` gives. Kept as a
-# named constant so `test_check_memory_file_size.py` can assert that property
+# named constant so `test_check_memory_file_size.py` can check its shape
 # against the string itself rather than scraping it back out of the output.
 BAND_HEADER = "Headroom before the cap, least first."
 
@@ -204,12 +204,14 @@ def report_approaching(
     printed directly above it.
 
     The header reports; it does not instruct. One imperative addressed to the
-    whole band would make the band the second gate the module docstring
-    rejects: at the shipped default the band opens 100 lines below the cap, so
-    a file with most of that room still ahead of it would be told to split.
-    Urgency belongs to the per-file headroom the listing already carries, so
-    the header names that number and orders by it, and the procedure that acts
-    on it lives in `skills/ums/SKILL.md` step 3.
+    whole band would advise every file in it identically: at the shipped
+    default the band opens 100 lines below the cap, so a file with most of that
+    room still ahead of it would be told to split. That is the wall moved
+    inward which the module docstring rejects for the exit code, arriving
+    through the advice instead of through the exit status. Urgency belongs to
+    the per-file headroom the listing already carries, so the header names that
+    number and orders by it, and the procedure that acts on it lives in
+    `skills/ums/SKILL.md` step 3.
     """
     if not approaching:
         if announce_empty:

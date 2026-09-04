@@ -60,11 +60,6 @@ So the guard fired correctly and warned nobody, which is indistinguishable
 from a guard that never fires. `scripts/check-hook-output-shape.py` now
 refuses a warn-only `PreToolUse` hook that neither blocks nor emits either
 channel, so this exact shape fails CI (ai-config#3068).
-
-The exemption is narrow rather than empty, so do not read the checker as
-ruling the shape out in general: a bare `if ...: return 2` on an error path
-reads as a block and exempts the hook, which README.md's warn-only hook
-section states as a Do bullet and measures against the shipped checker.
 """
 
 from __future__ import annotations

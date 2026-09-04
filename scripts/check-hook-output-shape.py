@@ -14,8 +14,8 @@ This checks two things:
        emit `"reason"` alone, warn-only Stop hooks must emit `"systemMessage"`,
        and warn-only PreToolUse hooks must emit `"additionalContext"` or
        `"systemMessage"` (ai-config#3068). "Warn-only" there means neither a
-       JSON decision nor an exit with status 2, which denies the tool call and
-       has its stderr fed back to Claude.
+       blocking JSON decision nor an exit with status 2, which denies the tool
+       call and has its stderr fed back to Claude.
   2. Test-side payload inspection:
      - For every test suite `hooks/test-*.py` of a warn-only hook: the test must
        inspect the emitted payload shape (e.g. asserting `systemMessage` or
@@ -173,6 +173,7 @@ def check_hook_sources(
             continue
 
         has_decision = "decision" in constants or "permissionDecision" in constants
+        blocks_by_decision = has_decision and ("deny" in constants or "block" in constants)
         has_reason = "reason" in constants
         has_system_message = "systemMessage" in constants
         has_additional_context = "additionalContext" in constants
@@ -206,19 +207,20 @@ def check_hook_sources(
         # plain stdout IS added to the context, so the same shape is fine there.
         #
         # "Does not block" covers both documented channels, matching the
-        # derivation in ai-config#3068: a JSON decision, and an exit with
-        # status 2, whose stderr IS fed back to Claude (memories/hooks.md,
+        # derivation in ai-config#3068: a JSON decision naming `deny` or
+        # `block`, and an exit with status 2, whose stderr IS fed back to
+        # Claude (memories/hooks.md,
         # "Blocking hooks deny execution (exit code 2)"). A hook that blocks
         # that way already has a surfaced channel and needs no advisory one.
         # Any OTHER non-zero status is a non-blocking error rather than a
         # block, so it does not exempt -- see blocks_by_exit_2 for why a
         # laxer scan would exempt nearly every hook that has an
         # unreadable-payload branch.
-        if "PreToolUse" in events and not (has_decision or blocks_by_exit):
+        if "PreToolUse" in events and not (blocks_by_decision or blocks_by_exit):
             if not (has_additional_context or has_system_message):
                 errors.append(
                     f"FAIL: {script} is registered as a PreToolUse hook that "
-                    "neither blocks (no 'decision' emit and no exit 2) "
+                    "neither blocks (no blocking 'decision' emit and no exit 2) "
                     "nor emits 'additionalContext' or 'systemMessage'. A "
                     "warn-only PreToolUse hook must emit "
                     "'hookSpecificOutput.additionalContext' on stdout (a "

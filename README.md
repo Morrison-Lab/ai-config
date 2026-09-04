@@ -542,9 +542,6 @@ the same condition, which this narrowing does not touch.
 - **Do:** give a warn-only `PreToolUse` hook
   `hookSpecificOutput.additionalContext`, and confirm it by reading the
   printed payload.
-- **Do:** write an unreadable-input bail-out as `return 1`, or as a `return 2`
-  inside an `except` handler --- a bare `if ...: return 2` on an error path is
-  read as a block and exempts the hook from the rule.
 - **Don't:** treat an error-path `return 1` as a blocking channel --- the
   checker reads status 2 alone.
 

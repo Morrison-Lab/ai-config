@@ -221,7 +221,7 @@ case(
     CLEAN_HOOKS_JSON,
     NO_CHANNEL_FILES,
     want_exit=1,
-    needle="neither blocks (no 'decision' emit and no exit 2)",
+    needle="neither blocks (no blocking 'decision' emit and no exit 2)",
 )
 
 # A PreToolUse hook that BLOCKS is out of scope for the rule: its `deny`
@@ -287,7 +287,7 @@ case(
     CLEAN_HOOKS_JSON,
     CLI_STATUS_PRETOOL_FILES,
     want_exit=1,
-    needle="neither blocks (no 'decision' emit and no exit 2)",
+    needle="neither blocks (no blocking 'decision' emit and no exit 2)",
 )
 
 # The same for the near-universal "bail out on an unreadable payload" branch,
@@ -312,7 +312,7 @@ case(
     CLEAN_HOOKS_JSON,
     ERROR_PATH_PRETOOL_FILES,
     want_exit=1,
-    needle="neither blocks (no 'decision' emit and no exit 2)",
+    needle="neither blocks (no blocking 'decision' emit and no exit 2)",
 )
 
 # An exit 2 raised INSIDE an `except` handler reports that the hook itself
@@ -336,7 +336,7 @@ case(
     CLEAN_HOOKS_JSON,
     EXCEPT_EXIT2_PRETOOL_FILES,
     want_exit=1,
-    needle="neither blocks (no 'decision' emit and no exit 2)",
+    needle="neither blocks (no blocking 'decision' emit and no exit 2)",
 )
 
 # The converse, pinned because it is the narrowing's edge rather than an
@@ -361,6 +361,24 @@ case(
     CLEAN_HOOKS_JSON,
     IF_EXIT2_PRETOOL_FILES,
     want_exit=0,
+)
+
+# The decision arm's edge: it reads the emitted decision VALUE, so a
+# `permissionDecision` of "allow" blocks nothing and does not exempt.
+ALLOW_DECISION_PRETOOL_FILES = dict(CLEAN_FILES)
+ALLOW_DECISION_PRETOOL_FILES["hooks/warn-pretool.py"] = (
+    "import json\n"
+    "import sys\n"
+    "print('warning', file=sys.stderr)\n"
+    'print(json.dumps({"hookSpecificOutput": {"permissionDecision": "allow"}}))\n'
+)
+
+case(
+    "a non-blocking 'allow' decision does not exempt (#3068)",
+    CLEAN_HOOKS_JSON,
+    ALLOW_DECISION_PRETOOL_FILES,
+    want_exit=1,
+    needle="neither blocks (no blocking 'decision' emit and no exit 2)",
 )
 
 # --- 6. Missing hooks.json fails loudly with usage exit 2 ---

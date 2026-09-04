@@ -45,7 +45,7 @@ Actively review recent session context and update all relevant memory files and 
   (
     repo="${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/ums rev-parse --show-toplevel 2>/dev/null || pwd)}"
     test -f "$repo/CLAUDE.md" && test -d "$repo/shared" || { echo "not an ai-config checkout: $repo" >&2; exit 1; }
-    cd "$repo" && grep -rilI "<keywords>" skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md
+    cd "$repo" && grep -rilI -- "<subject>" skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md
   )
   ```
 
@@ -55,7 +55,7 @@ Actively review recent session context and update all relevant memory files and 
 
 - **When step 2 routed the item to a repo other than ai-config, grep both corpora.** The query above searches an ai-config checkout, so run a second pass in the destination repo, over that repo’s own doc paths — a repo-local entry can otherwise duplicate or contradict a fragment nobody thought to search from that repo. See [`grep-is-not-coverage`](../../shared/workflow/grep-is-not-coverage.md)’s “Searching the wrong corpus is the same error with no grep in it”.
 
-- **When that grep finds the corpus already covers this class, record the recurrence on the existing entry, not just the new fact.** The first bullet of this step already says to extend in place rather than add a sibling; what is missing is the count. Write it on the entry – “3rd occurrence, 2026-08-16”, with a pointer to each prior record – so the entry carries evidence about whether the written rule is actually holding.
+- **When the corpus grep finds the corpus already covers this class, record the recurrence on the existing entry, not just the new fact.** The **Grep the corpus** bullet above already says to extend in place rather than add a sibling; what is missing is the count. Write it on the entry – “3rd occurrence, 2026-08-16”, with a pointer to each prior record – so the entry carries evidence about whether the written rule is actually holding.
 
   The count has a consumer that already exists and currently has nothing to read. [`deterministic-tools`](../../shared/principles/deterministic-tools.md) names the third occurrence as the moment a recurring judgment task becomes a tool, and [`learn-from-review-findings`](../../shared/workflow/learn-from-review-findings.md) asks of every accepted finding whether it is algorithmatizable – but nothing in the corpus counts, so that trigger fires on recollection or not at all. A rule on its third recurrence is a rule demonstrably not holding, which is the argument for a hook or a check rather than for a sharper sentence.
 

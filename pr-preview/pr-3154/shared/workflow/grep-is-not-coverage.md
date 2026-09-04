@@ -212,7 +212,9 @@ where a markdownlint entry was added to `memories/markdownlint.md`
 while `shared/writing/semantic-line-breaks.md` already covered the same rule in three regions
 (a bare `#NNNN` at column 1 parses as an ATX heading, markdownlint's MD018),
 at `3935bfff` (`origin/main` before #3060 merged) and unchanged at `2156b439` (its squash merge):
-`git grep -n MD018 3935bfff -- shared/writing/semantic-line-breaks.md` and the same query at `2156b439` return the same five lines ---
+`git grep -n MD018 3935bfff -- shared/writing/semantic-line-breaks.md`
+and the same query at `2156b439`
+return the same five lines ---
 274, 288, 295, 861 and 995 ---
 of which the first three sit inside one bold-lead block with its own `Do`/`Don't` pair.
 What step 3's own directory-wide grep would have done is checkable:
@@ -231,11 +233,11 @@ where the entry is a cross-link to the owner rather than a restatement ---
 so the count rose by one either way, and a hit count cannot tell an owner from a pointer.
 Every commit on #3060's branch is still reachable on `origin` from `refs/pull/3060/head`
 (`git ls-remote origin refs/pull/3060/head` returns `f9068299`,
-and after `git fetch --depth=200 origin refs/pull/3060/head`, `git rev-list --count 3935bfff..FETCH_HEAD` returns 33),
-which the default refspec does not bring down
-(`git config --get-all remote.origin.fetch` is `+refs/heads/*:refs/remotes/origin/*`)
-and a shallow clone walks only to its fetch depth;
-this record anchors on `main` commits, which a full fetch of `main` brings down
+and after `git fetch --depth=200 origin refs/pull/3060/head`, `git rev-list --count 3935bfff..FETCH_HEAD` returns 33).
+The default refspec does not bring `refs/pull/3060/head` down
+(`git config --get-all remote.origin.fetch` returned `+refs/heads/*:refs/remotes/origin/*` in the measuring clone),
+and a shallow clone walks only to its fetch depth,
+so this record anchors on `main` commits, which a full fetch of `main` brings down
 (`git merge-base --is-ancestor 3935bfff origin/main` and the same for `2156b439` both exit 0).
 Note also why the wrong-corpus section's `Do` could not have caught it.
 It reads "grep the ai-config corpus as well as the destination repo's docs,

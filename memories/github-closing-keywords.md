@@ -39,7 +39,7 @@ The PR body of #1718 used `Refs #1717` and did not contain the closing
 keyword.
 The squash message did.
 
-## Do / Don't
+## Do / Don't for the negated keyword
 
 - **Do:** if you must mention a closing keyword you are not using, keep the
   number off the keyword (`the closing keyword was not used for #1717`;
@@ -107,7 +107,8 @@ it keys on a corpus path or a count, and a claim about a branch's commits carrie
   in every spelling and both issue forms the parser accepts,
   with the PR's base resolved rather than assumed
   (`base="$(git remote show origin | sed -n 's/.*HEAD branch: //p')"`, or the branch a stacked PR targets):
-  `pat='(close[sd]?|fix(es|ed)?|resolve[sd]?):? *([A-Za-z0-9._-]+/[A-Za-z0-9._-]+)?#[0-9]+'`, then
+  `git rev-list --count "origin/$base..HEAD"` first, since a zero means the range is wrong rather than the branch clean, then
+  `pat='(close[sd]?|fix(es|ed)?|resolve[sd]?):? *([A-Za-z0-9._-]+/[A-Za-z0-9._-]+)?#[0-9]+'` and
   `git log --regexp-ignore-case --extended-regexp --grep="$pat" --format='== %h %s%n%b' "origin/$base..HEAD" | grep -iE "^== |$pat"`;
   each `==` line names a matching commit and the lines under it are its matching body lines,
   which is where this repo's keywords sit,
@@ -116,11 +117,14 @@ it keys on a corpus path or a count, and a claim about a branch's commits carrie
   the #1718 case above is a `Refs` PR body over a `Closes` squash body.
 - **Do:** put whatever keyword the merge should carry in the PR body, scoped per [`issue-first.md`](../shared/workflow/issue-first.md),
   then read every surface the parser will see for the merge method in use.
+  The PR body counts only when the PR targets the default branch (the docs cited above say so);
+  on a stacked PR its keyword never fires, while the branch commits' keywords still fire once those commits reach the default branch.
   Under a squash merge whose body you write: the PR body, the squash title, and the squash body you write.
-  Under a squash merge with the default body: the same three, with the branch commits listed in the body.
+  Under a squash merge with the default body: the PR body, the squash title, and the default squash body with the branch commits listed in it.
   Under a merge commit: the PR body, the branch commits, the merge commit's subject
-  (`merge_commit_title` read as `MERGE_MESSAGE` on 2026-09-04, the generated "Merge pull request #N" line),
-  and the merge commit's body, which defaults to the PR title (`merge_commit_message` read as `PR_TITLE` on 2026-09-04) and is editable in the dialog.
+  (`merge_commit_title` read as `MERGE_MESSAGE` on 2026-09-04, the generated `Merge pull request #N from <owner>/<branch>` line),
+  and the merge commit's body, which defaults to the PR title (`merge_commit_message` read as `PR_TITLE` on 2026-09-04);
+  both merge-commit fields are editable in the dialog.
   Under a rebase merge: the PR body and the branch commits.
 - **Don't:** read only the squash body you typed;
   the title arrives prefilled from the PR or the sole commit and reaches `main` unless you edit it.

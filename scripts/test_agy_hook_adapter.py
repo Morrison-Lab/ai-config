@@ -99,6 +99,26 @@ MOCK_HOOKS_DEF = {
                 ]
             },
             {
+                "matcher": "Write",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/test-write.py\"",
+                        "timeout": 10
+                    }
+                ]
+            },
+            {
+                "matcher": "Edit",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/test-edit.py\"",
+                        "timeout": 10
+                    }
+                ]
+            },
+            {
                 "matcher": "*",
                 "hooks": [
                     {
@@ -324,6 +344,200 @@ class TestAgyHookAdapter(unittest.TestCase):
         out = json.loads(mock_stdout.getvalue())
         self.assertEqual(out.get("decision"), "deny")
         self.assertEqual(out.get("reason"), "[define_subagent] Agent definition denied")
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    @patch('subprocess.run')
+    def test_call_mcp_tool_allow(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        mock_result = MagicMock(returncode=0, stdout=json.dumps({"hookSpecificOutput": {}}), stderr="")
+        mock_run.return_value = mock_result
+
+        payload = {
+            "toolCall": {
+                "name": "call_mcp_tool",
+                "args": {
+                    "ServerName": "github",
+                    "ToolName": "get_commit",
+                    "Arguments": {"owner": "foo", "repo": "bar"}
+                }
+            }
+        }
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
+        self.adapter.main()
+
+        out = json.loads(mock_stdout.getvalue())
+        self.assertEqual(out.get("decision"), "allow")
+
+        call_input = json.loads(mock_run.call_args_list[0].kwargs['input'])
+        self.assertEqual(call_input["tool_name"], "mcp__github__get_commit")
+        self.assertEqual(call_input["tool_input"], {"owner": "foo", "repo": "bar"})
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    @patch('subprocess.run')
+    def test_call_mcp_tool_deny(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        mock_deny = MagicMock(returncode=0, stdout=json.dumps({
+            "hookSpecificOutput": {
+                "permissionDecision": "deny",
+                "permissionDecisionReason": "Merge blocked by gate"
+            }
+        }), stderr="")
+        mock_run.return_value = mock_deny
+
+        payload = {
+            "toolCall": {
+                "name": "call_mcp_tool",
+                "args": {
+                    "ServerName": "github",
+                    "ToolName": "merge_pull_request",
+                    "Arguments": {"pull_number": 123}
+                }
+            }
+        }
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
+        self.adapter.main()
+
+        out = json.loads(mock_stdout.getvalue())
+        self.assertEqual(out.get("decision"), "deny")
+        self.assertEqual(out.get("reason"), "[call_mcp_tool (mcp__github__merge_pull_request)] Merge blocked by gate")
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    @patch('subprocess.run')
+    def test_call_mcp_tool_string_arguments(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        mock_result = MagicMock(returncode=0, stdout=json.dumps({"hookSpecificOutput": {}}), stderr="")
+        mock_run.return_value = mock_result
+
+        payload = {
+            "toolCall": {
+                "name": "call_mcp_tool",
+                "args": {
+                    "ServerName": "github",
+                    "ToolName": "get_commit",
+                    "Arguments": json.dumps({"owner": "foo", "repo": "bar"})
+                }
+            }
+        }
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
+        self.adapter.main()
+
+        out = json.loads(mock_stdout.getvalue())
+        self.assertEqual(out.get("decision"), "allow")
+
+        call_input = json.loads(mock_run.call_args_list[0].kwargs['input'])
+        self.assertEqual(call_input["tool_name"], "mcp__github__get_commit")
+        self.assertEqual(call_input["tool_input"], {"owner": "foo", "repo": "bar"})
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    @patch('subprocess.run')
+    def test_write_to_file_allow_and_deny(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        mock_allow = MagicMock(returncode=0, stdout=json.dumps({"hookSpecificOutput": {}}), stderr="")
+        mock_run.return_value = mock_allow
+
+        payload = {
+            "toolCall": {
+                "name": "write_to_file",
+                "args": {
+                    "TargetFile": "/tmp/test.py",
+                    "CodeContent": "x = 42"
+                }
+            }
+        }
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
+        self.adapter.main()
+
+        out = json.loads(mock_stdout.getvalue())
+        self.assertEqual(out.get("decision"), "allow")
+
+        call_input = json.loads(mock_run.call_args_list[0].kwargs['input'])
+        self.assertEqual(call_input["tool_name"], "Write")
+        self.assertEqual(call_input["tool_input"], {"file_path": "/tmp/test.py", "content": "x = 42"})
+
+        # Deny branch
+        mock_deny = MagicMock(returncode=0, stdout=json.dumps({
+            "hookSpecificOutput": {
+                "permissionDecision": "deny",
+                "permissionDecisionReason": "Stale issue write denied"
+            }
+        }), stderr="")
+        mock_run.return_value = mock_deny
+        mock_stdin.seek(0)
+        mock_stdout.seek(0)
+        mock_stdout.truncate(0)
+        self.adapter.main()
+
+        out = json.loads(mock_stdout.getvalue())
+        self.assertEqual(out.get("decision"), "deny")
+        self.assertEqual(out.get("reason"), "[write_to_file] Stale issue write denied")
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    @patch('subprocess.run')
+    def test_replace_file_content_allow_and_deny(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        mock_allow = MagicMock(returncode=0, stdout=json.dumps({"hookSpecificOutput": {}}), stderr="")
+        mock_run.return_value = mock_allow
+
+        payload = {
+            "toolCall": {
+                "name": "replace_file_content",
+                "args": {
+                    "TargetFile": "/tmp/test.py",
+                    "TargetContent": "old_val",
+                    "ReplacementContent": "new_val"
+                }
+            }
+        }
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
+        self.adapter.main()
+
+        out = json.loads(mock_stdout.getvalue())
+        self.assertEqual(out.get("decision"), "allow")
+
+        call_input = json.loads(mock_run.call_args_list[0].kwargs['input'])
+        self.assertEqual(call_input["tool_name"], "Edit")
+        self.assertEqual(call_input["tool_input"], {
+            "file_path": "/tmp/test.py",
+            "old_string": "old_val",
+            "new_string": "new_val"
+        })
+
+        # Deny branch
+        mock_deny = MagicMock(returncode=0, stdout=json.dumps({
+            "hookSpecificOutput": {
+                "permissionDecision": "deny",
+                "permissionDecisionReason": "Stale edit denied"
+            }
+        }), stderr="")
+        mock_run.return_value = mock_deny
+        mock_stdin.seek(0)
+        mock_stdout.seek(0)
+        mock_stdout.truncate(0)
+        self.adapter.main()
+
+        out = json.loads(mock_stdout.getvalue())
+        self.assertEqual(out.get("decision"), "deny")
+        self.assertEqual(out.get("reason"), "[replace_file_content] Stale edit denied")
 
     @patch('os.path.exists', return_value=True)
     @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))

@@ -15,7 +15,7 @@
         ]
       },
       {
-        "matcher": "invoke_subagent|send_message|define_subagent|mcp__github__.*",
+        "matcher": "invoke_subagent|send_message|define_subagent|call_mcp_tool|write_to_file|replace_file_content|mcp__github__.*",
         "hooks": [
           {
             "type": "command",

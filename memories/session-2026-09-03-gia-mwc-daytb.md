@@ -700,3 +700,15 @@ the case record's MD018 measurement was written as a plain `grep -n` while claim
 and the anti-patterns entry's quoted "check existing notes" step, which #3164 had deferred, sat in the touched hunk, so the `ums` half is fixed here and #3164 keeps the `consolidate-memory` half (noted on the issue).
 Pushed as `f6b9f7f3` after a fresh `ls-remote` read `73ced6bf`;
 Copilot re-requested, `@jules review` posted, PR body moved to the head.
+
+## 17:56 PDT --- 17:54 check-in: a false Copilot claim about `--cc`, measured before answering
+
+Open PRs in ai-config: #3154 and #3166 (this session), #3146 and a new #3167 (other sessions, left alone).
+[#3154](https://github.com/Morrison-Lab/ai-config/pull/3154) at `f6b9f7f3`: the claude-review run, Copilot's seventh round, and Jules all in progress.
+[#3166](https://github.com/Morrison-Lab/ai-config/pull/3166) at `89fcfa2f`: Jules approved;
+Copilot's second round said `git log --cc` prints no patch without `-p`.
+Measured on git 2.43.0 in the surviving scratch merge: `git log --cc main..feature` and `git log -p --cc main..feature` are byte-identical under `cmp` (546 bytes, two diff headers, the `++SHARED` line present), so the claim is false and the section's command demonstrated what it said.
+The flag is written out anyway at `147710bb` and the identity recorded in the mechanics paragraph, with the measurement posted on the PR;
+Copilot re-requested, `@jules review` posted.
+Loops at 17:54 PDT: wave 3 at 37 results, the wave-1 loop at 7, the wave-2 loop at 3.
+Lesson for the fold: a reviewer's claim about tool behaviour is measured before it is applied, and when the measurement refutes it, the fix can still make the text robust to the misreading.

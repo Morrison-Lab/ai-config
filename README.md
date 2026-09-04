@@ -469,11 +469,22 @@ That is the worst possible defect for a guard, and nothing catches it: the
 hook runs, exits 0, and its tests pass if they only assert that *something* was
 printed.
 
-Warn-only hooks here emit `systemMessage` (the `PreToolUse` ones pair it with
-`hookSpecificOutput.additionalContext`); the four blocking `Stop` hooks pair
-`reason` with `decision`.
+Most warn-only hooks here emit `systemMessage`, and the `PreToolUse` ones pair
+it with `hookSpecificOutput.additionalContext`;
+the blocking `Stop` hooks pair `reason` with `decision`.
 The trap is that a blocking hook is the natural model to copy, and it uses
 `reason` correctly.
+"Most" rather than all, derived over `hooks/hooks.json` rather than recalled:
+every registered warn-only `Stop` hook emits `systemMessage`, and so does
+every registered warn-only `PreToolUse` hook but one (measured 2026-09-04).
+The exception is `warn-pr-create-without-dupe-check.py`, which emits
+`additionalContext` alone --- accepted by the `PreToolUse` rule below, since
+that channel is surfaced on its own.
+Stated as a property rather than as a tally, because a tally goes stale on
+any unrelated hook addition: `no-underived-required-check.py` and
+`flag-config-deletion-without-ref-check.py` landed on the same day and moved
+the counts from 19 warn-only `PreToolUse` hooks to 20 and from two warn-only
+`Stop` hooks to three.
 
 So when adding a warn-only hook:
 
@@ -515,11 +526,24 @@ hook itself broke rather than that it denied a tool call.
 And it reads literal statuses only, since `sys.exit(main())` passes a computed
 one.
 
+The `except`-handler narrowing keys on the handler and nothing wider, so an
+error-path `return 2` written outside one still reads as a block and exempts
+the hook.
+Measured against the shipped checker on 2026-09-04, `blocks_by_exit_2` returns
+`True` for `if not path.exists(): return 2` and `False` for the same statement
+inside an `except` clause.
+Exactly one registered hook writes a literal status 2, and it is
+`flag-stale-adjacent-comment.py` inside an `except OSError` clause, so no
+registered hook was exempt when this was measured (2026-09-04).
+
 - **Do:** give a warn-only `PreToolUse` hook
   `hookSpecificOutput.additionalContext`, and confirm it by reading the
   printed payload.
-- **Don't:** treat an error-path `return 1` or `return 2` as a blocking
-  channel --- the checker does not, and neither does the harness.
+- **Do:** write an unreadable-input bail-out as `return 1`, or as a `return 2`
+  inside an `except` handler --- a bare `if ...: return 2` on an error path is
+  read as a block and exempts the hook from the rule.
+- **Don't:** treat an error-path `return 1` as a blocking channel --- the
+  checker reads status 2 alone.
 
 A hook that emits **both** channels should gate its `systemMessage` on
 `ANTIGRAVITY_AGENT` being unset.

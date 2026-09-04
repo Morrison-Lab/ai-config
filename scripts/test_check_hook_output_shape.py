@@ -9,7 +9,10 @@ verifying that:
   4. A test for a warn-only hook that does not assert payload shape fails (test-side blindness).
   5. A warn-only PreToolUse hook emitting neither additionalContext nor
      systemMessage fails, while one that blocks -- by a `deny` decision or by
-     exiting 2 -- does not; an error-path `return 1` does not exempt (#3068).
+     exiting 2 -- does not; an error-path `return 1` does not exempt, an
+     exit 2 inside an `except` handler does not exempt, and an `if`-guarded
+     error-path `return 2` DOES exempt, which is the narrowing's edge and is
+     pinned so widening it stays a deliberate change (#3068).
   6. Missing or unparseable hooks.json fails loudly with usage exit code 2.
   7. Unparseable Python source in a hook fails loudly with a diagnostic.
   8. The success line encodes on a cp1252 stdout (ai-config#2038).
@@ -334,6 +337,30 @@ case(
     EXCEPT_EXIT2_PRETOOL_FILES,
     want_exit=1,
     needle="neither blocks (no 'decision' emit and no exit 2)",
+)
+
+# The converse, pinned because it is the narrowing's edge rather than an
+# oversight: the exemption keys on the `except` handler and nothing wider, so
+# an `if`-guarded `return 2` on an error path DOES exempt. Whoever widens
+# blocks_by_exit_2 past ast.ExceptHandler has to change this case on purpose.
+IF_EXIT2_PRETOOL_FILES = dict(CLEAN_FILES)
+IF_EXIT2_PRETOOL_FILES["hooks/warn-pretool.py"] = (
+    "import pathlib\n"
+    "import sys\n"
+    "def main():\n"
+    "    if not pathlib.Path('nope').exists():\n"
+    "        print('cannot read', file=sys.stderr)\n"
+    "        return 2\n"
+    "    print('warning', file=sys.stderr)\n"
+    "    return 0\n"
+    "sys.exit(main())\n"
+)
+
+case(
+    "an if-guarded error-path exit 2 DOES exempt, by design (#3068)",
+    CLEAN_HOOKS_JSON,
+    IF_EXIT2_PRETOOL_FILES,
+    want_exit=0,
 )
 
 # --- 6. Missing hooks.json fails loudly with usage exit 2 ---

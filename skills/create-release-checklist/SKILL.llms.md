@@ -111,6 +111,7 @@ The final checklist should be formatted as Markdown with proper sections and che
 ``` bash
 gh issue create \
   --title "Release ${PACKAGE_NAME} ${NEW_VERSION}" \
+  --label ai-authored --label "model:<model-id>" \
   --body-file - <<'EOF'
 [checklist content here]
 EOF

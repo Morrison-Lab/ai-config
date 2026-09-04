@@ -390,11 +390,6 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="the-four-dispositions" class="level2">
 <h2 class="anchored" data-anchor-id="the-four-dispositions">The four dispositions</h2>
 <table class="caption-top table">
-<colgroup>
-<col style="width: 18%">
-<col style="width: 28%">
-<col style="width: 53%">
-</colgroup>
 <thead>
 <tr class="header">
 <th>Code</th>
@@ -416,7 +411,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <tr class="odd">
 <td><strong>D</strong> — Defer</td>
 <td>Valid but out of scope (new feature, broad refactor, needs design discussion).</td>
-<td>File a follow-up issue (<code>CREATE_ISSUE</code> on GitHub — <code>gh issue create</code>; <code>glab issue create</code> on GitLab), link it, and add it to the PR/MR’s <strong>Deferred / Out-of-Scope</strong> section.</td>
+<td>File a follow-up issue (<code>CREATE_ISSUE</code> on GitHub — <code>gh issue create</code>; <code>glab issue create</code> on GitLab), labelled <code>ai-authored</code> and <code>model:&lt;model-id&gt;</code> per <a href="../../shared/workflow/issue-first.md"><code>issue-first</code></a>, link it, and add it to the PR/MR’s <strong>Deferred / Out-of-Scope</strong> section.</td>
 </tr>
 <tr class="even">
 <td><strong>K</strong> — Acknowledge</td>

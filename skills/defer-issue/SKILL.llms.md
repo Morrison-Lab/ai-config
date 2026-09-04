@@ -86,6 +86,7 @@ Deferred from <source: e.g., PR #42, commit abc1234, review on path/to/file.R:12
 ``` sh
 gh issue create \
   --title "..." \
+  --label ai-authored --label "model:<model-id>" \
   --body "$(cat <<'EOF'
 ...
 EOF
@@ -94,13 +95,15 @@ EOF
 
 - Defaults to the current repo (whatever `gh` resolves from remotes / `gh repo set-default`).
 - If filing into a different repo than the current one, pass `--repo <owner>/<repo>` and confirm with the user first.
-- Check `gh label list` for an existing `followup`, `deferred`, or `tech-debt` label and add it with `--label`. **Don’t fabricate labels that don’t exist** — `gh` will fail and you’ll have to retry.
+- `ai-authored` and `model:<model-id>` are mandatory on every issue an agent files into a repo we administrate, per [`issue-first`](../../shared/workflow/issue-first.md); [`label-agent-filed-issues`](../../shared/workflow/label-agent-filed-issues.md) covers normalizing the model id and creating the pair where it is missing.
+- Then check `gh label list` for an existing `followup`, `deferred`, or `tech-debt` label and add it with `--label` too. **Don’t fabricate labels that don’t exist** — `gh` will fail and you’ll have to retry.
 - Don’t add `🤖 Generated with Claude Code` attribution to the issue **body** unless the user asks. Issue attribution isn’t covered by the global `attribution` setting. This is not an exemption from the agent-disclosure rule, which governs **comments** rather than issue bodies and uses a different, deliberately emoji-free marker — see [`disclose-agent-authorship`](../../shared/workflow/disclose-agent-authorship.md). So a comment this skill posts on the deferring PR carries the marker, while the filed issue’s own body stays unattributed.
 
 **GitLab:**
 
 ``` sh
-glab issue create --title "..." --description "$(cat <<'EOF'
+glab issue create --title "..." --label "ai-authored,model:<model-id>" \
+  --description "$(cat <<'EOF'
 ...
 EOF
 )"

@@ -460,21 +460,24 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p><strong>GitHub:</strong></p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode sh code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> issue create <span class="dt">\</span></span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">--title</span> <span class="st">"..."</span> <span class="dt">\</span></span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">--body</span> <span class="st">"</span><span class="va">$(</span><span class="fu">cat</span> <span class="op">&lt;&lt;'EOF'</span></span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="st">...</span></span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="op">EOF</span></span>
-<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="va">)</span><span class="st">"</span>   <span class="co"># CREATE_ISSUE</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">--label</span> ai-authored <span class="at">--label</span> <span class="st">"model:&lt;model-id&gt;"</span> <span class="dt">\</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">--body</span> <span class="st">"</span><span class="va">$(</span><span class="fu">cat</span> <span class="op">&lt;&lt;'EOF'</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="st">...</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="op">EOF</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a><span class="va">)</span><span class="st">"</span>   <span class="co"># CREATE_ISSUE</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <ul>
 <li>Defaults to the current repo (whatever <code>gh</code> resolves from remotes / <code>gh repo set-default</code>).</li>
 <li>If filing into a different repo than the current one, pass <code>--repo &lt;owner&gt;/&lt;repo&gt;</code> and confirm with the user first.</li>
-<li>Check <code>gh label list</code> for an existing <code>followup</code>, <code>deferred</code>, or <code>tech-debt</code> label and add it with <code>--label</code>. <strong>Don’t fabricate labels that don’t exist</strong> — <code>gh</code> will fail and you’ll have to retry.</li>
+<li><code>ai-authored</code> and <code>model:&lt;model-id&gt;</code> are mandatory on every issue an agent files into a repo we administrate, per <a href="../../shared/workflow/issue-first.md"><code>issue-first</code></a>; <a href="../../shared/workflow/label-agent-filed-issues.md"><code>label-agent-filed-issues</code></a> covers normalizing the model id and creating the pair where it is missing.</li>
+<li>Then check <code>gh label list</code> for an existing <code>followup</code>, <code>deferred</code>, or <code>tech-debt</code> label and add it with <code>--label</code> too. <strong>Don’t fabricate labels that don’t exist</strong> — <code>gh</code> will fail and you’ll have to retry.</li>
 <li>Don’t add <code>🤖 Generated with Claude Code</code> attribution to the issue <strong>body</strong> unless the user asks. Issue attribution isn’t covered by the global <code>attribution</code> setting. This is not an exemption from the agent-disclosure rule, which governs <strong>comments</strong> rather than issue bodies and uses a different, deliberately emoji-free marker — see <a href="../../shared/workflow/disclose-agent-authorship.md"><code>disclose-agent-authorship</code></a>. So a comment this skill posts on the deferring PR carries the marker, while the filed issue’s own body stays unattributed.</li>
 </ul>
 <p><strong>GitLab:</strong></p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode sh code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="ex">glab</span> issue create <span class="at">--title</span> <span class="st">"..."</span> <span class="at">--description</span> <span class="st">"</span><span class="va">$(</span><span class="fu">cat</span> <span class="op">&lt;&lt;'EOF'</span></span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="st">...</span></span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="op">EOF</span></span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="va">)</span><span class="st">"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode sh code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="ex">glab</span> issue create <span class="at">--title</span> <span class="st">"..."</span> <span class="at">--label</span> <span class="st">"ai-authored,model:&lt;model-id&gt;"</span> <span class="dt">\</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">--description</span> <span class="st">"</span><span class="va">$(</span><span class="fu">cat</span> <span class="op">&lt;&lt;'EOF'</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="st">...</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="op">EOF</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="va">)</span><span class="st">"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
 <section id="report-back-and-offer-the-cross-link" class="level3">
 <h3 class="anchored" data-anchor-id="report-back-and-offer-the-cross-link">5. Report back and offer the cross-link</h3>

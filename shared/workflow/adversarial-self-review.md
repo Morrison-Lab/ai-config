@@ -757,7 +757,7 @@ It was seen directly, twice, within one session --- and the captured line is thi
 --- end of report ---agentId: <id> (use SendMessage with to: '...')
 ```
 
-**Note what that exhibit is: the trailer landing on a sentinel line, which is the safe case**, and the one this section goes on to prescribe.
+**Note what that exhibit is: the trailer landing on a sentinel line, which is the safe case**, and the one the block below records as the mitigation [#3050](https://github.com/Morrison-Lab/ai-config/issues/3050) rejected.
 The shape the hazard is actually about is a fingerprint line with the trailer glued to it:
 
 ```
@@ -816,11 +816,13 @@ So the hazard is real and it is a **truncation** hazard rather than a suffix haz
 `agentId` begins with a hex character, which is what turns a short fingerprint into a plausible-looking wrong one instead of a parse failure.
 A wrong sha refuses the push with "the clean verdict is for commit X, but this push would ship Y" --- a message that reads as a stale verdict and is nothing of the kind.
 
-The remedy costs one line either way, and is cheap insurance rather than a fix for a demonstrated break at 40 characters.
+The remedy below costs one line and reads as cheap insurance rather than a fix for a demonstrated break at 40 characters, which is how it was first written up here.
 The block below is a report's TAIL, not a whole report.
 It shows the REORDERED ordering described above --- verdict and fingerprint after the payload --- which is the shape the sentinel exists for and the shape this file's "Structured review data" section rules out.
-So read the block as the mitigation for that reordering, not as a template to copy.
-What [#3050](https://github.com/Morrison-Lab/ai-config/issues/3050) has to settle is which of the two orderings a brief should mandate, not whether a conforming report needs a sentinel.
+So read the block as the shape the sentinel was proposed for, not as a template to copy.
+[#3050](https://github.com/Morrison-Lab/ai-config/issues/3050) has since settled which of the two orderings a brief should mandate, and it settled it against the block below: the payload goes last, a conforming report carries no sentinel, and the fingerprint is the full sha.
+The block stays as the record of the mitigation that decision rejected, so a reader meeting a sentinel in the wild can tell what it was for.
+It is not a shape to copy, and it is not the remedy for a reordered tail either --- the full sha is, under every ordering.
 
 ```
 -->
@@ -833,17 +835,58 @@ The leading `-->` is the JSON payload's own closing marker, included so the orde
 
 The sentinel puts a non-hex line between the fingerprint and anything the harness appends, so the fingerprint's length stops mattering.
 
+It is not free, though, and both its cost and its protection belong to the **consumer** reading the report rather than to the report's shape.
+Its cost falls unevenly across the two report contracts [`scripts/pre-push-review.py`](../../scripts/pre-push-review.py) validates,
+and falls nowhere at all on [`hooks/no-push-without-self-review.py`](../../hooks/no-push-without-self-review.py)'s own guard or on [`scripts/cursor-self-review-check.py`](../../scripts/cursor-self-review-check.py), the Cursor Cloud recovery gate that calls that same `parse_report`, neither of which runs a trailing-content check on either shape.
+Those three are the whole consumer set as of 2026-09-04, derived rather than recalled: `grep -rln parse_report hooks scripts --include='*.py' | grep -v test`.
+On that script's own four-section contract --- Summary Verdict, Critical Findings, Observations, Verification Steps --- it strips HTML comments and then scans whatever follows the last fingerprint.
+What `_TRAILING_AFTER_FINGERPRINT` admits there is a status banner, an `=` rule, a disclosure footer, a stopping-point line, or a restated verdict.
+`--- end of report ---` is none of those, so a sentinel is refused outright with "Reviewed-Commit fingerprint must be at the very end of the report".
+A persona-contract report never reaches that scan.
+`parse_review_verdict` routes it to `_parse_persona_verdict`, which runs no trailing-content check at all, so a sentinel there is tolerated rather than refused.
+Measured 2026-09-03 through `parse_review_verdict` itself rather than against the regex in isolation, which is the substitution [`verify-the-right-artifact`](verify-the-right-artifact.md) rules out:
+a persona report returned `(True, True, 'Clean (persona contract)')` payload-last, with a sentinel appended, and with the tail reordered alike, while the same sentinel on the local contract returned `(False, False, 'Reviewed-Commit fingerprint must be at the very end of the report.')`.
+Every one of those reports carried the full sha, so they establish that the sentinel is accepted on the persona contract, not that it is unnecessary there.
+
+That is refusal on one contract and tolerance on the other, and tolerance is not inertness.
+Measured 2026-09-04 on the persona contract, over a report whose fingerprint was abbreviated to seven characters, whose tail was reordered so that fingerprint was the report's last line, and which carried an `agentId:` trailer glued to it:
+without the sentinel `parse_review_verdict` returned a `Fingerprint SHA mismatch` refusal naming `b9dc14ba` against an expected sha beginning `b9dc14b0`, and with the sentinel sitting between the fingerprint and the trailer it returned `(True, True, 'Clean (persona contract)')`.
+The same abbreviated, reordered, glued report, measured the same day against the pre-push guard's own `parse_report`, returned `('clean', 'b9dc14ba')` without the sentinel and `('clean', 'b9dc14b')` with the sentinel in that same position --- for the four-section report shape as well as the persona one, since that guard checks no trailing content under either.
+`verify_review` then tests `c.startswith(reviewed_commit)`, so against a real `b9dc14b0...` commit the sentinel-free form refuses the push with the misparsed-sha message and the sentinel form passes it.
+So the sentence above about the fingerprint's length ceasing to matter is right wherever no trailing-content check runs --- `pre-push-review.py`'s persona contract, the pre-push guard's own `parse_report`, and the Cursor Cloud recovery gate alike --- over a fingerprint that is both abbreviated and last.
+What settled [#3050](https://github.com/Morrison-Lab/ai-config/issues/3050) against the sentinel is therefore not that it protects nothing.
+It is that a conforming report never reaches the situation it protects: payload-last means the fingerprint is not the last line, and the mandated full sha stops `REVIEWED_COMMIT`'s capture at the boundary under either trailer shape.
+What is left is the cost --- outright refusal on the four-section contract --- which a report gains nothing by taking on.
+
 Two caveats.
 The concatenation has been observed on Claude Code's `Agent` tool and nowhere else, so it is a claim about that harness on that date rather than about subagent dispatch generally.
 And the **reordering** is what sits in tension with [`.claude/agents/adversarial-reviewer.md`](../../.claude/agents/adversarial-reviewer.md)'s own instruction to emit nothing after the JSON payload's closing `-->`.
 The sentinel is not the source of that tension and does not add to it: a brief that puts the verdict and the fingerprint after the payload has already overridden the emit-nothing instruction, and the sentinel then joins a tail that exists either way.
 The ordering the guard parsed successfully was that reordered one --- which is a statement about the guard, not an endorsement, since the same ordering fails this file's payload-last contract.
-Which of the two orderings a brief should mandate is #3050's decision, as named above, rather than something to settle inside a review brief.
+That decision is made, per #3050: a brief mandates the payload-last ordering, so a conforming report never puts the fingerprint last and the tension never arises in one.
+The parser is what makes payload-last free rather than merely tidier --- `parse_report` blanks HTML comments before both of its regex searches, so a payload sitting last can neither supply nor displace the verdict LINE or the fingerprint.
+Measured 2026-09-03 by running `parse_report` over a report whose Markdown fingerprint and payload `commit_sha` named different commits;
+it returned the Markdown one.
+That is a claim about those two searches and nothing wider.
+The payload is read separately, from the raw text rather than the blanked copy, and it is authoritative: a payload listing any finding downgrades a clean verdict to `needs_work`.
+Measured the same day --- a payload-last report whose Markdown line read `### Verdict: Ready for merge` and whose payload carried one finding parsed as `('needs_work', <sha>)`, and parsed as `('clean', <sha>)` once that findings array was emptied.
+So a reviewer gains nothing by letting the two representations disagree, which is the failure the payload exists to catch.
+The decision does not rest on how often the harness concatenates its trailer, so the re-measurement #3050 wanted first would not move it:
+the full sha closes the truncation hazard under either trailer shape, and payload-last keeps the fingerprint off the report's last line however the trailer arrives.
 It is adjacent to [#2483](https://github.com/Morrison-Lab/ai-config/issues/2483) and not the same item: that issue is about verdicts arriving via background task notifications going unregistered.
 
+- **Do:** mandate the payload-last tail in every review brief you write --- verdict, then fingerprint, then payload, and nothing after it.
 - **Do:** state the fingerprint as the **full 40-character** sha, which is what actually protects it.
-- **Do:** add the sentinel line after it *when a brief reorders the tail so the fingerprint is last*, as cheap insurance against a truncated or reformatted fingerprint.
 - **Do:** read a "verdict is for commit X, but this push would ship Y" refusal as possibly a *misparsed* fingerprint rather than only a stale one --- print what the guard captured before concluding.
+- **Do:** fix the brief rather than keeping a sentinel you meet in the wild.
+  It does protect an abbreviated fingerprint that is the report's last line, on every consumer that runs no trailing-content check on the shape it is handed --- `pre-push-review.py`'s persona contract, the pre-push guard's own `parse_report`, and [`scripts/cursor-self-review-check.py`](../../scripts/cursor-self-review-check.py), the Cursor Cloud recovery gate, which calls that same `parse_report` and then compares prefix-tolerantly.
+  Measured on that gate 2026-09-04, over the same abbreviated, reordered, glued report: without the sentinel it printed `REFUSE: fingerprint b9dc14ba does not match expected head b9dc14b0...` and exited 1, and with the sentinel sitting between the fingerprint and the trailer it printed `PASS: clean verdict at the expected head` and exited 0.
+  The payload-last full-sha tail removes those situations instead of insuring against them.
+- **Don't:** write a brief that puts the verdict and the fingerprint after the payload, or that asks for a trailing sentinel.
+- **Don't:** reach for the sentinel as insurance --- a conforming report puts the payload last, so the fingerprint is never the last line, and the full sha closes the truncation hazard under either trailer shape.
+  It is refused outright on [`pre-push-review.py`](../../scripts/pre-push-review.py)'s four-section contract, whose trailing-content check admits no such line and which runs only when an expected sha is supplied --- as that script's own `main()` always supplies one.
+- **Don't:** read the full-sha rule as mechanically enforced.
+  `REVIEWED_COMMIT` still accepts `[0-9a-fA-F]{7,40}`, and [`pre-push-review.py`](../../scripts/pre-push-review.py) still clears a seven-character prefix match, so an abbreviated fingerprint is caught by nothing but the reviewer following the brief.
 - **Don't:** claim the suffix breaks a 40-character fingerprint;
   run `REVIEWED_COMMIT` over the line before asserting either way.
 - **Don't:** abbreviate the sha in a review brief's template, which is the input that turns the suffix into a silently wrong parse.

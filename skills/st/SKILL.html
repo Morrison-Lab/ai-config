@@ -418,16 +418,19 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> issue create <span class="at">--title</span> <span class="st">"&lt;concise title&gt;"</span> <span class="at">--body</span> <span class="st">"&lt;what &amp; why&gt;</span></span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="st">**Done when:** &lt;acceptance criteria&gt;</span></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="st">&lt;scope notes / out-of-scope&gt;"</span>   <span class="co"># CREATE_ISSUE</span></span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="co"># GitLab</span></span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="ex">glab</span> issue create <span class="at">--title</span> <span class="st">"&lt;concise title&gt;"</span> <span class="at">--description</span> <span class="st">"&lt;what &amp; why&gt;</span></span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="st">**Done when:** &lt;acceptance criteria&gt;"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="st">&lt;scope notes / out-of-scope&gt;"</span> <span class="dt">\</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">--label</span> ai-authored <span class="at">--label</span> <span class="st">"model:&lt;model-id&gt;"</span>   <span class="co"># CREATE_ISSUE</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="co"># GitLab</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="ex">glab</span> issue create <span class="at">--title</span> <span class="st">"&lt;concise title&gt;"</span> <span class="at">--description</span> <span class="st">"&lt;what &amp; why&gt;</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="st">**Done when:** &lt;acceptance criteria&gt;"</span> <span class="dt">\</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>  <span class="at">--label</span> <span class="st">"ai-authored,model:&lt;model-id&gt;"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <ul>
 <li><p>Keep scope tight — <strong>one concern per issue</strong> (see <code>split-concerns</code>). If the task is really several concerns, file several issues.</p></li>
 <li><p>Capture acceptance criteria so “done” is unambiguous later.</p></li>
-<li><p>Label it if the repo uses labels.</p></li>
+<li><p>The two labels above are not optional: every issue an agent files into a repo we administrate carries <code>ai-authored</code> and <code>model:&lt;model-id&gt;</code>, per <a href="../../shared/workflow/issue-first.md"><code>issue-first</code></a>. Normalize the model id and create the labels where they are missing, per <a href="../../shared/workflow/label-agent-filed-issues.md"><code>label-agent-filed-issues</code></a>.</p></li>
+<li><p>Add any further labels the repo’s own taxonomy calls for.</p></li>
 <li><p>Then <strong>claim it</strong> (<code>claim-pr</code> pattern) so a parallel session / the <code>@claude</code> bot doesn’t collide:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> issue comment <span class="op">&lt;</span>N<span class="op">&gt;</span> --body <span class="st">"Claude Code CLI (local session) is working on this — please hold off until I'm done.</span></span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>

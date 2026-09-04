@@ -65,9 +65,10 @@ The squash message did.
 
 The mirror of the #1718 case above.
 There the squash body carried a keyword the author had not wanted;
-here the keyword the merger expected was absent, and the absence was right.
+here the keyword a brief asserted was absent, and the absence was right.
 
-Under a squash merge, what closes an issue is the whole squash commit message as entered, plus the PR body.
+Under a squash merge of a PR that targets the default branch, what closes an issue is the whole squash commit message as entered, plus the PR body;
+a PR targeting any other branch has its body keywords ignored, per the docs cited above.
 The title counts: the docs cited above say a keyword in a commit message merged to the default branch closes the issue, and the subject is part of the message.
 This repo sets `squash_merge_commit_title` to `COMMIT_OR_PR_TITLE` (read 2026-09-04),
 which GitHub documents as the sole commit's subject on a one-commit PR and the PR title otherwise;
@@ -84,7 +85,8 @@ Measured 2026-09-04 on the six wave-1 PRs,
 on the fix-loop scripts from the first wave-1 script through r5 (r5 alone carries the shape ai-config#3203 proposed),
 on issue #3068's timeline,
 and on a run of `hooks/remind-brief-premises.py`.
-The fixer brief asserted for every branch that its first commit already carried the closing keyword.
+The fixer brief asserted for every branch that its first commit already carried the closing keyword;
+the assertion held for four of the six and failed for the two below.
 The sentence entered the loop's brief on 2026-09-03, in the first wave-1 script,
 and was copied into each later script through r5 without anyone re-reading the branches.
 The assertion was never true for `fix/3102-memory-size-approach`,
@@ -93,7 +95,7 @@ seven of that branch's nine commits carry the `Refs`, and the other two are gene
 The assertion was true for `fix/3068-flag-cd-stderr` on 2026-09-03 and false by 03:57Z on 2026-09-04,
 thirteen hours before the r5 script was written.
 A rebase reworded the keyword out of the branch's first commit on purpose,
-because the issue's first "done when" item (the warning surfaces in a live session) is one that branch could not evidence;
+because the issue's first "done when" item (the warning surfaces in a live session) is one that branch could not show;
 the empty commit `78fda241` records the rebase and the reason.
 Both PRs merged with hand-written squash bodies carrying `Refs`,
 and both issues stayed open, which was the intended outcome in each case.
@@ -107,7 +109,7 @@ it keys on a corpus path or a count, and a claim about a branch's commits carrie
   in every spelling and both issue forms the parser accepts,
   with the PR's base resolved rather than assumed
   (`base="$(git remote show origin | sed -n 's/.*HEAD branch: //p')"`, or the branch a stacked PR targets):
-  `git rev-list --count "origin/$base..HEAD"` first, since a zero means the range is wrong rather than the branch clean, then
+  `git rev-list --count "origin/$base..HEAD"` first, since a zero means the range holds no commits and the empty listing below it says nothing about the branch, then
   `pat='(close[sd]?|fix(es|ed)?|resolve[sd]?):? *([A-Za-z0-9._-]+/[A-Za-z0-9._-]+)?#[0-9]+'` and
   `git log --regexp-ignore-case --extended-regexp --grep="$pat" --format='== %h %s%n%b' "origin/$base..HEAD" | grep -iE "^== |$pat"`;
   each `==` line names a matching commit and the lines under it are its matching body lines,
@@ -128,6 +130,8 @@ it keys on a corpus path or a count, and a claim about a branch's commits carrie
   Under a rebase merge: the PR body and the branch commits.
 - **Don't:** read only the squash body you typed;
   the title arrives prefilled from the PR or the sole commit and reaches `main` unless you edit it.
+- **Don't:** count a stacked PR's body keyword as what will close the issue;
+  that keyword never fires, and the branch commits' keywords fire later, once the commits reach the default branch.
 - **Do:** when a branch carries `Refs` where a `Closes` was expected,
   read its commit messages for the reason before treating the absence as an omission,
   and look for the acceptance item a deliberate removal names.

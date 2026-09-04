@@ -226,7 +226,7 @@ the classification was derived while linking that PR's bare references.)
 
 Two instruments whose failure reads as an answer about the *remote*
 while each answers something narrower:
-one says only whether its argument is a ref name,
+one, when its argument is shorter than 40 characters, says only whether that argument is a ref name,
 the other only what the *clone* has fetched.
 Both produced the same false claim twice on one PR,
 that three commits were "fetchable from no remote ref",
@@ -252,11 +252,12 @@ fatal: remote error: upload-pack: not our ref 0000000000000000000000000000000000
 ```
 
 So the fetch's own error text is the test:
-`couldn't find remote ref` means the argument was not a ref name (retry with all 40 characters),
+`couldn't find remote ref` means the remote has no ref by that name (retry with all 40 characters),
 and `upload-pack: not our ref` means the remote would not serve that object.
 GitHub returns the second string on protocol v2 and v0 alike.
 A plain local-path remote on v0 says `Server does not allow request for unadvertised object` instead,
-because its advertisement carries no `allow-*-sha1-in-want` capability and git refuses before sending a `want`.
+because its advertisement carries no `allow-*-sha1-in-want` capability and git refuses before sending a `want`;
+the same fetch succeeds on v2, the default, which has no such client-side gate.
 Neither wording means the object is absent.
 
 **`git merge-base --is-ancestor A B` and `git rev-list --count B`
@@ -266,8 +267,8 @@ and `--is-ancestor` returned non-zero for three real ancestors,
 because the walk stopped at the graft
 (the section above on `git log -S` describes the same stop).
 A ranged count is bounded the same way:
-`origin/main..f9068299` walks from the tip and excludes only the `main` history the clone holds,
-so it returned 1 in that clone too.
+`origin/main..f9068299` still walks forward from `f9068299`, which is itself a graft,
+so the range returned 1 in that clone too.
 `git fetch --depth=200 origin refs/pull/3060/head` made `--is-ancestor` succeed for all three,
 so the earlier answer was about what had been fetched.
 

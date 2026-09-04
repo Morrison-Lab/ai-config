@@ -106,7 +106,8 @@ the empty commit `78fda241` records the rebase and the reason.
 Both PRs merged with hand-written squash bodies carrying `Refs`,
 and both issues stayed open, which was the intended outcome in each case.
 The mistake came after:
-issue #3068 was closed by hand on the strength of the item asking for a test that pins the `additionalContext` emission
+issue #3068 was closed by hand on the strength of the item
+asking for a test that pins the `additionalContext` emission
 plus an item the issue marks optional,
 and reopened twenty minutes later once `78fda241` and `a92de7b4` on the branch were read.
 The hook did not fire on the brief's sentence, and cannot:

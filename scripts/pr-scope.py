@@ -111,11 +111,24 @@ def actor_login(value):
     if isinstance(value, str):
         return value
     if isinstance(value, dict):
-        for key in ("login", "username", "name"):
+        for key in ("login", "username"):
             if value.get(key):
                 return str(value[key])
-        return ""
+        raise InputError(f"actor has no login: {value!r}")
     raise InputError(f"unrecognized actor field: {value!r}")
+
+
+def ref_name(value):
+    """Pull a branch name out of a ref field: a string, or an object."""
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        if value.get("ref"):
+            return str(value["ref"])
+        raise InputError(f"ref field has no ref: {value!r}")
+    raise InputError(f"unrecognized ref field: {value!r}")
 
 
 def normalize_pr(raw):
@@ -154,8 +167,12 @@ def normalize_pr(raw):
         "url": raw.get("url", raw.get("html_url", raw.get("web_url", ""))),
         "author": author,
         "assignees": assignees,
-        "head": raw.get("headRefName", raw.get("source_branch", "")),
-        "base": raw.get("baseRefName", raw.get("target_branch", "")),
+        "head": ref_name(
+            raw.get("headRefName") or raw.get("head") or raw.get("source_branch")
+        ),
+        "base": ref_name(
+            raw.get("baseRefName") or raw.get("base") or raw.get("target_branch")
+        ),
         "is_draft": bool(raw.get("isDraft", raw.get("draft", False))),
     }
 
@@ -352,14 +369,13 @@ def main(argv=None):
             payload = fetch(args.repo, args.limit, args.number)
         else:
             payload = load_payload(sys.stdin.read())
-        identities = split_logins([args.user] if args.user else [])
-        identities += split_logins(args.alias)
+        resolved = split_logins([args.user] if args.user else [])
         result = scope(
             payload,
-            identities,
+            resolved + split_logins(args.alias),
             split_numbers(args.requested),
             split_numbers(args.excluded),
-            identity_resolved=bool(identities),
+            identity_resolved=bool(resolved),
         )
     except (InputError, json.JSONDecodeError) as exc:
         print(f"pr-scope: {exc}", file=sys.stderr)

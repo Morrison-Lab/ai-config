@@ -62,7 +62,7 @@ def scope(prs, user=ME, aliases=(), requested=(), excluded=()):
         identities,
         set(requested),
         set(excluded),
-        identity_resolved=bool(identities),
+        identity_resolved=bool(user),
     )
 
 
@@ -158,6 +158,11 @@ check("no identity: a warning says the arms went unevaluated",
 check("resolved identity emits no warning",
       scope([gh_pr(24, ME)])["warnings"] == [])
 
+alias_only = scope([gh_pr(25, ALIAS)], user=None, aliases=[ALIAS])
+check("aliases without a resolved user do not resolve identity",
+      alias_only["identity_resolved"] is False
+      and reason_for(alias_only, 25) == pr_scope.REASON_NO_IDENTITY)
+
 # --- Field-name normalization ---------------------------------------------
 
 rest_shape = {
@@ -165,9 +170,13 @@ rest_shape = {
     "user": {"login": ME},
     "assignees": [{"login": "third-party"}],
     "head": {"ref": "feature"},
+    "base": {"ref": "main"},
 }
+rest = scope([rest_shape])["prs"][0]
 check("REST shape: user.login is read as the author",
-      scope([rest_shape])["prs"][0]["reason"] == pr_scope.REASON_AUTHOR)
+      rest["reason"] == pr_scope.REASON_AUTHOR)
+check("REST shape: head.ref and base.ref map to head and base",
+      rest["head"] == "feature" and rest["base"] == "main")
 
 mcp_shape = {"number": 31, "user": {"login": "someone-else"}, "assignees": [ME]}
 check("MCP shape: bare login strings in assignees are read",
@@ -257,16 +266,21 @@ try:
 except pr_scope.InputError:
     check("a PR with no number raises rather than being skipped", True)
 
+try:
+    pr_scope.normalize_pr({"number": 53, "author": {"name": ME}})
+    check("a display name is not matched as a login", False)
+except pr_scope.InputError:
+    check("a display name is not matched as a login", True)
+
 # --- Negative control -----------------------------------------------------
 #
 # A table that cannot fail is indistinguishable from one that never ran, so
 # assert that a deliberately broken predicate is caught by it.
 
 ids = {pr_scope.normalize_login(ME), pr_scope.normalize_login(ALIAS)}
+veto_rows = [row for row in TABLE if not row[4] and row[3]]
 leaked = []
-for label, pr, requested, excluded, want_scope, want_reason in TABLE:
-    if want_scope or not excluded:
-        continue
+for label, pr, requested, excluded, want_scope, want_reason in veto_rows:
     # The same row, classified with the veto list emptied.
     in_scope, _ = pr_scope.classify(
         pr_scope.normalize_pr(pr), ids, set(requested), set(), True
@@ -274,7 +288,7 @@ for label, pr, requested, excluded, want_scope, want_reason in TABLE:
     if in_scope:
         leaked.append(label)
 check("negative control: dropping the exclusion veto lets vetoed PRs through",
-      len(leaked) == 4)
+      bool(leaked) and len(leaked) == len(veto_rows))
 
 # --- End-to-end through main() --------------------------------------------
 
@@ -297,6 +311,16 @@ sys.stdin = sys.__stdin__
 text = buf.getvalue()
 check("--text reports what was examined before what it found",
       code == 0 and text.startswith("examined 2 PR(s)"))
+
+buf = io.StringIO()
+sys.stdin = io.StringIO(json.dumps([gh_pr(62, ALIAS)]))
+with redirect_stdout(buf):
+    code = pr_scope.main(["--alias", ALIAS])
+sys.stdin = sys.__stdin__
+emitted = json.loads(buf.getvalue())
+check("main with aliases but no --user fails closed",
+      code == 0 and emitted["identity_resolved"] is False
+      and emitted["included"] == [])
 
 buf = io.StringIO()
 sys.stdin = io.StringIO("not json")

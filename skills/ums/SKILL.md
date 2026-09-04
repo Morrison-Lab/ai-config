@@ -538,10 +538,13 @@ add a review gate for the cases that need one.
   The same shape recurs when a fix round appends prose narrating its own
   fixes: that prose is fresh unmeasured text, so a round that fixes N
   findings and adds a paragraph about them adds new claims to refute
-  (ai-config#3202: three per-round notebook entries drew the findings of
-  rounds 2 to 4 and were cut at `48380505`; the two-sentence summary that
-  replaced them was itself re-patched through round 11).
-  Write the fix with no narration, per ai-config#3203.
+  (ai-config#3202: the three notebook entries narrating rounds 1 to 3 were
+  deleted rather than patched at `48380505`, and the summary entry that
+  replaced them kept being re-edited, its round count rebound to each new
+  head, until the merged file's "As of `75bc0fc2`, the head round 13
+  reviewed").
+  Write the fix with no narration;
+  ai-config#3203 proposes the same brief for a fix loop's fixer.
 
 ## Proactive hook compliance
 

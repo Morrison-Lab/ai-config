@@ -407,7 +407,7 @@ AGG_NOT_YET = re.compile(
 # session's own when `own_repo` names its repository AND `own_items` names its
 # number, and everything else is foreign.
 AGG_FOREIGN = re.compile(
-    r"\b(?:([\w.-]+)/)?([\w.-]+)#(\d+)|\b(?:PR|MR|issue)\s+\d", re.I,
+    r"\b(?:([\w.-]+)/)?([\w.-]+)#(\d+)|\b(?:PR|MR|issue)\s+\d+", re.I,
 )
 
 # `origin`'s URL, parsed the way `gh` itself infers a repo when none is named

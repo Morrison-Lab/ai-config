@@ -224,39 +224,54 @@ the classification was derived while linking that PR's bare references.)
 
 ## A fetch by SHA needs the full 40 characters, and a shallow clone's `--is-ancestor` is bounded by its depth
 
-Two instruments that answer a question about the *clone* while reading as answers about the *remote*.
-Both produced the same false claim twice on one PR, that three commits were "fetchable from no remote ref",
+Two instruments whose failure reads as an answer about the *remote*
+while each answers something narrower:
+one says only whether its argument is a ref name,
+the other only what the *clone* has fetched.
+Both produced the same false claim twice on one PR,
+that three commits were "fetchable from no remote ref",
 when every one of them was an ancestor of a ref `origin` still advertised.
 
-**`git fetch origin <sha>` on GitHub takes the full 40-character SHA and nothing shorter.**
-A short SHA fails with `fatal: couldn't find remote ref <sha>`, and it fails the same way for a commit
-that is the tip of an advertised ref, so the failure carries no information about reachability.
-The same fetch with the full SHA succeeds for any commit the server still holds,
-which is [`claude-code-consumer-wiring`](claude-code-consumer-wiring.md)'s "any reachable commit" note from the other side.
+**`git fetch origin <sha>` takes the full 40-character SHA and nothing shorter.**
+That is git's own resolution, not a server policy:
+a non-40-hex argument is looked up as a ref name,
+and the same failure reproduces against a plain local-path remote on git 2.43.0.
+A short SHA fails with `fatal: couldn't find remote ref <sha>`,
+and it fails the same way for a commit that is the tip of an advertised ref,
+so the failure carries no information about reachability.
+The same fetch with the full SHA succeeds on GitHub for any commit reachable on the server,
+which is [`claude-code-consumer-wiring`](claude-code-consumer-wiring.md)'s
+"any reachable commit" note from the other side.
 
 ```console
 $ git fetch origin eb0cf15e
 fatal: couldn't find remote ref eb0cf15e
 $ git fetch origin eb0cf15e891c386be69c85643bd57b89f5fb2a60
- * branch  eb0cf15e891c386be69c85643bd57b89f5fb2a60 -> FETCH_HEAD
+From https://github.com/Morrison-Lab/ai-config
+ * branch              eb0cf15e891c386be69c85643bd57b89f5fb2a60 -> FETCH_HEAD
 ```
 
 **`git merge-base --is-ancestor A B` and `git rev-list --count B` on a shallow clone answer for the fetched depth.**
-`git rev-list --count f9068299` returned 1 for a commit with 33 on its branch,
+`git rev-list --count f9068299` returned 1
+for a commit whose branch carries 33 commits above `main`,
 and `--is-ancestor` returned non-zero for three real ancestors,
-because the walk stopped at the graft (the section above on `git log -S` describes the same stop).
-`git fetch --depth=200 origin refs/pull/3060/head` made all three ancestors,
+because the walk stopped at the graft
+(the section above on `git log -S` describes the same stop).
+`git fetch --depth=200 origin refs/pull/3060/head` made `--is-ancestor` succeed for all three,
 so the earlier answer was about what had been fetched.
 
-- **Do:** fetch by the full SHA, and read a short-SHA failure as "not a ref name", not as "not on the remote".
+- **Do:** fetch by the full SHA,
+  and read a short-SHA failure as "not a ref name", not as "not on the remote".
 - **Do:** run `git rev-parse --is-shallow-repository` before an ancestry or count query,
-  and deepen the fetch (or fetch the ref itself) when it is `true`.
-- **Don't:** write "not fetchable" or "reachable from no remote ref" from a short-SHA fetch or a shallow-clone walk;
+  and deepen the fetch (or fetch the ref itself) when that command prints `true`.
+- **Don't:** write "not fetchable" or "reachable from no remote ref"
+  from a short-SHA fetch or a shallow-clone walk;
   the ref walk on a deepened fetch is the measurement.
 
-(Measured 2026-09-03 on git 2.43.0 in a remote session's shallow clone, while driving
-[ai-config#3154](https://github.com/Morrison-Lab/ai-config/pull/3154);
-the claude-review round at `e698c456` caught the claim by walking `refs/pull/3060/head` on a full checkout.)
+(Measured 2026-09-03 on git 2.43.0 in a remote session's shallow clone,
+while driving [ai-config#3154](https://github.com/Morrison-Lab/ai-config/pull/3154);
+the claude-review round at `e698c456` caught the claim
+by walking `refs/pull/3060/head` on a full checkout.)
 
 ## Git branch create/reset (`git switch -C`)
 - `git switch -C "$BRANCH"` is already safe against flag-shaped branch names: `$BRANCH` is the argument *to* `-C`, so a value like `--weird` fails cleanly as `fatal: '--weird' is not a valid branch name` rather than being parsed as an option.

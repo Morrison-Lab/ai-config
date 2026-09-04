@@ -216,7 +216,7 @@ def _scratch_repo(cap_before, cap_after):
     def git(*args):
         subprocess.run(["git", *args], cwd=repo, env=env,
                        capture_output=True, check=True)
-    git("init", "-q")
+    git("init", "-q", "-b", "main")
     os.makedirs(os.path.join(repo, "data-raw"))
     target = os.path.join(repo, "data-raw", "ab507bs-imp.sbatch")
     with open(target, "w") as fh:

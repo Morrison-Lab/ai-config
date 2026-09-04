@@ -647,7 +647,15 @@ A persona-contract report never reaches that scan.
 `parse_review_verdict` routes it to `_parse_persona_verdict`, which runs no trailing-content check at all, so a sentinel there is tolerated rather than refused.
 Measured 2026-09-03 through `parse_review_verdict` itself rather than against the regex in isolation, which is the substitution [`verify-the-right-artifact`](verify-the-right-artifact.md) rules out:
 a persona report returned `(True, True, 'Clean (persona contract)')` payload-last, with a sentinel appended, and with the tail reordered alike, while the same sentinel on the local contract returned `(False, False, 'Reviewed-Commit fingerprint must be at the very end of the report.')`.
-So the sentinel is refused by one consumer and inert for the other, and protects nothing from either --- which is what settled #3050 against it, on top of the full sha closing the hazard it insured against whenever the reviewer complies.
+Every one of those reports carried the full sha, so they establish that the sentinel is accepted on the persona contract, not that it is unnecessary there.
+
+That is refusal on one contract and tolerance on the other, and tolerance is not inertness.
+Measured 2026-09-04 on the persona contract, over a report whose fingerprint was abbreviated to seven characters, whose tail was reordered so that fingerprint was the report's last line, and which carried an `agentId:` trailer glued to it:
+without the sentinel `parse_review_verdict` returned a `Fingerprint SHA mismatch` refusal naming `b9dc14ba` against an expected sha beginning `b9dc14b0`, and with the sentinel appended it returned `(True, True, 'Clean (persona contract)')`.
+So the sentence above about the fingerprint's length ceasing to matter is right, and right in exactly one place --- the persona contract, over a fingerprint that is both abbreviated and last.
+What settled [#3050](https://github.com/Morrison-Lab/ai-config/issues/3050) against the sentinel is therefore not that it protects nothing.
+It is that a conforming report never reaches the situation it protects: payload-last means the fingerprint is not the last line, and the mandated full sha stops `REVIEWED_COMMIT`'s capture at the boundary under either trailer shape.
+What is left is the cost --- outright refusal on the four-section contract --- which a report gains nothing by taking on.
 
 Two caveats.
 The concatenation has been observed on Claude Code's `Agent` tool and nowhere else, so it is a claim about that harness on that date rather than about subagent dispatch generally.
@@ -663,15 +671,17 @@ The payload is read separately, from the raw text rather than the blanked copy, 
 Measured the same day --- a payload-last report whose Markdown line read `### Verdict: Ready for merge` and whose payload carried one finding parsed as `('needs_work', <sha>)`, and parsed as `('clean', <sha>)` once that findings array was emptied.
 So a reviewer gains nothing by letting the two representations disagree, which is the failure the payload exists to catch.
 The decision does not rest on how often the harness concatenates its trailer, so the re-measurement #3050 wanted first would not move it:
-the full sha closes the truncation hazard under either trailer shape, and the sentinel is refused or inert however the trailer arrives.
+the full sha closes the truncation hazard under either trailer shape, and payload-last keeps the fingerprint off the report's last line however the trailer arrives.
 It is adjacent to [#2483](https://github.com/Morrison-Lab/ai-config/issues/2483) and not the same item: that issue is about verdicts arriving via background task notifications going unregistered.
 
 - **Do:** mandate the payload-last tail in every review brief you write --- verdict, then fingerprint, then payload, and nothing after it.
 - **Do:** state the fingerprint as the **full 40-character** sha, which is what actually protects it.
 - **Do:** read a "verdict is for commit X, but this push would ship Y" refusal as possibly a *misparsed* fingerprint rather than only a stale one --- print what the guard captured before concluding.
+- **Do:** fix the brief rather than keeping a sentinel you meet in the wild.
+  It does protect an abbreviated fingerprint that is the report's last line on the persona contract, which is the one situation it is not inert in --- and the payload-last full-sha tail removes that situation instead of insuring against it.
 - **Don't:** write a brief that puts the verdict and the fingerprint after the payload, or that asks for a trailing sentinel.
-- **Don't:** reach for the sentinel as insurance on a report [`pre-push-review.py`](../../scripts/pre-push-review.py) validates.
-  It is refused outright on that script's own four-section contract, whose trailing-content check admits no such line, and merely tolerated on the persona contract, which runs no such check --- so it protects nothing either way.
+- **Don't:** reach for the sentinel as insurance --- a conforming report puts the payload last, so the fingerprint is never the last line, and the full sha closes the truncation hazard under either trailer shape.
+  It is refused outright on [`pre-push-review.py`](../../scripts/pre-push-review.py)'s four-section contract, whose trailing-content check admits no such line and which runs only when an expected sha is supplied --- as that script's own `main()` always supplies one.
 - **Don't:** read the full-sha rule as mechanically enforced.
   `REVIEWED_COMMIT` still accepts `[0-9a-fA-F]{7,40}`, and [`pre-push-review.py`](../../scripts/pre-push-review.py) still clears a seven-character prefix match, so an abbreviated fingerprint is caught by nothing but the reviewer following the brief.
 - **Don't:** claim the suffix breaks a 40-character fingerprint;

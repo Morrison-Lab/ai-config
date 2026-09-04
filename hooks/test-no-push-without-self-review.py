@@ -1143,9 +1143,9 @@ def dotclaude_fallback_cases() -> tuple[int, int]:
     The discriminator is `git push --dry-run`. The degraded heuristic's regex
     matches it, and the real detector does not treat it as a push at all
     because it re-heads nothing -- so letting it through is only possible with
-    the detector loaded. Two negative controls: strip the detector out of the
-    checkout's `hooks/`, and drop the `.git` entry, and the same command denies
-    again either way.
+    the detector loaded. Three negative controls: strip the detector out of the
+    checkout's `hooks/`, drop the `.git` entry, and put the root at `$HOME`;
+    the same command denies again in each.
     """
     failures = 0
     ran = 0
@@ -1167,7 +1167,7 @@ def dotclaude_fallback_cases() -> tuple[int, int]:
         return guard, detector
 
     def check(guard, detector, label, cmd, should_deny, want_degraded,
-              want_report):
+              want_report, env=None):
         nonlocal failures, ran
         ran += 1
         res = subprocess.run(
@@ -1175,7 +1175,7 @@ def dotclaude_fallback_cases() -> tuple[int, int]:
             input=json.dumps({"tool_name": "Bash",
                               "tool_input": {"command": cmd},
                               "transcript_path": ""}),
-            capture_output=True, text=True, cwd=REPO)
+            capture_output=True, text=True, cwd=REPO, env=env)
         denied = '"deny"' in res.stdout
         degraded = "could not load its push detector" in res.stdout
         reported = f"loaded its push detector from {detector}" in res.stderr
@@ -1216,6 +1216,17 @@ def dotclaude_fallback_cases() -> tuple[int, int]:
               "git push --dry-run origin main", True, True, False)
     finally:
         shutil.rmtree(outside, ignore_errors=True)
+
+    home = tempfile.mkdtemp(prefix="npwsr-home-")
+    try:
+        guard, detector = install(home, True)
+        check(guard, detector,
+              "a .claude/hooks guard whose root is the home directory ignores "
+              "the hooks/ beside it and stays degraded",
+              "git push --dry-run origin main", True, True, False,
+              env=dict(os.environ, HOME=home))
+    finally:
+        shutil.rmtree(home, ignore_errors=True)
 
     check(HOOK, os.path.join(os.path.dirname(HOOK), "no-unreviewed-pr.py"),
           "the canonical guard names no path, having used its own sibling",

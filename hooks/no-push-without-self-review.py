@@ -216,7 +216,9 @@ def _sibling_candidates(here: str) -> list:
     root = os.path.dirname(parent)
     if (os.path.basename(here) == "hooks"
             and os.path.basename(parent) == ".claude"
-            and os.path.exists(os.path.join(root, ".git"))):
+            and os.path.exists(os.path.join(root, ".git"))
+            and os.path.realpath(root)
+            != os.path.realpath(os.path.expanduser("~"))):
         candidates.append(os.path.join(root, "hooks", SIBLING_NAME))
     return candidates
 

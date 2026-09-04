@@ -268,7 +268,7 @@ Injecting an invalid escape and watching the harness fail confirms the mechanism
 the version whose category you did not name still passes, and nothing in the green run says which version you proved anything about.
 That is the same maintainer-versus-CI split [ai-config#3114](https://github.com/Morrison-Lab/ai-config/issues/3114) was filed about.
 
-The message field is a regex matched against the start of the warning text, so `error:invalid escape sequence::` fires on the diagnostic under any category.
+The message field is a literal, matched case-insensitively against the start of the warning text --- `warnings._setoption` calls `re.escape()` on it before building the filter --- so `error:invalid escape sequence::` fires on the diagnostic under any category.
 Prefer it over adding `error::DeprecationWarning`, which would turn every unrelated deprecation in every suite into an error.
 
 Measured 2026-09-03 on this machine.
@@ -281,3 +281,4 @@ Adding one invalid escape to `hooks/flag-cop-out-offer.py` and running `hooks/te
 - **Do:** name the interpreter version an empirical propagation check was run on, since the check only ever proves the mechanism for that one.
 - **Don't:** rely on `error::SyntaxWarning` alone for invalid escapes --- it is vacuous on 3.11, and the injection test passes anyway on 3.12 and later.
 - **Don't:** broaden a category-only filter to `error::DeprecationWarning` to cover the gap, which errors on every unrelated deprecation as well.
+- **Don't:** put a regex in the `-W`/`PYTHONWARNINGS` message field, which is escaped to a literal there unlike `warnings.filterwarnings()`'s own `message=`, so `error:invalid.*sequence::` matches nothing and the filter is vacuous with no error.

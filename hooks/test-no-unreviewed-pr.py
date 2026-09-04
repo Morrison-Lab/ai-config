@@ -1393,6 +1393,54 @@ case(create("c") + [bash("ALLOW_UNREVIEWED_REDACTION_PR=0 gh pr view 1038 "
                     res("x", '{"number":1038}'), say("Not asserted.")], True,
      "ALLOW_UNREVIEWED_REDACTION_PR=0 is not an assertion")
 
+# --- unnumbered / help commands forge no obligation (ai-config#3206) ---
+case([bash("gh pr create --help", tid="h"),
+      res("h", "Usage: gh pr create [flags]"),
+      say("Checked help.")], False,
+     "gh pr create --help forges no obligation")
+case([bash("gh pr create -h", tid="h"),
+      res("h", "Usage: gh pr create [flags]"),
+      say("Checked help.")], False,
+     "gh pr create -h forges no obligation")
+case([bash("gh pr ready --help", tid="h"),
+      res("h", "Usage: gh pr ready [flags]"),
+      say("Checked help.")], False,
+     "gh pr ready --help forges no obligation")
+case([bash("gh pr create --title x --body y", tid="c"),
+      res("c", "some output without url or number"),
+      say("Done.")], False,
+     "a gh pr create producing no number or URL does not track")
+case(create("c1") + [
+    bash(REQ_CMD, tid="q1"), res("q1", OK),
+    bash("gh pr merge 1038 --squash", tid="m1"), res("m1", "Merged"),
+    bash("gh pr create --help", tid="h"),
+    res("h", "Usage: gh pr create [flags]"),
+    say("Ran create --help after merge.")], False,
+     "gh pr create --help after merged PRs does not wedge session")
+case([bash("gh pr create --reviewer copilot-pull-request-reviewer", tid="c1"),
+      res("c1", FAIL, err=True),
+      bash("gh pr create --base main --title x --body y", tid="c2"),
+      res("c2", URL),
+      bash(REQ_CMD, tid="q"), res("q", OK),
+      say("Recovered from failed create with successful create and request.")],
+     False, "a later create with a number drops an earlier unnumbered obligation")
+case([bash("gh pr create --base main --title x --body y", tid="c1"), res("c1", URL),
+      bash(REQ_CMD, tid="q1"), res("q1", OK),
+      bash("gh pr create --reviewer copilot-pull-request-reviewer", tid="c2"),
+      res("c2", FAIL, err=True),
+      bash("gh pr merge 1038 --squash", tid="m"), res("m", "Merged"),
+      say("Merged PR 1038.")],
+     False, "an unnumbered obligation drops once the live set is empty across a merge")
+case([bash("gh pr create --base main --title x --body y", tid="c1"), res("c1", URL),
+      bash(REQ_CMD, tid="q1"), res("q1", OK),
+      bash("gh pr create --base main --title x2 --body y2", tid="c2"),
+      res("c2", "https://github.com/o/r/pull/1039\n"),
+      bash("gh pr create --reviewer copilot-pull-request-reviewer", tid="c3"),
+      res("c3", FAIL, err=True),
+      bash("gh pr merge 1038 --squash", tid="m"), res("m", "Merged"),
+      say("Merged PR 1038 while 1039 is still live.")],
+     True, "an unnumbered obligation is kept when another live PR remains after a merge")
+
 
 def stdout_of(events):
     """The hook's raw stdout for a transcript.

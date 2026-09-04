@@ -74,6 +74,8 @@ BASH_QUIET = [
     ("labelled with -l and a quoted pair", 'gh issue create -l "ai-authored,model:x"'),
     ("labelled with --labels=", 'gh issue create --labels=ai-authored,model:x'),
     ("unbalanced quoting falls back to the regex", 'gh issue create --label ai-authored --title "t'),
+    ("the command quoted inline-code-style inside single quotes",
+     "git commit -m 'mentions of `gh issue create` in prose'"),
     ("not a create at all", "gh issue list --state all --search 'x'"),
     ("editing labels on an existing issue", 'gh issue edit 12 --add-label ai-authored'),
     ("a PR create", 'gh pr create --title "t" --body "b"'),

@@ -106,6 +106,17 @@ def carries_authorship(value: str) -> bool:
     `ai-authored-improvement` or `model:not-ai-authored` discharge the reminder."""
     return AUTHORSHIP_LABEL in [part.strip() for part in value.split(",")]
 
+
+# Inside single quotes nothing is a command: a commit message or echo that
+# quotes `gh issue create` inline-code-style must not read as a create at
+# command position. Double-quoted spans stay, since a backtick runs there.
+RX_SINGLE_QUOTED = re.compile(r"'[^']*'")
+
+
+def strip_single_quoted(command: str) -> str:
+    """Blank single-quoted spans before position matching, keeping length."""
+    return RX_SINGLE_QUOTED.sub(lambda m: "'" + " " * (len(m.group(0)) - 2) + "'", command)
+
 LABEL_FLAGS = ("--label", "--labels", "-l")
 
 # Fallback for a command shlex cannot tokenize: the value of a `--label` /
@@ -170,7 +181,7 @@ def evaluate_bash(command: str) -> str | None:
     if not command:
         return None
     stripped = strip_heredocs(command)
-    if not RX_ISSUE_CREATE.search(stripped):
+    if not RX_ISSUE_CREATE.search(strip_single_quoted(stripped)):
         return None
     if labels_authorship(stripped):
         return None

@@ -23,12 +23,12 @@ try:
         "scripts", "lib")
     if _LIB not in sys.path:
         sys.path.insert(0, _LIB)
-    from shellcmd import (resolve_cd_target, simple_commands_with_depth,
+    from shellcmd import (resolve_cd_target, simple_commands_with_scope,
                           strip_env)
 except Exception as _exc:  # broken install; fail open and say so
     print(f"no-unshipped-commit: cannot load scripts/lib/shellcmd.py "
           f"({_exc}); not tracking the shell's directory", file=sys.stderr)
-    resolve_cd_target = simple_commands_with_depth = strip_env = None
+    resolve_cd_target = simple_commands_with_scope = strip_env = None
 
 # `(?![\w-])`, not `\b`. A word boundary sits happily between `commit` and
 # `-`, because `-` is a non-word character -- so `git\s+commit\b` matched
@@ -237,14 +237,29 @@ def _moves_head(args):
     return PATHSPEC_SEP not in args
 
 
-# Appended by `shell_dir_after` so the parse reports the nesting depth the
-# TEXT ENDS AT. `simple_commands_with_depth` pairs each command with its own
-# depth and says nothing about the separators that follow the last one, so
+# Appended by `shell_dir_after` so the parse reports the subshell the TEXT
+# ENDS IN. `simple_commands_with_scope` pairs each command with its own scope
+# and says nothing about the separators that follow the last one, so
 # `(cd /a && git status)` and `(cd /a && ` are otherwise indistinguishable:
 # the first ends back in the parent shell, the second inside the subshell
 # where whatever follows it runs. A marker word invokes nothing and is never
 # a `cd`, so it only ever reports.
 END_MARKER = "__no_unshipped_commit_end__"
+
+
+def _scope_dir(dirs, scope, cur_dir):
+    """The directory subshell `scope` stands in, entering it if it is new.
+
+    A subshell inherits its parent's directory AT THE MOMENT IT OPENS, which
+    is what recording it lazily --- on the scope's first command --- gets
+    right: every `cd` the parent ran before the `(` has already been folded
+    into the parent's entry, and every `cd` it runs after the `)` comes later
+    and cannot reach a scope that is already closed.
+    """
+    if scope not in dirs:
+        dirs[scope] = (cur_dir if len(scope) == 1
+                       else _scope_dir(dirs, scope[:-1], cur_dir))
+    return dirs[scope]
 
 
 def shell_dir_after(text, cur_dir):
@@ -270,33 +285,36 @@ def shell_dir_after(text, cur_dir):
     a commit made in another checkout via the subshell one-liner was
     attributed to no directory at all and never reported.
 
-    One directory per nesting level, the shape
-    `hooks/no-push-without-self-review.py` already keeps: a subshell inherits
-    its parent's directory on descent, its own moves die with it on ascent,
-    and the parent's survives both.
+    One directory per SUBSHELL, keyed on the scope
+    `simple_commands_with_scope` reports rather than on nesting depth alone:
+    a subshell inherits its parent's directory on descent, its own moves die
+    with it on ascent, and the parent's survives both. Depth alone cannot
+    say that much, because two SIBLING subshells share a depth --- so keying
+    on it let `(cd /other-worktree && git status) && (git commit -m mine`
+    carry the first subshell's move into the second and attribute the commit
+    to a checkout it never ran in, which is ai-config#2422's own false-block
+    failure on a different spelling.
     """
-    if simple_commands_with_depth is None or not DIR_MOVE.search(text):
+    if simple_commands_with_scope is None or not DIR_MOVE.search(text):
         return cur_dir
     # The marker goes on its own line, so a heredoc terminator ending `text`
     # stays a terminator rather than becoming `EOF __no_unshipped_commit_end__`
     # and swallowing the rest of the call. When it is swallowed anyway,
-    # `end_depth` stays 0 and the parent shell's directory is the answer,
-    # which is what this function returned before the stack existed.
-    argvs = simple_commands_with_depth(text + chr(10) + END_MARKER)
+    # `end_scope` stays the caller's own shell and the parent's directory is
+    # the answer, which is what this function returned before scopes existed.
+    argvs = simple_commands_with_scope(text + chr(10) + END_MARKER)
     if argvs is None:
         return None
-    stack, end_depth = [cur_dir], 0
-    for depth, argv in argvs:
-        while len(stack) <= depth:
-            stack.append(stack[-1])
-        del stack[depth + 1:]
+    dirs, end_scope = {}, (0,)
+    for scope, argv in argvs:
+        here = _scope_dir(dirs, scope, cur_dir)
         if argv == [END_MARKER]:
-            end_depth = depth
+            end_scope = scope
             break
         _, rest = strip_env(argv)
         if rest and rest[0] in ("cd", "pushd", "popd"):
-            stack[depth] = resolve_cd_target(rest, stack[depth])
-    return stack[end_depth]
+            dirs[scope] = resolve_cd_target(rest, here)
+    return _scope_dir(dirs, end_scope, cur_dir)
 
 
 def absolute_dir(path):

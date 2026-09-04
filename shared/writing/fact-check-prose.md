@@ -959,14 +959,15 @@ the paragraph's content was "split at the clause boundary",
 and the honest form carries no numbers at all.
 Tracked as [#3158](https://github.com/Morrison-Lab/ai-config/issues/3158).)
 
-## A quoted tool output in a commit message is written after the output, not before
+## A tool's behaviour quoted in a commit message is written after the measurement, not before
 
 The section above covers a figure in a commit message.
 This covers a quotation: the error text a tool printed, the exit status it returned,
 or the behaviour a reviewer ascribed to it,
 written into the body as the reason for the change.
-The inherited-claims bullet near the top of this file governs restating such a claim in a doc or a comment;
-this governs the commit body, where the draft usually precedes the measurement.
+The inherited-claims bullet near the top of this file governs restating such a claim in a doc or a comment,
+and "A block presented as program output is a claim, so capture it rather than composing it" above governs a block composed from memory in a doc;
+this governs the commit body, where the sentence is inherited from a reviewer's paraphrase and the draft usually precedes the measurement.
 
 A commit message is usually drafted before the commit,
 and often before the measurement the message describes has been read,

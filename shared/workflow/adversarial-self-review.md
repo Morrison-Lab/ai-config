@@ -561,7 +561,7 @@ It was seen directly, twice, within one session --- and the captured line is thi
 --- end of report ---agentId: <id> (use SendMessage with to: '...')
 ```
 
-**Note what that exhibit is: the trailer landing on a sentinel line, which is the safe case**, and the one this section goes on to prescribe.
+**Note what that exhibit is: the trailer landing on a sentinel line, which is the safe case**, and the one the block below records as the mitigation [#3050](https://github.com/Morrison-Lab/ai-config/issues/3050) rejected.
 The shape the hazard is actually about is a fingerprint line with the trailer glued to it:
 
 ```
@@ -654,8 +654,8 @@ Every one of those reports carried the full sha, so they establish that the sent
 
 That is refusal on one contract and tolerance on the other, and tolerance is not inertness.
 Measured 2026-09-04 on the persona contract, over a report whose fingerprint was abbreviated to seven characters, whose tail was reordered so that fingerprint was the report's last line, and which carried an `agentId:` trailer glued to it:
-without the sentinel `parse_review_verdict` returned a `Fingerprint SHA mismatch` refusal naming `b9dc14ba` against an expected sha beginning `b9dc14b0`, and with the sentinel appended it returned `(True, True, 'Clean (persona contract)')`.
-The same abbreviated, reordered, glued report, measured the same day against the pre-push guard's own `parse_report`, returned `('clean', 'b9dc14ba')` without the sentinel and `('clean', 'b9dc14b')` with it --- for the four-section report shape as well as the persona one, since that guard checks no trailing content under either.
+without the sentinel `parse_review_verdict` returned a `Fingerprint SHA mismatch` refusal naming `b9dc14ba` against an expected sha beginning `b9dc14b0`, and with the sentinel sitting between the fingerprint and the trailer it returned `(True, True, 'Clean (persona contract)')`.
+The same abbreviated, reordered, glued report, measured the same day against the pre-push guard's own `parse_report`, returned `('clean', 'b9dc14ba')` without the sentinel and `('clean', 'b9dc14b')` with the sentinel in that same position --- for the four-section report shape as well as the persona one, since that guard checks no trailing content under either.
 `verify_review` then tests `c.startswith(reviewed_commit)`, so against a real `b9dc14b0...` commit the sentinel-free form refuses the push with the misparsed-sha message and the sentinel form passes it.
 So the sentence above about the fingerprint's length ceasing to matter is right wherever no trailing-content check runs --- `pre-push-review.py`'s persona contract, the pre-push guard's own `parse_report`, and the Cursor Cloud recovery gate alike --- over a fingerprint that is both abbreviated and last.
 What settled [#3050](https://github.com/Morrison-Lab/ai-config/issues/3050) against the sentinel is therefore not that it protects nothing.

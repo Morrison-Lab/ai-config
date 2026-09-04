@@ -117,7 +117,7 @@ committed pass.
      (
        repo="${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/ums rev-parse --show-toplevel 2>/dev/null || pwd)}"
        test -f "$repo/CLAUDE.md" && test -d "$repo/shared" || { echo "not an ai-config checkout: $repo" >&2; exit 1; }
-       cd "$repo" && grep -rilI "<subject>" skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md
+       cd "$repo" && grep -rilI -- "<subject>" skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md
      )
      ```
      The query runs over the files on disk,

@@ -997,31 +997,39 @@ See ai-config#694 for the precedent.
   Ten PRs (ai-config#3220 through #3229) were opened by `POST /pulls`
   anyway, for the convenience of a loop, and the claim comments posted the
   same way.
-  Three things those entries do not say:
+  Three things those entries do not say.
 
-  - Each workflow declines on its own `if:`.
-    `jules-review.yml` requires `github.event.issue.pull_request` and an
-    `author_association` of OWNER, MEMBER, or COLLABORATOR, so its ten runs
-    on the bot's claim comments skipped on the association and eleven more
-    on issue link-back comments skipped on the pull-request conjunct;
-    `antigravity-review.yml` requires an `@agy` or `@antigravity` mention,
-    so it skipped under every sender, the user's included.
-    Read the `if:` before naming the gate.
-  - The MCP tools dispatch where the proxy's raw `POST .../dispatches`
-    is refused: `mcp__github__actions_run_trigger` with `inputs.pr_number`
-    queued `claude-review.yml` for nine PRs under `d-morrison` in one
-    batch (eight verdicts; #3220's run was cancelled by the push that
-    followed it), and `mcp__github__add_issue_comment` re-posted the
-    mention so Jules started on all ten within a minute.
-    The MCP writes carried `d-morrison` in this container on 2026-09-04;
-    re-derive that per the entry above rather than carrying it.
-  - A dispatched run is not attached to the head commit's check-runs,
-    which keep the bot-sender run's `skipped` rows.
-    #3228 merged with the head's `require-clean-verdict` reading `skipped`
-    while the dispatch run's copy had failed on `verdict: unrecognized`
-    (ai-config#3233).
-    For a review that arrived by dispatch, read that run's jobs, not the
-    head's check-runs.
+  Each workflow declines on its own `if:`.
+  `jules-review.yml` requires `github.event.issue.pull_request`, an
+  `@jules` mention, and an `author_association` of OWNER, MEMBER, or
+  COLLABORATOR;
+  its ten runs on the bot's claim comments failed the association alone,
+  and eleven more on the bot's issue comments (ten link-backs and one
+  wave summary) failed the pull-request and mention conjuncts as well.
+  `antigravity-review.yml` requires the same pull-request and association
+  conjuncts plus an `@agy` or `@antigravity` mention, so it skipped under
+  every sender, the user's included, on the mention.
+  Read the `if:` before naming the gate.
+
+  The MCP tools dispatch where the proxy's raw `POST .../dispatches` is
+  refused: `mcp__github__actions_run_trigger` with `inputs.pr_number`
+  queued `claude-review.yml` for nine PRs under `d-morrison` in one batch
+  (eight verdicts; #3220's run was cancelled by the push that followed
+  it), and `mcp__github__add_issue_comment` re-posted the mention so Jules
+  started on all ten within a minute.
+  The MCP writes carried `d-morrison` in this container on 2026-09-04;
+  re-derive that per the entry above rather than carrying it.
+  `github-remote-sessions.md`'s "Don't reach for `workflow_dispatch` or an
+  `@claude review` comment" bullet describes the raw-API route, and this
+  is the MCP route it does not cover.
+
+  A dispatched run is not attached to the head commit's check-runs, which
+  keep the bot-sender run's `skipped` rows.
+  #3228 merged with the head's `require-clean-verdict` reading `skipped`
+  while the dispatch run's copy had failed on `verdict: unrecognized`
+  (ai-config#3233).
+  For a review that arrived by dispatch, read that run's jobs, not the
+  head's check-runs.
 
   - **Do:** open PRs and post reviewer mentions through the client whose
     writes carry the user's login.

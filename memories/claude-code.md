@@ -1019,7 +1019,7 @@ to stderr in the same tool result as the script's own output, before any body wa
 so those lines are a detector usable before posting rather than after.
 The detector is one-sided:
 it fires only when a substituted command fails and prints;
-a backtick span or `$(...)` naming a command that succeeds quietly, and any `$VAR` expansion, are substituted with nothing printed to stderr,
+a backtick span or `$(...)` naming a command that succeeds quietly, and any `$VAR` expansion, are substituted and print nothing to stderr,
 so silence proves nothing and the read-back below stays required.
 And a loop that posts to a forge should read one posted body back before posting the rest,
 since the first body is where the corruption shows.
@@ -1027,7 +1027,7 @@ since the first body is where the corruption shows.
 No guard was built at this occurrence.
 Issue #3230's done-when names a stderr-conditioned check;
 the half of that a hook can decide before the damage is a `PreToolUse` regex over the Bash command for an unquoted delimiter with a backtick or dollar sign in the heredoc body,
-which fires before the damage, and that is the shape to build at the third occurrence, per `shared/principles/deterministic-tools.md`.
+and that is the shape to build at the third occurrence, per `shared/principles/deterministic-tools.md`.
 
 - **Do:** treat `command not found` or `No such file or directory` on stderr from a heredoc-fed script as the payload probably having been substituted, and stop before posting.
 - **Do:** read one posted body back before a script posts the rest of its batch.

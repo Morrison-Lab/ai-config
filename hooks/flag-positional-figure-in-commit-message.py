@@ -33,24 +33,27 @@ THE MEASUREMENT (this repository's own history, re-derived 2026-09-03)
 
 piped to a scan for
 
-    \\b\\d+\\s+(?:lines?|characters?|chars?|words?)\\s+(?:above|below|earlier|later)\\b
-    |\\b\\d+-to-\\d+\\s+range\\b
+    ~?\\b\\d+\\s+(?:lines?|characters?|chars?|words?)\\s+(?:above|below|earlier|later)\\b
 
-matched **14 of 2412 commits** (15 occurrences). Every one is the target
+matched **14 occurrences across 13 commit messages**, out of roughly 2400
+scanned (2412 on `origin/main` as of 2026-09-03; the denominator moves with
+every commit, so read it as dated rather than fixed). Every one is the target
 shape -- a decorative figure locating a passage -- and there is not a single
 legitimate code-move description among them, which is what makes the pattern
 safe to warn on. Samples: `4e1dea144` ("the section 13 lines above it"),
 `593d25ccf` ("its own sibling 39 lines below"), `fcb4ee10d` ("says, 77 lines
 earlier at L186"), `f2f706fa1` ("a section defined ~130 lines later"),
-`60edf4c1e` ("already sat ~2000 lines below"), `0709c1a28` ("the 60-to-80
-range is human guidance").
+`60edf4c1e` ("already sat ~2000 lines below").
 
 Two properties of the corpus the regex has to respect:
 
-  * `38a0738cc` wraps as "instruction 30\\n  lines above", so the gap between
-    the number and the unit must be `\\s+` rather than a literal space. Twelve
-    of the fourteen match a space-only pattern; the newline tolerance is what
-    reaches the other two.
+  * The corpus wraps its commit messages, and it wraps at BOTH gaps.
+    `38a0738cc` breaks between the number and the unit ("instruction 30\\n
+    lines above"); `6f5b9dde3` breaks between the unit and the positional
+    word ("this file's own remedy 25 lines\\n   above"). So both gaps are
+    `\\s+` rather than a literal space, and that tolerance is what reaches
+    exactly 2 of the 13 -- a space-only variant of the same pattern matches
+    11.
   * `1385f7b48` writes "~140 lines LATER". No commit in this history is
     reached *only* by `re.IGNORECASE` (that commit carries a second, lowercase
     occurrence), but that occurrence itself is, so the flag stays on: the
@@ -63,8 +66,15 @@ purpose:
 
   * A bare count of changed lines or files -- "3 files changed",
     "2 insertions". That is a fact about the diff, derived by git itself.
+  * A `\\d+-to-\\d+ range`. An earlier draft carried that arm; it matched
+    exactly one commit in the whole history, `0709c1a28`'s "The 60-to-80
+    range is human guidance", and that match is a misfire rather than a hit
+    -- the sentence states what a style guide asks for, locates no passage,
+    and would be destroyed rather than improved by deleting its numbers.
+    One measured false positive and zero measured true positives is a losing
+    trade for a hook whose only capital is that a fire means something.
   * A bare dimensional count with no positional word: "143 characters",
-    "9000 chars". Measured against the same 2412 commits, `\\b\\d+\\s+
+    "9000 chars". Measured against the same ~2400 commits, `\\b\\d+\\s+
     (?:characters?|chars?|words?)\\b` alone matches **53** commits, and they
     are overwhelmingly legitimate measured facts -- a context budget
     (`b0f279f8e`, `78ab9ed4f`), GitHub's 65536-character comment cap
@@ -77,11 +87,25 @@ purpose:
 MESSAGE EXTRACTION
 ------------------
 Handles `-m "..."` / `-m '...'` (repeated `-m` concatenated as git does),
-`--message=...`, `-F <file>` / `--file=<file>` read off disk, leading
-environment assignments (`FOO=1 git commit ...`), and global git flags
-(`-C dir`, `-c k=v`) between `git` and the subcommand -- the `_ENV` and
-`_GIT_FLAGS` idioms from `no-unshipped-commit.py`, imported rather than
-re-derived.
+the attached form `-m"..."`, `--message=...`, `-F <file>` / `--file=<file>`
+read off disk, CLUSTERED short flags (`-am`, `-sm`, `-asm`, and `-ams` read
+as `-a -m s` exactly as git reads it), leading environment assignments
+(`FOO=1 git commit ...`), and global git flags (`-C dir`, `-c k=v`) between
+`git` and the subcommand.
+
+The cluster case is not a nicety: `git commit -am "..."` is among the
+commonest commit invocations there is, and a token-equality test against
+`-m` sees none of it -- so the first draft of this guard was silently blind
+on a large fraction of real traffic while every test passed.
+
+The `_ENV` and `_GIT_FLAGS` patterns are COPIED from
+`no-unshipped-commit.py`, byte-identical to the definitions there, not
+imported from it. The consequence is worth stating rather than leaving to be
+discovered: this is a DRY violation, so a fix to either copy does not reach
+the other, and a change to how a `git commit` invocation is recognised has
+to be made in both places. Copying rather than importing is the local
+convention for these two one-line patterns; the sibling hooks that import
+(`flag-unmeasured-timestamp.py`'s `_sibling()`) do so for whole functions.
 
 The command word is guarded with `(?![\\w-])`, not `\\b`, for the reason that
 file documents at length: a word boundary sits happily between `commit` and
@@ -120,13 +144,23 @@ COMMIT = re.compile(
     re.MULTILINE,
 )
 
-# The measured pattern. `\s+` (not a literal space) for the wrapped case;
-# `~` tolerated before the number because the corpus writes "~2000 lines
-# below"; case-insensitive for "140 lines LATER".
+# The measured pattern. BOTH gaps are `\s+` rather than a literal space,
+# because the corpus wraps in both places: `38a0738cc` breaks between the
+# number and the unit ("instruction 30\n  lines above") and `6f5b9dde3`
+# breaks between the unit and the positional word ("remedy 25 lines\n
+# above"). `~` is tolerated before the number for "~2000 lines below", and
+# the match is case-insensitive for "140 lines LATER".
+#
+# There is no `\d+-to-\d+ range` arm. It was written for `0709c1a28`'s
+# "The 60-to-80 range is human guidance", and that is the arm's ONLY match
+# in the whole history -- and it is a misfire, not a hit: the sentence
+# states what a style guide asks for, locates no passage, decays on no
+# insertion, and deleting the number would destroy it. Zero measured true
+# positives against one measured false positive is a losing trade for a
+# warn-only hook, whose whole capital is that a fire means something.
 RX_POSITIONAL = re.compile(
-    r"~?\b\d+\s+(?:lines?|characters?|chars?|words?)\s+"
-    r"(?:above|below|earlier|later)\b"
-    r"|\b\d+-to-\d+\s+range\b",
+    r"~?\b\d+ (?:lines?|characters?|chars?|words?)\s+"
+    r"(?:above|below|earlier|later)\b",
     re.IGNORECASE,
 )
 
@@ -137,9 +171,10 @@ NOTE = (
     "\"{figure}\" -- a positional figure about text. A commit message is "
     "permanent history: the count is true at the instant it is typed, false "
     "as soon as anything above it changes, and re-derived by nobody. "
-    "Measured on this repository's own history (2026-09-03): 14 of 2412 "
-    "commits carry this shape and every one is decoration rather than a "
-    "code-move description. THE REMEDY IS USUALLY TO DELETE THE NUMBER, NOT "
+    "Measured on this repository's own history (2026-09-03): 14 occurrences "
+    "across 13 of roughly 2400 commit messages carry this shape, and every "
+    "one is decoration rather than a code-move description. "
+    "THE REMEDY IS USUALLY TO DELETE THE NUMBER, NOT "
     "TO CORRECT IT -- name the target instead of counting to it (\"in the "
     "keep-dispatching-rounds bullet\", not \"30 lines above\"). A recounted "
     "figure is a fresher instance of the same defect. See "
@@ -190,6 +225,43 @@ def _read_file(path, cwd):
         return None
 
 
+RX_SHORT_CLUSTER = re.compile(r"-[A-Za-z]+$")
+
+
+def short_flag_value(tok):
+    """(letter, attached_value_or_None) for a short flag carrying a message.
+
+    Covers the plain `-m`, the attached `-m"..."`, and CLUSTERED short flags
+    -- `-am`, `-sm`, `-asm` -- which a token-equality test against `-m` misses
+    entirely. `git commit -am "..."` is one of the commonest commit
+    invocations there is, so that miss is a large silent blind spot rather
+    than an edge case.
+
+    The scan walks the cluster and stops at the first value-taking letter
+    (`m` or `F`), which is how git itself reads it: anything after that
+    letter in the same token is the attached value, so `-ams` is `-a -m s`
+    and `-ma` is `-m a` -- neither takes the NEXT token. A value-taking
+    letter in final position takes the next token instead.
+
+    Returns None for a token that is not a short-flag cluster (`--message`,
+    a path, a `--` terminator) or carries no value-taking letter (`-v`).
+    """
+    if not tok or tok.startswith("--"):
+        return None
+    # The ATTACHED form first, because after `shlex` splits it the token is
+    # `-mthe note 13 lines above` -- one token carrying spaces, which the
+    # cluster pattern below rightly refuses. Checking the cluster first
+    # silently lost `-m"..."` entirely.
+    if tok[:2] in ("-m", "-F") and len(tok) > 2:
+        return tok[1], tok[2:]
+    if not RX_SHORT_CLUSTER.match(tok):
+        return None
+    for i, ch in enumerate(tok[1:], start=1):
+        if ch in ("m", "F"):
+            return ch, (tok[i + 1:] or None)
+    return None
+
+
 def extract_message(segment, cwd):
     """The commit message text this segment would commit, or None.
 
@@ -202,11 +274,11 @@ def extract_message(segment, cwd):
     parts, i = [], 0
     while i < len(tokens):
         tok = tokens[i]
-        if tok in ("-m", "--message", "-F", "--file"):
+        if tok in ("--message", "--file"):
             if i + 1 >= len(tokens):
                 return None
             value = tokens[i + 1]
-            if tok in ("-m", "--message"):
+            if tok == "--message":
                 parts.append(value)
             else:
                 text = _read_file(value, cwd)
@@ -217,18 +289,33 @@ def extract_message(segment, cwd):
             continue
         if tok.startswith("--message="):
             parts.append(tok[len("--message="):])
-        elif tok.startswith("--file="):
+            i += 1
+            continue
+        if tok.startswith("--file="):
             text = _read_file(tok[len("--file="):], cwd)
             if text is None:
                 return None
             parts.append(text)
-        elif tok.startswith("-m") and len(tok) > 2 and not tok.startswith("--"):
-            parts.append(tok[2:])
-        elif tok.startswith("-F") and len(tok) > 2 and not tok.startswith("--"):
-            text = _read_file(tok[2:], cwd)
-            if text is None:
-                return None
-            parts.append(text)
+            i += 1
+            continue
+        short = short_flag_value(tok)
+        if short:
+            letter, attached = short
+            if attached is not None:
+                value, step = attached, 1
+            else:
+                if i + 1 >= len(tokens):
+                    return None
+                value, step = tokens[i + 1], 2
+            if letter == "m":
+                parts.append(value)
+            else:
+                text = _read_file(value, cwd)
+                if text is None:
+                    return None
+                parts.append(text)
+            i += step
+            continue
         i += 1
     return "\n\n".join(parts) if parts else None
 
@@ -279,10 +366,14 @@ def main() -> int:
         return 0
     if payload.get("tool_name") not in BASH_TOOL_NAMES:
         return 0
-    cwd = payload.get("cwd") or os.getcwd()
     tpath = payload.get("transcript_path") or ""
 
     try:
+        # Inside the try: `os.getcwd()` raises FileNotFoundError when the
+        # process's working directory has been deleted -- a traceback and a
+        # non-zero exit, which is exactly what "FAILS SILENT, ALWAYS" above
+        # promises never to do.
+        cwd = payload.get("cwd") or os.getcwd()
         command = (tool_input.get("command") or tool_input.get("CommandLine")
                    or tool_input.get("cmd") or tool_input.get("script"))
         if not isinstance(command, str) or not command.strip():

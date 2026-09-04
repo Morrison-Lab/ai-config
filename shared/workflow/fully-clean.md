@@ -726,9 +726,9 @@ and the verdict's own conclusion every round.**
   Re-fetch `get_review_comments` on every review wake and act on the whole
   set, never on the wake's own payload.
 
-- **The instrument that prints `FULLY CLEAN` reads none of these extra
-  surfaces, and its verdict is what gets mistaken for this section having
-  been performed.**
+- **The instrument that prints `FULLY CLEAN` reads the verdict body and its
+  conclusion, and none of the other surfaces --- and its verdict is what gets
+  mistaken for this section having been performed.**
   Every bullet above says no single check sees all the surfaces.
   What none of them says is *which* check, and that omission is where the
   section loses its force: a reader who runs
@@ -741,11 +741,17 @@ and the verdict's own conclusion every round.**
 
   Two of the surfaces above are outside it mechanically rather than by
   oversight.
-  `scripts/lib/payload_fetcher.py` covers, in its own words, "`gh pr view`,
-  `gh repo view`, and the two `gh api` reads" --- those being `/check-runs`
-  and `/actions/runs/`.
-  `pulls/<N>/comments` is not among them, so **inline comments are never
-  fetched at all** --- not fetched and left unresolved, never fetched.
+  Both halves of the mechanism have to be checked, because
+  `scripts/lib/payload_fetcher.py` governs only the `--from-json` path ---
+  reading it alone would miss a call added on the default one.
+  It covers, in its own words, "`gh pr view`, `gh repo view`, and the two
+  `gh api` reads".
+  The default path's call sites are the other half, and there are five:
+  `gh pr view --json` and the `/check-runs` read in
+  `scripts/lib/pull_request.py`, `gh repo view` for repo resolution, and two
+  `/actions/runs/` reads in the checker itself.
+  `pulls/<N>/comments` appears in neither half, so **inline comments are
+  never fetched at all** --- not fetched and left unresolved, never fetched.
   And no `<summary>`-scoped match on `suppressed` exists anywhere under
   `scripts/`, so the check prescribed by "A clean overview can hide a
   collapsed findings block" above is prescribed and not implemented.

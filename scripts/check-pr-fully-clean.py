@@ -20,9 +20,12 @@ See shared/workflow/fully-clean.md.
 
 NOT COVERED. A `FULLY CLEAN` line here is not the whole of that fragment's
 "Findings hide on several surfaces" check, and the difference is mechanical
-rather than a matter of thoroughness. scripts/lib/payload_fetcher.py maps
-`gh pr view`, `gh repo view`, and two `gh api` reads (`/check-runs` and
-`/actions/runs/`) -- so `pulls/<N>/comments` is never queried and inline
+rather than a matter of thoroughness. Both halves of the mechanism say so.
+scripts/lib/payload_fetcher.py, which governs the `--from-json` path, maps
+`gh pr view`, `gh repo view`, and two `gh api` reads; the default path's own
+call sites are `gh pr view --json` and the `/check-runs` read in
+scripts/lib/pull_request.py, `gh repo view` for repo resolution, and the two
+`/actions/runs/` reads below. `pulls/<N>/comments` is in neither, so inline
 review comments are invisible here, resolved or not (ai-config#3079). No
 `<summary>`-scoped match on `suppressed` exists in this file either, so a
 Copilot finding inside a collapsed `<details>` block is invisible too

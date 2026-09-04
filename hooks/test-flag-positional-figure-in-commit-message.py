@@ -3,17 +3,21 @@
 
 The positive cases are this repository's own history, verbatim in shape:
 `4e1dea144`'s "13 lines above", `593d25ccf`'s "39 lines below",
-`fcb4ee10d`'s "77 lines earlier", `f2f706fa1`'s "~130 lines later",
-`0709c1a28`'s "60-to-80 range", plus the two properties the corpus forces --
-`38a0738cc`'s newline between the number and the unit, and `1385f7b48`'s
-"140 lines LATER".
+`fcb4ee10d`'s "77 lines earlier", `f2f706fa1`'s "~130 lines later", plus the
+properties the corpus forces -- `38a0738cc`'s newline between the number and
+the unit, `6f5b9dde3`'s newline between the unit and the positional word, and
+`1385f7b48`'s "140 lines LATER". Measured 2026-09-03 on `origin/main`: 14
+occurrences across 13 of roughly 2400 commit messages.
 
 The negative cases decide whether the guard survives. A diffstat ("3 files
 changed"), a bare dimensional count ("143 characters" -- 53 commits in this
 history, overwhelmingly legitimate measured facts), a version number, an
 issue reference, a SHA, a date and a time are all things a commit message is
-supposed to say. So are `git commit-tree` and `git commit-graph write`,
-which write no message at all.
+supposed to say. So is `0709c1a28`'s "The 60-to-80 range is human guidance",
+which an earlier `\\d+-to-\\d+ range` arm fired on -- its only match in the
+whole history, and a misfire; the arm is gone and two cases here pin that.
+So are `git commit-tree` and `git commit-graph write`, which write no
+message at all.
 
 Run: python3 hooks/test-flag-positional-figure-in-commit-message.py \\
          hooks/flag-positional-figure-in-commit-message.py
@@ -53,8 +57,6 @@ CASES = [
      True, "fcb4ee10d's shape: 'N lines earlier' warns"),
     (commit("docs: depends on a section defined ~130 lines later"),
      True, "f2f706fa1's shape: '~N lines later' warns"),
-    (commit("docs: the 60-to-80 range is human guidance, not the CI check"),
-     True, "0709c1a28's shape: 'N-to-N range' warns"),
     (commit("docs: an entry on the same tool already sat ~2000 lines below"),
      True, "60edf4c1e's shape: a tilde-prefixed thousands figure warns"),
     (commit("docs: the quoted span runs 143 characters below the anchor"),
@@ -67,10 +69,22 @@ CASES = [
     # --- the two properties the corpus forces -------------------------------
     (commit("fix(prose): restated an identical instruction 30\n  lines above"),
      True, "38a0738cc: a newline between the number and the unit still warns"),
+    (commit("docs: an exception to this file's own remedy 25 lines\n   above"),
+     True, "6f5b9dde3: a newline between the unit and the positional word warns"),
     (commit("docs: the heuristic pointed at content ~140 lines LATER"),
      True, "1385f7b48: the figure is the target shape whatever its case"),
 
     # --- SCOPE DISCIPLINE: things a commit message is supposed to say -------
+    # `0709c1a28`'s "The 60-to-80 range is human guidance" was the ONLY match
+    # a `\\d+-to-\\d+ range` arm had in the whole history, and it is a misfire:
+    # the sentence states what a style guide asks for, locates no passage,
+    # decays on no insertion, and deleting its numbers would destroy it. The
+    # arm is gone; this pins that it stays gone.
+    (commit("docs: state what the CI check enforces; the 60-to-80 range is "
+            "human guidance"),
+     False, "0709c1a28: a style-guide range locates no passage and must not fire"),
+    (commit("style: rewrap the paragraph into the 60-to-80 range"),
+     False, "no 'N-to-N range' arm exists: zero true positives, one false one"),
     (commit("chore: regenerate fixtures -- 3 files changed, 2 insertions"),
      False, "a diffstat is derived by git itself, not asserted"),
     (commit("chore: trim skill descriptions to 9000 characters"),
@@ -111,6 +125,29 @@ CASES = [
      True, "a single-quoted message is read"),
     (bash('git commit -m "fix: tidy" -m "detail: the note 13 lines above"'),
      True, "a repeated -m is concatenated, as git does"),
+    (bash('git commit -m"the note 13 lines above"'),
+     True, "the attached -m\"...\" form is read"),
+
+    # --- CLUSTERED short flags ----------------------------------------------
+    # `-am` is among the commonest commit invocations there is, and a
+    # token-equality test against `-m` sees none of it -- a large silent
+    # blind spot rather than an edge case.
+    (bash('git commit -am "the note 13 lines above"'),
+     True, "-am: a clustered short flag with m LAST takes the next token"),
+    (bash('git commit -sm "the note 13 lines above"'),
+     True, "-sm: the same, with a different leading flag"),
+    (bash('git commit -asm "the note 13 lines above"'),
+     True, "-asm: a three-letter cluster with m last"),
+    (bash('git commit -am "chore: routine tidy of the fixtures"'),
+     False, "-am with a clean message stays silent"),
+    (bash('git commit -ma "the note 13 lines above"'),
+     False, "-ma is `-m a`, so the message is 'a' and the quoted text is a pathspec"),
+    (bash('git commit -ams "the note 13 lines above"'),
+     False, "-ams is `-a -m s`: m is not last, so the next token is not the message"),
+    (bash('git commit -av'),
+     False, "a cluster with no value-taking letter stays silent"),
+    (bash('git commit -am'),
+     False, "a dangling cluster with no value fails silent"),
     (bash('git commit --message="the note 13 lines above"'),
      True, "--message=... is read"),
     (bash('git status && git commit -m "the note 13 lines above"'),
@@ -216,6 +253,55 @@ def check_body_file():
     return 0 if ok else 1
 
 
+def check_cluster_body_file():
+    """A clustered `-aF <file>` reads the file, like a bare -F."""
+    fd, path = tempfile.mkstemp(suffix=".txt")
+    with os.fdopen(fd, "w") as fh:
+        fh.write("docs: rewrite\n\nThe note sits 77 lines earlier in the file.\n")
+    try:
+        ok = fired(run(bash(f"git commit -aF {path}")))
+    finally:
+        os.unlink(path)
+    print(f"{'ok  ' if ok else 'FAIL'}  a clustered -aF reads the file too")
+    return 0 if ok else 1
+
+
+def check_deleted_cwd():
+    """A deleted working directory must not produce a traceback or exit 1.
+
+    `os.getcwd()` raises FileNotFoundError there, so the fallback for a
+    payload with no `cwd` has to sit inside the guarded block -- otherwise
+    the "fails silent, always" contract is broken by the one condition the
+    hook cannot see coming.
+    """
+    tpath = write_transcript([PROMPT])
+    gone = tempfile.mkdtemp()
+    tmpdir = tempfile.mkdtemp()
+    try:
+        payload = commit("docs: the section 13 lines above says otherwise")
+        # No `cwd` key at all, so the hook must fall back to os.getcwd().
+        env = dict(os.environ, TMPDIR=tmpdir)
+        env.pop("ANTIGRAVITY_AGENT", None)
+        proc = subprocess.Popen(
+            [sys.executable, os.path.abspath(HOOK)],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, text=True, env=env, cwd=gone,
+            preexec_fn=(lambda: os.rmdir(gone)) if hasattr(os, "fork") else None)
+        out, err = proc.communicate(json.dumps(dict(payload, transcript_path=tpath)))
+        ok = proc.returncode == 0 and "Traceback" not in err
+    except OSError:
+        # Some platforms refuse to spawn into a directory at all; the
+        # condition this pins cannot arise there.
+        ok = True
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+        shutil.rmtree(gone, ignore_errors=True)
+        os.unlink(tpath)
+    print(f"{'ok  ' if ok else 'FAIL'}  a deleted working directory exits 0 "
+          f"with no traceback")
+    return 0 if ok else 1
+
+
 def check_body_file_clean():
     """A `-F` file with no positional figure stays silent."""
     fd, path = tempfile.mkstemp(suffix=".txt")
@@ -307,6 +393,8 @@ def main():
     failures += check_output_shape()
     failures += check_newline_figure_is_normalized()
     failures += check_body_file()
+    failures += check_cluster_body_file()
+    failures += check_deleted_cwd()
     failures += check_body_file_clean()
     failures += check_missing_body_file()
     failures += check_dry_run()

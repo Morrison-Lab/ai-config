@@ -287,6 +287,9 @@ The review caught it, and it is the same class of unmeasured claim.)
 
 - **Do:** run the clock command again immediately before typing a time into a forge comment, exactly as before a chat recap or a file edit.
 - **Don't:** infer a clock time from the number of tool calls or actions taken since the last real reading.
+- **Do:** derive a time written into a file from a `date` read in the *same* command that writes it, so a heredoc heading cannot be typed from memory.
+
+See [`CLAUDE.cases.md`](CLAUDE.cases.md), "A notebook heading typed from the last reading, with the rule loaded".
 
 Two hooks are this rule's mechanism, one per surface.
 `hooks/no-unmeasured-clock-claim.py` reads the reply at `Stop`.

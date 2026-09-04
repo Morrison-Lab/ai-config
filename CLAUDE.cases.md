@@ -140,6 +140,49 @@ The first `git branch -D` failed with the worktree message, and `git worktree li
 
 (`rme`#988/`epi204`#362: both cited `shared/writing/math-derivation-steps.md` in present tense while `ai-config`#502 was still open and each repo's `.ai-config` pin predated it --- flagged as a dangling reference by review in both, fixed by bumping the pin once #502 merged and hedging the still-open `gha`#228 half of the same citation.)
 
+## Timestamp recaps in local time --- A notebook heading typed from the last reading, with the rule loaded
+
+2nd measured occurrence, 2026-09-04, after the 2026-09-01 case the rule itself
+records.
+One real reading at 16:17 PDT was followed by two session-notebook headings
+written through a Bash heredoc as "16:20 PDT" and "16:23 PDT"; the next real
+read came back 16:19 PDT, so both stamps ran ahead of the clock they were
+extrapolated from.
+
+The remedy used since reads the clock inside the same command that writes the
+heading, so the time cannot be typed from memory at all:
+
+```bash
+now=$(TZ=America/Los_Angeles date "+%H:%M %Z")
+cat >> "$notebook" <<EOF
+
+## $now --- what happened
+EOF
+```
+
+Coverage, as the queries that settle it rather than as a recollection.
+`hooks/flag-unmeasured-timestamp.py` is registered in `hooks/hooks.json` under
+the `Write`, `Edit`, and `NotebookEdit` matchers for this surface
+(ai-config#2947) and under `Bash` and `mcp__github__.*` for the forge-comment
+surface (ai-config#2903), read off
+`json.load(open('hooks/hooks.json'))['hooks']['PreToolUse']`.
+Its `Bash` path does read a heredoc write, contrary to the natural assumption
+that only the `Write`/`Edit` tools are covered: `RX_BASH_REDIRECT_NOTEBOOK`
+matches a `>`, `>>`, or `tee` redirect whose target is a `session-*.md` or a
+`memories/` file, and `RX_IN_COMMAND_DATE` treats an in-command `date`
+substitution as measured by construction --- which is exactly the remedy above.
+So the matcher was not the gap.
+In this remote session `~/.claude/settings.json` carries no `hooks` key and no
+`enabledPlugins`, so no ai-config hook was active at all when the two headings
+were written (ai-config#2004, ai-config#1683).
+
+- **Do:** derive a written heading time from a `date` read in the same command
+  that writes it.
+- **Don't:** type a heading time into a heredoc from the last reading, however
+  recent that reading feels.
+- **Don't:** read a hook's existence as coverage --- a matcher can be right
+  while nothing in the session has the hook enabled.
+
 ## Surface merge-order constraints --- Draft-gating is the last resort, not the default
 
 (`UCD-SERG/ucd-serg.github.io`

@@ -287,6 +287,80 @@ Ask it of the character rather than of the input, since the input you would have
 (Measured on [ai-config#1968](https://github.com/Morrison-Lab/ai-config/pull/1968), merged 2026-08-22.
 `(?<![\w/-])` entered `hooks/no-empty-promise.py` in [#1724](https://github.com/Morrison-Lab/ai-config/pull/1724) and stood unchanged on `main` until #1968 replaced it, so for that whole interval a dispatch prompt saying `/ums` did not discharge a promise.)
 
+### A lookaround excludes what sits on its own side of the anchor, not what the excluded form "contains"
+
+The section above asks what *else* an excluded character means.
+This asks something cheaper and prior: whether the character is reachable from
+where the clause sits at all.
+A lookbehind reads left of the match and a lookahead reads right of it, so a
+form whose distinguishing character follows the operator cannot be excluded by
+a lookbehind.
+The clause does not fail visibly either --- it silently excludes some other
+operator that carries the same character on the left.
+
+The worked example is a stdout-redirect matcher:
+
+```python
+RX_STDOUT_REDIRECT = r"(?<![2-9&<>])>>?\s*([^\s;&|]+)(?![&>])"
+```
+
+`&` went into the lookbehind to exclude `>&2`.
+The `&` of `>&2` sits *after* the `>`, where only the lookahead can see it, and
+the lookahead already refused it.
+What the lookbehind actually excluded was `&>` and `&>>`, the combined
+stdout-and-stderr redirect, which is a redirect to a file and needed the
+opposite verdict.
+
+Both directions stay invisible at once.
+The intended exclusion still holds, because a different clause is doing it, and
+the accidental exclusion removes a form nobody wrote a case for.
+
+- **Do:** for each character in a lookaround, name the operator it is meant to
+  exclude and check which side of the anchor that character sits on.
+- **Do:** test the operator you meant to exclude *and* every operator that
+  shares the character.
+- **Don't:** add a character to a lookbehind because the form to exclude
+  "contains" it --- containment says nothing about position.
+
+(Measured 2026-09-04 on
+[ai-config#3251](https://github.com/Morrison-Lab/ai-config/pull/3251):
+a `date ... &>>notebook.md` write read as a print rather than a file write and
+so discharged the guard it should have tripped.)
+
+### A reviewer's proposed widening of a class can overshoot the bug it fixes
+
+The sections above govern the exclusion clause you wrote.
+This governs the widening someone else proposes for it, which arrives with a
+reason attached and so escapes the same enumeration.
+The reason is almost always a claim about an *earlier stage* --- the splitter
+already removed the operators, the stripper already removed the quotes, so the
+class need not defend against them.
+That claim is about a pattern you did not write and are not looking at, and it
+is one command to open.
+
+The reported bug was real: `RX_PRINTED_VAR`'s `[^;&|\n]*` refused a `|` sitting
+inside a quoted `echo` argument.
+The proposed fix was `[^\n]*`, reasoning that the segment splitter had already
+removed every real operator.
+Reading the splitter refutes it.
+It splits on `;`, `&&`, and `||` only, so a single `|` --- as in
+`echo done | grep -c $t` --- is still a live pipe inside the segment, and the
+widened class would have swallowed it and discharged the guard.
+
+The fix that held blanked operator characters inside quoted spans and kept the
+class, so the quoted form passes without readmitting the operator.
+
+- **Do:** read the earlier stage's own pattern before accepting that it removed
+  what a proposed widening assumes it removed.
+- **Do:** test the operator the class was protecting against alongside the
+  quoted form the widening is for; a widening is right only if both pass.
+- **Don't:** accept "the splitter already handled it" as a premise --- it names
+  a regex, and reading it settles the question.
+
+(Measured 2026-09-04 on
+[ai-config#3251](https://github.com/Morrison-Lab/ai-config/pull/3251),
+review round 3.)
+
 ### An attribution claim in a guide-for-future-edits comment is settled by mutation, not by re-reading it
 
 "Test the instrument against the incident that prompted it, verbatim"'s closing **Don't** governs a comment claiming *what* a matcher matches.

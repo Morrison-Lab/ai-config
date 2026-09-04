@@ -8,7 +8,7 @@ Times are PDT on 2026-09-04 unless a heading says otherwise.
 
 The user reported the reset and asked to continue.
 The four r2 loops from the earlier limit turned out to have kept running under their own task ids after the pause's stop calls (which hit the r3 runs), and their completion notices arrived at 21:50 PDT:
-0 of 6, 0 of 10, 1 of 12 (#3003 at `facfff6a`), and 0 of 10 verified, every other item cut by the 7:10Z limit.
+0 of 6, 0 of 10, 1 of 12 (#3003 at `facfff6a`), and 0 of 10 verified, every other item cut by the session limit that reset at 00:10 PDT (each failure reads "You've hit your session limit" and names the reset as "7:10am (UTC)").
 A later loop then committed on #3003 (`87b177f4`), so that verdict does not cover HEAD and #3003 rides in the wave-4 loop instead of being skipped.
 The `wip:` commit on wt-2422 is dropped back into the tree;
 wt-3038's `wip:` commit (`b9a75b79`) is under a later fix commit and stays for its loop to squash or reword.
@@ -41,7 +41,7 @@ no boundary with the inherited-claims bullet;
 and two earlier prompt-injection blocks on the same PR omitted, one cleared by a single re-run.
 `69523bd0` answers all eleven and `fc74e12a` replaces a head SHA I had guessed for the earlier block with the measured time.
 Round 2 dispatched.
-`memories/github-actions.md` is at 1242 of 1250 lines.
+`memories/github-actions.md` is at 1243 of 1250 lines.
 
 Lesson for the memory pass: a case record's attribution claims (which run, which artifact, who caught it) are the ones written from memory of the session rather than from the forge, and they were wrong at a higher rate than the measurements;
 write them by re-reading the comment or commit named, not by recalling it.
@@ -49,7 +49,7 @@ write them by re-reading the comment or commit named, not by recalling it.
 ## 00:54 PDT --- memory-pass branch round 8: the cut held; four residual sentences
 
 Round 8 at `e91dda59` re-derived every numbered claim in a fresh depth-1 clone (plain and ranged counts 1, then 226 after deepening the PR ref, `--is-ancestor` exit 0 for all three) and found four residues:
-the ranged-count sentence named the exclusion side as the cause when deepening `main` alone leaves the range at 1 (the walk forward from the grafted tip binds);
+the ranged-count sentence named the exclusion side as the cause when deepening `main` alone leaves the range at 1 (the walk back from the grafted tip binds);
 the local-path refusal lacked its v2 contrast (measured here: v0 refuses, v2 fetches);
 the opening's "says only whether its argument is a ref name" was unscoped against the full-SHA refusal;
 and "was not a ref name" contradicted "resolved as a ref name".
@@ -62,13 +62,13 @@ Round 2 at `fc74e12a` confirmed ten of eleven closures and found eleven more.
 The load-bearing ones: the "single re-run cleared" claim was false (the approve four minutes later reviewed a new head, `c6ea044c`);
 the disposal rule re-derived `fully-clean.cases.md`'s #818 record (Jules blocking for injection, repeating verbatim, claude-review clean, "the maintainer's call was to hold;
 the PR merged with `jules/review` red") without citing it, and installed a session-side disposition where the precedent had the maintainer decide;
-and it never named that `check-pr-fully-clean.py` and the #2274 veto still read the head as not-clean, so the #3154 merge at 20:53 PDT exceeded the grant by its letter.
+and the disposal rule never named that `check-pr-fully-clean.py` and the #2274 veto still read the head as not-clean, so the #3154 merge at 20:53 PDT exceeded the grant by its letter.
 Filed as [#3192](https://github.com/Morrison-Lab/ai-config/issues/3192), which puts the disposition to the maintainer;
 the entry now cites #818 and #3192 instead of settling it.
 Smaller: a `/pulls/N/status` path that does not exist (it is `commits/<sha>/status`), #817 added the `extra_instructions` input and #2293 the env-var spelling, two inexact quotations, "two ASCII dashes before" reading as a commit distance, a pronoun on the wrong clause, a "third occurrence" over two cases, "per the section above" citing a section that repaired by amend, and a scope sentence excluding two of the four cases.
 `684be2e9` answers all eleven;
 round 3 dispatched.
-`memories/github-actions.md` is at 1245 of 1250 lines.
+`memories/github-actions.md` is at 1246 of 1250 lines.
 
 Lesson for the memory pass, and the one this whole pass keeps teaching: the dupe check the #3154 fix widened was skipped for the entry recording #3154's own review, and the owned record (#818) was two directories away in `shared/workflow/`;
 the corpus-wide grep the new step 3 prescribes would have found "injection-detector block" in one command.
@@ -88,7 +88,7 @@ round 10 dispatched.
 Round 10 at `6a8f4a49` re-measured everything (including `--depth=3000` on the PR ref returning the full 2434 while the clone stayed shallow) and left one finding: "any bounded depth still truncates it" was a false universal.
 `0242210f` takes the reviewer's own shorter wording ("no depth picked in advance is known to reach the root") and no eleventh local round was run;
 the PR body says so, and Copilot, Jules, and claude-review review the head on the forge.
-Ten local rounds on a 47-line memory entry: rounds 1 and 2 on wording and causes, 3 to 7 on protocol mechanics the point never needed, 8 to 10 on the remedy's own claims.
+Ten local rounds on a 65-line memory entry (its added lines at `0242210f`): rounds 1 and 2 on wording and causes, 3 to 7 on protocol mechanics the point never needed, 8 to 10 on the remedy's own claims.
 
 ## 01:16 PDT --- #3193 opened for the fetch-by-SHA entry; wave-4 loop launched
 
@@ -113,7 +113,7 @@ the dupe check has to run on the *rule* being recorded, not only on the incident
 claude-review at `0242210f` reproduced every claim and returned Ready for merge with one non-blocking nit: `--is-ancestor` on the incident's shape dies with `fatal: Not a valid commit name <sha>` (exit 128) rather than returning a boolean.
 Measured here: exit 128 with the ancestor's object absent, a quiet exit 1 once it is fetched;
 `e63fd956` quotes both.
-Copilot's round was a quota skip ("the user who requested the review has reached their quota limit"), re-requested on the new head with `@jules review`.
+Copilot's round was a quota skip ("the user who requested the review has reached their quota limit"), so Copilot was re-requested on the new head and `@jules review` was posted in the same comment.
 Jules approved `0242210f`.
 The merge follows claude-review and Jules on `e63fd956` plus green checks;
 a second Copilot quota skip is recorded as a skip, not as clean, and does not block on its own since Copilot has posted no finding on this PR.
@@ -159,7 +159,7 @@ Round 6 dispatched.
 
 Round 6 at `0b522fd3` found the `new-line-breaks` gate red on the new `memories/jules-review.md` while my local run had printed clean:
 the file was untracked when the gate ran, and plain `git diff` never shows untracked content (the trap `memories/git-diffing.md` and gha's own README record);
-the 84-character semicolon line is split and the chain now stages before gating.
+the 82-character semicolon line is split and the chain now stages before gating.
 Also from the move: "the bcs bullet above" pointing at nothing in the new file, two pronouns, a stray comma in the index row, no inbound link from `github-actions.md` (its header now names the satellite, 1191 lines), "the guard is filed" reading as the existing hook, "only `[` errors" false for `\{`, `\(`, `\)`, and round numbers the #3193 body does not assign (now the five commits `1fff7e63` to `4af1f1ea` and the cut at `e91dda59`).
 `0c39d330` and a follow-up answer all eight;
 round 7 dispatched.
@@ -199,3 +199,19 @@ Merged this session: #3154, #3166, #3171, #3193, #3195.
 Merge-time memory pass: the two lessons this branch's rounds taught that the corpus does not yet carry as a rule are filed rather than written, since each wants its own PR and the loops hold the slots:
 the untracked-file blind spot of the diff-scoped gates recurred with the rule loaded (an instrument is owed), and the `ums` dupe check ran on the incident's vocabulary rather than on the rule being recorded (step 3 wants a second query on the rule).
 Filed as [#3196](https://github.com/Morrison-Lab/ai-config/issues/3196) (the diff-scoped gates' untracked-file blind spot wants an instrument) and [#3197](https://github.com/Morrison-Lab/ai-config/issues/3197) (`ums` step 3 dupe-checks the rule, not only the incident).
+
+## 02:49 PDT --- notebook branch at `95d6a96c`: adversarial round 1 returns eleven findings, all numbers written from recollection
+
+The reviewer (opus, read-only, 68 tool uses) confirmed every gate, every SHA, every heading time, and every forge claim, and found eleven defects of one class: figures typed from memory where the instrument was a command away.
+Two line counts of `memories/github-actions.md` off by one (1243 and 1246, not 1242 and 1245);
+the fetch-by-SHA entry called 47 lines when its added lines at `0242210f` number 65;
+the split semicolon line called 84 characters when it was 82 (the same figure is wrong in #3196's body);
+PR #3173's open time given as its `updated_at` (20:02 PDT) instead of its `created_at` (19:55 PDT);
+the `-zz` mechanism said grep "searched the current directory" when five path arguments remained, so it searched those;
+"the walk forward" in a gloss on a `rev-list` range that walks back;
+"the 7:10Z limit" as the file's only UTC stamp, against its own header rule;
+the index row listing #3184 among this file's filings (filed 20:55 PDT, in the 09-03 file) and "ten rounds" where this file carries rounds 7 to 10;
+and two ambiguous references (an "it" whose nearest antecedent was "the precedent", and a clause reading as Copilot re-requested by means of `@jules review`).
+Each figure re-measured here before the fix (`wc -l` at the named SHAs, `git diff --numstat`, `awk '{print length}'`, the PR's `created_at`, the loop notices' own failure text "You've hit your session limit", "resets 7:10am (UTC)").
+Fixed in one pass;
+the round is the notebook's own lesson applied to the notebook.

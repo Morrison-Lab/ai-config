@@ -924,7 +924,7 @@ Copilot and Jules re-requested.
 Jules's round at `74469ce5` (VERDICT: comment, one WARN) noted that the recipe passes the subject before any `--`, so a subject starting with a hyphen parses as an option.
 True, and the fix is `grep -rilI -- "<subject>" ...`, pushed as `75829fad`.
 The commit body says a `-zz` subject "exits 2 with invalid option";
-the measurement it cites printed exit 0, because `-z` is a valid flag, so grep consumed `-zz` as two flags, took the first path as the pattern, searched the current directory, and returned a wrong hit at exit 0.
+the measurement it cites printed exit 0, because `-z` is a valid flag, so grep consumed `-zz` as two flags, took the first path as the pattern, searched the remaining five paths, and returned a wrong hit at exit 0.
 `-Q` is the case that exits 2.
 The body was written from the expected result, not the printed one, and the chain pushed before the line was read;
 the correction is on the PR and goes in the squash body, since a commit cannot be amended after the push.
@@ -951,7 +951,7 @@ a verdict at `5ad81e12` is running with the squash body in its brief.
 ## 20:22 PDT --- check-in fired; #3154 at `4171ba24`; #3173 is a new peer PR
 
 The 20:20 PDT check-in fired.
-Open PRs: [#3154](https://github.com/Morrison-Lab/ai-config/pull/3154) (this session), [#3146](https://github.com/Morrison-Lab/ai-config/pull/3146) and draft [#3168](https://github.com/Morrison-Lab/ai-config/pull/3168) (other sessions), and [#3173](https://github.com/Morrison-Lab/ai-config/pull/3173), a memory-pass PR another session opened at 20:02 PDT, not driven here.
+Open PRs: [#3154](https://github.com/Morrison-Lab/ai-config/pull/3154) (this session), [#3146](https://github.com/Morrison-Lab/ai-config/pull/3146) and draft [#3168](https://github.com/Morrison-Lab/ai-config/pull/3168) (other sessions), and [#3173](https://github.com/Morrison-Lab/ai-config/pull/3173), a memory-pass PR another session opened at 19:55 PDT, not driven here.
 Copilot's eighteenth round at `5ad81e12` named two lines: one split at its comma as `4171ba24` (no word change), the other already two one-clause lines, said so on the PR.
 Copilot and Jules re-requested;
 claude-review runs on the push;

@@ -1285,6 +1285,21 @@ COMMENT_QUOTING_CLOSED = (
 BODY_QUOTING_CLOSED = (
     "title:\tSome PR\nstate:\tOPEN\nnumber:\t1038\n--\n"
     'The fixture reads {"number":7,"closed_at":"2026-01-01T00:00:00Z"}\n')
+# The PR DESCRIPTION alone, as `gh api .../pulls/<N> --jq .body` projects it:
+# raw prose, with the quoted API response's quotes NOT escaped inside any
+# enclosing JSON string. That single escaping level is the whole difference
+# between a projection and the un-projected read (ai-config#3086 review).
+BODY_QUOTING_CLOSED_PROJECTED = (
+    'The fixture reads {"number":7,"closed_at":"2026-01-01T00:00:00Z"}\n')
+# The same description inside the FULL pull object of an OPEN PR, which is what
+# an un-projected `gh api .../pulls/<N>` returns. gh escapes the description's
+# own quotes once inside its JSON, and the transcript escapes them again, so
+# the literal is double-escaped and RX_TERMINAL_STATE cannot reach it -- which
+# is why the un-projected read stays a probe while a projection does not.
+REST_OPEN_BODY_QUOTING = (
+    '{"number":1038,"state":"open","merged":false,"closed_at":null,'
+    '"merged_at":null,"body":"The fixture reads '
+    '{\\"number\\":7,\\"closed_at\\":\\"2026-01-01T00:00:00Z\\"}"}')
 
 case(create("c") + [bash("gh pr merge 1038 --squash", tid="m"), res("m", "{}"),
                     say("Merged.")], False,
@@ -1434,6 +1449,41 @@ case(create("c") + [bash("gh pr view 1038 --json state,comments "
 case(create("c") + [bash("gh pr view 1038 --json number", tid="v"),
                     res("v", REST_CLOSED), say("Read the number.")], True,
      "a selection naming no state field is not a status read")
+# The REST twin of the two cases above, on the arm that has no `--json` to
+# bound: `gh api .../pulls/<N>` fetches the whole pull object, so a `--jq` or
+# `--template` projection can print the PR's own DESCRIPTION as raw prose --
+# free text carrying whatever terminal literal it quotes, exactly the hole
+# `--comments` and the selection-less `gh pr view` are refused for. The
+# projection therefore costs the probe (ai-config#3086 review).
+case(create("c") + [bash("gh api repos/o/r/pulls/1038 --jq .body", tid="x"),
+                    res("x", BODY_QUOTING_CLOSED_PROJECTED),
+                    say("Read it.")], True,
+     "a `--jq` projection of the pull object is not a status read")
+case(create("c") + [bash("gh api repos/o/r/pulls/1038 -t '{{.body}}'",
+                         tid="x"),
+                    res("x", BODY_QUOTING_CLOSED_PROJECTED),
+                    say("Read it.")], True,
+     "a `--template` projection is not a status read either")
+# The two remaining spellings the flag parser accepts. Without them the
+# `=`-joined and attached-shorthand branches of `_api_projects` could each be
+# dropped with nothing red (ai-config#3086 review).
+case(create("c") + [bash("gh api repos/o/r/pulls/1038 --jq=.body", tid="x"),
+                    res("x", BODY_QUOTING_CLOSED_PROJECTED),
+                    say("Read it.")], True,
+     "an `=`-joined projection is not a status read")
+case(create("c") + [bash("gh api repos/o/r/pulls/1038 -q.body", tid="x"),
+                    res("x", BODY_QUOTING_CLOSED_PROJECTED),
+                    say("Read it.")], True,
+     "a shorthand projection with its value attached is not a status read")
+# The negative control for why the UN-projected read is still a probe: the same
+# description, inside the full pull object of an OPEN PR. It must not discharge
+# either -- and it does not, because the double escaping puts the literal out
+# of RX_TERMINAL_STATE's reach. Loosening that pattern's backslash allowance
+# would turn this case red and nothing else (ai-config#3086 review).
+case(create("c") + [bash("gh api repos/o/r/pulls/1038", tid="x"),
+                    res("x", REST_OPEN_BODY_QUOTING), say("Read it.")], True,
+     "an un-projected read of an OPEN pull does not discharge on the "
+     "description it embeds")
 # A call carrying NO method at all. The tool's schema marks `method` required,
 # so this is malformed rather than legitimate -- and the guard treats it as
 # not-a-probe, the direction that stays armed. Pinned because relaxing the

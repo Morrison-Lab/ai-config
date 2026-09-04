@@ -860,8 +860,10 @@ def _probe_selection(rest):
     than for the wrong thing (ai-config#3086 review). Requiring the selection
     also matches what the block message prescribes: `--json state,closed`.
 
-    `--jq`/`--template` need no separate handling: both project from whatever
-    `--json` selected, so the allowlist already bounds what they can emit.
+    `--jq`/`--template` need no separate handling HERE: both project from
+    whatever `--json` selected, so the allowlist already bounds what they can
+    emit. The `gh api` arm of _argv_probe has no `--json` to bound, so it
+    refuses a projection outright instead (see _api_projects).
     """
     fields = None
     for i, a in enumerate(rest):
@@ -875,6 +877,42 @@ def _probe_selection(rest):
         return False
     sel = {f.strip().lower() for f in fields.split(",") if f.strip()}
     return sel <= _PROBE_SAFE_FIELDS and bool(sel & _PROBE_STATE_FIELDS)
+
+
+# Flags that project a SUBSET of a `gh api` response body. `gh api` has no
+# field selection of its own -- it always fetches the whole pull object -- so
+# there is no allowlist to bound what a projection emits, unlike the `gh pr
+# view` arm `_probe_selection` gates. `--jq .body` on an OPEN pull prints the
+# DESCRIPTION as raw prose, and a description quoting an API response -- which
+# PRs in this corpus do constantly -- then carries a terminal-state literal
+# RX_TERMINAL_STATE matches, discharging the obligation with no reviewer
+# requested and no close (ai-config#3086 review). The un-projected body cannot
+# do that: there the description's own quotes are escaped inside gh's JSON, so
+# the literal is double-escaped and the pattern does not reach it.
+#
+# So a projection costs the probe. That is the same armed direction
+# _api_path_tokens and _probe_selection already prefer: a status read spelled
+# this way is simply not recognised, and the guard keeps warning.
+_API_PROJECTION_FLAGS = ("-q", "--jq", "-t", "--template")
+
+
+def _api_projects(argv):
+    """True when a `gh api`/`curl`/`wget` argv projects part of the body.
+
+    Covers the three spellings the parser accepts: the bare flag, the
+    `=`-joined long form, and a shorthand with its value attached (`-q.body`).
+    Scanned over the WHOLE argv for the same reason RX_DIFF_MEDIA is -- a
+    projection flag's value is one _api_path_tokens skips, and refusing a probe
+    only costs a warning.
+    """
+    for t in argv[1:]:
+        if t in _API_PROJECTION_FLAGS:
+            return True
+        if t.startswith(("--jq=", "--template=")):
+            return True
+        if len(t) > 2 and not t.startswith("--") and t[:2] in ("-q", "-t"):
+            return True
+    return False
 
 
 def _argv_probe(argv):
@@ -904,7 +942,9 @@ def _argv_probe(argv):
     disqualifies the probe (RX_DIFF_MEDIA). Without it a PR whose diff touches
     an API fixture or a JSON snapshot discharged itself merely by having that
     diff read -- the shell twin of the MCP `get_diff` hole, reached through the
-    REST spelling rather than through `gh pr diff` (ai-config#3086 review).
+    REST spelling rather than through `gh pr diff` (ai-config#3086 review). A
+    `--jq`/`--template` PROJECTION narrows the representation the same way and
+    disqualifies the probe for the same reason (_api_projects).
     The path must name the pull ITSELF, with no sub-resource, so
     `pulls/<N>/requested_reviewers` is not a probe. And it must be the request
     PATH: scanning every token instead let a `-f body=...` payload quoting a
@@ -927,6 +967,11 @@ def _argv_probe(argv):
         # _api_path_tokens deliberately skips, and refusing a probe is the
         # armed direction anyway, so a stray media type costs a warning.
         if any(RX_DIFF_MEDIA.search(t) for t in argv):
+            return False, None, None
+        # The representation can also be narrowed by PROJECTION rather than by
+        # header, and the pull's own free text is one of the things it can
+        # project (see _api_projects).
+        if _api_projects(argv):
             return False, None, None
         for t in _api_path_tokens(argv):
             m = RX_CMD_PULL.match(t)

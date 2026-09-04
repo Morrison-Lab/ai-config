@@ -970,3 +970,18 @@ A clean automated review from every available provider evaluating the current HE
   In tests guarding fallback implementations, assert `expect_equal(formals(fallback), formals(upstream))`
   and test output equivalence on representative fixtures.
   In document linters, check that a document intentionally rooted at level 3 has no orphaned level-2 headings.
+
+## Pattern 48: Silent Library Import Fallback in Standalone Hooks
+- **Do**: When providing an inline fallback in a hook script that attempts to import from a shared repository library (e.g. `scripts/lib/`), bind the exception and log an explicit diagnostic to `stderr` (`print(f"... cannot load ... ({_exc}); using fallback ...", file=sys.stderr)`).
+  In test suites, assert that inline fallback definitions stay synchronized with the shared library module, and test that the fallback error path logs as expected.
+- **Don't**: Use bare `except Exception: pass` around shared library imports in hooks.
+  A silent pass swallows broken paths, rename drifts, or syntax errors, causing the hook to run indefinitely on stale duplicate inline definitions with zero observability.
+- **Example**: 2026-09-04 on [PR #3201](https://github.com/Morrison-Lab/ai-config/pull/3201) ([Issue #3172](https://github.com/Morrison-Lab/ai-config/issues/3172)):
+  `hooks/no-unshipped-commit.py` wrapped `from git_cmd import ...` in `try: ... except Exception: pass`.
+  Automated review flagged that the silent fallback provided zero observability and lacked tests asserting that the inline fallback copies of `_ENV` and `_GIT_FLAGS` stayed synchronized with `scripts/lib/git_cmd.py`.
+- **Canonical Rule**: [`fail-fast.md`](../shared/principles/fail-fast.md) ("Never swallow an error into a silent fallback;
+  make any genuinely wanted fallback explicit, bounded, and observable").
+- **Fix**: Log a warning to `stderr` describing the import failure and fallback activation, and write regression tests in the hook's test suite asserting constant equality and fallback invocation.
+- **Algorithmatizable?**
+  Yes.
+  Linters or hook test suites can parse inline fallback definitions against shared library exports and test import failure execution.

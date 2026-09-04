@@ -69,3 +69,29 @@ disposition to the maintainer.
 - **Don't:** re-request Jules when the block's items recur, however the
   block's wording moves, or re-scope the diff to satisfy an item about the
   reviewer's own configuration.
+
+**A second instance, measured 2026-09-04 on
+[#3202](https://github.com/Morrison-Lab/ai-config/pull/3202), with
+`jules-review.yml` unchanged throughout.**
+The first run on head `6af715ec` approved (`jules/review` success at
+12:39:51Z, its comment noting that the diff it read was truncated);
+the first run on the next head `c58e7172`, nine added lines later in one
+notebook file, blocked at 12:43:14Z on the config item plus a notebook
+sentence recording a prior conclusion;
+the one re-run on that head reproduced the block at 12:46:15Z.
+The merged head `8a7d2314` carried no `jules/review` status at all.
+The maintainer's per-PR call to merge with the earlier head's block
+rebutted and still red is recorded on
+[#3192](https://github.com/Morrison-Lab/ai-config/issues/3192), which holds
+the general disposition open.
+One run on the approving head cannot separate a detector that fires per run
+from one that fires per diff, and that run's truncated diff is a third
+candidate the data do not exclude (the blocking re-run's comment reports a
+truncated diff too, which weighs against it without settling it).
+
+- **Do:** read an approve on one head and a block on the next as unresolved
+  evidence about the detector, and follow the Do above: rebut once, file,
+  hold.
+- **Don't:** report "a re-run can clear it" from an approve that was not a
+  re-run of the blocked head (this session's first #3183 comment did, and
+  was corrected there).

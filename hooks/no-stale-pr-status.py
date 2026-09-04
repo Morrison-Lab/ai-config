@@ -339,7 +339,7 @@ RX_METALINGUISTIC_HEAD = re.compile(
     r"|assertion|assessment|sentence|wording)\s+"
     r"(?:that|which)\s+"
     r"(?:(?:was|were|is|are|has|had|have|been)\s+"
-    r"|[a-z]+ly\s+"
+    r"|(?-i:[a-z]+ly)\s+"
     r"|(?:now|then|later|already|always|still|never|ever|just|once|again)\s+)*\Z",
     re.I,
 )

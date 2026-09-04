@@ -349,8 +349,12 @@ CASES = [
     ([QUERY, PUSH, say("All checks green is a claim that has now been retracted.")], False,
      "and between two auxiliaries"),
     ([QUERY, PUSH, say("All checks green is a claim that reviewers overstated.")], True,
-     "the adverb slot admits no bare noun, so an object relative with an unmarked "
-     "subject still breaks attachment"),
+     "an unmarked plural subject fills no slot in the head phrase, so that "
+     "object relative still breaks attachment -- a lowercase -ly-ending "
+     "subject is the residual"),
+    ([QUERY, PUSH, say("All checks green is a claim that Kelly overstated.")], True,
+     "the -ly branch is case-sensitive, so a capitalized subject fills no "
+     "adverb slot either"),
     # Only the head phrase is dropped, never the rest of the connector. Widen
     # the carve-out to swallow the whole connector and this stops blocking.
     ([QUERY, PUSH, say("All checks green is a claim that survives, though my "

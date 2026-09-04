@@ -230,11 +230,13 @@ the three above plus `memories/markdownlint.md`, the file the entry was added to
 where the entry is a cross-link to the owner rather than a restatement ---
 so the count rose by one either way, and a hit count cannot tell an owner from a pointer.
 Every commit on #3060's branch is still reachable on `origin` from `refs/pull/3060/head`
-(`git ls-remote origin refs/pull/3060/head` returns `f9068299`),
+(`git ls-remote origin refs/pull/3060/head` returns `f9068299`,
+and after `git fetch --depth=200 origin refs/pull/3060/head`, `git rev-list --count 3935bfff..FETCH_HEAD` returns 33),
 which the default refspec does not bring down
 (`git config --get-all remote.origin.fetch` is `+refs/heads/*:refs/remotes/origin/*`)
-and a shallow clone cannot walk;
-this record anchors on `main` commits, which a full fetch of `main` brings down.
+and a shallow clone walks only to its fetch depth;
+this record anchors on `main` commits, which a full fetch of `main` brings down
+(`git merge-base --is-ancestor 3935bfff origin/main` and the same for `2156b439` both exit 0).
 Note also why the wrong-corpus section's `Do` could not have caught it.
 It reads "grep the ai-config corpus as well as the destination repo's docs,
 whenever step 2 routes an item anywhere other than ai-config",
@@ -242,7 +244,8 @@ and this item was routed to ai-config, so its trigger did not fire.)
 
 ## Searching only the rendered output is the same error one layer down
 
-The wrong-corpus section above governs searching the wrong **repo**, and its subsection the wrong **directory** within one.
+The wrong-corpus section above governs searching the wrong **repo**,
+and its subsection the wrong **directory** within one.
 This one governs searching the wrong **layer within the right repo**:
 a sweep whose file filter reaches the generated artifact and not the generator that produces it.
 
@@ -300,7 +303,8 @@ and the next regeneration would have restored the exact shape the same PR's own 
 
 ## An unmerged PR is part of the corpus a citation can be corroborated against, and no default-branch search reaches it
 
-The wrong-corpus section above governs searching the wrong **repo**, and its subsection the wrong **directory** within one.
+The wrong-corpus section above governs searching the wrong **repo**,
+and its subsection the wrong **directory** within one.
 This one governs searching the wrong **branch state within the right repo**: a citation to content that ships only in an open PR, checked by grepping the default branch.
 
 The null result here is not merely inconclusive --- it is guaranteed whether or not the cited content is genuine.

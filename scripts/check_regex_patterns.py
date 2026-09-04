@@ -507,6 +507,9 @@ def generate_probes(pattern_str: str) -> list[str]:
             ("<tag>" * 15) + "!",
             ("Reviewed-Commit: 12345678" + ("=" * 45) + "!"),
             ("Reviewed-Commit: 12345678" + (" a" * 25) + "!"),
+            ("git " + ("-Cabc " * 20) + "X"),
+            ("git " + ("--foo=bar " * 20) + "X"),
+            ("git " + ("-c=a " * 20) + "X"),
         ]
     )
     return probes

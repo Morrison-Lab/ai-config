@@ -618,17 +618,20 @@ It had no `argparse` or usage guard,
 so `--help` was not special-cased and ran the full fetch-and-write path at whatever SHA `validate.yml` pinned.
 Measured 2026-09-02: `python3 scripts/sync-nlb-checker.py --help` fetched the vendored checker at the pinned SHA and rewrote `scripts/vendor/gha-check-new-line-breaks.py` plus its `.pin`.
 The run was a no-op only because the pin had not moved yet.
-ai-config#3095 fixed it: the script now parses its command line before anything is fetched,
+The script now parses its command line before anything is fetched,
 so `--help` and `-h` print the module docstring and exit 0 without touching the network or the working tree,
 and an unknown argument exits 2 rather than being ignored.
 The no-argument invocation is still the sync.
 - **Do:** bump the `uses:` SHA in `.github/workflows/validate.yml` first, run the script with no arguments, then commit the workflow, the vendored script, and the `.pin` together.
   `scripts/lib/nlb_gate.py`'s `assert_pin_matches_ci` refuses to load if the three disagree.
-- **Do:** run the script with `--help` to read its usage.
-  That is safe now, and was the surprise write above before the fix.
+- **Do:** run the script with `--help` to read its usage;
+  it now prints the docstring and exits without fetching or writing.
+- **Don't:** run the script with no arguments to see what it does.
+  The bare invocation is still the sync,
+  and it overwrites `scripts/vendor/gha-check-new-line-breaks.py` and its `.pin`.
 (Measured 2026-09-02 on [Morrison-Lab/gha#826](https://github.com/Morrison-Lab/gha/pull/826)
 and [ai-config#3089](https://github.com/Morrison-Lab/ai-config/pull/3089);
-tracked as [ai-config#3095](https://github.com/Morrison-Lab/ai-config/issues/3095).)
+reported as [ai-config#3095](https://github.com/Morrison-Lab/ai-config/issues/3095).)
 
 **`NLB_PATHS_IGNORE` is the one input the local run needs and does not
 default to**, so a command without it over-reports on generated files this

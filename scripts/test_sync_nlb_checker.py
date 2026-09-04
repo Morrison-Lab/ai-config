@@ -171,8 +171,22 @@ finally:
 # the process command line into it -- and that entry point is the one #3095
 # was reported against. Exercise it for real. Neither run touches the
 # network, because the parse now precedes the fetch.
-VENDORED = subject.nlb_gate.VENDOR_PY
-before = VENDORED.stat().st_mtime_ns if VENDORED.exists() else None
+# `before == after` passes vacuously when the vendored files are absent --
+# both readings are `None` and the check reports ok having observed nothing,
+# which is also the state a delete-then-rewrite regression leaves behind. Pin
+# the precondition, and compare content as well as mtime.
+VENDORED = [subject.nlb_gate.VENDOR_PY, subject.nlb_gate.VENDOR_PIN]
+check("the vendored files exist, so the no-write check has teeth",
+      all(path.exists() for path in VENDORED))
+
+
+def vendored_state():
+    """Content and mtime of each vendored file, or None where one is missing."""
+    return [(path.read_bytes(), path.stat().st_mtime_ns) if path.exists() else None
+            for path in VENDORED]
+
+
+before = vendored_state()
 
 help_run = subprocess.run([sys.executable, str(SCRIPT), "--help"],
                           capture_output=True, text=True)
@@ -185,8 +199,9 @@ bogus_run = subprocess.run([sys.executable, str(SCRIPT), "--bogus"],
                            capture_output=True, text=True)
 check("the real CLI exits 2 on an unknown argument", bogus_run.returncode == 2)
 
-after = VENDORED.stat().st_mtime_ns if VENDORED.exists() else None
-check("the real CLI writes nothing when it only parses", before == after)
+after = vendored_state()
+check("the real CLI leaves the vendored files byte-identical and untouched",
+      None not in before and before == after)
 
 if failures:
     sys.exit(f"{failures} check(s) failed")

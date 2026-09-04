@@ -130,7 +130,7 @@ the second easy to miss.
 > Deny and ask rules can match a top-level input parameter on any tool with `Tool(param:value)`. ...
 > An allow rule for one parameter value wouldn't establish that the call is safe overall, so allow rules continue to use each tool's own specifier syntax.
 
-Two consequences worth keeping straight:
+Three consequences worth keeping straight:
 
 - **There is no allow-rule form of this.**
   You cannot write an allow rule that says "only when `run_in_background` is false" --- allow rules use each tool's own specifier syntax (e.g. `Bash(npm run build)`), not parameter matching.

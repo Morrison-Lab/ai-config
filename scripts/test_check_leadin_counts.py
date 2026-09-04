@@ -7,6 +7,9 @@ bold-header paragraphs -- that the checker MUST catch. A zero result is
 otherwise indistinguishable from a detector that never ran, which is
 `shared/workflow/batch-merge-and-resolve.md`'s rule.
 
+One case is pinned the other way, as a known accepted false positive, so the
+suite never claims coverage of an exclusion the bounds do not actually reach.
+
 The rest are mostly must-NOT-fire cases, inverting the usual balance for a
 detector on purpose. This checker reads ordinary prose, where a numeral or a
 count word next to a list is far commoner than a real mismatch, so the cases
@@ -112,7 +115,11 @@ def main():
         ("Two was the count agreed.\n\n- a\n- b\n- c\n",
          "a count with no plural noun after it"),
         ("Holding two variables at once is hard.\n\n- a\n- b\n- c\n",
-         "a count that names something other than the list"),
+         "a count sitting behind a non-function word"),
+        ("Two changes are independent if:\n\n- a\n- b\n- c\n- d\n",
+         "a lead-in ending on a conditional subordinator"),
+        ("Two branches are safe to reorder when:\n\n- a\n- b\n- c\n",
+         "a lead-in ending on 'when'"),
         ("One thing to note:\n\n- a\n- b\n", "the word 'one'"),
         ("Write 3 sentences explaining the purpose:\n\n- a\n- b\n- c\n",
          "a bare numeral"),
@@ -197,6 +204,21 @@ def main():
         fires("Three shapes, all measured.\n\n"
               "**The first.**\nBody.\n\n"
               "**The second.**\nBody.\n"),
+    )
+
+    # --- a pinned known false positive ---
+    # ai-config#3005 names "two variables at once" as prose to skip, and the
+    # position bound reaches only the form that has a word in front of the
+    # count. The SENTENCE-INITIAL form still fires, and no bound separates it
+    # from "Three answers are legitimate, and only the first is ..." -- a
+    # genuine lead-in of the same shape. Measured on the corpus, a rule keyed
+    # on the copula suppresses 21 of the 83 accepted lead-ins. So this case
+    # is pinned as accepted rather than silently claimed to be handled: if a
+    # later bound fixes it, this line turns red and gets deleted deliberately.
+    check(
+        "the sentence-initial 'two variables at once' form still fires "
+        "(known accepted false positive)",
+        fires("Two variables at once is hard:\n\n- a\n- b\n- c\n"),
     )
 
     # --- exit codes and the reported population ---

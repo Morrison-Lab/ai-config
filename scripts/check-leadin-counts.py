@@ -27,6 +27,18 @@ measured against the live corpus rather than guessed:
   function words ("There are two ..."). That is what separates "Two
   consequences worth keeping straight:" from "a cheap habit with two payoffs
   rather than a new one." and from "Holding two variables at once is hard."
+  The bound is positional rather than semantic, so the SENTENCE-INITIAL form
+  of that last example -- "Two variables at once is hard:" -- is a known
+  accepted false positive. No bound separates it from "Three answers are
+  legitimate, and only the first is ...", which is a genuine lead-in of the
+  same shape; measured on the corpus, a rule keyed on the copula alone
+  suppresses 21 of the 83 accepted lead-ins, most of them real.
+- The lead-in sentence does not end on a conditional subordinator ("if",
+  "when", "unless"). "Two changes are independent if:" enumerates the
+  CONDITIONS below it rather than the two changes, which is the issue's "the
+  number refers to something other than the list" class. Measured on the
+  corpus, this bound suppresses exactly one lead-in of 83, and that one is
+  the false positive.
 - That count is followed within three tokens by a plural-looking noun, so
   "two variables" is a candidate and "two of those runs" is not.
 - The lead-in starts its own paragraph and is not itself a list item, so a
@@ -55,8 +67,9 @@ Exit codes: 0 clean, 1 at least one mismatch, 2 the scan examined no files
 (a check that examined nothing reports clean and is indistinguishable from
 one that passed).
 
-Not wired into CI. Wiring it as a gate is a deliberate follow-up, after the
-findings it reports on the live corpus have been read and fixed.
+Gated in `.github/workflows/validate.yml` over every tracked markdown file.
+The corpus reads clean at 0 findings across 711 files, measured on the branch
+that gates it.
 """
 from __future__ import annotations
 
@@ -118,6 +131,10 @@ LEAD_IN_PREFIX = {
 # A count phrase carrying one of these is a cross-reference to content
 # elsewhere in the file rather than to what follows.
 BACKREF_AFTER = {"above", "below", "earlier"}
+# A lead-in ending on one of these introduces the CONDITIONS for a predicate
+# rather than an enumeration of the counted noun, so the items below are not
+# what the count is counting.
+CONDITIONAL_TAIL = {"if", "when", "unless", "whenever", "provided"}
 
 HEADING_RE = re.compile(r"^ {0,3}#{1,6}\s")
 # The marker must be followed by whitespace, which is what keeps a bold run
@@ -172,6 +189,11 @@ def last_sentence(line: str) -> str:
 
 def stated_count(sentence: str) -> tuple[int, str] | None:
     """Return (count, phrase) for a genuine lead-in count, else None."""
+    tokens = TOKEN_RE.findall(sentence)
+    if tokens and tokens[-1].lower() in CONDITIONAL_TAIL:
+        # "Two changes are independent if:" counts the conditions below, not
+        # the two changes.
+        return None
     for match in COUNT_RE.finditer(sentence):
         before = [tok.lower() for tok in TOKEN_RE.findall(sentence[: match.start()])]
         if len(before) > MAX_TOKENS_BEFORE_COUNT:

@@ -577,7 +577,7 @@ _NO_PR = gh_stub("exit 1")
 _PR_3107 = gh_stub("echo 3107")
 MINE = {"GITHUB_REPOSITORY": "Morrison-Lab/ai-config",
         "GITHUB_REF": "refs/pull/3107/merge",
-        "GITHUB_HEAD_REF": "fix/3107-own-item",
+        "GITHUB_HEAD_REF": "chore/9901-unrelated",
         "PATH": _NO_PR + os.pathsep + os.environ["PATH"]}
 
 # The configuration the deployed hook actually runs in: a Claude Code session
@@ -588,6 +588,12 @@ LOCAL = {"GITHUB_REPOSITORY": "Morrison-Lab/ai-config",
          "GITHUB_REF": "refs/heads/fix/3117-brief-premises-cardinality",
          "GITHUB_HEAD_REF": "fix/3117-brief-premises-cardinality",
          "PATH": _PR_3107 + os.pathsep + os.environ["PATH"]}
+
+# The branch alone: `GITHUB_REF` names no pull request and `gh` reports none.
+BRANCH = {"GITHUB_REPOSITORY": "Morrison-Lab/ai-config",
+          "GITHUB_REF": "refs/heads/fix/3117-brief-premises-cardinality",
+          "GITHUB_HEAD_REF": "fix/3117-brief-premises-cardinality",
+          "PATH": _NO_PR + os.pathsep + os.environ["PATH"]}
 OWN_REPO = [
     (run(SELF_REF, ROUNDS, env=MINE),
      "REMIND", "the session's own repo AND item -- still its own history"),
@@ -603,6 +609,8 @@ OWN_REPO = [
      "REMIND", "no `GITHUB_REF` item: `gh` names the PR the branch does not"),
     (run(SIBLING_REF, ROUNDS, env=LOCAL),
      "silent", "same configuration, a SIBLING item -- not this session's"),
+    (run(SELF_REF.replace("3107", "3117"), ROUNDS, env=BRANCH),
+     "REMIND", "no `GITHUB_REF` item and no PR: the branch names it"),
 ]
 shutil.rmtree(_NO_PR, ignore_errors=True)
 shutil.rmtree(_PR_3107, ignore_errors=True)
@@ -747,10 +755,10 @@ def kinds(prompt):
 
 
 # `own_repo` reads `GITHUB_REPOSITORY` or `git remote get-url origin`, and
-# `own_items` reads `GITHUB_REF` or the checked-out branch, so an in-process
-# probe would otherwise depend on which remote this checkout points at and
-# which branch it is on. Both pinned here; the subprocess rows above exercise
-# the real resolution.
+# `own_items` unions `GITHUB_REF`, the checked-out branch, and the PR number
+# `gh` reports, so an in-process probe would otherwise depend on which remote
+# this checkout points at, which branch it is on, and which PR `gh` names.
+# Both pinned here; the subprocess rows above exercise the real resolution.
 hook._OWN_REPO = ("morrison-lab", "ai-config")
 hook._OWN_ITEMS = frozenset({"3107"})
 

@@ -741,14 +741,14 @@ and the verdict's own conclusion every round.**
 
   Two of the surfaces above are outside it mechanically rather than by
   oversight.
-  `scripts/lib/payload_fetcher.py` maps three commands: `gh pr view`,
-  `gh repo view`, and two `gh api` reads (`/check-runs` and
-  `/actions/runs/`).
+  `scripts/lib/payload_fetcher.py` covers, in its own words, "`gh pr view`,
+  `gh repo view`, and the two `gh api` reads" --- those being `/check-runs`
+  and `/actions/runs/`.
   `pulls/<N>/comments` is not among them, so **inline comments are never
   fetched at all** --- not fetched and left unresolved, never fetched.
   And no `<summary>`-scoped match on `suppressed` exists anywhere under
-  `scripts/`, so the collapsed-block check this section prescribes four
-  bullets above is prescribed and not implemented.
+  `scripts/`, so the check prescribed by "A clean overview can hide a
+  collapsed findings block" above is prescribed and not implemented.
   A review body carrying findings under no parsable verdict is the third.
 
   So run these two beside the instrument, every round, and read their output

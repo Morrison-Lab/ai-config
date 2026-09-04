@@ -1026,12 +1026,24 @@ Whether the condition deserved a guard was measured rather than argued.
 [`deterministic-tools`](../principles/deterministic-tools.md)'s
 third-occurrence bar is what licensed building it: the pattern
 `\b\d+\s+(?:lines?|characters?|chars?|words?)\s+(?:above|below|earlier|later)\b`
-together with `\b\d+-to-\d+\s+range\b` matched 15 of this repository's 2412
-commit messages, and every one of the 15 was the decorative-positional shape,
-with no legitimate code-move description among them --- so the misfire the
-guard was expected to have does not appear in the population it runs against.
+together with `\b\d+-to-\d+\s+range\b` matched 15 occurrences across 14 commit
+messages, measured 2026-09-03 over roughly 2,400 commits, and every one of the
+15 was the decorative-positional shape, with no legitimate code-move
+description among them --- so the misfire the guard was expected to have does
+not appear in the population it runs against.
 It warns and never blocks, because whether a figure is load-bearing is not
-lexically decidable even where its shape is.)
+lexically decidable even where its shape is.
+
+The denominator is deliberately approximate and dated, and the first draft of
+this paragraph is why.
+It said "15 of 2412 commit messages", conflating 15 occurrences with the 14
+messages carrying them --- one message holds two --- and pinning a total that
+had already moved to 2413 by the time the sentence was reread, because writing
+it had added a commit.
+That is this section's own rule failing inside the paragraph recording it, on
+a figure load-bearing for nothing: what the measurement establishes is that
+the shape is rare and its matches are all true positives, and no reader acts
+on the total.)
 
 ## An elapsed-time claim is a computation, not a memory
 

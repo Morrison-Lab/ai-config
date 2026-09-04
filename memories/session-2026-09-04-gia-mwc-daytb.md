@@ -200,38 +200,11 @@ Merge-time memory pass: the two lessons this branch's rounds taught that the cor
 the untracked-file blind spot of the diff-scoped gates recurred with the rule loaded (an instrument is owed), and the `ums` dupe check ran on the incident's vocabulary rather than on the rule being recorded (step 3 wants a second query on the rule).
 Filed as [#3196](https://github.com/Morrison-Lab/ai-config/issues/3196) (the diff-scoped gates' untracked-file blind spot wants an instrument) and [#3197](https://github.com/Morrison-Lab/ai-config/issues/3197) (`ums` step 3 dupe-checks the rule, not only the incident).
 
-## 02:49 PDT --- notebook branch at `95d6a96c`: adversarial round 1 returns eleven findings, all numbers written from recollection
+## 03:29 PDT --- notebook branch: four adversarial rounds before the PR opens, and the per-round entries are cut
 
-The reviewer (opus, read-only) reported confirming the gates, the cited SHAs, the heading times, and the forge claims it checked, and found eleven defects of one class: figures typed from memory where the instrument was a command away.
-Two line counts of `memories/github-actions.md` off by one (1243 and 1246, not 1242 and 1245);
-the fetch-by-SHA entry called 47 lines when its added lines at `0242210f` number 65;
-the split semicolon line called 84 characters when it was 82 (the same figure was wrong in #3196's body and was corrected there at 02:50 PDT);
-PR #3173's open time given as its `updated_at` (20:02 PDT) instead of its `created_at` (19:55 PDT);
-the `-zz` mechanism said grep "searched the current directory" when five path arguments remained, so it searched those;
-"the walk forward" in a gloss on a `rev-list` range that walks back;
-"the 7:10Z limit" as the file's only UTC stamp, against its own header rule;
-the index row listing #3184 among this file's filings (filed 20:55 PDT, in the 09-03 file) and "ten rounds" where this file carries rounds 7 to 10;
-and two ambiguous references (an "it" whose nearest antecedent was "the precedent", and a clause reading as Copilot re-requested by means of `@jules review`).
-Each figure re-measured here before the fix (`wc -l` at the named SHAs, `git diff --numstat`, `awk '{print length}'`, the PR's `created_at`, the loop notices' own failure text "You've hit your session limit", "resets 7:10am (UTC)").
-Fixed in one pass;
-the round is the notebook's own lesson applied to the notebook.
-
-## 03:07 PDT --- notebook branch at `de94b4cd`: round 2 returns six findings, four of them present since `95d6a96c`
-
-A different class from round 1: cross-references that resolve to nothing, a mechanism claim the later correction never pointed back at, and a coverage claim in the notebook's own voice.
-Two "the HH:MM entry" pointers named entries that never existed (19:36 for the 19:32 entry;
-20:20 for the 20:22 entry, 20:20 being the check-in time that entry opens with);
-the 17:46 entry's "none of the three is an ancestor" parenthetical stood uncorrected in place while the 19:39 entry refuted it (`git merge-base --is-ancestor` answers yes for all three in this full clone), so the pointer forward is now on the line itself;
-the #3166 merge heading and the re-anchored 19:37 both read a minute late against `d8c507a8`'s committer time of 19:36:26 PDT, where the other four anchors truncate to their minute;
-the 02:49 entry asserted round 1 "confirmed every gate, every SHA, every heading time, and every forge claim" as the notebook's own finding, with a tool-use count a reader cannot re-run, and this round refuted the "every heading time" part on content round 1 had read;
-and the same entry said #3196's body "is wrong" thirty-seven seconds before the issue was corrected, a present-tense claim about live state with no timestamp.
-All six fixed;
-the coverage sentence now attributes the report to the reviewer and drops the count.
-
-## 03:18 PDT --- notebook branch at `c01aa15d`: round 3 returns four findings, every one in the previous round's account of its own fixes
-
-The round-2 fixes were correct as measured;
-what failed was the entry narrating them, which named the wrong entry for the ancestry parenthetical (it sits under the 17:46 heading), stated a line distance nobody measured, miscounted how many findings predated `95d6a96c`, and attributed two refutations to one entry when they sit in two.
-The same shape as the #3193 rounds recorded in the `ums` anti-pattern: each fix commit's narration is fresh unmeasured prose, so a round that fixes N findings and adds an entry adds new claims to refute.
-Fixed against the file's own headings and `grep -n`;
-this entry carries no figure that is not a heading time.
+Rounds at `95d6a96c`, `de94b4cd`, `c01aa15d`, and `eea02bba` returned eleven, six, four, and four findings.
+Round 1's were figures written from recollection where the instrument was one command away: line counts, a character count, a PR's `updated_at` written as its open time, a grep search target, a `rev-list` direction, a bare UTC stamp, an index row, and two ambiguous references.
+The 84 that should have been 82 was also in #3196's body, corrected there at 02:50 PDT.
+Rounds 2 to 4 found defects in older entries (dangling "the HH:MM entry" pointers, a merge heading a minute late against its commit, an ancestry parenthetical left uncorrected in place) and, in growing share, in the entry each round appended to narrate its own fixes: a wrong entry named, an unmeasured line distance, a miscount, a self-description the same entry contradicted, a claim about #3196's body that went stale within the minute, and a citation of the `ums` anti-pattern for a shape it does not record.
+Those narrating entries are deleted rather than patched.
+This entry replaces them and states only what `git log` on the branch and the four review transcripts settle.

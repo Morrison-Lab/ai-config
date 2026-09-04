@@ -738,3 +738,11 @@ it does (`--recursive`, the default), every count in the record was measured wit
 Since the flag was redundant, the two commands drop it at `c6ea044c` and the measurement is on the PR;
 Copilot and Jules re-requested.
 Two of Copilot's last four claims about tool behaviour on this session's PRs were false (`git log --cc` without `-p`, `git grep -r`), and both were answered the same way: measure first, then apply only a change that is harmless and shorter.
+
+## 18:07 PDT --- #3154's forge quorum at `c6ea044c`
+
+At `c6ea044c`, [#3154](https://github.com/Morrison-Lab/ai-config/pull/3154) has Copilot's "Approval recommended" (its ninth round), the claude-review verdict, and a Jules approval;
+`validate` and `build` were still running, so the mergeable state read blocked on pending checks.
+Jules's round for the previous head had returned `block` over "prompt injection in the project rules file", the repository's own agent-instruction text, outside the diff;
+its next round approved without comment, so the block is superseded rather than answered.
+A pre-merge adversarial verdict at the shipping head follows once the slot the #3166 verdict holds frees, matching the bar applied to #3166.

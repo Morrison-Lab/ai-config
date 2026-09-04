@@ -397,8 +397,9 @@ What omits the merge patch is `git log -p`, unless given `-m` or `--diff-merges=
 The query that settles it, run 2026-09-03 on git 2.43.0 in a scratch repo whose merge resolution re-added a paragraph:
 `git diff main...feature | grep '^+SHARED'` printed the line,
 `git log -p main..feature | grep -c '^+SHARED'` printed 0,
-and the same `git log` with `-m` printed 2.
+and the same `git log` with `-m` printed 2 in that repo;
+the reproduction recorded in `memories/git-diffing.md` prints 3, and the original repo was not preserved, so the difference is not derived here.
 The false version had been written into `fix/ums-step3-corpus-scope`.
 The round-one adversarial verdict on the two held branches caught it, alongside five other findings: a headline universal resting on that mechanism sentence, an n=2 "most", a bare `#605` resolving to the wrong repository, a bullet list coalescing with its host section's list, and a case record asserting an underived cause inside the subsection that forbids exactly that.
 All six are fixed on the two branches, and a round-two verdict is running.
-Wants promotion to `memories/git.md` when this notebook is folded.
+Promoted to `memories/git-diffing.md` ("A merge commit's own content is visible to `git diff A...B` and invisible to `git log -p`").

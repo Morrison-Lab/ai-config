@@ -102,7 +102,7 @@ Five slots: four loops and the recurrences branch's round 3.
 Round 3 at `684be2e9` found the file that owns this block shape, `review-verdict-pitfalls.md`'s seventh case ("re-triggering cannot clear it";
 "do not count the re-raise against the rebuttal test ... reply once, then hold"), uncited and contradicted by the entry's "re-run once";
 also "identical" in the heading when the two blocks differed in wording, a "nondeterministic" mechanism the corpus twice refuses to infer, the phantom file described as merely out of scope, two pronouns on the wrong clause, a heading covering half its section, and a missing boundary with "A block presented as program output".
-`90fe6c86` cites the seventh case and #818, tells a session to rebut once, file, and hold, records the #3154 merge as the exception #3192 puts to the maintainer, and trims `memories/github-actions.md` to 1249 of 1250 lines;
+`90fe6c86` cites the seventh case and #818, tells a session to rebut once, file, and hold, records the #3154 merge as the exception #3192 puts to the maintainer, and brings `memories/github-actions.md` to 1249 of 1250 lines;
 round 4 dispatched.
 
 Lesson for the memory pass: the answer to "may a session merge over a repeating false-positive block" was already in the corpus (hold), two files away from where the session looked, and the merge of #3154 was made against it;
@@ -141,7 +141,7 @@ the missing fact was in the entry's own first paragraph, that `INPUT_EXTRA_INSTR
 Also: `hooks/warn-status-read-after-pipe.py` already guards the `$?` form of the pipe defect and #3184 should extend it;
 two verbatim clauses copied from the section above;
 the `-zz` exit status stated as entailed when it depends on an accidental match;
-and the `mergeable_state` discriminator restated 520 lines from the file's own bcs bullet.
+and the `mergeable_state` discriminator restated 520 lines from `memories/github-actions.md`'s own bcs bullet.
 `6fdb619b` answers all six and adds the deletion lesson from #3193 as a `ums` anti-pattern bullet;
 round 5 dispatched.
 
@@ -202,5 +202,5 @@ Filed as [#3196](https://github.com/Morrison-Lab/ai-config/issues/3196) (the dif
 
 ## 03:29 PDT --- notebook branch: adversarial rounds with no PR open yet, and the per-round entries are cut
 
-As of `56c02399`, the head round 12 reviewed, twelve adversarial rounds had run on this branch with no PR open, returning eleven, six, four, four, four, eleven, four, three, one, two, one, and one findings.
+As of `75bc0fc2`, the head round 13 reviewed, thirteen adversarial rounds had run on this branch with no PR open, returning eleven, six, four, four, four, eleven, four, three, one, two, one, one, and two findings.
 The three entries that narrated rounds 1 to 3, appended by the commits answering those rounds, were deleted rather than patched at `48380505`, the commit answering round 4, and this entry took their place.

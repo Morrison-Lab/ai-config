@@ -200,7 +200,7 @@ Morrison-Lab/ai-config#1174.)
 The section above routes between repos;
 the same miss happens inside one repo when the dupe check is scoped to a directory the owner is not in.
 
-- **Do:** grep the directories the corpus spans,
+- **Do:** grep the paths skill-builder step 0 runs,
   `skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md`,
   not the one the destination sits in.
 - **Don't:** read "the whole `memories/` directory", step 3's wording at `3935bfff`, as thorough;

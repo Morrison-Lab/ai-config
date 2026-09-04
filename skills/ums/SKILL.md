@@ -111,7 +111,7 @@ committed pass.
      runs to hundreds or a thousand-plus lines, so an existing entry on the
      same subject can sit far away in an unrelated cluster and never enter
      your view.
-     Grep the whole corpus rather than one file, and rather than only `memories/`:
+     Grep the paths skill-builder step 0 runs rather than one file, and rather than only `memories/`:
      ```bash
      (
        repo="${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/ums rev-parse --show-toplevel 2>/dev/null || pwd)}"

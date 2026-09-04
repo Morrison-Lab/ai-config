@@ -1317,6 +1317,54 @@ Both halves are strings a session can type, and neither names a workflow definit
 The issue is open and no hook file exists on `main`, so this section is the argument that its discharge should be dropped rather than a description of a shipped file;
 a comment recording that argument was posted on the issue on 2026-09-03.)
 
+## Your own command's shape is part of a transcript-read discharge condition
+
+The section above is the guard author's side of a discharge: does the matcher separate the obligation from prose that merely quotes it?
+This is the **subject's** side.
+[`pr-on-claim`](pr-on-claim.md) already states it for one hook --- run the `requested_reviewers` POST as the sole or last command, and pipe it nowhere --- and what follows generalizes that from one hook to every transcript-read guard, because the reason it holds there has nothing to do with that hook.
+
+A guard that reads the transcript sees the text of your command and the text of its output.
+It cannot see the effect the command had.
+So an ordinary formatting choice can destroy the evidence while the action itself succeeds perfectly, and the two outcomes are indistinguishable from where you are sitting: the thing you wanted happened, and the guard fired anyway.
+The reliable tell is that the first conclusion is always *the guard is broken*, because the action visibly worked.
+
+Two shapes, measured in one session, and they break different things:
+
+- `gh pr view --json state` narrowed with `--jq` to pretty-print flattened `"state":"MERGED"` into `state=MERGED`, so the hook's terminal-state discharge regex, written against the JSON, could not match.
+  What the guard reads is the output's **spelling**, and reshaping it is what destroys the record.
+- A `requested_reviewers` POST written as `... ; echo rc=$?` and as `... | head` moved out of last-command position, so its exit status could no longer be attributed to it.
+  What that guard needs there is the **position**, which is what makes the status attributable.
+
+The distinction decides the remedy, and getting it wrong forbids the right shape.
+`pr-on-claim` recommends narrowing that POST's response "with a flag on the POST itself rather than a downstream pipe".
+That is safe, and the reason is worth stating rather than assuming: the same hook does read the request's body --- a `"status":4xx` shape marks a failed request --- but a genuinely failed `gh api` also exits non-zero, so a projection cannot manufacture a false success by itself.
+The `gh pr view` above had no such second signal *for the fact in question*.
+Exit status distinguishes a failed read from a successful one and cannot distinguish MERGED from OPEN, so the terminal state has exactly one reader --- a regex written against the JSON spelling, which `--jq` rewrote.
+
+So ask what the guard reads, and expect the answer to name more than one thing.
+`no-unreviewed-pr.py` consults the output's text, the command's position, and its exit status, all three in one discharge, which is why "the position is what matters here" is not a licence to reshape the body.
+
+What the two shapes share is the moment.
+`--jq`, a trailing `echo`, and a pipe are each applied for readability, while composing the command, with no thought of the guard --- and each is applied to the very thing that was going to serve as the record.
+So the rule is about *which* commands get formatted rather than about formatting in general: a command that carries discharge evidence gets run bare, alone, and unchained, and the tidying goes on a separate follow-up call.
+
+**The mirror is a check reading a different artifact, and that failure has nothing to do with the subject's command.**
+The same session ran a CI-gate checker against the committed head while the fix sat uncommitted in the working tree.
+The checker was right, and the first conclusion was again that it was broken.
+That is [`verify-the-right-artifact`](verify-the-right-artifact.md)'s working-directory shape pointed the other way: there a stale checkout stands in for the authoritative revision, and here the authoritative revision stands in for the uncommitted change.
+That fragment covers only the first direction today ([#3130](https://github.com/Morrison-Lab/ai-config/issues/3130)), so this is adjacent to it rather than owned by it --- and it is still not this section's subject, since no command shape is involved.
+It is named here only because it wears the same disguise: an action that visibly worked, and a check that says it did not.
+Committing costs one command and settles it.
+
+- **Do:** run a discharge-relevant command alone and unchained, so the transcript carries its result verbatim.
+- **Do:** ask what the guard reads --- the output's text, the command's position, its exit status --- and expect more than one of those to matter at once.
+- **Do:** tidy or reshape that output in a separate call afterwards, when you want it readable.
+- **Do:** ask whether a disagreeing check is reading the artifact you changed, before diagnosing the check.
+- **Don't:** reshape the output of a command whose *text* is the evidence --- `--jq`, a downstream pipe, a formatting flag --- or chain anything after a command whose *position* is.
+- **Don't:** read those as alternatives;
+  a single guard can consult all three at once, so establishing that position matters says nothing about whether the body is inert.
+- **Don't:** conclude a guard is defective from the fact that the underlying action worked --- the guard measures the record, not the effect.
+
 ## Measure CPU time, not wall clock, when the assertion is about work done
 
 A performance regression test asserts something about the *code*.

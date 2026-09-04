@@ -222,6 +222,73 @@ qualify as `owner/repo#NNNN` per those before choosing a path.
 the source PR;
 the classification was derived while linking that PR's bare references.)
 
+## A fetch by SHA needs the full 40 characters, and a shallow clone's `--is-ancestor` is bounded by its depth
+
+Two instruments whose failure reads as an answer about the *remote*
+while each answers something narrower:
+one, when its argument is shorter than 40 characters, says only whether that argument is a ref name,
+the other only what the *clone* has fetched.
+Both produced the same false claim twice on one PR,
+that three commits were "fetchable from no remote ref",
+when every one of them was an ancestor of a ref that `origin` still advertised.
+
+**`git fetch origin <sha>` takes the full 40-character SHA and nothing shorter.**
+A non-40-hex argument is resolved as a ref name, never as a `want`,
+so the failure is git's own and says nothing about whether the commit is on the remote.
+A short SHA fails with `fatal: couldn't find remote ref <sha>`,
+and it fails the same way for a commit that is the tip of an advertised ref.
+The same fetch with the full SHA succeeds on GitHub for any commit reachable on the server,
+which is [`claude-code-consumer-wiring`](claude-code-consumer-wiring.md)'s
+"any reachable commit" note from the other side.
+
+```console
+$ git fetch origin eb0cf15e
+fatal: couldn't find remote ref eb0cf15e
+$ git fetch origin eb0cf15e891c386be69c85643bd57b89f5fb2a60
+From https://github.com/Morrison-Lab/ai-config
+ * branch              eb0cf15e891c386be69c85643bd57b89f5fb2a60 -> FETCH_HEAD
+$ git fetch origin 0000000000000000000000000000000000000001
+fatal: remote error: upload-pack: not our ref 0000000000000000000000000000000000000001
+```
+
+So the fetch's own error text is the test:
+`couldn't find remote ref` means the remote has no ref by that name (retry with all 40 characters),
+and `upload-pack: not our ref` means the remote would not serve that object.
+GitHub returns the second string on protocol v2 and v0 alike.
+A plain local-path remote on v0 says `Server does not allow request for unadvertised object` instead,
+because its advertisement carries no `allow-*-sha1-in-want` capability and git refuses before sending a `want`;
+the same fetch succeeds on v2, the default, which has no such client-side gate.
+Neither `couldn't find remote ref` nor `Server does not allow request for unadvertised object` means the object is absent.
+
+**`git merge-base --is-ancestor A B` and `git rev-list --count B`
+on a shallow clone answer for the fetched depth.**
+In the incident's clone `git rev-list --count f9068299` returned 1
+and `--is-ancestor` failed for three real ancestors
+(`fatal: Not a valid commit name <sha>` at exit 128 while the ancestor's object is absent from the clone,
+a quiet exit 1 once it is present),
+because the walk stopped at the graft
+(the section above on `git log -S` describes the same stop).
+A ranged count is bounded the same way:
+`origin/main..f9068299` still walks back from `f9068299`, which is itself a graft,
+so the range returned 1 in that clone too.
+`git fetch --depth=200 origin refs/pull/3060/head` made `--is-ancestor` succeed for all three,
+so the earlier answer was about what had been fetched.
+
+- **Do:** fetch by the full SHA,
+  and read a short-SHA failure as "not a ref name", not as "not on the remote".
+- **Do:** run `git rev-parse --is-shallow-repository` before an ancestry or count query;
+  when it prints `true`, deepen the fetch (or fetch the ref itself) for an ancestry query,
+  and `git fetch --unshallow` for a total count, since no depth picked in advance is known to reach the root.
+- **Don't:** write "not fetchable" or "reachable from no remote ref"
+  from a short-SHA fetch or a shallow-clone walk;
+  a full-SHA fetch, or the ref walk on a deepened fetch, is the measurement.
+
+(Measured 2026-09-03 on git 2.43.0, the incident in a remote session's shallow clone
+and the local-path reproduction in a scratch repo,
+while driving [ai-config#3154](https://github.com/Morrison-Lab/ai-config/pull/3154);
+the claude-review round at `e698c456` caught the claim
+by fetching `refs/pull/3060/head` live from origin and walking it.)
+
 ## Git branch create/reset (`git switch -C`)
 - `git switch -C "$BRANCH"` is already safe against flag-shaped branch names: `$BRANCH` is the argument *to* `-C`, so a value like `--weird` fails cleanly as `fatal: '--weird' is not a valid branch name` rather than being parsed as an option.
 - Do NOT "harden" it to `git switch -C -- "$BRANCH"` --- that form is **broken**:

@@ -258,7 +258,7 @@ GitHub returns the second string on protocol v2 and v0 alike.
 A plain local-path remote on v0 says `Server does not allow request for unadvertised object` instead,
 because its advertisement carries no `allow-*-sha1-in-want` capability and git refuses before sending a `want`;
 the same fetch succeeds on v2, the default, which has no such client-side gate.
-Neither wording means the object is absent.
+Neither `couldn't find remote ref` nor `Server does not allow request for unadvertised object` means the object is absent.
 
 **`git merge-base --is-ancestor A B` and `git rev-list --count B`
 on a shallow clone answer for the fetched depth.**
@@ -267,15 +267,16 @@ and `--is-ancestor` returned non-zero for three real ancestors,
 because the walk stopped at the graft
 (the section above on `git log -S` describes the same stop).
 A ranged count is bounded the same way:
-`origin/main..f9068299` still walks forward from `f9068299`, which is itself a graft,
+`origin/main..f9068299` still walks back from `f9068299`, which is itself a graft,
 so the range returned 1 in that clone too.
 `git fetch --depth=200 origin refs/pull/3060/head` made `--is-ancestor` succeed for all three,
 so the earlier answer was about what had been fetched.
 
 - **Do:** fetch by the full SHA,
   and read a short-SHA failure as "not a ref name", not as "not on the remote".
-- **Do:** run `git rev-parse --is-shallow-repository` before an ancestry or count query,
-  and deepen the fetch (or fetch the ref itself) when that command prints `true`.
+- **Do:** run `git rev-parse --is-shallow-repository` before an ancestry or count query;
+  when it prints `true`, deepen the fetch (or fetch the ref itself) for an ancestry query,
+  and `git fetch --unshallow` for a total count, since any bounded depth still truncates it.
 - **Don't:** write "not fetchable" or "reachable from no remote ref"
   from a short-SHA fetch or a shallow-clone walk;
   a full-SHA fetch, or the ref walk on a deepened fetch, is the measurement.
@@ -284,7 +285,7 @@ so the earlier answer was about what had been fetched.
 and the local-path reproduction in a scratch repo,
 while driving [ai-config#3154](https://github.com/Morrison-Lab/ai-config/pull/3154);
 the claude-review round at `e698c456` caught the claim
-by walking `refs/pull/3060/head` on a full checkout.)
+by fetching `refs/pull/3060/head` live from origin and walking it.)
 
 ## Git branch create/reset (`git switch -C`)
 - `git switch -C "$BRANCH"` is already safe against flag-shaped branch names: `$BRANCH` is the argument *to* `-C`, so a value like `--weird` fails cleanly as `fatal: '--weird' is not a valid branch name` rather than being parsed as an option.

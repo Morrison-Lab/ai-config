@@ -343,7 +343,8 @@ def simple_commands(command):
     tokens are separators and are dropped with the rest. A caller that models
     shell STATE rather than asking which programs ran needs the distinction,
     since a `cd` inside a subshell moves that subshell and never the parent;
-    `simple_commands_with_depth` is the same split with the nesting kept.
+    `simple_commands_with_depth` is the same split with the nesting kept, and
+    `simple_commands_with_scope` keeps the individual subshells apart as well.
     """
     with_depth = simple_commands_with_depth(command)
     if with_depth is None:
@@ -359,10 +360,37 @@ def simple_commands_with_depth(command):
     state --- its working directory above all --- dies with the subshell and
     never reaches the parent.
 
-    Depth is counted from the separator tokens themselves, which is why the
-    count is per token rather than per character: `shlex` emits a run like
-    `));` as ONE separator, so `(cd /a && (cd /b; ls)); cd /c` returns the
-    final `cd /c` at depth 0 rather than at depth 2.
+    A DEPTH CANNOT TELL TWO SIBLING SUBSHELLS APART, which matters to any
+    caller carrying per-level state: `(cd /a) && (git commit` and
+    `(cd /a && git commit` both report the commit at depth 1, so the first
+    subshell's `cd` reads as still in force inside the second, which it is
+    not. `simple_commands_with_scope` is the split that distinguishes them,
+    and a caller modelling the shell's directory needs it (ai-config#2422).
+
+    `{ ... }` grouping is NOT nesting for this purpose and is not counted: it
+    runs in the current shell, so a `cd` inside one does move the caller.
+    """
+    with_scope = simple_commands_with_scope(command)
+    if with_scope is None:
+        return None
+    return [(len(scope) - 1, argv) for scope, argv in with_scope]
+
+
+def simple_commands_with_scope(command):
+    """`simple_commands`, each argv paired with the SUBSHELL IT RUNS IN.
+
+    A scope is the tuple of subshell ids from the caller's own shell down to
+    the command, so `(0,)` is the caller's shell and `len(scope) - 1` is the
+    nesting depth `simple_commands_with_depth` reports. Every `(` allocates a
+    FRESH id, so two sibling subshells at the same depth carry different
+    scopes and a caller can tell that the second inherited from the parent
+    rather than from the first.
+
+    Parens are read one character at a time rather than by net count, because
+    a single separator token can both close and open: `shlex` emits `);` and
+    `)&&(` as one token each, and only the ordered read gives `)&&(` a new id
+    on the far side. The per-token net count this replaced got the depth
+    right and the identity wrong.
 
     `{ ... }` grouping is NOT nesting for this purpose and is not counted: it
     runs in the current shell, so a `cd` inside one does move the caller.
@@ -385,21 +413,24 @@ def simple_commands_with_depth(command):
         toks = list(lex)
     except ValueError:
         return None
-    cmds, cur, depth, cur_depth = [], [], 0, 0
+    cmds, cur, scope, cur_scope, opened = [], [], [0], (0,), 0
     for tok in toks:
         if tok and set(tok) <= _SHELL_OPS:
             if cur:
-                cmds.append((cur_depth, cur))
+                cmds.append((cur_scope, cur))
                 cur = []
-            depth += tok.count("(") - tok.count(")")
-            if depth < 0:
-                depth = 0
+            for ch in tok:
+                if ch == "(":
+                    opened += 1
+                    scope.append(opened)
+                elif ch == ")" and len(scope) > 1:
+                    scope.pop()
         else:
             if not cur:
-                cur_depth = depth
+                cur_scope = tuple(scope)
             cur.append(tok)
     if cur:
-        cmds.append((cur_depth, cur))
+        cmds.append((cur_scope, cur))
     return cmds
 
 

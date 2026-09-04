@@ -916,6 +916,15 @@ try:
     subshell_commit_inside = transcript([
         f"(cd {dormant_wt} && git add -A && git commit -m mine)",
     ])
+    # Two SIBLING subshells share a nesting depth and share nothing else: the
+    # first one's `cd` dies at its own `)`, so the second opens from the
+    # parent shell and the commit inside it lands where the parent stood.
+    # Keying the directory on depth alone carried the visited worktree
+    # across the boundary and blocked the Stop for a commit made elsewhere,
+    # which is ai-config#2422's own false-block failure respelt.
+    sibling_subshell_commit = transcript([
+        f"(cd {dormant_wt} && git status) && (git add -A && git commit -m mine)",
+    ])
     # `git checkout [<tree-ish>] -- <paths>` restores files and moves HEAD
     # nowhere, so it must not clear the carried branch --- reading the
     # pathspec as a branch name replaced `agy-dormant` with `README.md` and
@@ -1073,6 +1082,10 @@ try:
         # directory rather than lost with it.
         _si_reason = subject.decide(dormant_root, subshell_commit_inside)
         assert "agy-dormant" in _si_reason, _si_reason
+        # A commit in the NEXT subshell along did not run in the one before
+        # it, however equal their nesting depths.
+        assert subject.decide(dormant_root, sibling_subshell_commit) == "", \
+            "a sibling subshell must not inherit the previous one's `cd` (ai-config#2422)"
         # A pathspec checkout moves HEAD nowhere, so the carried branch stands.
         for _name, _t in (("git checkout -- <path>", pathspec_keeps_branch),
                           ("git checkout <tree-ish> -- <path>", treeish_pathspec_keeps_branch)):
@@ -1114,7 +1127,7 @@ try:
                    checkout_index_keeps_branch,
                    bare_cd_moves_home, pushd_supersedes, popd_supersedes,
                    subshell_cd, subshell_cd_semicolon, subshell_beside_real_cd,
-                   subshell_commit_inside,
+                   subshell_commit_inside, sibling_subshell_commit,
                    pathspec_keeps_branch, treeish_pathspec_keeps_branch,
                    bare_path_checkout_falls_open,
                    commit_then_git_c_away, git_c_before_commit,

@@ -341,6 +341,31 @@ check("brace grouping is not subshell nesting",
       [(0, ["f"]), (0, ["{", "cd", "/a"]), (0, ["}"])])
 check("a parse error is None on the depth-aware split too",
       shellcmd.simple_commands_with_depth("git commit -m \'unclosed"), None)
+# A DEPTH IS NOT AN IDENTITY. Two sibling subshells sit at the same depth and
+# share none of their state, so a caller carrying a per-level directory needs
+# the scope-aware split to tell them apart --- `(cd /a) && (git commit` reads
+# as `(cd /a && git commit` from the depths alone.
+check("sibling subshells share a depth",
+      shellcmd.simple_commands_with_depth("(cd /a) && (git commit)"),
+      [(1, ["cd", "/a"]), (1, ["git", "commit"])])
+check("sibling subshells get distinct scopes",
+      shellcmd.simple_commands_with_scope("(cd /a) && (git commit)"),
+      [((0, 1), ["cd", "/a"]), ((0, 2), ["git", "commit"])])
+check("one subshell keeps one scope throughout",
+      shellcmd.simple_commands_with_scope("(cd /a && git commit)"),
+      [((0, 1), ["cd", "/a"]), ((0, 1), ["git", "commit"])])
+# `shlex` emits `)&&(` as ONE separator token, whose net paren count is zero
+# --- so only the ordered per-character read opens a fresh scope on the far
+# side of it.
+check("a close-and-open in one token still opens a new scope",
+      shellcmd.simple_commands_with_scope("(cd /a)&&(git commit)"),
+      [((0, 1), ["cd", "/a"]), ((0, 2), ["git", "commit"])])
+check("nesting is a scope path, and the depth is its length",
+      shellcmd.simple_commands_with_scope("(cd /a && (cd /b; ls)); cd /c"),
+      [((0, 1), ["cd", "/a"]), ((0, 1, 2), ["cd", "/b"]),
+       ((0, 1, 2), ["ls"]), ((0,), ["cd", "/c"])])
+check("a parse error is None on the scope-aware split too",
+      shellcmd.simple_commands_with_scope("git commit -m \'unclosed"), None)
 
 # ------------------------------------------------- source-level hygiene
 #

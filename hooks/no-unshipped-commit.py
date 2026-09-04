@@ -237,8 +237,18 @@ def _moves_head(args):
     return PATHSPEC_SEP not in args
 
 
+# Appended by `shell_dir_after` so the parse reports the nesting depth the
+# TEXT ENDS AT. `simple_commands_with_depth` pairs each command with its own
+# depth and says nothing about the separators that follow the last one, so
+# `(cd /a && git status)` and `(cd /a && ` are otherwise indistinguishable:
+# the first ends back in the parent shell, the second inside the subshell
+# where whatever follows it runs. A marker word invokes nothing and is never
+# a `cd`, so it only ever reports.
+END_MARKER = "__no_unshipped_commit_end__"
+
+
 def shell_dir_after(text, cur_dir):
-    """The directory the shell stands in after `text`, given `cur_dir` before.
+    """The directory the shell stands in WHERE `text` ENDS, given `cur_dir`.
 
     `None` means INDETERMINATE, never "unchanged": `cd -`, `popd`, a `$VAR`
     target, and an unparseable command each move the shell somewhere this
@@ -246,28 +256,47 @@ def shell_dir_after(text, cur_dir):
     left. That is the whole of ai-config#2422's directory half --- a session
     that visits a dormant foreign worktree and then returns must not attribute
     its own later commit to the worktree it visited.
+
+    WHERE THE TEXT ENDS is what lets one function answer both of the two
+    questions this file asks it. The between-call carry passes a whole
+    balanced call, which ends at depth 0 in the parent shell --- so
+    `(cd /other-worktree && git status)`, the routine way to read another
+    checkout without leaving your own, leaves the parent where it stood and
+    never claims a later commit. The commit attribution passes the text up to
+    the commit, which ends wherever that commit runs --- so
+    `(cd /other-worktree && git commit -m x)` reports the worktree the commit
+    really ran in. An earlier revision instead skipped every `cd` at a depth
+    above 0, which answered the first question and silently lost the second:
+    a commit made in another checkout via the subshell one-liner was
+    attributed to no directory at all and never reported.
+
+    One directory per nesting level, the shape
+    `hooks/no-push-without-self-review.py` already keeps: a subshell inherits
+    its parent's directory on descent, its own moves die with it on ascent,
+    and the parent's survives both.
     """
     if simple_commands_with_depth is None or not DIR_MOVE.search(text):
         return cur_dir
-    argvs = simple_commands_with_depth(text)
+    # The marker goes on its own line, so a heredoc terminator ending `text`
+    # stays a terminator rather than becoming `EOF __no_unshipped_commit_end__`
+    # and swallowing the rest of the call. When it is swallowed anyway,
+    # `end_depth` stays 0 and the parent shell's directory is the answer,
+    # which is what this function returned before the stack existed.
+    argvs = simple_commands_with_depth(text + chr(10) + END_MARKER)
     if argvs is None:
         return None
+    stack, end_depth = [cur_dir], 0
     for depth, argv in argvs:
-        # A `cd` inside `( ... )` moves the SUBSHELL and dies with it, so the
-        # parent shell --- the one the next tool call inherits --- never
-        # left. `(cd /other-worktree && git status)` is the routine way to
-        # read another checkout without leaving your own, and treating it as
-        # a move made every later commit inherit the worktree merely
-        # inspected, which is the false attribution ai-config#2422 exists to
-        # remove. `DIR_MOVE` deliberately still matches inside parens: it is
-        # a pre-filter, so over-inclusive is the safe direction, and the
-        # depth is what decides.
-        if depth:
-            continue
+        while len(stack) <= depth:
+            stack.append(stack[-1])
+        del stack[depth + 1:]
+        if argv == [END_MARKER]:
+            end_depth = depth
+            break
         _, rest = strip_env(argv)
         if rest and rest[0] in ("cd", "pushd", "popd"):
-            cur_dir = resolve_cd_target(rest, cur_dir)
-    return cur_dir
+            stack[depth] = resolve_cd_target(rest, stack[depth])
+    return stack[end_depth]
 
 
 def absolute_dir(path):

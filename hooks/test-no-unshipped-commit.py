@@ -907,6 +907,15 @@ try:
         f"cd {dormant_wt} && (cd {dormant_root} && git status)",
         "git commit -m mine",
     ])
+    # The other half of the same axis: a commit that shares the subshell
+    # really did run in the directory the subshell moved to, so it is
+    # attributed there rather than dying with the parens. Skipping every
+    # `cd` above depth 0 answered only the parent-shell half and left this
+    # commit attributed to no directory at all, so an unshipped commit made
+    # in another checkout via the one-liner went unreported.
+    subshell_commit_inside = transcript([
+        f"(cd {dormant_wt} && git add -A && git commit -m mine)",
+    ])
     # `git checkout [<tree-ish>] -- <paths>` restores files and moves HEAD
     # nowhere, so it must not clear the carried branch --- reading the
     # pathspec as a branch name replaced `agy-dormant` with `README.md` and
@@ -1060,6 +1069,10 @@ try:
         # so the commit beside it is still attributed to where it landed.
         _sb_reason = subject.decide(dormant_root, subshell_beside_real_cd)
         assert "agy-dormant" in _sb_reason, _sb_reason
+        # And a commit INSIDE the parens is attributed to the subshell's own
+        # directory rather than lost with it.
+        _si_reason = subject.decide(dormant_root, subshell_commit_inside)
+        assert "agy-dormant" in _si_reason, _si_reason
         # A pathspec checkout moves HEAD nowhere, so the carried branch stands.
         for _name, _t in (("git checkout -- <path>", pathspec_keeps_branch),
                           ("git checkout <tree-ish> -- <path>", treeish_pathspec_keeps_branch)):
@@ -1101,6 +1114,7 @@ try:
                    checkout_index_keeps_branch,
                    bare_cd_moves_home, pushd_supersedes, popd_supersedes,
                    subshell_cd, subshell_cd_semicolon, subshell_beside_real_cd,
+                   subshell_commit_inside,
                    pathspec_keeps_branch, treeish_pathspec_keeps_branch,
                    bare_path_checkout_falls_open,
                    commit_then_git_c_away, git_c_before_commit,

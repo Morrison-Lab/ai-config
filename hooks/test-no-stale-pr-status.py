@@ -344,6 +344,13 @@ CASES = [
     ([QUERY, PUSH, say("All checks green is a claim that was overstated.")], False,
      "an auxiliary may sit between the pronoun and the retraction -- a bare "
      "\\Z anchor on RX_METALINGUISTIC_HEAD blocks this participle form"),
+    ([QUERY, PUSH, say("All checks green is a claim that was later overstated.")], False,
+     "an adverb may sit beside the auxiliary too"),
+    ([QUERY, PUSH, say("All checks green is a claim that has now been retracted.")], False,
+     "and between two auxiliaries"),
+    ([QUERY, PUSH, say("All checks green is a claim that reviewers overstated.")], True,
+     "the adverb slot admits no bare noun, so an object relative with an unmarked "
+     "subject still breaks attachment"),
     # Only the head phrase is dropped, never the rest of the connector. Widen
     # the carve-out to swallow the whole connector and this stops blocking.
     ([QUERY, PUSH, say("All checks green is a claim that survives, though my "

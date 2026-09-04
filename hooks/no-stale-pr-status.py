@@ -330,13 +330,7 @@ RX_LEADING_SEPARATOR = re.compile(_CLAUSE_SEPARATORS, re.I)
 # silently ALLOW, which is the direction that emits nothing. The grammar
 # decides it: in a SUBJECT relative the pronoun IS the claim and the verb
 # follows it directly, while an OBJECT relative puts its own subject in
-# between. So the carve-out must reach the retraction, and only an auxiliary
-# may sit in the gap -- "is a claim that was overstated." keeps its "was",
-# where a bare `\Z` anchor would newly block it.
-#
-# The residual cost is an object relative that really is about the claim ("All
-# checks green is a claim that I was wrong about."), which now blocks. That is
-# the visible direction, and it is the one to be wrong in.
+# between. So the carve-out must reach the retraction.
 RX_METALINGUISTIC_HEAD = re.compile(
     r"\b(?:is|was|were|are)\s+"
     r"(?:the|a|an|this|that|my|our|its)?\s*"
@@ -344,7 +338,9 @@ RX_METALINGUISTIC_HEAD = re.compile(
     r"(?:claim|statement|line|note|status|report|reading|call|verdict"
     r"|assertion|assessment|sentence|wording)\s+"
     r"(?:that|which)\s+"
-    r"(?:(?:was|were|is|are|has|had|have|been)\s+)*\Z",
+    r"(?:(?:was|were|is|are|has|had|have|been)\s+"
+    r"|[a-z]+ly\s+"
+    r"|(?:now|then|later|already|always|still|never|ever|just|once|again)\s+)*\Z",
     re.I,
 )
 

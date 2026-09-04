@@ -40,6 +40,13 @@ the push is genuinely unattributable and nothing is re-armed: arming all of
 them would demand N requests for one push and wedge the session, which costs
 more than the gap it closes.
 
+A reviewer REQUEST is not the only discharge, because a request does not
+survive being answered: Copilot consumes it on posting, which empties
+`reviewRequests` and the GET endpoint alike. So a landed Copilot review AT THE
+CURRENT HEAD discharges too, read from a `gh pr view` probe's own result. See
+the "Satisfaction" block below for why the commit, rather than the review
+count, is what the check keys on (ai-config#3001).
+
 Arming is the SAFE direction (an over-warn), so unlike every discharge path it
 does not wait for a result and does not read `is_error`. Only releasing changes
 need positive evidence of success -- see shared/principles/fail-fast.md, "A
@@ -985,6 +992,138 @@ RX_TERMINAL_STATE = re.compile(
     re.I,
 )
 
+# --- Satisfaction: a LANDED review at the current head ---------------------
+# The obligation this guard raises is discharged by a reviewer REQUEST, and a
+# request is consumed the moment Copilot posts: `reviewRequests` empties and
+# the GET endpoint reports nobody. So "never requested" and "requested,
+# reviewed, request consumed" look identical to any request-keyed check -- and
+# the second is the terminal SUCCESS state, so the guard fired hardest exactly
+# when the work was most complete. Each firing then bought another paid review
+# of a diff already reviewed at that commit, and the only way to stop the loop
+# was to ignore the guard (ai-config#3001, measured on `ucdavis/hac.sap` #25
+# and #37, where it fired on four consecutive turns with a Copilot review
+# already sitting at each PR's exact head).
+#
+# The landed review is the positive evidence a consumed request destroys, so
+# satisfaction is read from that instead. Keying on the review's COMMIT rather
+# than on a review COUNT keeps the true positive this guard already caught: a
+# review one commit behind is a stale verdict, not a satisfied obligation. And
+# a PR carrying no Copilot review at all still blocks, so the genuine
+# "never requested" catch is untouched.
+#
+# The patterns below are deliberately plain JSON, not the escaped shape
+# RX_TERMINAL_STATE tolerates: `_payloads` unwraps the dumped tool_result
+# first, so the text these read is already unescaped.
+RX_HEAD_OID = re.compile(
+    r'"(?:headRefOid|head)"\s*:\s*"([0-9a-f]{7,40})"', re.I)
+# Shas inside the `copilot` key of the DIGESTED shape this guard's own recovery
+# text prescribes. Scoped to that key's array, never read from the whole body:
+# some other reviewer's oid sits in exactly the same field, and crediting one
+# would discharge on a review nobody asked Copilot for.
+RX_COPILOT_ARRAY = re.compile(r'"copilot"\s*:\s*\[(.*?)\]', re.I | re.S)
+RX_REVIEW_SHA = re.compile(
+    r'"(?:sha|oid)"\s*:\s*"([0-9a-f]{7,40})"', re.I)
+
+
+def _oid_match(a, b):
+    """True when two object ids denote the same commit.
+
+    Prefix-compared because the prescribed query abbreviates both sides
+    (`.headRefOid[0:8]`, `.commit.oid[0:8]`), so exact string equality would
+    reject the very output the recovery text asks for. Seven hex characters is
+    git's own minimum abbreviation; anything shorter is refused rather than
+    matched loosely, because a shorter prefix collides.
+    """
+    a, b = (a or "").lower(), (b or "").lower()
+    if len(a) < 7 or len(b) < 7:
+        return False
+    return a.startswith(b) or b.startswith(a)
+
+
+def _payloads(body):
+    """Every JSON text carried by a dumped tool_result body.
+
+    `scan` reads results as `json.dumps(content)`, so the payload arrives
+    escaped and the document is one `json.loads` further in. Both the string
+    content shape and the list-of-blocks shape are unwrapped here. The dumped
+    text is kept as a candidate too, so a body this cannot unwrap is scanned
+    rather than silently skipped.
+    """
+    out = [body]
+    try:
+        inner = json.loads(body)
+    except (ValueError, TypeError):
+        return out
+    if isinstance(inner, str):
+        out.append(inner)
+    elif isinstance(inner, dict):
+        out.append(json.dumps(inner))
+    elif isinstance(inner, list):
+        for part in inner:
+            if isinstance(part, str):
+                out.append(part)
+            elif isinstance(part, dict):
+                text = part.get("text")
+                out.append(text if isinstance(text, str) else json.dumps(part))
+    return out
+
+
+def _copilot_oids(text):
+    """Commit oids of the Copilot reviews `text` reports.
+
+    Two shapes reach the transcript. The RAW `gh pr view --json
+    headRefOid,reviews` body nests the author login under one key and the
+    commit oid under another, so attribution is only readable by PARSING; an
+    unparseable body yields nothing, which withholds the discharge rather than
+    guessing at it. The DIGESTED shape (`{head: ..., copilot: [{sha: ...}]}`)
+    carries the attribution in the key name, so its shas are read from that
+    key's array alone.
+    """
+    out = []
+    try:
+        doc = json.loads(text)
+    except (ValueError, TypeError):
+        doc = None
+    if isinstance(doc, dict):
+        for rev in doc.get("reviews") or []:
+            if not isinstance(rev, dict):
+                continue
+            login = (rev.get("author") or {}).get("login") or ""
+            if not str(login).lower().startswith("copilot"):
+                continue
+            oid = (rev.get("commit") or {}).get("oid") or ""
+            if oid:
+                out.append(str(oid))
+        for rev in doc.get("copilot") or []:
+            if isinstance(rev, dict):
+                oid = rev.get("sha") or rev.get("oid") or ""
+                if oid:
+                    out.append(str(oid))
+    m = RX_COPILOT_ARRAY.search(text)
+    if m:
+        out.extend(RX_REVIEW_SHA.findall(m.group(1)))
+    return out
+
+
+def review_at_head(body):
+    """True when `body` reports a Copilot review OF the PR's current head.
+
+    Both halves are required, and requiring both is the whole point: a head
+    oid alone says nothing about review, and a review oid alone cannot tell a
+    current verdict from a stale one.
+    """
+    if not body:
+        return False
+    for text in _payloads(body):
+        heads = RX_HEAD_OID.findall(text)
+        if not heads:
+            continue
+        oids = _copilot_oids(text)
+        if any(_oid_match(h, o) for h in heads for o in oids):
+            return True
+    return False
+
+
 # A PR API path (`repos/o/r/pulls/1038`) inside a shell command, used by
 # _url_ident to read identity from a request command's own `gh api` URL. Open,
 # draft, and request identity are all resolved STRUCTURALLY from the specific
@@ -1676,16 +1815,26 @@ def scan(path):
                             # the entry stays for its own sake and stops
                             # counting against a later PR (see _rearm).
                             _mark_uncertain(live, uncertain, xnum or rnum)
-                    # A PR merged OUTSIDE this session (by a human, or by the
-                    # merge queue) leaves no action in the transcript -- only an
-                    # observation. Discharged on POSITIVE evidence only: the
-                    # probe named one PR, the read did not fail, and the body
-                    # actually reports a terminal state.
+                    # Two states leave no ACTION in the transcript, only an
+                    # observation: a PR merged OUTSIDE this session (by a
+                    # human, or by the merge queue), and a Copilot review that
+                    # has already landed and consumed its own request. Both are
+                    # discharged on POSITIVE evidence only -- the probe named
+                    # one PR, the read did not fail, and the body itself
+                    # reports the state.
                     if rid in pending_probe:
                         pnum, prepo, plast = pending_probe.pop(rid)
-                        if plast and not failed and RX_TERMINAL_STATE.search(body):
-                            _clear(obligations, pnum, prepo)
-                            live.pop(pnum, None)
+                        if plast and not failed:
+                            if RX_TERMINAL_STATE.search(body):
+                                _clear(obligations, pnum, prepo)
+                                live.pop(pnum, None)
+                            elif review_at_head(body):
+                                # The obligation is per-HEAD, and this head
+                                # has its review, so the demand is satisfied
+                                # rather than retired: the PR stays LIVE, and
+                                # a later push that re-heads it re-arms the
+                                # obligation exactly as before (ai-config#3001).
+                                _clear(obligations, pnum, prepo)
                     # A `no-ai-review` label exempts a redaction PR from the
                     # reviewer request, but only once the label has actually
                     # landed: a repo with no such label fails the add outright
@@ -2057,7 +2206,10 @@ def main() -> int:
             "memories/gh-cli.md). Note the list below is per-PR, not "
             "per-head: a review satisfies THIS head only when its `sha` "
             "equals `head`, so read those two rather than the number of "
-            "reviews.\n\n"
+            "reviews. That verification is itself a discharge -- a Copilot "
+            "review at the current head clears this demand, so run it as the "
+            "only command in its call, exactly as with the request "
+            "above.\n\n"
             "    gh pr view \"<N>\" --json headRefOid,reviews \\\n"
             "      --jq '{head: .headRefOid[0:8], copilot: [.reviews[] "
             "| select((.author.login // \"\") | startswith(\"copilot\")) "

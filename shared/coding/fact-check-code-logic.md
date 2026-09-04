@@ -632,6 +632,59 @@ See
 was wrong" for the general form this instance is one of three of, all
 on the same PR.)
 
+### Three ways an assertion passes without ever seeing the value it names
+
+The vacuous modes above concern an assertion evaluated against an empty or self-satisfying collection.
+These three concern an assertion evaluated against a **non-empty** stream that is not the stream the test claims to be reading.
+Each looks like ordinary, specific coverage --- a named value,
+an anchored pattern, a real comparison ---
+and each passes against deliberately broken code.
+
+- **The harness merges the streams.**
+  A runner that captures stdout and stderr into one buffer lets any log line,
+  progress message,
+  or warning satisfy an anchored grep meant for the program's *output*.
+  The assertion is specific, the pattern is anchored,
+  and the value it matched was written by the logger.
+  Check what the harness captures before trusting any assertion over captured text,
+  and assert against the stream you mean by capturing them separately.
+- **Two values are emitted as one field.**
+  When a formatter concatenates two variables with no separator,
+  a test asserting on the combined field cannot distinguish them,
+  so a defect that swaps, drops,
+  or duplicates one of the two leaves the assertion intact.
+  Assert on the parsed fields, or on a separator the format guarantees ---
+  not on a substring of the joined line.
+- **A subsequence match cannot see an appended item.**
+  An `in_order`-style assertion checks that the named items appear in that relative order.
+  Extra content between them, and extra content after the last of them,
+  satisfies it by construction ---
+  so a test written to pin an output's shape is blind to anything the code appends.
+  Pair every ordering assertion with a length or exact-set assertion,
+  or the ordering check is a lower bound and nothing more.
+
+The general form: **name the stream, the field,
+and the completeness the assertion actually constrains**,
+and check that each is the one the test is about.
+All three survive the "does it read as coverage" glance precisely because the assertion names a real,
+specific value --- what is wrong is the haystack, not the needle.
+
+- **Do:** state, for each assertion, which stream it reads,
+  which field it isolates, and what it forbids the output from also containing.
+- **Do:** pair an ordering assertion with an exact-set or length assertion,
+  so it constrains more than a lower bound.
+- **Don't:** trust an assertion over captured text without checking whether the harness captured one stream or two.
+- **Don't:** read a specific, named,
+  anchored expected value as evidence the assertion is discriminating ---
+  specificity of the needle says nothing about the haystack.
+
+(Measured 2026-09-02 Pacific on [ai-config#3023](https://github.com/Morrison-Lab/ai-config/pull/3023), whose own body records "Nine adversarial rounds,
+34 findings", several rounds finding a real defect in the previous round's fix.
+The three shapes above account for three of the four occasions on that PR where a suite passed against deliberately broken code.
+The fourth --- asserting a value is PRESENT on the failure path without asserting it ABSENT on the success path ---
+is the positive-fixture-without-negative-control case that "A predicate a fix adds needs mutation in both directions" above already covers,
+and is recorded as a recurrence of that entry rather than written again here.)
+
 ## When the runtime is available, run the claim instead of reasoning about it
 
 Every check above can be done by reading.

@@ -366,6 +366,58 @@ class TestEvaluate(unittest.TestCase):
         state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
         self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "deny")
 
+    def test_prose_after_the_approval_sentence_does_not_approve(self):
+        """The withholding sentence carries no vetoed word, so a lexical
+        veto could not see it: "Please fix the typo." and "The parser drops
+        tokens." are open requests under an approving headline, and the
+        second names no request verb at all. The bar after the approval
+        sentence is therefore emptiness, not vocabulary."""
+        for body in ("Ready for merge.\n\nPlease fix the typo in the "
+                     "docstring.",
+                     "Ready for merge.\n\nThe parser drops tokens.",
+                     "Ready for merge.\n\nI want tests for the empty case.",
+                     "Ready for merge. Please fix the typo."):
+            state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+            self.assertEqual(
+                gate.evaluate(MERGE_CMD, state)["decision"], "deny", body)
+
+    def test_praise_after_the_approval_sentence_also_does_not_approve(self):
+        """The deliberate boundary of the case above: no lexical rule
+        separates "The fix is exactly what I would have written." from
+        "The parser drops tokens.", so both deny. Enumerating in the allow
+        direction fails closed; enumerating in the veto direction
+        authorizes a merge over whatever the list omits."""
+        for body in ("Approved. Nice work, this is much cleaner than before.",
+                     "Ready for merge. The fix is exactly what I would have "
+                     "written.",
+                     "Ready for merge. I checked the docs after reading the "
+                     "diff."):
+            state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+            self.assertEqual(
+                gate.evaluate(MERGE_CMD, state)["decision"], "deny", body)
+
+    def test_pipeless_findings_table_above_the_heading_does_not_approve(self):
+        """GitHub Flavored Markdown renders a table with no leading pipe
+        identically, so the structural veto keys on the delimiter row as
+        well. The lead-in is where that still matters: below the approval
+        sentence any line at all vetoes."""
+        body = ("file | issue\n--- | ---\na.py | drops tokens\n\n"
+                "### Verdict\n\nReady for merge.")
+        state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "deny")
+
+    def test_mid_line_colon_nit_above_the_heading_does_not_approve(self):
+        """The findings vocabulary runs over the whole lead line: the colon
+        sits mid-line in "Minor: consider renaming x", so an end-anchored
+        colon test never fired on the shape it was written for."""
+        for body in ("Minor: consider renaming x.\n\n### Verdict\n\n"
+                     "Ready for merge.",
+                     "One nit: rename x.\n\n### Verdict\n\n"
+                     "Ready for merge."):
+            state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+            self.assertEqual(
+                gate.evaluate(MERGE_CMD, state)["decision"], "deny", body)
+
     def test_body_approval_on_a_pr_opened_by_someone_else_allows(self):
         """The self-approval bound is keyed on the PR author, so it does not
         fire on a chore PR someone else opened: what stands between an

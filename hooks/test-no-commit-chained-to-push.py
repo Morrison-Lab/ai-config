@@ -425,11 +425,19 @@ check("an override on a later commit does not clear an already-matched chain",
             "ALLOW_COMMIT_AND_PUSH=1 git commit -m b"), True)
 # The same shape with the overridden commit BETWEEN the matched commit and the
 # push, which is the position ai-config#3003 asked for and the one no case
-# here covered. It is a BEHAVIOURAL pin rather than a mutation probe: it
-# cannot separate a mutant that only drops `and commit_argv is None` (see the
-# block below), but it does go silent under the compound regression of
-# dropping that clause AND restoring the overridden commit's `return None`,
-# which is a shape this hook has shipped before. Measured on this branch.
+# here covered. That position is its whole contribution. It is a BEHAVIOURAL
+# pin rather than a mutation probe: it cannot separate a mutant that only
+# drops `and commit_argv is None` (see the block below), and the compound
+# regression of dropping that clause AND restoring the overridden commit's
+# `return None` already turns "an override on the first commit does not cover
+# a second, unprotected one" above red, so the compound is not what this case
+# adds either. Both mutants measured on scratch copies of the hook.
+#
+# The `return None` spelling never landed: `git log --follow origin/main --
+# hooks/no-commit-chained-to-push.py` returns one commit, and it ADDS the file
+# already carrying `continue`. It existed on the unmerged branch behind
+# ai-config#3023, which is what the hook's own "`continue`, never `return
+# None`" comment means by "Measured on this branch before the fix".
 check("an override on a middle commit does not clear the first-matched chain",
       fires("git commit -m a && ALLOW_COMMIT_AND_PUSH=1 git commit -m b "
             "&& git push"), True)
@@ -443,10 +451,14 @@ check("an override on a middle commit does not clear the first-matched chain",
 # No `fires` assertion can close it. That issue proposed
 # `git commit -m a && ALLOW_COMMIT_AND_PUSH=1 git commit -m b && git push`
 # and reported the mutant allowing it; measured on this branch, the mutant
-# DENIES it too, because an overridden second commit takes the `continue` and
-# leaves `commit_argv` holding the first commit either way. The clause changes
-# only WHICH argv is stored, never whether one is, so the two modules give the
-# SAME deny/allow answer on every input. The one observable difference is the
+# DENIES it too, by a DIFFERENT path from the shipped module. The mutant
+# enters the commit branch on that second commit, reads the override, and
+# takes the `continue`. The shipped clause is already False there, because
+# `commit_argv` holds the first commit, so it never reads the override at all
+# and falls through to the `elif`. Either way `commit_argv` still holds the
+# first commit when the push arrives. The clause changes only WHICH argv is
+# stored, never whether one is, so the two modules give the SAME deny/allow
+# answer on every input. The one observable difference is the
 # commit the refusal NAMES -- the command the message identifies as the one
 # about to be lost. M10 below is the matching mutation.
 _TWO_COMMITS = hook.evaluate("git commit -m a && git commit -m b && git push") or ""

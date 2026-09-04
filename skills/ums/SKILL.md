@@ -531,8 +531,9 @@ add a review gate for the cases that need one.
 - ❌ Patching a sentence the entry's point does not need, round after round.
   When successive review rounds find defects in mechanism prose no reader
   acts on, delete the prose rather than repair it; the tell is the third
-  round on the same paragraph (ai-config#3193: rounds 3 to 7 of ten went to
-  protocol detail the entry's Do/Don't never used, and the cut held).
+  round on the same paragraph (ai-config#3193: five successive commits,
+  `54c8e5fb` to `4af1f1ea`, went to protocol detail the entry's Do/Don't never
+  used, and the cut at `e91dda59` held through the remaining rounds).
 
 ## Proactive hook compliance
 

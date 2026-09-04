@@ -50,10 +50,12 @@ false-positive injection-detector block that reproduces every round" (#818)
 is the precedent, held for the maintainer.
 `jules/review` is a commit status read from `commits/<sha>/status`
 ([`fully-clean.md`](../shared/workflow/fully-clean.md) criterion 1), and on
-2026-09-03 it was outside the repository's required set: with it red and
-every check run green, `GET /pulls/3154` reported `mergeable_state: unstable`
-rather than `blocked`, the discriminator the bcs `test-coverage` bullet above
-records (re-read the required set on a live PR; the set changes without a commit).
+2026-09-03 `jules/review` was outside the repository's required set: with
+that status red and every check run green, `GET /pulls/3154` reported
+`mergeable_state: unstable` rather than `blocked`, the discriminator the bcs
+`test-coverage` bullet in [`github-actions.md`](github-actions.md) records.
+Re-read the required set on a live PR;
+the set changes without a commit.
 The #3154 merge went over the red status under the standing grant;
 [#3192](https://github.com/Morrison-Lab/ai-config/issues/3192) puts that
 disposition to the maintainer.

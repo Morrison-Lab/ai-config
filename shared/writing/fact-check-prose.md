@@ -996,7 +996,7 @@ on GNU grep 3.11 `-zz` is the valid `-z` flag twice, so grep took the first path
 exiting on whether that accidental pattern matched; `-Q` is the case that exits 2.
 `a51a170f`'s body quoted the error for a `[` subject as "Unmatched [", the reviewer's wording, where the tool prints "Invalid regular expression".
 The prose line that same commit added, and the prepared squash body, said a bare `(` motivates `-F`;
-`(` is a literal in grep's default BRE mode and only `[` errors, which `27bb9588` corrected.
+`(` is a literal in grep's default BRE mode and `[` is the one of those four that errors, which `27bb9588` corrected.
 The `(` case was caught by an adversarial verdict that ran the command;
 the other two surfaced while re-measuring for the next round's PR comment,
 and each correction went onto the PR and into the squash body rather than into an amend.

@@ -199,7 +199,7 @@ Morrison-Lab/ai-config#1174.)
 
 The section above routes between repos;
 the same miss happens inside one repo
-when the dupe check is scoped to a directory that does not hold the file owning the rule.
+when the dupe check is scoped to a directory that does not hold the file already owning the idea being recorded.
 
 - **Do:** grep [`skill-builder`](../../skills/skill-builder/SKILL.md) step 0's path list,
   not only the directory the destination sits in.

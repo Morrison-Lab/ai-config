@@ -125,7 +125,7 @@ committed pass.
      `-I` skips binary files, bytecode caches included, which a plain `grep -r` would otherwise report as hits.
      A rule can be owned by a `shared/` fragment or a skill as easily as by a memory,
      and a `memories/`-only grep stays outside those paths.
-     When such an entry exists, extend it in place; don't add a second bullet.
+     When the grep finds an existing entry on the subject, extend that entry in place; don't add a second bullet.
      (ai-config#689: a `list_workflow_runs` cost bullet went in next to the
      related `get_check_runs` guidance while an entry on the same tool already
      sat ~2000 lines below in the write-access cluster -- caught by the review

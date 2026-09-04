@@ -840,7 +840,7 @@ the first in a file the diff does not carry (`search-is-not-coverage.md`),
 the second in `grep-is-not-coverage.md`, which the diff does change, so an
 item can quote the diff and still be the misfire the instructions forbid.
 The same PR had two earlier prompt-injection blocks: one at `3084b58d` on the
-PR description, and one at `f6b9f7f3` quoting the same workflow config, which
+PR description, and one at 17:59 PDT quoting the same workflow config, which
 a single re-run cleared (approve four minutes later).
 The reviewer had also approved `27bb9588`, two ASCII dashes before `c5eb3da3`,
 so the block is nondeterministic across runs on the same words.

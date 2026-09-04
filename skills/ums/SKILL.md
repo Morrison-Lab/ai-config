@@ -528,6 +528,13 @@ add a review gate for the cases that need one.
   of inside it. (Caught by `@claude` review on ai-config#335: a new 0-indent
   bullet landed between two sibling sub-bullets of an existing parent,
   breaking the nesting.)
+- ❌ Patching a sentence the entry's point does not need, round after round.
+  When successive review rounds find defects in mechanism prose no reader
+  acts on, delete the prose rather than repair it; the tell is the third
+  round on the same paragraph (ai-config#3193: five successive commits,
+  `1fff7e63` to `4af1f1ea`, each re-patched the same protocol-mechanism
+  sentences, which the entry's Do/Don't never used and `e91dda59` deleted;
+  the deleted paragraphs were not restored).
 
 ## Proactive hook compliance
 

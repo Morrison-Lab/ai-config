@@ -54,8 +54,8 @@ models:
 # Never chain a commit into a push inside one cli value. A PreToolUse deny
 # rejects the whole Bash invocation, so a refused push discards the commit
 # along with it, and hooks/no-commit-chained-to-push.py refuses that shape
-# outright. This registry is the one place a model copies a command from
-# verbatim, so a chained example here becomes a chained call there.
+# outright. This registry is a place a model copies a command from verbatim,
+# so a chained example here becomes a chained call there.
 #   Do: stop the cli value at the commit and reach for the PUSH operation
 #       as a separate call.
 #   Don't: join a commit to a push with `&&` in a cli value, however

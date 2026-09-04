@@ -185,10 +185,13 @@ class TestEvaluate(unittest.TestCase):
     def test_human_commented_review_with_approving_body_allows(self):
         """ai-config#3062: reviewers here submit COMMENTED, never APPROVED,
         so approval has to be readable from the body's substance too --
-        otherwise the human-approval allow-path can never fire."""
+        otherwise the human-approval allow-path can never fire. The
+        reachable shape is the approval and nothing else: bare, emphasized,
+        terminated, or under a `### Verdict` heading."""
         for body in ("Ready for merge.",
-                     "Approved -- nothing further from me.",
-                     "### Verdict\n**Ready for merge** --- looks right."):
+                     "Approved",
+                     "**Ready for merge**.",
+                     "### Verdict\n\n**Ready for merge**"):
             state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
             self.assertEqual(
                 gate.evaluate(MERGE_CMD, state)["decision"], "allow", body)
@@ -258,7 +261,7 @@ class TestEvaluate(unittest.TestCase):
         review from the PR's own author cannot authorize its merge."""
         state = pr(
             reviews=[review("d-morrison", "COMMENTED",
-                            "### Verdict\n\n**Ready for merge** -- no findings.")],
+                            "### Verdict\n\n**Ready for merge**")],
             author="d-morrison",
         )
         decision = gate.evaluate(MERGE_CMD, state)
@@ -282,8 +285,10 @@ class TestEvaluate(unittest.TestCase):
         self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "deny")
 
     def test_body_approval_naming_a_non_head_commit_is_stale(self):
-        """GitHub never dismisses a COMMENTED review, so without a staleness
-        check an approval written before ten further pushes would stand."""
+        """GitHub never dismisses a COMMENTED review, so an approval written
+        before ten further pushes must not stand. The review's own
+        `commit.oid` is what head-binds it; a `Reviewed commit:` footer is
+        one more line, so the emptiness bar refuses this body regardless."""
         body = ("### Verdict\n**Ready for merge**\n\n"
                 "Reviewed commit: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
         state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
@@ -322,9 +327,9 @@ class TestEvaluate(unittest.TestCase):
         """This corpus's own review layout puts `### Findings` *above*
         `### Verdict` (shared/workflow/self-review-fallback.md), so a veto
         scoped to the post-heading text would be defeated by section order
-        rather than by substance. The lead-in is held to the conditional
-        bar too, so prose withholding approval above the heading vetoes the
-        heading's own headline."""
+        rather than by substance. The lead-in is held to the same
+        emptiness bar, so prose withholding approval above the heading
+        vetoes the heading's own headline."""
         for body in ("### Findings\n\n- the migration lacks a down-step\n"
                      "- the parser drops tokens\n\n### Verdict\n\n"
                      "**Ready for merge**",
@@ -334,9 +339,9 @@ class TestEvaluate(unittest.TestCase):
             self.assertEqual(
                 gate.evaluate(MERGE_CMD, state)["decision"], "deny", body)
 
-    def test_conditional_marker_below_the_headline_does_not_approve(self):
+    def test_withholding_prose_below_the_headline_does_not_approve(self):
         """The withholding half of a qualified approval survives a line
-        break, so anchoring the marker test on the headline let the same
+        break, so anchoring any test on the headline alone let the same
         sentence families through one newline lower."""
         for body in ("Ready for merge.\nBut please fix the typo in the "
                      "docstring.",
@@ -349,7 +354,7 @@ class TestEvaluate(unittest.TestCase):
             self.assertEqual(
                 gate.evaluate(MERGE_CMD, state)["decision"], "deny", body)
 
-    def test_conditional_marker_below_the_verdict_heading_does_not_approve(self):
+    def test_withholding_prose_below_the_verdict_heading_does_not_approve(self):
         """The mirror of the lead-in case: the same words that veto above a
         `### Verdict` heading must veto below it, or section order decides
         the merge rather than substance."""
@@ -381,6 +386,45 @@ class TestEvaluate(unittest.TestCase):
             self.assertEqual(
                 gate.evaluate(MERGE_CMD, state)["decision"], "deny", body)
 
+    def test_clause_joined_request_after_the_approval_does_not_approve(self):
+        """A sentence-punctuation split reads only `.`, `!`, and `?`, so
+        every other clause joiner kept the open request inside the approval
+        sentence and merged over it. The bar is the whole line matched end
+        to end, so the joiner cannot decide the merge."""
+        for body in ("Ready for merge; please fix the typo in the docstring.",
+                     "Ready for merge, please fix the typo in the docstring.",
+                     "Ready for merge: the parser drops tokens.",
+                     "Ready for merge -- please fix the typo in the "
+                     "docstring.",
+                     "Ready for merge --- please fix the typo in the "
+                     "docstring.",
+                     "Approved --- nothing further from me."):
+            state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+            self.assertEqual(
+                gate.evaluate(MERGE_CMD, state)["decision"], "deny", body)
+
+    def test_quoted_or_fenced_remainder_after_the_approval_denies(self):
+        """Blanking is sound in the approval direction and unsound in the
+        veto direction: it would delete the region before the emptiness
+        test ever saw it, so a reviewer quoting the line they want changed,
+        or pasting the offending snippet in a fence, would merge over an
+        open request. Nothing is blanked here, so both add lines."""
+        for body in ("Ready for merge.\n\n> Please fix the typo in the "
+                     "docstring.",
+                     "Ready for merge.\n\n```\nPlease fix the typo.\n```"):
+            state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+            self.assertEqual(
+                gate.evaluate(MERGE_CMD, state)["decision"], "deny", body)
+
+    def test_lone_quoted_approval_does_not_approve(self):
+        """The other half of not blanking: with the blockquote markers left
+        in place, a one-line body quoting someone else's approval would
+        otherwise be trimmed down to that approval."""
+        for body in ("> Ready for merge.", ">> Approved"):
+            state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+            self.assertEqual(
+                gate.evaluate(MERGE_CMD, state)["decision"], "deny", body)
+
     def test_praise_after_the_approval_sentence_also_does_not_approve(self):
         """The deliberate boundary of the case above: no lexical rule
         separates "The fix is exactly what I would have written." from
@@ -398,18 +442,18 @@ class TestEvaluate(unittest.TestCase):
 
     def test_pipeless_findings_table_above_the_heading_does_not_approve(self):
         """GitHub Flavored Markdown renders a table with no leading pipe
-        identically, so the structural veto keys on the delimiter row as
-        well. The lead-in is where that still matters: below the approval
-        sentence any line at all vetoes."""
-        body = ("file | issue\n--- | ---\na.py | drops tokens\n\n"
+        identically, so a structural veto keyed on the leading pipe saw
+        only half of them. No cell here carries findings vocabulary either,
+        so nothing but the emptiness bar can deny it."""
+        body = ("file | note\n--- | ---\na.py | drops tokens\n\n"
                 "### Verdict\n\nReady for merge.")
         state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
         self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "deny")
 
     def test_mid_line_colon_nit_above_the_heading_does_not_approve(self):
-        """The findings vocabulary runs over the whole lead line: the colon
-        sits mid-line in "Minor: consider renaming x", so an end-anchored
-        colon test never fired on the shape it was written for."""
+        """A nit stated above the heading is a line, so the emptiness bar
+        denies it wherever the colon sits. An end-anchored colon test never
+        fired on "Minor: consider renaming x" at all."""
         for body in ("Minor: consider renaming x.\n\n### Verdict\n\n"
                      "Ready for merge.",
                      "One nit: rename x.\n\n### Verdict\n\n"
@@ -440,13 +484,25 @@ class TestEvaluate(unittest.TestCase):
         self.assertEqual(
             gate.evaluate(MERGE_CMD, disclosed)["decision"], "deny")
 
-    def test_innocuous_lead_in_above_the_verdict_heading_still_allows(self):
-        """The control for the case above: widening the veto to the whole
-        body must not deny every review that writes a sentence before its
-        heading, or the allow-path ai-config#3062 revived dies again."""
-        body = "I read the whole diff.\n\n### Verdict\n\nReady for merge."
-        state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
-        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "allow")
+    def test_lead_in_above_the_verdict_heading_does_not_approve(self):
+        """One bar governs both zones. Exempting the lead-in from the
+        emptiness test only relocated the findings: this corpus's own
+        review layout puts them above the heading, so a lexical bar there
+        let "Please fix the typo." authorize the merge it denied one line
+        lower. Innocuous narration denies with them, which is the
+        deliberate cost -- no lexical rule separates "I read the whole
+        diff." from "The parser drops tokens."""
+        for body in ("I read the whole diff.\n\n### Verdict\n\n"
+                     "Ready for merge.",
+                     "Please fix the typo in the docstring.\n\n"
+                     "### Verdict\n\nReady for merge.",
+                     "The parser drops tokens.\n\n### Verdict\n\n"
+                     "Ready for merge.",
+                     "I want tests for the empty case.\n\n### Verdict\n\n"
+                     "Ready for merge."):
+            state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+            self.assertEqual(
+                gate.evaluate(MERGE_CMD, state)["decision"], "deny", body)
 
     def test_agent_disclosure_in_a_quoted_or_fenced_region_still_denies(self):
         """The marker test reads the raw body: blanking exists to stop a

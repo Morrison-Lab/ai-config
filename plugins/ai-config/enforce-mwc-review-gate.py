@@ -28,10 +28,10 @@ merged over a "Needs more work" verdict (reverted in sparta#1429):
   author, never from an `authorAssociation` outside the repository,
   never from a review whose own `commit.oid` is not the head, never from
   a raw body carrying the agent-disclosure marker (quoted or fenced
-  included), never past a `Reviewed commit:` other than the head, never
-  from an approval sentence carrying a conditional, qualifier, or
-  interrogative marker, and never when substantive prose follows that
-  sentence; a later non-approving review from the same human retracts it.
+  included), and never from a body that says anything besides the
+  approval itself -- one line, under an optional `### Verdict` heading,
+  matched end to end, with no lead-in, no trailing clause, and no later
+  line; a later non-approving review from the same human retracts it.
   Those bounds carry a narrower property across the reviews channel
   than the comments channel enforces: an agent posting under the user's
   login cannot approve the merge of a PR it opened. On a PR someone else
@@ -95,58 +95,11 @@ NOT_CLEAN_VERDICT_RE = re.compile(
 REVIEWED_COMMIT_RE = re.compile(
     r"Reviewed[-\s]commit[:\s]+`?([0-9a-f]{7,40})`?", re.IGNORECASE
 )
-# Leading Markdown emphasis, heading, quote, and list markup, so an
-# approval headline can be anchored at the start of its own text.
-LEADING_MARKUP_RE = re.compile(r"^[\s*_~`#>+-]+")
-# A bot verdict headline sits under `### Verdict` by convention, so a
-# CLEAN_VERDICT_RE substring hit is safe there. A human review body has no
-# such structure, so its prose is arbitrary and a conditional or
-# interrogative sentence ("Ready for merge once you rebase", "I'd approve
-# if...") would otherwise read as an approval it explicitly withholds.
-# The second half of the alternation is the *qualifier* family, which the
-# first half missed: "Ready for merge but please fix the typo" and
-# "Approved, though the docstring drifts" each withhold approval in the
-# same breath as granting it, and are the commonest way a reviewer does so.
-# The veto runs over the approval *sentence*, and over any lead-in above a
-# `### Verdict` heading -- not over every line. Running it over every line
-# denied ordinary praise ("much cleaner than before", "exactly what I would
-# have written") on words no reviewer reads as conditional, while still
-# allowing "Ready for merge." over "Please fix the typo.", which carries no
-# listed word at all. Prose *after* the approval sentence is therefore
-# bounded structurally rather than lexically, in
-# `human_review_body_approves`.
-CONDITIONAL_MARKER_RE = re.compile(
-    r"\?|'d\b|\b(?:if|once|after|before|unless|until|when|would|assuming"
-    r"|pending|provided|modulo"
-    r"|but|though|although|except|aside|apart|save)\b",
-    re.IGNORECASE,
-)
-# An approval sentence ends at the first `.`, `!`, or `?` followed by
-# whitespace; a headline with no internal break is one sentence.
-SENTENCE_BREAK_RE = re.compile(r"(?<=[.!?])\s+")
-# The clean bar (skills/pr-status/SKILL.md): an approving headline with
-# *zero* follow-on findings. Below the approval sentence that bar is now
-# enforced by requiring emptiness, so these two patterns police the lead-in
-# above a `### Verdict` heading -- the one place a reviewer may write prose
-# and still approve. FINDINGS_VOCAB_RE runs over the whole line rather than
-# only a line *ending* in a colon: the colon sits mid-line in "Minor:
-# consider renaming x", so the end-anchored form never fired on the shape
-# it was written for.
-FINDINGS_VOCAB_RE = re.compile(
-    r"\b(findings?|issues?|remaining|open items?|blockers?|non-?blocking"
-    r"|minor|nits?|nitpicks?|suggestions?|consider|could improve"
-    r"|follow-?ups?)\b",
-    re.IGNORECASE,
-)
-# The last two alternatives are Markdown table rows: a findings *table* is
-# an ordinary way to list findings, and GitHub Flavored Markdown renders a
-# table with no leading pipe identically, so a veto keyed on the leading
-# pipe alone saw only half of them. The second alternative is the delimiter
-# row every GFM table must carry, pipe-led or not.
-FINDINGS_STRUCTURE_RE = re.compile(
-    r"^\s*(?:#{1,6}\s|[-*+]\s|\d+[.)]\s|\|)"
-    r"|^[ \t]*:?-{3,}:?[ \t]*\|"
-)
+# Markdown emphasis and terminal punctuation around an approval headline,
+# so `**Ready for merge**.` reads as the phrase itself. Heading, quote, and
+# list markers are deliberately absent: a human approval must be the bare
+# phrase, and a quoted or bulleted line is not it.
+HEADLINE_TRIM_RE = re.compile(r"^[\s*_~`]+|[\s*_~`.!]+$")
 # The corpus-mandated agent-disclosure marker, plus the headers review
 # workflows post under. `gh pr review --comment` is a first-class agent
 # surface (hooks/require-agent-disclosure.py gates it), so a review body
@@ -186,7 +139,7 @@ def is_bot_login(login):
             or login.removesuffix("[bot]") in REVIEWER_BOT_LOGINS)
 
 
-def human_review_body_approves(body, head_oid=""):
+def human_review_body_approves(body):
     """Whether a human review body affirmatively approves the PR.
 
     An `APPROVED` state alone cannot carry human approval in this corpus,
@@ -197,92 +150,52 @@ def human_review_body_approves(body, head_oid=""):
     wait for a formal APPROVED review. So read the body's substance beside
     the state.
 
-    Only the headline can approve -- the first non-empty line, or the first
-    line under a `### Verdict` heading when the body carries one -- so a
-    review whose prose merely mentions an "approved" helper does not read
-    as an approval. The body is read as two zones. Up to and including the
-    approval sentence the vetoes are lexical and structural; after that
-    sentence nothing substantive may stand at all. Both zones are policed,
-    not the verdict section alone, because this corpus's own review layout
-    puts the findings first (`### Findings` above `### Verdict`, per
-    shared/workflow/self-review-fallback.md), so a veto scoped to the
-    post-heading text would be defeated by section order rather than by
-    substance.
-    Blockquoted and fenced regions are blanked exactly as
-    `evaluate_verdict` blanks them, so a review quoting someone else's
-    approval is not itself one.
+    The rule is that a reviewer who wants to authorize writes the approval
+    and stops. One bar governs the whole body, not one bar per zone: every
+    non-empty line is collected, an optional `### Verdict` heading may
+    stand above them, and exactly one line may remain -- the approval
+    phrase itself, once Markdown emphasis and a terminal `.` or `!` are
+    trimmed, matched end to end rather than as a substring.
 
-    Four further bounds, each closing a route by which this would be
-    looser than the `APPROVED` state it stands in for:
+    That bar is emptiness rather than a word list because the ways of
+    withholding an approval are unbounded while an approval is not.
+    Enumerating in the allow direction fails closed; enumerating in the
+    veto direction authorizes a merge over whatever the list omits. Three
+    earlier attempts at the veto direction each shipped a hole a reviewer
+    could walk through in ordinary prose: a conditional word list let
+    "Ready for merge." stand over "Please fix the typo."; splitting the
+    headline on sentence punctuation let the same request back in joined
+    by a semicolon, comma, colon, or dash; and exempting the lead-in above
+    a `### Verdict` heading let the findings stand wherever this corpus's
+    own review layout puts them (`### Findings` above `### Verdict`, per
+    shared/workflow/self-review-fallback.md).
+
+    Nothing is blanked before the count, either. Blockquoting and fencing
+    hide a region from a veto that reads text, so a quoted request or a
+    fenced snippet would otherwise vanish and leave a bare approval
+    standing. Here they add lines instead. `>` is also absent from the
+    trim, so a body quoting someone else's approval is not itself one.
+
+    Two further bounds, each closing a route by which this would be looser
+    than the `APPROVED` state it stands in for:
 
     - a body carrying the agent-disclosure marker is not human approval,
-      whichever login submitted the review. That one test reads the RAW
-      body rather than the blanked one, because blanking works the other
-      way here: it exists to stop a quoted *approval* counting, so
-      running it first let one `>` character delete the disclosure and
-      turn an agent's own review into a human approval;
-    - a body whose `Reviewed commit:` is not the PR head is stale and
-      denies, exactly as `classify_verdict_body` treats a verdict
-      comment. That footer is a bot convention, so a human review body
-      does not carry one and this check usually does not fire; the head
-      binding that does is the review's own `commit.oid`, in
-      `body_approval_is_admissible`;
-    - the headline must *begin* with an approval phrase, and the approval
-      sentence itself must carry no conditional, qualifier, or
-      interrogative marker, so "Ready for merge once you rebase",
-      "Ready for merge but fix the typo", and "Two questions before I
-      approve" do not approve;
-    - nothing substantive may follow that sentence -- not the rest of its
-      own line, not a later line, whichever side of a `### Verdict`
-      heading it sits on. That bar is emptiness rather than a word list
-      because the ways of withholding an approval are unbounded while an
-      approval is not. A lexical veto let "Ready for merge." stand over
-      "Please fix the typo.", over "The parser drops tokens.", and over a
-      findings table written without leading pipes -- none of which
-      carries a vetoed word -- while denying praise that happened to
-      contain "before" or "would". Enumerating in the allow direction
-      fails closed; enumerating in the veto direction authorizes a merge
-      over whatever the list omits. The lead-in above a `### Verdict`
-      heading is the one place prose may still stand, and it keeps the
-      lexical and structural bars.
+      whichever login submitted the review;
+    - the review must be head-bound and its author a repository member,
+      which `body_approval_is_admissible` checks on the review record
+      rather than on its prose.
     """
     if not body:
         return False
     if AGENT_AUTHORSHIP_RE.search(body):
         return False
-    blanked = FENCE_RE.sub("", BLOCKQUOTE_LINE_RE.sub("", body))
-    if NOT_CLEAN_VERDICT_RE.search(blanked):
+    lines = [ln.strip() for ln in body.splitlines() if ln.strip()]
+    if lines and VERDICT_MARKER_RE.match(lines[0]):
+        rest = VERDICT_MARKER_RE.sub("", lines[0], count=1).strip()
+        lines = ([rest] if rest else []) + lines[1:]
+    if len(lines) != 1:
         return False
-    shas = REVIEWED_COMMIT_RE.findall(blanked)
-    if shas and head_oid and not head_oid.startswith(shas[-1]):
-        return False
-    lead = ""
-    if VERDICT_MARKER_RE.search(blanked):
-        lead, blanked = VERDICT_MARKER_RE.split(blanked, maxsplit=1)
-    lines = [ln.strip() for ln in blanked.splitlines() if ln.strip()]
-    if not lines:
-        return False
-    headline = LEADING_MARKUP_RE.sub("", lines[0])
-    if not CLEAN_VERDICT_RE.match(headline):
-        return False
-    parts = SENTENCE_BREAK_RE.split(headline, maxsplit=1)
-    if CONDITIONAL_MARKER_RE.search(parts[0]):
-        return False
-    # Nothing substantive after the approval sentence: neither the rest of
-    # its own line nor any later one.
-    if len(parts) > 1 and parts[1].strip():
-        return False
-    if lines[1:]:
-        return False
-    # The lead-in above the heading is the reviewer's own prose, so it
-    # keeps the lexical and structural bars.
-    lead_lines = [ln.strip() for ln in lead.splitlines() if ln.strip()]
-    return not any(
-        CONDITIONAL_MARKER_RE.search(line)
-        or FINDINGS_STRUCTURE_RE.search(line)
-        or FINDINGS_VOCAB_RE.search(line)
-        for line in lead_lines
-    )
+    return bool(CLEAN_VERDICT_RE.fullmatch(HEADLINE_TRIM_RE.sub("", lines[0])))
 
 
 def body_approval_is_admissible(review, head_oid):
@@ -366,8 +279,7 @@ def latest_human_review_states(reviews, head_oid="", pr_author=""):
             inferred.discard(login)
         elif state == "COMMENTED" and states.get(login) != "CHANGES_REQUESTED":
             if (body_approval_is_admissible(r, head_oid)
-                    and human_review_body_approves(
-                        r.get("body", "") or "", head_oid)):
+                    and human_review_body_approves(r.get("body", "") or "")):
                 # Only an approval this body established is retractable.
                 # Marking the login inferred while a formal APPROVED already
                 # stands would let the next chatty review pop that formal

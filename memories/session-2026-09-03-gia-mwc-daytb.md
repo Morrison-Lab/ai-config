@@ -196,3 +196,210 @@ So the three sites now name `docs/subagent-report-trailer` and `claude/ums-load-
 Worth recording as its own small pattern: a rule written and applied in the same commit is exactly where the application gets checked least, because writing the rule *feels* like the work.
 The reviewer that catches it is reading the two as one artifact, which the author cannot.
 
+
+## Phase 1 outcome, and the one pattern the whole night was about
+
+Merged: [#3024](https://github.com/Morrison-Lab/ai-config/pull/3024), [#3093](https://github.com/Morrison-Lab/ai-config/pull/3093).
+Driven to clean and pushed: [#3084](https://github.com/Morrison-Lab/ai-config/pull/3084) (`23933b1b`), [#3060](https://github.com/Morrison-Lab/ai-config/pull/3060) (`c851d68f`).
+Left to the concurrent peer: [#3023](https://github.com/Morrison-Lab/ai-config/pull/3023), [#3089](https://github.com/Morrison-Lab/ai-config/pull/3089).
+Filed: [#3098](https://github.com/Morrison-Lab/ai-config/issues/3098).
+Annotated out-of-diff: [#3050](https://github.com/Morrison-Lab/ai-config/issues/3050) (carries a claim [#3084](https://github.com/Morrison-Lab/ai-config/pull/3084) retracted), [#3083](https://github.com/Morrison-Lab/ai-config/issues/3083) (a second symptom of the stop hook), [#3089](https://github.com/Morrison-Lab/ai-config/pull/3089) (a fifth occurrence of the false-clean its bump fixes).
+
+Findings per round, which is the number worth keeping:
+
+| PR | rounds | findings |
+|---|---|---|
+| [#3084](https://github.com/Morrison-Lab/ai-config/pull/3084) | 6 | 1, 5, 7, 3, 2, **0** |
+| [#3060](https://github.com/Morrison-Lab/ai-config/pull/3060) | 5 | 11, 7, 2, 3, **0** |
+| [#3093](https://github.com/Morrison-Lab/ai-config/pull/3093) | 3 | 3, 2, **0** |
+
+**Every one of those was caught before the remote saw it**, because `no-push-without-self-review` held each branch until its head had a clean verdict.
+The stop hook spent that whole hour telling me to push.
+
+### The pattern, stated once
+
+Nearly every substantive finding this session was one shape: **an instrument reported an absence, and the absence was read as a fact about the world rather than about the instrument's reach.**
+Seven instances, in the order they arrived:
+
+1. A merge-conflict matrix of zero, which needed a purpose-built positive control to distinguish from a detector that never ran.
+2. A corpus sweep returning zero concatenated trailers, read as confirming its conclusion while a known-real instance sat outside its population.
+3. My correction to (2), which called it a *failed* positive control --- also wrong, because the sighting was an in-context render and the sweep read stored JSONL.
+   Different artifacts.
+4. A line-break checker reporting clean over eight real violations, because the tree was dirty and it takes line numbers from the commit and content from the tree.
+5. A prescribed verification query that returned null under every explanation it was offered to distinguish.
+6. My fix to (5), which re-aimed *the same matcher* --- and the first explanation is precisely that this matcher is blind.
+7. A CI negative control reporting that it could not discriminate, because load compressed the ratio it measures.
+
+The recurring sub-shape is (3) and (6): **the repair reproduces the defect.**
+When the fault is "this instrument cannot see what you are asking it", the natural repair re-aims the same instrument, which changes the target and not the blindness.
+Knowing the general principle did not prevent any of these.
+In (4) I had read the rule, quoted it earlier the same hour, and broke it twice within twenty minutes.
+
+What did work, every time, was an outside reader with the artifact in hand.
+
+### Two rules the reviews produced, already merged in [#3093](https://github.com/Morrison-Lab/ai-config/pull/3093)
+
+- A SHA that resolves only in the authoring container is worse than no SHA in a record meant for a reader who has only the remote: it reads as checkable, invites the check, and fails it.
+  Name the branch and say what gates the push.
+- A rule written and applied in the same commit is where the application gets checked least, because writing the rule feels like the work.
+
+## 01:28 PDT --- state re-derived after the compaction
+
+Re-queried rather than recalled, per the state-claim rule.
+
+| PR | head | state |
+|---|---|---|
+| [#3084](https://github.com/Morrison-Lab/ai-config/pull/3084) | `bf558244` | pushed, 14 checks success and 1 skipped (a superseded `new-line-breaks` run), `review / require-clean-verdict` success, both threads resolved |
+| [#3060](https://github.com/Morrison-Lab/ai-config/pull/3060) | remote `c851d68f`, local `0daed144` | round 6 committed, unpushed, awaiting a push-gate verdict |
+| [#3023](https://github.com/Morrison-Lab/ai-config/pull/3023) | `6aa021b5` | open, the peer's |
+| [#3089](https://github.com/Morrison-Lab/ai-config/pull/3089) | `8f1ca761` | **merged 06:51Z**, not by me --- `merged_by` is the shared login, so the API cannot say by whom; the branch itself is agent-authored |
+| [#3100](https://github.com/Morrison-Lab/ai-config/pull/3100) | `3acc79bd` | new since the last sweep, agent-authored, not mine |
+| [#3101](https://github.com/Morrison-Lab/ai-config/pull/3101) | `d8c88486` | new since the last sweep, agent-authored, not mine |
+
+Two things the re-derivation changed.
+
+**[#3089](https://github.com/Morrison-Lab/ai-config/pull/3089) merged while I was not watching, which the earlier row called "left to the peer" and never revisited.**
+It carries the fix for the dirty-tree false-clean that cost this session two of its own errors:
+the bumped checker widens `auto` scope to the working tree when tracked matching files are dirty,
+and prints `Examined N added line(s) across M file(s) (scope: ...)` ahead of its verdict.
+So the instrument that reported an absence about lines it never examined now reports its own reach.
+That is the session's recurring pattern getting an instrument rather than a rule, and someone else built it.
+
+**The peer's PR count grew by two while this session was compacting.**
+`ListAgents` reported no peers all session and still does.
+The instrument that actually settles it is the commit trailer, not `updated_at`, which cannot separate a peer from any other actor pushing under the same login:
+the tip of [#3023](https://github.com/Morrison-Lab/ai-config/pull/3023) carries a `Claude-Session:` URL differing from this session's, which is decisive;
+the tips of [#3089](https://github.com/Morrison-Lab/ai-config/pull/3089), [#3100](https://github.com/Morrison-Lab/ai-config/pull/3100) and [#3101](https://github.com/Morrison-Lab/ai-config/pull/3101) carry no trailer, the human's authorship, and a `Co-Authored-By: Claude ...` line, which is consistent with a local session rather than with a person typing that line, and does not settle it.
+Banked as a rule in `memories/git-worktrees.md` on [#3060](https://github.com/Morrison-Lab/ai-config/pull/3060)'s branch.
+
+## The merge gate, re-probed rather than recalled
+
+`shared/workflow/adversarial-self-review.md` on `origin/main` --- not on either of my branches, which edit that file ---
+requires for a merge "a reviewer differing from the authoring session in **both** model and harness",
+and says plainly that where none is reachable "the merge waits --- 'blocked on reviewer availability' is the honest status".
+
+Re-probed at 01:28 PDT: `codex`, `opencode`, `agy`, `cursor`, `cursor-agent`, `gemini`, `aider`, `crush` all absent from `PATH`,
+and no provider API key is set in the environment.
+The CI `claude-review` job does not close the gap, and my first statement of why was asserted rather than derived.
+I wrote that it "differs in harness and not in model".
+Nothing reachable establishes that: `.github/workflows/claude-review.yml` passes no `model:` input, and the reusable workflow it calls documents that input as empty by default, falling through to `claude-code-action`'s own default, which no memory file here pins.
+The derivable reason does not need the model at all.
+The gate requires "the **author-dispatched** cross-model, cross-harness reviewer's 100% all-clear adversarial verdict at the shipping head", and a workflow triggered by the push is not author-dispatched whatever model it runs.
+
+So [#3084](https://github.com/Morrison-Lab/ai-config/pull/3084) is finished except for a gate no reachable reviewer can satisfy, and it waits.
+The standing ai-config `mwc` grant does not help, because the gate is a condition on the *verdict*, not on authorization.
+
+## 02:06 PDT --- [#3060](https://github.com/Morrison-Lab/ai-config/pull/3060) pushed at `ae58121f`, and what four rounds cost
+
+The table above is a snapshot of 01:28 and stays one;
+PR [#3060](https://github.com/Morrison-Lab/ai-config/pull/3060) is now pushed at `ae58121f`, six commits past the local head that table records, and thirteen past the remote one.
+`git rev-list --count` is where both figures come from, rather than a count typed from memory.
+
+Four review rounds landed in that stretch.
+Two generalisations about them were written here and both were false, which is worth more than either would have been.
+The first --- that each round's findings were about the previous round's *fix* --- was refuted by the table printed directly beneath it.
+The second --- that the branch never stopped growing, so every round found defects in material added since the last one --- was not on the page and took one query per row to refute.
+
+There is no single shape, because the four rounds split into two:
+
+- **Rounds 6 and 7 found content that was already in the tree an earlier round had reviewed.**
+  Derived: `git show c851d68f:shared/workflow/algorithmatize-checks.md | grep -F 'command not found'` returns the line round 7 flagged, and the same query over `adversarial-self-review.md` for `What ended the series` returns the line round 6 flagged.
+  Note the weaker claim that supports: `c851d68f` is not round 7's immediate predecessor head, since eight commits separate it from `b94767dd`.
+  Round 6's reviewing head is not derivable at all --- it was a local dispatch that left no artifact --- so that half rests on recollection, like round 9's.
+  What is established is that the passages predate an earlier review of their own files, not that the round immediately before each one read those lines.
+  That earlier CI round was itself `NOT_CLEAN`, so "passed clean over them" is wrong twice over;
+  it returned a finding elsewhere and said nothing about these.
+- **Round 8 found material that did not exist at the previous round's head.**
+  Derived: every entry its fixes touched postdates round 7's head `b94767dd`, though the files themselves all existed at it --- `git show b94767dd:memories/git-worktrees.md | grep -c Claude-Session` returns 0 against 7 afterwards, and the `address-every-comment.md`, `markdownlint.md` and `algorithmatize-checks.md` entries all arrive later.
+  **Round 9's half rests on recollection, not derivation**, and cannot be checked: rounds 8 and 9 were two passes whose fixes squashed into one commit, so no intermediate head exists to query.
+
+So the transferable statement is not about pace or about fix quality.
+It is that **a verdict is not evidence about the material it did not flag** --- twice here, a passage sat in a file a round had in front of it and was flagged only later.
+Two instances cannot support "never", and the weaker form is the useful one anyway: it says convergence is not a stopping signal, which is the opposite of what an empty round feels like.
+
+A query goes some of the way and it is worth stating what it does not settle: `git show <previous-round-head>:<file> | grep -F '<flagged text>'`.
+Present means the text predates that head.
+**Absent does not mean it was added since**, which is what I first wrote here and this branch's own history refutes --- `What ended the series` is absent at `b94767dd` because the commit *named* for rewording it removed the phrase, not because it arrived later.
+That cause is structurally expected in a converging series, since each round's fix rewrites the text the next round would have searched for --- though one instance is not a frequency, and one instance is all this is.
+Use `-F` as cheap insurance, and note that my first reason for it was wrong.
+I cited `#3059`, `){0,12}` and `<cmd>` as strings a regex would misread.
+Measured: `#` and `<` are metacharacters in neither BRE nor ERE, so two of the three behave identically with and without `-F`, and the third differs only under `-E` while the recipe above is plain `grep`.
+The real hazard is a flagged string carrying `.`, `*` or `[`, which this corpus's prose produces constantly.
+
+| round | reviewer | findings | what they were about |
+|---|---|---|---|
+| 6 | adversarial subagent | 0, plus an out-of-scope note | a line the note said was pre-existing, which the diff carried as an addition |
+| 7 | CI `@claude` | 1 | a claim billed as measured that does not reproduce where a `time` binary exists |
+| 8 | adversarial subagent | 6 here, 7 counting the notebook | a false gap claim, a spliced list, and four claims billed as measured that were inferred |
+| 9 | adversarial subagent | 1 | a hedge applied to one instance of a claim and not to its two siblings |
+
+Three lessons, each of which cost a round.
+
+**An out-of-scope note is a scope claim, and one `git diff` query settles it.**
+Round 6's note was correct about the defect and wrong about whose it was, because the reviewer located the line by reading the file at `HEAD` and read untouched surrounding text as provenance.
+Banked in `address-every-comment.md`, and the entry had to be rewritten in round 8 because that file already carried the rule --- my dupe-check grepped `out of scope` spaced where the rule writes `out-of-scope` hyphenated.
+A phrase grep decided a coverage question, which is what `grep-is-not-coverage` says never to let it do.
+
+**Two reviewers can measure the same command and disagree, and the mechanism is the only durable record.**
+CI got exit 0 with `TIMEFORMAT` ignored;
+this container gets `time: command not found`.
+Both are right: an assignment prefix demotes `time` from reserved word to a command word, so a `PATH` lookup follows, and the symptom depends on whether a `time` binary is installed.
+The one-command check --- put an executable named `time` on `PATH` and compare the bare and prefix forms --- is now in the entry, so the next reader settles it locally rather than trusting either report.
+
+**A hedge is an incomplete sweep by default.**
+Round 9 found the same claim in three places, one hedged in prose and two left flatly asserted in a table.
+The prose fix reads as complete from the inside precisely because it is the instance you were thinking about.
+
+`markdownlint-cli2` runs here via `npx` at CI's pinned version in seconds, which would have caught the MD018 failure before the push and now catches the recurrences I keep producing.
+What is checkable: one CI-recorded failure, job `100580631907`, which is what prompted the rule --- and note the rule and that fix landed in the same commit, `eb0cf15e`, so the occurrence predates its own rule rather than following it.
+What is self-reported and leaves no artifact: two further occurrences afterwards, both caught by the local run before they could reach a commit.
+A reader can verify the first and has only my word for the other two, which is worth saying in a sentence that would otherwise read as evidence.
+Recorded in `memories/markdownlint.md` alongside the rule itself.
+
+## 12:20 PDT --- Phase 2 wave launched under the go-all-out-until-1pm directive
+
+User: quota at 74% of weekly, resetting 13:00 PDT.
+Directive, verbatim: "until 1pm pacific, go all out with subagent workflows;
+grab a bunch of new issues and drive PRs".
+Model switched to Fable 5.1.
+Every `agent()` call passes `model: 'opus'`.
+Not Fable, which CLAUDE.md forbids for a subagent without explicit per-launch permission.
+Not the cheap tier either, which `when-to-orchestrate` prescribes for mechanical work, because implementing an issue and refuting an implementation are judgment-heavy.
+The quota cost of at least twenty-one Opus dispatches was accepted on the reset at 13:00.
+One workflow run over seven issues, each with one primary target file, all seven distinct.
+That set was derived from the issue bodies rather than from worktree file sets, which did not exist yet, so re-derive it with `scripts/pr-overlap.py` once the PRs are open:
+
+- [#3095](https://github.com/Morrison-Lab/ai-config/issues/3095) `scripts/sync-nlb-checker.py`
+- [#3068](https://github.com/Morrison-Lab/ai-config/issues/3068) `hooks/flag-cd-into-main-checkout.py`
+- [#3086](https://github.com/Morrison-Lab/ai-config/issues/3086) `hooks/no-unreviewed-pr.py`
+- [#3062](https://github.com/Morrison-Lab/ai-config/issues/3062) `plugins/ai-config/enforce-mwc-review-gate.py`
+- [#3117](https://github.com/Morrison-Lab/ai-config/issues/3117) `hooks/remind-brief-premises.py`
+- [#3102](https://github.com/Morrison-Lab/ai-config/issues/3102) `scripts/check-memory-file-size.py`
+- [#3113](https://github.com/Morrison-Lab/ai-config/issues/3113) `scripts/check-pr-fully-clean.py`
+
+Each issue: implement in a worktree on `fix/<N>-<slug>` off `origin/main`, then two Opus refuters, a fix round, and a recheck.
+Claims posted on all seven issues at 12:20 PDT.
+The two unpushed branches, `fix/ums-step3-corpus-scope` ([#3123](https://github.com/Morrison-Lab/ai-config/issues/3123)) and `fix/2465-rollup-cause` (Refs [#2465](https://github.com/Morrison-Lab/ai-config/issues/2465)), wait on an adversarial verdict.
+Push both branches once that verdict lands.
+
+## 12:38 PDT --- a correction to an earlier entry, and a corrected belief
+
+**[#3084](https://github.com/Morrison-Lab/ai-config/pull/3084) merged, and no entry since recorded it.**
+The merge-gate section's last word on [#3084](https://github.com/Morrison-Lab/ai-config/pull/3084) was that it waits on a gate no reachable reviewer can satisfy.
+It merged at 2026-09-03T16:25:36Z under the shared login, and got the same never-revisited treatment the 01:28 entry records for [#3089](https://github.com/Morrison-Lab/ai-config/pull/3089).
+Whether the cross-model gate was satisfied for that merge is not derived here.
+The three prose defects it merged ahead of are tracked as [#3109](https://github.com/Morrison-Lab/ai-config/issues/3109), closed by [#3115](https://github.com/Morrison-Lab/ai-config/pull/3115).
+
+**A corrected belief, recorded at the correction.**
+Belief: a squash-merging repo's three-dot diff excludes a merge commit's content, so a re-add made while resolving a merge is invisible to review.
+Fact: `git diff main...feature` is a merge-base-to-tip tree diff and lists the re-add as an added line.
+What omits the merge patch is `git log -p`, unless given `-m` or `--diff-merges=on`.
+The query that settles it, run 2026-09-03 on git 2.43.0 in a scratch repo whose merge resolution re-added a paragraph:
+`git diff main...feature | grep '^+SHARED'` printed the line,
+`git log -p main..feature | grep -c '^+SHARED'` printed 0,
+and the same `git log` with `-m` printed 2 in that repo;
+the reproduction recorded in `memories/git-diffing.md` prints 3, and the original repo was not preserved, so the difference is not derived here.
+The false version had been written into `fix/ums-step3-corpus-scope`.
+The round-one adversarial verdict on the two held branches caught it, alongside five other findings: a headline universal resting on that mechanism sentence, an n=2 "most", a bare `#605` resolving to the wrong repository, a bullet list coalescing with its host section's list, and a case record asserting an underived cause inside the subsection that forbids exactly that.
+All six are fixed on the two branches, and a round-two verdict is running.
+Promoted to `memories/git-diffing.md` ("A merge commit's own content is visible to `git diff A...B` and invisible to `git log -p`").

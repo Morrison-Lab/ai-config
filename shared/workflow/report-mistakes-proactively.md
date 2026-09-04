@@ -31,6 +31,10 @@ a product one.
    duplicate an open-state search cannot see.
    When an **open** issue already covers the mistake, comment there with
    the new evidence instead of filing a duplicate.
+   The same holds for a new symptom of a tracked defect family: a hook or
+   checker that already has a tracking issue gets a comment on it, not a
+   sibling issue per symptom
+   ([`triage-backlog`](triage-backlog.md), "Fold, do not multiply").
    A closed match is not a skip: surface it and confirm before deciding
    whether to reopen it or file a new one, per
    [`issue-first`](issue-first.md).

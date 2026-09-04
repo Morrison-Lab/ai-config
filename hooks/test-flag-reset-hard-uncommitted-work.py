@@ -367,6 +367,18 @@ def checkout_force_bundled_case(path):
     return "git checkout -qf other"
 
 
+def checkout_new_branch_attached_case(path):
+    """`git checkout -bfixup` -- `-b`'s value attached to the cluster.
+    Measured on git 2.43.0: this creates branch `fixup`, exits 0, and the
+    dirty tracked file survives, so the `f` in the cluster is part of the
+    branch name rather than `--force`."""
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return "git checkout -bfixup"
+
+
 def checkout_ref_dirty_case(path):
     """`git checkout <ref>`, UNFORCED, over a dirty tracked file. Measured
     on git 2.43.0: the change is carried across to the new branch and the
@@ -489,6 +501,9 @@ SHOULD_STAY_SILENT += [
     ("S15", switch_force_case,
      "`git switch -f <ref>` is the deliberate gap: this hook does not read "
      "`git switch`, and the catalogs say so"),
+    ("S16", checkout_new_branch_attached_case,
+     "`git checkout -bfixup` -- `-b` takes the rest of the cluster as its "
+     "value, so the `f` is not `--force`"),
 ]
 
 

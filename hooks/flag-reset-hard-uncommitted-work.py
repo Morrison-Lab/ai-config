@@ -90,9 +90,9 @@ nothing else about the command announces it. Measured 2026-09-04 on git
 2.43.0, over a tree carrying ` M f.txt` and ` M g.txt`: `git checkout other`
 left both edits in place, while `git checkout -f other`,
 `git checkout --force -b feature`, and `git checkout -f` with no operand at
-all each exited 0 with both edits gone. Every forced form is whole-tree, so
-a forced `checkout` that resolves to no pathspec is scoped to the whole
-tracked tree, exactly like `reset --hard`.
+all each exited 0 with both edits gone. A forced `checkout` that resolves
+to no pathspec is scoped to the whole tracked tree, exactly like
+`reset --hard`.
 
 `git switch -f`/`--discard-changes` does the same thing and is NOT matched:
 `switch` is a fourth command this hook does not read at all, and reading it
@@ -174,6 +174,20 @@ CHECKOUT_RESTORE_BOOL_FLAGS = {
 # Flags that consume the NEXT token as a value (checked, per subcommand).
 CHECKOUT_VALUE_FLAGS = {"-b", "-B", "--orphan"}
 RESTORE_VALUE_FLAGS = {"-s", "--source"}
+CHECKOUT_VALUE_SHORTS = "bBt"
+RESTORE_VALUE_SHORTS = "s"
+
+
+def _cluster_forces(tok, value_shorts):
+    """Whether short cluster `tok` carries `-f`. A value-taking short option
+    swallows the rest of the cluster as its value, so only an `f` before the
+    first such letter is `--force` rather than part of a branch name."""
+    if not SHORT_CLUSTER.fullmatch(tok):
+        return False
+    cluster = tok[1:]
+    stop = next((i for i, c in enumerate(cluster) if c in value_shorts),
+                len(cluster))
+    return "f" in cluster[:stop]
 
 
 def _checkout_restore_targets(subcommand, args):
@@ -185,10 +199,13 @@ def _checkout_restore_targets(subcommand, args):
     `post` is every token after one. `staged_no_worktree` (restore only) is
     whether `--staged` appeared without `--worktree` -- that combination
     only rewrites the index, so it carries no risk to the working tree.
-    `saw_force` is whether `-f`/`--force` appeared before any `--`.
+    `saw_force` is whether `--force`, or a short cluster whose `f` precedes
+    any value-taking short option, appeared before any `--`.
     """
     value_flags = (CHECKOUT_VALUE_FLAGS if subcommand == "checkout"
                    else RESTORE_VALUE_FLAGS)
+    value_shorts = (CHECKOUT_VALUE_SHORTS if subcommand == "checkout"
+                    else RESTORE_VALUE_SHORTS)
     pre, post = [], []
     saw_sep = saw_staged = saw_worktree = saw_force = False
     i = 0
@@ -210,7 +227,7 @@ def _checkout_restore_targets(subcommand, args):
             saw_worktree = True
             i += 1
             continue
-        if tok == "--force" or (SHORT_CLUSTER.fullmatch(tok) and "f" in tok):
+        if tok == "--force" or _cluster_forces(tok, value_shorts):
             saw_force = True
             i += 1
             continue

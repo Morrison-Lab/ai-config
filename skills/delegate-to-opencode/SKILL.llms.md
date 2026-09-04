@@ -23,6 +23,20 @@ The `Agent` tool’s `model` parameter is an enum of Claude aliases, and `.claud
 
 The first two transfer from `delegate-to-codex`, but for a reason that skill does not have. There, work shape and model capability were independent. Here they point the same way: authoring and judgment work is exactly what the free tier is worst at.
 
+## The one measured exception: authoring work a mechanical test can accept
+
+The “needs strong reasoning, judgment, or long-context synthesis” bullet above rests on two grounds at once. The free tier is weakest at exactly that shape of work, and a wrong answer from it costs more to catch than the quota it saved. Only the second ground stops binding once a deterministic check settles correctness without the returned diff having to be reviewed for it. The first does not, so what the check buys is that a wrong answer is cheap rather than that it is unlikely — expect to re-run or re-route on a failed check. That is why this exception requires the check rather than merely permitting the dispatch.
+
+One measurement bounds the exception rather than establishing a capability: one free-tier model id, on one R refactor, given a detailed brief and accepted because a mechanical suite passed rather than because the returned diff read well. [`memories/delegation.md`](../../memories/delegation.md)’s “opencode free tier: a full authoring task, validated mechanically” section is that record, and carries the date, the model id, the acceptance test, and the two failures from the same session that qualify it.
+
+The separate “result must conform to a schema and you have no cheap validator” bullet is untouched by any of this. It never bound on that measurement, whose result was an R refactor with no schema to conform to, and it still binds on its own terms wherever a schema is required and no validator is cheap.
+
+- **Do:** delegate authoring work to a free-tier model only when the brief carries literal paths, per [step 2, “Prepare the prompt”](#2-prepare-the-prompt), and the exact text each file the task creates should hold (the “exact new-file content” of the record cited above), *and* a mechanical acceptance test — a test suite, a linter, a byte comparison — decides correctness on its own.
+- **Do:** settle the data question before the shape question — a mechanical acceptance test does not license a hosted dispatch the consuming repo’s data rules forbid.
+- **Don’t:** condition the dispatch on the acceptance test alone — a vague brief with a passing check is a combination nobody measured.
+- **Don’t:** let your own reading of the returned diff stand in for the mechanical check.
+- **Don’t:** apply this exception to restricted data — a data trigger forbids OpenCode and OpenRouter dispatch, the free tier included, unless the consuming repository has explicitly approved that hosted destination.
+
 ## Hosted-only routing rule
 
 [`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.llms.md)’s “Data sensitivity is a second trigger” section says a repo can route work to codex because of **what the work reads**, that this trigger overrides the shape exceptions, and that when codex is busy the work waits rather than falling back.

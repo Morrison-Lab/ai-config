@@ -233,9 +233,11 @@ that three commits were "fetchable from no remote ref",
 when every one of them was an ancestor of a ref `origin` still advertised.
 
 **`git fetch origin <sha>` takes the full 40-character SHA and nothing shorter.**
-That is git's own resolution, not a server policy:
-a non-40-hex argument is looked up as a ref name,
-and the same failure reproduces against a plain local-path remote on git 2.43.0.
+That is git's own resolution rather than a server policy:
+a non-40-hex argument is looked up as a ref name and never reaches the server,
+while a 40-hex object the remote does not hold is refused *by* the server,
+and the two error messages are what tell the cases apart
+(both shapes reproduced on git 2.43.0 against GitHub and against a plain local-path remote).
 A short SHA fails with `fatal: couldn't find remote ref <sha>`,
 and it fails the same way for a commit that is the tip of an advertised ref,
 so the failure carries no information about reachability.
@@ -249,9 +251,16 @@ fatal: couldn't find remote ref eb0cf15e
 $ git fetch origin eb0cf15e891c386be69c85643bd57b89f5fb2a60
 From https://github.com/Morrison-Lab/ai-config
  * branch              eb0cf15e891c386be69c85643bd57b89f5fb2a60 -> FETCH_HEAD
+$ git fetch origin 0000000000000000000000000000000000000001
+fatal: remote error: upload-pack: not our ref 0000000000000000000000000000000000000001
 ```
 
-**`git merge-base --is-ancestor A B` and `git rev-list --count B` on a shallow clone answer for the fetched depth.**
+So the full-SHA fetch is itself the one-command test:
+`couldn't find remote ref` means the argument was not a ref name,
+and `upload-pack: not our ref` means the object is not on the remote.
+
+**`git merge-base --is-ancestor A B` and `git rev-list --count B`
+on a shallow clone answer for the fetched depth.**
 `git rev-list --count f9068299` returned 1
 for a commit whose branch carries 33 commits above `main`,
 and `--is-ancestor` returned non-zero for three real ancestors,
@@ -266,9 +275,10 @@ so the earlier answer was about what had been fetched.
   and deepen the fetch (or fetch the ref itself) when that command prints `true`.
 - **Don't:** write "not fetchable" or "reachable from no remote ref"
   from a short-SHA fetch or a shallow-clone walk;
-  the ref walk on a deepened fetch is the measurement.
+  a full-SHA fetch, or the ref walk on a deepened fetch, is the measurement.
 
-(Measured 2026-09-03 on git 2.43.0 in a remote session's shallow clone,
+(Measured 2026-09-03 on git 2.43.0, the incident in a remote session's shallow clone
+and the local-path reproduction in a scratch repo,
 while driving [ai-config#3154](https://github.com/Morrison-Lab/ai-config/pull/3154);
 the claude-review round at `e698c456` caught the claim
 by walking `refs/pull/3060/head` on a full checkout.)

@@ -117,6 +117,7 @@ def strip_single_quoted(command: str) -> str:
     """Blank single-quoted spans before position matching, keeping length."""
     return RX_SINGLE_QUOTED.sub(lambda m: "'" + " " * (len(m.group(0)) - 2) + "'", command)
 
+
 LABEL_FLAGS = ("--label", "--labels", "-l")
 
 # Fallback for a command shlex cannot tokenize: the value of a `--label` /

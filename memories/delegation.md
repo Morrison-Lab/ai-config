@@ -523,16 +523,11 @@ The routing rule this measurement licenses lives in that skill's
 accept" section, which cites this section rather than restating it.
 Amend the measurement here and leave the rule there.
 
-- **Do:** treat free-tier delegation of authoring work as feasible
-  when the acceptance test is mechanical ---
-  it is the deterministic validation step, not the model's own
-  confidence, that makes trusting the result safe.
 - **Do:** read this as one data point for one model id on one task,
   not as a general claim about hosted-free-tier authoring capability.
-- **Don't:** delegate authoring work to a free-tier model with no
-  deterministic way to check the result ---
-  this success was confirmed by four independent test suites,
-  not by inspecting the diff.
+- **Don't:** credit the model's own confidence for the result ---
+  what made it safe to trust was four independent test suites passing,
+  with nobody reading the diff.
 
 ## Conversation-inheriting subagent dispatch vs. clean-context dispatch for UMS and CAI
 

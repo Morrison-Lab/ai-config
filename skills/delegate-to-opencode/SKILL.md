@@ -64,17 +64,22 @@ The "needs strong reasoning, judgment, or long-context synthesis" bullet above r
 The free tier is weakest at exactly that shape of work, and a wrong answer from it costs more to catch than the quota it saved.
 Only the second ground stops binding once a deterministic check settles correctness with nobody reading the returned diff.
 The first does not, so what the check buys is that a wrong answer is cheap rather than that it is unlikely --- expect to re-run or re-route on a failed check.
-That is also why this exception requires the check rather than merely permitting the dispatch, and why one acceptance test discharges the "no cheap validator" bullet in the same move.
+That is why this exception requires the check rather than merely permitting the dispatch.
 
 One measurement bounds the exception rather than establishing a capability.
 On 2026-08-28, `opencode/nemotron-3-ultra-free` completed a five-file R test-harness refactor correctly on the first try, given a brief carrying literal paths and exact expected content and four independent Rscript suites standing as the acceptance test.
 The result was accepted because the suites passed, not because the diff read well.
-[`memories/delegation.md`](../../memories/delegation.md)'s "opencode free tier: a full authoring task, validated mechanically" section is the record behind that sentence: it carries the full provenance and the two failures from the same session that qualify it, so amend that section rather than this one when the data point changes.
+
+The separate "result must conform to a schema and you have no cheap validator" bullet is untouched by any of this.
+It never bound on that measurement, whose result was an R refactor with no schema to conform to, and it still binds on its own terms wherever a schema is required and no validator is cheap.
+
+[`memories/delegation.md`](../../memories/delegation.md)'s "opencode free tier: a full authoring task, validated mechanically" section is the record behind the measurement, carrying its full provenance and the two failures from the same session that qualify it.
+That file governs the measurement and this section governs the routing rule, so a change to the data point belongs there and a change to the rule belongs here.
 
 - **Do:** delegate authoring work to a free-tier model when a mechanical acceptance test --- a test suite, a linter, a byte comparison --- decides correctness on its own.
-- **Do:** carry literal paths and exact expected content in the brief, per [step 2](#2-prepare-the-prompt).
+- **Do:** carry literal paths and exact expected content in the brief.
 - **Don't:** let your own reading of the returned diff stand in for the mechanical check.
-- **Don't:** read one passing run on one model id as a capability claim about hosted-free models generally.
+- **Don't:** apply this exception to restricted data --- a data trigger forbids every hosted destination, the free tier included, unless the consuming repository has explicitly approved it.
 
 ## Hosted-only routing rule
 

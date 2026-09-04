@@ -125,7 +125,7 @@ committed pass.
      `-I` skips binary files, bytecode caches included, which a plain `grep -r` would otherwise report as hits.
      A rule can be owned by a `shared/` fragment or a skill as easily as by a memory,
      and a `memories/`-only grep stays outside those paths.
-     When one exists, extend it in place; don't add a second bullet.
+     When such an entry exists, extend it in place; don't add a second bullet.
      (ai-config#689: a `list_workflow_runs` cost bullet went in next to the
      related `get_check_runs` guidance while an entry on the same tool already
      sat ~2000 lines below in the write-access cluster -- caught by the review
@@ -452,7 +452,7 @@ add a review gate for the cases that need one.
   ("always poll for new review after pushing --- check commit SHA matches")
 - ❌ Skipping step 3's dupe check and creating duplicates --
   specifically, reading only the region you're appending to instead of
-  grepping the corpus for the subject (step 3)
+  grepping the corpus for the subject
 - ❌ Updating only preferences when a skill also needs the fix
 - ❌ `git add -A` --- it sweeps unrelated in-flight edits (the user's work, other
   draft skills) into your commit/PR. Stage the specific files you touched.
@@ -464,8 +464,7 @@ add a review gate for the cases that need one.
   project-memory mechanism (Claude Code: `~/.claude/projects/<project-path>/memory/`
   --- substitute the equivalent for a non-Claude agent) is short-lived staging
   only --- hand off that a PR adding those agent docs is still required.
-  See the checklist
-  item above and `memories/preferences.md` for the full rule.
+  See the checklist item above and `memories/preferences.md` for the full rule.
 - ❌ Naming a tool, flag, or API identifier that appears **nowhere else in the
   corpus** without anchoring it somewhere checkable. A lone mention reads
   identically whether it is correct or hallucinated, so a later session has

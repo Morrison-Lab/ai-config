@@ -53,11 +53,13 @@ switched off -- taking the real cases with it (`algorithmatize-checks`, and
 the draft carve-out in #1041). So stating plainly that a mistake is not
 mechanizable, and why, discharges this too.
 """
+import hashlib
 import importlib.util
 import json
 import os
 import re
 import sys
+import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -81,6 +83,7 @@ _ums = _sibling("remind-ums-after-error.py")
 # sibling is missing -- it must never become a second, divergent copy.
 ADMISSION = getattr(_ums, "ADMISSION", None)
 visible_prose = getattr(_ums, "visible_prose", lambda t: t)
+_sentinel_gate = getattr(_ums, "_sentinel_gate", None)
 
 # Writing or registering a hook. `hooks.json` counts because registration is
 # the second half of the work, per README's activation gate.
@@ -175,6 +178,22 @@ def main() -> int:
     if done_at >= admit_at:
         return 0
 
+    # Once per distinct admission phrase, per registration, bounded by
+    # transcript distance rather than session lifetime -- same reasoning and
+    # same mechanism as the sibling hook (ai-config#2997 review finding: an
+    # existence-only sentinel suppressed a genuinely later, unrelated
+    # admission that happened to share a short common phrase with an earlier
+    # one). `_sentinel_gate`/`LOOP_WINDOW` are reused from the sibling rather
+    # than reimplemented, so the two cannot drift apart. The mode is in the
+    # key because this hook is registered on both UserPromptSubmit and Stop,
+    # and each registration owes its own firing.
+    mode = os.getenv("AI_CONFIG_STOP") or ""
+    key = hashlib.sha256(f"{path}:{admit_txt}:{mode}".encode()).hexdigest()[:16]
+    sentinel = os.path.join(
+        tempfile.gettempdir(), f".claude-no-mistake-without-a-hook-{key}")
+    if _sentinel_gate is None or not _sentinel_gate(sentinel, admit_at):
+        return 0
+
     message = (
         "[hook: no-mistake-without-a-hook] You admitted a mistake earlier in "
         f"this session (\"{admit_txt.strip()}\") and no hook work followed "
@@ -198,7 +217,10 @@ def main() -> int:
         "discharges this.\n\n"
         "This is separate from the UMS pass the sibling hook asks for: that "
         "one records the learning, this one prevents the recurrence. Both can "
-        "be owed at once."
+        "be owed at once.\n\n"
+        "If this is a false positive -- you were correcting someone else's "
+        "claim, quoting the rule, or writing a hypothetical -- disregard it "
+        "and carry on. A phrase wrapped in backticks is not matched at all."
     )
     if os.getenv("AI_CONFIG_STOP") == "1":
         print(json.dumps({"decision": "block", "reason": message}))

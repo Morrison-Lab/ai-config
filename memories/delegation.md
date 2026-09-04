@@ -518,6 +518,11 @@ under dot-prefixed directories,
 recovering only because the brief carried literal paths --- see that
 skill's step 2 ("Prepare the prompt").
 
+The routing rule this measurement licenses lives in that skill's
+"The one measured exception: authoring work a mechanical test can
+accept" section, which cites this section rather than restating it.
+Amend the measurement here and leave the rule there.
+
 - **Do:** treat free-tier delegation of authoring work as feasible
   when the acceptance test is mechanical ---
   it is the deterministic validation step, not the model's own

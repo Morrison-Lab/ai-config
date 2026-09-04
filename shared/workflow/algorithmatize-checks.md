@@ -1474,11 +1474,9 @@ A timing figure is a claim about a machine, so re-measure rather than porting th
 - **Do:** measure a fixed cost under the load it appears under before subtracting it, since an idle reading bounds the interpreter's share and not the runner's.
 - **Do:** prefer the repair that survives both shapes of distortion when you cannot measure which shape you have.
 - **Do:** recompute a bound at the size step it is read against, and pin the separation with a control of the opposite shape.
-- **Do:** hold every margin in one comparison to a single basis, and name that basis where the figures are stated.
 - **Don't:** read a control's "I cannot discriminate" as evidence about the code it controls.
 - **Don't:** widen a ratio's input-size gap while leaving a bound that was derived for the old gap.
 - **Don't:** rest a causal classification on a measurement taken where the cause cannot appear.
-- **Don't:** set a margin computed against a theoretical reading beside one computed against a measured reading --- an agreement between the two is an artifact of the switch.
 
 ## A slow wall-clock reading is a claim about the machine before it is a finding about the code
 

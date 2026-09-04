@@ -410,8 +410,10 @@ def main():
                     tasks_to_run.append((extract_hook_list(group), task_payload, tool_cwd, "define_subagent"))
 
         elif tool_name == "call_mcp_tool":
-            server = (args.get("ServerName") or args.get("serverName") or args.get("server") or "").strip()
-            sub_tool = (args.get("ToolName") or args.get("toolName") or args.get("tool") or "").strip()
+            raw_server = args.get("ServerName") or args.get("serverName") or args.get("server") or ""
+            raw_sub_tool = args.get("ToolName") or args.get("toolName") or args.get("tool") or ""
+            server = raw_server.strip() if isinstance(raw_server, str) else str(raw_server).strip()
+            sub_tool = raw_sub_tool.strip() if isinstance(raw_sub_tool, str) else str(raw_sub_tool).strip()
             mcp_args = args.get("Arguments") or args.get("arguments") or {}
             if isinstance(mcp_args, str):
                 try:
@@ -433,7 +435,8 @@ def main():
                     tasks_to_run.append((extract_hook_list(group), mcp_payload, tool_cwd, f"call_mcp_tool ({claude_tool_name})"))
 
         elif tool_name == "write_to_file":
-            file_path = args.get("TargetFile") or args.get("target_file") or args.get("targetFile") or args.get("path") or ""
+            raw_file_path = args.get("TargetFile") or args.get("target_file") or args.get("targetFile") or args.get("path") or ""
+            file_path = _clean_path(str(raw_file_path)) if raw_file_path else ""
             content = args.get("CodeContent") or args.get("code_content") or args.get("content") or ""
             write_payload = {
                 "tool_name": "Write",
@@ -450,7 +453,8 @@ def main():
                     tasks_to_run.append((extract_hook_list(group), write_payload, tool_cwd, "write_to_file"))
 
         elif tool_name == "replace_file_content":
-            file_path = args.get("TargetFile") or args.get("target_file") or args.get("targetFile") or args.get("path") or ""
+            raw_file_path = args.get("TargetFile") or args.get("target_file") or args.get("targetFile") or args.get("path") or ""
+            file_path = _clean_path(str(raw_file_path)) if raw_file_path else ""
             old_string = args.get("TargetContent") or args.get("target_content") or args.get("targetContent") or ""
             new_string = args.get("ReplacementContent") or args.get("replacement_content") or args.get("replacementContent") or ""
             edit_payload = {

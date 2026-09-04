@@ -501,18 +501,55 @@ already emit one of the two.
 `UserPromptSubmit` is deliberately out of scope, since its plain stdout is
 added to the context.
 "Warn-only" here means the hook neither emits a blocking decision nor exits
-non-zero, matching the derivation in that issue:
+with status 2, matching the derivation in that issue:
 a `PreToolUse` hook that exits 2 denies the tool call and has its stderr fed
 back to Claude, so it already has a surfaced channel and the rule leaves it
 alone.
-That exemption reads literal exit statuses only, since the near-universal
-`sys.exit(main())` idiom passes a computed one and treating that as blocking
-would exempt nearly every hook.
+The exemption is deliberately narrow, because writing a non-zero status
+somewhere does not show that a hook blocks.
+It reads status 2 alone, since every other non-zero status is a non-blocking
+error and the near-universal "bail out on an unreadable payload" branch would
+otherwise exempt almost every hook.
+It ignores a status raised inside an `except` handler, which reports that the
+hook itself broke rather than that it denied a tool call.
+And it reads literal statuses only, since `sys.exit(main())` passes a computed
+one.
 
-Under Antigravity, gate any `systemMessage` on `ANTIGRAVITY_AGENT` being
-unset.
-Its adapter surfaces `additionalContext` and every collected `systemMessage`
-separately, so a payload carrying both prints the warning twice there.
+- **Do:** give a warn-only `PreToolUse` hook
+  `hookSpecificOutput.additionalContext`, and confirm it by reading the
+  printed payload.
+- **Don't:** treat an error-path `return 1` or `return 2` as a blocking
+  channel --- the checker does not, and neither does the harness.
+
+A hook that emits **both** channels should gate its `systemMessage` on
+`ANTIGRAVITY_AGENT` being unset.
+Antigravity's adapter surfaces `additionalContext` and every collected
+`systemMessage` separately, so a payload carrying both prints the warning
+twice there;
+a hook emitting one channel alone is unaffected, which is why the warn-only
+`Stop` hooks here need no gate.
+Nothing enforces this, and three registered hooks do not yet carry the gate:
+`flag-add-a-outside-pathspec.py`, `no-fable-subagent.py` and
+`warn-stale-review-diff-base.py`.
+That census is derived over `hooks/hooks.json` rather than recalled ---
+registered scripts whose source names both channels and never names
+`ANTIGRAVITY_AGENT` (measured 2026-09-03):
+
+```python
+import json, pathlib
+d = json.load(open("hooks/hooks.json"))
+s = {h["script"] for e in d["hooks"].values() for g in e for h in g["hooks"]}
+print(sorted(x for x in s if (pathlib.Path("hooks") / x).is_file()
+             and all(k in (pathlib.Path("hooks") / x).read_text()
+                     for k in ("additionalContext", "systemMessage"))
+             and "ANTIGRAVITY_AGENT" not in
+                 (pathlib.Path("hooks") / x).read_text()))
+```
+
+- **Do:** gate the `systemMessage` whenever the same payload also carries
+  `additionalContext`.
+- **Don't:** state the gate as repo-wide fact --- re-derive the census, since
+  the three hooks above still warn twice under Antigravity.
 
 Every hook must ship a companion `test-<name>.py` beside it in the same change before pushing;
 `scripts/test_hooks.py` runs

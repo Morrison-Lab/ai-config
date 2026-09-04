@@ -519,6 +519,11 @@ def _emit(note, summary):
              and x != "warn-stale-review-diff-base.py"]
         print(len(c), sum("systemMessage" in
                           (pathlib.Path("hooks") / x).read_text() for x in c))
+
+    This hook is also one of the three that do not yet gate `systemMessage` on
+    `ANTIGRAVITY_AGENT`, so under that adapter its warning prints twice.
+    `README.md`'s warn-only hook section carries that census and the snippet
+    deriving it.
     """
     print(json.dumps({
         "hookSpecificOutput": {

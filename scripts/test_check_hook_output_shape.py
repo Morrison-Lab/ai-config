@@ -9,7 +9,7 @@ verifying that:
   4. A test for a warn-only hook that does not assert payload shape fails (test-side blindness).
   5. A warn-only PreToolUse hook emitting neither additionalContext nor
      systemMessage fails, while one that blocks -- by a `deny` decision or by
-     exiting non-zero -- does not (#3068).
+     exiting 2 -- does not; an error-path `return 1` does not exempt (#3068).
   6. Missing or unparseable hooks.json fails loudly with usage exit code 2.
   7. Unparseable Python source in a hook fails loudly with a diagnostic.
   8. The success line encodes on a cp1252 stdout (ai-config#2038).
@@ -218,7 +218,7 @@ case(
     CLEAN_HOOKS_JSON,
     NO_CHANNEL_FILES,
     want_exit=1,
-    needle="neither blocks (no 'decision' emit and no non-zero exit)",
+    needle="neither blocks (no 'decision' emit and no exit 2)",
 )
 
 # A PreToolUse hook that BLOCKS is out of scope for the rule: its `deny`
@@ -260,6 +260,80 @@ case(
     CLEAN_HOOKS_JSON,
     EXIT2_PRETOOL_FILES,
     want_exit=0,
+)
+
+# A non-zero status that is NOT 2 is a non-blocking error, so it must not
+# exempt. Here the `return 1` sits on a plain CLI path, outside any handler --
+# the shape hooks/flag-stale-adjacent-comment.py carries at its `run_cli()`
+# verdict return. A rule reading any non-zero literal as blocking would exempt
+# this hook while its warning path still reaches nobody.
+CLI_STATUS_PRETOOL_FILES = dict(CLEAN_FILES)
+CLI_STATUS_PRETOOL_FILES["hooks/warn-pretool.py"] = (
+    "import sys\n"
+    "def main():\n"
+    "    if sys.argv[1:] == ['--help']:\n"
+    "        print('usage', file=sys.stderr)\n"
+    "        return 1\n"
+    "    print('warning', file=sys.stderr)\n"
+    "    return 0\n"
+    "sys.exit(main())\n"
+)
+
+case(
+    "a CLI-path 'return 1' does not exempt a warn-only PreToolUse hook (#3068)",
+    CLEAN_HOOKS_JSON,
+    CLI_STATUS_PRETOOL_FILES,
+    want_exit=1,
+    needle="neither blocks (no 'decision' emit and no exit 2)",
+)
+
+# The same for the near-universal "bail out on an unreadable payload" branch,
+# which is the shape most likely to be mistaken for a block.
+ERROR_PATH_PRETOOL_FILES = dict(CLEAN_FILES)
+ERROR_PATH_PRETOOL_FILES["hooks/warn-pretool.py"] = (
+    "import json\n"
+    "import sys\n"
+    "def main():\n"
+    "    try:\n"
+    "        json.load(sys.stdin)\n"
+    "    except json.JSONDecodeError:\n"
+    "        print('bad payload', file=sys.stderr)\n"
+    "        return 1\n"
+    "    print('warning', file=sys.stderr)\n"
+    "    return 0\n"
+    "sys.exit(main())\n"
+)
+
+case(
+    "an unreadable-payload 'return 1' does not exempt either (#3068)",
+    CLEAN_HOOKS_JSON,
+    ERROR_PATH_PRETOOL_FILES,
+    want_exit=1,
+    needle="neither blocks (no 'decision' emit and no exit 2)",
+)
+
+# An exit 2 raised INSIDE an `except` handler reports that the hook itself
+# broke, not that it denied a tool call, so it must not exempt either. This is
+# the shape hooks/flag-stale-adjacent-comment.py carries in its `run_cli()`.
+EXCEPT_EXIT2_PRETOOL_FILES = dict(CLEAN_FILES)
+EXCEPT_EXIT2_PRETOOL_FILES["hooks/warn-pretool.py"] = (
+    "import sys\n"
+    "def main():\n"
+    "    try:\n"
+    "        open('nope')\n"
+    "    except OSError:\n"
+    "        return 2\n"
+    "    print('warning', file=sys.stderr)\n"
+    "    return 0\n"
+    "sys.exit(main())\n"
+)
+
+case(
+    "exit 2 inside an except handler does not exempt (#3068)",
+    CLEAN_HOOKS_JSON,
+    EXCEPT_EXIT2_PRETOOL_FILES,
+    want_exit=1,
+    needle="neither blocks (no 'decision' emit and no exit 2)",
 )
 
 # --- 6. Missing hooks.json fails loudly with usage exit 2 ---

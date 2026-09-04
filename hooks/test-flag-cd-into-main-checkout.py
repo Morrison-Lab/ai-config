@@ -82,7 +82,7 @@ NOT_A_WORKTREE = [
 # updating it, and an early return that skips the remaining checks, both turn
 # into an explicit failure rather than a summary line that overstates what the
 # suite exercised. The constant is derived against, not merely asserted.
-DELIVERY_CASES = 6
+DELIVERY_CASES = 8
 
 
 def run_hook(command: str, cwd: str, antigravity: bool = False):
@@ -113,24 +113,28 @@ def check_delivery():
     debug log alone, and plain stdout is not surfaced. So these cases read the
     printed payload rather than asserting that something was printed.
 
-    Returns `(failures, ran)`. `ran` counts the checks that actually executed,
-    including on the early-return paths, so the caller can refuse a run that
-    reported on fewer cases than it claimed.
+    Returns `(failures, ran)`. `ran` counts every check that executed,
+    incremented BEFORE the check rather than after it, so the two precondition
+    checks below count on the passing path as well as the failing one. The
+    caller refuses a run whose count differs from `DELIVERY_CASES`, which only
+    detects a deleted check if that check was counted when it passed.
     """
     failures = 0
     ran = 0
 
     rc, out, err = run_hook(f"cd {REPO} && ls", WT)
+    ran += 1
     if rc != 0:
         print(f"::error::hook must never block; exited {rc}\n{err}", file=sys.stderr)
-        return failures + 1, ran + 1
+        return failures + 1, ran
 
+    ran += 1
     try:
         payload = json.loads(out)
     except json.JSONDecodeError as exc:
         print(f"::error::hook emitted non-JSON on stdout ({exc}): {out!r}",
               file=sys.stderr)
-        return failures + 1, ran + 1
+        return failures + 1, ran
 
     hso = payload.get("hookSpecificOutput") or {}
     context = hso.get("additionalContext")

@@ -198,7 +198,8 @@ Morrison-Lab/ai-config#1174.)
 ### The same failure has a same-repo sibling: the wrong directory
 
 The section above routes between repos;
-the same miss happens inside one repo when the dupe check is scoped to a directory the owner is not in.
+the same miss happens inside one repo
+when the dupe check is scoped to a directory the owner is not in.
 
 - **Do:** grep the paths [`skill-builder`](../../skills/skill-builder/SKILL.md) step 0 runs,
   not only the directory the destination sits in.

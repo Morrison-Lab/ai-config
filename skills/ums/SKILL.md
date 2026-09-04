@@ -111,7 +111,8 @@ committed pass.
      runs to hundreds or a thousand-plus lines, so an existing entry on the
      same subject can sit far away in an unrelated cluster and never enter
      your view.
-     Grep the paths [`skill-builder`](../skill-builder/SKILL.md) step 0 runs rather than one file, and rather than only `memories/`:
+     Grep the paths [`skill-builder`](../skill-builder/SKILL.md) step 0 runs
+     rather than one file, and rather than only `memories/`:
      ```bash
      (
        repo="${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/ums rev-parse --show-toplevel 2>/dev/null || pwd)}"
@@ -455,14 +456,15 @@ add a review gate for the cases that need one.
 - ❌ Updating only preferences when a skill also needs the fix
 - ❌ `git add -A` --- it sweeps unrelated in-flight edits (the user's work, other
   draft skills) into your commit/PR. Stage the specific files you touched.
-- ❌ Creating `memories/repo/<repo>.md` for any repo — this pattern is retired.
+- ❌ Creating `memories/repo/<repo>.md` for any repo --- this pattern is retired.
   Put repo-specific lore in the repo's own agent docs (`.github/agents/`,
   `CLAUDE.md`, `.github/instructions/`, `.github/copilot-instructions.md`, or
   checked-in `.claude/memories/`) via a PR;
   if the repo has no agent-doc infrastructure yet, this session's own local
   project-memory mechanism (Claude Code: `~/.claude/projects/<project-path>/memory/`
-  — substitute the equivalent for a non-Claude agent) is short-lived staging
-  only — hand off that a PR adding those agent docs is still required. See the checklist
+  --- substitute the equivalent for a non-Claude agent) is short-lived staging
+  only --- hand off that a PR adding those agent docs is still required.
+  See the checklist
   item above and `memories/preferences.md` for the full rule.
 - ❌ Naming a tool, flag, or API identifier that appears **nowhere else in the
   corpus** without anchoring it somewhere checkable. A lone mention reads

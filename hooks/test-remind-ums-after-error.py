@@ -132,6 +132,10 @@ REMIND = [
      "a guarded hit is skipped, not treated as the end of the search"),
     ([txt("The animated gif I misread as a screenshot came from the docs.")],
      "`gif` merely ends in `if` -- word-boundary control on the guard"),
+    ([txt("The commit had my mistake baked in.")],
+     "`had` before a real admission is not an irrealis marker"),
+    ([txt("I need to check whether\n\nI was wrong about the pin.")],
+     "a marker in an earlier paragraph does not reach across the break"),
     ([txt("My earlier claim was wrong about the pin.")],
      "my earlier claim was wrong (ai-config#1898 anchored form still fires)"),
 ]
@@ -166,8 +170,6 @@ IRREALIS_2997 = [
      "whether I miscounted"),
     ([txt("Whether or not I was wrong about the pin, the check still runs.")],
      "whether or not I was wrong"),
-    ([txt("Had I misread the status, the second signal would have caught it.")],
-     "had I misread (subject-auxiliary inversion)"),
     ([txt("Suppose I was wrong about the base branch; the guard still holds.")],
      "suppose I was wrong"),
     ([txt("Assuming that I was wrong about the count, the conclusion is "

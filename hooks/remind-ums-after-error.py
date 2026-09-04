@@ -145,11 +145,6 @@ _ADMISSION_RE = re.compile(
 # so only a marker introducing that very clause counts. `\b` leads the
 # alternation because "a gif I misread" would otherwise supply the `if`.
 #
-# `had` is here for subject-auxiliary inversion ("had I misread the status"),
-# which is irrealis. It cannot suppress a real "I had misread it": that phrase
-# puts `had` BETWEEN the subject and the verb, so no alternative above matches
-# it in the first place.
-#
 # Bare `if` is included, and the issue flagged that as the one debatable call
 # --- "if I was wrong, ..." is occasionally a hedged real admission. It asked
 # for the question to be settled by grepping transcripts rather than by
@@ -159,13 +154,6 @@ _ADMISSION_RE = re.compile(
 # cost: a hedged admission almost always continues into an unhedged one
 # ("... then my earlier claim was wrong"), which the alternatives above still
 # catch, whereas a false positive here is documented to cost six firings.
-#
-# The issue's suggested list also named `so that` and `to make sure`, and both
-# are deliberately absent. Neither introduces a first-person verb directly in
-# English --- the shape they actually produce is "so that if I misread ...",
-# whose `if` the alternation already covers --- so an alternative for either
-# would be a branch nothing can reach, which is the dead code
-# `shared/principles/dead-code-is-tech-debt.md` rules out.
 IRREALIS_LEAD = re.compile(
     r"""\b(?:
         (?:even\s+)?if
@@ -176,14 +164,13 @@ IRREALIS_LEAD = re.compile(
       | supposing
       | suppose(?:\s+that)?
       | assuming(?:\s+that)?
-      | had
-    )\s+$""",
+    )[^\S\n]+$""",
     re.I | re.X,
 )
 
 # 32 characters holds the longest marker above ("whether or not ") with room
-# for the whitespace that can follow it, and is short enough that a marker
-# belonging to an earlier clause cannot reach across a sentence boundary.
+# for the whitespace that can follow it. Adjacency is enforced by the anchor in
+# `IRREALIS_LEAD`, not by this bound.
 LEAD_WINDOW = 32
 
 
@@ -392,18 +379,9 @@ def main() -> int:
         return 0
 
     # Keyed on the transcript path too, so the sentinel is per session. Without
-    # it, two sessions producing the same admission at the same record index
-    # share one sentinel in /tmp, and the second session's reminder is
-    # suppressed for as long as that /tmp survives.
-    #
-    # The record index is deliberately NOT in the key (ai-config#2997). With it
-    # in, the key was per OCCURRENCE rather than per phrase, so writing about a
-    # misfire re-fired it: an explanation has to name the phrase in prose to be
-    # intelligible, that names it at a new index, and the new index is a new
-    # key. The guard therefore rewarded silence and penalized diagnosis, and
-    # the issue measured six firings from one root sentence. Per phrase per
-    # session is the right grain: a reminder already delivered for this exact
-    # phrase is noise on repeat, and noise is what gets a guard ignored.
+    # it, two sessions producing the same admission share one sentinel in
+    # /tmp, and the second session's reminder is suppressed for as long as
+    # that /tmp survives.
     key = hashlib.sha256(f"{path}:{admit_txt}".encode()).hexdigest()[:16]
     sentinel = os.path.join(tempfile.gettempdir(), f".claude-ums-after-error-{key}")
     if os.path.exists(sentinel):

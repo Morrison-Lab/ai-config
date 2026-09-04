@@ -96,6 +96,43 @@ def run(events):
         os.unlink(path)
 
 
+def once_per_phrase():
+    """Fires once per distinct phrase per session, per registration."""
+    fd, path = tempfile.mkstemp(suffix=".jsonl")
+    with os.fdopen(fd, "w") as fh:
+        fh.write(json.dumps(say("I was wrong about the base branch.")) + "\n")
+    payload = json.dumps({"transcript_path": path})
+
+    def invoke(stop=False):
+        env = dict(os.environ)
+        env.pop("AI_CONFIG_STOP", None)
+        if stop:
+            env["AI_CONFIG_STOP"] = "1"
+        r = subprocess.run(
+            [sys.executable, HOOK], input=payload, capture_output=True,
+            text=True, env=env,
+        )
+        return "no-mistake-without-a-hook" in r.stdout
+
+    try:
+        checks = [
+            (invoke(), True, "an admission reminds on the first prompt"),
+            (invoke(), False, "the same phrase does not remind twice"),
+            (invoke(stop=True), True,
+             "the Stop registration still fires after the prompt-time one"),
+            (invoke(stop=True), False,
+             "the Stop registration also fires once per phrase"),
+        ]
+        with open(path, "a") as fh:
+            fh.write(json.dumps(say("I miscounted the open PRs.")) + "\n")
+        checks.append(
+            (invoke(), True,
+             "a different admission in the same session still fires"))
+        return checks
+    finally:
+        os.unlink(path)
+
+
 def main():
     passes = failures = 0
     for events, expected, label in CASES:
@@ -105,6 +142,14 @@ def main():
             print(f"FAIL: {label} ({exc})")
             failures += 1
             continue
+        if got == expected:
+            print(f"PASS: {label}")
+            passes += 1
+        else:
+            print(f"FAIL: {label} (expected remind={expected}, got {got})")
+            failures += 1
+
+    for got, expected, label in once_per_phrase():
         if got == expected:
             print(f"PASS: {label}")
             passes += 1

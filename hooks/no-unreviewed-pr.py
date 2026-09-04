@@ -895,12 +895,29 @@ def _probe_selection(rest):
 # this way is simply not recognised, and the guard keeps warning.
 _API_PROJECTION_FLAGS = ("-q", "--jq", "-t", "--template")
 
+# `gh` is a cobra/pflag program, so a shorthand also arrives inside a CLUSTER:
+# `gh api ... -iq .body` is `--include` followed by `--jq`, whose value is the
+# NEXT argument because nothing follows `q` in the cluster. pflag's
+# parseSingleShortArg reads a bool shorthand (`-i` has a NoOptDefVal) without
+# consuming a value and hands the rest of the cluster back to the loop, so the
+# `q` is a flag rather than a value. An exact-token test does not see it, and
+# not seeing it ADMITS the probe -- the unsafe direction, and the same hole
+# `--jq .body` was refused for (ai-config#3086 review).
+#
+# So any single-dash token whose letters reach a `q` or a `t` counts. That
+# over-refuses a cluster where the letter is really an attached value
+# (`-Xstatus` is `--method status`), which costs a probe and nothing else --
+# again the armed direction.
+RX_API_SHORTHAND_PROJECTION = re.compile(r"-[A-Za-z]*[qt]")
+
 
 def _api_projects(argv):
     """True when a `gh api`/`curl`/`wget` argv projects part of the body.
 
-    Covers the three spellings the parser accepts: the bare flag, the
-    `=`-joined long form, and a shorthand with its value attached (`-q.body`).
+    Covers the long forms -- the bare flag and the `=`-joined spelling -- and
+    every single-dash shorthand spelling the parser accepts: the bare `-q`, a
+    value attached (`-q.body`), and a `q` or `t` inside a CLUSTER (`-iq .body`)
+    (RX_API_SHORTHAND_PROJECTION).
     Scanned over the WHOLE argv for the same reason RX_DIFF_MEDIA is -- a
     projection flag's value is one _api_path_tokens skips, and refusing a probe
     only costs a warning.
@@ -910,7 +927,7 @@ def _api_projects(argv):
             return True
         if t.startswith(("--jq=", "--template=")):
             return True
-        if len(t) > 2 and not t.startswith("--") and t[:2] in ("-q", "-t"):
+        if not t.startswith("--") and RX_API_SHORTHAND_PROJECTION.match(t):
             return True
     return False
 

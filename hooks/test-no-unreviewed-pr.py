@@ -1464,9 +1464,9 @@ case(create("c") + [bash("gh api repos/o/r/pulls/1038 -t '{{.body}}'",
                     res("x", BODY_QUOTING_CLOSED_PROJECTED),
                     say("Read it.")], True,
      "a `--template` projection is not a status read either")
-# The two remaining spellings the flag parser accepts. Without them the
-# `=`-joined and attached-shorthand branches of `_api_projects` could each be
-# dropped with nothing red (ai-config#3086 review).
+# The further spellings the flag parser accepts. Without them the `=`-joined
+# and single-dash branches of `_api_projects` could each be dropped with
+# nothing red (ai-config#3086 review).
 case(create("c") + [bash("gh api repos/o/r/pulls/1038 --jq=.body", tid="x"),
                     res("x", BODY_QUOTING_CLOSED_PROJECTED),
                     say("Read it.")], True,
@@ -1475,6 +1475,22 @@ case(create("c") + [bash("gh api repos/o/r/pulls/1038 -q.body", tid="x"),
                     res("x", BODY_QUOTING_CLOSED_PROJECTED),
                     say("Read it.")], True,
      "a shorthand projection with its value attached is not a status read")
+# The GROUPED shorthand, which pflag accepts too: `-iq .body` is `--include`
+# plus `--jq`, whose value is the next argument. An exact-token test admits it,
+# and admitting it discharges an OPEN PR on its own description -- the failure
+# the four cases above exist to close, reached through the one spelling they
+# did not cover (ai-config#3086 review).
+case(create("c") + [bash("gh api repos/o/r/pulls/1038 -iq .body", tid="x"),
+                    res("x", BODY_QUOTING_CLOSED_PROJECTED),
+                    say("Read it.")], True,
+     "a projection inside a grouped shorthand is not a status read")
+# The control for the widening in the other direction: a single-dash flag that
+# projects NOTHING still leaves a probe. Without it the shorthand branch could
+# refuse every single-dash token and turn no case red, which would disarm the
+# discharge this hook depends on (ai-config#3086 review).
+case(create("c") + [bash("gh api repos/o/r/pulls/1038 -i", tid="x"),
+                    res("x", REST_CLOSED), say("Read it with headers.")],
+     False, "a non-projecting shorthand leaves the REST read a probe")
 # The negative control for why the UN-projected read is still a probe: the same
 # description, inside the full pull object of an OPEN PR. It must not discharge
 # either -- and it does not, because the double escaping puts the literal out

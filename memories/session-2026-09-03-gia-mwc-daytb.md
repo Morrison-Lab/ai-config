@@ -810,3 +810,337 @@ Copilot and Jules re-requested; a verdict at `e698c456` is running alongside #31
 
 Lesson for the memory pass: in a case record, a "because" clause is a claim like any other and needs its own command;
 the near-miss is writing the cause that arrived with the discovery.
+
+## 19:37 PDT --- #3166 merged at `d8c507a8`; the notebook branch takes `main`
+
+[#3166](https://github.com/Morrison-Lab/ai-config/pull/3166) merged under the standing grant (squash, hand-written body, Refs [#3129](https://github.com/Morrison-Lab/ai-config/issues/3129)):
+claude-review CLEAN and Jules approve at `2c1b5bd4`, every check run green, the verdict at that head Ready with three wording notes, and Copilot's round rebutted on the PR as a file-wide em-dash sweep tracked in [#735](https://github.com/Morrison-Lab/ai-config/issues/735) (22 remaining in `memories/git.md`, 13 files under `memories/`).
+That rebuttal is a Defer to a tracked issue, which is the disposition `fully-clean` accepts.
+`wt-ums-git` and its branch are removed.
+`origin/main` merged into this notebook branch at `9f4d877b`;
+the one conflict was #3166's replacement of the 12:38 entry's "Wants promotion" line against this branch's 400 appended lines below it, resolved by taking the promoted line and keeping every later entry.
+This branch's PR opens once [#3154](https://github.com/Morrison-Lab/ai-config/pull/3154) lands, so the merge entry rides in the same round.
+
+## 19:39 PDT --- correction: the #3060 commits are reachable; two instruments answered a different question
+
+The 19:36 entry and the `e698c456` commit said the three earlier #3060 commits were fetchable from no remote ref.
+False.
+The claude-review round at `e698c456` walked `refs/pull/3060/head` and found all three in its history, and a deepened fetch here confirms it:
+`git fetch --depth=200 origin refs/pull/3060/head`, then `git merge-base --is-ancestor <full sha> FETCH_HEAD` returns 0 for each.
+Two artifacts produced the false reading, and both were mine.
+`git fetch origin eb0cf15e` fails with "couldn't find remote ref" because GitHub serves a fetch by SHA only for the full 40 characters;
+the same fetch with the full SHA succeeds.
+And this clone is shallow (`git rev-parse --is-shallow-repository` is true;
+`git rev-list --count f9068299` was 1 before the deepened fetch), so `merge-base --is-ancestor` answered for the fetched depth, not the history.
+Fixed at the next head with the sentence rewritten to the measurement, and "column 0" changed to "column 1" to match the owning fragment.
+
+Lessons for the memory pass: a fetch by SHA on GitHub needs the full 40 characters, so a short-SHA failure says nothing about reachability;
+and an ancestry or count query on a shallow clone is bounded by the fetch depth, so test `--is-shallow-repository` before reading either as a fact about the remote.
+The general form is the one already in `verify-the-right-artifact`: the instrument answered, and the answer was about the clone, not the remote.
+
+## 19:41 PDT --- a gate read as prose, not as an exit code
+
+The wording commit for [#3154](https://github.com/Morrison-Lab/ai-config/pull/3154) at `73de53a9` was pushed with a new-line-breaks violation on it.
+The gate ran and printed `nlb exit=1`, and the command chain joined the gates with `;` and the commit with `&&` only from `git add` onward, so the exit code was displayed and never consulted.
+The next commit breaks the line and its chain runs every gate under `&&` ahead of the commit, which is the shape the earlier lesson about writing the message file before the gates already implied and this chain did not follow.
+The two wording findings from the verdict at `e698c456` (a nearer wrong "entry";
+"the rule" before any rule was named) are applied in `73de53a9`;
+the third ("the corpus" for six paths) stays, since the step's lead names the path list two sentences later and the file uses the shorthand throughout.
+
+## 19:46 PDT --- #3154 at `ee05069e`: a line-wrap round, and the verdict it inherits
+
+At `7e7c80b0` claude-review returned Ready for merge with every count re-derived and Jules approved;
+Copilot's eleventh round asked for one clause per line on three lines the fix commits had added.
+`ee05069e` rewraps them, and `git diff -w --word-diff=porcelain` over that commit shows zero word-level changes,
+so the adversarial verdict running at `7e7c80b0` covers the shipping head's content and is not re-dispatched for the wrap.
+Copilot and Jules re-requested.
+
+## 19:51 PDT --- #3154 at `ced1937b`: the anchoring clause, and a second masked gate in one hour
+
+The verdict that ran against `7e7c80b0` (and read `ee05069e` when it landed mid-review) found the clause I had written for the reachability fix, "`main` refs, which every clone carries", false for a shallow clone, which carries the ref and resolves neither `3935bfff` nor `2156b439`.
+`33673a01` rewrites the sentence around the two commands that settle it and says the record anchors on `main` commits a full fetch brings down;
+it also names #3060 instead of "the branch" and points the skill's count paragraph at the grep bullet.
+That commit opened a line with `#3060's`, which is MD018, the rule the record describes;
+markdownlint reported it and the chain piped the report into `tail`, so the exit code never reached the push, the same failure as the 19:41 entry with a different pipe.
+`ced1937b` moves the number off column 1, and the chain now runs under `set -o pipefail` with every gate joined by `&&`.
+Copilot and Jules re-requested; a verdict at `ced1937b` is running.
+
+Lesson for the memory pass: a gate whose output is piped into `tail` or `grep` reports the pipe's exit code, so a chain that joins gates with `&&` still pushes on a red gate unless `set -o pipefail` is on;
+the recurring shape here is reading a gate's printed verdict while the shell reads a different one.
+
+## 19:54 PDT --- five headings above carried invented times
+
+A clock read at 19:54 PDT against the commit times of the pushes each entry describes showed the last five headings running up to 31 minutes fast:
+the entries stamped 19:44, 19:52, 19:57, 20:12 and 20:22 were written at about 19:37, 19:39, 19:41, 19:46 and 19:51, the times of `d8c507a8`'s merge and of the `709bc612`, `7e7c80b0`, `ee05069e` and `ced1937b` pushes.
+Two chat recaps in the same stretch said 20:03 and 20:24 for the same reason.
+Each stamp was extrapolated from the sense of elapsed work since the 19:36 reading, which is the near-miss `CLAUDE.md`'s "Timestamp recaps in local time" section names in its 2026-09-01 measurement, recurring here on the same day it was last written down.
+The headings are corrected to the commit-anchored times;
+this entry's own time is a fresh reading.
+
+## 19:56 PDT --- #3154 at `b2ba0cbb`: Copilot's thirteenth round, two pointer lines split
+
+At `ced1937b` Jules approved and every check run except claude-review finished green.
+Copilot's round asked for one clause per line on three lines;
+two were the identical pointer sentences at 245 and 303, split at the comma with no word changes,
+and the third (217) is a single relative clause, left as it is and said so on the PR.
+The verdict running at `ced1937b` covers `b2ba0cbb`'s words, since the commit changes none.
+
+## 19:58 PDT --- #3154 at `c60f77c1`: the anchoring sentence carries a command per clause
+
+The verdict at `ced1937b` refuted "a shallow clone cannot walk" in the same shallow clone with a deepened fetch,
+found "every commit" backed only by an `ls-remote`,
+and found the anchoring clause, the one the previous round had corrected, still the only clause without a command.
+It also showed "the grep bullet above" had two candidates, the nearer being the cross-repo bullet that also greps.
+`c60f77c1` pastes a command beside each clause (rev-list over the deepened fetch: 33; the refspec; "walks only to its fetch depth"; merge-base for both anchors) and names the first bullet of the step.
+Copilot and Jules re-requested; a verdict at `c60f77c1` is running.
+Across this PR's last four rounds every finding on the sentence has been a universal about clones or fetches stated one step wider than its command,
+and the fix each time was the command itself, so a sentence in a case record earns a clause only with its command.
+
+## 20:02 PDT --- #3154 at `657d6b20`: Copilot approves with a placeholder nit
+
+Copilot's round at `b2ba0cbb` recommended approval and, as a previously-missed item, asked that the recipe's `<keywords>` placeholder match the text's "specific subject";
+it is `<subject>` at `657d6b20`, the only change since `c60f77c1`, whose verdict is still running and covers every other word.
+
+## 20:05 PDT --- #3154 at `e5032f09`: a pointer fixed to the wrong bullet
+
+The verdict at `c60f77c1` reproduced all five commands in the anchoring sentence and found "the first bullet of this step" naming the read-the-file bullet, which is the first, while the extend-in-place sentence sits in the second.
+The fix for an ambiguous pointer produced an unambiguous wrong one, because the bullet was named by position from memory instead of by its lead.
+`e5032f09` quotes the lead ("**Grep the corpus**"), changes the count bullet's "that grep" to "the corpus grep", and turns the anchoring sentence's drifting "which" into a sentence that names the ref.
+Copilot and Jules re-requested; a verdict at `e5032f09` is running.
+The sixth adversarial round on this sentence and its neighbours;
+each round's finding has been narrower than the last, and none since `e698c456` has been about a measurement.
+
+## 20:06 PDT --- #3154 at `74469ce5`: another wrap-only round
+
+Copilot's round asked for the MD018 measurement line's two commands and their shared result to sit on separate lines;
+`74469ce5` does that with zero word changes, the only change since `e5032f09`, whose verdict is still running.
+Copilot and Jules re-requested.
+
+## 20:08 PDT --- #3154 at `75829fad`: Jules's hyphen finding, and a commit body written before its measurement was read
+
+Jules's round at `74469ce5` (VERDICT: comment, one WARN) noted that the recipe passes the subject before any `--`, so a subject starting with a hyphen parses as an option.
+True, and the fix is `grep -rilI -- "<subject>" ...`, pushed as `75829fad`.
+The commit body says a `-zz` subject "exits 2 with invalid option";
+the measurement it cites printed exit 0, because `-z` is a valid flag, so grep consumed `-zz` as two flags, took the first path as the pattern, searched the current directory, and returned a wrong hit at exit 0.
+`-Q` is the case that exits 2.
+The body was written from the expected result, not the printed one, and the chain pushed before the line was read;
+the correction is on the PR and goes in the squash body, since a commit cannot be amended after the push.
+The silent `-zz` case is the stronger argument for `--` than the loud `-Q` case.
+
+## 20:10 PDT --- #3154 at `052eee60`: the refspec reported as output
+
+Copilot's round at `75829fad` asked that the refspec parenthetical report what `git config --get-all remote.origin.fetch` returned rather than state the value with "is", since the setting is configurable and multi-valued;
+`052eee60` says "returned ... in the measuring clone", the only change since `75829fad`.
+Copilot and Jules re-requested;
+the verdict at `e5032f09` is still running, and the next verdict covers `75829fad`'s `--` and this wording together.
+
+## 20:17 PDT --- #3154 at `5ad81e12`: five wording items, seven threads, and a squash body written ahead of the merge
+
+The verdict that ran against `e5032f09` read the tree at `052eee60` and reproduced every command; it left two process items and five wording items.
+The wording items are one commit: "the subject grep finds an existing entry" for a lead that said "corpus" twice, a rewrap, the eight-file list one item per line, "returns" for the refspec, one em dash in the rewritten step.
+The process items:
+seven Copilot threads whose asks were in the tree but never resolved are resolved;
+and the false measurement in `75829fad`'s body, which the PR comment had promised to correct "in the squash body", now has its mechanism, `scratchpad/squash-3154.txt`, written with the corrected statement and fact-checkable against the diff, plus a line in the PR description's branch-history section.
+Copilot and Jules re-requested; a verdict at `5ad81e12` is running with the squash body in its brief.
+
+## 20:22 PDT --- check-in fired; #3154 at `4171ba24`; #3173 is a new peer PR
+
+The 20:20 PDT check-in fired.
+Open PRs: [#3154](https://github.com/Morrison-Lab/ai-config/pull/3154) (this session), [#3146](https://github.com/Morrison-Lab/ai-config/pull/3146) and draft [#3168](https://github.com/Morrison-Lab/ai-config/pull/3168) (other sessions), and [#3173](https://github.com/Morrison-Lab/ai-config/pull/3173), a memory-pass PR another session opened at 20:02 PDT, not driven here.
+Copilot's eighteenth round at `5ad81e12` named two lines: one split at its comma as `4171ba24` (no word change), the other already two one-clause lines, said so on the PR.
+Copilot and Jules re-requested; claude-review runs on the push; the verdict at `5ad81e12` covers the words.
+Since `ee05069e` every Copilot round has either approved or named a line split, alternating, so if the next round names another split on unchanged text the disposition is a rebuttal and the forge quorum stands on the round that approved;
+the check-in re-armed for 21:21 PDT carries that rule.
+
+## 20:24 PDT --- `require-clean-verdict` red on a Ready-for-merge review: the classifier reads `NOT_CLEAN` as "not clean"
+
+At `5ad81e12` the claude-review body said "Ready for merge" and `review / require-clean-verdict` failed with `verdict: needs-more-work`.
+Reproduced locally with gha's `.github/workflows/scripts/classify-review-verdict.sh` (v2 at `898a3e2`) on the comment body:
+the classifier scans the lines after the last "Verdict" heading, last match wins, and normalises each line with `re.sub(r'[*_~`]+', ' ', s)`, so the backticked identifier `NOT_CLEAN` in "`check-pr-fully-clean.py` reports `NOT_CLEAN`, but every blocker is ..." becomes "NOT CLEAN" and matches the negated-positive pattern.
+Earlier rounds carried the same sentence and passed because their verdict heading came last, so the sentence sat above the scan;
+this round put the heading near the top.
+The review bot's own brief tells it to backtick quoted verdict words, and that defence does not reach this classifier, which strips the ticks instead of blanking the span.
+Filed upstream as [gha#827](https://github.com/Morrison-Lab/gha/issues/827), with the reproduction and a proposed fix (blank code spans; treat an in-word underscore as part of the identifier).
+The `4171ba24` round decides whether #3154 is blocked by it;
+if the check is required and red again, the merge waits on a fix in gha or a review body whose last matching line is the verdict.
+
+## 20:25 PDT --- #3154's verdict at `5ad81e12`: Ready for merge, four wording notes left as they are
+
+The verdict re-derived every count, confirmed "the subject grep" has one referent (bullet 108) among the seven top-level bullets of step 3, confirmed the eight-file list and its one-paragraph rendering, ran the five gates, and fact-checked the prepared squash body by execution, including the `-zz` and `-Q` grep cases.
+Four wording-only notes remain undisposed by a push, on the convergence rule the 20:20 entry states:
+a break inside "record the recurrence" and "grep both corpora" (the enforced rules pass);
+"(`origin/main` before #3060 merged)" reads as adjacent when `3935bfff` is six commits before the squash (true on the looser reading, and nothing depends on adjacency);
+the `pwd` fallback fails closed from a subdirectory of a checkout;
+and the cross-repo bullet names no remedy for an unset `CLAUDE_PLUGIN_ROOT` in a destination-repo cwd, though the guard's message is self-diagnosing.
+The last two belong with [#3163](https://github.com/Morrison-Lab/ai-config/issues/3163), which owns the recipe's robustness.
+`4171ba24` differs from `5ad81e12` by one line split, so this verdict is the shipping head's.
+
+## 20:27 PDT --- #3154 at `a51a170f`: `4171ba24` fully clean on the forge; Copilot's `-F`
+
+At `4171ba24` claude-review returned Ready for merge and `require-clean-verdict` passed (the review put its verdict heading last again), Jules approved, every check ran green.
+Copilot's round there named a real gap: the recipe searches for API calls and error strings, which carry regex metacharacters, and `grep -rilI -- "foo[" skills/` exits 2 ("Invalid regular expression" on GNU grep 3.11) while `-F` searches and exits 1.
+`a51a170f` adds `-F` and a prose line naming it.
+The commit body quotes the error as "Unmatched [", the wording the reviewer used, not the one the measurement printed;
+the body was written into the chain before the measurement's output was read, the same order error as the `-zz` body, and the correction is on the PR and in the squash body.
+A verdict at `a51a170f` is running with the updated squash body in its brief;
+Copilot and Jules re-requested.
+
+Lesson for the memory pass, third occurrence today: a commit body that quotes a tool's output has to be written after the output is on screen, never from the reviewer's paraphrase or the expected result.
+
+## 20:31 PDT --- #3154 at `2e12bcb3`: the resolver reads the current directory
+
+At `a51a170f` claude-review returned Ready for merge (it ran `check-pr-fully-clean.py`, read Jules's superseded `--` WARN, and confirmed the flag present) and Jules approved.
+Copilot's round there raised the `pwd` fallback the 19:5x verdict had deferred to #3163, plus the shape of the `ls-remote` clause;
+`2e12bcb3` inserts `git rev-parse --show-toplevel` on the current directory ahead of `pwd` (measured from `skills/ums/`: hits at exit 0) and says the command returns one line whose SHA begins `f9068299`.
+Copilot and Jules re-requested;
+the verdict agent at `a51a170f` is asked to extend to this head rather than a sixth slot being spent.
+
+## 20:32 PDT --- #3154 at `27bb9588`: `(` is a literal in BRE
+
+The verdict at `a51a170f` measured what the `-F` commit and the squash body had asserted from Copilot's wording:
+a bare `(` is a literal in grep's default BRE mode (`grep -rilI -- "get_check_runs(" scripts/` exits 0 with hits), so only `[` errors, and `.` and `*` over-match.
+`27bb9588` names those three in the prose line and breaks it at its clause boundary;
+the squash body says the same.
+Copilot and Jules re-requested;
+the same verdict agent is resumed for `2e12bcb3` and `27bb9588`.
+Fourth time today a claim about tool behaviour was copied from a reviewer's phrasing rather than measured, and the second in the same hour on grep alone.
+
+## 20:35 PDT --- #3154's verdict at `27bb9588`: Ready for merge
+
+The resumed verdict agent measured the resolver from a checkout subdirectory (resolves, exit 0), from `/tmp` (fails closed), and from a different repo carrying its own `CLAUDE.md` (fails closed on the missing `shared/`), confirmed the `ls-remote` output shape, the `[`/`.`/`*` claims, the five gates, both commits' trailers, and every count in the squash body, and returned Ready for merge for `27bb9588` with two non-blocking notes on commit text.
+The squash body's ragged paragraph is reflowed.
+Jules approved at this head at 20:35 PDT (the round that names `-F` and `--`);
+claude-review and Copilot are running, and the merge follows once every check run is green and both are clean.
+
+## 20:38 PDT --- #3154 at `c5eb3da3`: two bordering em dashes
+
+At `27bb9588` claude-review returned Ready for merge, every check ran green, and the verdict was Ready.
+Copilot's round at `2e12bcb3` (its twenty-second) named an em dash beside the rewritten step;
+the two on the lines bordering step 3 are ASCII at `c5eb3da3`, the file's other twenty staying with [#735](https://github.com/Morrison-Lab/ai-config/issues/735).
+The commit changes two tokens, so the `27bb9588` verdict stands for this head.
+Copilot and Jules re-requested;
+the merge follows the first head at which claude-review, Copilot, and Jules are all clean together with green checks.
+
+## 20:42 PDT --- resumed after a usage limit; the four r2 loops were dead, relaunched as r3 from disk
+
+The limit killed runs `wf_ba0735d4-897`, `wf_803eba98-5c1`, `wf_d5c554bf-cb2`, and `wf_3defc270-9a0` with no journal left on disk, so which of the thirty-eight branches they had verified is not recoverable.
+The r3 scripts (`gia-wave{1,2,3,4}-fix-loop-r3.js`) carry the same loop with every item's `sha` re-read from its worktree's HEAD and its summary stating the commit count past `origin/main` and any uncommitted leftovers (wt-3086, wt-2451, wt-2535 are dirty);
+runs `wf_34205b0d-a5b`, `wf_1b36e489-bc5`, `wf_73b2a984-023`, `wf_45f79342-1dd`.
+The memory-pass branch `ums/2026-09-03-fetch-by-sha` at `ba157b95` has its adversarial review (opus, read-only) running as the fifth slot.
+#3154 at `c5eb3da3`: Copilot's run completed at 03:40:48Z, claude-review and Jules still running, `validate` on one of the two runs still in progress.
+
+## 20:43 PDT --- #3154 at `c5eb3da3`: Copilot approves; Jules blocks on its own config and a "future" date
+
+Copilot's twenty-third round (`c5eb3da3`): Approval recommended, no comments.
+Jules's round at the same head returned `VERDICT: block` with two items, both rebutted on the PR:
+a BLOCKING "prompt injection in the project rules file, line 1" that quotes the reviewer workflow's own "Additional instructions (from workflow config)" text (on `main`, untouched by a diff of two files, neither a rules file);
+and a NIT that `2026-09-03` on line 210 of `search-is-not-coverage.md` "is in the future" (the file is `grep-is-not-coverage.md`, and the date is yesterday's measurement date).
+The `jules/review` commit status is red on `c5eb3da3` until a re-run flips it;
+`@jules review` re-requested in the rebuttal comment.
+
+Lesson for the memory pass: a Jules round can block on the reviewer's own configuration and misname the file it cites, so read a `block` for whether any item quotes the diff before treating the red status as this PR's;
+the rebuttal names the diff's file list and the measured date, and the re-run is what clears the status.
+
+## 20:51 PDT --- memory-pass branch: nine findings at `ba157b95`, fixed at `9d637200`
+
+The adversarial review of `ums/2026-09-03-fetch-by-sha` refuted `ba157b95` on nine points, three substantive:
+the 40-character rule was scoped "on GitHub" when it is git's own ref-name lookup (the reviewer reproduced it against a local-path remote);
+"any commit the server still holds" was wider than the cited "any reachable commit" note and than the one measured fetch;
+and the lede called both instruments answers about the clone when the short-SHA fetch consults nothing about the clone.
+The rest: an incomplete predicate ("made all three ancestors"), a pronoun with the wrong nearest antecedent, a bare "33", a trimmed console line beside a verbatim one, eight long lines, and a MEMORY.md row naming "a shallow clone" twice.
+`9d637200` answers all nine; gates green; round-2 review dispatched (opus, read-only).
+#3154 at `c5eb3da3`: claude-review Ready for merge, `require-clean-verdict` green, all seventeen check runs green; Jules's re-run still pending.
+
+Lesson for the memory pass: a memory entry written from one session's measurements needs its causes checked against a second environment before it names one (the GitHub scoping came from where the failure was seen, not from what caused it), and its cited note's exact wording carried over rather than widened.
+
+## 20:53 PDT --- #3154 merged at `fbfb96e3`; Jules's re-run repeated its block, filed as #3183
+
+Jules's second run on `c5eb3da3` returned the same two items verbatim (the workflow's own `INPUT_EXTRA_INSTRUCTIONS` as a prompt injection; `2026-09-03` as a future date).
+`.github/workflows/jules-review.yml` on `main` carries those instructions at lines 213 to 228 (added to close [#815](https://github.com/Morrison-Lab/ai-config/issues/815)), including "never report a date as a typo or as being in the future", so the block is the noise the fix for #815 was written to suppress, now quoting the fix itself.
+Filed as [#3183](https://github.com/Morrison-Lab/ai-config/issues/3183).
+Merged [#3154](https://github.com/Morrison-Lab/ai-config/pull/3154) (squash, `fbfb96e3`, closes #3123) under the standing grant on: seventeen green check runs including `require-clean-verdict`, claude-review Ready, Copilot approving, the adversarial verdict Ready at `27bb9588` (two ASCII dashes from the head), Jules approving at `27bb9588`, and the Jules block Rebutted with the diff's file list; one standing-down comment on the PR.
+Worktree `wt-umsscope` and branch removed; `main` fast-forwarded; subscription dropped.
+
+Lesson for the memory pass: a reviewer block whose items quote the reviewer workflow's own trusted instructions is a reviewer defect, and re-running it once is the whole measurement; the second identical block is the signal to file and merge on the approving round, not to spend a third run.
+
+## 20:56 PDT --- merge-time memory pass for #3154: one guard filed, three entries on a second branch
+
+Dupe-checked each owed lesson across the corpus with the whole-corpus recipe #3154 just shipped.
+The `pipefail` chain and the commit-body-from-paraphrase lessons were already rules (`errexit-is-not-uniform.md`'s ad-hoc-chain section; `fact-check-prose.md`'s commit-message section), both broken with the rule loaded, so each gets a dated recurrence beside its rule and the chain case a guard issue, [#3184](https://github.com/Morrison-Lab/ai-config/issues/3184).
+The Jules own-config block was new; it lands in `memories/github-actions.md` beside the #857 Jules record (1225 lines, under the 1250 gate).
+Branch `ums/2026-09-03-recurrences` in `wt-ums-rec`, one commit, gates green, awaiting a review slot (four loops and the memory-pass round-2 review hold all five).
+The "re-run local checks after merging main" lesson is Pattern 7 and Pattern 26 in `mistake-patterns.md`, so it is not re-recorded;
+the "because clause" and "second environment" lessons are `metacognitive-monitoring.md`'s cause rule, and the memory-pass commit body carries the instance.
+
+## 21:00 PDT --- memory-pass branch round 2: the local-path remote is a server too
+
+Round 2 at `9d637200` closed eight of the nine and refuted the fix for the first:
+a plain local-path remote runs `git upload-pack`, so reproducing the short-SHA failure there rules out a GitHub policy, not a server policy.
+The discriminator is the error text the section already printed:
+`fatal: couldn't find remote ref <arg>` for a non-40-hex argument (client-side) versus `fatal: remote error: upload-pack: not our ref <sha>` for a 40-hex object the remote lacks (measured against GitHub at 20:58 PDT with a zero SHA and a 39-character prefix).
+`1fff7e63` states the contrast, adds the server-side line to the console block, names the full-SHA fetch as the one-command test, extends the provenance line, breaks the bold lede, and marks MEMORY.md's second shallow-clone mention (which `9d637200`'s body had claimed and its diff had not done).
+Round 3 dispatched.
+
+Lesson for the memory pass: the evidence offered for a cause has to discriminate the cause from its rivals, and a reproduction that rules out one rival (GitHub) can be presented as ruling out the class (any server); the instrument that discriminates was already on screen and unused.
+
+## 21:09 PDT --- memory-pass branch round 3: "never reaches the server" was false
+
+Round 3 at `1fff7e63` measured the sentence round 2 had asked about and refuted it:
+`GIT_TRACE_PACKET=1 git fetch origin eb0cf15e` sends `command=ls-refs` with `ref-prefix eb0cf15e`, receives the advertisement, and only then prints `couldn't find remote ref`;
+what it never sends is a `want` (reproduced here against GitHub at 21:07 PDT).
+It also found the "one-command test" naming an outcome the full-SHA fetch cannot produce, the refusal string being protocol v2's (a local-path remote on v0 says `Server does not allow request for unadvertised object`; GitHub on v0 still says `upload-pack: not our ref`, measured with `-c protocol.version=0`), and the prior commit body misplacing the lede's break.
+`54c8e5fb` closes all five; round 4 dispatched.
+
+Lesson for the memory pass: three rounds in a row, the sentence that carried the section's cause was the one written from inference while the instrument that could settle it (the error text, then the packet trace) was one command away; the reviewer's brief asked for that command each time and the author ran it only after the refutation.
+
+## 21:18 PDT --- memory-pass branch round 4: two claims added on the unmeasured half
+
+Round 4 at `54c8e5fb` closed rounds 3's items and found the two claims that commit added without measuring:
+protocol v2 has been the default since 2.29, not 2.26 (2.27 demoted it, per git's release notes);
+and on protocol v0 an unadvertised 40-hex fetch sends no `want` at all (measured here: zero `want` lines on v0, one on v2, in a scratch local-path remote), so "refusal to serve" for both strings contradicted the section's own client-side-versus-server discriminator.
+`31637c54` states the two mechanisms separately, corrects the version, and takes the body's "carries no information about reachability" into the index row.
+Round 5 dispatched.
+
+Lesson for the memory pass, same shape as round 3: a fix for a measured finding is where the next unmeasured claim gets written, because the fix's own sentence is drafted with the finding's authority rather than its instrument.
+
+## 21:25 PDT --- memory-pass branch round 5: the want decision is the advertisement's, not the protocol's
+
+Round 5 at `31637c54` closed round 4's three and found the parenthetical that commit added keyed on the wrong axis:
+GitHub's v0 advertisement carries `allow-tip-sha1-in-want` and `allow-reachable-sha1-in-want`, so git sends the `want` there on v0 as well (measured here: a `fetch-pack> want` line under `-c protocol.version=0`, and the two capabilities in the advertisement), and only the local-path remote's advertisement lacks it.
+It also found the shallow-clone contrast pairing the unranged `rev-list --count f9068299` (226 here) with the ranged command's 33.
+`5ec4102a` keys the mechanism on the advertisement, scopes the trace counts per remote, and names both `rev-list` commands;
+round 6 dispatched.
+The first `want` count I ran here returned 0 because it grepped for the v2 prefix `fetch> want` while v0 logs `fetch-pack> want`;
+the broader `grep 'want '` found it.
+
+Lesson for the memory pass: each round's fix has introduced exactly one new unmeasured claim on the same subject, five rounds running; the next entry of this shape gets its every mechanism sentence traced before the first review, not after the fifth.
+
+## 21:35 PDT --- memory-pass branch round 6: four mechanism sentences under the wrong variable
+
+Round 6 at `5ec4102a` closed round 5's two and found four more, each a mechanism keyed on the wrong variable:
+the short-SHA paragraph mixed v2's `ls-refs` with v0's unsolicited advertisement (measured here: zero request packets on v0 for a short SHA);
+"the second string is protocol v2's" when a server returns `not our ref` once any `want` reaches it;
+"one `want` line" that a `grep -c 'want '` does not reproduce (the capabilities contain the word, and the v0 request prefix is `fetch-pack>`);
+and "on a full checkout returns 33" when the ranged count returns 33 in a shallow clone too.
+`4af1f1ea` scopes each sentence to what was measured;
+round 7 dispatched with an explicit brief to say what can be deleted.
+
+Lesson for the memory pass: the section has grown a protocol-mechanics paragraph the entry's point (a short-SHA failure says nothing about reachability) never needed, and each added mechanism sentence has cost a review round; the next round's brief asks the reviewer which sentences the reader acts on.
+
+## 21:44 PDT --- paused at 96% of the five-hour quota (user directive); state snapshotted to origin
+
+The user asked to pause so nothing is lost;
+the four r3 loops (`wf_34205b0d-a5b`, `wf_1b36e489-bc5`, `wf_73b2a984-023`, `wf_45f79342-1dd`) and the round-7 reviewer were stopped, and the 22:22 check-in deleted.
+Every worktree branch is pushed to `origin` as a snapshot, with no PR opened for the wave branches or the two memory branches;
+a worktree that was dirty when the loops stopped carries a `wip:` commit naming the interrupted round, to be squashed or reverted when its loop resumes.
+
+Resume list, in order:
+
+1. `ums/2026-09-03-fetch-by-sha` (`wt-ums-sha`, `4af1f1ea`): round 7 of the adversarial review was killed mid-run; re-dispatch it (opus, read-only) with the round-7 brief (the 21:35 entry), asking which sentences the reader does not act on;
+   on Ready, push (fresh `ls-remote`), open the PR, request Copilot and `@jules`, drive to clean, merge under the standing grant.
+2. `ums/2026-09-03-recurrences` (`wt-ums-rec`, `012c3d1c`, gates green): one adversarial review, then the same path.
+3. This notebook branch (`wt-nb3`): a verdict, then PR.
+4. The wave loops: regenerate r4 scripts from disk the way `gia-wave{1,2,3,4}-fix-loop-r3.js` were (the regeneration script is in the 20:42 entry's description), drop any `wip:` commit back into the working tree first, and relaunch four loops.
+5. Open PRs #3180, #3179, #3175, #3173, #3168 are other sessions'; leave them.
+
+Filed this session and unclaimed: #3160 to #3165, #3183, #3184.

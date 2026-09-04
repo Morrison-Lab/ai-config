@@ -204,3 +204,12 @@ Filed as [#3196](https://github.com/Morrison-Lab/ai-config/issues/3196) (the dif
 
 As of `75bc0fc2`, the head round 13 reviewed, thirteen adversarial rounds had run on this branch with no PR open, returning eleven, six, four, four, four, eleven, four, three, one, two, one, one, and two findings.
 The three entries that narrated rounds 1 to 3, appended by the commits answering those rounds, were deleted rather than patched at `48380505`, the commit answering round 4, and this entry took their place.
+
+## 05:39 PDT --- the four r4 loops end at 0 of 38 verified; every head snapshotted; #3202 opened; #3203 filed
+
+The round-14 review of this branch and the loops' last rechecks died on the account session limit that reset at 12:30 UTC (05:30 PDT).
+The loops' completion notices: wave 1 0 of 6, wave 2 0 of 10, wave 3 0 of 11, wave 4 0 of 11, with 20 branches at the three-round cap still carrying findings and 18 cut before any recheck of their current head (the workflow reports a killed recheck as the finding `recheck agent returned null`).
+Every wave worktree was clean and every branch fast-forwarded or already matched origin, so all 38 heads are on origin as snapshots with no PR.
+Each branch's issue now carries a status comment with its head SHA and the last recheck's findings verbatim, or a note that the recheck was cut, posted through the REST API from body files.
+[#3203](https://github.com/Morrison-Lab/ai-config/issues/3203) records the four loops' agent and token counts against the zero verified and proposes the restructuring.
+This branch merged `origin/main` at `6af715ec` with the gates green and opened as [#3202](https://github.com/Morrison-Lab/ai-config/pull/3202): claim comment with `@jules review`, Copilot requested, session subscribed.

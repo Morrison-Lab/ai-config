@@ -111,7 +111,7 @@ committed pass.
      runs to hundreds or a thousand-plus lines, so an existing entry on the
      same subject can sit far away in an unrelated cluster and never enter
      your view.
-     Grep the paths [`skill-builder`](../skill-builder/SKILL.md) step 0 runs
+     Grep [`skill-builder`](../skill-builder/SKILL.md) step 0's path list
      rather than one file, and rather than only `memories/`:
      ```bash
      (

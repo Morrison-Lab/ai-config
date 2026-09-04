@@ -256,6 +256,34 @@ CASES = [
     ([QUERY, PUSH, say("Correcting my earlier status which claimed all checks "
                        "green.")], False,
      "same for 'which'"),
+    # `that` is the commonest word on either side of that split, so leaving it
+    # out left the guard switchable off by one word. Delete it from
+    # _TRAILING_ONLY_SEPARATORS and the two blocking cases stop blocking; move
+    # it into _CLAUSE_SEPARATORS and the two allow cases stop allowing.
+    ([QUERY, PUSH, say("#1689 is fully clean per the note that was wrong.")], True,
+     "'that' is a restrictive relative pronoun after the claim -- it modifies "
+     "the note, exactly as 'which' does"),
+    ([QUERY, PUSH, say("All checks green per the check that was mistaken.")], True,
+     "same shape without a PR number"),
+    ([QUERY, PUSH, say("I was wrong that all checks green.")], False,
+     "before the claim 'that' is the complementizer taking it as the "
+     "retraction's own object"),
+
+    # `until` is a time connective like `after` and `before` beside it, so a
+    # retraction reaching across it is about a different proposition. Delete it
+    # from _CLAUSE_SEPARATORS and this stops blocking.
+    ([QUERY, PUSH, say("All checks green until I noticed my earlier count was "
+                       "overstated.")], True,
+     "'until' introduces a time, so the claim it bounds still stands"),
+
+    # A bracketed aside is a parenthesized one in the other bracket style, and
+    # pinning only the parens let the verdict turn on which style was typed.
+    # Delete either bracket pair from the character class and its case stops
+    # blocking.
+    ([QUERY, PUSH, say("All checks green (the earlier note was wrong).")], True,
+     "a parenthesized aside is about the note, not the claim"),
+    ([QUERY, PUSH, say("All checks green [the earlier note was wrong].")], True,
+     "so is the same aside in square brackets"),
 
     # The copula guard. Attributive "wrong" sits in the SAME clause as the
     # claim, so attachment cannot rule it out; only the copula requirement can.

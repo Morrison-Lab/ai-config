@@ -154,14 +154,12 @@ RX_SENTENCE_BREAK = re.compile(r"[.!?;][\"'\)\]*_`]*(?:\s|$)|\n")
 #
 # What is NOT taken from it is its first-person anchor. That file anchors most
 # of its alternatives on an explicit `I`/`my` subject -- `correcting this` and
-# `retracting that claim` are the exceptions -- because its job is to detect an
-# admission, and "the review was wrong" is a statement about someone else.
-# (The source file's own header states the anchor without those exceptions;
-# measured against its live regex, both alternatives above match a string
-# carrying neither `I` nor `my`.) This guard's job is different, and the issue's
-# own measured sentence proves the anchor cannot transfer: in `But "fully clean"
-# was wrong too` the subject is the quoted claim, not a person. Attachment does
-# that work here instead -- see RX_CLAUSE_SEPARATOR below.
+# `retracting that claim` among the several that do not -- because its job is
+# to detect an admission, and "the review was wrong" is a statement about
+# someone else. This guard's job is different, and the issue's own measured
+# sentence proves the anchor cannot transfer: in `But "fully clean" was wrong
+# too` the subject is the quoted claim, not a person. Attachment does that
+# work here instead -- see RX_CLAUSE_SEPARATOR below.
 #
 # The copula is required for the adjective forms, because bare `wrong` is most
 # often attributive ("the wrong branch", "the wrong file") and says nothing
@@ -188,9 +186,9 @@ RX_RETRACTION = re.compile(
 #
 # In each, the retraction and the claim sit in DIFFERENT clauses, and the text
 # between them says so: a comma, a prose dash, a coordinating or subordinating
-# conjunction, or a markdown boundary (a table cell, a new list item). None of
-# those appears between the claim and its retraction in the measured sentence,
-# where the two are adjacent.
+# conjunction, the bracket or paren opening an aside, or a markdown boundary (a
+# table cell, a new list item). None of those appears between the claim and its
+# retraction in the measured sentence, where the two are adjacent.
 #
 # Attachment replaces the character window an earlier round used. A window
 # cannot tell "green -- the badge is wrong" from "green was wrong", since both
@@ -208,6 +206,14 @@ RX_RETRACTION = re.compile(
 # a relative clause about a different noun instead, so "#1689 is fully clean
 # per the reviewer whose note was wrong." leaves the claim standing and still
 # has to block.
+#
+# `that` belongs in the same set, and it is the commonest word in English on
+# either side of this split -- so omitting it left the guard switchable off by
+# one word, the same defect the dash spelling had. It is the complementizer
+# leading ("I was wrong that all checks green.") and the restrictive relative
+# pronoun trailing ("#1689 is fully clean per the note that was wrong."), which
+# is exactly the trailing-only shape. It cannot join the shared set, because
+# the leading reading is the plainest correction there is.
 #
 # `:` is a clause boundary in BOTH directions and stays in the shared set. It
 # introduces the CORRECTED claim at least as often as the retracted one --
@@ -232,23 +238,30 @@ RX_RETRACTION = re.compile(
 # because those two also sit inside ordinary words and paths
 # (`conflict-free`, `pre-push`, `hooks/foo.py`); the other glyphs never do.
 #
-# Nothing else moves. `because`, `since`, `after`, `before`, `once`, `unless`,
-# `if`, and `now that` introduce a reason or a time rather than the
+# A square-bracketed aside is the same case as a parenthesized one, and
+# listing only the parens made the verdict turn on the bracket style: "All
+# checks green (the earlier note was wrong)." blocked while the identical
+# sentence in brackets did not. Both open an aside about something other than
+# the claim, so both break attachment.
+#
+# Nothing else moves. `because`, `since`, `after`, `before`, `until`, `once`,
+# `unless`, `if`, and `now that` introduce a reason or a time rather than the
 # retraction's object, so a retraction reaching across one of them is about a
 # different proposition and STAYS blocked in both directions -- "All checks
-# green because the earlier reading was wrong." still asserts green. The
-# two-word `now that` has to be spelled out, since a bare `now` is no
-# separator at all.
+# green because the earlier reading was wrong." still asserts green. `until` is
+# the same part of speech as the `after`/`before`/`once` beside it, and its
+# omission was an oversight rather than a carve-out. The two-word `now that`
+# has to be spelled out, since a bare `now` is no separator at all.
 _CLAUSE_SEPARATORS = (
-    r"--|[,;:()|]"
+    r"--|[,;:()|\[\]]"
     r"|[\u2013\u2014\u2192\u2026]|\s[-/]\s"
     r"|\n[ \t]*[-*+>#]"
     r"|\b(?:but|and|or|so|yet|however|though|although|while|whereas"
-    r"|after|before|since|because|once|unless|if|now\s+that)\b"
+    r"|after|before|until|since|because|once|unless|if|now\s+that)\b"
 )
-# The complementizer and the relative pronouns, which break attachment only
+# The complementizers and the relative pronouns, which break attachment only
 # AFTER the claim -- before it they can take the claim as their own object.
-_TRAILING_ONLY_SEPARATORS = r"|\b(?:when|where|which|who|whose|whom)\b"
+_TRAILING_ONLY_SEPARATORS = r"|\b(?:when|that|where|which|who|whose|whom)\b"
 RX_CLAUSE_SEPARATOR = re.compile(
     _CLAUSE_SEPARATORS + _TRAILING_ONLY_SEPARATORS, re.I)
 RX_LEADING_SEPARATOR = re.compile(_CLAUSE_SEPARATORS, re.I)

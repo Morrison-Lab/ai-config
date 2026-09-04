@@ -196,11 +196,18 @@ RX_RETRACTION = re.compile(
 # cannot tell "green -- the badge is wrong" from "green was wrong", since both
 # put the retraction within a few characters; a clause separator can.
 #
-# One separator is direction-asymmetric, so the set is split rather than
-# shared. `when` is a complementizer: in "I was wrong when I said all checks
-# green." the claim is the content of the retracted saying, so `when` must not
-# break a LEADING retraction off the claim it withdraws. After the claim the
-# same word opens a separate clause, so it still breaks there.
+# Two families of separator are direction-asymmetric, so the set is split
+# rather than shared. `when` is a complementizer: in "I was wrong when I said
+# all checks green." the claim is the content of the retracted saying, so
+# `when` must not break a LEADING retraction off the claim it withdraws. After
+# the claim the same word opens a separate clause, so it still breaks there.
+# The relative pronouns `where`, `which`, `who`, `whose`, and `whom` are the
+# second family, for the same reason. Before the claim they can take it as
+# their own object, so "Correcting my earlier status which claimed all checks
+# green." withdraws exactly the claim that follows. After the claim they open
+# a relative clause about a different noun instead, so "#1689 is fully clean
+# per the reviewer whose note was wrong." leaves the claim standing and still
+# has to block.
 #
 # `:` is a clause boundary in BOTH directions and stays in the shared set. It
 # introduces the CORRECTED claim at least as often as the retracted one --
@@ -214,18 +221,36 @@ RX_RETRACTION = re.compile(
 # whose own text already discloses the reading is pre-push; the cost of the
 # asymmetric one is a stale claim that nothing reports.
 #
+# A prose DASH is the same case as `:`, and listing only the ASCII double
+# hyphen left the guard switchable off by one keystroke: "PR #1689 is fully
+# clean -- the earlier blocker was inaccurate." blocked while the identical
+# sentence spelled with an em-dash, an en-dash, or a spaced single hyphen did
+# not. The text this guard reads is assistant prose in a transcript, which
+# `shared/coding/ascii-punctuation-in-source.md` does not govern, so every
+# spelling has to be listed -- as `\uXXXX` escapes, so this file itself stays
+# ASCII. Only the ASCII hyphen and the slash need surrounding whitespace,
+# because those two also sit inside ordinary words and paths
+# (`conflict-free`, `pre-push`, `hooks/foo.py`); the other glyphs never do.
+#
 # Nothing else moves. `because`, `since`, `after`, `before`, `once`, `unless`,
-# and `if` introduce a reason or a time rather than the retraction's object, so
-# a retraction reaching across one of them is about a different proposition and
-# STAYS blocked in both directions -- "All checks green because the earlier
-# reading was wrong." still asserts green.
+# `if`, and `now that` introduce a reason or a time rather than the
+# retraction's object, so a retraction reaching across one of them is about a
+# different proposition and STAYS blocked in both directions -- "All checks
+# green because the earlier reading was wrong." still asserts green. The
+# two-word `now that` has to be spelled out, since a bare `now` is no
+# separator at all.
 _CLAUSE_SEPARATORS = (
     r"--|[,;:()|]"
+    r"|[\u2013\u2014\u2192\u2026]|\s[-/]\s"
     r"|\n[ \t]*[-*+>#]"
     r"|\b(?:but|and|or|so|yet|however|though|although|while|whereas"
-    r"|after|before|since|because|once|unless|if)\b"
+    r"|after|before|since|because|once|unless|if|now\s+that)\b"
 )
-RX_CLAUSE_SEPARATOR = re.compile(_CLAUSE_SEPARATORS + r"|\bwhen\b", re.I)
+# The complementizer and the relative pronouns, which break attachment only
+# AFTER the claim -- before it they can take the claim as their own object.
+_TRAILING_ONLY_SEPARATORS = r"|\b(?:when|where|which|who|whose|whom)\b"
+RX_CLAUSE_SEPARATOR = re.compile(
+    _CLAUSE_SEPARATORS + _TRAILING_ONLY_SEPARATORS, re.I)
 RX_LEADING_SEPARATOR = re.compile(_CLAUSE_SEPARATORS, re.I)
 
 # The trailing scan deliberately does NOT treat a bare newline as a sentence

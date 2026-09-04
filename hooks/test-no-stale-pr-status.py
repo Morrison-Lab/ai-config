@@ -195,6 +195,68 @@ CASES = [
      "correcting an earlier status is not retracting the claim that follows "
      "the colon"),
 
+    # Round 3 review. A prose dash is a clause separator too, and listing only
+    # the ASCII double hyphen made the verdict turn on one keystroke: the
+    # `--` case above blocked while every other spelling of the same sentence
+    # allowed, which is the silent direction. Delete the dash alternative from
+    # _CLAUSE_SEPARATORS and all four of these stop blocking.
+    ([QUERY, PUSH, say("PR #1689 is fully clean - the earlier blocker was "
+                       "inaccurate.")], True,
+     "a spaced single hyphen separates the retraction from the claim"),
+    ([QUERY, PUSH, say("PR #1689 is fully clean \u2014 the earlier blocker was "
+                       "inaccurate.")], True,
+     "so does an em-dash -- assistant prose is not held to this repo's "
+     "ASCII-punctuation rule, so the guard has to read the glyph"),
+    ([QUERY, PUSH, say("PR #1689 is fully clean \u2013 the earlier blocker was "
+                       "inaccurate.")], True,
+     "so does an en-dash"),
+    ([QUERY, PUSH, say("I was wrong \u2014 all checks green now.")], True,
+     "the dash is shared like the colon: after a retraction it introduces the "
+     "corrected claim, which is a fresh stale-clean assertion"),
+    # The whitespace requirement on the ASCII hyphen is what keeps a hyphenated
+    # word from reading as a clause break. Drop it and this stops allowing.
+    ([QUERY, PUSH, say("I overstated the pre-push reading of all checks green.")], False,
+     "an unspaced hyphen inside a word is not a clause separator"),
+    ([QUERY, PUSH, say("All checks green / the earlier note was wrong.")], True,
+     "a spaced slash separates them too"),
+    ([QUERY, PUSH, say("All checks green \u2192 the earlier note was wrong.")], True,
+     "so does an arrow"),
+    ([QUERY, PUSH, say("All checks green \u2026 the earlier note was wrong.")], True,
+     "so does an ellipsis glyph, which the ASCII spelling already handled "
+     "through the sentence-break scan"),
+
+    # `now that` is a reason connective like `because`, and only the two-word
+    # spelling is one -- a bare `now` separates nothing. Delete it from
+    # _CLAUSE_SEPARATORS and this stops blocking.
+    ([QUERY, PUSH, say("All checks green now that the earlier reading was "
+                       "wrong.")], True,
+     "'now that' introduces a reason, so the claim it explains still stands"),
+
+    # The relative pronouns join `when` in the trailing-only set: after the
+    # claim they open a clause about a different noun, so they break there.
+    # Delete each from _TRAILING_ONLY_SEPARATORS and its case stops blocking.
+    ([QUERY, PUSH, say("#1689 is fully clean where the earlier note was "
+                       "wrong.")], True,
+     "'where' opens a clause about a different proposition"),
+    ([QUERY, PUSH, say("#1689 is fully clean per the note which was wrong.")], True,
+     "'which' modifies the note, not the claim"),
+    ([QUERY, PUSH, say("#1689 is fully clean per the reviewer who was wrong.")], True,
+     "'who' modifies the reviewer, not the claim"),
+    ([QUERY, PUSH, say("#1689 is fully clean per the reviewer whose note was "
+                       "wrong.")], True,
+     "'whose' modifies the reviewer's note, not the claim"),
+    ([QUERY, PUSH, say("All checks green according to the reviewer whom I "
+                       "earlier said was wrong.")], True,
+     "'whom' likewise"),
+    # And the other direction, which is why they are trailing-only rather than
+    # shared. Move either into _CLAUSE_SEPARATORS alone and these stop allowing.
+    ([QUERY, PUSH, say("I was wrong where I said all checks green.")], False,
+     "before the claim a relative pronoun takes it as the retraction's own "
+     "object, exactly as 'when' does"),
+    ([QUERY, PUSH, say("Correcting my earlier status which claimed all checks "
+                       "green.")], False,
+     "same for 'which'"),
+
     # The copula guard. Attributive "wrong" sits in the SAME clause as the
     # claim, so attachment cannot rule it out; only the copula requirement can.
     # Delete the `(?:was|were|is|are)\s+` prefix from RX_RETRACTION and this

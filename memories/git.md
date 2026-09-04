@@ -156,8 +156,9 @@ and the clone can decide it without `gh` and without an API token:
 GitHub keeps a `refs/pull/NNNN/head` ref for every pull request and none for an
 issue, so the remote answers the question directly;
 [`git-branches`](git-branches.md)'s
-"GitHub keeps `refs/pull/N/head` forever" section owns that fact and the
-measurement behind it.
+"GitHub keeps `refs/pull/N/head` forever" section owns the persistence half
+and its measurement;
+the absence of such a ref for an issue is measured here.
 Measured 2026-09-03 against `origin` = `https://github.com/Morrison-Lab/ai-config`,
 on a machine with no `gh` on `PATH`:
 

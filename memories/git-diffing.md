@@ -223,9 +223,7 @@ genuine conflict.
 - **Don't:** write a bare `--diff-merges`, which requires a value.
 
 (Refs [ai-config#3129](https://github.com/Morrison-Lab/ai-config/pull/3129),
-whose notebook entry of 2026-09-03 records the correction;
-the false belief was written into `fix/ums-step3-corpus-scope`
-and caught by the round-one adversarial verdict on that branch.)
+whose notebook entry of 2026-09-03 records the correction.)
 
 ## A `git diff` self-check is blind to untracked files, whatever range you pick
 

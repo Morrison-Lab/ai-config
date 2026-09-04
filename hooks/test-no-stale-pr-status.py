@@ -270,20 +270,55 @@ CASES = [
      "retraction's own object"),
 
     # `until` is a time connective like `after` and `before` beside it, so a
-    # retraction reaching across it is about a different proposition. Delete it
-    # from _CLAUSE_SEPARATORS and this stops blocking.
+    # retraction reaching across it is about a different proposition. Its
+    # terminative sense is a separate question this guard does not read: only
+    # the retraction vocabulary withdraws a claim, so a claim bounded by a time
+    # is still a claim. Delete `until` from _CLAUSE_SEPARATORS and this stops
+    # blocking.
     ([QUERY, PUSH, say("All checks green until I noticed my earlier count was "
                        "overstated.")], True,
-     "'until' introduces a time, so the claim it bounds still stands"),
+     "what follows 'until' is a time, so the retraction here is about the "
+     "earlier COUNT rather than about the claim -- not because a bounded "
+     "claim still holds, which 'until' in fact denies"),
 
     # A bracketed aside is a parenthesized one in the other bracket style, and
     # pinning only the parens let the verdict turn on which style was typed.
-    # Delete either bracket pair from the character class and its case stops
-    # blocking.
+    # Delete the parens from _CLAUSE_SEPARATORS, or the brackets from
+    # _TRAILING_ONLY_SEPARATORS, and the matching case stops blocking.
     ([QUERY, PUSH, say("All checks green (the earlier note was wrong).")], True,
      "a parenthesized aside is about the note, not the claim"),
     ([QUERY, PUSH, say("All checks green [the earlier note was wrong].")], True,
      "so is the same aside in square brackets"),
+    # The brackets are trailing-only, and the parens are not, because BEFORE
+    # the claim a bracketed span in this corpus is markdown rather than an
+    # aside. Move them into _CLAUSE_SEPARATORS and both of these stop allowing,
+    # which blocks a plain retraction -- the class ai-config#3038 was filed to
+    # stop blocking.
+    ([QUERY, PUSH, say("Retracting the status [#1689][pr] all checks green.")], False,
+     "a reference-style markdown link inside a leading retraction is not a "
+     "clause break"),
+    ([QUERY, PUSH, say("I misread [^1] all checks green.")], False,
+     "nor is a footnote marker"),
+
+    # The head noun of a trailing relative clause is USUALLY some other noun,
+    # which is what puts the relative pronouns in the trailing-only set. When
+    # it refers back to the claim instead, the clause withdraws exactly the
+    # claim, so RX_METALINGUISTIC_HEAD drops that head phrase from the
+    # connector. Delete the RX_METALINGUISTIC_HEAD.sub call and all three of
+    # these stop allowing.
+    ([QUERY, PUSH, say("All checks green is a claim that was wrong.")], False,
+     "the head noun refers back to the claim, so the relative clause retracts "
+     "it rather than modifying some other noun"),
+    ([QUERY, PUSH, say("#1689 is fully clean is the line that was wrong.")], False,
+     "same shape naming the line rather than the claim"),
+    ([QUERY, PUSH, say("All checks green is a claim which was wrong.")], False,
+     "the hole predates 'that' -- the 'which' spelling blocked from the round "
+     "that added the relative pronouns"),
+    # Only the head phrase is dropped, never the rest of the connector. Widen
+    # the carve-out to swallow the whole connector and this stops blocking.
+    ([QUERY, PUSH, say("All checks green is a claim that survives, though my "
+                       "count was wrong.")], True,
+     "a separator past the head phrase still breaks attachment"),
 
     # The copula guard. Attributive "wrong" sits in the SAME clause as the
     # claim, so attachment cannot rule it out; only the copula requirement can.

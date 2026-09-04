@@ -205,15 +205,21 @@ RX_RETRACTION = re.compile(
 # green." withdraws exactly the claim that follows. After the claim they open
 # a relative clause about a different noun instead, so "#1689 is fully clean
 # per the reviewer whose note was wrong." leaves the claim standing and still
-# has to block.
+# has to block. USUALLY, not always: when the head noun refers back to the
+# claim itself the relative clause withdraws exactly the assertion this guard
+# protects, and RX_METALINGUISTIC_HEAD below is that carve-out.
 #
-# `that` belongs in the same set, and it is the commonest word in English on
-# either side of this split -- so omitting it left the guard switchable off by
-# one word, the same defect the dash spelling had. It is the complementizer
-# leading ("I was wrong that all checks green.") and the restrictive relative
-# pronoun trailing ("#1689 is fully clean per the note that was wrong."), which
-# is exactly the trailing-only shape. It cannot join the shared set, because
-# the leading reading is the plainest correction there is.
+# `that` belongs in the same set, and it is the commonest relative pronoun in
+# English -- so omitting it left the guard switchable off by one word, the same
+# defect the dash spelling had. It is the complementizer leading ("I was wrong
+# that all checks green.") and the restrictive relative pronoun trailing
+# ("#1689 is fully clean per the note that was wrong."), which is exactly the
+# trailing-only shape. It cannot join the shared set, because the leading
+# reading is the plainest correction there is. Adding it is also what forced
+# the carve-out: the metalinguistic hole was already open for the `which`
+# spelling and rare there, and `that` is the spelling people actually write on
+# a restrictive relative, so widening without the carve-out would have turned a
+# rare false block into a common one.
 #
 # `:` is a clause boundary in BOTH directions and stays in the shared set. It
 # introduces the CORRECTED claim at least as often as the retracted one --
@@ -238,33 +244,80 @@ RX_RETRACTION = re.compile(
 # because those two also sit inside ordinary words and paths
 # (`conflict-free`, `pre-push`, `hooks/foo.py`); the other glyphs never do.
 #
-# A square-bracketed aside is the same case as a parenthesized one, and
-# listing only the parens made the verdict turn on the bracket style: "All
-# checks green (the earlier note was wrong)." blocked while the identical
-# sentence in brackets did not. Both open an aside about something other than
-# the claim, so both break attachment.
+# A square-bracketed aside is the same case as a parenthesized one AFTER the
+# claim, and listing only the parens made the verdict turn on the bracket
+# style: "All checks green (the earlier note was wrong)." blocked while the
+# identical sentence in brackets did not. Both open an aside about something
+# other than the claim, so both break the TRAILING attachment.
+#
+# Before the claim the two part company, which is why the brackets are
+# trailing-only while the parens stay shared. A leading bracketed span in this
+# corpus is markdown rather than an aside -- a reference-style link
+# ("[#1689][pr]"), a footnote marker ("[^1]"), a shortcut link -- so reading it
+# as a clause break blocks the plain retraction it sits inside. Measured with
+# the brackets shared: "Retracting the status [#1689][pr] all checks green."
+# and "I misread [^1] all checks green." each flipped from ALLOW to BLOCK,
+# which is the false-block class this guard exists to stop.
 #
 # Nothing else moves. `because`, `since`, `after`, `before`, `until`, `once`,
 # `unless`, `if`, and `now that` introduce a reason or a time rather than the
 # retraction's object, so a retraction reaching across one of them is about a
 # different proposition and STAYS blocked in both directions -- "All checks
-# green because the earlier reading was wrong." still asserts green. `until` is
-# the same part of speech as the `after`/`before`/`once` beside it, and its
-# omission was an oversight rather than a carve-out. The two-word `now that`
-# has to be spelled out, since a bare `now` is no separator at all.
+# green because the earlier reading was wrong." still asserts green. `until`
+# belongs beside them on that same ground, and not on a shared part of speech:
+# what follows it is a time, so the retraction in "All checks green until I
+# noticed my earlier count was overstated." is about the COUNT rather than
+# about the claim. Its terminative sense ("P until Q" ends P at Q) is a
+# different question, and one this guard does not read: a claim bounded by a
+# time is still a claim, and only the retraction vocabulary withdraws one. The
+# two-word `now that` has to be spelled out, since a bare `now` is no
+# separator at all.
 _CLAUSE_SEPARATORS = (
-    r"--|[,;:()|\[\]]"
+    r"--|[,;:()|]"
     r"|[\u2013\u2014\u2192\u2026]|\s[-/]\s"
     r"|\n[ \t]*[-*+>#]"
     r"|\b(?:but|and|or|so|yet|however|though|although|while|whereas"
     r"|after|before|until|since|because|once|unless|if|now\s+that)\b"
 )
-# The complementizers and the relative pronouns, which break attachment only
-# AFTER the claim -- before it they can take the claim as their own object.
-_TRAILING_ONLY_SEPARATORS = r"|\b(?:when|that|where|which|who|whose|whom)\b"
+# The complementizers, the relative pronouns, and the square brackets, which
+# break attachment only AFTER the claim -- before it a pronoun can take the
+# claim as its own object, and a bracketed span is markdown rather than an
+# aside.
+_TRAILING_ONLY_SEPARATORS = (
+    r"|[\[\]]"
+    r"|\b(?:when|that|where|which|who|whose|whom)\b"
+)
 RX_CLAUSE_SEPARATOR = re.compile(
     _CLAUSE_SEPARATORS + _TRAILING_ONLY_SEPARATORS, re.I)
 RX_LEADING_SEPARATOR = re.compile(_CLAUSE_SEPARATORS, re.I)
+
+# The one shape where a trailing relative pronoun does NOT open a clause about
+# a different noun: the head noun refers back to the claim itself. "All checks
+# green is a claim that was wrong." names the assertion and then withdraws it,
+# so breaking on the pronoun blocks a plain retraction -- the very class this
+# guard exists to stop blocking. The hole predates `that`: measured against the
+# previous commit, "All checks green is a claim which was wrong." already
+# blocked before `that` joined the set.
+#
+# Only this head phrase is dropped from the connector, never the rest of it, so
+# a separator anywhere else still breaks: "All checks green is a claim that
+# survives, though my count was wrong." still blocks on the comma, and "All
+# checks green because the note is a claim that was wrong." still blocks on
+# `because`. That is also why the pattern is unanchored: an ASSERT match often
+# ends mid-phrase (`\ball (checks|green)\b` matches only "All checks"), so the
+# connector opens with the tail of the claim rather than with the copula. The
+# residual cost is a sentence that uses the metalinguistic frame to assert the
+# claim rather than to withdraw it ("All checks green is the status that the
+# earlier note was wrong about."), which nobody writes.
+RX_METALINGUISTIC_HEAD = re.compile(
+    r"\b(?:is|was|were|are)\s+"
+    r"(?:the|a|an|this|that|my|our|its)?\s*"
+    r"(?:earlier|prior|previous|one|only|original)?\s*"
+    r"(?:claim|statement|line|note|status|report|reading|call|verdict"
+    r"|assertion|assessment|sentence|wording)\s+"
+    r"(?:that|which)\s+",
+    re.I,
+)
 
 # The trailing scan deliberately does NOT treat a bare newline as a sentence
 # end, mirroring `scripts/check-pr-fully-clean.py`'s SENTENCE_END. This corpus
@@ -309,7 +362,9 @@ def _is_retracted(text, hit):
     was widened to stop blocking.
     """
     for after in RX_RETRACTION.finditer(text, hit.end(), _trailing_end(text, hit)):
-        if _attaches(text[hit.end():after.start()]):
+        connector = RX_METALINGUISTIC_HEAD.sub(
+            "", text[hit.end():after.start()], count=1)
+        if _attaches(connector):
             return True
         break
     start = _sentence_start(text, hit)

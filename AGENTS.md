@@ -416,8 +416,12 @@ And a comment posted under a genuine bot token, where the forge already reports 
   always format them as clickable markdown hyperlinks to their forge URLs
   (e.g. `[PR #123](https://github.com/<owner>/<repo>/pull/123)`),
   never as bare unlinked text (such as `#123`),
-  except for forge issue-closing syntax (such as `Closes #123`).
+  except for forge issue-closing syntax (such as `Closes #123`)
+  and for a `#NNN` an entry displays as a token rather than cites as a source.
 - Preserve semantic line breaks (SemBr) and formatting conventions when editing markdown docs.
+
+- **Do:** link every pull request or issue you cite as a source, whether or not the reader can open its repository.
+- **Don't:** link a `#NNN` an entry is displaying rather than citing --- a linter's truncation example, a spell-check false positive --- because the link destroys what the entry demonstrates.
 
 ## Deliver completed implementation work
 

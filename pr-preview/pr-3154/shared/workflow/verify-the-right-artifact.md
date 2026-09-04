@@ -991,3 +991,71 @@ Prefer a recent run, since an older one may predate the definition you just read
 - **Don't:** treat a pull request having merged as evidence its check names still describe the branch --- they described it at one instant, and a later merge can retire them without touching that pull request at all.
 
 See [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md), "A merged pull request's check names written into a live ruleset".
+
+## Existence of a mechanism is not reachability of it
+
+[`The four shapes`](#the-four-shapes) above names a counterpart that is **missing** ---
+a cache `save` with no `restore`, a marketplace entry with no install.
+This shape is the one where the counterpart is present, correct, and never reached.
+The clearing branch is in the source, it does exactly what it should,
+and the normal path never produces the input it reads ---
+so the mechanism is real and the behaviour it promises is unavailable.
+
+It is more convincing than the missing-counterpart case,
+because finding the code that would have prevented a false positive feels like having explained the false positive.
+Reading it produces a genuine and correct conclusion --- this guard clears on a terminal state ---
+and that conclusion is about the source rather than about the run.
+Existence and reachability are different claims,
+and confirming the first is exactly what checking the second would feel like.
+
+[`The test`](#the-test) above supplies the question, so ask it of reachability rather than of existence:
+what would have to be true for this mechanism never to fire,
+and does the normal path produce the input it matches on?
+Trace the input backwards to whatever emits it.
+Where the emitter is a command, read that command's actual output
+rather than assuming it carries the fields the matcher wants.
+
+- **Do:** name the producer of a mechanism's input, and read what that producer actually emits, before saying the mechanism works.
+- **Do:** treat "the clearing branch exists" as an answer about the source and an open question about the run.
+- **Don't:** close an incident on the strength of having found the code that should have prevented it.
+- **Don't:** read a matcher's field list as evidence those fields ever arrive --- a matcher is a claim about its input, not a supply of one.
+
+(Measured 2026-09-03, and the record is the rule applied to itself three times.
+A `Stop` hook demanded a per-HEAD reviewer request on an already-merged pull request.
+The hook was read, a terminal-state matcher was found in it,
+and the incident was written off as the guard behaving correctly given what it could see ---
+a claim about the source presented as a claim about the run.
+The first retraction asserted a *cause*:
+that `gh pr merge`'s own success output carries none of that matcher's fields,
+so merging without a later `--json state` probe would leave an obligation that can never discharge.
+Adversarial review refuted that from the source of `hooks/no-unreviewed-pr.py`,
+finding a second clearing branch --- `close_ident` ---
+that discharges a merge structurally, from the command's argv and exit status,
+with the terminal-state matcher reserved for a merge performed OUTSIDE the session.
+The second retraction adopted that reading, and was wrong in the identical way,
+because it too was reasoned from the code rather than run against the artifact.
+Running the hook's own `close_ident` on the command the session actually issued settles it:
+
+```python
+close_ident("ALLOW_MERGE=1 gh pr merge 3101 -R Morrison-Lab/ai-config "
+            "--squash --delete-branch 2>&1 | tail -3")
+# -> (False, None, None, False)
+```
+
+Two independent defeats, either sufficient alone.
+The environment-variable prefix makes the first token of the parsed argv something other than `gh`,
+so the structural recogniser rejects the command outright;
+and the merge is not the last simple command in the pipeline,
+which the call site treats as ambiguous rather than as a discharge.
+The idealized command with neither feature returns a clear,
+which is the value both retractions were reasoning about.
+So both clearing branches were reachable in principle and the run reached neither ---
+one defeated by the command's shape, the other never fed its input.
+[#3152](https://github.com/Morrison-Lab/ai-config/issues/3152) was filed on the first mistaken premise;
+the correction is posted on its thread.
+The lesson survives three wrong causes intact, and is sharper for them:
+reading a matcher tells you what it would accept, and reading a recogniser tells you what it would recognize.
+Neither tells you which branch this run took.
+Only running the reader against the exact artifact does, and
+[`mistake-patterns`](../../memories/mistake-patterns.md) Pattern 17 names that move ---
+which is worth stating twice, because it was cited in the same change that failed to perform it.)

@@ -616,3 +616,11 @@ the corpus's own #3110 rule (three rounds without consensus, ask whether the pro
 The remote head `94244eb5` already carries a clean claude-review verdict and a Jules approval;
 the local delta since it is seven small commits answering Copilot and the adversarial rounds.
 Decision: one more verdict, then push whatever it returns if its findings are wording-only, letting the forge quorum judge the shipping head.
+
+## 17:15 PDT --- wave 2 finished unverified; the wave-1 fix loop and the UMS round-3 verdict launched
+
+Wave 2 (run `wf_39a49412-041`) completed with all ten branches at two or three commits and none verified;
+the recheck left 3 to 9 findings on each (#3121, #3105, #3098, #3038, #3050, #3110, #3111, #3108, #3034, #3114), 60 agents and 10.8 million subagent tokens for the run.
+The three branches carrying the placeholder author (#3121, #3105, #3038) were reset the way wave 1's were, before their fix-loop script was generated from the run's result.
+The freed slots went to the wave-1 serial fix loop (run `wf_c4f6e28c-623`, one agent at a time) and to the UMS branch's round-3 verdict at `3011644c`;
+with wave 3 and #3154's verdict that fills the cap, so the wave-2 loop and wave 4 wait.

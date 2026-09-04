@@ -47,11 +47,12 @@ Skip if your most recent comment already says so and is still live — claims ex
         | jq -r -s --arg head "$head" \
         '[.[][] | select(.user.login=="copilot-pull-request-reviewer[bot]" and .commit_id==$head)] | .[].id')"
       if [ -n "$review_ids" ]; then
+        comments="$(gh api "repos/<owner>/<repo>/pulls/<N>/comments" --paginate | jq -s '[.[][]]')"
         for rid in $review_ids; do
           gh api "repos/<owner>/<repo>/pulls/<N>/reviews/$rid" --jq '{state, body}'
-          gh api "repos/<owner>/<repo>/pulls/<N>/comments" --paginate \
-            | jq -s --arg rid "$rid" \
-            '[.[][] | select(.pull_request_review_id == ($rid | tonumber))] | .[] | {line: (.line // .original_line), body}'
+          jq --arg rid "$rid" \
+            '.[] | select(.pull_request_review_id == ($rid | tonumber)) | {line: (.line // .original_line), body}' \
+            <<<"$comments"
         done
       else
         echo "no fresh review yet -- wait or re-request"

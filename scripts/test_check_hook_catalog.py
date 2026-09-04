@@ -189,31 +189,39 @@ case("matcher mismatch fails",
 # --- matcher semantics, measured against the harness (ai-config#2535) -----
 # These lock the finding that settles #2535: a plain-name matcher is compared
 # by EXACT STRING EQUALITY, not as an unanchored regex, and an alternation is
-# exact membership rather than dead. Read from the matcher function in the
-# `cli.js` bundled in the `@anthropic-ai/claude-code` npm package (version
-# 2.1.42 per that package's own package.json) and re-run against the extracted
-# function under node, 2026-09-03. If a harness bump changes this, these fail
-# rather than the double-binding check quietly reporting the wrong answer.
+# exact membership rather than dead. Extracted from the standalone native
+# `claude` binary (2.1.260 per `claude --version`) and re-run under node,
+# 2026-09-04. If a harness bump changes this, these fail rather than the
+# double-binding check quietly reporting the wrong answer.
 check("a plain-name matcher does not match a longer tool name",
-      _catalog.matcher_matches("NotebookEdit", "Edit") is False)
+      _catalog.matcher_matches("NotebookEdit", "Edit", "PreToolUse") is False)
 check("a plain-name matcher matches its own tool",
-      _catalog.matcher_matches("Edit", "Edit") is True)
+      _catalog.matcher_matches("Edit", "Edit", "PreToolUse") is True)
 check("an alternation matcher matches each named tool",
-      all(_catalog.matcher_matches(t, "Write|Edit|NotebookEdit")
+      all(_catalog.matcher_matches(t, "Write|Edit|NotebookEdit", "PreToolUse")
           for t in ("Write", "Edit", "NotebookEdit")))
 check("an alternation matcher matches nothing else",
-      _catalog.matcher_matches("Bash", "Write|Edit|NotebookEdit") is False)
+      _catalog.matcher_matches("Bash", "Write|Edit|NotebookEdit",
+                               "PreToolUse") is False)
 check("a non-plain matcher is an unanchored regex",
-      _catalog.matcher_matches("NotebookEdit", "Edit.*") is True
+      _catalog.matcher_matches("NotebookEdit", "Edit.*", "PreToolUse") is True
       and _catalog.matcher_matches("mcp__github__issue_write",
-                                   "mcp__github__.*") is True)
+                                   "mcp__github__.*", "PreToolUse") is True)
 check("an empty or star matcher fires on every tool",
-      _catalog.matcher_matches("Bash", "") is True
-      and _catalog.matcher_matches("Bash", "*") is True)
-check("a comma-joined matcher is a regex, so it names no tools literally",
-      _catalog.matcher_names("Write, Edit") == frozenset())
+      _catalog.matcher_matches("Bash", "", "PreToolUse") is True
+      and _catalog.matcher_matches("Bash", "*", "PreToolUse") is True)
+check("a comma-joined matcher is an alternation on a wide-class event",
+      _catalog.matcher_names("Write, Edit", "PreToolUse")
+      == frozenset({"Write", "Edit"}))
+check("and fires on each tool it names there",
+      _catalog.matcher_matches("Edit", "Bash, Edit", "PreToolUse") is True
+      and _catalog.matcher_matches("Write", "Bash, Edit",
+                                   "PreToolUse") is False)
+check("off a wide-class event a comma-joined matcher is a regex instead",
+      _catalog.matcher_names("Write, Edit", "Stop") == frozenset()
+      and _catalog.matcher_matches("Edit", "Bash, Edit", "Stop") is False)
 check("an alternation matcher names each of its tools literally",
-      _catalog.matcher_names("Write|Edit")
+      _catalog.matcher_names("Write|Edit", "PreToolUse")
       == frozenset({"Write", "Edit"}))
 
 # --- double binding (ai-config#2535) --------------------------------------
@@ -301,16 +309,17 @@ case("a settled regex pair counts as compared, not as undecidable",
 # The classifier itself, so each arm is pinned rather than inferred from the
 # two fixtures above.
 check("two different regexes name no tool, so nothing settles them alone",
-      _catalog.undecidable_pair("mcp__github__.*", "mcp__.*") is True)
+      _catalog.undecidable_pair("mcp__github__.*", "mcp__.*",
+                                "PreToolUse") is True)
 check("but a vocabulary name can still settle two different regexes",
-      _catalog.overlapping_tools("Edit.*", "Note.*", {"NotebookEdit"})
-      == ["NotebookEdit"])
+      _catalog.overlapping_tools("Edit.*", "Note.*", {"NotebookEdit"},
+                                 "PreToolUse") == ["NotebookEdit"])
 check("a regex paired with a plain name is decidable",
-      _catalog.undecidable_pair("mcp__.*", "Bash") is False)
+      _catalog.undecidable_pair("mcp__.*", "Bash", "PreToolUse") is False)
 check("two identical regexes are decidable",
-      _catalog.undecidable_pair("mcp__.*", "mcp__.*") is False)
+      _catalog.undecidable_pair("mcp__.*", "mcp__.*", "PreToolUse") is False)
 check("a catch-all is decidable against anything",
-      _catalog.undecidable_pair("", "mcp__.*") is False)
+      _catalog.undecidable_pair("", "mcp__.*", "PreToolUse") is False)
 
 # Two groups carrying the identical matcher -- the shape `hooks_json` cannot
 # build, and the one a reader is likeliest to create by appending a group
@@ -322,6 +331,13 @@ _dup = json.dumps({"hooks": {"PreToolUse": [
 case("the same matcher in two groups is a double binding",
      [], [("a.py", "PreToolUse", "Bash, Bash", "warns")] + ALLOW_ROWS,
      want_fail=True, needle="which both fire on Bash", hooks_text=_dup)
+
+# A comma-joined matcher beside a group naming one of its tools is a real
+# double binding on PreToolUse, since the harness splits on `[|,]` there.
+case("a comma-joined matcher overlapping a plain one is a double binding",
+     [("a.py", "PreToolUse", "Bash, Edit"), ("a.py", "PreToolUse", "Edit")],
+     [("a.py", "PreToolUse", "Bash, Edit, Edit", "warns")] + ALLOW_ROWS,
+     want_fail=True, needle="which both fire on Edit")
 
 case("a double binding on different events is not one",
      [("a.py", "PreToolUse", "Bash"), ("a.py", "Stop", "")],

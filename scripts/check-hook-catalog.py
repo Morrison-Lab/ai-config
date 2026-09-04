@@ -125,18 +125,21 @@ ROW = re.compile(
 )
 
 # How the harness decides whether a matcher applies to a tool call, measured
-# 2026-09-03 against the matcher function in the `cli.js` bundled in the
-# `@anthropic-ai/claude-code` npm package, version 2.1.42 per that package's
-# own package.json, and re-run against the extracted function under node. A
-# standalone native build can report a different version on the same machine,
-# and `memories/claude-code-hooks.md` carries that measurement:
+# 2026-09-04 by extracting the matcher functions from the standalone native
+# `claude` binary this container runs, version 2.1.260 per `claude --version`,
+# and re-running them under node:
 #
-#     if (!q || q === "*") return true;
-#     if (/^[a-zA-Z0-9_|]+$/.test(q)) {
-#       if (q.includes("|")) return q.split("|").map(y => y.trim()).includes(A);
-#       return A === q;
+#     function dls(e, n, r) {
+#       if (!(n ? /^[a-zA-Z0-9_|, -]+$/ : /^[a-zA-Z0-9_|]+$/).test(e)) return;
+#       return e.split(n ? /[|,]/ : "|").map(d => d.trim())
+#                .filter(Boolean).flatMap(d => sge(hu(d), r));
 #     }
-#     try { return new RegExp(q).test(A) } catch { return false }
+#     function mur(e, n, r, o, d, p) {
+#       if (!n || n === "*") return true;
+#       let y = dls(n, r, o), E = pur(e, d, p);
+#       if (y !== undefined) return y.includes(e) || E.some(v => y.includes(v));
+#       try { return new RegExp(n).test(e) } catch { return false }
+#     }
 #
 # So there are three branches, and the first two are NOT regex matching:
 #
@@ -148,17 +151,36 @@ ROW = re.compile(
 #   anything else     an UNANCHORED JavaScript regex, which is why
 #                     `mcp__github__.*` works and `mcp__github__*` does not.
 #
-# The fast-path class is `[A-Za-z0-9_|]`, narrower than the
-# `[A-Za-z0-9_\- ,|]` that `memories/claude-code-hooks.md` recorded before
-# this was measured: a matcher carrying `-`, a space, or a comma falls through
-# to the regex branch.
+# `mur`'s third argument is `fur.has(hook_event_name)`, so on the events in
+# WIDE_MATCHER_EVENTS the fast-path class is `[A-Za-z0-9_|, -]` and the
+# separator is `[|,]`: a comma-joined matcher is an alternation there, not a
+# regex. Off those events the class is `[A-Za-z0-9_|]` and the separator is
+# `|` alone.
+WIDE_MATCHER_EVENTS = frozenset({
+    "PreToolUse", "PostToolUse", "PostToolUseFailure", "PermissionRequest",
+    "PermissionDenied", "UserPromptExpansion", "SessionStart", "SessionEnd",
+    "Setup", "PreCompact", "PostCompact", "PreModelSwitch", "PostModelSwitch",
+    "Notification", "SubagentStart", "SubagentStop", "Elicitation",
+    "ElicitationResult", "ConfigChange", "InstructionsLoaded",
+    "DirectoryAdded",
+})
 PLAIN_MATCHER = re.compile(r"^[A-Za-z0-9_|]+$")
+WIDE_PLAIN_MATCHER = re.compile(r"^[A-Za-z0-9_|, -]+$")
+SEPARATOR = re.compile(r"\|")
+WIDE_SEPARATOR = re.compile(r"[|,]")
 
 # A matcher that is absent, empty, or `*` applies to every tool.
 CATCH_ALL = frozenset({"", "*"})
 
 
-def matcher_matches(tool, matcher):
+def _fast_path(event):
+    """The (class, separator) pair the harness uses on `event`."""
+    if event in WIDE_MATCHER_EVENTS:
+        return WIDE_PLAIN_MATCHER, WIDE_SEPARATOR
+    return PLAIN_MATCHER, SEPARATOR
+
+
+def matcher_matches(tool, matcher, event):
     """Whether `matcher` fires on a call to `tool`, per the semantics above.
 
     Python's `re` is not JavaScript's, so a matcher exercising a dialect
@@ -168,30 +190,30 @@ def matcher_matches(tool, matcher):
     """
     if matcher in CATCH_ALL:
         return True
-    if PLAIN_MATCHER.match(matcher):
-        if "|" in matcher:
-            return tool in [part.strip() for part in matcher.split("|")]
-        return tool == matcher
+    names = matcher_names(matcher, event)
+    if names:
+        return tool in names
     try:
         return re.search(matcher, tool) is not None
     except re.error:
         return False
 
 
-def matcher_names(matcher):
+def matcher_names(matcher, event):
     """Tool names a matcher names literally; empty for a regex matcher.
 
     These are the only tool names available to compare two matchers against.
     The harness knows the full tool list and this check does not, so the
     vocabulary is built from what hooks.json itself spells out.
     """
-    if matcher in CATCH_ALL or not PLAIN_MATCHER.match(matcher):
+    pattern, separator = _fast_path(event)
+    if matcher in CATCH_ALL or not pattern.match(matcher):
         return frozenset()
     return frozenset(
-        part.strip() for part in matcher.split("|") if part.strip())
+        part.strip() for part in separator.split(matcher) if part.strip())
 
 
-def overlapping_tools(first, second, vocabulary):
+def overlapping_tools(first, second, vocabulary, event):
     """Tool names both matchers fire on, as a sorted list.
 
     A catch-all overlaps the OTHER matcher exactly, not every tool, so it is
@@ -207,11 +229,11 @@ def overlapping_tools(first, second, vocabulary):
         return ["every tool"]
     if first in CATCH_ALL or second in CATCH_ALL:
         other = second if first in CATCH_ALL else first
-        named = sorted(matcher_names(other))
+        named = sorted(matcher_names(other, event))
         return named or [f"every tool {other!r} fires on"]
     hits = sorted(tool for tool in vocabulary
-                  if matcher_matches(tool, first)
-                  and matcher_matches(tool, second))
+                  if matcher_matches(tool, first, event)
+                  and matcher_matches(tool, second, event))
     if not hits and first == second:
         return [f"whatever {first!r} matches"]
     return hits
@@ -428,7 +450,7 @@ def _show(matcher):
     return repr(matcher) if matcher else "(no matcher)"
 
 
-def undecidable_pair(first, second):
+def undecidable_pair(first, second, event):
     """Whether neither matcher names a tool, as a conservative fallback.
 
     This is asked only after `overlapping_tools` has already found nothing, so
@@ -449,7 +471,8 @@ def undecidable_pair(first, second):
         return False
     if first == second:
         return False
-    return not matcher_names(first) and not matcher_names(second)
+    return (not matcher_names(first, event)
+            and not matcher_names(second, event))
 
 
 def check_double_bindings(binds):
@@ -476,8 +499,8 @@ def check_double_bindings(binds):
     classifier first would have skipped exactly the double binding it was
     meant to find.
     """
-    vocabulary = {name for _, _, matcher in binds
-                  for name in matcher_names(matcher)}
+    vocabulary = {name for _, event, matcher in binds
+                  for name in matcher_names(matcher, event)}
     by_key = {}
     for script, event, matcher in binds:
         by_key.setdefault((script, event), []).append(matcher)
@@ -488,8 +511,9 @@ def check_double_bindings(binds):
     for (script, event), matchers in sorted(by_key.items()):
         for i, first in enumerate(matchers):
             for second in matchers[i + 1:]:
-                shared = overlapping_tools(first, second, vocabulary)
-                if not shared and undecidable_pair(first, second):
+                shared = overlapping_tools(
+                    first, second, vocabulary, event)
+                if not shared and undecidable_pair(first, second, event):
                     undecidable += 1
                     print(f"NOTE: {script} is bound to {event} in two matcher "
                           f"groups, {_show(first)} and {_show(second)}, and "

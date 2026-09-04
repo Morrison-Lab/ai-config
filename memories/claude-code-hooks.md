@@ -250,32 +250,33 @@ Tracked as ai-config#1609.)
 
 ## A hook matcher has three branches, and only the third is a regex
 
-Measured 2026-09-03 by reading the matcher function out of the `cli.js` bundled in the `@anthropic-ai/claude-code` npm package, version 2.1.42 per that package's own `package.json`,
-and re-running the extracted function under `node` against a table of tool names.
+Measured 2026-09-04 by extracting the matcher functions from the standalone native `claude` binary this container runs, version 2.1.260 per `claude --version`,
+and re-running them under `node` against a table of tool names.
 Re-verify on a harness bump rather than treating this as permanent,
-and read the build actually in use rather than whichever copy of the package happens to be on disk.
-The two differ on one machine: measured 2026-09-04 in a container where `claude --version` reported 2.1.260 from a standalone native binary while the npm package installed beside it was still 2.1.42.
-Extracting the same function from that 2.1.260 binary shows the three branches intact --- it opens `if(!n||n==="*")return!0`, consults the same `^[a-zA-Z0-9_|]+$` fast path, then falls through to `new RegExp(n)` --- and adds two things the reading below does not cover:
-each branch is also tried against alias forms of the tool name, and the fast-path class widens to `^[a-zA-Z0-9_|, -]+$` under a flag whose value that reading did not resolve.
-So treat the three branches as the durable part and the fast-path class as the part to re-measure.
+and read the build actually in use rather than whichever copy of the package happens to be on disk:
+the `@anthropic-ai/claude-code` npm package installed beside that binary was still 2.1.42, and its `cli.js` carries a narrower fast path than the binary applies.
 
 ```js
-if (!q || q === "*") return true;
-if (/^[a-zA-Z0-9_|]+$/.test(q)) {
-  if (q.includes("|")) return q.split("|").map((y) => y.trim()).includes(A);
-  return A === q;
+// `wide` is fur.has(hook_event_name); `A` is the query, `q` the matcher.
+function names(q, wide) {
+  if (!(wide ? /^[a-zA-Z0-9_|, -]+$/ : /^[a-zA-Z0-9_|]+$/).test(q)) return;
+  return q.split(wide ? /[|,]/ : "|").map((y) => y.trim()).filter(Boolean);
 }
+if (!q || q === "*") return true;
+const parts = names(q, wide);
+if (parts !== undefined)
+  return parts.includes(A) || aliases(A).some((v) => parts.includes(v));
 try { return new RegExp(q).test(A) } catch { return false }
 ```
 
-`A` is the match query (`tool_name` for `PreToolUse`) and `q` is the group's `matcher`.
+`A` is the match query (`tool_name` for `PreToolUse`), `q` is the group's `matcher`, and `aliases` yields the alias forms of the tool name.
 So:
 
 | matcher | evaluated as | fires on a `NotebookEdit` call? |
 |---|---|---|
 | absent, empty, or `*` | fires on every call | fires |
 | a plain name, e.g. `Edit` | **exact string equality** | does **not** fire |
-| an alternation, e.g. `Write\|Edit` | exact membership of the trimmed parts | does **not** fire; `NotebookEdit` is not one of the parts |
+| an alternation, e.g. `Write\|Edit`, or `Write, Edit` where `wide` is set | exact membership of the trimmed parts | does **not** fire; `NotebookEdit` is not one of the parts |
 | anything else, e.g. `mcp__github__.*` | an **unanchored** JavaScript regex | does **not** fire; that regex does not match `NotebookEdit` |
 
 Only the catch-all fires here, and that is the whole trap:
@@ -287,11 +288,10 @@ A plain name is not a substring test, so binding one script to `Write`, `Edit`, 
 And an alternation is usable rather than silently inert, so those three groups could be written as one.
 This repo keeps them apart anyway, per the Don't below.
 
-The fast-path character class is `[A-Za-z0-9_|]`.
-This note previously recorded it as `[A-Za-z0-9_\- ,|]`, which was wrong in the direction that matters:
-a matcher carrying `-`, a space, or a comma falls through to the **regex** branch,
-so `"Write, Edit"` is a regex that matches the literal text `Write, Edit` and therefore no tool at all.
-The comma-joined form is the README catalog's own notation for several groups, never a matcher to bind.
+The `wide` flag is `fur.has(hook_event_name)`, and `PreToolUse` is a member of `fur`, so every matcher this repo binds takes the wide arm.
+There the fast-path class is `[A-Za-z0-9_|, -]` and the separator is `[|,]`, so `"Write, Edit"` is an alternation firing on `Write` and on `Edit`.
+Off those events the class is `[A-Za-z0-9_|]` and the separator is `|` alone, so the same matcher falls through to the **regex** branch and matches only the literal text `Write, Edit`;
+that narrow reading is what the 2.1.42 `cli.js` applies on every event.
 
 The harness runs **every** group whose matcher fires, so one script named in two firing groups runs twice on one call.
 That is wasteful for a warn-only hook and is not benign for a blocking one.
@@ -303,11 +303,12 @@ That is wasteful for a warn-only hook and is not benign for a blocking one.
   whenever some tool name `hooks.json` itself spells out fires both matchers;
   a pair of two regexes no such name settles prints a `NOTE` and does not fail, so a green run does not by itself rule that pair out.
 - **Do:** name the package and version a matcher reading came from, rather than attributing it to "Claude Code vN" and leaving which install it was to inference.
+- **Do:** keep the comma-joined form to the README catalog's notation for several groups, so pasting one into `hooks.json` cannot silently add a second firing group.
 - **Don't:** read a version off a package directory and report it as the harness version --- run `claude --version` for that one.
 - **Don't:** use `"mcp__github__*"` (shell glob), which is a regex matching `mcp__github` followed by zero or more `_`.
 - **Don't:** expect a plain name to match a longer tool name --- it is compared by equality.
-- **Don't:** bind a comma-joined matcher such as `"Bash, Edit"`;
-  that is the catalog's notation, and as a matcher it fires on nothing.
+- **Don't:** bind a comma-joined matcher such as `"Bash, Edit"` expecting it to be inert;
+  on `PreToolUse` it fires on `Bash` and on `Edit` exactly like `"Bash|Edit"` does.
 - **Don't:** collapse a script's per-tool groups into one alternation on the strength of that being permitted.
   One group per tool is this repo's convention, and `hooks/test-remind-brief-premises.py` asserts a per-tool matcher set,
   `set(_matchers) >= {"Agent", "Task", "SendMessage"}`, which a single alternation group would fail.

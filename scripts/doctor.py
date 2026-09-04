@@ -364,9 +364,13 @@ def read_settings(path: Path) -> tuple[Dict[str, Any], Optional[str]]:
     """Return (settings, parse_error) for a Claude Code settings file.
 
     A missing file is not an error -- it simply enables no plugin *here*.
-    A file that exists and does not parse is reported rather than
-    swallowed: it leaves the sweep unable to say whether the plugin route
-    is in use.
+    A file that exists and does not yield a settings object is reported
+    rather than swallowed: it leaves the sweep unable to say whether the
+    plugin route is in use. That covers a top level that parses to
+    something other than an object (a list, a string, `null`) as well as
+    one that does not parse at all -- returning `{}` for either would be
+    read as "this scope names no entry" and let a lower scope decide, which
+    is the silent fallback `shared/principles/fail-fast.md` rules out.
 
     One scope per call; `resolve_plugin_enabled` walks them in order.
     """
@@ -376,15 +380,17 @@ def read_settings(path: Path) -> tuple[Dict[str, Any], Optional[str]]:
         data = json.loads(strip_jsonc_comments(path.read_text(encoding="utf-8")))
     except Exception as exc:
         return {}, str(exc)
-    return (data if isinstance(data, dict) else {}), None
+    if not isinstance(data, dict):
+        return {}, f"top-level value is {type(data).__name__}, not an object"
+    return data, None
 
 
 def settings_scope_paths(home: Path) -> List[Path]:
     """Return the `enabledPlugins` settings files to read, highest scope first.
 
     Local, then project, then user, matching the *scope walk* in
-    `skills/ai-config-hooks/run-hook.sh`. The within-file rule differs
-    between the two -- see `resolve_plugin_enabled`.
+    `skills/ai-config-hooks/run-hook.sh`. The walk is the only part the two
+    share; each reads a file differently -- see `resolve_plugin_enabled`.
     The project root is `CLAUDE_PROJECT_DIR` when the harness exports it,
     and this checkout otherwise.
     """
@@ -411,12 +417,17 @@ def resolve_plugin_enabled(home: Path) -> tuple[Optional[bool], Optional[Path], 
     final. Within one file any truthy `ai-config@*` entry counts, since a
     second marketplace's copy loads the same plugin.
 
-    That within-file union is a deliberate divergence from
-    `skills/ai-config-hooks/run-hook.sh`, which takes the *first*
-    `ai-config@*` entry in a file and ignores the rest, so the two disagree
-    on `{"ai-config@Morrison-Lab": false, "ai-config@other": true}`: this
-    reads the plugin as enabled, the runner as disabled. Only the scope walk
-    is shared. See `memories/claude-code-settings.md`.
+    Only the scope walk is shared with `skills/ai-config-hooks/run-hook.sh`,
+    which parses nothing: it greps the raw file text and takes the *first*
+    match of `"ai-config@...": true|false` wherever it lands. That diverges
+    from this function twice. Within `enabledPlugins` the two disagree on
+    `{"ai-config@Morrison-Lab": false, "ai-config@other": true}`: this reads
+    the plugin as enabled, the runner as disabled. And the runner's match
+    need not be an entry at all -- a commented-out
+    `// "ai-config@Morrison-Lab": true`, or one inside any other object,
+    reads as enabled there while this function, which strips comments and
+    reads `enabledPlugins` only, does not see it.
+    See `memories/claude-code-settings.md`.
 
     Two scopes above these three stay unread, so the answer can still be
     wrong in both directions: a managed-settings `false` over a walked

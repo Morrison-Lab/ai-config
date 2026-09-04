@@ -245,6 +245,20 @@ class TestConsumerLeftovers(unittest.TestCase):
         self.assertIsNone(res["plugin_enabled"])
         self.assertIn("did not parse", res["details"])
 
+    def test_settings_parsing_to_a_non_object_are_reported_not_swallowed(self):
+        # A top level that is valid JSON but not an object still leaves the
+        # sweep unable to say whether the plugin route is in use. Returning
+        # an empty dict would read as "this scope names no entry" and let a
+        # lower scope decide, which is the silent fallback fail-fast rules
+        # out.
+        (self.home / "settings.json").write_text("[]", encoding="utf-8")
+        res = doctor.check_consumer_leftovers()
+        self.assertFalse(res["ok"])
+        self.assertEqual(res["status"], "WARN")
+        self.assertIsNone(res["plugin_enabled"])
+        self.assertIn("did not parse", res["details"])
+        self.assertIn("not an object", res["details"])
+
     def test_clean_home_reports_ok(self):
         self.enable_plugin()
         res = doctor.check_consumer_leftovers()
@@ -483,6 +497,30 @@ class TestConsumerLeftovers(unittest.TestCase):
         readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
         self.assertIn("symlink `shared/` there by hand", readme)
         self.assertNotIn("symlink or copy `shared/`", readme)
+
+    def test_readme_qualifies_the_doctor_claim_on_the_plugin_gate(self):
+        # The check is doubly conditional: it exempts only a symlink that
+        # resolves into a checkout, and it reports nothing at all when the
+        # plugin gate says disabled. README is a reader's first account of
+        # it, so an unconditional sentence there promises a report the
+        # sweep does not make.
+        readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+        self.assertIn("When an ai-config plugin is enabled", readme)
+        self.assertNotIn(
+            "`python3 scripts/doctor.py` follows that split, reporting", readme
+        )
+
+    def test_memory_names_the_runners_raw_text_rule_not_only_first_versus_union(self):
+        # The divergence section exists to enumerate how the two readers
+        # differ, so it goes stale the moment it names only the
+        # within-`enabledPlugins` rule: the runner also matches a
+        # commented-out line and text outside `enabledPlugins`, which this
+        # check never reads.
+        memory = (REPO_ROOT / "memories" / "claude-code-settings.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("greps the raw file text", memory)
+        self.assertIn("commented-out", memory)
 
     def test_name_matching_skill_symlink_outside_a_checkout_is_doubled(self):
         # The provenance test and the name test run in order rather than on

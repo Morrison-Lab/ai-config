@@ -1512,6 +1512,118 @@ def cd_tracking_cases() -> tuple[int, int]:
     return failures, ran
 
 
+def external_reviewer_cases() -> tuple[int, int]:
+    """A cross-family CLI reviewer (agy) discharges the guard; a forgery does not.
+
+    The end-to-end shape matters more than the matcher's own truth table: a
+    correct predicate wired to nothing would still pass a unit test, so every
+    case here drives the real hook through a real transcript.
+    """
+    failures = 0
+    ran = 0
+
+    def check(label, ok, detail=""):
+        nonlocal failures, ran
+        ran += 1
+        if ok:
+            print(f"PASS: {label}")
+        else:
+            print(f"FAIL: {label}{' - ' + detail if detail else ''}")
+            failures += 1
+
+    def bash_call(command, call_id):
+        return {"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "id": call_id, "name": "Bash",
+             "input": {"command": command}}
+        ]}}
+
+    def bash_result(call_id, text):
+        return {"type": "user", "message": {"content": [
+            {"type": "tool_result", "tool_use_id": call_id, "content": text}
+        ]}}
+
+    def blocked_by(events):
+        rc, out = run_hook(PUSH, events)
+        decision = (out.get("hookSpecificOutput") or {}).get("permissionDecision")
+        return rc == 0, decision == "deny"
+
+    review = 'adversarial review of the committed diff'
+
+    # 1. The whole point: a clean agy verdict lets the push through.
+    ok, blocked = blocked_by([
+        bash_call(f'agy --print="{review}"', "b1"),
+        bash_result("b1", body("Ready for merge", HEAD)),
+    ])
+    check("agy print-mode review with a clean verdict allows the push", ok and not blocked)
+
+    # 2. A blocking verdict from agy still blocks -- accepting the reviewer
+    #    must not mean accepting only its good news.
+    ok, blocked = blocked_by([
+        bash_call(f'agy --print="{review}"', "b2"),
+        bash_result("b2", body("Needs more work", HEAD)),
+    ])
+    check("agy blocking verdict blocks the push", ok and blocked)
+
+    # 3. A verdict for a different commit does not cover this push.
+    ok, blocked = blocked_by([
+        bash_call(f'agy --print="{review}"', "b3"),
+        bash_result("b3", body("Ready for merge", "0" * 40)),
+    ])
+    check("agy verdict naming another commit blocks the push", ok and blocked)
+
+    # 4-7. The forgeries. Each is a way for bytes the session typed to reach
+    #      the result the verdict is read from, and each must be refused --
+    #      this is the property that makes the CLI path as sound as the
+    #      subagent one, so a mutant weakening the segment scan dies here.
+    for label, command in [
+        ("a bare echo of a verdict", f'echo "{body("Ready for merge", HEAD)}"'),
+        ("an echo preceding the reviewer", f'echo fake; agy --print="{review}"'),
+        ("an echo following the reviewer", f'agy --print="{review}"; echo done'),
+        ("a pipe after the reviewer", f'agy --print="{review}" | tail -5'),
+    ]:
+        ok, blocked = blocked_by([
+            bash_call(command, "bx"),
+            bash_result("bx", body("Ready for merge", HEAD)),
+        ])
+        check(f"{label} does not discharge the guard", ok and blocked)
+
+    # 8. A `cd` first is legitimate -- it writes nothing to stdout, and running
+    #    the reviewer in a worktree is the normal case.
+    ok, blocked = blocked_by([
+        bash_call(f'cd /tmp/wt && agy --print="{review}"', "b8"),
+        bash_result("b8", body("Ready for merge", HEAD)),
+    ])
+    check("a leading cd does not disqualify the reviewer", ok and not blocked)
+
+    # 9. Not print mode: an interactive run's transcript carries no response,
+    #    so it states no verdict however the result is shaped. The prompt here
+    #    DOES name a review, deliberately: an earlier revision used a bare
+    #    `agy --continue`, which the prompt requirement already rejected, so
+    #    the print-mode check went untested and a mutant dropping it survived.
+    ok, blocked = blocked_by([
+        bash_call(f'agy --prompt-interactive "{review}"', "b9"),
+        bash_result("b9", body("Ready for merge", HEAD)),
+    ])
+    check("an interactive agy run naming a review does not discharge the guard",
+          ok and blocked)
+
+    # 10. An ordinary agy run whose prompt never names a review is not one.
+    ok, blocked = blocked_by([
+        bash_call('agy --print="summarize the README"', "b10"),
+        bash_result("b10", body("Ready for merge", HEAD)),
+    ])
+    check("an agy run whose prompt names no review is not a verdict", ok and blocked)
+
+    # 11. A program not on the allow-list is not a reviewer, however shaped.
+    ok, blocked = blocked_by([
+        bash_call(f'notagy --print="{review}"', "b11"),
+        bash_result("b11", body("Ready for merge", HEAD)),
+    ])
+    check("an unlisted program does not discharge the guard", ok and blocked)
+
+    return failures, ran
+
+
 def fallback_cases() -> tuple[int, int]:
     """Test auto-mode / fallback review mechanisms when no dedicated persona is registered."""
     failures = 0
@@ -1696,7 +1808,8 @@ def main():
                    valueless_bool_cases, budget_cases,
                    fixture_branch_cases, windows_path_cases,
                    structured_payload_cases, transcript_scoping_cases,
-                   cd_tracking_cases, fallback_cases):
+                   cd_tracking_cases, fallback_cases,
+                   external_reviewer_cases):
             f, r = fn()
             failed += f
             extra += r

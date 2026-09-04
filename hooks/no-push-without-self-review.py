@@ -140,6 +140,75 @@ REVIEW_PROMPT_RE = re.compile(
 
 AGENT_TOOLS = {"agent", "task", "invoke_subagent", "taskoutput", "task_output", "manage_task"}
 
+# A cross-family reviewer invoked as a CLI, whose print-mode output IS its
+# review. Each value lists the flags putting that program in non-interactive
+# print mode, so an interactive session -- whose transcript carries no
+# response -- cannot be mistaken for a review.
+#
+# Accepting these lets `when-to-orchestrate`'s cross-family verify
+# recommendation reach the one check that most wants it, and gives a session at
+# its own quota ceiling a reviewed-push path at all.
+EXTERNAL_REVIEWER_PRINT_FLAGS = {
+    "agy": ("--print", "--prompt", "-p"),
+}
+
+# Programs writing nothing to stdout, so their presence in the same command
+# cannot forge or pollute the bytes the verdict is read from. Deliberately
+# tiny: every addition is another way for a second command's output to reach
+# that result.
+STDOUT_SILENT_PROGRAMS = {"cd"}
+
+
+def external_reviewer_command(command: str) -> bool:
+    """Is this Bash command a cross-family reviewer run whose output is its review?
+
+    This guard is sound because the harness produces the tool result and a
+    session cannot fabricate one. That property survives the move to a CLI
+    reviewer only if the COMMAND is verified rather than the text of its
+    result: scanning the transcript for a `Reviewed-Commit:` line would be
+    satisfied by typing `echo`, which is the discharge
+    `shared/workflow/algorithmatize-checks.md` says to refuse to ship rather
+    than to weaken.
+
+    So every segment before the last must be stdout-silent, and the last must
+    be a recognized reviewer in print mode whose prompt names the review.
+    `_depth_segments` splits on `|` as well as on `;` and `&&`, so a pipe, a
+    prepended `echo`, and a trailing `; echo` each leave a non-silent segment
+    and are refused -- the same bare-and-unchained discipline a
+    discharge-bearing command already owes, rather than a new rule to learn.
+    """
+    try:
+        segments = [text for _, text in _depth_segments(command)]
+    except Exception:
+        return False
+    if not segments:
+        return False
+
+    for segment in segments[:-1]:
+        try:
+            argv = shlex.split(segment)
+        except ValueError:
+            return False
+        _, argv = _strip_env(argv)
+        if not argv or os.path.basename(argv[0]) not in STDOUT_SILENT_PROGRAMS:
+            return False
+
+    try:
+        argv = shlex.split(segments[-1])
+    except ValueError:
+        return False
+    _, argv = _strip_env(argv)
+    if not argv:
+        return False
+    flags = EXTERNAL_REVIEWER_PRINT_FLAGS.get(os.path.basename(argv[0]))
+    if flags is None:
+        return False
+    in_print_mode = any(token == flag or token.startswith(flag + "=")
+                        for token in argv[1:] for flag in flags)
+    # The prompt must name the review, exactly as the in-family fallback path
+    # requires, so an ordinary `agy` run cannot become a verdict by accident.
+    return in_print_mode and bool(REVIEW_PROMPT_RE.search(command))
+
 OVERRIDE_ENV = re.compile(r"\AALLOW_UNREVIEWED_PUSH=1\Z")
 
 # Degraded mode only, where the shell parser is unavailable and the strict
@@ -1368,6 +1437,11 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                             if task_id and task_id in reviewer_task_ids:
                                 if isinstance(call_id, str) and call_id:
                                     reviewer_call_ids.add(call_id)
+                    elif tool_name == "bash" and external_reviewer_command(
+                            str(inp.get("command") or "")):
+                        saw_reviewer_call = True
+                        if isinstance(call_id, str) and call_id:
+                            reviewer_call_ids.add(call_id)
                     elif tool_name == "send_message" and record_is_reviewer:
                         msg_text = str(inp.get("Message") or inp.get("message") or "")
                         if msg_text:

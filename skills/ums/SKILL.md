@@ -156,9 +156,9 @@ committed pass.
      See
      [`grep-is-not-coverage`](../../shared/workflow/grep-is-not-coverage.md)'s
      "Searching the wrong corpus is the same error with no grep in it".
-   - **When that grep finds the corpus already covers this class, record the
+   - **When the corpus grep finds the corpus already covers this class, record the
      recurrence on the existing entry, not just the new fact.**
-     The first bullet of this step already says to extend in place rather than add a
+     The **Grep the corpus** bullet above already says to extend in place rather than add a
      sibling; what is missing is the count.
      Write it on the entry -- "3rd occurrence, 2026-08-16", with a pointer to
      each prior record -- so the entry carries evidence about whether the

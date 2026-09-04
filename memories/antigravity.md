@@ -27,9 +27,9 @@ backed by a staging directory created in `bootstrap.sh`.
   - In Antigravity's `hooks.json`, `PreToolUse` handlers are **grouped** under `{ "matcher": "...", "hooks": [ ... ] }`.
   - The plugin's `PreToolUse` list carries **two** groups rather than one, deliberately: a `"run_command"` group (literal matcher, unchanged since before this split) carrying `enforce-mwc-review-gate.py` and `claude-hook-adapter.py`, and a second group matched on the regex alternation `"invoke_subagent|send_message|define_subagent|call_mcp_tool|write_to_file|replace_file_content|mcp__github__.*"` carrying only `claude-hook-adapter.py`.
     Whether Antigravity treats `matcher` as a regex at all is unverified (2026-08-26), so the split is a de-risking measure: if that assumption is wrong, only the second group's coverage (the newer tool names) fails to fire, and the pre-existing `run_command` merge-control gate --- matched literally, so it does not depend on regex support --- is unaffected.
-  - `call_mcp_tool` maps `ServerName` and `ToolName` to Claude Code's `mcp__{ServerName}__{ToolName}` convention (e.g. `ServerName: "github"`, `ToolName: "merge_pull_request"` -> `mcp__github__merge_pull_request`), unpacking `Arguments` into `tool_input`.
-  - `write_to_file` maps to `Write` (`file_path: TargetFile`, `content: CodeContent`).
-  - `replace_file_content` maps to `Edit` (`file_path: TargetFile`, `old_string: TargetContent`, `new_string: ReplacementContent`).
+  - `call_mcp_tool` maps `ServerName` and `ToolName` to Claude Code's `mcp__{ServerName}__{ToolName}` convention (e.g. `ServerName: "github"`, `ToolName: "merge_pull_request"` -> `mcp__github__merge_pull_request`), unpacking `Arguments` into `tool_input` (verified live in Antigravity session 2026-09-04).
+  - `write_to_file` maps to `Write` (`file_path: TargetFile`, `content: CodeContent`) (verified live in Antigravity session 2026-09-04).
+  - `replace_file_content` maps to `Edit` (`file_path: TargetFile`, `old_string: TargetContent`, `new_string: ReplacementContent`) (verified live in Antigravity session 2026-09-04).
   - `run_command` maps to Claude Code's `Bash` tool (`{"command": args.get("CommandLine")}`).
   - `invoke_subagent` passes an array `{"Subagents": [{"TypeName": "...", "Workspace": "...", "Prompt": "..."}]}`.
     A bridge adapter evaluates all subagents in the list against `Agent` PreToolUse hooks.

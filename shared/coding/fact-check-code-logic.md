@@ -383,7 +383,7 @@ Reading the test is not a substitute.
 A vacuous test usually looks targeted,
 because it was written from the same mental model that produced the fix.
 
-Seven distinct mechanisms can make a test pass against the reverted fix:
+Eight distinct mechanisms can make a test pass against the reverted fix:
 
 - **Wrong entry point.**
   The test calls a helper directly,
@@ -397,6 +397,22 @@ Seven distinct mechanisms can make a test pass against the reverted fix:
 - **Boundary fixture.**
   The fixture sits on a line or span boundary
   where existing syntax rules already make the changed behaviour irrelevant.
+- **Coincident fixture.**
+  The fixture's own values coincide with the implementation's,
+  so the buggy path and the fixed path return the same answer on it.
+  This is the mapping-and-ordering case:
+  a lookup indexed by position
+  and the same lookup indexed by name
+  agree on every input whose order matches the table's,
+  and the two paths differ on no other axis at all.
+  It differs from **Boundary fixture** in that nothing about the input
+  looks like an edge case ---
+  it is an ordinary, representative value
+  that happens to be degenerate for the one distinction under test.
+  That is also why it survives a reading:
+  a fixture chosen while thinking about the fix
+  is the fixture likeliest to be in the implementation's own order,
+  so writing the vacuous version is the default rather than the slip.
 - **Wrong expectation.**
   The asserted behaviour contradicts the specification,
   so the test protects a bug rather than the fix.
@@ -413,7 +429,7 @@ Seven distinct mechanisms can make a test pass against the reverted fix:
 
 Those are test bugs,
 not merely weak tests.
-A suite with all seven can still be green,
+A suite with all eight can still be green,
 and coverage can still report the lines as exercised.
 Only the mutation answers whether the assertion depends on the fix.
 
@@ -423,11 +439,20 @@ Only the mutation answers whether the assertion depends on the fix.
 - **Do:** make "the fixture arrived" an assertion in its own right ---
   a parse step's return value, a counter, a log line ---
   rather than a thing you satisfied yourself of once by reading the code.
+- **Do:** give a mapping or ordering bug a fixture whose order differs
+  from the implementation's,
+  since the two paths agree on every fixture that shares it.
 - **Don't:** accept a test because it mentions the helper that changed,
   or because a coverage report marks the line covered.
 - **Don't:** trust a test label as evidence of what the assertion checks.
 - **Don't:** read a green guard as one whose subject ran.
   A payload rejected upstream and a working fix are the same observable.
+- **Don't:** read a representative fixture as a discriminating one ---
+  representativeness is a claim about typical inputs,
+  and a guard needs an input the two candidate behaviours disagree on.
+
+See [`fact-check-code-logic.cases.md`](fact-check-code-logic.cases.md),
+"Mutate the fix, not only the test --- a fixture ordered like the table".
 
 ### A misleading test label also licenses a DELETION, which is the direction with no mutation available
 

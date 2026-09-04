@@ -128,6 +128,28 @@ Each had contained only a cross-reference repointing from `memories/github.md`
 to `memories/github-mcp-tools.md`, and
 `git show origin/main:<file> | grep -c github-mcp-tools` returned `1` for each.)
 
+## A deferral to another open PR outliving that PR's merge
+
+(ucdavis/bcs#913, 2026-09-03: the branch was cut from `main` at
+2026-09-03T19:23:33Z, and an early edit reflowed a paragraph in
+`vignettes/articles/simulation.qmd`.
+That paragraph was also the subject of ucdavis/bcs#908, which the session had
+inspected at the start, seen was open, and deliberately deferred to on that
+exact sentence.
+#908 merged at 2026-09-03T23:55:21Z --- roughly four and a half hours later,
+mid-session --- as commit `f36b0c2f`, replacing "known exactly by
+construction" with a Monte Carlo standard-error bound computed inline.
+The session's later commits kept editing the pre-#908 paragraph, so the branch
+ended up proposing to re-add the sentence #908 had removed.
+`git merge-tree` reported the conflict;
+an adversarial reviewer found it;
+the fix was to merge `origin/main` and resolve so both changes survived.
+The session had never pushed, so
+[`check-before-pushing`](check-before-pushing.md) had not yet had a moment to
+fire, and it asks about the remote *branch* rather than the base in any case.
+What made the edit feel safe was the deferral itself: the decision was
+recorded and correctly recalled, and only its premise had expired.)
+
 ## When the whole PR is superseded, close it rather than resolve it
 
 (Morrison-Lab/ai-config#1188, 2026-08-06: an idle PR with a "Needs more work"

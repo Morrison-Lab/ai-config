@@ -50,7 +50,7 @@ HOOKS = os.path.join(ROOT, "hooks")
 # population is what the number below is derived from, so re-state both
 # whenever the suite grows rather than leaving a stale count behind: 32 cases
 # plus 17 mutation rounds finished in 178s on a Linux cloud runner
-# (2026-08-26), and 59 cases plus 39 rounds finished in 142s on another one
+# (2026-08-26), and 64 cases plus 42 rounds finished in 159s on another one
 # (2026-09-04). The unit is a test CASE, not a scratch repository: every case
 # builds a working repo AND a bare origin, and several build a clone or a
 # worktree on top, so the repositories outnumber the cases at least two to

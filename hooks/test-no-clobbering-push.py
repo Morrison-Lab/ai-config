@@ -362,6 +362,50 @@ def brace_group_case(path, bare):
     return f"{{ cd {wt}; }} && git push origin HEAD:peer-brace"
 
 
+def case_pattern_push_case(path, bare):
+    """`(cd <worktree> && case a in a) git push;; esac)` -- the pattern's `)`
+    is not the subshell's.
+
+    Both characters are the same, so popping a scope on the pattern recorded
+    the push OUTSIDE the parentheses it really runs in and dropped the `cd`
+    beside it -- the wrong-repository reading of ai-config#2451, and here it
+    is SILENT rather than merely misworded: the session's own HEAD equals the
+    remote tip, which reads as already pushed. Real bash puts the push in the
+    worktree (`bash -c '(cd wt && case a in a) pwd;; esac)'` prints it).
+    """
+    wt = _diverged_peer_worktree(path, "peer-casebug")
+    return (f"(cd {wt} && case a in a) "
+            "git push origin HEAD:peer-casebug;; esac)")
+
+
+def two_clause_case_push_case(path, bare):
+    """The push sits in the SECOND clause, so its pattern's `)` follows a
+    `;;` rather than the `in`.
+
+    A case returns to pattern position at each clause terminator. Without
+    that, the first pattern's `)` is the only one read as a pattern and `b)`
+    pops the enclosing subshell -- the same wrong-repository reading, arriving
+    one clause later than the case above.
+    """
+    wt = _diverged_peer_worktree(path, "peer-case2")
+    return (f"(cd {wt} && case b in a) true;; b) "
+            "git push origin HEAD:peer-case2;; esac)")
+
+
+def case_substitution_subject_case(path, bare):
+    """`(cd <worktree> && case $(echo a) in a) git push;; esac)` -- the case
+    SUBJECT carries parentheses of its own.
+
+    Pattern position begins at the `in`, not at the `case`: reading it from
+    the keyword makes the substitution's `(` a pattern opener, its `)` the
+    pattern's close, and the real pattern's `)` a subshell pop again -- the
+    same wrong-repository reading, one shape further along.
+    """
+    wt = _diverged_peer_worktree(path, "peer-casesubj")
+    return (f"(cd {wt} && case $(echo a) in a) "
+            "git push origin HEAD:peer-casesubj;; esac)")
+
+
 def spaced_worktree_case(path, bare):
     """The worktree the push runs in lives under a directory carrying a space.
 
@@ -496,6 +540,36 @@ def sibling_subshell_cd_case(path, bare):
     wt = _diverged_peer_worktree(path, "peer-sibling")
     return (f"(cd {wt} && true) && "
             "(git push origin HEAD:peer-sibling)")
+
+
+def case_pattern_fast_forward_case(path, bare):
+    """The WARN case above with nothing to report: the case-wrapped push is an
+    ordinary fast-forward in the worktree it runs from, while the session's
+    own directory diverges.
+
+    The two-sided pin. Its partner shows the reading arriving where the push
+    runs; this one shows that popping the scope at the pattern does not merely
+    lose a warning but invents one, about a repository the push never touches.
+    """
+    wt = _wrong_repo_worktree(path, bare, "case-ff")
+    return (f"(cd {wt} && case a in a) "
+            "git push origin HEAD:case-ff;; esac)")
+
+
+def subshell_in_case_body_case(path, bare):
+    """A real subshell NESTED INSIDE a case body, with the push after the
+    whole statement: `(cd <worktree> && case a in a) (true);; esac) && git
+    push`.
+
+    The mirror of W14. There a `)` had to stop popping; here one still has to
+    pop, and the two are told apart by the depth the case was opened at. A fix
+    that declined every `)` while a case is open leaves the inner subshell
+    unclosed, so the statement's own `)` pops it instead and the push reads
+    the worktree it never runs in.
+    """
+    wt = _diverged_peer_worktree(path, "peer-casesub")
+    return (f"(cd {wt} && case a in a) (true);; esac) && "
+            "git push origin HEAD:peer-casesub")
 
 
 def conditional_cd_case(path, bare):
@@ -794,6 +868,15 @@ SHOULD_WARN = [
     ("W13", spaced_worktree_case,
      "a worktree path carrying a space -- the emitted `git -C` must still "
      "parse as one argument"),
+    ("W14", case_pattern_push_case,
+     "`(cd <worktree> && case a in a) git push;; esac)` -- a case pattern's "
+     "`)` closes no subshell"),
+    ("W15", two_clause_case_push_case,
+     "`case b in a) true;; b) git push;; esac` -- a `;;` returns the case to "
+     "pattern position, so the second clause's `)` is a pattern too"),
+    ("W16", case_substitution_subject_case,
+     "`case $(echo a) in a)` -- pattern position begins at the `in`, so the "
+     "subject's own parentheses are a subshell"),
 ]
 
 SHOULD_STAY_SILENT = [
@@ -873,6 +956,13 @@ SHOULD_STAY_SILENT = [
     ("S37", pipeline_rhs_cd_newline_case,
      "`echo x |` at the end of a line -- the same run with the fork operator "
      "before the `cd`"),
+    ("S38", case_pattern_fast_forward_case,
+     "a case-wrapped push that is a fast-forward where it runs -- popping the "
+     "scope at the pattern invents a divergence"),
+    ("S39", subshell_in_case_body_case,
+     "`(cd <worktree> && case a in a) (true);; esac) && git push` -- a "
+     "subshell inside a case body still closes, so the statement's `)` pops "
+     "the outer one"),
 ]
 
 
@@ -932,6 +1022,18 @@ LABEL_EXPECT = {
              "add shared.txt", "read in `", "git -C "],
             ["git checkout ", "git log --oneline HEAD..origin/peer-space",
              "git fetch origin peer-space"]),
+    "W14": (["your local HEAD", "log --oneline HEAD..origin/peer-casebug",
+             "add shared.txt", "read in `", "git -C "],
+            ["git checkout ", "git log --oneline HEAD..origin/peer-casebug",
+             "git fetch origin peer-casebug"]),
+    "W15": (["your local HEAD", "log --oneline HEAD..origin/peer-case2",
+             "add shared.txt", "read in `", "git -C "],
+            ["git checkout ", "git log --oneline HEAD..origin/peer-case2",
+             "git fetch origin peer-case2"]),
+    "W16": (["your local HEAD", "log --oneline HEAD..origin/peer-casesubj",
+             "add shared.txt", "read in `", "git -C "],
+            ["git checkout ", "git log --oneline HEAD..origin/peer-casesubj",
+             "git fetch origin peer-casesubj"]),
     # W10 is the opposite pin: the push runs in the call's OWN directory, so
     # naming it would be noise and `git -C` would be wrong.
     "W10": (["your local HEAD", "git log --oneline HEAD..origin/peer-payload",
@@ -1192,10 +1294,10 @@ MUTATIONS = {
           "        if False:\n            continue")],
         # S1, S2 and S11 are fast-forward pushes too, so removing the gate
         # makes all of them warn -- the harness caught this set being
-        # under-declared the first time. S17 joins them: its silence is a
-        # fast-forward READ IN THE RIGHT DIRECTORY, so it flips here as well
+        # under-declared the first time. S17 and S38 join them: each is a
+        # fast-forward READ IN THE RIGHT DIRECTORY, so both flip here as well
         # as under the `cd` clause below.
-        {"S1", "S2", "S5", "S11", "S17"},
+        {"S1", "S2", "S5", "S11", "S17", "S38"},
     ),
     "subcommand": (
         "only `git push` matches, not another git subcommand",
@@ -1218,8 +1320,10 @@ MUTATIONS = {
           "            continue")],
         # S23, S24 and S27-S31 do NOT flip: their `cd` is declined rather than
         # applied, and a `cd` that is not applied at all leaves the same
-        # directory.
-        {"S17", "S18", "W8", "W11", "W12", "W13"},
+        # directory. W14-W16 and S38 do flip: a case statement changes which
+        # scope the push lands in, never whether the `cd` before it applies.
+        {"S17", "S18", "S38", "W8", "W11", "W12", "W13", "W14", "W15",
+         "W16"},
     ),
     "branch_region_declines": (
         "a compound statement opens a REGION, so every `cd` in its body is "
@@ -1364,18 +1468,23 @@ MUTATIONS = {
         "leak onto a push outside it",
         # Anchored on the parenthesis clause alone, NOT on the `for ch in t`
         # loop around it: that loop also derives the separator each simple
-        # command carries, and blanking it would revert two clauses at once
-        # and report a flip set neither of them owns.
-        [('                if ch == "(":\n'
+        # command carries and tracks the `case` statements open, and blanking
+        # it would revert three clauses at once and report a flip set none of
+        # them owns. Only the PUSH is suppressed, which is enough: with
+        # nothing ever pushed, `len(scopes) > 1` is never true and the pop
+        # below cannot fire either.
+        [('                if ch == "(" and not pattern:\n'
           "                    opened += 1\n"
-          "                    scopes.append(scopes[-1] + (opened,))\n"
-          '                elif ch == ")" and len(scopes) > 1:\n'
-          "                    scopes.pop()",
-          "                pass")],
+          "                    scopes.append(scopes[-1] + (opened,))",
+          "                if False:\n"
+          "                    opened += 1\n"
+          "                    scopes.append(scopes[-1] + (opened,))")],
         # W11's `cd` shares the subshell with its push, so it still applies
         # when every command reads as root -- which is what makes the pair a
-        # two-sided pin rather than one case asserting silence.
-        {"S21", "S22"},
+        # two-sided pin rather than one case asserting silence. S39 is the
+        # same pin around a case statement: its `cd` is in the OUTER subshell,
+        # so a leak past the closing parenthesis reaches the push after it.
+        {"S21", "S22", "S39"},
     ),
     "subshells_have_identities": (
         "a subshell is identified, not merely counted, so a `cd` in one does "
@@ -1386,6 +1495,34 @@ MUTATIONS = {
         # S21's push sits outside the parentheses, so a depth-shaped label
         # leaves it correct; only the sibling shape can see the difference.
         {"S22"},
+    ),
+    "case_pattern_is_not_a_subshell": (
+        "a `)` that closes a `case` pattern pops no subshell, though it is "
+        "the same character one closes with",
+        [('                elif ch == ")" and pattern:\n'
+          "                    cases[-1][1] = False\n"
+          '                elif ch == ")" and len(scopes) > 1:',
+          '                elif ch == ")" and len(scopes) > 1:')],
+        {"W14", "W15", "W16", "S38"},
+    ),
+    "case_terminator_restores_pattern_position": (
+        "a `;;` returns the case to pattern position, so every clause's `)` "
+        "is read as a pattern and not only the first one's",
+        [('                elif (ch in ";&" and prev == ";" and cases\n'
+          "                        and cases[-1][0] == len(scopes)):\n"
+          "                    cases[-1][1] = True",
+          "                elif False:\n"
+          "                    cases[-1][1] = True")],
+        # Only a case of MORE than one clause can see this: W14's push sits in
+        # the first clause, whose pattern position comes from the `in`.
+        {"W15"},
+    ),
+    "case_pattern_begins_at_in": (
+        "pattern position begins at the case's `in`, so parentheses in the "
+        "SUBJECT are read as a subshell rather than as a pattern",
+        [("        cases.append([depth, False, False])",
+          "        cases.append([depth, True, True])")],
+        {"W16"},
     ),
     "brace_group_is_transparent": (
         "a brace group's punctuation is stripped as a lead word, so the `cd` "
@@ -1419,7 +1556,7 @@ MUTATIONS = {
         "where, and qualifies every remediation command with `git -C`",
         [("        moved = os.path.realpath(cwd) != os.path.realpath(base)",
           "        moved = False")],
-        {"W8", "W9", "W11", "W12", "W13"},
+        {"W8", "W9", "W11", "W12", "W13", "W14", "W15", "W16"},
     ),
     "heredoc_blanking": (
         "a heredoc body is blanked before parsing, so a mention inside one "

@@ -127,6 +127,28 @@ directory let the first one's `cd` leak into the second and
 wrong-repository reading, arriving by the very mechanism added to prevent it
 (measured 2026-09-04).
 
+Not every `)` closes a subshell, though, and the one that does not is a `case`
+PATTERN: `(cd elsewhere && case a in a) git push;; esac)` carries three of
+them and opens one subshell. Popping a scope on the pattern's `)` recorded the
+push OUTSIDE the parentheses it really runs in, so the `cd` beside it was
+dropped and the push was read in the session's own repository --
+ai-config#2451's wrong-repository reading once more, and silent rather than
+merely misworded wherever the session sits on the remote tip (measured
+2026-09-04). `_simple_commands` therefore tracks `case` ... `esac` alongside
+the parentheses, the same two words `evaluate`'s region counter already reads
+out of `BLOCK_OPEN` / `BLOCK_CLOSE`, and declines to pop for a `)` that closes
+a pattern of the innermost case open at the CURRENT depth. A `;;` returns that
+case to pattern position, so the second clause's `)` is read as a pattern too.
+Every other `)` pops as it always did, which is what closes a subshell nested
+inside a case body; keying both tests to the depth the case opened at is what
+keeps a deeper one from being read as that case's own.
+
+Pattern position begins at the case's `in` rather than at the `case` keyword,
+because the subject between them can itself carry parentheses: in
+`case $(echo a) in a) ...` the substitution's own `(` would otherwise be
+swallowed as a pattern opener, and the real pattern's `)` would then pop the
+enclosing subshell after all (measured 2026-09-04).
+
 A `cd` the shell may never REACH, and one it reaches in a subshell of its
 own, are declined as well. Both arrive here looking exactly like an ordinary
 `cd`, because `_simple_commands` splits on operators and models neither
@@ -378,6 +400,37 @@ def _next_sep(sep, ch):
     return ch
 
 
+def _track_case(cases, argv, depth):
+    """Open, advance, or close a `case` statement, given one simple command.
+
+    `case` and `esac` reach this the way every other keyword reaches
+    `evaluate`'s region counter: as an ordinary word at the head of a simple
+    command, behind whatever env assignments and lead words precede it. The
+    region answers whether a `cd` sits in a body that may never run, which is
+    a different question from the one here -- which `)` characters close a
+    PATTERN rather than a subshell -- so the statement is tracked in both
+    places rather than one reading the other.
+
+    An entry holds the subshell depth the `case` opened at, whether it stands
+    in pattern position, and whether its `in` has been passed. The depth keys
+    the parenthesis tests to that case's own level. The third field bounds the
+    search for the `in`: a body command can carry that word too (`for f in
+    *`), and by then the case has long since passed its own.
+    """
+    i, _override, _redirected = _lead_prefix(argv)
+    if i >= len(argv):
+        return
+    if argv[i] == "case":
+        cases.append([depth, False, False])
+    elif argv[i] == "esac" and cases:
+        cases.pop()
+        return
+    if (cases and cases[-1][0] == depth and not cases[-1][2]
+            and "in" in argv[i:]):
+        cases[-1][1] = True
+        cases[-1][2] = True
+
+
 def _simple_commands(cmd):
     """Split a shell command into `(subshell path, argv, separator)` triples;
     None on error.
@@ -402,6 +455,13 @@ def _simple_commands(cmd):
     character by character, for a caller that needs the segment TEXT rather
     than an argv; it answers the weaker question and neither can be written in
     terms of the other.
+
+    Reading every `)` as a subshell close is what made the path wrong for a
+    `case`: its patterns close with the same character, so
+    `(cd wt && case a in a) git push;; esac)` popped the parentheses at the
+    pattern and recorded the push outside them, losing the `cd` beside it
+    (measured 2026-09-04). `_track_case` tracks the statement here as well as
+    in `evaluate`'s region counter, and a pattern's `)` pops nothing.
 
     The separator is the operator immediately BEFORE each simple command, and
     it is what tells a `cd` the shell always reaches from one it may never
@@ -432,6 +492,11 @@ def _simple_commands(cmd):
     except ValueError:
         return None
     cmds, cur, scopes, opened, sep = [], [], [()], 0, ""
+    # The `case` statements still open, innermost last. A case PATTERN closes
+    # with the same character a subshell does, so without this
+    # `(cd wt && case a in a) git push;; esac)` popped the parentheses at the
+    # pattern and read the push in the session's own repository.
+    cases = []
     for t in toks:
         if t and set(t) <= _SHELL_OPS:
             trailing = ""
@@ -446,15 +511,28 @@ def _simple_commands(cmd):
                 trailing = _next_sep(trailing, ch)
             if cur:
                 cmds.append((scopes[-1], cur, sep, trailing))
+                _track_case(cases, cur, len(scopes))
                 cur = []
                 sep = ""
-            frozen = False
+            frozen, prev = False, ""
             for ch in t:
-                if ch == "(":
+                # A `)` closes a case PATTERN, rather than a subshell, only
+                # for the innermost case open at THIS depth and only while
+                # that case is in pattern position -- which a `;;` (or a `;&`
+                # fallthrough) restores for the clause after it.
+                pattern = bool(cases and cases[-1][0] == len(scopes)
+                               and cases[-1][1])
+                if ch == "(" and not pattern:
                     opened += 1
                     scopes.append(scopes[-1] + (opened,))
+                elif ch == ")" and pattern:
+                    cases[-1][1] = False
                 elif ch == ")" and len(scopes) > 1:
                     scopes.pop()
+                elif (ch in ";&" and prev == ";" and cases
+                        and cases[-1][0] == len(scopes)):
+                    cases[-1][1] = True
+                prev = ch
                 if ch in "()":
                     sep, frozen = "", False
                 elif not frozen:

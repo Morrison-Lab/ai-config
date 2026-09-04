@@ -114,6 +114,20 @@ check(
     == [[3]],
 )
 check(
+    "a bare mention far below the link in one unbroken block is still reported",
+    # A blank-line-delimited block in this corpus can run hundreds of lines,
+    # so the block alone cannot bound the sentence that carries the link.
+    [
+        f["bare_lines"]
+        for f in scan(
+            LINKED
+            + "Filler prose line.\n" * 20
+            + "The quotable-findings rule applies.\n"
+        )
+    ]
+    == [[22]],
+)
+check(
     "a blockquoted mention is not a bare mention",
     # Quoted review text names a fragment it is reporting on.
     scan(LINKED + "\n> the quotable-findings rule\n") == [],

@@ -128,6 +128,11 @@ SETEXT_UNDERLINE = re.compile(r"^\s{0,3}(?:=+|-+)\s*$")
 # indented-code-block rule below.
 LIST_MARKER = re.compile(r"^\s{0,3}(?:[-*+]|\d{1,9}[.)])\s")
 
+# How far from a link a bare mention can sit and still belong to the
+# sentence that carries it.  This corpus writes semantic line breaks, so
+# that sentence wraps over a few lines.
+NEAR_LINK_LINES = 3
+
 SKIP_PREFIXES = ("http://", "https://", "mailto:", "tel:", "#")
 
 DEFAULT_SCAN_GLOBS = [
@@ -311,6 +316,15 @@ def paragraph_ids(text: str) -> dict[int, int]:
     return ids
 
 
+def carries_link(idx: int, at: list[int], blocks: dict[int, int]) -> bool:
+    """True when line `idx` sits in the sentence one of `at`'s links carries."""
+    block = blocks.get(idx)
+    return any(
+        blocks.get(link) == block and abs(link - idx) <= NEAR_LINK_LINES
+        for link in at
+    )
+
+
 def link_lines(text: str) -> dict[str, list[int]]:
     """Map each linked fragment basename to the 1-indexed lines linking it.
 
@@ -430,16 +444,15 @@ def scan_text(
             continue
         considered += 1
         first_link = min(at)
-        linked_blocks = {blocks[idx] for idx in at if idx in blocks}
-        # A paragraph that also links the fragment is not a missing link: the
-        # link is right there, and asking for a second one is the redundancy
-        # shared/workflow/challenge-redundant-content.md rejects.  The block
-        # rather than the line, because this corpus writes semantic line
-        # breaks, so the sentence carrying the link spans several lines.
+        # A mention in the sentence that carries the link is not a missing
+        # link: the link is right there, and asking for a second one is the
+        # redundancy shared/workflow/challenge-redundant-content.md rejects.
+        # Bounded by NEAR_LINK_LINES as well as by the block, since a block
+        # in this corpus is not always one paragraph.
         bare = [
             idx
             for idx in bare_lines(lines, name, first_link)
-            if blocks.get(idx) not in linked_blocks
+            if not carries_link(idx, at, blocks)
         ]
         if not bare:
             continue

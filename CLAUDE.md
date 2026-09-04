@@ -1578,7 +1578,7 @@ Advisory, always exits 0, and wired into `validate.yml` as a non-gating step.
 
 ## Remove forward-pointing phrases from prose, not just crossref divs
 
-The section above covers formal Quarto crossref-div ordering for term/result definitions, and this repo's own linked-once-then-bare miss.
+The section above covers this repo's own linked-once-then-bare miss, and formal Quarto crossref-div ordering for term/result definitions.
 The same problem shows up more broadly as plain-text signposting — "as discussed below", "in the following section", "we'll cover this later" — pointing at content the reader hasn't reached yet, in any prose (not just documents with crossref divs).
 
 [shared/writing/forward-references.md](shared/writing/forward-references.md)

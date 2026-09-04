@@ -208,8 +208,9 @@ genuine conflict.
   which is what review sees.
 - **Do:** pass `-m` or `--diff-merges=on` when you want `git log -p` to print
   merge patches.
-- **Do:** anchor a grep for a two-parent merge's own content as `^[+][+]`,
-  one `+` per parent, never `^+`.
+- **Do:** anchor a grep for a two-parent merge's own content as `^[+][+]`
+  in a combined diff, one `+` per parent, never `^+` there
+  (`^+` is the right anchor for the single-column `git diff <base>...<tip>` read above).
   A `+` in one column only marks a line one parent already carried
   (`+ SHARED paragraph.` is the copy `main` had; ` +FEATURE paragraph.` is the
   branch's own line),

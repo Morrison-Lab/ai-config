@@ -173,7 +173,7 @@ $ git ls-remote origin refs/pull/3095/head
 An empty result means **not a PR**, which for a reference you know exists means an issue;
 a number that exists as neither also comes back empty (`refs/pull/999999/head`, empty, exit 0),
 so confirm the number is real before writing the `/issues/` path.
-Both calls above exit 0.
+Both calls in the console block above exit 0.
 `ls-remote` reports "no such ref" as an empty result rather than as a failure,
 so `if git ls-remote ...; then` classifies every number as a PR.
 A non-zero exit means the query never answered:

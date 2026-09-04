@@ -48,7 +48,8 @@ This checks five things:
 Check 3 is what stops the table drifting in a way the set comparison cannot see:
 a row can name every hook correctly and still tell a reader the wrong event.
 Check 5 needs the harness's own matcher semantics, which `matcher_matches`
-reimplements; see its docstring for the measurement that settles them.
+reimplements; see the comment block above `PLAIN_MATCHER` for the measurement
+that settles them.
 
 When a tracker cannot be fetched (offline, timeout, or rate limit), this check
 prints `SKIP` and does not fail. That skip is the documented offline path, not

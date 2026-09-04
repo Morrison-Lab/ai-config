@@ -266,12 +266,16 @@ try { return new RegExp(q).test(A) } catch { return false }
 `A` is the match query (`tool_name` for `PreToolUse`) and `q` is the group's `matcher`.
 So:
 
-| matcher | evaluated as | `Edit` vs a `NotebookEdit` call |
+| matcher | evaluated as | fires on a `NotebookEdit` call? |
 |---|---|---|
 | absent, empty, or `*` | fires on every call | fires |
 | a plain name, e.g. `Edit` | **exact string equality** | does **not** fire |
-| an alternation, e.g. `Write\|Edit` | exact membership of the trimmed parts | fires only on the named tools |
-| anything else, e.g. `mcp__github__.*` | an **unanchored** JavaScript regex | fires |
+| an alternation, e.g. `Write\|Edit` | exact membership of the trimmed parts | does **not** fire; `NotebookEdit` is not one of the parts |
+| anything else, e.g. `mcp__github__.*` | an **unanchored** JavaScript regex | does **not** fire; that regex does not match `NotebookEdit` |
+
+Only the catch-all fires here, and that is the whole trap:
+`Edit` would fire on a `NotebookEdit` call if it reached the regex branch,
+and a plain name never reaches it.
 
 Two consequences that were previously open questions (ai-config#2535).
 A plain name is not a substring test, so binding one script to `Write`, `Edit`, and `NotebookEdit` as three groups is three disjoint bindings rather than a triple invocation on a `NotebookEdit` call.

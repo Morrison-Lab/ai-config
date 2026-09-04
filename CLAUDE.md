@@ -306,7 +306,7 @@ The tool result already returns a clock time (e.g. "Next wakeup scheduled for 08
 
 ## Bare keyword directives
 
-Two families of slash skill read as directives when I write them **without** the leading slash: the **queue commands** that amend the task list, and the **judgment grants** that hand a decision back to you.
+Three families of slash skill read as directives when I write them **without** the leading slash: the **queue commands** that amend the task list, the **judgment grants** that hand a decision back to you, and the **orchestration commands** that cap a run already in flight.
 
 ### Queue commands
 

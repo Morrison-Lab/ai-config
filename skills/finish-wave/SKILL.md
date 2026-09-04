@@ -32,10 +32,12 @@ Take the wave from a live query at every check-in, rather than freezing a list o
 A PR opened minutes ago, or one the review bot pushed to, belongs to the wave and never entered any list written earlier ([`derive-dont-enumerate`](../../shared/workflow/derive-dont-enumerate.md)).
 
 ```bash
-gh pr list --state open --author @me --json number,title,url,headRefName
-gh issue list --state open --assignee @me --json number,title,url
+python3 scripts/pr-sweep.py -R <owner>/<repo> --include-drafts
+gh issue list --state open --json number,title,url \
+  --search "commenter:$(gh api user -q .login) \"hold off\" in:comments"
 ```
 
+Where the script is unavailable, fall back to `gh pr list --state open --author @me --json number,title,url,headRefName,isDraft`.
 In a remote session without `gh` on `PATH`, substitute the GitHub MCP equivalents from [`tool-mappings.md`](../../tool-mappings.md).
 
 - **Do:** re-run the queries each time you report the wave's state.
@@ -88,8 +90,7 @@ It is not a stop order either --- "stop" or "that's enough" ends the loop where 
 ## Relationship to other skills
 
 - **[`gii`](../gii/SKILL.md)** --- owns the wave boundary this skill executes, including the default 5-issue max and the "A UMS pass is not a new wave" rule.
-- **[`gia`](../gia/SKILL.md)** --- honors the same boundary in its Phase 2.
-  Invoke this skill for the hold rather than restating it.
+- **[`gia`](../gia/SKILL.md)** --- honors the same boundary in its Phase 2, and points here for the hold.
 - **[`gip`](../grab-issues-in-parallel/SKILL.md)** --- the parallel grabber the cap also halts.
 - **[`ardi`](../ardi/SKILL.md)** --- the loop that drives each wave PR to clean while the cap holds.
 - **[`ums`](../ums/SKILL.md)** --- runs inside the cap, at the wave's clean verdicts and merges.

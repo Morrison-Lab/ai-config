@@ -1,6 +1,6 @@
 ---
 name: fw
-description: "Alias for `finish-wave`. Finish the current wave; start no new one."
+description: "→ finish-wave."
 user-invocable: true
 allowed-tools:
   - Bash

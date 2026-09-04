@@ -168,6 +168,26 @@ The full rule, including the Do/Don't pair, is
 Questioning alone does not owe a pass: the check has to show the claim
 was wrong.
 
+## Run UMS before every pause
+
+Before ending a turn to wait on anything --- CI, a review round,
+a subagent, or an answer from the user --- run `ums` first.
+A wait's length is not knowable when it begins, so the learnings sit in
+conversation state for however long it runs, and a pause is the likeliest
+point for compaction or a session nobody resumes.
+"Resume every non-clean pause" above obliges a wake mechanism at this same
+moment; this obliges the pass alongside it.
+The pass is owed by accumulated learnings rather than by the number of waits,
+so a monitoring loop and a run of separately posed questions each get it at
+the first pause and again only once new learnings accumulate.
+The full rule, including the rationale and the other pairs, is
+[`shared/workflow/run-ums-proactively.md`](shared/workflow/run-ums-proactively.md).
+
+- **Do:** run the pass before the pause, not once the wait turns out to be long, whenever learnings have accumulated since the last pass.
+- **Do:** run it at the first pause, whether the waits that follow are a monitoring loop's re-arms or a run of separately posed questions.
+- **Don't:** re-run it at a second consecutive pause that has learned nothing since the first.
+- **Don't:** defer the pass to when the wait ends --- the resumption may land in another session or never come.
+
 ## Help your subagents improve over time
 
 An orchestrator owns the three things that set a dispatched agent's

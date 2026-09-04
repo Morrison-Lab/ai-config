@@ -252,6 +252,32 @@ That is [`learn-from-review-findings`](learn-from-review-findings.md)'s converge
 - **Don't:** count a verdict that cites prior rounds in its justification as a fully independent round;
   that much of it is a re-reading of the rounds it names, however hard the rest of it worked.
 
+### Tell it to RUN the repo's validation, not only to read the diff
+
+The rule above says which facts a brief must carry.
+It does not say what the reviewer should **do** with the checkout, and the default answer --- read the diff against the standards --- is what every round does when the brief does not say otherwise.
+Reading is the wrong instrument for a whole class of defect, because a diff-reading round can only find what is visible in the changed lines, and a registration gap, a broken import path, or a check that fails on files the diff never touched are all invisible there by construction.
+
+So name the commands in the brief.
+The repo's own checkers, its test suite, and whatever `check-install`-shaped verification exists are the ones that matter, and they are cheap for a reviewer already holding the checkout.
+
+Recorded 2026-09-03 from [ai-config#3059](https://github.com/Morrison-Lab/ai-config/issues/3059), on a hook that took nine adversarial rounds.
+Eight rounds read the diff.
+The ninth ran the repository's own local validation, and found **two red CI gates that all eight prior rounds had missed** --- one of which would have shipped the hook completely **inert to plugin-path consumers** while every test in the suite passed.
+The record gives no more detail than that.
+It does not name the hook, the gates, or what was missing, so read it for the shape rather than for a mechanism --- and note that a diff-reading round cannot find a gate that fails on files the diff never touched, whatever the gate turns out to be.
+
+Note what this is not.
+It is not "Run every mechanical style instrument before dispatching, not after", which says *you* run the style instruments beforehand so the reviewer never spends attention on them.
+That rule keeps mechanical noise out of the round.
+This one puts a different instrument *into* the round, because the author's pre-dispatch run and the reviewer's own run answer different questions --- yours confirms the diff is clean, and the reviewer's confirms the repo is.
+
+- **Do:** name the repo's *functional* checkers and test command in the brief --- not the style instruments, which you have already run --- and ask for their output rather than a judgement about them.
+- **Do:** ask specifically whether the change is *reachable* --- registered, imported, wired into the path a consumer actually takes --- since that is the gap a diff read cannot show.
+- **Don't:** assume a reviewer holding the checkout will run anything it was not asked to run.
+- **Don't:** read a run of diff-reading rounds as having covered the repo;
+  they covered the changed lines, which is a different population.
+
 ## Run every mechanical style instrument before dispatching, not after
 
 The rule above is about what the reviewer sees.
@@ -886,3 +912,32 @@ The companion half of that session --- concluding a silent subagent had
 stalled when it was alive and twelve rounds ahead --- is recorded in
 [`git-worktrees`](../../memories/git-worktrees.md), "A quiet worktree is not
 evidence the session working it has stopped".)
+
+### Ask it whether ANOTHER ROUND earns its place, which is a different question
+
+The section above retires the **work**.
+This one retires the **loop** while keeping the work, and the two need separating because a reviewer asked only the ship-or-drop question has no way to say "keep it, and stop iterating".
+
+**The default rule is elsewhere in this file, and this question is for the case that rule does not reach.**
+"Review the instrument too, not only the change it verifies" already gives the terminus: keep running rounds while findings keep landing, and "Give a docs-only diff describing an instrument a full round" restates it.
+That is the right default and it is not withdrawn here.
+What it assumes is that each round's findings are *about the change*.
+Once a round's findings are about the **previous round's fix** --- the shape [`learn-from-review-findings`](learn-from-review-findings.md)'s "A later round can find a defect in the FIX" section documents --- findings still landing no longer distinguishes a series that is converging from one the fixes are feeding, so the default criterion returns "keep going" in both cases and stops discriminating.
+
+So the expected-value question is not a competing terminus.
+It is the tie-breaker for the case the findings-still-landing rule cannot separate, and it applies only there.
+Put it to the reviewer in its own sentence, alongside the findings: **does another round have positive expected value, or is the remaining risk smaller than the risk a further fix introduces?**
+A reviewer holding the round's own findings can weigh their severity against the observed rate at which fixes on this change have introduced new defects, which is a judgement the author cannot make about their own series.
+
+Recorded 2026-09-03 from [ai-config#3059](https://github.com/Morrison-Lab/ai-config/issues/3059), across nine rounds on one hook.
+Rounds 6, 7 and 8 each introduced a defect the next round found, which is exactly the condition above;
+only round 9 introduced none.
+Two things ended the series, per #3059: asking that question directly, and the validation-running round above.
+Neither was a round happening to come back empty --- which, per the convergence rule, would not have been evidence it was finished anyway.
+
+- **Do:** ask for a continue-or-stop judgement once a round's findings are about the previous round's *fix* rather than about the change, separately from the ship-or-drop question.
+- **Do:** give the reviewer the rate at which this change's own fixes have introduced new defects, since that is the term it cannot derive from the diff.
+- **Don't:** collapse the two questions.
+  "Should this exist" and "should this iterate further" have different right answers, and a change worth shipping is the usual situation in which the continue-or-stop question arises at all.
+- **Don't:** treat an empty round as the answer to either question;
+  a converging series narrows its own search space, so the empty round is the least informative one.

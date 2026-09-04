@@ -337,6 +337,39 @@ python3 scripts/check-context-closure.py --base ../consumer-repo --compare origi
 
 Measured on `ucdavis/bcs` at a three-day-old pin, the same 33 imports had grown **+62%**, arriving silently since a bump's gitlink diff is one line (ai-config#1028).
 
+### Lead-in counts (`scripts/check-leadin-counts.py`)
+
+Prose here introduces a list with a spelled-out count --- "Two lightweight checks keep the skill catalog well-formed:", "Three things the new observation adds" --- and then enumerates the items below it.
+A later edit that splits or merges one item leaves the count stale, and a reader who counts along stops at the stated number and never reaches the last item.
+Nothing else catches it: there is no broken link, the lines are well formed, and the prose reads fluently either way.
+
+```sh
+python3 scripts/check-leadin-counts.py                 # every tracked markdown file
+python3 scripts/check-leadin-counts.py memories/foo.md # just these files
+```
+
+Exit `0` every lead-in count matches, `1` at least one mismatch, `2` the scan examined no files (a check that examined nothing reports clean otherwise).
+
+Gated in `validate.yml`, over every tracked markdown file.
+The corpus reads clean at 0 findings;
+the checker prints the population it examined on every run.
+The one stale count the checker found on its first run --- `memories/claude-code-permissions.md` said two above three bullets --- is fixed in the same commit that gates it.
+
+False positives, rather than recall, are what bound the design: a checker that flagged every numeral would be switched off, taking the real cases with it.
+So it reads only spelled-out counts that open the last sentence above the enumeration, or sit behind at most two function words ("There are two ...").
+It reads that sentence only when it is its own one-line paragraph, so a count closing a multi-line paragraph is never examined.
+It skips a lead-in ending on a conditional subordinator, since "Two changes are independent if:" enumerates the conditions rather than the changes.
+And it discounts a bold-header run that overshoots the stated count by more than one, since body prose between such headers gives that shape no structural end.
+
+Those bounds are positional rather than semantic, so one shape stays a known false positive: a count that opens its sentence and then names a property of itself ("Two variables at once is hard:").
+No bound separates that from "Three answers are legitimate, and only the first is ...", which is a genuine lead-in of the same shape.
+The simplest alternative, a rule "keyed on the copula alone" that just requires `is`/`are`/`was`/`were` to appear somewhere in the sentence, suppresses the large majority of the lead-ins the shipped implementation accepts, most of them genuinely real, so it is not a workable substitute.
+No exact count is quoted: the total moves as prose lands, and three hand measurements while the checker was written gave three different totals, so derive it fresh rather than trusting a number.
+`scripts/test_check_leadin_counts.py` pins it as accepted rather than claiming coverage it does not have.
+
+- **Do:** run it over a file whose bulleted or bold-header sections you have just split or merged.
+- **Don't:** read a clean result as proof that every count in the file is right --- the bounds above trade recall for a quiet enough report to act on.
+
 ### Attributed quotes (`scripts/check-user-quote.py`)
 
 Shows every transcript record containing a phrase you are about to attribute to the user, with its provenance --- record shape, `origin.kind`, flags, `userType` --- so you can read them and judge.

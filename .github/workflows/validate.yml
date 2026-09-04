@@ -123,6 +123,14 @@ jobs:
         run: python3 scripts/test_check_verdict_scan_parity.py
       - name: Run check-user-quote tests
         run: python3 scripts/test_check_user_quote.py
+      - name: Check lead-in counts against their enumerations
+        # ai-config#3005. A lead-in count goes stale when a later edit splits
+        # or merges one item, and a reader who counts along never reaches the
+        # last one. Nothing else here sees it: no broken link, well-formed
+        # lines, fluent prose either way.
+        run: python3 scripts/check-leadin-counts.py
+      - name: Run check-leadin-counts tests
+        run: python3 scripts/test_check_leadin_counts.py
       - name: Run check-doi-bib tests
         run: python3 scripts/test_check_doi_bib.py
       - name: Run test_pull_request tests

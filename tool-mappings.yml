@@ -56,6 +56,9 @@ models:
 # along with it, and hooks/no-commit-chained-to-push.py refuses that shape
 # outright. This registry is a place a model copies a command from verbatim,
 # so a chained example here becomes a chained call there.
+# hooks/test-no-commit-chained-to-push.py enforces this by sweeping every
+# `cli` value in this file through that guard, so a chained value
+# reintroduced here fails CI.
 #   Do: stop the cli value at the commit and reach for the PUSH operation
 #       as a separate call.
 #   Don't: join a commit to a push with `&&` in a cli value, however

@@ -534,7 +534,6 @@ for op in operations:
         refused += 1
     check(f"registry {op.get('id', '<unknown>')}.cli is not a chained "
           "commit-and-push", denied, False)
-print(f"  swept {examined} tool-mappings.yml cli values; {refused} refused")
 
 # The entry the issue named, pinned by id rather than by the sweep above, so a
 # registry that lost the operation entirely cannot pass by having nothing left
@@ -876,4 +875,5 @@ if failures:
     for line in failures:
         print("  " + line)
     sys.exit(1)
-print("all tests passed")
+print(f"all tests passed (swept {examined} tool-mappings.yml cli "
+      f"values; {refused} refused)")

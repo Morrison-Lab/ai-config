@@ -41,9 +41,11 @@ This checks five things:
      (ai-config#2535). A double binding runs the hook twice on one call, which
      is merely wasteful for a warn-only hook and is not benign for a blocking
      one. This one is decidable only over tool names hooks.json itself spells
-     out, so a pair of two DIFFERENT regex matchers cannot be settled here at
-     all; such a pair is reported as a NOTE and counted apart from the compared
-     ones, rather than passing as clean.
+     out, so a pair no such name matches is not settled here at all; that pair
+     is reported as a NOTE and counted apart from the compared ones, and the
+     run still exits 0. Two regex matchers ARE settled whenever some name in
+     that vocabulary fires both, so the overlap is computed first and the NOTE
+     is only the fallback when it finds nothing.
 
 Check 3 is what stops the table drifting in a way the set comparison cannot see:
 a row can name every hook correctly and still tell a reader the wrong event.
@@ -123,8 +125,11 @@ ROW = re.compile(
 )
 
 # How the harness decides whether a matcher applies to a tool call, measured
-# 2026-09-03 against Claude Code v2.1.42's own matcher function in
-# `cli.js`, and re-run against the extracted function under node:
+# 2026-09-03 against the matcher function in the `cli.js` bundled in the
+# `@anthropic-ai/claude-code` npm package, version 2.1.42 per that package's
+# own package.json, and re-run against the extracted function under node. A
+# standalone native build can report a different version on the same machine,
+# and `memories/claude-code-hooks.md` carries that measurement:
 #
 #     if (!q || q === "*") return true;
 #     if (/^[a-zA-Z0-9_|]+$/.test(q)) {
@@ -424,13 +429,16 @@ def _show(matcher):
 
 
 def undecidable_pair(first, second):
-    """Whether no tool name available here can settle if two matchers overlap.
+    """Whether neither matcher names a tool, as a conservative fallback.
 
-    A regex matcher names no tools literally, so it contributes nothing to the
-    vocabulary, which is built only from what hooks.json spells out. Two
-    DIFFERENT regexes are therefore not compared so much as skipped:
-    `mcp__github__.*` and `mcp__.*` share every `mcp__github__` tool, and this
-    check sees none of them.
+    This is asked only after `overlapping_tools` has already found nothing, so
+    it never decides a pair some vocabulary name settles. It answers the
+    narrower question of whether that empty result is evidence of disjointness
+    or merely the absence of evidence: a regex matcher names no tools
+    literally, so two DIFFERENT regexes contribute nothing to the vocabulary
+    and an empty overlap says nothing about them. `mcp__github__.*` and
+    `mcp__.*` share every `mcp__github__` tool, and this check sees none of
+    them unless some other binding spells one out.
 
     A pair where either matcher names its tools IS decidable, because any
     overlap lies inside that named set and every name in it is in the
@@ -456,10 +464,17 @@ def check_double_bindings(binds):
     Returns (failure count, pairs compared, pairs undecidable). The second
     number is the negative control: a detector that examined nothing reports
     the same zero failures as a clean catalog, and only the count tells them
-    apart. The third keeps that control honest -- a pair of two different
-    regexes cannot be decided from the tool names hooks.json spells out, so
-    counting it as compared would report a skip as a clean comparison. Such a
-    pair is named as a NOTE for a human to settle.
+    apart. The third keeps that control honest -- when both matchers are
+    regexes and no name in the vocabulary fires both, the empty overlap is the
+    absence of evidence rather than evidence of disjointness, so counting it as
+    compared would report a skip as a clean comparison. Such a pair is named as
+    a NOTE for a human to settle.
+
+    The overlap is computed BEFORE that classification, so a pair of two
+    regexes some vocabulary name settles fails rather than printing the NOTE:
+    `Edit.*` and `Note.*` both fire on `NotebookEdit`, and asking the
+    classifier first would have skipped exactly the double binding it was
+    meant to find.
     """
     vocabulary = {name for _, _, matcher in binds
                   for name in matcher_names(matcher)}
@@ -473,7 +488,8 @@ def check_double_bindings(binds):
     for (script, event), matchers in sorted(by_key.items()):
         for i, first in enumerate(matchers):
             for second in matchers[i + 1:]:
-                if undecidable_pair(first, second):
+                shared = overlapping_tools(first, second, vocabulary)
+                if not shared and undecidable_pair(first, second):
                     undecidable += 1
                     print(f"NOTE: {script} is bound to {event} in two matcher "
                           f"groups, {_show(first)} and {_show(second)}, and "
@@ -482,7 +498,6 @@ def check_double_bindings(binds):
                           "hand")
                     continue
                 examined += 1
-                shared = overlapping_tools(first, second, vocabulary)
                 if not shared:
                     continue
                 print(f"FAIL: {script} is bound to {event} in two matcher "

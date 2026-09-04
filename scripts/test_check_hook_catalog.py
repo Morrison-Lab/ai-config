@@ -189,10 +189,11 @@ case("matcher mismatch fails",
 # --- matcher semantics, measured against the harness (ai-config#2535) -----
 # These lock the finding that settles #2535: a plain-name matcher is compared
 # by EXACT STRING EQUALITY, not as an unanchored regex, and an alternation is
-# exact membership rather than dead. Read from Claude Code v2.1.42's own
-# matcher function in `cli.js` and re-run against the extracted function under
-# node, 2026-09-03. If a harness bump changes this, these fail rather than the
-# double-binding check quietly reporting the wrong answer.
+# exact membership rather than dead. Read from the matcher function in the
+# `cli.js` bundled in the `@anthropic-ai/claude-code` npm package (version
+# 2.1.42 per that package's own package.json) and re-run against the extracted
+# function under node, 2026-09-03. If a harness bump changes this, these fail
+# rather than the double-binding check quietly reporting the wrong answer.
 check("a plain-name matcher does not match a longer tool name",
       _catalog.matcher_matches("NotebookEdit", "Edit") is False)
 check("a plain-name matcher matches its own tool",
@@ -276,10 +277,34 @@ case("an undecidable pair is counted apart from the compared ones",
      want_fail=False,
      needle="0 matcher pair(s) compared for a double binding, 1 undecidable")
 
+# The vocabulary settles some regex-regex pairs, so the undecidable
+# classification has to be the FALLBACK rather than the gate: `Edit.*` and
+# `Note.*` both fire on `NotebookEdit`, which a sibling binding spells out.
+# Asking `undecidable_pair` first printed the NOTE and exited 0 over a real
+# double binding -- a skip reported as a clean comparison, the same shape the
+# undecidable count exists to prevent, running in the other direction.
+case("two regexes a vocabulary name settles are a double binding, not a NOTE",
+     [("a.py", "PreToolUse", "Edit.*"), ("a.py", "PreToolUse", "Note.*"),
+      ("b.py", "PreToolUse", "NotebookEdit")],
+     [("a.py", "PreToolUse", "Edit.*, Note.*", "warns"),
+      ("b.py", "PreToolUse", "NotebookEdit", "warns")] + ALLOW_ROWS,
+     want_fail=True, needle="which both fire on NotebookEdit")
+
+case("a settled regex pair counts as compared, not as undecidable",
+     [("a.py", "PreToolUse", "Edit.*"), ("a.py", "PreToolUse", "Note.*"),
+      ("b.py", "PreToolUse", "NotebookEdit")],
+     [("a.py", "PreToolUse", "Edit.*, Note.*", "warns"),
+      ("b.py", "PreToolUse", "NotebookEdit", "warns")] + ALLOW_ROWS,
+     want_fail=True,
+     needle="1 matcher pair(s) compared for a double binding, 0 undecidable")
+
 # The classifier itself, so each arm is pinned rather than inferred from the
 # two fixtures above.
-check("two different regexes are undecidable",
+check("two different regexes name no tool, so nothing settles them alone",
       _catalog.undecidable_pair("mcp__github__.*", "mcp__.*") is True)
+check("but a vocabulary name can still settle two different regexes",
+      _catalog.overlapping_tools("Edit.*", "Note.*", {"NotebookEdit"})
+      == ["NotebookEdit"])
 check("a regex paired with a plain name is decidable",
       _catalog.undecidable_pair("mcp__.*", "Bash") is False)
 check("two identical regexes are decidable",

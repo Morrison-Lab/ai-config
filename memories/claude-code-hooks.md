@@ -250,9 +250,14 @@ Tracked as ai-config#1609.)
 
 ## A hook matcher has three branches, and only the third is a regex
 
-Measured 2026-09-03 by reading Claude Code v2.1.42's own matcher function out of its bundled `cli.js`,
+Measured 2026-09-03 by reading the matcher function out of the `cli.js` bundled in the `@anthropic-ai/claude-code` npm package, version 2.1.42 per that package's own `package.json`,
 and re-running the extracted function under `node` against a table of tool names.
-Re-verify on a harness bump rather than treating this as permanent.
+Re-verify on a harness bump rather than treating this as permanent,
+and read the build actually in use rather than whichever copy of the package happens to be on disk.
+The two differ on one machine: measured 2026-09-04 in a container where `claude --version` reported 2.1.260 from a standalone native binary while the npm package installed beside it was still 2.1.42.
+Extracting the same function from that 2.1.260 binary shows the three branches intact --- it opens `if(!n||n==="*")return!0`, consults the same `^[a-zA-Z0-9_|]+$` fast path, then falls through to `new RegExp(n)` --- and adds two things the reading below does not cover:
+each branch is also tried against alias forms of the tool name, and the fast-path class widens to `^[a-zA-Z0-9_|, -]+$` under a flag whose value that reading did not resolve.
+So treat the three branches as the durable part and the fast-path class as the part to re-measure.
 
 ```js
 if (!q || q === "*") return true;
@@ -294,7 +299,11 @@ That is wasteful for a warn-only hook and is not benign for a blocking one.
 - **Do:** use `"mcp__github__.*"` (JavaScript regex) to match a whole MCP server's tools.
 - **Do:** read an alternation, `"Write|Edit|NotebookEdit"`, as one group that fires rather than one that is silently inert
   (the table above escapes that pipe only because a bare `|` would end a markdown cell).
-- **Do:** run `python3 scripts/check-hook-catalog.py`, which reimplements the three branches and fails a script bound twice for the same event and tool.
+- **Do:** run `python3 scripts/check-hook-catalog.py`, which reimplements the three branches and fails a script bound twice for the same event and tool
+  whenever some tool name `hooks.json` itself spells out fires both matchers;
+  a pair of two regexes no such name settles prints a `NOTE` and does not fail, so a green run does not by itself rule that pair out.
+- **Do:** name the package and version a matcher reading came from, rather than attributing it to "Claude Code vN" and leaving which install it was to inference.
+- **Don't:** read a version off a package directory and report it as the harness version --- run `claude --version` for that one.
 - **Don't:** use `"mcp__github__*"` (shell glob), which is a regex matching `mcp__github` followed by zero or more `_`.
 - **Don't:** expect a plain name to match a longer tool name --- it is compared by equality.
 - **Don't:** bind a comma-joined matcher such as `"Bash, Edit"`;

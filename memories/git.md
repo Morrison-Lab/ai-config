@@ -149,7 +149,7 @@ See [`git-tags.md`](git-tags.md) for tag management (force-moving/sliding tags a
 - Flagged on ai-config#186: the first draft of the harness-override instruction included
   `git branch -r` as the fallback; reviewer (claude-review bot) caught it.
 
-## Classify a bare `#NNNN` as issue or PR with `git ls-remote refs/pull/NNNN/head`
+## Classify a bare `#NNNN` as issue or PR with `git ls-remote origin refs/pull/NNNN/head`
 
 Linking a bare `#NNNN` needs the right path segment,
 and the clone can decide it without `gh` and without an API token:
@@ -224,7 +224,7 @@ the classification was derived while linking that PR's bare references.)
 
 ## Git branch create/reset (`git switch -C`)
 - `git switch -C "$BRANCH"` is already safe against flag-shaped branch names: `$BRANCH` is the argument *to* `-C`, so a value like `--weird` fails cleanly as `fatal: '--weird' is not a valid branch name` rather than being parsed as an option.
-- Do NOT "harden" it to `git switch -C -- "$BRANCH"` — that form is **broken**:
+- Do NOT "harden" it to `git switch -C -- "$BRANCH"` --- that form is **broken**:
   the `--` is consumed as the branch name (the required argument to `-C`), so `$BRANCH` is parsed as the start-point instead and the command fails without creating the branch.
   (Verified on git 2.x;
 a review bot suggested the broken form on Morrison-Lab/gha#58.)

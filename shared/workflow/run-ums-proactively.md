@@ -217,23 +217,21 @@ then the worked example that questioning triggers UMS if the claim was wrong.
 Tracked as [ai-config#2261](https://github.com/Morrison-Lab/ai-config/issues/2261).)
 
 **Every pause is a UMS trigger, whatever the session is waiting for.**
-Every trigger above names something that *happened*: a verdict landed, a PR merged, a claim turned out to be false, a review arrived.
-A pause names nothing that happened, so no event-shaped rule fires on it, and the pass is not so much skipped as never raised.
-Pushing a branch and arming a timer for CI, waiting out a review round, and posing a question and stopping for the answer all end a turn with the session's learnings held only in conversation state.
+Most triggers above name something that *happened* --- a verdict landed, a PR merged, a claim turned out false, a review arrived --- and the one that does not, recommending that the session end, names the most final pause there is rather than an ordinary mid-session wait.
+So read the pause as the general rule, that section as its terminal case, and the event triggers as the ones that fire even when no pause follows.
 
-The wait is where that state is most exposed.
-Its length is not knowable when it begins --- a review round can take minutes or days --- and it is the likeliest point for compaction, a `/clear`, an interruption, or a session nobody resumes.
-So read the pause as the general rule, and the triggers above as the cases where the pass is owed even though no pause is coming.
+A pause leaves the session's learnings held only in conversation state, and that is where they are most exposed, because a wait's length is not knowable when it begins --- a review round can take minutes or days --- and it is the likeliest point for compaction, a `/clear`, or a session nobody resumes.
 [`flag-session-boundaries`](flag-session-boundaries.md)'s "Arm resumption before every non-clean pause" section already obliges a wake mechanism at that same moment;
 this obliges the pass alongside it.
 
-The near-miss is the wait that looks too short to be a boundary, or that is waiting on the very trigger a rule above names --- a CI run whose verdict will itself be a checkpoint.
-Deferring the pass to the moment the wait ends is the announced-and-never-run failure with a due date attached, since the resumption may land in a different session or never come at all.
+The pass is owed once per wait rather than once per timer: `CLAUDE.md`'s "Monitor every pushed PR head to completion" re-arms a poll every couple of minutes, so run it at the loop's first pause and again only once new learnings accumulate.
+The near-miss runs the other way --- a first wait that looks too short to count, or one waiting on the very trigger a rule above names, such as a CI run whose verdict will itself be a checkpoint.
+Deferring the pass to when the wait ends is the announced-and-never-run failure with a due date attached, since the resumption may land in a different session or never come.
 
 - **Do:** run the pass before ending a turn to wait on CI, a review, or an answer from the user.
-- **Do:** shrink the pass to the learnings that would not survive the gap, when the wait looks short.
-- **Don't:** defer the pass to the moment the wait ends, on the reading that the resumption will carry it.
-- **Don't:** treat a routine-looking wait as too small to be a boundary --- its length is not knowable when it begins.
+- **Do:** owe it once per wait, at a monitoring loop's first pause rather than at every re-arm of its timer.
+- **Don't:** defer the pass to when the wait ends, on the reading that the resumption will carry it.
+- **Don't:** treat a routine-looking first wait as too small to be a boundary.
 
 (Directive from the user, filed 2026-09-01 as [ai-config#2905](https://github.com/Morrison-Lab/ai-config/issues/2905):
 "if you're about to pause and wait for external triggers (CI, reviews, user input), always run ums first".)

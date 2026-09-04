@@ -561,9 +561,37 @@ _spec = importlib.util.spec_from_file_location("_guard", HOOK)
 _guard = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_guard)
 
+
+def halfway_bound(step):
+    """Growth halfway, in log terms, between linear and quadratic at `step`.
+
+    A linear scan grows `step`x and a quadratic one `step ** 2`x, so their
+    geometric mean is `step ** 1.5`. Deriving it rather than writing a number
+    keeps the bound meaningful at whatever size step it is read against: a
+    figure fixed for one step separates the two shapes at no other.
+    """
+    return step ** 1.5
+
+
+def report_separation(label, bound, step):
+    """Assert a growth bound sits strictly between the two shapes it separates.
+
+    A timing control can only exercise the bound it is itself read against, so
+    a second bound in this file has nothing checking it. This costs no clock
+    at all and fails on any hand-edited flat figure that has stopped
+    separating linear from quadratic -- which is exactly how widening a size
+    step without recomputing the bound goes wrong.
+    """
+    ok = step < bound < step ** 2
+    print(f"  {'allow' if ok else 'WRONG':<6} "
+          f"{label}: bound {bound:g}x sits {'' if ok else 'NOT '}between "
+          f"linear ~{step}x and quadratic ~{step ** 2}x")
+    return ok
+
+
 SCAN_SMALL = 300            # repetitions in the baseline input
 SCAN_STEP = 4               # the large input is this multiple of the small one
-SCAN_GROWTH_BOUND = 8.0     # sqrt(4 * 16): halfway between linear and quadratic
+SCAN_GROWTH_BOUND = halfway_bound(SCAN_STEP)   # 8.0 = sqrt(4 * 16)
 SCAN_BASELINE_REPS = 3
 SCAN_TARGET_REPS = 2
 
@@ -577,8 +605,13 @@ SCAN_FLOOR_SECONDS = 0.001
 # A liveness ceiling, deliberately absurd rather than a runtime budget: the
 # ratio is blind to a constant-factor blowup, and this hook runs before EVERY
 # Bash call, so a scan burning half a minute of CPU is broken whatever its
-# shape. The slowest reading ever reported was 2.1s, on an input five times
-# larger than the one measured here, so this ceiling cannot flake.
+# shape. Every timed case is read against it, `report_growth` and
+# `report_control` alike. The slowest of them is the negative control's
+# quadratic scan over 96000 characters, 1.45-1.54s of CPU over three runs on
+# a 4-core Linux container at load average ~3.5, against 315ms for the
+# slowest scanner case there, so the ceiling leaves about 20x of headroom.
+# Load eats into that, so read a breach as a claim about the machine before
+# one about the scanner.
 SCAN_ABSURD_SECONDS = 30.0
 
 
@@ -600,10 +633,12 @@ def fastest_scan(scan, text, reps):
     return best
 
 
-def growth_of(build_input, small=SCAN_SMALL, scan=_guard.offending):
+def growth_of(
+    build_input, small=SCAN_SMALL, scan=_guard.offending, step=SCAN_STEP
+):
     """Growth factor, large-input seconds, and the baseline it divided by."""
     base = fastest_scan(scan, build_input(small), SCAN_BASELINE_REPS)
-    large = fastest_scan(scan, build_input(small * SCAN_STEP), SCAN_TARGET_REPS)
+    large = fastest_scan(scan, build_input(small * step), SCAN_TARGET_REPS)
     if base < SCAN_FLOOR_SECONDS:
         return float("nan"), large, base
     return large / base, large, base
@@ -633,24 +668,80 @@ def quoted_spans(n):
     return " ".join(f'echo "field {i}"' for i in range(n))
 
 
+check(report_separation("scanner bound", SCAN_GROWTH_BOUND, SCAN_STEP))
 check(report_growth("chained substitutions", chained_substitutions))
 check(report_growth("quoted spans", quoted_spans))
 
 
 # Negative control. A ratio test that never fires is indistinguishable from a
 # scanner that is fine, so prove the bound still catches what it exists for:
-# a deliberately quadratic scan, measured through the same helper at the same
-# size step, has to land ABOVE the bound. Without this the two assertions
-# above would keep passing if `fastest_scan` or the bound were ever broken.
+# a deliberately quadratic scan, measured through the same helper against the
+# halfway bound its own size step earns, has to land ABOVE it, and a linear
+# scan measured the same way has to land BELOW it. Without this pair the two
+# assertions above would keep passing if `fastest_scan` were ever broken.
+#
+# The pair is read against SCAN_CONTROL_BOUND, so it exercises that bound and
+# no other -- in particular not SCAN_GROWTH_BOUND, which is the bound those
+# two assertions are themselves read against. `report_separation` covers both,
+# and covers them without a clock.
 #
 # The control needs a much longer input than the scanners above, for two
 # reasons that push the same way. Python's own per-iteration overhead is
 # linear, and below a few thousand characters it is large enough to mask the
 # quadratic term and understate the growth. And the baseline has to clear
 # SCAN_FLOOR_SECONDS with room to spare, or the control disqualifies itself.
-# At this size the baseline costs ~6ms, six times the floor, and the measured
-# growth is 15.1-15.7x against a theoretical 16x.
+# At this size the baseline costs ~6ms, six times the floor.
 SCAN_CONTROL_SMALL = 6000
+
+# The control takes a WIDER size step than the scanners above, and the reason
+# is load rather than taste. The ratio is large / small, so anything that
+# inflates the SMALL reading more than the large one compresses it, and a
+# quadratic scan then reads as sub-quadratic: the control reports that it
+# cannot discriminate, which is a false negative about the instrument rather
+# than a finding about any scanner. Measured at a step of 4: 14.5-15.3x over
+# five runs on an idle container, against 7.3x on a loaded GitHub runner
+# (#3098) -- a 2.1x compression, against a margin over the bound of only 1.9x.
+#
+# What a wider step buys is margin, because the quadratic term outruns the
+# halfway bound: at step s the reading is s ** 2 and the bound is s ** 1.5, so
+# the margin is sqrt(s). Measured here, 3.6-3.7x at step 16 against 1.9x at
+# step 4, which clears the 2.1x compression the runner produced.
+#
+# The bound has to be recomputed at the control's own step for that to hold,
+# and this is the trap in widening the gap alone: 8.0 is the halfway line for
+# a 4x step and is EXACTLY the 8x a linear scan grows at an 8x step, so
+# widening that far leaves it no margin against the shape it exists to reject.
+# Measured at step 8, a linear scan grew 7.55-8.09x across twelve runs on one
+# container and 7.83-8.11x on another, crossing 8.0 in 1 run of 12 and in 3 of
+# 12. At the step of 16 this control actually runs at, a linear scan grew
+# 15.7-16.0x and cleared 8.0 in all six runs, so a flat 8.0 read against this
+# step would pass for either shape. The positive control below
+# (`linear_scan`, checked through `report_control(..., expect_above=False)`)
+# asserts the separation rather than arguing it.
+#
+# Subtracting a measured fixed cost was the other repair on offer. It was not
+# chosen, and not because measurement ruled it out: what can be measured off
+# the runner is the INTERPRETER's fixed cost -- 0.62ms of the 6.2ms baseline for
+# the loop plus one zero-length `count` call, which is the shape #3098
+# proposed subtracting -- while the LOAD-induced fixed cost the repair targets
+# cannot be measured from here at all. So the distortion's shape stays a
+# hypothesis, and the wider step is chosen for surviving either shape rather
+# than for ruling one out.
+SCAN_CONTROL_STEP = 16
+SCAN_CONTROL_BOUND = halfway_bound(SCAN_CONTROL_STEP)   # 64.0 = sqrt(16 * 256)
+
+# Passes chosen so the linear control's baseline costs ~8ms, well clear of
+# SCAN_FLOOR_SECONDS: one pass over 6000 characters is far too fast to time.
+#
+# The positive control is exposed to the OPPOSITE distortion from the negative
+# one, and its margin is worth stating because this file's timing assertions
+# have now flaked six times. Load INFLATING a ratio is the direction
+# shared/workflow/algorithmatize-checks.md already records, at 8.45x for an
+# unchanged linear scanner against a bound of 8.0 -- a ~2.0x inflation, though
+# of a wall-clock reading where this control uses `process_time`. Measured
+# here the positive control reads 15.2-15.4x against the 64x bound, so it
+# tolerates ~4.2x inflation, about twice the worst ever recorded.
+SCAN_LINEAR_CONTROL_PASSES = 4000
 
 
 def quadratic_scan(text):
@@ -659,20 +750,60 @@ def quadratic_scan(text):
         text.count("q", i)
 
 
-_control_growth, _, _control_base = growth_of(
-    lambda n: "x" * n, small=SCAN_CONTROL_SMALL, scan=quadratic_scan)
-if _control_base < SCAN_FLOOR_SECONDS:
-    _control_ok = False
-    check(_control_ok)
-    print(f"  WRONG  negative control: baseline of {_control_base * 1000:.1f}ms "
-          f"is below the {SCAN_FLOOR_SECONDS * 1000:.0f}ms floor, so this "
-          f"platform's CPU clock cannot measure the growth")
-else:
-    _control_ok = _control_growth > SCAN_GROWTH_BOUND
-    check(_control_ok)
-    print(f"  {'allow' if _control_ok else 'WRONG':<6} "
-          f"negative control: a quadratic scan grew {_control_growth:.1f}x, "
-          f"past the {SCAN_GROWTH_BOUND:g}x bound")
+def linear_scan(text):
+    """Deliberately O(n): a fixed number of whole-text passes, no rescans."""
+    for _ in range(SCAN_LINEAR_CONTROL_PASSES):
+        text.count("q")
+
+
+def report_control(label, scan, expect_above):
+    """Assert a known-shape scan lands the right side of the control bound.
+
+    Reports the ratio and its margin whichever way the comparison goes: a
+    bound whose margin is only printed on failure fails suddenly, where one
+    whose margin is printed on every run drifts visibly first (#3098).
+
+    The liveness ceiling gates this case too. The negative control is the
+    slowest scan the file runs, and `fastest_scan` bails out of a breach with
+    a truncated minimum whose ratio still lands on the expected side, so an
+    ungated control would print `allow` over a machine that had blown the
+    ceiling -- a silent failure where the ceiling exists to be loud.
+    """
+    growth, large, base = growth_of(
+        lambda n: "x" * n, small=SCAN_CONTROL_SMALL, scan=scan,
+        step=SCAN_CONTROL_STEP)
+    if base < SCAN_FLOOR_SECONDS:
+        print(f"  WRONG  {label}: baseline of {base * 1000:.1f}ms is below "
+              f"the {SCAN_FLOOR_SECONDS * 1000:.0f}ms floor, so this "
+              f"platform's CPU clock cannot measure the growth")
+        return False
+    if expect_above:
+        separated = growth > SCAN_CONTROL_BOUND
+    else:
+        separated = growth < SCAN_CONTROL_BOUND
+    live = large <= SCAN_ABSURD_SECONDS
+    ok = separated and live
+    side = "above" if expect_above else "below"
+    margin = (growth / SCAN_CONTROL_BOUND if expect_above
+              else SCAN_CONTROL_BOUND / growth)
+    ceiling = "" if live else f", OVER the {SCAN_ABSURD_SECONDS:g}s ceiling"
+    print(f"  {'allow' if ok else 'WRONG':<6} "
+          f"{label} {SCAN_CONTROL_SMALL} -> "
+          f"{SCAN_CONTROL_SMALL * SCAN_CONTROL_STEP} grew {growth:.1f}x, "
+          f"{'' if separated else 'NOT '}{side} the "
+          f"{SCAN_CONTROL_BOUND:g}x bound "
+          f"(linear ~{SCAN_CONTROL_STEP}x, "
+          f"quadratic ~{SCAN_CONTROL_STEP ** 2}x, margin {margin:.1f}x, "
+          f"{large * 1000:.0f}ms CPU{ceiling})")
+    return ok
+
+
+check(report_separation("control bound", SCAN_CONTROL_BOUND,
+                        SCAN_CONTROL_STEP))
+check(report_control("negative control: a quadratic scan",
+                     quadratic_scan, expect_above=True))
+check(report_control("positive control: a linear scan",
+                     linear_scan, expect_above=False))
 
 # The executor scan reads a DIFFERENT string from the one being masked, and the
 # two are interchangeable only because both are length-preserving. A caller that

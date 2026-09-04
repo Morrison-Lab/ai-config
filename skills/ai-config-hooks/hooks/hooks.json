@@ -327,6 +327,13 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/warn-unlabelled-agent-issue.py\"'",
+            "timeout": 10,
+            "script": "warn-unlabelled-agent-issue.py",
+            "why": "shared/workflow/issue-first.md, 'Label an agent-filed issue with its authorship and its model'. disclose-agent-authorship.md scopes its marker line to comment BODIES and excludes an issue body, so an agent-filed issue is the one artifact that discloses nothing -- it goes out under the account holder's login as type: User. The labels close that, and the rule is consulted at read time while the omission happens at composition time. WARNS, never blocks: an unlabelled issue is fixed by one `gh issue edit --add-label` while a blocked create loses the act that makes work visible (report-mistakes-proactively.md, 'filing is not gated on approval'), the rule is scoped to repos we administrate and this hook cannot tell which repo is ours (sup files upstream with neither label), and a repo whose labels cannot be created still gets the issue. Anchored on a command position with heredoc bodies stripped, for the reason warn-pr-create-without-dupe-check.py records: this corpus quotes `gh issue create` constantly. Fails open. Tracked as #3111."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/flag-stale-adjacent-comment.py\"'",
             "timeout": 15,
             "script": "flag-stale-adjacent-comment.py",
@@ -650,6 +657,13 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/warn-unlabelled-agent-issue.py\"'",
+            "timeout": 10,
+            "script": "warn-unlabelled-agent-issue.py",
+            "why": "shared/workflow/issue-first.md, 'Label an agent-filed issue with its authorship and its model'. disclose-agent-authorship.md scopes its marker line to comment BODIES and excludes an issue body, so an agent-filed issue is the one artifact that discloses nothing -- it goes out under the account holder's login as type: User. The labels close that, and the rule is consulted at read time while the omission happens at composition time. WARNS, never blocks: an unlabelled issue is fixed by one `gh issue edit --add-label` while a blocked create loses the act that makes work visible (report-mistakes-proactively.md, 'filing is not gated on approval'), the rule is scoped to repos we administrate and this hook cannot tell which repo is ours (sup files upstream with neither label), and a repo whose labels cannot be created still gets the issue. Anchored on a command position with heredoc bodies stripped, for the reason warn-pr-create-without-dupe-check.py records: this corpus quotes `gh issue create` constantly. Fails open. Tracked as #3111."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/require-agent-disclosure.py\"'",
             "timeout": 10,
             "script": "require-agent-disclosure.py",
@@ -804,6 +818,18 @@
             "_note_see_bash_entry": "Design notes live on this hook's Bash entry, per this file's precedent (require-agent-disclosure.py, warn-stale-issue-edit.py). Repeating them per matcher guarantees sibling divergence on the next correction."
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-underived-required-check.py\"'",
+            "timeout": 10,
+            "script": "no-underived-required-check.py",
+            "why": "Warns when a `gh api` command sets required status checks on a repository or organization ruleset, or on classic branch protection. A context string is matched against a check-run name exactly, so one no workflow emits sits as `Expected` forever and blocks every merge, silently. Detects lexical shapes only -- a write assembled across variables, or reached through a wrapper it does not know, is silent -- so its silence is never evidence that contexts were derived. Carries no discharge condition by design: every candidate was satisfiable by a pull request's own run, or by typing the string."
+          }
+        ]
       }
     ],
     "Stop": [
@@ -913,6 +939,13 @@
             "timeout": 10,
             "script": "require-stopping-point.py",
             "why": "A stopping-point declaration is an explicit standing preference, not a best-effort recap; blocks an otherwise final reply that omits it."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/flag-config-deletion-without-ref-check.py\"'",
+            "timeout": 10,
+            "script": "flag-config-deletion-without-ref-check.py",
+            "why": "ai-config#3096 -- a reply recommended `find \"$HOME/.claude/hooks\" -name '*.py' -delete` over what was the LIVE guard set (settings.json registered 46 of those files by explicit path). A content diff had been run, so the removal felt sanctioned; the question never asked was what POINTS AT the files. Warns rather than blocks: the condition cannot tell an orphan from a registered file without reading the config, and the point is to prompt that read."
           }
         ]
       }

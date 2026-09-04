@@ -1,11 +1,18 @@
 #!/usr/bin/env python3
-"""Tests for `scripts/sync-nlb-checker.py`'s `_fetch`, offline.
+"""Tests for `scripts/sync-nlb-checker.py`'s `_fetch` and CLI, offline.
 
-Both routes are stubbed: `subprocess.run` stands in for `gh`, and
+Both fetch routes are stubbed: `subprocess.run` stands in for `gh`, and
 `urllib.request.urlopen` for raw HTTPS. The case that matters most is the
 one ai-config#2338 was filed for: a machine with no `gh` on PATH, where
 `subprocess.run` raises `FileNotFoundError` instead of returning a non-zero
 exit, and the HTTPS route must still run.
+
+The CLI checks cover ai-config#3095: `--help` used to run the sync, so it
+must now print usage and exit 0 with `_fetch` never reached, and an unknown
+argument must exit 2 rather than being ignored. They run twice: in-process
+against `main(argv)`, and as a subprocess against the real entry point, which
+is the one the issue was reported against and the only one that exercises the
+`argv=None` default and the `if __name__ == "__main__"` wiring.
 
 Run:  python3 scripts/test_sync_nlb_checker.py
 """
@@ -107,7 +114,97 @@ for label, run, needle in (
             check(f"{label} + HTTPS down names the gh reason",
                   needle in message and "connection refused" in message)
 
+# ai-config#3095: `--help` ran the sync, fetching over the network and
+# rewriting two tracked files. It must print usage and exit 0 instead, and
+# `_fetch` must never be reached -- so stub it to fail loudly if it is.
+saved_fetch = subject._fetch
+
+
+class _Reached(Exception):
+    """Raised by the stub, so a check can tell whether `_fetch` ran."""
+
+
+def fetch_stub(sha):
+    raise _Reached(sha)
+
+
+subject._fetch = fetch_stub
+try:
+    for flag in ("--help", "-h"):
+        out = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(out):
+                subject.main([flag])
+            check(f"{flag} exits", False)
+        except _Reached:
+            check(f"{flag} exits before fetching", False)
+        except SystemExit as exc:
+            check(f"{flag} exits 0", exc.code == 0)
+        check(f"{flag} prints the module docstring",
+              "Refresh the vendored" in out.getvalue()
+              and "Do not hand-edit" in out.getvalue())
+
+    err = io.StringIO()
+    try:
+        with contextlib.redirect_stderr(err):
+            subject.main(["--bogus"])
+        check("an unknown argument exits", False)
+    except _Reached:
+        check("an unknown argument exits before fetching", False)
+    except SystemExit as exc:
+        check("an unknown argument exits 2", exc.code == 2)
+
+    # The no-argument invocation parses to no options and is still the sync,
+    # so it must reach `_fetch` rather than stopping at the parser.
+    check("no arguments parse to an empty namespace",
+          vars(subject._parse_args([])) == {})
+    try:
+        subject.main([])
+        check("no arguments reach the fetch", False)
+    except _Reached:
+        check("no arguments reach the fetch", True)
+finally:
+    subject._fetch = saved_fetch
+
+# The checks above drive `main(argv)` in-process, which cannot see the
+# `argv=None` default or the `if __name__ == "__main__"` line that forwards
+# the process command line into it -- and that entry point is the one #3095
+# was reported against. Exercise it for real. Neither run touches the
+# network, because the parse now precedes the fetch.
+# `before == after` passes vacuously when the vendored files are absent --
+# both readings are `None` and the check reports ok having observed nothing,
+# which is also the state a delete-then-rewrite regression leaves behind. Pin
+# the precondition, and compare content as well as mtime.
+VENDORED = [subject.nlb_gate.VENDOR_PY, subject.nlb_gate.VENDOR_PIN]
+check("the vendored files exist, so the no-write check has teeth",
+      all(path.exists() for path in VENDORED))
+
+
+def vendored_state():
+    """Content and mtime of each vendored file, or None where one is missing."""
+    return [(path.read_bytes(), path.stat().st_mtime_ns) if path.exists() else None
+            for path in VENDORED]
+
+
+before = vendored_state()
+
+help_run = subprocess.run([sys.executable, str(SCRIPT), "--help"],
+                          capture_output=True, text=True)
+check("the real CLI exits 0 on --help", help_run.returncode == 0)
+check("the real CLI prints the module docstring on --help",
+      "Refresh the vendored" in help_run.stdout
+      and "Do not hand-edit" in help_run.stdout)
+
+bogus_run = subprocess.run([sys.executable, str(SCRIPT), "--bogus"],
+                           capture_output=True, text=True)
+check("the real CLI exits 2 on an unknown argument", bogus_run.returncode == 2)
+
+after = vendored_state()
+check("the real CLI leaves the vendored files byte-identical and untouched",
+      None not in before and before == after)
+
 if failures:
     sys.exit(f"{failures} check(s) failed")
-print("PASS: _fetch falls through to HTTPS when gh is missing or failing, and "
-      "names both routes when both fail")
+print("PASS: _fetch falls through to HTTPS when gh is missing or failing, "
+      "names both routes when both fail, and the CLI -- in-process and as the "
+      "real entry point -- prints usage for --help/-h without fetching")

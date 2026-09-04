@@ -593,12 +593,25 @@ gh api repos/<owner>/<repo>/issues/<N>/comments --paginate \
 
 `memories/gh-cli.md` carries the full statement, including the placeholder-wording trap when polling a run still in flight.
 
-**Also check formal GitHub reviews, not just issue-style comments — a human's `CHANGES_REQUESTED` can be invisible to a comments-only scan.** A review submitted via GitHub's review UI (as opposed to a plain PR comment) shows up in `gh pr view N --json reviews`, and its top-level `body` is frequently **empty** — the actual finding lives entirely in a per-line inline comment, which only appears via `gh api repos/<owner>/<repo>/pulls/N/comments` (a different endpoint from issue comments). Checking `--json comments` alone can miss the review's existence entirely. Before declaring a PR ready, also run:
+**Also check formal GitHub reviews, not just issue-style comments --- a review's findings can sit where a comments-only scan never looks, whoever posted it and whatever state it carries.**
+A review submitted via GitHub's review UI (as opposed to a plain PR comment) shows up in `gh pr view N --json reviews`, and its top-level `body` is frequently **empty** --- the actual finding lives entirely in a per-line inline comment, which only appears via `gh api repos/<owner>/<repo>/pulls/N/comments` (a different endpoint from issue comments).
+The mirror case is a finding in the top-level `body` itself, plainly or inside a collapsed `<details>` suppression block: neither shape produces a comment object, so `pulls/N/comments` and a thread query both return nothing over it.
+[`fully-clean`](shared/workflow/fully-clean.md) carries the matcher for the collapsed block, and what fails that bar is the finding rather than the state.
+So a bot's `COMMENTED` review carrying a finding fails that bar exactly as a human's `CHANGES_REQUESTED` does.
+Checking `--json comments` alone can miss the review's existence entirely.
+Before declaring a PR ready, also run:
 ```
+gh pr view N --json reviews --jq '.reviews[] | [.state, .author.login, .submittedAt, ((.body // "") | split("\n") | map(select(length > 0)) | .[0] // "(empty body)")] | @tsv'
 gh pr view N --json reviews --jq '.reviews[] | select(.state == "CHANGES_REQUESTED") | "\(.author.login) \(.submittedAt)"'
 gh api repos/<owner>/<repo>/pulls/N/comments --jq '.[] | "\(.path):\(.line // .original_line // "?") \(.user.login) \(.body)"'
 ```
 A `CHANGES_REQUESTED` state is blocking regardless of whether an automated re-review later says "Ready for merge" — that bot verdict doesn't clear a human's own review state, which only the human (or an explicit dismissal) can resolve.
+The unfiltered listing comes first: the state filter answers only whether a review *state* blocks the merge button, which the forge lets `CHANGES_REQUESTED` alone do.
+
+- **Do:** read every formal review's state and body, whoever posted it, and treat a finding in a review body --- a collapsed suppression block included --- as blocking.
+- **Don't:** pass over a review because its author is a bot or its state is `COMMENTED`, nor read that state as blocking on its own.
+
+See [`CLAUDE.cases.md`](CLAUDE.cases.md), "A bot's `COMMENTED` review is the same blind spot".
 
 (A specific case of the standing **never assume; always verify** rule in `memories/preferences.md` — confirm the verdict with a fresh query, don't recall it.)
 
@@ -745,6 +758,16 @@ The companion to issue-first above: that rule settles *whether* something is tra
 Actionable work is an issue.
 An open-ended policy question whose deliverable is a decision, and which has a real do-nothing option, is a discussion --- in an answerable category (`Q&A`) so the resolution can be marked as the answer.
 Its second half is the general principle: best practice outranks repo precedent when choosing venue or method, and "the board is unused, so nobody would find it there" is circular reasoning that can never permit anyone to start using it.
+
+## Triage the backlog weekly; closing as not-planned is licensed
+
+[shared/workflow/triage-backlog.md](shared/workflow/triage-backlog.md)
+
+The counterweight to the filing rules around it.
+Every open issue ends the weekly pass carrying one of `P1`, `P2`, `P3`, or closed, and a bare aphorism, a filing-mechanism test, or a duplicate may be closed as not-planned on the pass's own judgment.
+A new symptom of a tracked defect family is a comment on that family's issue, not a new issue.
+`scripts/triage-backlog.py` is the instrument and the `triage` skill runs it.
+(Measured 2026-09-03: 15 to 410 open issues in six weeks with 14 not-planned closes in the repo's history, ai-config#3134.)
 
 ## If you see something, say something — file an issue for every noticed mistake
 
@@ -1560,9 +1583,15 @@ math, apply this in addition to the fact-check above.
 
 Applies wherever `code-review`/`ard`/`ardi` already reviews a prose diff, alongside the fact-check and ambiguous-terminology checks above.
 
+`python3 scripts/check-bare-fragment-mentions.py` is the instrument for this corpus's own version of the miss: a fragment linked once and then named as plain prose further down the same file.
+Advisory, always exits 0, and wired into `validate.yml` as a non-gating step.
+
+- **Do:** run it over a prose diff that names a fragment more than once.
+- **Don't:** link a fragment on its first mention and then repeat the basename bare further down.
+
 ## Remove forward-pointing phrases from prose, not just crossref divs
 
-The section above covers formal Quarto crossref-div ordering for term/result definitions specifically.
+The section above covers this repo's own linked-once-then-bare miss, and formal Quarto crossref-div ordering for term/result definitions.
 The same problem shows up more broadly as plain-text signposting — "as discussed below", "in the following section", "we'll cover this later" — pointing at content the reader hasn't reached yet, in any prose (not just documents with crossref divs).
 
 [shared/writing/forward-references.md](shared/writing/forward-references.md)

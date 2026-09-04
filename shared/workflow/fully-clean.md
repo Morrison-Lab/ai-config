@@ -65,6 +65,36 @@ for the formal review itself, and two of those threads being resolved read as
 the review question settled.
 The defect reached `main` and needed a follow-up PR.)
 
+**The rollup trap above has an earlier form:
+naming a cause the signal never confirmed, and reporting that to a human.**
+The trap above needs a real, checked cause before it closes.
+This one needs none.
+[`metacognitive-monitoring`](metacognitive-monitoring.md)'s "Read the artifact that failed, not the one beside it" and "A story that fits the evidence is not a finding" own the mechanism and the remedy:
+proximity is not evidence,
+and a cause no experiment discriminates is reported as not established rather than as the likeliest candidate.
+One thing here is local to a rollup.
+`mergeable_state: blocked` reports that at least one input is non-passing and never which,
+so every input you can see is equally available as an explanation,
+and the field can neither confirm nor refute whichever one you pick.
+
+The other is who acts on it.
+`blocked` prompts a re-check, which costs a query.
+`blocked waiting for your approval` sends a person to approve something that needed no approval,
+and they cannot tell from the message that the cause was inferred rather than derived.
+
+- **Do:** name the field a reported cause came from --- `statusCheckRollup`, `reviewDecision`, the branch-protection endpoint --- none of which is `mergeable_state`.
+- **Don't:** put an underived cause in a sentence someone else will act on;
+  `blocked, cause not yet derived` costs them a query, where a wrong cause costs them an action.
+
+(Measured 2026-09-03 on ai-config#3115:
+a fresh reading of the PR's `mergeable_state` field returned `blocked` while every review sat at `COMMENTED` rather than `APPROVED`,
+and that was reported to the user as branch protection holding the PR for a human approving review.
+Nothing in the field said so.
+Re-queried about an hour later, with no push and no approval between,
+it returned `clean` and the PR merged on the standing grant.
+Which input was non-passing at the first reading was never derived.
+The record establishes only that nothing in the field confirmed the reported cause, which is all the argument needs.)
+
 **In a remote/web session the instrument still runs, and hand-checking the
 axes in its place is not acceptable** (user directive, 2026-08-29,
 ai-config#2441).
@@ -668,8 +698,46 @@ and the verdict's own conclusion every round.**
   and create zero inline comments
   while placing substantive findings inside a collapsed
   `<details>` suppression block in the review body.
-  Match case-insensitively on `suppressed` **inside the `<summary>`
-  heading**, not anywhere in the body.
+  Match case-insensitively on `suppressed` **in a `<summary>` element, or
+  in an ATX heading inside a collapsed `<details>` region** --- not
+  anywhere in the body, which flags ordinary overview prose.
+  Measured 2026-09-03 on ai-config#3084 review `5098574802`, the block
+  arrives as `### Suppressed comments (1)` under
+  `<summary>Review details</summary>`, which a `<summary>`-only match
+  returns zero against, while that same body wraps its `Pull request
+  overview` and `File summaries` prose in collapsed `<details>` regions of
+  their own --- so a collapsed region is no longer a proxy for "not
+  ordinary overview prose".
+  That is a reason to prefer the heading anchor, not to forbid the wider
+  match.
+  The comparison was measured on 2026-09-04 by enumerating Copilot review
+  bodies from the `reviews` endpoint, rather than by grepping this corpus's
+  own prose for `suppressed`: 137 bodies across 39 PRs, drawn from
+  ai-config PRs 1000 through 1100 and 3060 through 3130, plus
+  ai-config#660, ai-config#2913 and ai-config#2976.
+  Region-wide has exactly one measured false positive in that set, and
+  body-wide has two.
+  The two wider forms are nested rather than parallel: an occurrence inside
+  a `<details>` region is by definition an occurrence in the body, so every
+  body region-wide flags is also a body-wide hit.
+  Body-wide hit 80 bodies, region-wide 79, and the heading anchor 78.
+  Body-wide alone flags ai-config#1038 review `4837572117`, whose
+  uncollapsed overview sentence reads "Aligns ARDI-family guidance on
+  deadlocks, sweep scheduling, and suppressed Copilot findings" while its
+  body carries no suppression block.
+  Both wider forms flag ai-config#1036 review `4837539268`, whose collapsed
+  `Show a summary per file` table reads "Detects suppressed Copilot
+  findings." and whose body likewise carries no suppression block --- the
+  settling counter-example an earlier version of this passage asserted the
+  measured set did not contain.
+  The heading anchor excludes both controls, a `<summary>`-only match
+  returns zero against 50 of those 78, and the only body the region-wide
+  form flagged and the heading anchor did not is `4837539268`.
+  So region-scoping buys no measured coverage and costs one false positive
+  in 137.
+  Keep it as a fallback on the cost asymmetry alone --- a false zero merges
+  over real findings, while a false positive costs one re-read --- and not
+  on any claim that it has never fired wrongly.
   See [`fully-clean.cases.md`](fully-clean.cases.md),
   "The collapsed-block case (Morrison-Lab/ai-config#1029)".
 - **"No verdict" is its own state, distinct from "a verdict with no
@@ -699,6 +767,10 @@ and the verdict's own conclusion every round.**
 - **Do:** read all review surfaces before calling a PR clean,
   every round,
   including collapsed suppressed-comments blocks.
+- **Do:** run the region-wide match as a fallback behind the heading
+  anchor, and re-read the region on a hit only the fallback finds ---
+  its one measured shape is a collapsed per-file summary table carrying
+  no block at all.
 - **Do:** distinguish "no findings" from "no verdict" explicitly, and treat
   the latter as unreviewed.
 - **Don't:** report clean on a zero thread count, however many checks are
@@ -706,9 +778,14 @@ and the verdict's own conclusion every round.**
 - **Don't:** treat an empty review body as an all-clear without checking the
   inline comments.
 - **Don't:** treat a "generated no new comments" overview as an all-clear
-  until every `<summary>` heading has been checked case-insensitively for
-  `suppressed` --- not until the whole body has, which flags ordinary
-  overview prose that merely mentions suppressed findings.
+  until every `<summary>` element and every ATX heading inside a collapsed
+  `<details>` region has been checked case-insensitively for `suppressed`
+  --- not until the whole body has, which flags ordinary overview prose
+  that merely mentions suppressed findings, and not `<summary>` alone,
+  which misses a block nested one heading deeper.
+- **Don't:** rule the region-wide match out on the strength of that
+  proxy's failure --- one false positive in 137 measured bodies makes it
+  the weaker anchor, not a wrong one.
 - **Don't:** read a reviewer's silence as a verdict --- a job that posted
   nothing leaves the same zero counts as a job that found nothing.
 - **Don't:** act on a review wake's own payload --- it is one comment out of

@@ -93,7 +93,10 @@ A split --- one all-clear and another not-clean, nits included --- is not
 (ai-config#2274).
 ARD every item from every review, then request fresh reviews.
 If no qualifying reviewer is reachable, the merge waits ---
-"blocked on reviewer availability" is the honest status ---
+"blocked on reviewer availability" is the honest status
+only once it carries the per-provider enumeration
+[`Availability is a per-route question`](#availability-is-a-per-route-question-and-command--v-answers-one-route)
+requires ---
 and arming an auto-merge while waiting is
 [Pattern 12](../../memories/mistake-patterns.md).
 
@@ -115,6 +118,199 @@ The merge-side rules live with the gate they serve:
   A merge needs its own cross-model, cross-harness verdict
   evaluating the shipping head.
 
+
+## Availability is a per-route question, and `command -v` answers one route
+
+The inventory above is a **machine** inventory:
+every entry in it is a local binary,
+so a `PATH` probe answers whether each entry is *installed*, and nothing else.
+Installation is not availability:
+an installed CLI can still be quota-blocked or unauthenticated,
+which is the second question
+[`Query all available providers sequentially`](#query-all-available-providers-sequentially)
+asks when it requires every exclusion to be recorded with its reason.
+A reviewer is reachable by any of three routes,
+and only the first of them can ever appear on `PATH`:
+
+1. **A local CLI**, probed with `command -v`.
+   The binaries the orchestrator's model adapters
+   ([`model_adapters.py`](../../scripts/orchestrator/model_adapters.py)) probe are derivable,
+   so start from them rather than from a list copied into this sentence,
+   per [`avoid-hardcoding-external-data`](../coding/avoid-hardcoding-external-data.md):
+   `grep -o 'shutil.which("[a-z0-9-]*")' scripts/orchestrator/model_adapters.py | sort -u`.
+   That set is a floor rather than the population:
+   a CLI no adapter probes never appears in it,
+   and `agy` is the worked case,
+   since [`delegation.md`](../../memories/delegation.md)'s ladder routes dispatchable work to it
+   while the adapter named after it probes `gemini`,
+   so probe the union of that set with the 2026-08-25 machine inventory above.
+2. **A forge-side bot**, which runs on the forge and so is invisible to `PATH` in principle.
+3. **An API key** for a provider reachable without its CLI,
+   probed in the environment rather than on `PATH`.
+   The variables are every API-key variable the adapters read,
+   so derive them from
+   [`model_adapters.py`](../../scripts/orchestrator/model_adapters.py)
+   rather than from a subset copied into this sentence,
+   per [`avoid-hardcoding-external-data`](../coding/avoid-hardcoding-external-data.md):
+   `grep -o '[A-Z_]*API_KEY' scripts/orchestrator/model_adapters.py | sort -u`.
+   A subset written out here once left a reader probing fewer variables
+   than the adapters read,
+   which is this section's own failure one route over.
+   Not every variable the derivation returns gates an adapter's `is_available()`,
+   since some are read only when a call is made,
+   so a hit names a provider to probe rather than one to record available.
+
+Both derivations read a path that exists in `ai-config`'s own checkout.
+Where that file is absent --- a consumer repository,
+or the lab manual's transclusion of this fragment ---
+each command returns nothing,
+and that null is a missing source rather than an empty population.
+Fall back to the machine inventory above for the local-CLI route,
+reading it there as a floor rather than as that route's population,
+and record the shortfall alongside the probe result.
+Record the API-key route as underivable in that repository rather than as empty.
+An underivable route is a recorded exclusion carrying its reason
+rather than a satisfied enumeration,
+extending [`Query all available providers sequentially`](#query-all-available-providers-sequentially)'s
+requirement that every exclusion of a known provider be recorded with its reason
+to the case where the providers themselves cannot be named ---
+so the status names the route that could not be derived
+rather than reading as a bare block.
+
+A null `command -v` sweep is therefore evidence about `PATH` and about nothing else.
+That is [`grep-is-not-coverage`](grep-is-not-coverage.md)'s shape,
+with `command -v` in place of `grep`,
+and [`verify-the-right-artifact`](verify-the-right-artifact.md)'s,
+with the local machine standing in for the set of reachable providers.
+
+The forge-side route is the one an inventory of binaries cannot see,
+so its providers are enumerated here rather than left to be inferred:
+
+| provider | how it is reached |
+| --- | --- |
+| Copilot | a reviewer request on the pull request, where the repository has Copilot review enabled |
+| Jules | a mention comment from an account the workflow's `author_association` allowlist admits, where the repository carries a Jules review workflow |
+| Antigravity | such a mention comment, or a manual workflow run, where the repository carries an Antigravity review workflow |
+
+The concrete dispatch mechanism behind each row --- the endpoint, the tool name, the workflow file ---
+varies by harness and by repository,
+so it lives in [`claude-review-dispatch`](../../memories/claude-review-dispatch.md)
+and [`gh-cli`](../../memories/gh-cli.md)
+rather than here.
+
+**Read the table as a starting list rather than as the population, and re-derive every row per repository.**
+All three rows are repository-conditional, not only the two comment-triggered ones:
+a review workflow is added or removed by one pull request,
+so derive those rows from the repository's own `on:` blocks,
+and Copilot review is switched on and off per repository by a ruleset rule
+and per user by quota,
+so derive that row from the repository's rulesets.
+
+**A comment-triggered row also depends on who posts the mention, which is a property of the session rather than of the repository.**
+Both comment-triggered workflows gate their job on
+`author_association` being one of `OWNER`, `MEMBER`, or `COLLABORATOR`,
+and a session whose comment writes land under a bot identity posts as `CONTRIBUTOR`,
+so the job skips with no error and no verdict
+([ai-config#1433](https://github.com/Morrison-Lab/ai-config/issues/1433),
+and [`self-review-fallback`](self-review-fallback.md)'s own statement of the same gate).
+A posted mention is therefore not a dispatch:
+read the created comment's `author_association` back,
+and read the workflow's own `if:` for the allowlist it applies.
+
+**Copilot carries a state the other two rows do not: reachable and withheld.**
+A standing maintainer directive forbids requesting Copilot code review
+on any pull request in any repository while the moratorium stands.
+Read its live expiry from the `MORATORIUM_END` constant
+in [`no-unreviewed-pr.py`](../../hooks/no-unreviewed-pr.py),
+never from a date copied into prose,
+per [`avoid-hardcoding-external-data`](../coding/avoid-hardcoding-external-data.md);
+that constant was still in the future when this section was written on 2026-09-03,
+so the moratorium was live and the row's recorded state was "reachable, withheld".
+The full statement and its measurements are in [`gh-cli`](../../memories/gh-cli.md).
+
+Whether a forge-side reviewer's harness and model differ from the authoring session's
+is a per-session question,
+settled by the ladder above rather than by this table ---
+a session authoring under the `agy` CLI and reviewed by an Antigravity workflow
+shares a harness family with its reviewer,
+and whether it shares a model is not readable from this table either.
+Whether any of the three rows satisfies the **merge** gate is a separate question this section does not settle:
+the ladder and its Do bullet above are unchanged by this inventory,
+and the multi-backend rule stated there still has to be applied per provider,
+since a caller that passes an empty model input resolves that model downstream
+and the value has to be read where it is resolved rather than assumed here.
+
+**So "blocked on reviewer availability" owes an enumeration, not a probe.**
+That status is honest only after naming every known provider and the state it was found in,
+which is what [`Query all available providers sequentially`](#query-all-available-providers-sequentially)
+already requires
+and what a single failed sweep never establishes.
+
+- **Do:** run the availability check as a list of provider routes --- local CLI, forge bot, API key --- and record each provider's state.
+- **Do:** name every known provider and its state before writing "blocked on reviewer availability",
+  a provider that is reachable but withheld by policy included.
+- **Do:** re-derive every forge-side row against the repository in hand,
+  since a workflow, a ruleset rule, and a quota each turn one of them on or off.
+- **Do:** settle a forge-side reviewer's merge-gate qualification against the ladder above,
+  per provider and per authoring session.
+- **Do:** derive the API-key route from the adapters that read those variables,
+  since they are its source of truth and a copied list drifts from them.
+- **Do:** derive the local-CLI route from the adapters' own probes,
+  then probe the union of that set with the 2026-08-25 machine inventory above,
+  since each source drops what the other carries ---
+  the derivation drops `agy`, and the inventory drops `gemini`.
+- **Do:** read the commenting identity's `author_association` back
+  before recording a comment-triggered forge reviewer as dispatched.
+- **Do:** read an empty local-CLI derivation as a missing source
+  wherever `model_adapters.py` is not in the checkout,
+  fall back to the machine inventory above as a floor,
+  and record the shortfall alongside the probe result.
+- **Do:** record the API-key route as underivable rather than as empty
+  wherever that file is not in the checkout,
+  since the machine inventory names no API-key variable.
+- **Do:** record an underivable route as an explicit exclusion carrying its reason,
+  by extension from [`Query all available providers sequentially`](#query-all-available-providers-sequentially),
+  and name that route in the status line.
+- **Don't:** read an empty derivation as an empty population;
+  that is this section's own thesis failing on the section itself.
+- **Don't:** read a null `command -v` sweep as an availability verdict;
+  it reports what is on `PATH` and stops there.
+- **Don't:** record a CLI as available on a `command -v` hit alone;
+  a present binary can still be quota-blocked or unauthenticated,
+  which is a state the probe never reports.
+- **Don't:** enumerate the API-key route from a list written out in prose,
+  here or anywhere else; that list is a subset the moment an adapter is added.
+- **Don't:** treat either local-CLI source alone as that route's population
+  where both are readable;
+  the derivation drops `agy` and the inventory drops `gemini`,
+  so a probe of one of them misses a route the other names.
+- **Don't:** read the inventory-only fallback as that population either;
+  where `model_adapters.py` is absent the inventory is a floor,
+  so the shortfall is recorded rather than resolved.
+- **Don't:** count an underivable route as an enumerated one;
+  a route whose providers cannot be named is an exclusion,
+  so a bare "blocked on reviewer availability" over it is the unenumerated claim again.
+- **Don't:** record a comment-triggered forge reviewer as dispatched on a posted mention alone;
+  an `author_association` allowlist skips the job with no error.
+- **Don't:** read the three forge-side rows as that route's population;
+  a repository can carry a review workflow this table does not name,
+  so derive the rows from its own `on:` blocks and rulesets rather than from this list.
+- **Don't:** treat the machine inventory above as the provider population, since a forge-side reviewer cannot appear in it.
+- **Don't:** record a withheld provider as available,
+  or read its row as licence to dispatch it.
+- **Don't:** read a row in this table as evidence that its harness or its model
+  differs from the authoring session's.
+
+(Measured 2026-09-03 on ai-config#3105:
+a session held two green PRs for roughly seven hours as
+"blocked on reviewer availability",
+on a `command -v` sweep over eight CLIs that correctly found none of them installed.
+Jules was measured reachable, replying within a minute of a mention comment.
+Antigravity carried a review workflow and was permitted, and was not probed.
+Copilot was reachable and withheld:
+the moratorium had been extended the previous day and was read as expired,
+so the Copilot request made on #3084 that day was a breach of the directive
+rather than a measurement, and is recorded here as the slippage it was.)
 
 ## What "separate" requires
 
@@ -251,6 +447,32 @@ That is [`learn-from-review-findings`](learn-from-review-findings.md)'s converge
 - **Don't:** read a long visible review history as coverage --- it is a record of what was found, and every entry marks a place a defect once lived.
 - **Don't:** count a verdict that cites prior rounds in its justification as a fully independent round;
   that much of it is a re-reading of the rounds it names, however hard the rest of it worked.
+
+### Tell it to RUN the repo's validation, not only to read the diff
+
+The rule above says which facts a brief must carry.
+It does not say what the reviewer should **do** with the checkout, and the default answer --- read the diff against the standards --- is what every round does when the brief does not say otherwise.
+Reading is the wrong instrument for a whole class of defect, because a diff-reading round can only find what is visible in the changed lines, and a registration gap, a broken import path, or a check that fails on files the diff never touched are all invisible there by construction.
+
+So name the commands in the brief.
+The repo's own checkers, its test suite, and whatever `check-install`-shaped verification exists are the ones that matter, and they are cheap for a reviewer already holding the checkout.
+
+Recorded 2026-09-03 from [ai-config#3059](https://github.com/Morrison-Lab/ai-config/issues/3059), on a hook that took nine adversarial rounds.
+Eight rounds read the diff.
+The ninth ran the repository's own local validation, and found **two red CI gates that all eight prior rounds had missed** --- one of which would have shipped the hook completely **inert to plugin-path consumers** while every test in the suite passed.
+The record gives no more detail than that.
+It does not name the hook, the gates, or what was missing, so read it for the shape rather than for a mechanism --- and note that a diff-reading round cannot find a gate that fails on files the diff never touched, whatever the gate turns out to be.
+
+Note what this is not.
+It is not "Run every mechanical style instrument before dispatching, not after", which says *you* run the style instruments beforehand so the reviewer never spends attention on them.
+That rule keeps mechanical noise out of the round.
+This one puts a different instrument *into* the round, because the author's pre-dispatch run and the reviewer's own run answer different questions --- yours confirms the diff is clean, and the reviewer's confirms the repo is.
+
+- **Do:** name the repo's *functional* checkers and test command in the brief --- not the style instruments, which you have already run --- and ask for their output rather than a judgement about them.
+- **Do:** ask specifically whether the change is *reachable* --- registered, imported, wired into the path a consumer actually takes --- since that is the gap a diff read cannot show.
+- **Don't:** assume a reviewer holding the checkout will run anything it was not asked to run.
+- **Don't:** read a run of diff-reading rounds as having covered the repo;
+  they covered the changed lines, which is a different population.
 
 ## Run every mechanical style instrument before dispatching, not after
 
@@ -535,7 +757,7 @@ It was seen directly, twice, within one session --- and the captured line is thi
 --- end of report ---agentId: <id> (use SendMessage with to: '...')
 ```
 
-**Note what that exhibit is: the trailer landing on a sentinel line, which is the safe case**, and the one this section goes on to prescribe.
+**Note what that exhibit is: the trailer landing on a sentinel line, which is the safe case**, and the one the block below records as the mitigation [#3050](https://github.com/Morrison-Lab/ai-config/issues/3050) rejected.
 The shape the hazard is actually about is a fingerprint line with the trailer glued to it:
 
 ```
@@ -594,11 +816,13 @@ So the hazard is real and it is a **truncation** hazard rather than a suffix haz
 `agentId` begins with a hex character, which is what turns a short fingerprint into a plausible-looking wrong one instead of a parse failure.
 A wrong sha refuses the push with "the clean verdict is for commit X, but this push would ship Y" --- a message that reads as a stale verdict and is nothing of the kind.
 
-The remedy costs one line either way, and is cheap insurance rather than a fix for a demonstrated break at 40 characters.
+The remedy below costs one line and reads as cheap insurance rather than a fix for a demonstrated break at 40 characters, which is how it was first written up here.
 The block below is a report's TAIL, not a whole report.
 It shows the REORDERED ordering described above --- verdict and fingerprint after the payload --- which is the shape the sentinel exists for and the shape this file's "Structured review data" section rules out.
-So read the block as the mitigation for that reordering, not as a template to copy.
-What [#3050](https://github.com/Morrison-Lab/ai-config/issues/3050) has to settle is which of the two orderings a brief should mandate, not whether a conforming report needs a sentinel.
+So read the block as the shape the sentinel was proposed for, not as a template to copy.
+[#3050](https://github.com/Morrison-Lab/ai-config/issues/3050) has since settled which of the two orderings a brief should mandate, and it settled it against the block below: the payload goes last, a conforming report carries no sentinel, and the fingerprint is the full sha.
+The block stays as the record of the mitigation that decision rejected, so a reader meeting a sentinel in the wild can tell what it was for.
+It is not a shape to copy, and it is not the remedy for a reordered tail either --- the full sha is, under every ordering.
 
 ```
 -->
@@ -611,17 +835,58 @@ The leading `-->` is the JSON payload's own closing marker, included so the orde
 
 The sentinel puts a non-hex line between the fingerprint and anything the harness appends, so the fingerprint's length stops mattering.
 
+It is not free, though, and both its cost and its protection belong to the **consumer** reading the report rather than to the report's shape.
+Its cost falls unevenly across the two report contracts [`scripts/pre-push-review.py`](../../scripts/pre-push-review.py) validates,
+and falls nowhere at all on [`hooks/no-push-without-self-review.py`](../../hooks/no-push-without-self-review.py)'s own guard or on [`scripts/cursor-self-review-check.py`](../../scripts/cursor-self-review-check.py), the Cursor Cloud recovery gate that calls that same `parse_report`, neither of which runs a trailing-content check on either shape.
+Those three are the whole consumer set as of 2026-09-04, derived rather than recalled: `grep -rln parse_report hooks scripts --include='*.py' | grep -v test`.
+On that script's own four-section contract --- Summary Verdict, Critical Findings, Observations, Verification Steps --- it strips HTML comments and then scans whatever follows the last fingerprint.
+What `_TRAILING_AFTER_FINGERPRINT` admits there is a status banner, an `=` rule, a disclosure footer, a stopping-point line, or a restated verdict.
+`--- end of report ---` is none of those, so a sentinel is refused outright with "Reviewed-Commit fingerprint must be at the very end of the report".
+A persona-contract report never reaches that scan.
+`parse_review_verdict` routes it to `_parse_persona_verdict`, which runs no trailing-content check at all, so a sentinel there is tolerated rather than refused.
+Measured 2026-09-03 through `parse_review_verdict` itself rather than against the regex in isolation, which is the substitution [`verify-the-right-artifact`](verify-the-right-artifact.md) rules out:
+a persona report returned `(True, True, 'Clean (persona contract)')` payload-last, with a sentinel appended, and with the tail reordered alike, while the same sentinel on the local contract returned `(False, False, 'Reviewed-Commit fingerprint must be at the very end of the report.')`.
+Every one of those reports carried the full sha, so they establish that the sentinel is accepted on the persona contract, not that it is unnecessary there.
+
+That is refusal on one contract and tolerance on the other, and tolerance is not inertness.
+Measured 2026-09-04 on the persona contract, over a report whose fingerprint was abbreviated to seven characters, whose tail was reordered so that fingerprint was the report's last line, and which carried an `agentId:` trailer glued to it:
+without the sentinel `parse_review_verdict` returned a `Fingerprint SHA mismatch` refusal naming `b9dc14ba` against an expected sha beginning `b9dc14b0`, and with the sentinel sitting between the fingerprint and the trailer it returned `(True, True, 'Clean (persona contract)')`.
+The same abbreviated, reordered, glued report, measured the same day against the pre-push guard's own `parse_report`, returned `('clean', 'b9dc14ba')` without the sentinel and `('clean', 'b9dc14b')` with the sentinel in that same position --- for the four-section report shape as well as the persona one, since that guard checks no trailing content under either.
+`verify_review` then tests `c.startswith(reviewed_commit)`, so against a real `b9dc14b0...` commit the sentinel-free form refuses the push with the misparsed-sha message and the sentinel form passes it.
+So the sentence above about the fingerprint's length ceasing to matter is right wherever no trailing-content check runs --- `pre-push-review.py`'s persona contract, the pre-push guard's own `parse_report`, and the Cursor Cloud recovery gate alike --- over a fingerprint that is both abbreviated and last.
+What settled [#3050](https://github.com/Morrison-Lab/ai-config/issues/3050) against the sentinel is therefore not that it protects nothing.
+It is that a conforming report never reaches the situation it protects: payload-last means the fingerprint is not the last line, and the mandated full sha stops `REVIEWED_COMMIT`'s capture at the boundary under either trailer shape.
+What is left is the cost --- outright refusal on the four-section contract --- which a report gains nothing by taking on.
+
 Two caveats.
 The concatenation has been observed on Claude Code's `Agent` tool and nowhere else, so it is a claim about that harness on that date rather than about subagent dispatch generally.
 And the **reordering** is what sits in tension with [`.claude/agents/adversarial-reviewer.md`](../../.claude/agents/adversarial-reviewer.md)'s own instruction to emit nothing after the JSON payload's closing `-->`.
 The sentinel is not the source of that tension and does not add to it: a brief that puts the verdict and the fingerprint after the payload has already overridden the emit-nothing instruction, and the sentinel then joins a tail that exists either way.
 The ordering the guard parsed successfully was that reordered one --- which is a statement about the guard, not an endorsement, since the same ordering fails this file's payload-last contract.
-Which of the two orderings a brief should mandate is #3050's decision, as named above, rather than something to settle inside a review brief.
+That decision is made, per #3050: a brief mandates the payload-last ordering, so a conforming report never puts the fingerprint last and the tension never arises in one.
+The parser is what makes payload-last free rather than merely tidier --- `parse_report` blanks HTML comments before both of its regex searches, so a payload sitting last can neither supply nor displace the verdict LINE or the fingerprint.
+Measured 2026-09-03 by running `parse_report` over a report whose Markdown fingerprint and payload `commit_sha` named different commits;
+it returned the Markdown one.
+That is a claim about those two searches and nothing wider.
+The payload is read separately, from the raw text rather than the blanked copy, and it is authoritative: a payload listing any finding downgrades a clean verdict to `needs_work`.
+Measured the same day --- a payload-last report whose Markdown line read `### Verdict: Ready for merge` and whose payload carried one finding parsed as `('needs_work', <sha>)`, and parsed as `('clean', <sha>)` once that findings array was emptied.
+So a reviewer gains nothing by letting the two representations disagree, which is the failure the payload exists to catch.
+The decision does not rest on how often the harness concatenates its trailer, so the re-measurement #3050 wanted first would not move it:
+the full sha closes the truncation hazard under either trailer shape, and payload-last keeps the fingerprint off the report's last line however the trailer arrives.
 It is adjacent to [#2483](https://github.com/Morrison-Lab/ai-config/issues/2483) and not the same item: that issue is about verdicts arriving via background task notifications going unregistered.
 
+- **Do:** mandate the payload-last tail in every review brief you write --- verdict, then fingerprint, then payload, and nothing after it.
 - **Do:** state the fingerprint as the **full 40-character** sha, which is what actually protects it.
-- **Do:** add the sentinel line after it *when a brief reorders the tail so the fingerprint is last*, as cheap insurance against a truncated or reformatted fingerprint.
 - **Do:** read a "verdict is for commit X, but this push would ship Y" refusal as possibly a *misparsed* fingerprint rather than only a stale one --- print what the guard captured before concluding.
+- **Do:** fix the brief rather than keeping a sentinel you meet in the wild.
+  It does protect an abbreviated fingerprint that is the report's last line, on every consumer that runs no trailing-content check on the shape it is handed --- `pre-push-review.py`'s persona contract, the pre-push guard's own `parse_report`, and [`scripts/cursor-self-review-check.py`](../../scripts/cursor-self-review-check.py), the Cursor Cloud recovery gate, which calls that same `parse_report` and then compares prefix-tolerantly.
+  Measured on that gate 2026-09-04, over the same abbreviated, reordered, glued report: without the sentinel it printed `REFUSE: fingerprint b9dc14ba does not match expected head b9dc14b0...` and exited 1, and with the sentinel sitting between the fingerprint and the trailer it printed `PASS: clean verdict at the expected head` and exited 0.
+  The payload-last full-sha tail removes those situations instead of insuring against them.
+- **Don't:** write a brief that puts the verdict and the fingerprint after the payload, or that asks for a trailing sentinel.
+- **Don't:** reach for the sentinel as insurance --- a conforming report puts the payload last, so the fingerprint is never the last line, and the full sha closes the truncation hazard under either trailer shape.
+  It is refused outright on [`pre-push-review.py`](../../scripts/pre-push-review.py)'s four-section contract, whose trailing-content check admits no such line and which runs only when an expected sha is supplied --- as that script's own `main()` always supplies one.
+- **Don't:** read the full-sha rule as mechanically enforced.
+  `REVIEWED_COMMIT` still accepts `[0-9a-fA-F]{7,40}`, and [`pre-push-review.py`](../../scripts/pre-push-review.py) still clears a seven-character prefix match, so an abbreviated fingerprint is caught by nothing but the reviewer following the brief.
 - **Don't:** claim the suffix breaks a 40-character fingerprint;
   run `REVIEWED_COMMIT` over the line before asserting either way.
 - **Don't:** abbreviate the sha in a review brief's template, which is the input that turns the suffix into a silently wrong parse.
@@ -886,3 +1151,32 @@ The companion half of that session --- concluding a silent subagent had
 stalled when it was alive and twelve rounds ahead --- is recorded in
 [`git-worktrees`](../../memories/git-worktrees.md), "A quiet worktree is not
 evidence the session working it has stopped".)
+
+### Ask it whether ANOTHER ROUND earns its place, which is a different question
+
+The section above retires the **work**.
+This one retires the **loop** while keeping the work, and the two need separating because a reviewer asked only the ship-or-drop question has no way to say "keep it, and stop iterating".
+
+**The default rule is elsewhere in this file, and this question is for the case that rule does not reach.**
+"Review the instrument too, not only the change it verifies" already gives the terminus: keep running rounds while findings keep landing, and "Give a docs-only diff describing an instrument a full round" restates it.
+That is the right default and it is not withdrawn here.
+What it assumes is that each round's findings are *about the change*.
+Once a round's findings are about the **previous round's fix** --- the shape [`learn-from-review-findings`](learn-from-review-findings.md)'s "A later round can find a defect in the FIX" section documents --- findings still landing no longer distinguishes a series that is converging from one the fixes are feeding, so the default criterion returns "keep going" in both cases and stops discriminating.
+
+So the expected-value question is not a competing terminus.
+It is the tie-breaker for the case the findings-still-landing rule cannot separate, and it applies only there.
+Put it to the reviewer in its own sentence, alongside the findings: **does another round have positive expected value, or is the remaining risk smaller than the risk a further fix introduces?**
+A reviewer holding the round's own findings can weigh their severity against the observed rate at which fixes on this change have introduced new defects, which is a judgement the author cannot make about their own series.
+
+Recorded 2026-09-03 from [ai-config#3059](https://github.com/Morrison-Lab/ai-config/issues/3059), across nine rounds on one hook.
+Rounds 6, 7 and 8 each introduced a defect the next round found, which is exactly the condition above;
+only round 9 introduced none.
+Two things ended the series, per #3059: asking that question directly, and the validation-running round above.
+Neither was a round happening to come back empty --- which, per the convergence rule, would not have been evidence it was finished anyway.
+
+- **Do:** ask for a continue-or-stop judgement once a round's findings are about the previous round's *fix* rather than about the change, separately from the ship-or-drop question.
+- **Do:** give the reviewer the rate at which this change's own fixes have introduced new defects, since that is the term it cannot derive from the diff.
+- **Don't:** collapse the two questions.
+  "Should this exist" and "should this iterate further" have different right answers, and a change worth shipping is the usual situation in which the continue-or-stop question arises at all.
+- **Don't:** treat an empty round as the answer to either question;
+  a converging series narrows its own search space, so the empty round is the least informative one.

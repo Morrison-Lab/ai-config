@@ -657,3 +657,11 @@ Pushed as `3f8f2fd9` after a fresh `ls-remote` read `2b3bd51c`;
 Copilot re-requested, `@jules review` posted, PR body moved to the head.
 The commit failed once because the message file is written after the gates in the script, and a gate failure skipped it;
 write the message file before the gates.
+
+## 17:41 PDT --- UMS branch opened as #3166 after round 4
+
+Round 4 on `ums/2026-09-03-merge-visibility` returned four findings, all attribution or wording:
+the closing note duplicated the opening's provenance, the `git-branches` citation claimed the issue half it does not own, the notebook's 2-versus-3 parenthetical supplied a cause that produces neither number, and the promotion line named a learning the notebook never recorded.
+All four applied at `d2b5db54`, pushed as a new branch, and opened as [#3166](https://github.com/Morrison-Lab/ai-config/pull/3166) (Refs #3129) with Copilot requested and `@jules review` posted, per the convergence decision;
+subscribed to its activity.
+[#3166](https://github.com/Morrison-Lab/ai-config/pull/3166) edits this notebook file's part-2 region, so this part-3 branch merges `main` after #3166 lands rather than before.

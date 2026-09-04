@@ -279,9 +279,10 @@ _NUMBERED_SEGMENT = r"[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*"
 #
 # The precision mechanism is preserved here rather than traded away. Bare
 # segments are admitted only BESIDE a still-mandatory `TOKEN`-shaped one,
-# so an item cannot be built from bare words alone: "Addressed, Rebutted, or Deferred" matches nothing, and neither
-# does an ordinary prose slash pair (`and/or`, `CI/CD`, `input/output`) or
-# a two-segment all-bare directory (`shared/workflow`). What changes is
+# so an item cannot be built from bare words alone: "Addressed, Rebutted,
+# or Deferred" matches nothing, and neither does an ordinary prose slash
+# pair (`and/or`, `CI/CD`, `input/output`) or a two-segment all-bare
+# directory (`shared/workflow`). What changes is
 # only WHERE the separator has to sit -- somewhere in the item, rather than
 # in every segment of it.
 #
@@ -303,6 +304,11 @@ _NUMBERED_SEGMENT = r"[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*"
 PATH_TOKEN = (
     rf"(?:{_BARE_SEGMENT}/){{0,8}}{TOKEN}(?:/{_NUMBERED_SEGMENT}){{0,8}}"
 )
+
+PATH_TOKEN_RE = re.compile(PATH_TOKEN)
+
+# A path segment carrying no internal hyphen/underscore/dot of its own.
+ONLY_BARE_SEGMENT_RE = re.compile(r"(?:^|/)[A-Za-z][A-Za-z0-9]*(?=/|$)")
 
 # What separates two ITEMS of a hand-typed list, now that an item can carry
 # its own internal `/`. A comma always separates -- no path contains one.
@@ -622,10 +628,10 @@ CARDINALITY_RE = re.compile(
 #      more by route 11 below, which fixed the 3-item one outright and
 #      moved the 2-item one into the extension-vs-version residual.
 #      The extension-vs-version-tail confusion this route was ORIGINALLY
-#      named for is still real, just reachable through a different shape (a coincidental item
-#      whose OWN leading segment is independently `TOKEN`-shaped, so it
-#      joins the main match directly rather than via `continuation` at
-#      all) -- pinned separately as
+#      named for is still real, just reachable through a different shape
+#      (a coincidental item whose OWN leading segment is independently
+#      `TOKEN`-shaped, so it joins the main match directly rather than
+#      via `continuation` at all) -- pinned separately as
 #      `ACCEPTED_MISS_GENUINE_EXTENSION_VS_VERSION_TWO_ITEM`. Both remain
 #      PINNED AS ACCEPTED RESIDUALS, not fixed with a ninth predicate; the
 #      lesson for future editors is to verify which code path a repro
@@ -982,8 +988,25 @@ def looks_like_one_path(group_text, continuation=""):
     (`foo.py, bar.py`), still fires: neither piece contains a `/`, so
     neither ever reads as a citation. Only a piece that itself looks like a
     path -- because it names one, directory and all -- is exempted.
+
+    Checked first, ahead of that per-piece test: a comma-joined list whose
+    pieces are ALL extension-less `PATH_TOKEN` paths, at least one of them
+    carrying a bare segment (`Morrison-Lab/gha, ai-config/memories`), is
+    citations too. `looks_like_citation` cannot see those one at a time --
+    it has no extension and no trailing `/` to key on, and the same
+    TOKEN-then-bare shape is also a recalled identifier beside a branch
+    name (`cycle-charge-flee/main`, pinned as
+    `COINCIDENTAL_SLASH_BRANCH_SUFFIX`), which is why the whole list, not
+    the piece, is what carries the answer.
     """
     pieces = COMMA_SPLIT_RE.split(group_text)
+    if len(pieces) > 1 and all(
+            "/" in piece
+            and PATH_TOKEN_RE.fullmatch(piece)
+            and not PATH_EXTENSION_RE.search(piece)
+            for piece in pieces) and any(
+            ONLY_BARE_SEGMENT_RE.search(piece) for piece in pieces):
+        return True
     last = len(pieces) - 1
     return all(
         looks_like_citation(piece, continuation if i == last else "")

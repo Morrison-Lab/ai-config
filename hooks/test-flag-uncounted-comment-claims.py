@@ -384,6 +384,18 @@ ALL_BARE_SEGMENT_CITATIONS_MUST_NOT_FIRE = (
     "No hits in ai-config/memories/tools.md, "
     "Support/glab-cli/config.yml after the sweep."
 )
+# The same shape with NO extension on either side, which the fixture above
+# cannot reach: both pieces are recognized by their bare segments alone,
+# not by an extension.
+EXTENSION_LESS_BARE_SEGMENT_CITATIONS_MUST_NOT_FIRE = (
+    "No matches in Morrison-Lab/gha, Support/glab-cli were found."
+)
+# The price of `ENUM_SEPARATOR` reading an unspaced `/` as path structure:
+# a list of recalled identifiers joined that way is no longer parsed as a
+# list at all.
+ACCEPTED_MISS_UNSPACED_SLASH_IDENTIFIER_LIST = (
+    "The affected files: cycle-charge-flee/interval-labels were changed."
+)
 # An EXTENSION-LESS path cited alone, the false positive the widened item
 # grammar would have created had `ENUM_SEPARATOR` not been tightened with
 # it: nothing in `Morrison-Lab/gha/antigravity-review` is an extension or a
@@ -1040,6 +1052,10 @@ def unit_checks(mod):
           mod.find_claims(BARE_SEGMENT_PATH_ALONE_MUST_NOT_FIRE), [])
     check("find_claims silent on a list of only bare-segment citations",
           mod.find_claims(ALL_BARE_SEGMENT_CITATIONS_MUST_NOT_FIRE), [])
+    check("find_claims silent on an extension-less pair of bare-segment citations",
+          mod.find_claims(EXTENSION_LESS_BARE_SEGMENT_CITATIONS_MUST_NOT_FIRE), [])
+    check("find_claims ACCEPTS missing an unspaced slash-joined identifier list",
+          mod.find_claims(ACCEPTED_MISS_UNSPACED_SLASH_IDENTIFIER_LIST), [])
     # The separator half of the same fix: an unspaced `/` is path
     # structure, so a lone extension-less path is one item and can never
     # reach ENUM_RE's two-item minimum.

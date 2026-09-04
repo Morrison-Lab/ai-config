@@ -229,3 +229,58 @@ User directive, verbatim:
 "daytb; 3203 sounds good.
 you can overrule jules and merge".
 So #3202 merges at its next claude-review-clean head with `jules/review` red, as a maintainer decision for this PR (recorded on #3192), and the wave branches proceed by #3203's route: restructure the recheck-and-fix loop first, then rerun it once over the 38 snapshots.
+
+## 09:56 PDT --- r5 loops launched from `gia-fix-loop-r5.js`; #3202 at `8a7d2314` awaiting claude-review before the merge
+
+The r5 script implements #3203's five points: one whole-diff recheck per item, at most two fix rounds each rechecked on `git diff <prev>..HEAD` plus the answered findings, a no-narration brief with delete-not-repair for prose a previous round added, and `no_verdict` for a killed agent.
+Runs `wf_bad31608-f03` (wave 1), `wf_ea4fb2c4-1cb` (wave 2), `wf_0400aa03-5ec` (wave 3), `wf_7a2c1144-332` (wave 4), one agent at a time each, opus, launched at 09:54 PDT and recorded on #3203.
+The first launch failed to parse because the schema block was extracted by line number from the r4 script and picked up its ITEMS block instead;
+extracting by text marker fixed it.
+
+## 09:57 PDT --- #3202 merged at `78d7900b` over the Jules block; notebook continues on `docs/session-notebook-2026-09-04-part2`
+
+claude-review returned Ready for merge on `8a7d2314` at 16:55:34Z with `require-clean-verdict` and every check run green;
+squash-merged under the standing grant with `jules/review` red on the maintainer's call, the squash body naming #3192 and #3183.
+Post-merge: unsubscribed, `wt-nb3` and its branch removed (origin auto-deleted the branch), `main` fast-forwarded to `78d7900b`, and this file's pending entries carried into worktree `wt-nb4` on the new branch by `git apply` of the uncommitted diff.
+Merged this session: #3154, #3166, #3171, #3193, #3195, #3202.
+
+## 09:59 PDT --- a false claim of mine on #3183 corrected; post-merge UMS pass opened as a branch
+
+My first #3183 comment said "a re-run can clear it";
+the approve it cited was the first run on `6af715ec`, not a re-run of the blocked head, and the one re-run on `c58e7172` reproduced the block, so the claim was corrected in a second comment.
+The post-merge UMS pass for #3202 goes on branch `ums/2026-09-04-jules-per-run-and-fix-narration` (worktree `wt-ums4`): the per-run reading and the #3192 per-PR decision into `memories/jules-review.md` with a Do/Don't pair, and the fix-round-narration recurrence into the `ums` anti-pattern bullet, pointing at #3203.
+
+## 10:00 PDT --- #3203's title carried leaked tool-call markup; retitled
+
+claude-review's round on `8a7d2314` noted that #3203's title ended in raw tool-call markup: the `issue_write` call that filed it had a malformed `labels` parameter tag, so the title swallowed the tag text and the label was never applied.
+Retitled and labelled `enhancement` through a second `issue_write`;
+the tell for next time is a title that reads correctly in the call and wrong in the API response, so read the response's title back after every create.
+
+## 10:10 PDT --- UMS branch round 1: eight findings, the mechanism prose cut at `15af3f00`
+
+The round refuted the "fires per run" cause (one run on the approving head, whose Jules comment says its diff was truncated, cannot separate per-run from per-diff), the "merged over the red status" sentence (the merged head `8a7d2314` carried no `jules/review` status: the API's statuses list for it is empty), a Do that said "re-run once" against the section's own Do and the seventh case, two timestamps a second off the statuses' `created_at` (12:39:51Z and 12:46:15Z), an insertion that split a paragraph into a list item, and three claims in the `ums` bullet the merged notebook does not support.
+The block now follows the section's existing list, states the three status times, says the merged head had no status, names the alternatives one run cannot exclude, and defers to the existing Do;
+the bullet cites only the merged notebook's own text.
+Round 2 dispatched on `15af3f00`.
+
+## 10:21 PDT --- UMS branch round 2: one finding ("unanswered" for a rebutted block); pushed at `bc945786` and opened as a PR
+
+The fix was one clause plus the measured note that the blocking re-run's comment also reported a truncated diff;
+no third local round for one word, the forge's claude-review covers the head.
+
+## 10:28 PDT --- #3207 merged at `090686c9`
+
+claude-review Ready for merge, Jules approve, Copilot quota-skipped, every check run green at `bc945786`;
+squash-merged under the standing grant, unsubscribed, worktree `wt-ums4` and its branch removed, `main` fast-forwarded.
+Merged this session: #3154, #3166, #3171, #3193, #3195, #3202, #3207.
+The merge-time UMS pass finds nothing beyond what #3207 itself recorded.
+
+## 13:01 PDT --- r5 wave 1 verified 6 of 6; six PRs opened
+
+`wf_bad31608-f03` finished: 6 of 6 verified, no verdict on 0, 28 agents, 4,278,236 subagent tokens, 3.06 hours, against r4's 36 agents, 6,060,363 tokens, and 0 of 6 on the same branches;
+posted on #3203.
+Each verified head fast-forwarded to origin after a fresh `ls-remote` (none diverged, none dirty, none conflicting with `origin/main` by `merge-tree`), then opened:
+[#3211](https://github.com/Morrison-Lab/ai-config/pull/3211) (#3068, `bb4b4c8c`), [#3212](https://github.com/Morrison-Lab/ai-config/pull/3212) (#3086, `80a1056a`), [#3213](https://github.com/Morrison-Lab/ai-config/pull/3213) (#3062, `3dc56569`), [#3214](https://github.com/Morrison-Lab/ai-config/pull/3214) (#3117, `0e784162`), [#3215](https://github.com/Morrison-Lab/ai-config/pull/3215) (#3102, `d2cc0f8f`), [#3216](https://github.com/Morrison-Lab/ai-config/pull/3216) (#3113, `5d743c15`);
+each claimed with `@jules review`, Copilot requested, subscribed.
+The claim comments carry no hand-typed clock time;
+the forge's `created_at` is the record.

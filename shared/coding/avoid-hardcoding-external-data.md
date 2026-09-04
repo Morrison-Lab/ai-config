@@ -243,7 +243,7 @@ They did not.
 The flake was the same in either location, and that explanation was retracted a revision later.
 
 The other half of the point is what a later reader finds.
-Run from a pristine `git archive` of `origin/main` on 2026-09-04, `python3 scripts/test_check_pr_fully_clean.py` reports `753 passed, 0 failed`, and `git show --numstat 32a760c32` shows that #3100 never touched that file.
+Run from a pristine `git archive` of `origin/main` on 2026-09-03, `python3 scripts/test_check_pr_fully_clean.py` reports `753 passed, 0 failed`, and `git show --numstat 32a760c32` shows that #3100 never touched that file.
 So the written 754 does not reproduce on any tree the record points at, and no sha or command was published beside it that would let anyone say when it did.
 The text that shipped gives no count as an expectation, and says why.)
 

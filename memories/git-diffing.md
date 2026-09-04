@@ -176,7 +176,7 @@ git log -p main..feature                   | grep -c '^+SHARED'  # 0  hides it
 git log -p -m main..feature                | grep -c '^+SHARED'  # 3  one diff per parent: 2 hits vs the feature parent, 1 vs main
 git log -p --diff-merges=on main..feature  | grep -c '^+SHARED'  # 3  same as -m
 git show <merge>                           | grep -c '^+SHARED'  # 0  see below
-git log --cc main..feature                 | grep -c '^+SHARED'  # 0  see below
+git log -p --cc main..feature              | grep -c '^+SHARED'  # 0  see below
 ```
 
 Three mechanics behind those numbers.
@@ -192,6 +192,8 @@ its value:
 
 `git show <merge>` defaults to the combined diff,
 byte-identical under `cmp` to `git show --cc <merge>`.
+`--cc` implies `-p`:
+`git log --cc main..feature` and `git log -p --cc main..feature` are byte-identical under `cmp` as well.
 
 **The last two commands do show the re-add, and the grep is what misses it.**
 A combined diff indents its `+` columns one per parent,

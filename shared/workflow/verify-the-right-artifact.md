@@ -1010,7 +1010,8 @@ git merge-base --is-ancestor <your-last-pushed-sha> origin/<default-branch> && e
 git grep -c '<distinctive symbol from your diff>' origin/<default-branch> -- <path>
 ```
 
-The ancestry check answers whether your commit is even in the merged history at all; the content grep answers the sharper question, since a squash merge can be an ancestor-check false negative (the SHA changes on squash) while still needing the grep to confirm the actual lines survived.
+The ancestry check answers whether your commit is even in the merged history at all;
+the content grep answers the sharper question, since a squash merge can be an ancestor-check false negative (the SHA changes on squash) while still needing the grep to confirm the actual lines survived.
 Pick a symbol distinctive enough that a match means your specific change, not a coincidentally similar one nearby.
 
 Recovery is not "push the stale branch again."
@@ -1022,7 +1023,9 @@ Cut a fresh branch off the current default branch and re-apply just the lost pie
 - **Don't:** read `MERGED` as proof your content landed --- it is proof *a* merge happened, which is a claim about the PR's state field, not about the tree.
 - **Don't:** diff a long-stale branch against the current default branch and treat what it shows as your own missing work --- some of it is the default branch's newer content read backwards.
 
-(Measured 2026-09-04 on `Morrison-Lab/ai-config#3024`: the PR showed `MERGED`, but at another session's head commit rather than the one this session had pushed and had reviewed clean. Three pieces of reviewed work were silently lost --- an enumeration, two corrected docstrings, and a test arm --- with nothing red anywhere. Recovery was `Morrison-Lab/ai-config#3179`, cut fresh off `main` rather than off the stale branch, whose own diff against `main` showed `main`'s newer work as deletions.)
+(Measured 2026-09-04 on `Morrison-Lab/ai-config#3024`: the PR showed `MERGED`, but at another session's head commit rather than the one this session had pushed and had reviewed clean.
+Three pieces of reviewed work were silently lost --- an enumeration, two corrected docstrings, and a test arm --- with nothing red anywhere.
+Recovery was `Morrison-Lab/ai-config#3179`, cut fresh off `main` rather than off the stale branch, whose own diff against `main` showed `main`'s newer work as deletions.)
 
 ## Existence of a mechanism is not reachability of it
 

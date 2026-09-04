@@ -1238,6 +1238,68 @@ def _push_wording():
 # and the guard re-fires forever, which is how a guard stops being read.
 MERGED = ('{"state":"MERGED","merged":true,'
           '"url":"https://github.com/o/r/pull/1038"}')
+# The same observation for a PR CLOSED without merging (ai-config#3086). A
+# closed PR is terminal for exactly the reason a merged one is -- the request
+# POST returns 200 and adds nobody -- so it must discharge identically.
+CLOSED = ('{"state":"CLOSED","merged":false,'
+          '"url":"https://github.com/o/r/pull/1038"}')
+# Field-selecting probes, which is where merged and closed had drifted apart:
+# `--json merged,mergedAt` discharged and `--json closed,closedAt` did not.
+MERGED_FIELDS = '{"merged":true,"mergedAt":"2026-09-01T00:00:00Z"}'
+CLOSED_FIELDS = '{"closed":true,"closedAt":"2026-09-03T06:25:00Z"}'
+# A closed-unmerged PR read through the MERGE-side fields alone. Says nothing
+# about closure, so it must NOT discharge. This pins the MERGE side only: it
+# contains neither `closed` nor `closedAt`, so it exercises neither alternative
+# ai-config#3086 added and constrains nothing about them.
+UNMERGED_FIELDS = '{"merged":false,"mergedAt":null}'
+# The negative control for the CLOSE side, which is the half the #3086 diff
+# widened: an OPEN PR read through the close-side fields. Without it a later
+# loosening of `"closed"\s*:\s*true` to `\w+`, or of the `closedAt` digit
+# anchor, would turn no case red (ai-config#3086 review).
+OPEN_CLOSE_FIELDS = '{"closed":false,"closedAt":null}'
+# A REST body: the raw `gh api`/MCP spellings are snake_case, and the same
+# facts in the same channel-independent shape must discharge.
+REST_CLOSED = ('{"number":1038,"state":"closed","merged":false,'
+               '"closed_at":"2026-09-03T06:25:00Z","merged_at":null}')
+# A body that merely CONTAINS a terminal-state literal without reporting one:
+# the diff of a PR that touches an API fixture or a JSON snapshot -- this very
+# file, for one. `pull_request_read` serves `get_diff` under the same tool name
+# as `get`, so a registration that ignores the method reads this as a status
+# report (ai-config#3086 review).
+DIFF_QUOTING_CLOSED = (
+    'diff --git a/hooks/fixtures.json b/hooks/fixtures.json '
+    '+  "state": "CLOSED", "merged": false')
+# A COMMENT thread, rendered as the plain text `gh pr view --comments` prints
+# and `--json comments --jq '.comments[].body'` projects. The terminal literal
+# belongs to the API response the comment QUOTES, not to the PR the comment
+# sits on -- and PRs in this corpus quote API responses constantly.
+COMMENT_QUOTING_CLOSED = (
+    'claude: the fixture reads {"number":7,'
+    '"closed_at":"2026-01-01T00:00:00Z"}\n')
+# The PR BODY, rendered the way `gh pr view <N>` prints it with no selection
+# at all: gh's non-TTY plain output is tab-separated headers, then `--`, then
+# the description verbatim. The header line reads `state:\tOPEN`, which
+# RX_TERMINAL_STATE cannot match in any case, so the only terminal literal such
+# a body can carry is one the DESCRIPTION quotes -- and PR descriptions in this
+# corpus quote API responses as freely as comments do (ai-config#3086 review).
+BODY_QUOTING_CLOSED = (
+    "title:\tSome PR\nstate:\tOPEN\nnumber:\t1038\n--\n"
+    'The fixture reads {"number":7,"closed_at":"2026-01-01T00:00:00Z"}\n')
+# The PR DESCRIPTION alone, as `gh api .../pulls/<N> --jq .body` projects it:
+# raw prose, with the quoted API response's quotes NOT escaped inside any
+# enclosing JSON string. That single escaping level is the whole difference
+# between a projection and the un-projected read (ai-config#3086 review).
+BODY_QUOTING_CLOSED_PROJECTED = (
+    'The fixture reads {"number":7,"closed_at":"2026-01-01T00:00:00Z"}\n')
+# The same description inside the FULL pull object of an OPEN PR, which is what
+# an un-projected `gh api .../pulls/<N>` returns. gh escapes the description's
+# own quotes once inside its JSON, and the transcript escapes them again, so
+# the literal is double-escaped and RX_TERMINAL_STATE cannot reach it -- which
+# is why the un-projected read stays a probe while a projection does not.
+REST_OPEN_BODY_QUOTING = (
+    '{"number":1038,"state":"open","merged":false,"closed_at":null,'
+    '"merged_at":null,"body":"The fixture reads '
+    '{\\"number\\":7,\\"closed_at\\":\\"2026-01-01T00:00:00Z\\"}"}')
 
 case(create("c") + [bash("gh pr merge 1038 --squash", tid="m"), res("m", "{}"),
                     say("Merged.")], False,
@@ -1256,6 +1318,53 @@ case(create("c") + [use("update_pull_request", tid="m", owner="o", repo="r",
 case(create("c") + [bash("gh pr view 1038 --json state,merged", tid="v"),
                     res("v", MERGED), say("Someone merged it.")], False,
      "observing a terminal state on a single-PR probe discharges")
+# Closed WITHOUT merging: the same terminal state, reached the other way
+# (ai-config#3086). Pinned alongside the merged cases so the equivalence is
+# asserted rather than incidental.
+case(create("c") + [bash("gh pr view 1038 --json state,merged", tid="v"),
+                    res("v", CLOSED), say("Closed it without merging.")],
+     False, "observing CLOSED on a single-PR probe discharges too")
+case(create("c") + [bash("gh pr view 1038 --json merged,mergedAt", tid="v"),
+                    res("v", MERGED_FIELDS), say("It merged.")], False,
+     "a probe selecting the merge FIELDS discharges")
+case(create("c") + [bash("gh pr view 1038 --json closed,closedAt", tid="v"),
+                    res("v", CLOSED_FIELDS), say("It closed.")], False,
+     "a probe selecting the close FIELDS discharges, exactly as the merge "
+     "fields do")
+# The REST close: neither a `gh pr` verb nor a structured tool, so before
+# ai-config#3086's review it reached no path at all and the guard stayed armed
+# on a PR the session had just closed. It clears as a PROBE -- the call names
+# one pull and its own result reports the new state.
+case(create("c") + [bash("gh api repos/o/r/pulls/1038 -X PATCH "
+                         "-f state=closed", tid="x"),
+                    res("x", REST_CLOSED), say("Closed it over REST.")],
+     False, "a REST close names one pull and its result reports CLOSED")
+case(create("c") + [bash('gh api "repos/o/r/pulls/1038"', tid="x"),
+                    res("x", REST_CLOSED), say("Read it over REST.")],
+     False, "a REST read of one pull is a probe too")
+# The MCP twin, which a remote/web session has instead of `gh` (ai-config#3086
+# review). Its body is the same snake_case REST shape.
+case(create("c") + [use("mcp__github__pull_request_read", tid="v", owner="o",
+                        repo="r", pullNumber=1038, method="get"),
+                    res("v", REST_CLOSED), say("Read it.")], False,
+     "the MCP single-PR read is a probe, so `gh` is not the only channel")
+# `curl`/`wget` are accepted alongside `gh api`, and the URL they carry has a
+# host in front of the path -- a shape no other case exercises, so an edit to
+# the anchoring would otherwise turn nothing red (ai-config#3086 review).
+case(create("c") + [bash("curl -s -H 'Accept: application/vnd.github+json' "
+                         "https://api.github.com/repos/o/r/pulls/1038",
+                         tid="x"),
+                    res("x", REST_CLOSED), say("Read it with curl.")], False,
+     "a curl read of one pull is a probe, host and all")
+# `--url` is the one request-carrying flag deliberately absent from
+# `_API_VALUE_FLAGS`, since its value IS the path. Nothing else exercises it,
+# so adding it to that set would otherwise turn no case red (ai-config#3086
+# review).
+case(create("c") + [bash("curl -s --url "
+                         "https://api.github.com/repos/o/r/pulls/1038",
+                         tid="x"),
+                    res("x", REST_CLOSED), say("Read it with --url.")], False,
+     "`--url` carries the request path, so its value stays a probe candidate")
 
 # ... and the fail-safe direction, which must survive all of the above.
 case(create("c") + [bash("gh pr merge 1038 --squash", tid="m"),
@@ -1267,6 +1376,176 @@ case(create("c") + [bash("gh pr merge 1038 --squash; echo done", tid="m"),
 case(create("c") + [bash("gh pr view 1038 --json state", tid="v"),
                     res("v", '{"state":"OPEN"}'), say("Still open.")], True,
      "a probe reporting OPEN does not discharge")
+case(create("c") + [bash("gh pr view 1038 --json merged,mergedAt", tid="v"),
+                    res("v", UNMERGED_FIELDS), say("Not merged.")], True,
+     "a probe reporting merged:false alone does not discharge -- it says "
+     "nothing about closure")
+case(create("c") + [bash("gh pr view 1038 --json closed,closedAt", tid="v"),
+                    res("v", OPEN_CLOSE_FIELDS), say("Still open.")], True,
+     "a probe reporting closed:false does not discharge -- the negative "
+     "control for the widened close-side alternatives")
+case(create("c") + [bash('gh api "repos/o/r/pulls/1038/requested_reviewers"',
+                         tid="x"), res("x", REST_CLOSED),
+                    say("Read the reviewers.")], True,
+     "a sub-resource path is not a single-PR probe, whatever its body says")
+case(create("c") + [use("mcp__github__pull_request_read", tid="v", owner="o",
+                        repo="r", pullNumber=1039, method="get"),
+                    res("v", REST_CLOSED), say("Read the other PR.")], True,
+     "an MCP read of a DIFFERENT PR does not discharge this one")
+case(create("c") + [use("mcp__github__pull_request_read", tid="v", owner="o",
+                        repo="r", pullNumber=1038, method="get_diff"),
+                    res("v", DIFF_QUOTING_CLOSED), say("Read the diff.")],
+     True,
+     "an MCP read of a PR's DIFF is not a status read, whatever the diff "
+     "quotes -- the twin of `gh pr diff`, which is not a probe either")
+# The SHELL twins of the `get_comments`/`get_reviews` methods that MCP arm
+# excludes. `gh pr view <N> --comments` and `--json comments` return arbitrary
+# comment text, and a comment quoting an API response -- which PRs in this
+# corpus do constantly -- carries a terminal-state literal that says nothing
+# about the PR the comment sits on. The `gh pr view` arm matched both until
+# _probe_selection was added, so such a comment discharged the obligation with
+# no reviewer requested and no close (ai-config#3086 review).
+case(create("c") + [bash("gh pr view 1038 --comments", tid="v"),
+                    res("v", COMMENT_QUOTING_CLOSED), say("Read the thread.")],
+     True,
+     "`--comments` is not a status read, whatever a comment quotes")
+# The selection-less form, which is the same hole reached by asking for
+# nothing rather than by asking for the wrong thing. A `gh pr view <N>` with no
+# `--json` prints the PR body, so it carries free text for the same reason
+# `--comments` does -- and it cannot discharge legitimately either, since its
+# plain `state:` header is not the JSON shape RX_TERMINAL_STATE matches. A
+# selection is therefore REQUIRED, which is also the form the block message
+# prescribes (ai-config#3086 review).
+case(create("c") + [bash("gh pr view 1038", tid="v"),
+                    res("v", BODY_QUOTING_CLOSED), say("Read it.")],
+     True,
+     "a selection-less `gh pr view` is not a status read -- its output "
+     "carries the PR body")
+# The same text reached through `--json comments`, with `--jq` unwrapping the
+# body to raw prose. The `--jq` is load-bearing: gh escapes a comment's inner
+# quotes once inside its own JSON, so the un-projected form does not match
+# RX_TERMINAL_STATE and would pass here for a reason that has nothing to do
+# with this rule (ai-config#3086 review).
+case(create("c") + [bash("gh pr view 1038 --json comments "
+                         "--jq '.comments[].body'", tid="v"),
+                    res("v", COMMENT_QUOTING_CLOSED), say("Read the thread.")],
+     True,
+     "`--json comments` is not a status read either, and `--jq` does not "
+     "launder it")
+# The near-miss a "names a state field" rule alone would admit: the selection
+# DOES name a state, and carries free text beside it. Pins the ALLOWLIST half
+# specifically -- dropping it, or admitting `comments` into the allowlist,
+# leaves this case green while the two above stay red (ai-config#3086 review).
+case(create("c") + [bash("gh pr view 1038 --json state,comments "
+                         "--jq '.comments[].body'", tid="v"),
+                    res("v", COMMENT_QUOTING_CLOSED), say("Read both.")],
+     True,
+     "a state field does not launder a free-text field selected beside it")
+# And the other half: allowlisted fields that name no state at all. The
+# decision belongs to the SELECTION rather than to the body, so the fixture
+# supplies a body this field list could not have produced -- with the allowlist
+# in place nothing realistic reaches this arm, which is why dropping the
+# state-field requirement would otherwise turn no case red.
+case(create("c") + [bash("gh pr view 1038 --json number", tid="v"),
+                    res("v", REST_CLOSED), say("Read the number.")], True,
+     "a selection naming no state field is not a status read")
+# The REST twin of the two cases above, on the arm that has no `--json` to
+# bound: `gh api .../pulls/<N>` fetches the whole pull object, so a `--jq` or
+# `--template` projection can print the PR's own DESCRIPTION as raw prose --
+# free text carrying whatever terminal literal it quotes, exactly the hole
+# `--comments` and the selection-less `gh pr view` are refused for. The
+# projection therefore costs the probe (ai-config#3086 review).
+case(create("c") + [bash("gh api repos/o/r/pulls/1038 --jq .body", tid="x"),
+                    res("x", BODY_QUOTING_CLOSED_PROJECTED),
+                    say("Read it.")], True,
+     "a `--jq` projection of the pull object is not a status read")
+case(create("c") + [bash("gh api repos/o/r/pulls/1038 -t '{{.body}}'",
+                         tid="x"),
+                    res("x", BODY_QUOTING_CLOSED_PROJECTED),
+                    say("Read it.")], True,
+     "a `--template` projection is not a status read either")
+# The further spellings the flag parser accepts. Without them the `=`-joined
+# and single-dash branches of `_api_projects` could each be dropped with
+# nothing red (ai-config#3086 review).
+case(create("c") + [bash("gh api repos/o/r/pulls/1038 --jq=.body", tid="x"),
+                    res("x", BODY_QUOTING_CLOSED_PROJECTED),
+                    say("Read it.")], True,
+     "an `=`-joined projection is not a status read")
+case(create("c") + [bash("gh api repos/o/r/pulls/1038 -q.body", tid="x"),
+                    res("x", BODY_QUOTING_CLOSED_PROJECTED),
+                    say("Read it.")], True,
+     "a shorthand projection with its value attached is not a status read")
+# The GROUPED shorthand, which pflag accepts too: `-iq .body` is `--include`
+# plus `--jq`, whose value is the next argument. An exact-token test admits it,
+# and admitting it discharges an OPEN PR on its own description -- the failure
+# the four cases above exist to close, reached through the one spelling they
+# did not cover (ai-config#3086 review).
+case(create("c") + [bash("gh api repos/o/r/pulls/1038 -iq .body", tid="x"),
+                    res("x", BODY_QUOTING_CLOSED_PROJECTED),
+                    say("Read it.")], True,
+     "a projection inside a grouped shorthand is not a status read")
+# The control for the widening in the other direction: a single-dash flag that
+# projects NOTHING still leaves a probe. Without it the shorthand branch could
+# refuse every single-dash token and turn no case red, which would disarm the
+# discharge this hook depends on (ai-config#3086 review).
+case(create("c") + [bash("gh api repos/o/r/pulls/1038 -i", tid="x"),
+                    res("x", REST_CLOSED), say("Read it with headers.")],
+     False, "a non-projecting shorthand leaves the REST read a probe")
+# The negative control for why the UN-projected read is still a probe: the same
+# description, inside the full pull object of an OPEN PR. It must not discharge
+# either -- and it does not, because the double escaping puts the literal out
+# of RX_TERMINAL_STATE's reach. Loosening that pattern's backslash allowance
+# would turn this case red and nothing else (ai-config#3086 review).
+case(create("c") + [bash("gh api repos/o/r/pulls/1038", tid="x"),
+                    res("x", REST_OPEN_BODY_QUOTING), say("Read it.")], True,
+     "an un-projected read of an OPEN pull does not discharge on the "
+     "description it embeds")
+# A call carrying NO method at all. The tool's schema marks `method` required,
+# so this is malformed rather than legitimate -- and the guard treats it as
+# not-a-probe, the direction that stays armed. Pinned because relaxing the
+# absent-method default to `get` would otherwise turn no case red
+# (ai-config#3086 review).
+case(create("c") + [use("mcp__github__pull_request_read", tid="v", owner="o",
+                        repo="r", pullNumber=1038),
+                    res("v", REST_CLOSED), say("Read it, method-less.")],
+     True,
+     "an MCP read with no method is not a probe, so a missing method leaves "
+     "the guard armed")
+case(create("c") + [bash("gh api repos/o/r/issues/9/comments "
+                         "-f 'body=status of repos/o/r/pulls/1038'", tid="x"),
+                    res("x", REST_CLOSED), say("Posted a comment.")], True,
+     "a pull path quoted in a PAYLOAD is not the request path, so a "
+     "comment-posting write is not a probe")
+# The REST spelling of `gh pr diff`: the SAME path as a status read, with the
+# representation selected by the `Accept:` header alone, so the body is diff
+# text. The shell twin of the MCP `get_diff` case above (ai-config#3086
+# review).
+case(create("c") + [bash("gh api repos/o/r/pulls/1038 "
+                         "-H 'Accept: application/vnd.github.diff'", tid="x"),
+                    res("x", DIFF_QUOTING_CLOSED), say("Read the diff.")],
+     True,
+     "a diff media type on the pull path is not a status read, whatever the "
+     "diff quotes")
+case(create("c") + [bash("curl -s -H 'Accept: application/vnd.github.diff' "
+                         "https://api.github.com/repos/o/r/pulls/1038",
+                         tid="x"),
+                    res("x", DIFF_QUOTING_CLOSED), say("Read the diff.")],
+     True,
+     "the curl spelling of that diff read is not a status read either")
+# The mirror image of the payload case above, on the REQUEST side: a
+# comment-posting POST whose body quotes the reviewers endpoint must not
+# discharge the obligation it names (ai-config#3086 review).
+case(create("c") + [bash("gh api repos/o/r/issues/9/comments -X POST "
+                         "-f 'body=asked at "
+                         "repos/o/r/pulls/1038/requested_reviewers'", tid="x"),
+                    res("x", '{"requested_reviewers":[{"login":"Copilot"}]}'),
+                    say("Posted a comment.")], True,
+     "the reviewers endpoint quoted in a PAYLOAD is not the request path, so "
+     "a comment-posting write requests nobody")
+case(create("c") + [bash("curl -s https://api.github.com/repos/o/r/pulls/1038"
+                         "/requested_reviewers", tid="x"),
+                    res("x", REST_CLOSED), say("Read the reviewers.")], True,
+     "the curl negative control: a sub-resource URL is not a single-PR probe")
 case(create("c") + [bash("gh pr list --state merged", tid="v"),
                     res("v", MERGED), say("Listed.")], True,
      "a repo-wide list naming no single PR is not a probe")
@@ -1869,6 +2148,64 @@ def _redaction_wording():
         os.unlink(path)
 
 
+def _terminal_wording():
+    """The block text must NAME the closed/merged case as a legitimate defer.
+
+    ai-config#3086: the message enumerated exactly two deferrals -- a
+    deliberate draft, and a redacting diff -- so a session holding a PR closed
+    without merging found no correct action described, and the only sanctioned
+    moves were a false claim of draft status or a request that GitHub accepts
+    and discards. Enumerating carve-outs as though they were exhaustive is the
+    same defect point 3 of ai-config#1392 recorded for the draft-only text.
+
+    The cause wording is asserted too. A close CHAINED ahead of another command
+    is observed and deliberately not credited, so telling that reader the guard
+    "has not observed the transition" is the same misdiagnosis the `chained`
+    paragraph above already exists to prevent (ai-config#3086 review).
+    """
+    reason = reason_of(create("c") + [say("Opened it.")])
+    # "Two" would mean the draft and redaction pair survived unchanged.
+    return ("CLOSED" in reason and "Three legitimate reasons" in reason
+            and "Two legitimate reasons" not in reason
+            and "has not observed" not in reason
+            and "Either way" not in reason
+            and "does not credit as a status read" in reason
+            and "CREDITED" in reason)
+
+
+# Every `gh pr view <N>` line the block text prints. The message carries more
+# than one -- the head/reviews verification is a `gh pr view` too -- so the
+# terminal-state read is picked out by the thing it reads (`state`) rather than
+# by its position, which a reflow would move.
+RX_PRESCRIBED_READ = re.compile(r"^[ \t]*(gh pr view \"<N>\".*)$", re.M)
+
+
+def _terminal_remedy_runs():
+    """The command the message prescribes must be one the guard ACCEPTS.
+
+    This is the single point the whole exemption turns on: a session holding a
+    PR closed outside the transcript can only discharge by making the state
+    visible, and the message names exactly one way to do that. If `probe_ident`
+    does not recognise that command form, the obligation is undischargeable
+    again -- which is precisely the defect ai-config#3086 reports.
+
+    So the form is READ OUT OF THE BLOCK TEXT rather than restated here: a
+    reflow that chains a `| jq` after the read (making it non-last, so `plast`
+    is false), or an edit to `_verb_ident`'s flag handling, must turn this red
+    rather than leaving a green suite over a message nobody can act on
+    (ai-config#3086 review).
+    """
+    reason = reason_of(create("c") + [say("Opened it.")])
+    reads = [m.group(1) for m in RX_PRESCRIBED_READ.finditer(reason)
+             if "state" in m.group(1)]
+    if len(reads) != 1:
+        return False
+    cmd = reads[0].replace("<N>", "1038").replace("<owner>/<repo>", "o/r")
+    return not block_of(create("c") + [
+        bash(cmd, tid="v"), res("v", '{"state":"CLOSED","closed":true}'),
+        say("Read the state.")])
+
+
 def block_of(events):
     out = stdout_of(events)
     return '"decision": "block"' in out or '"decision":"block"' in out
@@ -2054,6 +2391,21 @@ def main():
         passes += 1
     else:
         print("FAIL: the block text does not name the redaction deferral")
+        failures += 1
+
+    if _terminal_wording():
+        print("PASS: the block text names the closed/merged deferral")
+        passes += 1
+    else:
+        print("FAIL: the block text does not name the closed/merged deferral")
+        failures += 1
+
+    if _terminal_remedy_runs():
+        print("PASS: the status read the block text prescribes discharges")
+        passes += 1
+    else:
+        print("FAIL: the status read the block text prescribes does not "
+              "discharge")
         failures += 1
 
     if _chained_request_wording():

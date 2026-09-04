@@ -81,6 +81,8 @@ jobs:
         run: python3 scripts/check_regex_patterns.py
       - name: Run regex pattern check tests
         run: python3 scripts/test_check_regex_patterns.py
+      - name: Run git command regex helper tests
+        run: python3 scripts/test_git_cmd.py
       - name: Run orchestrator tests
         # ai-config#2627: this suite existed and ran nowhere, so the
         # orchestrator's own behaviour was unpinned -- which is how a literal

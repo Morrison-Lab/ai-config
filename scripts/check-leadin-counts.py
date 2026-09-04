@@ -32,7 +32,7 @@ measured against the live corpus rather than guessed:
   accepted false positive. No bound separates it from "Three answers are
   legitimate, and only the first is ...", which is a genuine lead-in of the
   same shape; measured on the corpus, a rule keyed on the copula alone
-  suppresses 21 of the 89 accepted lead-ins, most of them real.
+  suppresses 20 of the 88 accepted lead-ins, most of them real.
 - The lead-in sentence does not end on a conditional subordinator ("if",
   "when", "unless"). "Two changes are independent if:" enumerates the
   CONDITIONS below it rather than the two changes, which is the issue's "the
@@ -68,8 +68,8 @@ Exit codes: 0 clean, 1 at least one mismatch, 2 the scan examined no files
 one that passed).
 
 Gated in `.github/workflows/validate.yml` over every tracked markdown file.
-The corpus reads clean at 0 findings across all 715 tracked markdown files,
-measured 2026-09-04 on the branch that gates it.
+The corpus reads clean at 0 findings; the run prints the population it
+examined.
 """
 from __future__ import annotations
 
@@ -312,8 +312,10 @@ def is_lead_in(lines: list[str], idx: int, fenced: set[int]) -> bool:
     if idx == 0:
         return True
     previous = lines[idx - 1]
-    # Its own paragraph: a count buried at the end of a long paragraph is not
-    # announcing anything.
+    # Its own paragraph. Semantic line breaks put a genuine lead-in at the end
+    # of a multi-line paragraph too, so this bound costs recall: relaxing it
+    # raises accepted lead-ins from 88 to 143 and reports 9 mismatches, 8 of
+    # them false positives.
     return not previous.strip() or bool(HEADING_RE.match(previous))
 
 
@@ -396,7 +398,7 @@ def main(argv=None) -> int:
         return 0
     for rel, line_no, stated, actual, kind, phrase in findings:
         print(
-            f"::warning file={rel},line={line_no}::"
+            f"::error file={rel},line={line_no}::"
             f"lead-in says {stated} ('{phrase}') but {actual} "
             f"{kind}(s) follow; update whichever is wrong"
         )

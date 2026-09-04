@@ -15,7 +15,9 @@ detector on purpose. This checker reads ordinary prose, where a numeral or a
 count word next to a list is far commoner than a real mismatch, so the cases
 proving it stays quiet are what make it usable at all.
 """
+import contextlib
 import importlib.util
+import io
 import sys
 import tempfile
 from pathlib import Path
@@ -212,7 +214,7 @@ def main():
     # count. The SENTENCE-INITIAL form still fires, and no bound separates it
     # from "Three answers are legitimate, and only the first is ..." -- a
     # genuine lead-in of the same shape. Measured on the corpus, a rule keyed
-    # on the copula suppresses 21 of the 89 accepted lead-ins. So this case
+    # on the copula suppresses 20 of the 88 accepted lead-ins. So this case
     # is pinned as accepted rather than silently claimed to be handled: if a
     # later bound fixes it, this line turns red and gets deleted deliberately.
     check(
@@ -237,6 +239,16 @@ def main():
 
     check("main exits 1 on a mismatch", leadin.main([str(bad)]) == 1)
     check("main exits 0 when every count matches", leadin.main([str(good)]) == 0)
+
+    # The step is a hard gate, so a mismatch annotates at error level: a
+    # ::warning renders as non-blocking while the job goes red.
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer):
+        leadin.main([str(bad)])
+    printed = buffer.getvalue()
+    check("a mismatch annotates at error level", "::error file=" in printed)
+    check("a mismatch does not annotate at warning level",
+          "::warning" not in printed)
 
     # A check that examined nothing reports clean and is indistinguishable
     # from one that passed, so an empty population is exit 2.

@@ -339,7 +339,7 @@ Measured on `ucdavis/bcs` at a three-day-old pin, the same 33 imports had grown 
 
 ### Lead-in counts (`scripts/check-leadin-counts.py`)
 
-Prose here introduces a list with a spelled-out count --- "Two consequences worth keeping straight:", "Three things the new observation adds" --- and then enumerates the items below it.
+Prose here introduces a list with a spelled-out count --- "Two lightweight checks keep the skill catalog well-formed:", "Three things the new observation adds" --- and then enumerates the items below it.
 A later edit that splits or merges one item leaves the count stale, and a reader who counts along stops at the stated number and never reaches the last item.
 Nothing else catches it: there is no broken link, the lines are well formed, and the prose reads fluently either way.
 
@@ -351,16 +351,18 @@ python3 scripts/check-leadin-counts.py memories/foo.md # just these files
 Exit `0` every lead-in count matches, `1` at least one mismatch, `2` the scan examined no files (a check that examined nothing reports clean otherwise).
 
 Gated in `validate.yml`, over every tracked markdown file.
-The corpus reads clean at 0 findings across all 715 tracked markdown files, measured 2026-09-04 on this branch.
+The corpus reads clean at 0 findings;
+the checker prints the population it examined on every run.
 The one stale count the checker found on its first run --- `memories/claude-code-permissions.md` said two above three bullets --- is fixed in the same commit that gates it.
 
 False positives, rather than recall, are what bound the design: a checker that flagged every numeral would be switched off, taking the real cases with it.
 So it reads only spelled-out counts that open the last sentence above the enumeration, or sit behind at most two function words ("There are two ...").
+It reads that sentence only when it is its own one-line paragraph, so a count closing a multi-line paragraph is never examined.
 It skips a lead-in ending on a conditional subordinator, since "Two changes are independent if:" enumerates the conditions rather than the changes.
 And it discounts a bold-header run that overshoots the stated count by more than one, since body prose between such headers gives that shape no structural end.
 
 Those bounds are positional rather than semantic, so one shape stays a known false positive: a count that opens its sentence and then names a property of itself ("Two variables at once is hard:").
-No bound separates that from "Three answers are legitimate, and only the first is ...", which is a genuine lead-in of the same shape, and a rule keyed on the copula alone suppresses 21 of the 89 accepted lead-ins in this corpus.
+No bound separates that from "Three answers are legitimate, and only the first is ...", which is a genuine lead-in of the same shape, and a rule keyed on the copula alone suppresses 20 of the 88 accepted lead-ins in this corpus.
 `scripts/test_check_leadin_counts.py` pins it as accepted rather than claiming coverage it does not have.
 
 - **Do:** run it over a file whose bulleted or bold-header sections you have just split or merged.

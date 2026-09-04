@@ -309,12 +309,12 @@ check('no hooks/test-*.py spawns its hook via a bare "python3"',
 # an instrument: derive the counts here rather than trust the instruction.
 
 runner_src = SCRIPT.read_text(encoding="utf-8")
-declared = re.findall(r"(\d+) repos plus (\d+) rounds", runner_src)
+declared = re.findall(r"(\d+) cases plus (\d+) rounds", runner_src)
 case_ids = set(re.findall(r'\(\s*"([DWS]\d+)"\s*,', src))
 clauses = re.findall(r'^    "\w+": \($',
                      src[src.index("MUTATIONS = {"):], re.M)
 check("the timeout comment states the population it was measured on",
-      bool(declared), "no 'N repos plus M rounds' reading in the comment")
+      bool(declared), "no 'N cases plus M rounds' reading in the comment")
 measured = (str(len(case_ids)), str(len(clauses)))
 check("the timeout comment's latest population matches the suite",
       bool(declared) and declared[-1] == measured,

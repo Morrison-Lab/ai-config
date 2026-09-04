@@ -115,7 +115,8 @@ A subshell written with PARENTHESES scopes a `cd` to itself, so
 `_simple_commands` therefore labels each simple command with the subshell it
 runs in, using the parentheses `shlex` has already separated from quoted text,
 and `evaluate` keeps one directory per subshell: a subshell inherits its
-caller's directory when it opens, and nothing it does is ever read back out. Reading such a push in `elsewhere` is the
+caller's directory when it opens, and nothing it does is ever read back out.
+Reading a push that sits OUTSIDE those parentheses in `elsewhere` is the
 wrong-repository reading of ai-config#2451 again, and this file introduced it
 before the parentheses were tracked at all (measured 2026-09-04).
 
@@ -132,15 +133,27 @@ own, are declined as well. Both arrive here looking exactly like an ordinary
 short-circuiting nor forking, so applying them read the later push in
 `elsewhere` where no shell ever puts it -- ai-config#2451's wrong-repository
 warning once more, in each of the shapes below (measured 2026-09-04). Three
-things are tracked to decline them.
+things are tracked to decline them, and a fourth decline below has a
+different reason.
 
 A compound statement's body runs only when a branch is taken or an iteration
 begins, so `evaluate` counts the REGION one opens (`if`, `while`, `until`,
 `for`, `select`, `case`) and closes (`fi`, `done`, `esac`), and declines every
-`cd` inside. The region rather than the opening keyword, because a keyword
-attaches to a single simple command: `if ...; then echo no; cd elsewhere; fi`
-leaves that `cd` carrying no keyword at all, and it was applied while the
-one-command body beside it was declined.
+`cd` in that body. The region rather than the opening keyword, because a
+keyword attaches to a single simple command: `if ...; then echo no;
+cd elsewhere; fi` leaves that `cd` carrying no keyword at all, and it was
+applied while the one-command body beside it was declined.
+
+The CONDITION such a statement opens is the fourth decline, and the reason is
+not the one above: a condition runs in the current shell, so its `cd` really
+is reached. What the region cannot do is see it. The condition shares one
+argv with the keyword, so `if cd elsewhere; then git push; fi` left that `cd`
+unseen and read the push in the session's own repository -- ai-config#2451's
+wrong-repository warning, its misattributed commit list and its
+branch-into-itself merge included (measured 2026-09-04). `evaluate` tests
+that argv's remainder for a `cd` and declines it, rather than resolving it,
+because where the shell sits after `fi` depends on whether the condition
+succeeded.
 
 Each simple command carries the operator PRECEDING it, which is what tells an
 alternative from a chain: a `cd` after `||` runs only when what came before
@@ -149,6 +162,16 @@ failed, and a `cd` after `|` is a pipeline element the shell forks.
 Each also carries the operator FOLLOWING it, because a fork is invisible from
 the operator before: `cd elsewhere & git push` and `cd elsewhere | cat; git
 push` both move a directory the pushing shell never sees.
+
+That operator is the FIRST of its punctuation run, and the run is where it
+was lost: a newline becomes `;` here, so `cd elsewhere &` at the end of a line
+arrives as `&;`, and folding the whole run reported the `;` and discarded the
+fork -- the wrong-repository reading arriving through the very clause added
+to stop it (measured 2026-09-04). The trailing operator also propagates
+BACKWARDS across `&&` and `||`, because a `&` backgrounds the whole AND-OR
+list before it rather than the one command it follows: in
+`cd elsewhere && make & git push` the `cd` is forked too (measured
+2026-09-04, in the one-line and end-of-line spellings alike).
 
 `&&` is deliberately NOT declined, because a `cd` and a later push joined by an
 unbroken `&&` chain are reached together: the push runs only if everything
@@ -272,6 +295,9 @@ LEAD_WORDS = {"then", "do", "else", "elif", "!", "time", "sudo", "command",
 # (measured 2026-09-04). `elif` opens nothing -- its `if` already did -- and
 # `{` / `}` open nothing either, since a brace group runs in the current shell
 # whenever the command carrying it runs.
+#
+# The region covers the BODY. A `cd` in the opening statement's own condition
+# shares an argv with the keyword and is declined separately in `evaluate`.
 BLOCK_OPEN = {"if", "while", "until", "for", "select", "case"}
 BLOCK_CLOSE = {"fi", "done", "esac"}
 
@@ -387,6 +413,14 @@ def _simple_commands(cmd):
     question the leading one cannot: `cd a & git push` and `cd a | cat` each
     fork the `cd` into a subshell, and from the operator before it that `cd` is
     indistinguishable from an ordinary one (measured 2026-09-04).
+
+    Two things make that operator survive the shapes a real command is written
+    in. It is read as the FIRST operator of its punctuation run rather than
+    the run folded down, because a newline becomes `;` here and `cd a &` at
+    the end of a line therefore arrives as `&;`. And it propagates BACKWARDS
+    across `&&` and `||` within one subshell, because a `&` backgrounds the
+    AND-OR list before it rather than its own command alone: in
+    `cd a && make & git push` the `cd` is forked too (measured 2026-09-04).
     """
     cmd = re.sub(r"\\\r?\n", " ", cmd)
     cmd = RX_HEREDOC.sub("<<", cmd)
@@ -402,6 +436,13 @@ def _simple_commands(cmd):
         if t and set(t) <= _SHELL_OPS:
             trailing = ""
             for ch in t:
+                # Only the FIRST operator of a punctuation run is read. A
+                # newline becomes `;`, so `cd elsewhere &` at end of line
+                # arrives as the single run `&;`, and folding the whole run
+                # discarded the `&` that forked the command (measured
+                # 2026-09-04).
+                if trailing and ch != trailing[-1]:
+                    break
                 trailing = _next_sep(trailing, ch)
             if cur:
                 cmds.append((scopes[-1], cur, sep, trailing))
@@ -418,6 +459,16 @@ def _simple_commands(cmd):
             cur.append(t)
     if cur:
         cmds.append((scopes[-1], cur, sep, ""))
+    # A `&` backgrounds the whole AND-OR list before it, not only the command
+    # it follows, so `cd elsewhere && make & git push` forks the `cd` as well.
+    # The trailing operator is therefore propagated backwards across `&&` and
+    # `||` inside one subshell: without it that push was read in `elsewhere`,
+    # which is ai-config#2451's wrong-repository warning (measured
+    # 2026-09-04).
+    for i in range(len(cmds) - 1, 0, -1):
+        prev, here = cmds[i - 1], cmds[i]
+        if here[3] == "&" and prev[3] in ("&&", "||") and prev[0] == here[0]:
+            cmds[i - 1] = (prev[0], prev[1], prev[2], "&")
     return cmds
 
 
@@ -844,6 +895,11 @@ def evaluate(command, base_cwd=None):
     `if ...; then echo no; cd elsewhere; fi` was applied while the
     one-command body beside it was declined (measured 2026-09-04).
 
+    The CONDITION that opens such a statement is declined by its own test,
+    because it shares one argv with the keyword and so is never a command the
+    region sees: `if cd elsewhere; then git push; fi` read the push in the
+    session's own repository (measured 2026-09-04).
+
     Where the reading ends up in a different directory from `base_cwd`, the
     warning SAYS so and emits its remediation commands with `git -C`, because
     the reader's shell is still in `base_cwd`: a bare `git merge origin/<b>`
@@ -884,6 +940,17 @@ def evaluate(command, base_cwd=None):
         lead, _override, _redirected = _lead_prefix(argv)
         head = argv[lead:]
         if head and head[0] in BLOCK_OPEN:
+            # The CONDITION shares this argv with the keyword that opens the
+            # region, and it runs in the current shell rather than in the body
+            # the region declines -- so `if cd elsewhere; then git push; fi`
+            # really does move the push. Leaving it unseen read that push in
+            # the session's own repository (measured 2026-09-04). It is
+            # DECLINED rather than resolved, because where the shell ends up
+            # after `fi` depends on whether the condition succeeded.
+            cond = head[1:]
+            skip, _o, _r = _lead_prefix(cond)
+            if skip < len(cond) and cond[skip] in CD_WORDS:
+                dirs[scope] = None
             region += 1
         elif head and head[0] in BLOCK_CLOSE:
             region = max(region - 1, 0)

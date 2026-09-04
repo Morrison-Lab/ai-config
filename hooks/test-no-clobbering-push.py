@@ -568,6 +568,57 @@ def pipeline_cd_case(path, bare):
     return f"cd {wt} | cat; git push origin HEAD:peer-pipe"
 
 
+def condition_cd_if_case(path, bare):
+    """`if cd <worktree>; then git push ...; fi` -- the `cd` is the CONDITION.
+
+    It shares one argv with the keyword that opens the region, so the region
+    never sees it and the operators recorded either side belong to the whole
+    `if` rather than to the `cd`. Leaving it unseen read the push in the
+    session's own repository, which diverges here: the
+    wrong-repository warning of ai-config#2451, its misattributed commit list
+    and its branch-into-itself merge included (measured 2026-09-04).
+
+    A condition runs in the current shell, so declining is the answer rather
+    than resolving: whether the shell is still there after `fi` depends on
+    whether the condition succeeded.
+    """
+    wt = _wrong_repo_worktree(path, bare, "cond-if")
+    return f"if cd {wt}; then git push origin HEAD:cond-if; fi"
+
+
+def condition_cd_while_case(path, bare):
+    """`while cd <worktree>; do git push ...; done` -- the same argv shape
+    under a different keyword, so a fix keyed on `if` alone would miss it."""
+    wt = _wrong_repo_worktree(path, bare, "cond-while")
+    return f"while cd {wt}; do git push origin HEAD:cond-while; done"
+
+
+def background_cd_newline_case(path, bare):
+    """S29 with the `&` at the END OF A LINE, which is how a multi-line Bash
+    call spells it.
+
+    A newline is rewritten to `;` before parsing, so the fork arrives as the
+    single punctuation run `&;`. Folding the run reported the `;` and
+    discarded the `&`, which applied a `cd` a real shell forks -- the
+    wrong-repository reading arriving through the very clause added to stop it
+    (measured 2026-09-04).
+    """
+    wt = _diverged_peer_worktree(path, "peer-bg-nl")
+    return f"cd {wt} &\ngit push origin HEAD:peer-bg-nl"
+
+
+def background_list_cd_case(path, bare):
+    """`cd <worktree> && true & git push` -- the `&` backgrounds the whole
+    AND-OR list, so the `cd` is forked even though `&&` follows it.
+
+    The operator after the `cd` is the one separator this guard deliberately
+    keeps, so only propagating the `&` backwards over the chain can decline
+    it.
+    """
+    wt = _diverged_peer_worktree(path, "peer-bg-list")
+    return f"cd {wt} && true & git push origin HEAD:peer-bg-list"
+
+
 def pipeline_rhs_cd_case(path, bare):
     """`echo x | cd <worktree>; git push` -- the same fork read from the other
     side, where the `|` PRECEDES the `cd` rather than following it."""
@@ -792,6 +843,18 @@ SHOULD_STAY_SILENT = [
     ("S31", pipeline_rhs_cd_case,
      "`echo x | cd <worktree>; git push` -- the same fork with the `|` before "
      "the `cd`"),
+    ("S32", condition_cd_if_case,
+     "`if cd <worktree>; then git push; fi` -- the `cd` is the condition, "
+     "which shares an argv with the keyword"),
+    ("S33", condition_cd_while_case,
+     "`while cd <worktree>; do git push; done` -- the same shape under "
+     "another keyword"),
+    ("S34", background_cd_newline_case,
+     "`cd <worktree> &` at the end of a line -- the newline joins the fork "
+     "into one punctuation run"),
+    ("S35", background_list_cd_case,
+     "`cd <worktree> && true & git push` -- the `&` backgrounds the whole "
+     "AND-OR list"),
 ]
 
 
@@ -1143,10 +1206,17 @@ MUTATIONS = {
     "branch_region_declines": (
         "a compound statement opens a REGION, so every `cd` in its body is "
         "declined rather than only the one carrying the keyword",
-        [('BLOCK_OPEN = {"if", "while", "until", "for", "select", "case"}',
-          "BLOCK_OPEN = set()")],
+        # Anchored on the region's USE rather than on `BLOCK_OPEN`: the
+        # condition test below sits inside the same `head[0] in BLOCK_OPEN`
+        # arm, so emptying that set would revert two clauses at once and
+        # report a flip set neither of them owns.
+        [("            if region or sep in BRANCH_SEPS or after in "
+          "FORK_SEPS:",
+          "            if sep in BRANCH_SEPS or after in FORK_SEPS:")],
         # S27 and S28 are the shapes a keyword-only test missed: their `cd` is
-        # not the body's first command, so no keyword reaches it.
+        # not the body's first command, so no keyword reaches it. S32 and S33
+        # do NOT flip: their `cd` is the condition rather than the body, and
+        # a separate clause declines it.
         {"S23", "S27", "S28"},
     ),
     "alternative_cd_declines": (
@@ -1160,7 +1230,10 @@ MUTATIONS = {
         "a `cd` the shell forks into a subshell of its own -- backgrounded, "
         "or piped -- moves no directory the push can see",
         [('FORK_SEPS = {"&", "|"}', "FORK_SEPS = set()")],
-        {"S29", "S30"},
+        # S34 and S35 are the same decline reached by two shapes whose `&`
+        # this clause could not see until it was recovered: one written at the
+        # end of a line, and one backgrounding the whole AND-OR list.
+        {"S29", "S30", "S34", "S35"},
     ),
     "separator_is_tracked": (
         "each simple command carries the operator before it, which is what "
@@ -1173,11 +1246,40 @@ MUTATIONS = {
     "trailing_separator_is_tracked": (
         "each simple command also carries the operator after it, which is the "
         "only side a fork is visible from",
-        [('            trailing = ""\n'
-          "            for ch in t:\n"
-          "                trailing = _next_sep(trailing, ch)",
-          '            trailing = ""')],
-        {"S29", "S30"},
+        # Anchored on the assignment alone rather than on the loop around it:
+        # the loop now also carries the first-operator break, and blanking the
+        # pair would revert two clauses at once.
+        [("                trailing = _next_sep(trailing, ch)",
+          "                pass")],
+        {"S29", "S30", "S34", "S35"},
+    ),
+    "trailing_separator_reads_the_first_operator": (
+        "a punctuation run reports the operator it STARTS with, so the `;` a "
+        "newline leaves behind cannot overwrite the `&` before it",
+        [("                if trailing and ch != trailing[-1]:\n"
+          "                    break\n", "")],
+        # Only the end-of-line spelling can see this: S29 writes the `&` and
+        # the next command on one line, so its run is a single character.
+        {"S34"},
+    ),
+    "background_forks_the_whole_list": (
+        "a `&` backgrounds the AND-OR list before it, so the trailing "
+        "operator propagates backwards across `&&` and `||`",
+        [("        prev, here = cmds[i - 1], cmds[i]\n"
+          '        if here[3] == "&" and prev[3] in ("&&", "||") '
+          "and prev[0] == here[0]:\n"
+          '            cmds[i - 1] = (prev[0], prev[1], prev[2], "&")',
+          "        pass")],
+        {"S35"},
+    ),
+    "condition_cd_declines": (
+        "a `cd` in a compound statement's own condition is declined, though "
+        "it shares an argv with the keyword and the region never sees it",
+        [("            if skip < len(cond) and cond[skip] in CD_WORDS:\n"
+          "                dirs[scope] = None",
+          "            if False:\n"
+          "                dirs[scope] = None")],
+        {"S32", "S33"},
     ),
     "unexpanded_value_declines": (
         "a `$name` or a command substitution names no directory, so it is "
@@ -1205,8 +1307,9 @@ MUTATIONS = {
           "        if cwd is None:\n            cwd = os.getcwd()")],
         # S19 and S20 reach the same gate by a different route: their
         # directory is indeterminate because the REPOSITORY was redirected,
-        # not because a `cd` was.
-        {"S18", "S19", "S20"},
+        # not because a `cd` was. S32 and S33 reach it because a `cd` in a
+        # condition is declined without being resolved.
+        {"S18", "S19", "S20", "S32", "S33"},
     ),
     "dash_c_moves_the_push": (
         "the push's own `-C` values are read out, not skipped as option noise",

@@ -32,9 +32,18 @@ Take the wave from a live query at every check-in, rather than freezing a list o
 A PR opened minutes ago, or one the review bot pushed to, belongs to the wave and never entered any list written earlier ([`derive-dont-enumerate`](../../shared/workflow/derive-dont-enumerate.md)).
 
 ```bash
-python3 scripts/pr-sweep.py -R <owner>/<repo> --include-drafts
-gh issue list --state open --json number,title,url \
-  --search "commenter:$(gh api user -q .login) \"hold off\" in:comments"
+me=$(gh api user -q .login)
+python3 scripts/pr-sweep.py -R <owner>/<repo> --include-drafts --json \
+  | jq --arg me "$me" '.repos[].prs[] | select(.author == $me)'
+for phrase in "hold off" "paws off" "back off"; do
+  gh issue list --state open --json number \
+    --search "commenter:$me \"$phrase\" in:comments" -q '.[].number'
+done | sort -un | while read -r n; do
+  gh issue view "$n" --json number,title,url,comments -q '
+    select([.comments[] | select((.body | test("hold off|paws off|back off"; "i"))
+      and (.body | test("unclaim|released|PR is free|now mergeable"; "i") | not))]
+      | length > 0) | [.number, .title, .url] | @tsv'
+done
 ```
 
 Where the script is unavailable, fall back to `gh pr list --state open --author @me --json number,title,url,headRefName,isDraft`.

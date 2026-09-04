@@ -729,3 +729,12 @@ At `147710bb`, [#3166](https://github.com/Morrison-Lab/ai-config/pull/3166) has 
 The last adversarial verdict was at `6c8db734`, three commits back, so a pre-merge verdict at the shipping head runs in the one free slot before the standing grant is used;
 the session's bar for that grant has been the cross-model quorum plus the adversarial verdict at the head that ships.
 [#3154](https://github.com/Morrison-Lab/ai-config/pull/3154) at `5652ebd5` waits on its three reviewers.
+
+## 18:04 PDT --- #3154 at `c6ea044c`: a false claim about `git grep -r`, answered with a measurement and a shorter command
+
+At `5652ebd5` the claude-review run returned Ready for merge again and CI stayed green.
+Copilot's eighth round said `git grep` does not accept `-r`;
+it does (`--recursive`, the default), every count in the record was measured with it, and dropping it leaves the file lists at `3935bfff` identical (three and eight).
+Since the flag was redundant, the two commands drop it at `c6ea044c` and the measurement is on the PR;
+Copilot and Jules re-requested.
+Two of Copilot's last four claims about tool behaviour on this session's PRs were false (`git log --cc` without `-p`, `git grep -r`), and both were answered the same way: measure first, then apply only a change that is harmless and shorter.

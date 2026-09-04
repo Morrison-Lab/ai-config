@@ -755,10 +755,20 @@ and the verdict's own conclusion every round.**
   And no `<summary>`-scoped match on `suppressed` exists anywhere under
   `scripts/`, so the check prescribed by "A clean overview can hide a
   collapsed findings block" above is prescribed and not implemented.
-  A review body carrying findings under no parsable verdict is the third.
+  A third surface sits outside it for a different reason: a review body
+  carrying findings under no parsable verdict is *fetched* --- the body is
+  read --- and simply not counted, because the verdict scan has nothing to
+  key on.
+  The second query below is what covers it, and covering it means reading
+  the body yourself rather than adding a query.
 
-  So run these two beside the instrument, every round, and read their output
-  rather than the instrument's exit code as the answer to this section:
+  So run both of these beside the instrument, every round, and read their
+  output rather than the instrument's exit code as the answer to this
+  section.
+  The first reaches the inline comments.
+  The second returns the review bodies, which is where both the collapsed
+  suppressed block and the unparsed-verdict findings live --- so it answers
+  two of the three surfaces, and only by your reading what it prints:
 
   ```bash
   gh api repos/<owner>/<repo>/pulls/<N>/comments \

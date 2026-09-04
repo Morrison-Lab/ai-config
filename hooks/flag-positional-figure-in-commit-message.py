@@ -159,7 +159,7 @@ COMMIT = re.compile(
 # positives against one measured false positive is a losing trade for a
 # warn-only hook, whose whole capital is that a fire means something.
 RX_POSITIONAL = re.compile(
-    r"~?\b\d+ (?:lines?|characters?|chars?|words?)\s+"
+    r"~?\b\d+\s+(?:lines?|characters?|chars?|words?)\s+"
     r"(?:above|below|earlier|later)\b",
     re.IGNORECASE,
 )

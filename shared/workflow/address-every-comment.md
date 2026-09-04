@@ -387,6 +387,56 @@ still failed.)
 
 **A flagged item that came in via a `main`-sync merge, not your own diff, is still a Defer --- just one where the follow-up is fixing it on `main` directly, not filing a per-PR issue.** This is not the ARD skill's "Acknowledge" disposition: `skills/ard/SKILL.md` reserves Acknowledge for praise or a no-ask observation, and explicitly warns against stretching it to dodge a real finding --- a redundant config line a reviewer flags is a real finding with an implied fix request, so it needs a real disposition, not a label that means "no change requested." When a reviewer flags something (a redundant config line, a stale pattern) inside a file your branch only touches because you merged `main` in to resolve a conflict, check provenance before fixing it: `git log`/`git blame` the flagged line, or just compare against `origin/main`'s current content. If it's identical to `main`, "fixing" it on your branch alone doesn't fix anything --- it just makes your branch disagree with `main` on unrelated content the next person to touch that file will have to reconcile again. Reply agreeing the finding is correct but out of scope for this PR, and leave it for whoever owns that file's actual content to fix on `main` directly --- no follow-up issue needed, since the fix target is `main` itself, not this PR's own change.
 
+**A reviewer's own "out of scope" note is a scope claim, and one `git diff` query settles it.**
+The rule is already in this file --- "A note the reviewer declined to raise is still a claim, and so is your refutation of it" says to verify a declined, out-of-scope, or passing note against the code before either acting on it or writing it off.
+What that rule does not carry is the query, and for a scope claim specifically the query is exact rather than a judgement.
+The paragraph above governs checking provenance before *fixing* a flagged line;
+this is the same check pointed at the decision *not* to fix one, which is the direction that fails silently.
+Skipping the check before a fix costs a redundant edit, which the next reader can see and undo.
+Skipping it before a skip ships a defect inside your own diff, and nothing reports that: the note reads as scope discipline, the reviewer sounds careful, and the PR merges with the finding parked.
+
+The instrument is one command:
+
+```bash
+git diff origin/<default-branch>...HEAD -- <file> | grep -nF -- '<the flagged text>'
+```
+
+`-F` and `--`, not a bare `grep`.
+The flagged text is pasted from a review comment, so it carries the passage's own punctuation, and in regex mode a dot or a star is an operator: measured, `a.c` matches both `a.c` and `abc`, so the check reports a `+` for a line the branch never added, which is the wrong answer it was run to rule out.
+The regex case is the dangerous one, because it is the quiet one: a wrong answer arrives with no diagnostic attached to it.
+Text opening with `-` fails loudly by comparison --- `grep -n '-fast'` reads `-f ast`, writes a diagnostic to stderr and exits 2, so nothing is searched and you can see that nothing was.
+`--` is still worth having: a check that dies on a whole class of flagged text is one you stop reaching for.
+
+Three dots, not two.
+Two dots compares the two tips rather than diffing from the merge base, and it fails in both directions.
+A line the base DELETED after you branched shows as a `+`, so you claim a finding that is not yours and pay a redundant edit --- the cheaper failure, since the next reader can see and undo it.
+The costly one is the reverse: when the base independently ADDS the same line, both tips carry it, two dots emits no `+` at all, and the check reports a line your branch really did add as not-yours.
+That is the silent skip this section is about, arrived at through the instrument meant to prevent it.
+Both are measured against a local branch named `main`,
+so the two readings below name it rather than the remote-tracking placeholder above:
+they report the commands that ran, and are not themselves the instrument to copy.
+On a line the base deleted, `main..HEAD` reported `+removed-later-on-main` beside the real addition, where `main...HEAD` reported only the real one.
+On a line both sides added, `main..HEAD` reported 0 added lines against `main...HEAD`'s 1.
+
+A `+` line means the branch added it, so [`dont-incur-technical-debt`](../principles/dont-incur-technical-debt.md)'s question answers itself and the fix is yours now.
+
+The mistake that produces the wrong note is worth naming, because it is not carelessness.
+The reviewer locates the flagged line by reading the file at `HEAD` --- `sed -n`, an editor, a `grep` over the checkout --- sees it sitting in surrounding text the diff never touched, and reads that context as provenance.
+That is [`verify-the-right-artifact`](verify-the-right-artifact.md)'s substitution of a checkout for the change, and the checkout answers a different question.
+A file shows what is there;
+only the diff shows who put it there.
+
+- **Do:** run the diff query on every finding a reviewer marks out of scope, before parking it.
+- **Do:** treat a `+` line as settling the question --- an in-diff defect is fixed now, whatever the note said.
+- **Don't:** accept a scope claim because the reviewer read the file and the line looked pre-existing.
+- **Don't:** read "out of scope" as the cheaper disposition;
+  it is the one whose error is invisible.
+
+(Measured 2026-09-03 on [ai-config#3060](https://github.com/Morrison-Lab/ai-config/pull/3060).
+An adversarial round returned PASS and appended an out-of-scope note about an overclaiming line in `shared/workflow/adversarial-self-review.md`.
+The diff query returned that line as a `+` line added by the same branch.
+Asked to check its own scope claim rather than to accept the correction, the reviewer confirmed the error and named its cause: it had located the line with `sed -n '760,800p'` over the checkout, rather than asking the diff whether the branch had added it.)
+
 **This generalizes to a skill's own inline restatement of a fragment it
 links to.** A `SKILL.md` that links a backing `shared/` fragment for the
 full detail often *also* restates the fragment's approach or word list
@@ -800,10 +850,34 @@ seeds.
 Tracked as
 [ai-config#2028](https://github.com/Morrison-Lab/ai-config/issues/2028).)
 
+**A finding raised against someone else's implementation is measured, not adopted or dismissed.**
+Every verification rule above assumes the finding was raised against **your** artifact.
+A different shape arrives when a peer session runs an adversarial pass on **its own** draft of a similar mechanism, finds edge cases there, and asks whether they apply to yours.
+Nothing in that exchange is a review of your work, so none of the machinery above fires, and the two obvious responses --- dismissing it as being about different code, or adopting it and fixing --- are both wrong.
+Run the peer's cases against your implementation as concrete inputs, and report back which passed.
+Then check whether your suite already covers the shape before adding anything --- by breaking the guard and seeing what goes red, not by reading the suite for a case that looks similar.
+Check too that the property the peer says makes the shape matter is one your implementation can actually respond to;
+in the recorded instance it was not.
+
+- **Do:** run a peer's edge cases as concrete inputs against your implementation, and report which passed.
+- **Do:** establish coverage by mutation before adding a regression case, since the case you are about to write may already be there.
+- **Do:** pin the shape when the mutation shows it genuinely uncovered and the peer's reason names why it matters.
+- **Don't:** dismiss a finding because it was raised against different code --- whether it transfers is measurable, and measuring is cheaper than arguing.
+- **Don't:** adopt it either, or fix against it before establishing that your implementation has the defect.
+- **Don't:** settle it by reading your own pattern;
+  that is the same self-confirmation dispatching a reviewer exists to avoid.
+- **Don't:** add a regression case on the strength of a claim that the shape is untested.
+  Mutate first --- in the one recorded instance both "missing" cases were verbatim duplicates.
+  The same caution extends to a claim of your own, though the record does not demonstrate that arm.
+
+See [`address-every-comment.cases.md`](address-every-comment.cases.md),
+"A peer's edge cases raised against a different implementation".
+
 **Softening the quantifier a finding named as unsupported is not addressing
 it, because the evidence base a reviewer measured did not change.**
 A finding of the shape "this generalizes from one instance" has an
-observation and an inference exactly like the one above, and the inference
+observation and an inference exactly like the one in **Accepting a finding
+does not verify the fix it appears to license** above, and the inference
 here is the adverb itself: "frequently", "often", "typically" all assert a
 rate, and a rate needs more than the one case the passage reports.
 The tempting fix trades the flagged word for a milder synonym --- "commonly"

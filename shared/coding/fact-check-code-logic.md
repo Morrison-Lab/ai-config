@@ -632,6 +632,59 @@ See
 was wrong" for the general form this instance is one of three of, all
 on the same PR.)
 
+### Three ways an assertion passes without ever seeing the value it names
+
+The vacuous modes above concern an assertion evaluated against an empty or self-satisfying collection.
+These three concern an assertion evaluated against a **non-empty** stream that is not the stream the test claims to be reading.
+Each looks like ordinary, specific coverage --- a named value,
+an anchored pattern, a real comparison ---
+and each passes against deliberately broken code.
+
+- **The harness merges the streams.**
+  A runner that captures stdout and stderr into one buffer lets any log line,
+  progress message,
+  or warning satisfy an anchored grep meant for the program's *output*.
+  The assertion is specific, the pattern is anchored,
+  and the value it matched was written by the logger.
+  Check what the harness captures before trusting any assertion over captured text,
+  and assert against the stream you mean by capturing them separately.
+- **Two values are emitted as one field.**
+  When a formatter concatenates two variables with no separator,
+  a test asserting on the combined field cannot distinguish them,
+  so a defect that swaps, drops,
+  or duplicates one of the two leaves the assertion intact.
+  Assert on the parsed fields, or on a separator the format guarantees ---
+  not on a substring of the joined line.
+- **A subsequence match cannot see an appended item.**
+  An `in_order`-style assertion checks that the named items appear in that relative order.
+  Extra content between them, and extra content after the last of them,
+  satisfies it by construction ---
+  so a test written to pin an output's shape is blind to anything the code appends.
+  Pair every ordering assertion with a length or exact-set assertion,
+  or the ordering check is a lower bound and nothing more.
+
+The general form: **name the stream, the field,
+and the completeness the assertion actually constrains**,
+and check that each is the one the test is about.
+All three survive the "does it read as coverage" glance precisely because the assertion names a real,
+specific value --- what is wrong is the haystack, not the needle.
+
+- **Do:** state, for each assertion, which stream it reads,
+  which field it isolates, and what it forbids the output from also containing.
+- **Do:** pair an ordering assertion with an exact-set or length assertion,
+  so it constrains more than a lower bound.
+- **Don't:** trust an assertion over captured text without checking whether the harness captured one stream or two.
+- **Don't:** read a specific, named,
+  anchored expected value as evidence the assertion is discriminating ---
+  specificity of the needle says nothing about the haystack.
+
+(Measured 2026-09-02 Pacific on [ai-config#3023](https://github.com/Morrison-Lab/ai-config/pull/3023), whose own body records "Nine adversarial rounds,
+34 findings", several rounds finding a real defect in the previous round's fix.
+The three shapes above account for three of the four occasions on that PR where a suite passed against deliberately broken code.
+The fourth --- asserting a value is PRESENT on the failure path without asserting it ABSENT on the success path ---
+is the positive-fixture-without-negative-control case that "A predicate a fix adds needs mutation in both directions" above already covers,
+and is recorded as a recurrence of that entry rather than written again here.)
+
 ## When the runtime is available, run the claim instead of reasoning about it
 
 Every check above can be done by reading.
@@ -1297,4 +1350,30 @@ This is the single-constant counterpart to the sibling-audit rule in
 ("When one parser construct becomes tolerant of a condition, audit its siblings for the same condition"):
 where that rule prescribes sweeping distinct constructs that parse the same syntax class,
 this one prescribes eliminating duplicate literals for the exact same construct outright.)
+
+## Prose about your own tests and instruments overclaims by default, and it can be the dominant finding class
+
+Every section above treats one claim at a time --- a mutation that did not apply, a needle already present, a count asserted rather than derived.
+Across a long review it compounds into something worth naming on its own: a PR whose *code* was correct within a round or two can still take many more rounds to land, because nearly every remaining finding is a **claim about the code's own tests**, not a defect in the code.
+
+The claims that keep failing this way share a shape --- each is a sentence about the session's own instruments, and each is cheap to write and expensive to check, so the writer settles for plausible:
+
+- A "superset" relation between two mutations or two test arms, asserted rather than run.
+- A phrase attributed to a rendered or generated artifact ("the docstring says X", "the comment lands in paragraph Y") without rendering it and looking.
+- A coverage claim scoped with "the only arm that ..." when a neighboring arm was never checked against the same input.
+- An enumeration claimed exhaustive ("two cases: A and B") when a third case exists in the code (an `||`, an early return, an alternate branch) and was simply not looked for.
+- A count in prose ("four mutations were confirmed") that does not match the count of items actually named in the surrounding paragraph.
+
+None of these is a hard error to catch in isolation --- each reads as a small, plausible aside in a paragraph that is otherwise doing real work, which is exactly why they survive a first self-read and only surface once a reviewer tries to reproduce the specific claim.
+
+The remedy is the same one this file gives for code: run the thing before describing it.
+
+- **Do:** run the mutation and the ablation before asserting a superset or coverage relation between them.
+- **Do:** render the artifact (the docstring, the generated message, the diff) and grep or read it before saying a phrase appears in it.
+- **Do:** enumerate the actual branches in the code (grep for the operator, walk the `if`/`elif`/`else`) before writing "the only case" or "two cases".
+- **Do:** count the items you are about to name in a sentence, and match the stated count to that count.
+- **Don't:** treat a plausible-sounding claim about your own tests as needing no check merely because it is about testing infrastructure rather than about the feature --- it is exactly as checkable, and exactly as likely to be wrong.
+- **Don't:** read "the code is right" as "the PR is ready" while claims about the code's own verification remain unmeasured.
+
+(A session working in `Morrison-Lab/gha` recorded the incident that produced this section in its own local `prose-about-my-own-tests-overclaims.md` --- project-local Claude Code auto-memory, not a file committed to any repository, so there is no link to give here: roughly eleven adversarial review rounds on one PR, where the code was correct by round two and every one of the remaining rounds found a claim of exactly the shapes listed above.)
 

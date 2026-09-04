@@ -209,6 +209,35 @@ def _skew(claimed, measured):
     return diff - 1440 if diff > 720 else diff
 
 
+def _mask_nested(line):
+    """`line` with every character inside a quoted, substituted, or grouped
+    span replaced by a space, so an operator there is not a boundary."""
+    out = []
+    stack = []
+    escaped = False
+    for ch in line:
+        top = stack[-1] if stack else None
+        inside = bool(stack)
+        if escaped:
+            escaped = False
+        elif top == "'":
+            if ch == "'":
+                stack.pop()
+        elif ch == "\\":
+            escaped = True
+        elif top in ('"', "`"):
+            if ch == top:
+                stack.pop()
+        elif ch in ("'", '"', "`", "(", "{"):
+            stack.append(ch)
+        elif top == "(" and ch == ")":
+            stack.pop()
+        elif top == "{" and ch == "}":
+            stack.pop()
+        out.append(" " if inside else ch)
+    return "".join(out)
+
+
 def _split_command(command):
     """`[(segment, heredoc bodies fed by that segment), ...]`.
 
@@ -233,7 +262,13 @@ def _split_command(command):
         i += 1
     out = []
     for idx, line in enumerate(kept):
-        parts = RX_SEGMENT_SPLIT.split(line)
+        masked = _mask_nested(line)
+        parts = []
+        prev = 0
+        for m in RX_SEGMENT_SPLIT.finditer(masked):
+            parts.append(line[prev:m.start()])
+            prev = m.end()
+        parts.append(line[prev:])
         for k, part in enumerate(parts):
             last = k == len(parts) - 1
             out.append((part, bodies_at.get(idx, []) if last else []))

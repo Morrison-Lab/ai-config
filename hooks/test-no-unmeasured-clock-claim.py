@@ -64,6 +64,17 @@ CAPTURED_PRINTF_APPEND = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "id": "call_prtf", "input": {
         "command": "t=$(TZ=America/Los_Angeles date \"+%H:%M %Z\"); "
                    "printf '%s' \"$t\" >> notebook.md"}}]}}
+# An operator inside the substitution, so the split must not treat it as a
+# command boundary.
+CAPTURED_SUBSHELL_OP = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_subop", "input": {
+        "command": "t=$(cd /tmp && TZ=America/Los_Angeles date \"+%H:%M %Z\"); "
+                   "echo \"## $t\" >> notebook.md"}}]}}
+# The echo sits in a brace group whose redirection is outside the group.
+CAPTURED_BRACE_GROUP = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_brace", "input": {
+        "command": "t=$(TZ=America/Los_Angeles date \"+%H:%M %Z\"); "
+                   "{ echo \"## $t\"; } >> notebook.md"}}]}}
 # The same heading, with no intermediate variable.
 HEREDOC_DATE = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "id": "call_here", "input": {
@@ -358,6 +369,12 @@ CASES = [
     ([CAPTURED_PRINTF_APPEND, result("call_prtf", ""), say("Recap: 01:07 PDT")],
      True,
      "#2991: printf into a file is not a print either"),
+    ([CAPTURED_SUBSHELL_OP, result("call_subop", ""),
+      say("Recap: 01:07 PDT")], True,
+     "#2991: an operator inside the substitution is not a command boundary"),
+    ([CAPTURED_BRACE_GROUP, result("call_brace", ""),
+      say("Recap: 01:07 PDT")], True,
+     "#2991: a brace group's redirection covers the echo inside it"),
     ([HEREDOC_DATE, result("call_here", ""), say("Recap: 01:07 PDT")], True,
      "#2991: a read inside a redirected heredoc body never reaches the "
      "transcript"),

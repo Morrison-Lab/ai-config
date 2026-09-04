@@ -1267,6 +1267,13 @@ REST_CLOSED = ('{"number":1038,"state":"closed","merged":false,'
 DIFF_QUOTING_CLOSED = (
     'diff --git a/hooks/fixtures.json b/hooks/fixtures.json '
     '+  "state": "CLOSED", "merged": false')
+# A COMMENT thread, rendered as the plain text `gh pr view --comments` prints
+# and `--json comments --jq '.comments[].body'` projects. The terminal literal
+# belongs to the API response the comment QUOTES, not to the PR the comment
+# sits on -- and PRs in this corpus quote API responses constantly.
+COMMENT_QUOTING_CLOSED = (
+    'claude: the fixture reads {"number":7,'
+    '"closed_at":"2026-01-01T00:00:00Z"}\n')
 
 case(create("c") + [bash("gh pr merge 1038 --squash", tid="m"), res("m", "{}"),
                     say("Merged.")], False,
@@ -1365,6 +1372,45 @@ case(create("c") + [use("mcp__github__pull_request_read", tid="v", owner="o",
      True,
      "an MCP read of a PR's DIFF is not a status read, whatever the diff "
      "quotes -- the twin of `gh pr diff`, which is not a probe either")
+# The SHELL twins of the `get_comments`/`get_reviews` methods that MCP arm
+# excludes. `gh pr view <N> --comments` and `--json comments` return arbitrary
+# comment text, and a comment quoting an API response -- which PRs in this
+# corpus do constantly -- carries a terminal-state literal that says nothing
+# about the PR the comment sits on. The `gh pr view` arm matched both until
+# _probe_selection was added, so such a comment discharged the obligation with
+# no reviewer requested and no close (ai-config#3086 review).
+case(create("c") + [bash("gh pr view 1038 --comments", tid="v"),
+                    res("v", COMMENT_QUOTING_CLOSED), say("Read the thread.")],
+     True,
+     "`--comments` is not a status read, whatever a comment quotes")
+# The same text reached through `--json comments`, with `--jq` unwrapping the
+# body to raw prose. The `--jq` is load-bearing: gh escapes a comment's inner
+# quotes once inside its own JSON, so the un-projected form does not match
+# RX_TERMINAL_STATE and would pass here for a reason that has nothing to do
+# with this rule (ai-config#3086 review).
+case(create("c") + [bash("gh pr view 1038 --json comments "
+                         "--jq '.comments[].body'", tid="v"),
+                    res("v", COMMENT_QUOTING_CLOSED), say("Read the thread.")],
+     True,
+     "`--json comments` is not a status read either, and `--jq` does not "
+     "launder it")
+# The near-miss a "names a state field" rule alone would admit: the selection
+# DOES name a state, and carries free text beside it. Pins the ALLOWLIST half
+# specifically -- dropping it, or admitting `comments` into the allowlist,
+# leaves this case green while the two above stay red (ai-config#3086 review).
+case(create("c") + [bash("gh pr view 1038 --json state,comments "
+                         "--jq '.comments[].body'", tid="v"),
+                    res("v", COMMENT_QUOTING_CLOSED), say("Read both.")],
+     True,
+     "a state field does not launder a free-text field selected beside it")
+# And the other half: allowlisted fields that name no state at all. The
+# decision belongs to the SELECTION rather than to the body, so the fixture
+# supplies a body this field list could not have produced -- with the allowlist
+# in place nothing realistic reaches this arm, which is why dropping the
+# state-field requirement would otherwise turn no case red.
+case(create("c") + [bash("gh pr view 1038 --json number", tid="v"),
+                    res("v", REST_CLOSED), say("Read the number.")], True,
+     "a selection naming no state field is not a status read")
 # A call carrying NO method at all. The tool's schema marks `method` required,
 # so this is malformed rather than legitimate -- and the guard treats it as
 # not-a-probe, the direction that stays armed. Pinned because relaxing the

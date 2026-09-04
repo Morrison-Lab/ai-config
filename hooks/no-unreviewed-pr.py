@@ -749,10 +749,57 @@ def _api_path_tokens(argv):
         yield t
 
 
+# The `gh pr view` field selections whose VALUES cannot carry free text, and
+# the subset of them that actually reports a terminal state. A `gh pr view`
+# result is only a status read when both hold: every selected field is machine
+# shaped, and at least one of them names the state.
+#
+# `_PROBE_STATE_FIELDS` is the second half of RX_TERMINAL_STATE's vocabulary,
+# kept as a set of gh field names rather than derived from that pattern, since
+# the pattern also has to match REST snake_case bodies gh never emits.
+_PROBE_STATE_FIELDS = {"state", "merged", "mergedat", "closed", "closedat"}
+_PROBE_SAFE_FIELDS = _PROBE_STATE_FIELDS | {
+    "isdraft", "number", "url", "id", "mergeable", "reviewdecision",
+}
+
+
+def _probe_selection(rest):
+    """True when a `gh pr view`/`gh pr checks` selection is a STATUS read.
+
+    An allowlist rather than a denylist of free-text fields, because a field
+    this filter fails to recognise must cost a probe (leaving the guard armed
+    and warning) rather than admit one.
+
+    `--comments` and `--json comments,reviews` are the shell twins of the MCP
+    `get_comments`/`get_reviews` methods PROBE_TOOL_METHODS excludes: their
+    bodies are arbitrary comment text, and a comment quoting an API response --
+    which PRs in this corpus do constantly -- would otherwise report a terminal
+    state for a PR that has none (ai-config#3086 review). Requiring one state
+    field in the selection is the second half: `--json number` reports no
+    state at all, so reading it is not the observation that discharges.
+
+    `--jq`/`--template` need no separate handling: both project from whatever
+    `--json` selected, so the allowlist already bounds what they can emit.
+    """
+    fields = None
+    for i, a in enumerate(rest):
+        if a == "--comments":
+            return False
+        if a == "--json" and i + 1 < len(rest):
+            fields = rest[i + 1]
+        elif a.startswith("--json="):
+            fields = a.split("=", 1)[1]
+    if fields is None:
+        return True
+    sel = {f.strip().lower() for f in fields.split(",") if f.strip()}
+    return sel <= _PROBE_SAFE_FIELDS and bool(sel & _PROBE_STATE_FIELDS)
+
+
 def _argv_probe(argv):
     """(is_probe, num, repo) for a single-PR status read.
 
-    `gh pr view <N>` / `gh pr checks <N>`, or an API call naming ONE pull --
+    `gh pr view <N>` / `gh pr checks <N>` whose selection can only report the
+    state (_probe_selection), or an API call naming ONE pull --
     `gh api repos/o/r/pulls/<N>`. These discharge nothing by themselves -- they
     are only the CHANNEL through which a PR retired OUTSIDE this session (by a
     human, by the merge queue, or by a REST call this hook does not model as an
@@ -787,6 +834,8 @@ def _argv_probe(argv):
         return False, None, None
     if argv[0] == "gh" and len(argv) >= 3 and argv[1] == "pr" \
             and argv[2] in ("view", "checks"):
+        if not _probe_selection(argv[3:]):
+            return False, None, None
         num, repo = _verb_ident(argv)
         return (num is not None), num, repo
     api = (argv[0] == "gh" and len(argv) >= 2 and argv[1] == "api") \
@@ -1073,9 +1122,13 @@ PROBE_TOOLS = {"pull_request_read", "mcp__github__pull_request_read"}
 # and friends, whose bodies are arbitrary diff or comment text -- so an
 # ungated registration let any PR whose diff touches an API fixture or a JSON
 # snapshot discharge its own obligation merely by having that diff read
-# (ai-config#3086 review). The shell arm has the same restriction by
-# construction: `gh pr view`/`gh pr checks` are probes and `gh pr diff`, the
-# twin of `get_diff`, is not. `method` is REQUIRED by the tool's schema
+# (ai-config#3086 review). The shell arm needs the same restriction and does
+# not get it by construction: `gh pr diff`, the twin of `get_diff`, is indeed
+# not a probe, but `gh pr view <N> --comments` and `--json comments,reviews`
+# are the twins of `get_comments`/`get_reviews`, and the `gh pr view` arm
+# matched them until _probe_selection was added -- so a comment quoting an API
+# response discharged the PR it was posted on (ai-config#3086 review).
+# `method` is REQUIRED by the tool's schema
 # (measured 2026-09-04 against the server's own input schema), so demanding it
 # explicitly rejects no legitimate call, and a missing one is treated as
 # not-a-probe -- the direction that leaves the guard armed.
@@ -1111,11 +1164,15 @@ RX_TERMINAL_STATE = re.compile(
 )
 
 # A PR API path (`repos/o/r/pulls/1038`) inside a shell command, used by
-# _url_ident to read identity from a request command's own `gh api` URL. Open,
-# draft, and request identity are all resolved STRUCTURALLY from the specific
-# simple command (open_ident/draft_ident/request_ident), never from a
-# whole-string scan -- a decoy PR number chained ahead would otherwise mislabel
-# the obligation (see open_ident).
+# _url_ident and thence by _pr_ident alone: it attaches the redaction EXEMPTION
+# to whatever PR-naming command a session was going to run anyway. Deliberately
+# UNANCHORED, unlike RX_CMD_PULL and RX_CMD_REVIEWERS, which the probe and
+# request paths use instead precisely so a pull path quoted in a payload cannot
+# supply identity (ai-config#3086 review). Open, draft, and request identity are
+# all resolved STRUCTURALLY from the specific simple command
+# (open_ident/draft_ident/request_ident), never from a whole-string scan -- a
+# decoy PR number chained ahead would otherwise mislabel the obligation (see
+# open_ident).
 RX_CMD_API = re.compile(r"repos/([\w.-]+)/([\w.-]+)/pulls?/(\d+)", re.I)
 
 # The same path with NOTHING after the number, used by _argv_probe to spot an

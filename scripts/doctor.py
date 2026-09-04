@@ -362,12 +362,7 @@ def read_settings(path: Path) -> tuple[Dict[str, Any], Optional[str]]:
     swallowed: it leaves the sweep unable to say whether the plugin route
     is in use.
 
-    Single-scope by design, like `install-hooks.py`'s sibling reader: user
-    settings are the lowest of the five scopes, so managed settings, a
-    project `.claude/settings.json`, or `.claude/settings.local.json` can
-    each enable the plugin without appearing in this file. Reading only
-    this one keeps the answer free of false positives, at the cost of a
-    skip that cannot claim the machine has no plugin.
+    One scope per call; `resolve_plugin_enabled` walks them in order.
     """
     if not path.is_file():
         return {}, None
@@ -376,6 +371,56 @@ def read_settings(path: Path) -> tuple[Dict[str, Any], Optional[str]]:
     except Exception as exc:
         return {}, str(exc)
     return (data if isinstance(data, dict) else {}), None
+
+
+def settings_scope_paths(home: Path) -> List[Path]:
+    """Return the `enabledPlugins` settings files to read, highest scope first.
+
+    Local, then project, then user, matching `skills/ai-config-hooks/run-hook.sh`.
+    The project root is `CLAUDE_PROJECT_DIR` when the harness exports it,
+    and this checkout otherwise.
+    """
+    project = Path(os.environ.get("CLAUDE_PROJECT_DIR") or REPO_ROOT)
+    return [
+        project / ".claude" / "settings.local.json",
+        project / ".claude" / "settings.json",
+        home / "settings.json",
+    ]
+
+
+def resolve_plugin_enabled(home: Path) -> tuple[Optional[bool], Optional[Path], Optional[str]]:
+    """Resolve whether an ai-config plugin is enabled, by scope precedence.
+
+    Returns `(enabled, source, parse_error)`. `source` is the file that
+    decided, or None when no scope named an `ai-config@*` entry at all.
+    `enabled` is None only when a settings file exists and does not parse,
+    which leaves the answer unknown rather than false.
+
+    Scope-resolved rather than read from one file, per
+    `memories/claude-code-settings.md`: `enabledPlugins` resolves by
+    precedence rather than by unioning truthy names across files, so the
+    first file that names an entry decides and an explicit `false` there is
+    final. Within one file any truthy `ai-config@*` entry counts, since a
+    second marketplace's copy loads the same plugin.
+
+    Two scopes above these three stay unread, so the answer can still be
+    wrong in both directions: a managed-settings `false` over a walked
+    `true` makes the sweep run on a machine whose plugin is disabled and
+    report its only install as leftovers, and a managed-settings or
+    command-line `true` with no walked entry makes the sweep skip. Managed
+    settings live at an OS-specific path and command-line arguments are not
+    readable from here at all.
+    """
+    from lib.plugin_overlap import ai_config_entries
+
+    for path in settings_scope_paths(home):
+        settings, parse_error = read_settings(path)
+        if parse_error is not None:
+            return None, path, parse_error
+        entries = ai_config_entries(settings)
+        if entries:
+            return any(entries.values()), path, None
+    return False, None, None
 
 
 def describe_path(path: Path) -> str:
@@ -447,11 +492,8 @@ def find_skill_leftovers(home: Path) -> tuple[List[str], List[str]]:
 
 def check_consumer_leftovers() -> Dict[str, Any]:
     """Report `~/.claude` copies and symlinks left by pre-plugin installs."""
-    from lib.plugin_overlap import enabled_ai_config_plugins
-
     home = claude_home()
-    settings_path = home / "settings.json"
-    settings, parse_error = read_settings(settings_path)
+    enabled, source, parse_error = resolve_plugin_enabled(home)
     if parse_error is not None:
         return {
             "name": "consumer_leftovers",
@@ -460,11 +502,15 @@ def check_consumer_leftovers() -> Dict[str, Any]:
             "plugin_enabled": None,
             "leftovers": [],
             "doubled_skills": [],
-            "details": f"Not swept: {settings_path} did not parse ({parse_error}), so whether the plugin route is in use is unknown.",
+            "details": f"Not swept: {source} did not parse ({parse_error}), so whether the plugin route is in use is unknown.",
         }
 
-    enabled = enabled_ai_config_plugins(settings)
     if not enabled:
+        decided = (
+            f"{source} disables the ai-config plugin"
+            if source is not None
+            else "no local, project, or user settings file names an ai-config plugin"
+        )
         return {
             "name": "consumer_leftovers",
             "ok": True,
@@ -472,7 +518,7 @@ def check_consumer_leftovers() -> Dict[str, Any]:
             "plugin_enabled": False,
             "leftovers": [],
             "doubled_skills": [],
-            "details": f"Skipped: {settings_path} enables no ai-config plugin (higher-precedence scopes are not read), so a ~/.claude copy may be this machine's only install.",
+            "details": f"Skipped: {decided} (managed settings and command-line arguments are not read), so a ~/.claude copy may be this machine's only install.",
         }
 
     leftovers = [
@@ -508,7 +554,7 @@ def check_consumer_leftovers() -> Dict[str, Any]:
         "plugin_enabled": True,
         "leftovers": leftovers,
         "doubled_skills": doubled_skills,
-        "details": f"Under {home}: {'. '.join(parts)}. Reported only -- inspect each by hand before removing anything: ~/.claude/skills also holds your own skills, and README.md documents placing ~/.claude/shared by hand while ai-config#2352 is open (see shared/workflow/keep-checkouts-fresh.md).",
+        "details": f"Under {home}: {'. '.join(parts)}. Swept because {source} enables the ai-config plugin. Reported only -- inspect each by hand before removing anything: ~/.claude/skills also holds your own skills, and README.md documents placing ~/.claude/shared by hand while ai-config#2352 is open (see shared/workflow/keep-checkouts-fresh.md).",
     }
 
 

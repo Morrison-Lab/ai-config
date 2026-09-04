@@ -25,17 +25,21 @@ In every session --- at session start, and again periodically during long sessio
    `python3 scripts/doctor.py` sweeps all four paths and reports rather than deletes ([#2528](https://github.com/Morrison-Lab/ai-config/issues/2528)).
    Its `consumer_leftovers` check settles provenance only for a symlink resolving into an ai-config checkout;
    a bare name match it reports as the doubled-listing symptom to investigate by hand.
-   It skips the client's `synced/` bucket, and skips the sweep entirely when `~/.claude/settings.json` enables no ai-config plugin, since a `~/.claude` copy is then likely the machine's only install.
-   **That gate reads one scope, so its skip is not a claim that no plugin is enabled.**
-   User settings are the lowest of the five precedence scopes, so managed settings, a project's `.claude/settings.json`, or `.claude/settings.local.json` can each enable the plugin without appearing there --- see [`claude-code-settings`](../../memories/claude-code-settings.md).
+   It skips the client's `synced/` bucket, and skips the sweep entirely when no ai-config plugin is enabled, since a `~/.claude` copy is then likely the machine's only install.
+   **That gate resolves `enabledPlugins` by scope precedence --- local, then project, then user --- rather than reading one file**, matching `skills/ai-config-hooks/run-hook.sh`.
+   `enabledPlugins` resolves by precedence rather than by unioning truthy names across files, so the first file naming an `ai-config@*` entry decides and an explicit `false` there is final --- see [`claude-code-settings`](../../memories/claude-code-settings.md).
+   **Two scopes above those three stay unread, so the gate can be wrong in both directions.**
+   A managed-settings `false` over a walked `true` runs the sweep on a machine whose plugin is disabled, and reports its only install as leftovers.
+   A managed-settings or command-line `true` with no walked entry makes the sweep skip.
 
    - **Do:** include `skills/` when sweeping `~/.claude` for leftovers.
    - **Do:** read a doubled listing (a bare name beside an `ai-config:`-prefixed one) as the symptom, since the cost is otherwise invisible.
    - **Do:** run `python3 scripts/doctor.py` for the sweep rather than pasting an `ls` by hand.
-   - **Do:** check the higher-precedence scopes by hand when the check reports a skip, rather than reading the skip as an all-clear.
+   - **Do:** check managed settings by hand when the gate's answer surprises you, in either direction.
    - **Don't:** read "the plugin serves it" as "nothing is installed to check" --- a replacement does not remove what it replaced.
    - **Don't:** read its name-match finding as proof of a leftover --- provenance is what a symlink into a checkout settles and a shared name does not.
-   - **Don't:** read that skip as proof the machine has no plugin --- it reads `~/.claude/settings.json` alone, which is the lowest scope.
+   - **Don't:** read that skip as proof the machine has no plugin --- managed settings and command-line arguments are not read.
+   - **Don't:** read its leftover list as proof the plugin is enabled --- a managed-settings `false` over a lower-scope `true` produces the same list.
    - **Don't:** delete `~/.claude/skills` on presence or on a name match;
      neither distinguishes a leftover from the client's own skills.
 

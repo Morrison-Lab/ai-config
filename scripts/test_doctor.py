@@ -198,15 +198,28 @@ class TestConsumerLeftovers(unittest.TestCase):
         self._tmp = tempfile.TemporaryDirectory()
         self.home = Path(self._tmp.name)
         self.addCleanup(self._tmp.cleanup)
-        env = patch.dict(os.environ, {"CLAUDE_HOME": str(self.home)})
+        # A hermetic project root too: the scope walk reads the project's
+        # `.claude/` settings above the user file, so leaving it at this
+        # checkout would let a developer's own settings.local.json decide.
+        self._proj = tempfile.TemporaryDirectory()
+        self.project = Path(self._proj.name)
+        self.addCleanup(self._proj.cleanup)
+        (self.project / ".claude").mkdir()
+        env = patch.dict(
+            os.environ,
+            {"CLAUDE_HOME": str(self.home), "CLAUDE_PROJECT_DIR": str(self.project)},
+        )
         env.start()
         self.addCleanup(env.stop)
 
-    def enable_plugin(self):
-        (self.home / "settings.json").write_text(
-            json.dumps({"enabledPlugins": {"ai-config@Morrison-Lab": True}}),
+    def write_settings(self, path: Path, enabled: bool):
+        path.write_text(
+            json.dumps({"enabledPlugins": {"ai-config@Morrison-Lab": enabled}}),
             encoding="utf-8",
         )
+
+    def enable_plugin(self):
+        self.write_settings(self.home / "settings.json", True)
 
     def symlink(self, target: Path, link: Path):
         try:
@@ -215,10 +228,7 @@ class TestConsumerLeftovers(unittest.TestCase):
             self.skipTest("symlinks unavailable on this platform")
 
     def test_skips_sweep_when_plugin_not_enabled(self):
-        (self.home / "settings.json").write_text(
-            json.dumps({"enabledPlugins": {"ai-config@Morrison-Lab": False}}),
-            encoding="utf-8",
-        )
+        self.write_settings(self.home / "settings.json", False)
         (self.home / "shared").mkdir()
         res = doctor.check_consumer_leftovers()
         self.assertTrue(res["ok"])
@@ -300,6 +310,83 @@ class TestConsumerLeftovers(unittest.TestCase):
         (self.home / "skills" / "session-start-hook").mkdir()
         res = doctor.check_consumer_leftovers()
         self.assertTrue(res["ok"])
+        self.assertEqual(res["leftovers"], [])
+        self.assertEqual(res["doubled_skills"], [])
+
+    def test_higher_scope_false_beats_user_scope_true(self):
+        # `enabledPlugins` resolves by precedence rather than by unioning,
+        # so a project `false` over a user `true` means the plugin is off
+        # and `~/.claude/shared` may be this machine's only install.
+        self.enable_plugin()
+        self.write_settings(self.project / ".claude" / "settings.json", False)
+        (self.home / "shared").mkdir()
+        res = doctor.check_consumer_leftovers()
+        self.assertTrue(res["ok"])
+        self.assertFalse(res["plugin_enabled"])
+        self.assertEqual(res["leftovers"], [])
+        self.assertIn("Skipped", res["details"])
+
+    def test_higher_scope_true_enables_sweep_with_no_user_entry(self):
+        # The other direction of the same walk: a project `true` with no
+        # user entry is a real plugin install, so the sweep must run.
+        self.write_settings(self.project / ".claude" / "settings.json", True)
+        (self.home / "shared").mkdir()
+        res = doctor.check_consumer_leftovers()
+        self.assertFalse(res["ok"])
+        self.assertTrue(res["plugin_enabled"])
+        self.assertEqual(len(res["leftovers"]), 1)
+
+    def test_local_scope_false_beats_project_scope_true(self):
+        # Local settings outrank project settings, so the first file in
+        # the walk that names an entry has to be the one that decides.
+        self.write_settings(self.project / ".claude" / "settings.local.json", False)
+        self.write_settings(self.project / ".claude" / "settings.json", True)
+        (self.home / "shared").mkdir()
+        res = doctor.check_consumer_leftovers()
+        self.assertTrue(res["ok"])
+        self.assertFalse(res["plugin_enabled"])
+        self.assertEqual(res["leftovers"], [])
+
+    def test_no_scope_names_the_plugin_skips_the_sweep(self):
+        (self.home / "shared").mkdir()
+        res = doctor.check_consumer_leftovers()
+        self.assertTrue(res["ok"])
+        self.assertFalse(res["plugin_enabled"])
+        self.assertEqual(res["leftovers"], [])
+        self.assertIn("no local, project, or user settings file", res["details"])
+
+    def test_claude_home_that_is_itself_a_checkout_stops_the_walk(self):
+        # The home stop, isolated from the `.git` requirement: this home
+        # carries `.git` as well as `CLAUDE.md` and `hooks/hooks.json`, so
+        # only stopping at the home keeps a personal skill under it out of
+        # the settled-provenance half.
+        self.enable_plugin()
+        (self.home / ".git").mkdir()
+        (self.home / "CLAUDE.md").write_text("user memory", encoding="utf-8")
+        (self.home / "hooks").mkdir()
+        (self.home / "hooks" / "hooks.json").write_text("{}", encoding="utf-8")
+        (self.home / "personal" / "my-skill").mkdir(parents=True)
+        (self.home / "skills").mkdir()
+        self.symlink(self.home / "personal" / "my-skill", self.home / "skills" / "my-skill")
+        res = doctor.check_consumer_leftovers()
+        self.assertFalse(any("my-skill" in item for item in res["leftovers"]))
+        self.assertEqual(res["leftovers"], [f"{self.home / 'hooks'} (copy)"])
+
+    def test_non_git_directory_holding_both_files_is_not_a_checkout(self):
+        # The `.git` requirement, isolated from the home stop: this target
+        # sits outside the Claude home entirely, so the home stop never
+        # fires and only the `.git` test can reject it.
+        self.enable_plugin()
+        outside = tempfile.TemporaryDirectory()
+        self.addCleanup(outside.cleanup)
+        faux = Path(outside.name)
+        (faux / "CLAUDE.md").write_text("looks like a corpus", encoding="utf-8")
+        (faux / "hooks").mkdir()
+        (faux / "hooks" / "hooks.json").write_text("{}", encoding="utf-8")
+        (faux / "skills" / "ums").mkdir(parents=True)
+        (self.home / "skills").mkdir()
+        self.symlink(faux / "skills" / "ums", self.home / "skills" / "ums")
+        res = doctor.check_consumer_leftovers()
         self.assertEqual(res["leftovers"], [])
         self.assertEqual(res["doubled_skills"], [])
 

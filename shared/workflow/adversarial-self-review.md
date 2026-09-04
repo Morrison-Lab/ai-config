@@ -93,7 +93,10 @@ A split --- one all-clear and another not-clean, nits included --- is not
 (ai-config#2274).
 ARD every item from every review, then request fresh reviews.
 If no qualifying reviewer is reachable, the merge waits ---
-"blocked on reviewer availability" is the honest status ---
+"blocked on reviewer availability" is the honest status
+only once it carries the per-provider enumeration
+[`Availability is a per-route question`](#availability-is-a-per-route-question-and-command--v-answers-one-route)
+requires ---
 and arming an auto-merge while waiting is
 [Pattern 12](../../memories/mistake-patterns.md).
 
@@ -115,6 +118,199 @@ The merge-side rules live with the gate they serve:
   A merge needs its own cross-model, cross-harness verdict
   evaluating the shipping head.
 
+
+## Availability is a per-route question, and `command -v` answers one route
+
+The inventory above is a **machine** inventory:
+every entry in it is a local binary,
+so a `PATH` probe answers whether each entry is *installed*, and nothing else.
+Installation is not availability:
+an installed CLI can still be quota-blocked or unauthenticated,
+which is the second question
+[`Query all available providers sequentially`](#query-all-available-providers-sequentially)
+asks when it requires every exclusion to be recorded with its reason.
+A reviewer is reachable by any of three routes,
+and only the first of them can ever appear on `PATH`:
+
+1. **A local CLI**, probed with `command -v`.
+   The binaries the orchestrator's model adapters
+   ([`model_adapters.py`](../../scripts/orchestrator/model_adapters.py)) probe are derivable,
+   so start from them rather than from a list copied into this sentence,
+   per [`avoid-hardcoding-external-data`](../coding/avoid-hardcoding-external-data.md):
+   `grep -o 'shutil.which("[a-z0-9-]*")' scripts/orchestrator/model_adapters.py | sort -u`.
+   That set is a floor rather than the population:
+   a CLI no adapter probes never appears in it,
+   and `agy` is the worked case,
+   since [`delegation.md`](../../memories/delegation.md)'s ladder routes dispatchable work to it
+   while the adapter named after it probes `gemini`,
+   so probe the union of that set with the 2026-08-25 machine inventory above.
+2. **A forge-side bot**, which runs on the forge and so is invisible to `PATH` in principle.
+3. **An API key** for a provider reachable without its CLI,
+   probed in the environment rather than on `PATH`.
+   The variables are every API-key variable the adapters read,
+   so derive them from
+   [`model_adapters.py`](../../scripts/orchestrator/model_adapters.py)
+   rather than from a subset copied into this sentence,
+   per [`avoid-hardcoding-external-data`](../coding/avoid-hardcoding-external-data.md):
+   `grep -o '[A-Z_]*API_KEY' scripts/orchestrator/model_adapters.py | sort -u`.
+   A subset written out here once left a reader probing fewer variables
+   than the adapters read,
+   which is this section's own failure one route over.
+   Not every variable the derivation returns gates an adapter's `is_available()`,
+   since some are read only when a call is made,
+   so a hit names a provider to probe rather than one to record available.
+
+Both derivations read a path that exists in `ai-config`'s own checkout.
+Where that file is absent --- a consumer repository,
+or the lab manual's transclusion of this fragment ---
+each command returns nothing,
+and that null is a missing source rather than an empty population.
+Fall back to the machine inventory above for the local-CLI route,
+reading it there as a floor rather than as that route's population,
+and record the shortfall alongside the probe result.
+Record the API-key route as underivable in that repository rather than as empty.
+An underivable route is a recorded exclusion carrying its reason
+rather than a satisfied enumeration,
+extending [`Query all available providers sequentially`](#query-all-available-providers-sequentially)'s
+requirement that every exclusion of a known provider be recorded with its reason
+to the case where the providers themselves cannot be named ---
+so the status names the route that could not be derived
+rather than reading as a bare block.
+
+A null `command -v` sweep is therefore evidence about `PATH` and about nothing else.
+That is [`grep-is-not-coverage`](grep-is-not-coverage.md)'s shape,
+with `command -v` in place of `grep`,
+and [`verify-the-right-artifact`](verify-the-right-artifact.md)'s,
+with the local machine standing in for the set of reachable providers.
+
+The forge-side route is the one an inventory of binaries cannot see,
+so its providers are enumerated here rather than left to be inferred:
+
+| provider | how it is reached |
+| --- | --- |
+| Copilot | a reviewer request on the pull request, where the repository has Copilot review enabled |
+| Jules | a mention comment from an account the workflow's `author_association` allowlist admits, where the repository carries a Jules review workflow |
+| Antigravity | such a mention comment, or a manual workflow run, where the repository carries an Antigravity review workflow |
+
+The concrete dispatch mechanism behind each row --- the endpoint, the tool name, the workflow file ---
+varies by harness and by repository,
+so it lives in [`claude-review-dispatch`](../../memories/claude-review-dispatch.md)
+and [`gh-cli`](../../memories/gh-cli.md)
+rather than here.
+
+**Read the table as a starting list rather than as the population, and re-derive every row per repository.**
+All three rows are repository-conditional, not only the two comment-triggered ones:
+a review workflow is added or removed by one pull request,
+so derive those rows from the repository's own `on:` blocks,
+and Copilot review is switched on and off per repository by a ruleset rule
+and per user by quota,
+so derive that row from the repository's rulesets.
+
+**A comment-triggered row also depends on who posts the mention, which is a property of the session rather than of the repository.**
+Both comment-triggered workflows gate their job on
+`author_association` being one of `OWNER`, `MEMBER`, or `COLLABORATOR`,
+and a session whose comment writes land under a bot identity posts as `CONTRIBUTOR`,
+so the job skips with no error and no verdict
+([ai-config#1433](https://github.com/Morrison-Lab/ai-config/issues/1433),
+and [`self-review-fallback`](self-review-fallback.md)'s own statement of the same gate).
+A posted mention is therefore not a dispatch:
+read the created comment's `author_association` back,
+and read the workflow's own `if:` for the allowlist it applies.
+
+**Copilot carries a state the other two rows do not: reachable and withheld.**
+A standing maintainer directive forbids requesting Copilot code review
+on any pull request in any repository while the moratorium stands.
+Read its live expiry from the `MORATORIUM_END` constant
+in [`no-unreviewed-pr.py`](../../hooks/no-unreviewed-pr.py),
+never from a date copied into prose,
+per [`avoid-hardcoding-external-data`](../coding/avoid-hardcoding-external-data.md);
+that constant was still in the future when this section was written on 2026-09-03,
+so the moratorium was live and the row's recorded state was "reachable, withheld".
+The full statement and its measurements are in [`gh-cli`](../../memories/gh-cli.md).
+
+Whether a forge-side reviewer's harness and model differ from the authoring session's
+is a per-session question,
+settled by the ladder above rather than by this table ---
+a session authoring under the `agy` CLI and reviewed by an Antigravity workflow
+shares a harness family with its reviewer,
+and whether it shares a model is not readable from this table either.
+Whether any of the three rows satisfies the **merge** gate is a separate question this section does not settle:
+the ladder and its Do bullet above are unchanged by this inventory,
+and the multi-backend rule stated there still has to be applied per provider,
+since a caller that passes an empty model input resolves that model downstream
+and the value has to be read where it is resolved rather than assumed here.
+
+**So "blocked on reviewer availability" owes an enumeration, not a probe.**
+That status is honest only after naming every known provider and the state it was found in,
+which is what [`Query all available providers sequentially`](#query-all-available-providers-sequentially)
+already requires
+and what a single failed sweep never establishes.
+
+- **Do:** run the availability check as a list of provider routes --- local CLI, forge bot, API key --- and record each provider's state.
+- **Do:** name every known provider and its state before writing "blocked on reviewer availability",
+  a provider that is reachable but withheld by policy included.
+- **Do:** re-derive every forge-side row against the repository in hand,
+  since a workflow, a ruleset rule, and a quota each turn one of them on or off.
+- **Do:** settle a forge-side reviewer's merge-gate qualification against the ladder above,
+  per provider and per authoring session.
+- **Do:** derive the API-key route from the adapters that read those variables,
+  since they are its source of truth and a copied list drifts from them.
+- **Do:** derive the local-CLI route from the adapters' own probes,
+  then probe the union of that set with the 2026-08-25 machine inventory above,
+  since each source drops what the other carries ---
+  the derivation drops `agy`, and the inventory drops `gemini`.
+- **Do:** read the commenting identity's `author_association` back
+  before recording a comment-triggered forge reviewer as dispatched.
+- **Do:** read an empty local-CLI derivation as a missing source
+  wherever `model_adapters.py` is not in the checkout,
+  fall back to the machine inventory above as a floor,
+  and record the shortfall alongside the probe result.
+- **Do:** record the API-key route as underivable rather than as empty
+  wherever that file is not in the checkout,
+  since the machine inventory names no API-key variable.
+- **Do:** record an underivable route as an explicit exclusion carrying its reason,
+  by extension from [`Query all available providers sequentially`](#query-all-available-providers-sequentially),
+  and name that route in the status line.
+- **Don't:** read an empty derivation as an empty population;
+  that is this section's own thesis failing on the section itself.
+- **Don't:** read a null `command -v` sweep as an availability verdict;
+  it reports what is on `PATH` and stops there.
+- **Don't:** record a CLI as available on a `command -v` hit alone;
+  a present binary can still be quota-blocked or unauthenticated,
+  which is a state the probe never reports.
+- **Don't:** enumerate the API-key route from a list written out in prose,
+  here or anywhere else; that list is a subset the moment an adapter is added.
+- **Don't:** treat either local-CLI source alone as that route's population
+  where both are readable;
+  the derivation drops `agy` and the inventory drops `gemini`,
+  so a probe of one of them misses a route the other names.
+- **Don't:** read the inventory-only fallback as that population either;
+  where `model_adapters.py` is absent the inventory is a floor,
+  so the shortfall is recorded rather than resolved.
+- **Don't:** count an underivable route as an enumerated one;
+  a route whose providers cannot be named is an exclusion,
+  so a bare "blocked on reviewer availability" over it is the unenumerated claim again.
+- **Don't:** record a comment-triggered forge reviewer as dispatched on a posted mention alone;
+  an `author_association` allowlist skips the job with no error.
+- **Don't:** read the three forge-side rows as that route's population;
+  a repository can carry a review workflow this table does not name,
+  so derive the rows from its own `on:` blocks and rulesets rather than from this list.
+- **Don't:** treat the machine inventory above as the provider population, since a forge-side reviewer cannot appear in it.
+- **Don't:** record a withheld provider as available,
+  or read its row as licence to dispatch it.
+- **Don't:** read a row in this table as evidence that its harness or its model
+  differs from the authoring session's.
+
+(Measured 2026-09-03 on ai-config#3105:
+a session held two green PRs for roughly seven hours as
+"blocked on reviewer availability",
+on a `command -v` sweep over eight CLIs that correctly found none of them installed.
+Jules was measured reachable, replying within a minute of a mention comment.
+Antigravity carried a review workflow and was permitted, and was not probed.
+Copilot was reachable and withheld:
+the moratorium had been extended the previous day and was read as expired,
+so the Copilot request made on #3084 that day was a breach of the directive
+rather than a measurement, and is recorded here as the slippage it was.)
 
 ## What "separate" requires
 

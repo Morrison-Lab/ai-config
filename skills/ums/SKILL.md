@@ -135,7 +135,24 @@ committed pass.
      related `get_check_runs` guidance while an entry on the same tool already
      sat ~2000 lines below in the write-access cluster -- caught by the review
      bot, not by the author.)
-   - **When the target memory file is already at the 1200-line cap**,
+   - **Run `python3 scripts/check-memory-file-size.py` before writing the
+     append, and read its warning band, not only its pass/fail line.**
+     The band names every memory file near the cap and how many lines each
+     has left (ai-config#3102), so a file with almost no
+     headroom is knowable here, while the entry can still be re-wrapped or the
+     file split, rather than by tripping the gate in step 4 once the append is
+     written.
+     Read each listed file's headroom, not its membership: the band opens 100
+     lines below the cap at the shipped default, so most of it is room rather
+     than a warning.
+     - **Do:** read the reported headroom of the file the entry topically
+       belongs in, and recover lines or split that file when its headroom does
+       not comfortably cover the entry.
+     - **Don't:** pick the destination by headroom rather than by subject,
+       or redirect or split on band membership alone --- a file with most of
+       the band still ahead of it can take this entry.
+   - **When the target memory file is already at the cap
+     `scripts/check-memory-file-size.py` reports**,
      recover lines (re-wrap or drop) or split the file.
      A fold has two shapes and neither escapes every gate: a new source
      line trips `scripts/test_check_memory_file_size.py`, while folding
@@ -145,8 +162,8 @@ committed pass.
      `scripts/test_check_memory_file_size.py`
      even when every new sentence is a real lesson
      (3rd occurrence, 2026-08-25 on `memories/preferences.md` in
-     ai-config#2262: `origin/main` was exactly 1200 lines, and a
-     +5-line append reddened `validate`.
+     ai-config#2262: `origin/main` sat exactly at the cap, 1200 lines as
+     that cap then stood, and a +5-line append reddened `validate`.
      Prior: `shared/writing/semantic-line-breaks.md` ai-config#1291;
      `shared/workflow/review-verdict-pitfalls.md` ai-config#811).
    - **When step 2 routed the item to a repo other than ai-config, grep both
@@ -218,6 +235,10 @@ committed pass.
    `tools.md` on 2026-09-01 when a UMS append crossed the budget),
    `NLB_BASE_REF=origin/main python3 scripts/vendor/gha-check-new-line-breaks.py`,
    `python3 scripts/check-links.py`, and `markdownlint` on the changed files.
+
+   `check-memory-file-size.py` prints its warning band here too, but this run
+   is the pass/fail one: the band is actionable in step 3, before the append is
+   written, and by now the append already exists.
 
    **If a push is rejected non-fast-forward:** fetch first and diff before
    assuming a real conflict -- the branch may have picked up another

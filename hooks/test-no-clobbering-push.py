@@ -45,8 +45,11 @@ def _commit(path, name, content):
     _run(path, "commit", "-qm", f"add {name}")
 
 
-def bash(command):
-    return {"tool_name": "Bash", "tool_input": {"command": command}}
+def bash(command, payload_cwd=None):
+    payload = {"tool_name": "Bash", "tool_input": {"command": command}}
+    if payload_cwd is not None:
+        payload["cwd"] = payload_cwd
+    return payload
 
 
 # ---------------------------------------------------------------- fixtures
@@ -98,6 +101,39 @@ def _local_advances(path):
 def _named_remote(path, bare, name):
     """Add a second remote under a name that is NOT the config fallback."""
     _run(path, "remote", "add", name, bare)
+
+
+def _second_worktree(path, branch, start="HEAD"):
+    """A second worktree of `path`, checked out on a new `branch`.
+
+    `HEAD` is per-worktree; branch refs are not. That asymmetry is why every
+    cross-worktree case below pushes `HEAD:<branch>` rather than a named
+    source ref: a named branch resolves identically in both directories, so it
+    could not tell the two readings apart.
+    """
+    holder = tempfile.mkdtemp()
+    _TMPDIRS.append(holder)
+    target = os.path.join(holder, "wt")
+    _run(path, "worktree", "add", "-q", "-b", branch, target, start)
+    return target
+
+
+def _diverged_peer_worktree(path, branch):
+    """A second worktree whose HEAD diverges from `origin/<branch>`, while the
+    session's own HEAD equals that remote tip exactly.
+
+    Both halves are load-bearing. The worktree half is the divergence the
+    guard exists to report; the session half is what it read instead, and it
+    reads as "already pushed" -- so resolving HEAD in the session's directory
+    is a false NEGATIVE here, not merely a wrongly-worded warning.
+    """
+    _commit(path, "shared.txt", "shared\n")
+    _run(path, "push", "-q", "origin", "main")
+    wt = _second_worktree(path, branch, "HEAD~1")
+    _commit(wt, "peer.txt", "peer\n")
+    _run(wt, "push", "-q", "origin", branch)
+    _run(path, "push", "-q", "-f", "origin", f"main:{branch}")
+    return wt
 
 
 # --- should DENY ---------------------------------------------------------
@@ -250,6 +286,27 @@ def explicit_current_branch_case(path, bare):
     return "git push origin main"
 
 
+def cross_worktree_diverged_case(path, bare):
+    """The push runs in a second worktree, via a leading `cd`, and diverges
+    there while the session's own directory shows nothing to report."""
+    wt = _diverged_peer_worktree(path, "peer")
+    return f"cd {wt} && git push origin HEAD:peer"
+
+
+def dash_c_worktree_case(path, bare):
+    """`git -C <worktree> push` moves the push without a `cd`, so the `-C`
+    values have to be read out rather than skipped as option noise."""
+    wt = _diverged_peer_worktree(path, "peer-c")
+    return f"git -C {wt} push origin HEAD:peer-c"
+
+
+def payload_cwd_case(path, bare):
+    """The Bash call's own `cwd` names a different directory from the hook
+    process's, with no `cd` and no `-C` to reveal it."""
+    wt = _diverged_peer_worktree(path, "peer-payload")
+    return "git push origin HEAD:peer-payload", wt
+
+
 def value_cluster_remote_case(path, bare):
     """`-uo ci.skip upstream HEAD`: `o` eats `ci.skip`, so the remote is
     `upstream`. Without that, `ci.skip` is read as the remote and the reading
@@ -305,6 +362,36 @@ def new_branch_case(path, bare):
     _run(path, "checkout", "-q", "-b", "feature/new")
     _local_advances(path)
     return "git push -u origin HEAD"
+
+
+def cross_worktree_fast_forward_case(path, bare):
+    """ai-config#2451 verbatim: the push is an ordinary fast-forward in the
+    worktree it runs from, while the session's own directory sits on an
+    unrelated branch.
+
+    Resolving HEAD there reported a divergence that did not exist, named the
+    pushing session's own commits as somebody else's, and prescribed a
+    `git merge origin/<branch>` that would have merged a branch into itself.
+    """
+    _remote_advances(path, bare, keep_object=False)
+    _local_advances(path)
+    wt = _second_worktree(path, "ums-lessons")
+    _commit(wt, "first.txt", "first\n")
+    _run(wt, "push", "-q", "origin", "ums-lessons")
+    _commit(wt, "second.txt", "second\n")
+    return f"cd {wt} && git push origin HEAD:ums-lessons"
+
+
+def indeterminate_cd_case(path, bare):
+    """`cd -` needs OLDPWD, which no static scan has.
+
+    Declining is the point: the session's directory genuinely diverges here,
+    so falling back to it would produce a confident warning about a repository
+    the push may never touch.
+    """
+    _remote_advances(path, bare, keep_object=False)
+    _local_advances(path)
+    return "cd - && git push origin HEAD"
 
 
 def quoted_mention_case(path, bare):
@@ -409,6 +496,12 @@ SHOULD_WARN = [
     ("W6", named_branch_case,
      "`git push origin feature-x` from `main` compares against local "
      "`feature-x`, not HEAD"),
+    ("W8", cross_worktree_diverged_case,
+     "`cd <worktree> && git push` reads HEAD where the push runs"),
+    ("W9", dash_c_worktree_case,
+     "`git -C <worktree> push` moves the push without a `cd`"),
+    ("W10", payload_cwd_case,
+     "the Bash call's own `cwd`, with no `cd` and no `-C` to reveal it"),
 ]
 
 SHOULD_STAY_SILENT = [
@@ -432,6 +525,11 @@ SHOULD_STAY_SILENT = [
     ("S16", named_branch_source_missing_case,
      "the pushed source ref does not resolve locally -- decline, don't fall "
      "back to HEAD"),
+    ("S17", cross_worktree_fast_forward_case,
+     "ai-config#2451: a fast-forward in the worktree the push runs from"),
+    ("S18", indeterminate_cd_case,
+     "`cd -` is indeterminate -- decline rather than read the session's own "
+     "directory"),
 ]
 
 
@@ -459,10 +557,23 @@ LABEL_EXPECT = {
            ["your local `", "git checkout "]),
     "W7": (["git log --oneline main..origin/main"],
            ["git checkout ", "you are not on the branch being pushed"]),
+    # The commit SUBJECT is the directory-sensitive half here: `add shared.txt`
+    # is what `local..tip` contains only when `local` was resolved in the
+    # worktree the push runs from. Asserting the branch name alone would pass
+    # on a reading taken in the session's own directory.
+    "W8": (["your local HEAD", "git log --oneline HEAD..origin/peer",
+            "add shared.txt"],
+           ["git checkout "]),
+    "W9": (["your local HEAD", "git log --oneline HEAD..origin/peer-c",
+            "add shared.txt"],
+           ["git checkout "]),
+    "W10": (["your local HEAD", "git log --oneline HEAD..origin/peer-payload",
+             "add shared.txt"],
+            ["git checkout "]),
 }
 
 
-def verdict(hook_path, repo, command, case_id=None):
+def verdict(hook_path, repo, command, case_id=None, payload_cwd=None):
     # sys.executable, not a bare "python3": that guarantees the same
     # interpreter running this test, rather than whatever (if anything)
     # "python3" resolves to on the machine's PATH. ai-config#2098 flagged a
@@ -473,7 +584,8 @@ def verdict(hook_path, repo, command, case_id=None):
     # block. Keep sys.executable for the guaranteed-correct-interpreter
     # reason; don't restate the blocking hypothesis as settled.
     proc = subprocess.run(
-        [sys.executable, hook_path], input=json.dumps(bash(command)),
+        [sys.executable, hook_path],
+        input=json.dumps(bash(command, payload_cwd)),
         capture_output=True, text=True, cwd=repo,
     )
     if proc.returncode != 0:
@@ -513,14 +625,21 @@ _BUILT = {}
 
 
 def build_all(cases):
+    """Build every fixture. A builder returns its command, or that command
+    paired with the `cwd` the Bash payload should carry -- which is how the
+    tool call's own directory is exercised separately from the hook process's.
+    """
     for case_id, builder in cases.items():
         path, bare = _new_repo()
-        _BUILT[case_id] = (path, builder(path, bare))
+        built = builder(path, bare)
+        command, payload_cwd = built if isinstance(built, tuple) else (built,
+                                                                       None)
+        _BUILT[case_id] = (path, command, payload_cwd)
 
 
 def build_and_verdict(hook_path, case_id):
-    path, command = _BUILT[case_id]
-    return verdict(hook_path, path, command, case_id)
+    path, command, payload_cwd = _BUILT[case_id]
+    return verdict(hook_path, path, command, case_id, payload_cwd)
 
 
 if not os.path.isfile(HOOK):
@@ -634,8 +753,8 @@ MUTATIONS = {
         "the local side of the comparison is the ref being PUSHED, not HEAD",
         [('        local = _git(["rev-parse", "--verify", "--quiet", '
           'source + "^{commit}"],\n'
-          "                     timeout=5)",
-          '        local = _git(["rev-parse", "HEAD"], timeout=5)')],
+          "                     timeout=5, cwd=cwd)",
+          '        local = _git(["rev-parse", "HEAD"], timeout=5, cwd=cwd)')],
         # Also covers the deletion and wildcard refspecs: this one read is
         # what declines them, so reverting it makes both warn about the
         # currently checked-out branch instead.
@@ -643,10 +762,11 @@ MUTATIONS = {
     ),
     "deny_scans_every_command": (
         "the refusal pass examines every simple command, not just the first",
-        [("    for argv, flags, _pos, _repo, _ok, override in parsed:\n"
+        [("    for argv, flags, _pos, _repo, _ok, override, _cwd in parsed:\n"
           '        if flags["force"] and not flags["dry_run"] '
           "and not override:",
-          "    for argv, flags, _pos, _repo, _ok, override in parsed[:1]:\n"
+          "    for argv, flags, _pos, _repo, _ok, override, _cwd in "
+          "parsed[:1]:\n"
           '        if flags["force"] and not flags["dry_run"] '
           "and not override:")],
         {"D9"},
@@ -680,15 +800,49 @@ MUTATIONS = {
           "        if False:\n            continue")],
         # S1, S2 and S11 are fast-forward pushes too, so removing the gate
         # makes all of them warn -- the harness caught this set being
-        # under-declared the first time.
-        {"S1", "S2", "S5", "S11"},
+        # under-declared the first time. S17 joins them: its silence is a
+        # fast-forward READ IN THE RIGHT DIRECTORY, so it flips here as well
+        # as under the `cd` clause below.
+        {"S1", "S2", "S5", "S11", "S17"},
     ),
     "subcommand": (
         "only `git push` matches, not another git subcommand",
         [('    if i >= len(argv) or argv[i] != "push":\n'
-          "        return None, False",
+          "        return None, False, ()",
           "    pass")],
         {"S10"},
+    ),
+    "cd_moves_the_push": (
+        "a `cd` earlier in the compound command moves the directory the push "
+        "runs in",
+        [("        if head and head[0] in CD_WORDS:\n"
+          "            cwd = _resolve_cd(head, cwd)\n"
+          "            continue",
+          "        if head and head[0] in CD_WORDS:\n"
+          "            continue")],
+        {"S17", "S18", "W8"},
+    ),
+    "indeterminate_cd_declines": (
+        "a `cd` that cannot be resolved declines the reading rather than "
+        "falling back to the hook's own directory",
+        [("        if cwd is None:\n            continue",
+          "        if cwd is None:\n            cwd = os.getcwd()")],
+        {"S18"},
+    ),
+    "dash_c_moves_the_push": (
+        "the push's own `-C` values are read out, not skipped as option noise",
+        [('            if argv[i] == "-C" and i + 1 < len(argv):\n'
+          "                cdirs.append(argv[i + 1])\n"
+          "            i += 2",
+          "            i += 2")],
+        {"W9"},
+    ),
+    "base_is_the_payload_cwd": (
+        "the directory a push starts in is the Bash call's own `cwd`, not the "
+        "hook process's",
+        [('        verdict = evaluate(command, payload.get("cwd"))',
+          "        verdict = evaluate(command)")],
+        {"W10"},
     ),
     "heredoc_blanking": (
         "a heredoc body is blanked before parsing, so a mention inside one "

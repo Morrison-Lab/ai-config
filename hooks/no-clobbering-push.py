@@ -92,6 +92,32 @@ can turns on one thing worth distinguishing in the report:
     weaker one -- the remote moved since your last fetch and you cannot even
     see what is there. Say exactly that.
 
+## Where the reading is taken
+
+`HEAD` is per-worktree, so WHERE the local ref is resolved is part of the
+reading rather than an implementation detail. Resolving it in the session's
+own directory made every cross-worktree push report a divergence that did not
+exist: a session sitting in one worktree, pushing from another, was told that
+its own commits of a few minutes earlier belonged to somebody else, and was
+prescribed a `git merge origin/<branch>` that would have merged a branch into
+itself (ai-config#2451).
+
+So each push is read in the directory it actually runs in: the payload's
+`cwd`, moved by any `cd` earlier in the same compound command, then moved
+again by the push's own `git -C`. When a `cd` cannot be resolved statically
+--- `cd -`, a directory stack, an unexpanded variable --- the directory is
+INDETERMINATE and the reading is declined, because a reading taken in the
+wrong repository is worse than no reading at all. That is the same choice
+`_target` already makes when the destination is not a single named branch.
+
+One narrower gap remains, stated rather than papered over: `_simple_commands`
+models no nesting, so a `cd` inside a subshell --- `(cd elsewhere && git
+push)` --- is applied to that push, correctly, and then leaks past the closing
+parenthesis onto any later push in the same command.
+`no-push-without-self-review.py` tracks parenthesis depth for exactly this and
+is the fuller treatment; matching it here means a second structural parser, so
+this file resolves the unnested case and carries the leak knowingly.
+
 ## The match condition
 
   M1  the tool is `Bash` and `tool_input.command` parses into simple commands
@@ -115,6 +141,7 @@ network is unreachable, and on any `ls-remote` timeout.
 from __future__ import annotations
 
 import json
+import os
 import re
 import shlex
 import subprocess
@@ -199,28 +226,111 @@ def _simple_commands(cmd):
     return cmds
 
 
-def _push_argv(argv):
-    """The `push`-and-after tokens of a `git push` simple command, plus whether
-    the command was prefixed with the override. `(None, False)` if this argv
-    is not a `git push`."""
+def _lead_prefix(argv):
+    """`(index of the first real word, whether the override was assigned)`.
+
+    Shared with the `cd` scan in `evaluate`, which has to skip the same env
+    assignments and shell lead words: a `cd` behind a keyword
+    (`while true; do cd other; git push`) is the retry-loop shape
+    `skills/push/SKILL.md` prescribes, so it is reachable by ordinary use.
+    """
     i = 0
     override = False
     while i < len(argv) and (ASSIGNMENT.match(argv[i]) or argv[i] in LEAD_WORDS):
         if argv[i].startswith(OVERRIDE + "="):
             override = argv[i].split("=", 1)[1].strip() == "1"
         i += 1
+    return i, override
+
+
+def _push_argv(argv):
+    """The `push`-and-after tokens of a `git push` simple command, whether the
+    command was prefixed with the override, and its own `-C` values.
+    `(None, False, ())` if this argv is not a `git push`.
+
+    The `-C` values are collected rather than merely skipped because they move
+    the directory the push runs in, and `HEAD` is per-worktree -- so
+    `git -C <other-worktree> push origin HEAD` resolved against the session's
+    own `HEAD` reads an unrelated branch. Git applies each `-C` relative to the
+    last, so they are kept in order rather than reduced to the first.
+    """
+    i, override = _lead_prefix(argv)
     if i >= len(argv) or argv[i] != "git":
-        return None, False
+        return None, False, ()
     i += 1
-    # Skip git's own global options.
+    # Skip git's own global options, keeping the `-C` values.
+    cdirs = []
     while i < len(argv) and argv[i].startswith("-"):
         if argv[i] in GIT_VALUE_OPTS:
+            if argv[i] == "-C" and i + 1 < len(argv):
+                cdirs.append(argv[i + 1])
             i += 2
         else:
             i += 1
     if i >= len(argv) or argv[i] != "push":
-        return None, False
-    return argv[i + 1:], override
+        return None, False, ()
+    return argv[i + 1:], override, tuple(cdirs)
+
+
+# `cd` moves the directory a later push runs in; `pushd`/`popd` move it too,
+# and this scan does not simulate a directory stack, so they are recognized
+# only in order to DECLINE.
+CD_WORDS = ("cd", "pushd", "popd")
+
+
+def _resolve_cd(argv, cur):
+    """The directory `argv` leaves the shell in, or `None` for indeterminate.
+
+    `None` is a real answer rather than a failure: the caller declines the
+    reading instead of falling back to the session's own directory, which is
+    the substitution this resolution exists to stop.
+
+    Deliberately narrower than `no-push-without-self-review.py`'s
+    `_resolve_cd_target`, which resolves the same grammar for a different
+    guard. Importing it would give this hook a dependency on a sibling that
+    execs a sibling of its own, in a process that starts on every Bash call,
+    and the import would fail wherever this file runs as a copy -- including
+    this hook's own mutation harness, where the failure would read as a
+    behaviour change rather than a missing import. So the forms below are
+    resolved the same way and every other form is declined rather than
+    guessed.
+    """
+    if argv[0] != "cd":
+        return None  # a directory stack this scan does not simulate
+    target = None
+    for i, tok in enumerate(argv[1:], start=1):
+        if tok == "--":
+            target = argv[i + 1] if i + 1 < len(argv) else None
+            break
+        if tok.startswith("-") and tok != "-":
+            continue  # `-P`, `-L`, `-e`, `-@` take no value
+        target = tok
+        break
+    if target is None or target == "-":
+        return None  # bare `cd` goes home; `cd -` needs OLDPWD
+    if "$" in target or "`" in target:
+        return None  # unexpanded; resolving it means simulating the shell
+    if target.startswith("~"):
+        target = os.path.expanduser(target)
+        if target.startswith("~"):
+            return None  # an unknown user
+    if os.path.isabs(target):
+        return os.path.normpath(target)
+    if cur is None:
+        return None
+    return os.path.normpath(os.path.join(cur, target))
+
+
+def _push_cwd(cur, cdirs):
+    """Where a push carrying `cdirs` runs, or `None` for indeterminate."""
+    for d in cdirs:
+        if os.path.isabs(d):
+            cur = os.path.normpath(d)
+        elif cur is None:
+            return None
+        else:
+            cur = os.path.normpath(os.path.join(cur, d))
+    return cur
 
 
 def _parse_push(rest):
@@ -288,11 +398,15 @@ def _parse_push(rest):
     return flags, positionals, repo_opt, ok
 
 
-def _git(args, timeout=8):
-    """Run a git command; return stdout on success, else None."""
+def _git(args, timeout=8, cwd=None):
+    """Run a git command in `cwd`; return stdout on success, else None.
+
+    A `cwd` that does not exist raises `FileNotFoundError`, an `OSError`, so a
+    stale directory fails open here like every other trouble.
+    """
     try:
         out = subprocess.run(["git"] + args, capture_output=True, text=True,
-                             timeout=timeout)
+                             timeout=timeout, cwd=cwd)
     except (OSError, subprocess.SubprocessError):
         return None
     if out.returncode != 0:
@@ -300,7 +414,7 @@ def _git(args, timeout=8):
     return out.stdout
 
 
-def _target(positionals, repo_opt):
+def _target(positionals, repo_opt, cwd):
     """`(remote, branch, source, on_source)` the push is aimed at, or all-`None`.
 
     Handles the shapes that occur: a bare `git push`, `git push origin`,
@@ -330,7 +444,7 @@ def _target(positionals, repo_opt):
     `ls-remote` at the wrong ref and report on something the push never
     touches, which is worse than reporting nothing.
     """
-    head = _git(["rev-parse", "--abbrev-ref", "HEAD"])
+    head = _git(["rev-parse", "--abbrev-ref", "HEAD"], cwd=cwd)
     head = head.strip() if head else None
     if head == "HEAD":
         head = None  # detached; no branch to reason about
@@ -347,7 +461,7 @@ def _target(positionals, repo_opt):
     if remote is None:
         remote = "origin"
         if head:
-            up = _git(["config", "--get", f"branch.{head}.remote"])
+            up = _git(["config", "--get", f"branch.{head}.remote"], cwd=cwd)
             if up and up.strip():
                 remote = up.strip()
 
@@ -434,12 +548,12 @@ WARN_TAIL = (
 )
 
 
-def _describe(local, tip, limit=10):
+def _describe(local, tip, cwd, limit=10):
     """Formatted commit list for `local..tip`, or None if the object is absent."""
-    if _git(["cat-file", "-e", tip + "^{commit}"], timeout=5) is None:
+    if _git(["cat-file", "-e", tip + "^{commit}"], timeout=5, cwd=cwd) is None:
         return None
     out = _git(["log", "--format=    %h  %an, %ar  %s", f"{local}..{tip}"],
-               timeout=5)
+               timeout=5, cwd=cwd)
     if out is None:
         return None
     lines = [ln for ln in out.splitlines() if ln.strip()]
@@ -452,8 +566,14 @@ def _describe(local, tip, limit=10):
     return len(lines), text
 
 
-def evaluate(command):
+def evaluate(command, base_cwd=None):
     """`('deny', reason)`, `('warn', context)`, or `None`.
+
+    `base_cwd` is the directory the Bash call starts in -- the payload's own
+    `cwd` -- and a `cd` earlier in the same compound command moves it, as the
+    push's own `git -C` moves it again. It is threaded through every read
+    below rather than left to the hook process's own directory, because `HEAD`
+    is per-worktree and this guard's whole output is a comparison against it.
 
     TWO passes over the compound command, deliberately, and the refusal pass
     runs first.
@@ -472,29 +592,44 @@ def evaluate(command):
         return None
 
     parsed = []
+    cwd = base_cwd or os.getcwd()
     for argv in cmds:
-        rest, override = _push_argv(argv)
+        head = argv[_lead_prefix(argv)[0]:]
+        if head and head[0] in CD_WORDS:
+            cwd = _resolve_cd(head, cwd)
+            continue
+        rest, override, cdirs = _push_argv(argv)
         if rest is None:
             continue
         flags, positionals, repo_opt, ok = _parse_push(rest)
-        parsed.append((argv, flags, positionals, repo_opt, ok, override))
+        parsed.append((argv, flags, positionals, repo_opt, ok, override,
+                       _push_cwd(cwd, cdirs)))
 
     # Pass 1 -- refusal. Lexical, so no network read, and any command in the
-    # compound counts.
-    for argv, flags, _pos, _repo, _ok, override in parsed:
+    # compound counts. It is deliberately blind to the directory: `--force` is
+    # a force push wherever it runs, so nothing about the refusal depends on
+    # resolving one.
+    for argv, flags, _pos, _repo, _ok, override, _cwd in parsed:
         if flags["force"] and not flags["dry_run"] and not override:
             return "deny", DENY.format(segment=" ".join(argv))
 
     # Pass 2 -- the reading. Only reached when nothing is refused.
-    for argv, flags, positionals, repo_opt, ok, _override in parsed:
+    for argv, flags, positionals, repo_opt, ok, _override, cwd in parsed:
         segment = " ".join(argv)
+
+        # An indeterminate directory declines the reading rather than falling
+        # back to the hook's own. A comparison against the wrong repository is
+        # exactly what ai-config#2451 reported, and it is worse than silence:
+        # it names a cause and prescribes a merge.
+        if cwd is None:
+            continue
 
         # Everything below reports on ONE branch, so anything that is not one
         # ordinary branch push is out of scope rather than guessed at.
         if flags["dry_run"] or flags["delete"] or flags["refset"] or not ok:
             continue
 
-        remote, branch, source, on_source = _target(positionals, repo_opt)
+        remote, branch, source, on_source = _target(positionals, repo_opt, cwd)
         if not remote or not branch:
             continue
         # `source` is deliberately NOT tested for emptiness here. An empty
@@ -518,12 +653,12 @@ def evaluate(command):
         # `refs/heads/*:refs/heads/*` contains a `*`, and `git rev-parse
         # --verify` resolves neither (measured: both exit 1 with no output).
         local = _git(["rev-parse", "--verify", "--quiet", source + "^{commit}"],
-                     timeout=5)
+                     timeout=5, cwd=cwd)
         if not local:
             continue  # names no single local ref -- fail open, no network read
         local = local.strip()
 
-        ls = _git(["ls-remote", "--heads", remote, branch], timeout=8)
+        ls = _git(["ls-remote", "--heads", remote, branch], timeout=8, cwd=cwd)
         if not ls or not ls.strip():
             continue  # ref absent remotely, or the read failed -- fail open
         tip = ls.split()[0]
@@ -533,7 +668,7 @@ def evaluate(command):
 
         anc = subprocess.run(
             ["git", "merge-base", "--is-ancestor", tip, local],
-            capture_output=True, text=True, timeout=5)
+            capture_output=True, text=True, timeout=5, cwd=cwd)
         if anc.returncode == 0:
             continue  # plain fast-forward; nothing at risk
 
@@ -546,7 +681,7 @@ def evaluate(command):
         body = WARN_HEAD.format(remote=remote, branch=branch, tip=tip[:12],
                                 local=local[:12], segment=segment,
                                 srclabel=srclabel)
-        described = _describe(local, tip)
+        described = _describe(local, tip, cwd)
         if described:
             n, commits = described
             body += WARN_KNOWN.format(n=n, commits=commits)
@@ -618,7 +753,7 @@ def main() -> int:
         return 0
 
     try:
-        verdict = evaluate(command)
+        verdict = evaluate(command, payload.get("cwd"))
     except Exception as exc:  # fail open on any parse or subprocess trouble
         print(f"no-clobbering-push: could not evaluate command ({exc})",
               file=sys.stderr)

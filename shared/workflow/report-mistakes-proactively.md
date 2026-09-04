@@ -31,6 +31,10 @@ a product one.
    duplicate an open-state search cannot see.
    When an **open** issue already covers the mistake, comment there with
    the new evidence instead of filing a duplicate.
+   The same holds for a new symptom of a tracked defect family: a hook or
+   checker that already has a tracking issue gets a comment on it, not a
+   sibling issue per symptom
+   ([`triage-backlog`](triage-backlog.md), "Fold, do not multiply").
    A closed match is not a skip: surface it and confirm before deciding
    whether to reopen it or file a new one, per
    [`issue-first`](issue-first.md).
@@ -291,8 +295,8 @@ every push.
 Each becomes decorative the moment it shares a call with what it gates.
 
 [`pr-on-claim`](pr-on-claim.md) already states the structural sibling for one
-command: the Copilot `requested_reviewers` POST must be the sole, or last,
-command in its Bash call, so that a `Stop` hook can tell whether it ran.
+command: the Copilot `requested_reviewers` POST must be the sole command in
+its Bash call, so that a `Stop` hook can tell whether it ran.
 The reason here is different and stronger.
 There the reader is a hook, and separability is enough.
 Here the reader is you, so the query has to **finish in its own call**, with

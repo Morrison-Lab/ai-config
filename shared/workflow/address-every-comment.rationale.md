@@ -1036,3 +1036,34 @@ never blocking --- which argues for holding whether the note is right or wrong.
 Checking tells you which of those you are in, it is usually one command, and
 the two compose: verify the note, then hold anyway unless it named a real
 defect.
+
+**A finding raised against someone else's implementation is measured, not adopted
+or dismissed.**
+Dismissal is wrong because the peer is reasoning about the same problem, often
+having probed a part of it you did not.
+Adoption is wrong because the finding is about a different implementation, so
+whether it transfers is an empirical question about your code rather than a
+property of the finding.
+Both feel like a response and neither is one: the first spends nothing, the
+second spends a round on a fix that may repair nothing.
+
+Run the peer's cases as concrete inputs, not as a reading of your own regex or
+your own parser --- a reading of the code is exactly the confirmation the
+diff-versus-standards rules elsewhere in this corpus rule out.
+Then say which passed and which did not, so the peer learns something about the
+shape of the problem whichever way it goes.
+
+Pinning a shape that already passes can be worth it --- a case passing today
+passes by construction of code nobody promised to keep, and what the peer
+supplied was a *reason to care about that shape*, which survives the
+measurement.
+
+But establish that the shape is actually uncovered first, and establish it by
+mutation.
+Reading the suite for a similar-looking case is the same self-confirmation this
+rule exists to avoid, one level down, and the measured outcome in the case
+record was that both "missing" cases were verbatim duplicates already present.
+A duplicate regression case costs review attention and buys nothing, while
+reporting a shape as newly pinned when it was already covered is a false claim
+in the record.
+

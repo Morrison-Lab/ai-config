@@ -81,12 +81,13 @@ sentence recording a prior conclusion;
 the one re-run on that head reproduced the block at 12:46:15Z.
 The merged head `8a7d2314` carried no `jules/review` status at all.
 The maintainer's per-PR call to merge with the earlier head's block
-unanswered is recorded on
+rebutted and still red is recorded on
 [#3192](https://github.com/Morrison-Lab/ai-config/issues/3192), which holds
 the general disposition open.
 One run on the approving head cannot separate a detector that fires per run
 from one that fires per diff, and that run's truncated diff is a third
-candidate the data do not exclude.
+candidate the data do not exclude (the blocking re-run's comment reports a
+truncated diff too, which weighs against it without settling it).
 
 - **Do:** read an approve on one head and a block on the next as unresolved
   evidence about the detector, and follow the Do above: rebut once, file,

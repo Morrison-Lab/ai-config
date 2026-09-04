@@ -588,6 +588,16 @@ class TestEvaluate(unittest.TestCase):
         ])
         self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "deny")
 
+    def test_list_marked_approval_does_not_approve(self):
+        """A list marker is not emphasis, so a bulleted or numbered line
+        must not trim back to the bare approval phrase."""
+        for body in ("* Ready for merge.", "- Ready for merge.",
+                     "1. Approved."):
+            state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+            self.assertEqual(
+                gate.evaluate(MERGE_CMD, state)["decision"], "deny", body)
+            self.assertFalse(gate.human_review_body_approves(body), body)
+
     def test_struck_through_approval_does_not_approve(self):
         """Strikethrough is a retraction, not emphasis, so `~~` must not be
         trimmed back to the bare approval phrase."""
@@ -613,8 +623,6 @@ class TestEvaluate(unittest.TestCase):
             self.assertIn("its own work", decision["reason"])
 
     def test_one_character_review_commit_is_not_head_bound(self):
-        """The head binding is a sha-prefix test, so it needs a plausible
-        abbreviation: a single character prefixes almost every head."""
         short = review("d-morrison", "COMMENTED", "Ready for merge.",
                        commit=HEAD[0])
         self.assertEqual(

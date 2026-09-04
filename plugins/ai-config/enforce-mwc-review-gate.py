@@ -98,10 +98,10 @@ REVIEWED_COMMIT_RE = re.compile(
 # Shortest sha abbreviation a head-binding prefix test will accept.
 ABBREV_SHA_LEN = 7
 # Markdown emphasis and terminal punctuation around an approval headline,
-# so `**Ready for merge**.` reads as the phrase itself. Heading, quote,
-# list, and strikethrough markers are deliberately absent: a human approval
-# must be the bare phrase, and a quoted, bulleted, or struck-through line is
-# not it.
+# so `**Ready for merge**.` reads as the phrase itself. Heading, quote, and
+# strikethrough markers are deliberately absent: a human approval must be
+# the bare phrase, and a quoted or struck-through line is not it.
+LIST_ITEM_RE = re.compile(r"^([-+*]|\d+[.)])\s")
 HEADLINE_TRIM_RE = re.compile(r"^[\s*_`]+|[\s*_`.!]+$")
 # The corpus-mandated agent-disclosure marker, plus the headers review
 # workflows post under. `gh pr review --comment` is a first-class agent
@@ -196,7 +196,7 @@ def human_review_body_approves(body):
     if lines and VERDICT_MARKER_RE.match(lines[0]):
         rest = VERDICT_MARKER_RE.sub("", lines[0], count=1).strip()
         lines = ([rest] if rest else []) + lines[1:]
-    if len(lines) != 1:
+    if len(lines) != 1 or LIST_ITEM_RE.match(lines[0]):
         return False
     return bool(CLEAN_VERDICT_RE.fullmatch(HEADLINE_TRIM_RE.sub("", lines[0])))
 
@@ -237,12 +237,11 @@ def latest_human_review_states(reviews, head_oid="", pr_author=""):
 
     Values are APPROVED, CHANGES_REQUESTED, NOT_CLEAN, or SELF_APPROVED.
     NOT_CLEAN is a body-derived blocker: an admissible review body stating
-    the PR is not clean, which vetoes exactly as a not-clean verdict
-    comment does, so the reviews channel is read in both directions rather
-    than only in the allow direction. SELF_APPROVED is a body-derived
-    approval that cannot be attributed to someone other than the PR's own
-    author, which is recorded so the caller can say why it does not
-    authorize a merge, and which never allows.
+    the PR is not clean, matched over the raw body with quotes and fences
+    included. SELF_APPROVED is a body-derived approval that cannot be
+    attributed to someone other than the PR's own author, which is
+    recorded so the caller can say why it does not authorize a merge, and
+    which never allows.
 
     PENDING never changes an author's standing, and COMMENTED changes it
     only when the review record is admissible (see

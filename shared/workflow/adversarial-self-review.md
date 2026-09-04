@@ -93,7 +93,10 @@ A split --- one all-clear and another not-clean, nits included --- is not
 (ai-config#2274).
 ARD every item from every review, then request fresh reviews.
 If no qualifying reviewer is reachable, the merge waits ---
-"blocked on reviewer availability" is the honest status ---
+"blocked on reviewer availability" is the honest status
+only once it carries the per-provider enumeration
+[`Availability is a per-route question`](#availability-is-a-per-route-question-and-command--v-answers-one-route)
+requires ---
 and arming an auto-merge while waiting is
 [Pattern 12](../../memories/mistake-patterns.md).
 
@@ -130,7 +133,8 @@ A reviewer is reachable by any of three routes,
 and only the first of them can ever appear on `PATH`:
 
 1. **A local CLI**, probed with `command -v`.
-   The binaries the adapters probe are derivable,
+   The binaries the orchestrator's model adapters
+   ([`model_adapters.py`](../../scripts/orchestrator/model_adapters.py)) probe are derivable,
    so start from them rather than from a list copied into this sentence,
    per [`avoid-hardcoding-external-data`](../coding/avoid-hardcoding-external-data.md):
    `grep -o 'shutil.which("[a-z0-9-]*")' scripts/orchestrator/model_adapters.py | sort -u`.
@@ -138,7 +142,8 @@ and only the first of them can ever appear on `PATH`:
    a CLI no adapter probes never appears in it,
    and `agy` is the worked case,
    since [`delegation.md`](../../memories/delegation.md)'s ladder routes dispatchable work to it
-   while the adapter named after it probes `gemini`.
+   while the adapter named after it probes `gemini`,
+   so probe the union of that set with the ladder's own entries above.
 2. **A forge-side bot**, which runs on the forge and so is invisible to `PATH` in principle.
 3. **An API key** for a provider reachable without its CLI,
    probed in the environment rather than on `PATH`.
@@ -234,8 +239,9 @@ and what a single failed sweep never establishes.
 - **Do:** derive the API-key route from the adapters that read those variables,
   since they are its source of truth and a copied list drifts from them.
 - **Do:** derive the local-CLI route from the adapters' own probes,
-  and treat the result as a floor,
-  since a CLI no adapter probes never appears in it.
+  then probe the union of that set with the ladder's own entries,
+  since each source drops what the other carries ---
+  the derivation drops `agy`, and the inventory drops `gemini`.
 - **Do:** read the commenting identity's `author_association` back
   before recording a comment-triggered forge reviewer as dispatched.
 - **Don't:** read a null `command -v` sweep as an availability verdict;
@@ -246,7 +252,8 @@ and what a single failed sweep never establishes.
 - **Don't:** enumerate the API-key route from a list written out in prose,
   here or anywhere else; that list is a subset the moment an adapter is added.
 - **Don't:** enumerate the local-CLI route from a list written out in prose either;
-  it drops every CLI the adapters do not probe.
+  that list is a subset the moment an adapter is added,
+  and the inventory above already drops `gemini`.
 - **Don't:** record a comment-triggered forge reviewer as dispatched on a posted mention alone;
   an `author_association` allowlist skips the job with no error.
 - **Don't:** treat the machine inventory above as the provider population, since a forge-side reviewer cannot appear in it.

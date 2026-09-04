@@ -116,6 +116,58 @@ The merge-side rules live with the gate they serve:
   evaluating the shipping head.
 
 
+## Availability is a per-route question, and `command -v` answers one route
+
+The inventory above is a **machine** inventory:
+every entry in it is a local binary,
+so a `PATH` probe answers it completely and answers nothing else.
+A reviewer is reachable by any of three routes,
+and only the first of them can ever appear on `PATH`:
+
+1. **A local CLI**, probed with `command -v` --- `agy`, `opencode`, `codex`, `claude`, `cursor`.
+2. **A forge-side bot**, which runs on the forge and so is invisible to `PATH` in principle.
+3. **An API key** for a provider with no CLI installed, probed in the environment.
+
+A null `command -v` sweep is therefore evidence about `PATH` and about nothing else.
+That is [`grep-is-not-coverage`](grep-is-not-coverage.md)'s shape,
+with `command -v` in place of `grep`,
+and [`verify-the-right-artifact`](verify-the-right-artifact.md)'s,
+with the local machine standing in for the set of reachable providers.
+
+The forge-side route is the one an inventory of binaries cannot see,
+so its providers are enumerated here rather than left to be inferred:
+
+| provider | how it is reached |
+| --- | --- |
+| Copilot | `mcp__github__request_copilot_review`, or the `requested_reviewers` REST endpoint |
+| Jules | an `@jules review` comment on the PR, which fires `.github/workflows/jules-review.yml` |
+| Antigravity | an `@agy` or `@antigravity` comment, or `workflow_dispatch` on `.github/workflows/antigravity-review.yml` |
+
+Each of those runs a different model on a different harness from a Claude session,
+so each qualifies for the merge gate above on both axes.
+Read the table as a starting list rather than as the population.
+The two comment-triggered rows depend on a workflow that one PR can add or remove,
+so derive them from the repo's own `on:` blocks
+per [`claude-review-dispatch`](../../memories/claude-review-dispatch.md).
+
+**So "blocked on reviewer availability" owes an enumeration, not a probe.**
+That status is honest only after naming every known provider and the state it was found in,
+which is what the pinned quorum below already requires
+and what a single failed sweep never establishes.
+
+- **Do:** run the availability check as a list of provider routes --- local CLI, forge bot, API key --- and record each provider's state.
+- **Do:** name every known provider and its state before writing "blocked on reviewer availability".
+- **Don't:** read a null `command -v` sweep as an availability verdict;
+  it reports what is on `PATH` and stops there.
+- **Don't:** treat the machine inventory above as the provider population, since a forge-side reviewer cannot appear in it.
+
+(Measured 2026-09-03 on ai-config#3105:
+a session held two green PRs for roughly seven hours as
+"blocked on reviewer availability",
+on a `command -v` sweep over eight CLIs that correctly found none of them installed.
+Copilot, Jules, and Antigravity were all reachable throughout,
+and a Copilot request on #3084 produced a running check the same day.)
+
 ## What "separate" requires
 
 **Its own context window.**

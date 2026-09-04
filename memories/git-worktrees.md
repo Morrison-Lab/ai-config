@@ -974,6 +974,41 @@ since nothing about it involved git state --- the mechanism is identical to
 the first two instances, and the correction came from a message rather than
 from a diff.)
 
+**A `Claude-Session:` commit trailer names the exact session that authored a commit, which is the one instrument that identifies a peer rather than inferring one.**
+The rule above says `ListAgents` silence means "not tracked here" rather than "does not exist".
+That is right, and it leaves you with no way to say who *is* there.
+Git history does.
+A remote session's commits carried a `Claude-Session:` trailer holding that session's own URL in the one case observed here, so where the trailer is present, comparing it against your own settles authorship instead of suggesting it.
+The trailer may be absent, which is why its ABSENCE settles nothing --- the third signature below is exactly that case.
+
+```bash
+git log -1 --format='author=%an <%ae>%n%b' origin/<branch> \
+  | grep -E 'author=|Claude-Session|Co-Authored-By'
+```
+
+Three signatures, seen across four branches --- the first two measured, the third measured in its observables and inferred in its conclusion:
+
+- **A `Claude-Session:` URL differing from yours** --- a concurrent *remote* session, named.
+  Decisive, where `updated_at` movement is only a hint.
+- **Your own `Claude-Session:` URL** --- your commit.
+- **No trailer, authored by the human, with a `Co-Authored-By: Claude ...` line** --- consistent with a *local* Claude Code session, which commits under the human's git identity and injects no session trailer.
+  This one prompts a question rather than settling it, unlike the other two: the same facts also fit a person typing the co-author line, or a remote session with the trailer suppressed.
+
+The third signature misreads in both directions.
+Read as human-authored it credits a person with an agent's work;
+read as absent evidence it makes every local session invisible to a peer sweep.
+The `Co-Authored-By:` line is what separates it from a genuinely hand-written commit, and it names the model too, so a `Claude Fable 5.1` co-author tells you a differently-configured session is active on that branch.
+
+- **Do:** read the trailer off the branch tip before calling a PR yours, a peer's, or a human's.
+- **Don't:** infer authorship from the GitHub login --- a local session, a remote session, and the person all push under the same account.
+- **Don't:** read a missing `Claude-Session:` trailer as "not an agent";
+  check for `Co-Authored-By:` before concluding that.
+
+(Measured 2026-09-03 during a `gia` sweep on ai-config.
+`ListAgents` reported no peers for the entire session while a peer demonstrably held ai-config#3023, whose tip carried a `Claude-Session:` URL differing from this session's.
+ai-config#3089, #3100 and #3101 carried no trailer and the human's authorship, with `Co-Authored-By: Claude Opus 5` or `Claude Fable 5.1`.
+An adversarial reviewer sent to settle the same question reported #3023 as human-authored with no trailer, which is why the query above names the trailer explicitly rather than leaving it to a general history read.)
+
 ## A subagent that has REPORTED COMPLETION can still be resumed, so its worktree is not yours to work in
 
 The section above is entirely about concluding "dead" on evidence that shows

@@ -195,16 +195,24 @@ RX_RETRACTION = re.compile(
 # Attachment replaces the character window an earlier round used. A window
 # cannot tell "green -- the badge is wrong" from "green was wrong", since both
 # put the retraction within a few characters; a clause separator can.
-# Two of the separators are direction-asymmetric, so the set is split rather
-# than shared. A retraction that LEADS its claim states that claim as its own
-# object, and both `:` and `when` are ordinary ways to introduce that object --
-# "I overstated it: 11 pass was the pre-push reading." and "I was wrong when I
-# said all checks green." are each one clause, not two. The same two characters
-# and words after the claim introduce a DIFFERENT clause instead: "All checks
-# green: the earlier reviewer was wrong." says the reviewer was wrong, not the
-# claim, and reading it as a retraction silently disabled the guard on a
-# genuine stale-clean assertion -- the invisible failure, since a suppressed
-# guard emits nothing.
+#
+# One separator is direction-asymmetric, so the set is split rather than
+# shared. `when` is a complementizer: in "I was wrong when I said all checks
+# green." the claim is the content of the retracted saying, so `when` must not
+# break a LEADING retraction off the claim it withdraws. After the claim the
+# same word opens a separate clause, so it still breaks there.
+#
+# `:` is a clause boundary in BOTH directions and stays in the shared set. It
+# introduces the CORRECTED claim at least as often as the retracted one --
+# "I was wrong: all checks green now." withdraws some earlier claim and then
+# asserts a fresh, stale one -- so reading it as attachment silently disables
+# the guard on a genuine stale-clean assertion. That is the invisible failure,
+# since a suppressed guard emits nothing, and the identical sentence with a
+# period ("I was wrong. All checks green now.") already blocks, so nothing
+# should turn on the one character. The cost of the symmetric reading is a
+# visible warning on "I overstated it: 11 pass was the pre-push reading.",
+# whose own text already discloses the reading is pre-push; the cost of the
+# asymmetric one is a stale claim that nothing reports.
 #
 # Nothing else moves. `because`, `since`, `after`, `before`, `once`, `unless`,
 # and `if` introduce a reason or a time rather than the retraction's object, so
@@ -212,12 +220,12 @@ RX_RETRACTION = re.compile(
 # STAYS blocked in both directions -- "All checks green because the earlier
 # reading was wrong." still asserts green.
 _CLAUSE_SEPARATORS = (
-    r"--|[,;()|]"
+    r"--|[,;:()|]"
     r"|\n[ \t]*[-*+>#]"
     r"|\b(?:but|and|or|so|yet|however|though|although|while|whereas"
     r"|after|before|since|because|once|unless|if)\b"
 )
-RX_CLAUSE_SEPARATOR = re.compile(_CLAUSE_SEPARATORS + r"|:|\bwhen\b", re.I)
+RX_CLAUSE_SEPARATOR = re.compile(_CLAUSE_SEPARATORS + r"|\bwhen\b", re.I)
 RX_LEADING_SEPARATOR = re.compile(_CLAUSE_SEPARATORS, re.I)
 
 # The trailing scan deliberately does NOT treat a bare newline as a sentence

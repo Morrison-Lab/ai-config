@@ -125,7 +125,7 @@ CASES = [
      "the measured sentence: a retraction quoting the phrase it retracts"),
     ([QUERY, PUSH, say('My earlier "ready to merge" call was incorrect.')], False,
      "retraction vocabulary AFTER the phrase, in the same sentence"),
-    ([QUERY, PUSH, say("I overstated it: 11 pass was the pre-push reading.")], False,
+    ([QUERY, PUSH, say("I overstated the 11 pass reading.")], False,
      "retraction vocabulary BEFORE the phrase, with no clause break between"),
     ([QUERY, PUSH, say('The reviewer is wrong that #1689 is conflict-free.')], False,
      "'is wrong' is a retraction even without a first-person subject -- the "
@@ -178,14 +178,22 @@ CASES = [
     ([QUERY, PUSH, say("All checks green because the earlier reading was "
                        "wrong.")], True,
      "a reason clause is not a retraction of the claim it explains"),
-    # `:` and `when` are the two direction-asymmetric separators, so each needs
-    # a case on BOTH sides. Trailing colon: an elaboration after the claim is
-    # its own clause. Delete `:` from RX_CLAUSE_SEPARATOR and this stops
-    # blocking -- silently, since a suppressed guard emits nothing. The leading
-    # colon is already pinned by the "I overstated it: 11 pass" case above,
-    # which stops allowing if `:` is put in RX_LEADING_SEPARATOR too.
+    # `when` is the only direction-asymmetric separator. `:` breaks attachment
+    # in BOTH directions, so it needs a blocking case on each side. Delete `:`
+    # from _CLAUSE_SEPARATORS and all three below stop blocking -- silently,
+    # since a suppressed guard emits nothing.
     ([QUERY, PUSH, say("All checks green: the earlier reviewer was wrong.")], True,
      "a colon separates a trailing retraction from the claim"),
+    # The leading pair. A colon after a retraction introduces the CORRECTED
+    # claim at least as often as the retracted one, and that reading is a fresh
+    # stale-clean assertion. Put `:` back in RX_CLAUSE_SEPARATOR alone and both
+    # of these stop blocking while the trailing case above stays green.
+    ([QUERY, PUSH, say("I was wrong: all checks green now.")], True,
+     "a colon after a retraction introduces a fresh claim, not the withdrawn "
+     "one -- the same sentence with a period blocks, so the colon must too"),
+    ([QUERY, PUSH, say("Correcting my earlier status: #1689 is fully clean.")], True,
+     "correcting an earlier status is not retracting the claim that follows "
+     "the colon"),
 
     # The copula guard. Attributive "wrong" sits in the SAME clause as the
     # claim, so attachment cannot rule it out; only the copula requirement can.

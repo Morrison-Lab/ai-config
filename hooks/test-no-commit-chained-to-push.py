@@ -433,14 +433,11 @@ check("an override on a later commit does not clear an already-matched chain",
 # a second, unprotected one" above red, so the compound is not what this case
 # adds either. Both mutants measured on scratch copies of the hook.
 #
-# The `return None` spelling never landed on main. `git log --oneline --
-# hooks/no-commit-chained-to-push.py` returns exactly one commit, 673615a4 --
-# the squash of ai-config#3023, merged 2026-09-03 -- and `git show
-# 673615a4:hooks/no-commit-chained-to-push.py` already carries `continue`.
-# (Under a shallow clone, check that the boundary precedes 673615a4 before
-# trusting that one-commit history.) The spelling existed on a PRE-MERGE
-# revision of that branch, which is what the hook's own "`continue`, never
-# `return None`" comment means by "Measured on this branch before the fix".
+# `git show 673615a4:hooks/no-commit-chained-to-push.py` -- the squash of
+# ai-config#3023, merged 2026-09-03 -- already carries `continue`, so the
+# `return None` spelling existed only on a PRE-MERGE revision of that branch,
+# which is what the hook's own "`continue`, never `return None`" comment means
+# by "Measured on this branch before the fix".
 check("an override on a middle commit does not clear the first-matched chain",
       fires("git commit -m a && ALLOW_COMMIT_AND_PUSH=1 git commit -m b "
             "&& git push"), True)

@@ -504,11 +504,13 @@ check("bare git", fires("git; git push"), False)
 # examined alongside how many were refused -- a zero with no denominator is
 # indistinguishable from a sweep that never ran.
 #
-# PyYAML is guarded the way every other consumer in this repo guards it
-# (scripts/validate-skills.py, scripts/sync-codex-skill-wrappers.py,
-# scripts/test_validate_workflow.py), so a missing dependency names itself
-# rather than arriving as a traceback -- this is the only third-party import
-# under `hooks/`.
+# PyYAML is guarded the way scripts/validate-skills.py,
+# scripts/sync-codex-skill-wrappers.py, and scripts/test_validate_workflow.py
+# guard it, so a missing dependency names itself rather than arriving as a
+# traceback -- this is the only third-party import under `hooks/`. Not every
+# consumer does: scripts/test_run_local_validation.py imports it bare and
+# scripts/check-vendored-drift.py swallows the ImportError, which is a gap in
+# those two files rather than a precedent to copy.
 try:
     import yaml  # noqa: E402
 except ImportError:  # pragma: no cover
@@ -521,14 +523,18 @@ operations = registry.get("operations") or []
 check("the registry has operations to sweep", bool(operations), True)
 
 examined = 0
+refused = 0
 for op in operations:
     command = op.get("cli")
     if not isinstance(command, str):
         continue
     examined += 1
+    denied = fires(command)
+    if denied:
+        refused += 1
     check(f"registry {op.get('id', '<unknown>')}.cli is not a chained "
-          "commit-and-push", fires(command), False)
-print(f"  swept {examined} tool-mappings.yml cli values")
+          "commit-and-push", denied, False)
+print(f"  swept {examined} tool-mappings.yml cli values; {refused} refused")
 
 # The entry the issue named, pinned by id rather than by the sweep above, so a
 # registry that lost the operation entirely cannot pass by having nothing left

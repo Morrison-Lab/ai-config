@@ -545,20 +545,34 @@ registered hook was exempt when this was measured (2026-09-04).
 - **Don't:** treat an error-path `return 1` as a blocking channel --- the
   checker reads status 2 alone.
 
-A hook that emits **both** channels should gate its `systemMessage` on
-`ANTIGRAVITY_AGENT` being unset.
-Antigravity's adapter surfaces `additionalContext` and every collected
-`systemMessage` separately, so a payload carrying both prints the warning
-twice there;
-a hook emitting one channel alone is unaffected.
-What owes the gate is the pair of channels, not the event: a warn-only `Stop`
-hook carrying both owes it too, and
-`flag-config-deletion-without-ref-check.py` is the registered instance.
-Nothing enforces this, and several registered hooks do not yet carry the gate.
+A **`PreToolUse`** hook that emits **both** channels should gate its
+`systemMessage` on `ANTIGRAVITY_AGENT` being unset.
+The event decides this, and the adapter is where to read it off.
+`plugins/ai-config/claude-hook-adapter.py`'s `PreToolUse` branch prints
+`hookSpecificOutput.additionalContext` to stderr as `Warning from <hook>: ...`
+and separately prints every collected `systemMessage` as
+`claude-hook-adapter [allow]: ...`, so a `PreToolUse` payload carrying both
+prints the warning twice there.
+Its `Stop` branch instead collapses the two into one, taking the first channel
+present through
+`msg = hook_out.get("systemMessage") or hook_out.get("additionalContext") or nested_context`
+and appending a single entry, so a warn-only `Stop` hook carrying both
+surfaces its warning once and owes no gate.
+A hook emitting one channel alone is unaffected on either event.
+Driving the shipped adapter with a synthetic hook that emits both channels
+returns those two stderr lines for a `PreToolUse` payload and the single
+`{"systemMessage": ...}` object for a `Stop` payload (measured 2026-09-04).
+Nothing enforces the gate, and several registered `PreToolUse` hooks do not
+yet carry it.
 That census is derived over `hooks/hooks.json` rather than recalled ---
 registered scripts whose source names both channels and never *gates* on
 `ANTIGRAVITY_AGENT`.
-Read the membership off the query below rather than off this paragraph.
+It keys on the channels rather than on the event, so a `Stop` hook can appear
+in its output without owing the gate;
+`flag-config-deletion-without-ref-check.py` is registered under `Stop` alone
+and is there for that reason.
+Read the membership off the query below rather than off this paragraph, and
+check each name's registered event before acting on it.
 No sentence here states the count, because a tally in prose goes stale on any
 unrelated hook addition, and this one went stale twice in two days
 (output pasted below the snippet, measured 2026-09-04):
@@ -585,15 +599,16 @@ so the disclosure would delete that hook from the census disclosing it.
 That is what happened here: the name-keyed query printed two names under a
 paragraph naming three.
 
-- **Do:** gate the `systemMessage` whenever the same payload also carries
-  `additionalContext`.
+- **Do:** gate a `PreToolUse` hook's `systemMessage` whenever the same payload
+  also carries `additionalContext`.
 - **Do:** key a census like this one on the expression that does the work, and
   paste the output beside the query.
 - **Don't:** state the gate as repo-wide fact, or read the census off the
-  prose --- re-run the query, since the hooks it names still warn twice under
-  Antigravity.
-- **Don't:** read a warn-only `Stop` hook as exempt --- the event does not
-  decide it, the pair of channels does.
+  prose --- re-run the query and check each name's registered event, since
+  only its `PreToolUse` members warn twice under Antigravity.
+- **Don't:** gate a warn-only `Stop` hook --- the adapter's `Stop` branch
+  picks one channel through an `or` chain, so only a `PreToolUse` payload
+  carrying both warns twice.
 - **Don't:** key it on a bare identifier --- prose about the absence of a gate
   reads as the gate itself.
 

@@ -535,6 +535,13 @@ add a review gate for the cases that need one.
   `1fff7e63` to `4af1f1ea`, each re-patched the same protocol-mechanism
   sentences, which the entry's Do/Don't never used and `e91dda59` deleted;
   the deleted paragraphs were not restored).
+  The same shape recurs when a fix round appends prose narrating its own
+  fixes: that prose is fresh unmeasured text, so a round that fixes N
+  findings and adds a paragraph about them adds new claims to refute
+  (ai-config#3202: three per-round notebook entries drew the findings of
+  rounds 2 to 4 and were cut at `48380505`; the two-sentence summary that
+  replaced them was itself re-patched through round 11).
+  Write the fix with no narration, per ai-config#3203.
 
 ## Proactive hook compliance
 

@@ -54,6 +54,29 @@ is the precedent, held for the maintainer.
 that status red and every check run green, `GET /pulls/3154` reported
 `mergeable_state: unstable` rather than `blocked`, the discriminator the bcs
 `test-coverage` bullet in [`github-actions.md`](github-actions.md) records.
+
+**The detector fires per run, not on every run, so a later head's approve is
+not evidence that the block cleared.**
+Measured 2026-09-04 on [#3202](https://github.com/Morrison-Lab/ai-config/pull/3202),
+a `memories/`-only PR, with `jules-review.yml` unchanged throughout:
+the first run on head `6af715ec` approved (12:39:52Z);
+the first run on the next head `c58e7172`, one appended notebook entry
+later, blocked (12:43:14Z) on the config item plus a notebook sentence
+recording a prior conclusion;
+the one re-run on that same head reproduced the block (12:46:16Z).
+So the seventh case's "re-triggering cannot clear it" held on the head where
+the detector fired, and the approve on the earlier head was a run in which
+it did not fire.
+The maintainer merged #3202 over the red status as a per-PR decision,
+recorded on [#3192](https://github.com/Morrison-Lab/ai-config/issues/3192),
+which still holds the general disposition open.
+
+- **Do:** read an approve on one head and a block on the next, under one
+  config, as the detector firing per run; rebut once, re-run once, then hold
+  for the maintainer's call.
+- **Don't:** report "a re-run can clear it" from an approve that was not a
+  re-run of the blocked head (this session's first #3183 comment did, and
+  was corrected there).
 Re-read the required set on a live PR;
 the set changes without a commit.
 The #3154 merge went over the red status under the standing grant;

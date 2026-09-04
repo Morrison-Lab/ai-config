@@ -40,10 +40,34 @@ import tempfile
 # The two guards' interaction guaranteed the loop: one required the prefix,
 # the other could not see prefixed pushes.
 _ENV = r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
-_GIT_FLAGS = r"(?:-(?:C\s*\S+|c\s*\S+|[a-zA-Z0-9_-]+(?:=\S*)?)\s+|--[a-zA-Z0-9_-]+(?:=\S*)?\s+)*"
+_GIT_FLAGS = (
+    r"(?:"
+    r"-[Cc]\s*\S+\s+|"
+    r"-[a-bd-zA-BD-Z0-9_][a-zA-Z0-9_-]*(?:=\S*)?\s+|"
+    r"--[a-zA-Z0-9_][a-zA-Z0-9_-]*(?:=\S*)?\s+"
+    r")*"
+)
 COMMIT = re.compile(r"(?:^|[;&|\n])\s*" + _ENV + r"git\s+" + _GIT_FLAGS + r"commit(?![\w-])", re.MULTILINE)
 PUSH = re.compile(r"(?:^|[;&|\n])\s*" + _ENV + r"git\s+" + _GIT_FLAGS + r"push(?![\w-])", re.MULTILINE)
 CREATE = re.compile(r"(?:^|[;&|\n])\s*" + _ENV + r"gh\s+pr\s+create\b", re.MULTILINE)
+
+try:
+    _LIB = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+        "scripts", "lib")
+    if _LIB not in sys.path:
+        sys.path.insert(0, _LIB)
+    from git_cmd import (  # type: ignore[no-redef]
+        _ENV as _GIT_ENV,
+        _GIT_FLAGS as _GIT_CMD_FLAGS,
+        COMMIT as _GIT_COMMIT,
+        CREATE as _GIT_CREATE,
+        PUSH as _GIT_PUSH,
+    )
+    _ENV, _GIT_FLAGS = _GIT_ENV, _GIT_CMD_FLAGS
+    COMMIT, PUSH, CREATE = _GIT_COMMIT, _GIT_PUSH, _GIT_CREATE
+except Exception:
+    pass
 
 # A heredoc body redirected INTO A FILE is text, not commands: `cat > x <<'EOF'
 # ... EOF` writes the lines rather than running them. A corpus about git

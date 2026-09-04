@@ -115,6 +115,26 @@ with tempfile.TemporaryDirectory() as tmp:
         "memories/near.md: 95 lines" in out,
     )
     check("reports the remaining headroom", "(5 lines of headroom)" in out)
+    # The header reports rather than instructs. A single imperative addressed
+    # to the whole band would make the band the second gate the module
+    # docstring rejects -- at the shipped default it opens 100 lines below the
+    # cap, so a file with most of that room left would be told to split. Pin
+    # both halves: the wording that points at the per-file headroom, and the
+    # absence of the band-wide order it replaced.
+    check(
+        "the band header points at the headroom",
+        "Headroom before the cap, least first:" in out,
+    )
+    check(
+        "the band header issues no band-wide split order",
+        "Split before appending" not in out,
+    )
+    # "least first" is a claim the header makes about the listing, so check it:
+    # near.md has 5 lines of headroom and edge.md has 8.
+    check(
+        "orders the band least headroom first",
+        out.index("near.md") < out.index("edge.md"),
+    )
     # The breach format is "<path>: <n> lines" with nothing after it, so the
     # absence of that line is what proves the warned file was not also
     # reported as over the cap.

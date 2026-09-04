@@ -196,6 +196,13 @@ def report_approaching(
     over-cap file is past the cap rather than near it, so "no memory file is
     within N lines of the cap" would read as contradicting the finding
     printed directly above it.
+
+    The header reports; it does not instruct. One imperative addressed to the
+    whole band would make the band the second gate the module docstring
+    rejects: at the shipped default the band opens 100 lines below the cap, so
+    a file with most of that room still ahead of it would be told to split.
+    Urgency belongs to the per-file headroom the listing already carries, so
+    the header points at that number rather than at membership.
     """
     if not approaching:
         if announce_empty:
@@ -207,7 +214,8 @@ def report_approaching(
     print(
         f"\n{len(approaching)} memory file(s) are approaching the "
         f"{max_lines}-line cap ({warn_lines} lines or more).\n"
-        "Split before appending: the next entry may not fit.\n"
+        "Headroom before the cap, least first: prefer a file with room to "
+        "spare, and split one that has almost none.\n"
     )
     for rel_path, n_lines, headroom in approaching:
         print(f"  {rel_path}: {n_lines} lines ({headroom} lines of headroom)")

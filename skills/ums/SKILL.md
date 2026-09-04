@@ -142,8 +142,13 @@ committed pass.
      has left (ai-config#3102), so a file with almost no
      headroom is knowable here, where the target is still being chosen,
      rather than by tripping the gate in step 4 once the append is written.
-     Pick a different file, or split first, when the one you were about to
-     write to is on that list.
+     Read each listed file's headroom, not its membership: the band opens 100
+     lines below the cap at the shipped default, so most of it is room rather
+     than a warning.
+     - **Do:** send the entry to a file whose reported headroom comfortably
+       covers it, and split or reroute one whose headroom does not.
+     - **Don't:** redirect or split on band membership alone --- a file with
+       most of the band still ahead of it can take this entry.
    - **When the target memory file is already at the cap
      `scripts/check-memory-file-size.py` reports**, append elsewhere,
      recover lines (re-wrap or drop), or split the file.

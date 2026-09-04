@@ -83,14 +83,18 @@ spent.
 
 The enforcement half was measured on #1226's own first push, which failed
 `validate` at **step 12, "Run memory-file-size check tests"** --- not at the
-later step named "Check for oversized memory files (advisory)", which runs
-`scripts/check-memory-file-size.py` with no `--strict` and exits 0 by design.
-What gates is the assertion in `scripts/test_check_memory_file_size.py` whose
+later step then named "Check for oversized memory files (advisory)", which on
+that date ran `scripts/check-memory-file-size.py` with no `--strict` and
+exited 0 by design.
+What gated was the assertion in `scripts/test_check_memory_file_size.py` whose
 comment reads "The real corpus must stay under the shipped default, or the
 check ships red", calling `cmfs.oversized_files` over the tracked memory files
 and exiting 1 on any finding.
-So the cap is hard and is enforced from the check's test suite rather than from
-the check.
+So the cap was hard that day and was enforced from the check's test suite
+rather than from the check.
+That step has since gained `--strict` and lost "(advisory)" from its name
+(ai-config#2970 / #2973, 2026-09-01), so the cap is now enforced from both the
+CI step and the test suite.
 Two sibling files were already at the gate when this was found:
 `memories/git.md` at 1199, and `memories/claude-bot-workflows.md` at 1199 after
 the trim #1226 made to fit, with `memories/debugging.md` at 1169 --- tracked

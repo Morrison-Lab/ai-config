@@ -67,6 +67,12 @@ When a new entry lands after `main` has appended one of its own, take the next n
   Corrected by user: "stop saying mergeable when there's red CI and/or no clean review".
   Never use "mergeable" as a status verdict or conflate git mergeability with PR readiness;
   explicitly report CI check status and review verdict.
+  Re-hit 2026-09-03 (Antigravity session, working `ucdavis/epi204` wrap-up):
+  reported unrelated open PR #384 in wrap-up dashboard as "Ready for self-merge" based on green CI checks and a fallback self-review comment reading "Ready for merge",
+  without running `scripts/check-pr-fully-clean.py`.
+  `check-pr-fully-clean.py` exited 1 because the automated review had been quota-skipped.
+  Blocked by stop hook `check-clean-claim.py`.
+  Never transcribe a fallback review's prose or call a PR ready for merge without `check-pr-fully-clean.py` exiting 0.
 - **Canonical Rule**: `AGENTS.md` ("Request review and drive every started PR to clean"),
   `fully-clean.md`, and `hooks/no-incomplete-check-enumeration.py`.
 - **Do:** Run `python3 scripts/check-pr-fully-clean.py <N> -R <owner>/<repo>`

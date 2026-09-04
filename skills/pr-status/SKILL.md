@@ -274,14 +274,17 @@ The blind spot is about *where the finding sits*, not about who posted it or whi
 
 ```bash
 gh pr view "<N>" --json reviews \
-  --jq '.reviews[] | "\(.state) \(.author.login) \(.submittedAt) \((.body // "")[0:400])"'
+  --jq '.reviews[] | [.state, .author.login, .submittedAt,
+          ((.body // "") | split("\n") | map(select(length > 0)) | .[0] // "(empty body)")] | @tsv'
 ```
 
-Truncating each body keeps a long PR's review history readable;
-re-fetch the full body of any review whose head line is not plainly clean, and read a collapsed suppression block inside it as findings (see *Parse for findings before declaring clean* above).
+One line per review keeps a long PR's review history readable, and the last field is the body's first line.
+That line identifies a review rather than settling it, so read the full body of every review the listing names --- not only those whose first line looks unclean, since "generated no new comments" is the overview a suppression block hides behind --- and read a collapsed suppression block inside it as findings (see *Parse for findings before declaring clean* above).
 
 - **Do:** list every review's state and body, whoever posted it, before running the state-filtered query.
+- **Do:** read the full body of every review the listing names, whatever its first line says.
 - **Don't:** read an empty `CHANGES_REQUESTED` result as evidence that no review carries findings.
+- **Don't:** gate the full-body read on a review's first line reading unclean --- a plainly clean first line is the false-clean shape.
 
 A PR is only **fully clean / ready to merge** when **at least one** of the
 `@claude` comment or an external reviewer's verdict (see *Check for a

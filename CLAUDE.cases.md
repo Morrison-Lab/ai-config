@@ -181,7 +181,7 @@ The login-filtered query returned the round-2 comment from `02:12:52Z` instead, 
 
 ## Re-check for latest review findings before reporting PR status --- A bot's `COMMENTED` review is the same blind spot
 
-(Morrison-Lab/ai-config#3084, 2026-09-03: three Copilot reviews, `5098574802` among them, were submitted in state `COMMENTED` with bodies reading "Changes recommended" and their findings under a suppression block, so they produced no review thread and no inline comment object.
+(Morrison-Lab/ai-config#3084, 2026-09-03: three Copilot reviews at head `6f10014`, `5098574802` among them, were submitted in state `COMMENTED` --- two headed "Changes recommended", the third "Needs a closer look" --- with their findings under a suppression block, so they produced no review thread and no inline comment object.
 The pre-merge check queried review threads, got two threads and both resolved, reported clean, and the defect reached `main`.
 This section was loaded in context throughout and did not fire, because it named "a human's `CHANGES_REQUESTED`" and the reviewer was a bot.
 Filed as [ai-config#3121](https://github.com/Morrison-Lab/ai-config/issues/3121).)

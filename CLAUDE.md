@@ -597,23 +597,29 @@ gh api repos/<owner>/<repo>/issues/<N>/comments --paginate \
 A review submitted via GitHub's review UI (as opposed to a plain PR comment) shows up in `gh pr view N --json reviews`, and its top-level `body` is frequently **empty** --- the actual finding lives entirely in a per-line inline comment, which only appears via `gh api repos/<owner>/<repo>/pulls/N/comments` (a different endpoint from issue comments).
 The mirror case a threads-only check misses just as completely is a finding stated in the top-level `body`, either as plain text or inside a collapsed `<details>` suppression block.
 Neither shape produces an inline comment object, so both the `pulls/N/comments` endpoint and a review-thread query return nothing over it.
-The suppression block's `<summary>` heading has changed wording once already, so match case-insensitively on `suppressed` inside `<summary>` rather than on any literal, per [`skills/ardi/SKILL.md`](skills/ardi/SKILL.md).
+The block has moved as well as changed wording, so match case-insensitively on `suppressed` anywhere inside a collapsed `<details>` region --- its `<summary>` or a heading nested in it --- rather than on any literal or on `<summary>` alone.
+Measured 2026-09-03 on ai-config#3084 review `5098574802`, it arrives as `### Suppressed comments (1)` under `<summary>Review details</summary>`, which a `<summary>`-only match returns zero against.
+Keep it scoped to that region, per [`skills/ardi/SKILL.md`](skills/ardi/SKILL.md): uncollapsed overview prose mentions the word, so a body-wide match keeps a clean PR permanently non-clean.
 Checking `--json comments` alone can miss the review's existence entirely.
-A bot's `COMMENTED` review whose body reads "Changes recommended" vetoes a merge under [`fully-clean`](shared/workflow/fully-clean.md) exactly as a human's `CHANGES_REQUESTED` does, because the blind spot is about *where the finding sits*.
+A bot's `COMMENTED` review vetoes a merge under [`fully-clean`](shared/workflow/fully-clean.md) exactly as a human's `CHANGES_REQUESTED` does, whatever headline its body carries --- "Changes recommended", "Needs a closer look", and "generated no new comments" have each introduced a body carrying real findings --- because the blind spot is about *where the finding sits*.
 The forge enforces only `CHANGES_REQUESTED`, though: a `COMMENTED` review sets no blocking state and needs no dismissal, which is precisely why nothing stops you merging over its findings.
 Before declaring a PR ready, also run:
 ```
-gh pr view N --json reviews --jq '.reviews[] | "\(.state) \(.author.login) \(.submittedAt) \((.body // "")[0:400])"'
+gh pr view N --json reviews --jq '.reviews[] | [.state, .author.login, .submittedAt, ((.body // "") | split("\n") | map(select(length > 0)) | .[0] // "(empty body)")] | @tsv'
 gh api repos/<owner>/<repo>/pulls/N/comments --jq '.[] | "\(.path):\(.line // .original_line // "?") \(.user.login) \(.body)"'
 ```
 A `CHANGES_REQUESTED` state is blocking regardless of whether an automated re-review later says "Ready for merge" — that bot verdict doesn't clear a human's own review state, which only the human (or an explicit dismissal) can resolve.
-The first command truncates each body so a long PR's history stays readable;
-re-fetch any review's full body when its head line is not plainly clean.
+The first command emits one line per review, so a long PR's history stays readable, and its last field is the body's first line.
+That line identifies a review;
+it never settles one, so read every listed review's full body rather than only those whose first line looks unclean.
+Gating on the first line skips the documented false-clean shape, since "generated no new comments" is the overview a suppression block hides behind.
 It is also deliberately unfiltered: add `select(.state == "CHANGES_REQUESTED")` only as a follow-up narrowing, after you have read every review's state and body.
 
 - **Do:** read every formal review's state and body, whoever posted it, and treat a finding in a review body --- a collapsed suppression block included --- as blocking.
 - **Do:** keep any state filter as a second, deliberately narrow query, run after the unfiltered listing rather than instead of it.
+- **Do:** read every listed review's full body --- its first line is an identifier, not a verdict.
 - **Don't:** pass over a review because its author is a bot or its state is `COMMENTED` --- neither attribute is why the blind spot exists.
+- **Don't:** gate that read on a first line reading unclean --- a plainly clean one is the false-clean shape.
 - **Don't:** read an empty or fully-resolved thread list as an empty review population.
 
 See [`CLAUDE.cases.md`](CLAUDE.cases.md), "A bot's `COMMENTED` review is the same blind spot".

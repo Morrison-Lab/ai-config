@@ -1,6 +1,6 @@
 ---
 name: handoff
-description: "Snapshot state to forge and memory."
+description: "Snapshot state to forge/memory."
 user-invocable: true
 allowed-tools:
   - Bash
@@ -16,9 +16,9 @@ work cleanly, then **post it on the forge** --- GitHub, GitLab, or whichever
 tracker owns the work --- and keep a copy as a **project memory**.
 
 The forge post is the required half, and the memory file is the backup.
-A memory file lives on one machine, under one account, in a directory no
-teammate and no other session can read, so a handoff that exists only there is
-invisible to everyone it was written for.
+A memory file is readable only by this account on this machine,
+so a teammate, a remote session, a CI run,
+and the user reading the forge cannot see a handoff that exists only there.
 
 This is the manual trigger for the standing "always leave handoff notes
 proactively when pausing" policy in `memories/preferences.md`: *always* leave
@@ -88,10 +88,9 @@ already look, so it is where the pick-up state belongs.
 Route by what the work actually has:
 
 - **An open PR/MR** --- comment on it, in the paused-claim form below.
-- **An issue and no PR/MR** --- comment on the issue, or edit the issue body
-  when the state describes the work rather than reporting on it.
-- **Neither** --- file an issue carrying the handoff, per
-  [`issue-first`](../../shared/workflow/issue-first.md), and comment there.
+- **An issue and no PR/MR** --- comment on the issue.
+- **Neither** --- file an issue whose body is the handoff, per
+  [`issue-first`](../../shared/workflow/issue-first.md).
 - **State that outlives the thread** --- commit it to a file in the repo (a
   runbook, a design note) and link that file from the comment.
 
@@ -183,8 +182,9 @@ Judge on the in-flight items.
 
 ### A handoff written as a repo-root file is a staging hazard
 
-The rest of this skill persists the snapshot as a **project memory**, which is
-outside the repo and cannot be committed by accident.
+Step 2 persists the snapshot as a **project memory**, which is outside the repo
+and cannot be committed by accident,
+and Step 3's committed-file route tracks the file deliberately.
 A handoff written instead as a repo-root `HANDOFF-*.md` is untracked **and**
 usually unignored, which is precisely the combination that lets a bare
 `git add -A` sweep it into a PR.
@@ -193,7 +193,7 @@ That is not hypothetical.
 It is the shape of `ucdavis/bcs`'s 2026-07-30 incident, where an
 untracked-and-unignored directory was staged that way and pushed a credential.
 
-So prefer the project-memory form.
+So prefer the project-memory form, or a file you track deliberately.
 Where a repo-root file already exists, either retire it under the rule above or
 add a `.gitignore` entry --- and read its contents before doing either, since a
 stale handoff can carry a rule the project has since **reversed**, which is

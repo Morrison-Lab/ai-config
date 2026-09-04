@@ -138,8 +138,7 @@ into a reported `exempt` bucket rather than guessed at.
 
 ## The doubling survives every check that already runs
 
-The linking and ordering checks above are decidable from the source: a
-mention is linked or it is not, and a div precedes a mention or it does not.
+The crossref linking and ordering checks in the earlier sections are decidable from the source: a mention is linked or it is not, and a div precedes a mention or it does not.
 The doubled type word is decidable from the source too --- the grep above
 settles it outright --- but only for a reader who already knows to look.
 `Definition @def-hessian` is a well-formed crossref that resolves, numbers

@@ -295,6 +295,22 @@ def prose_lines(text: str) -> list[str]:
     return out
 
 
+def paragraph_ids(text: str) -> dict[int, int]:
+    """Map each non-blank 1-indexed line to its blank-line-delimited block."""
+    ids: dict[int, int] = {}
+    block = 0
+    started = False
+    for idx, line in enumerate(text.split("\n"), start=1):
+        if not line.strip():
+            started = False
+            continue
+        if not started:
+            block += 1
+            started = True
+        ids[idx] = block
+    return ids
+
+
 def link_lines(text: str) -> dict[str, list[int]]:
     """Map each linked fragment basename to the 1-indexed lines linking it.
 
@@ -406,6 +422,7 @@ def scan_text(
     exempt: list[dict] = []
     links = link_lines(text)
     lines = prose_lines(text)
+    blocks = paragraph_ids(text)
     mine = own_names(md)
     considered = 0
     for name, at in sorted(links.items()):
@@ -413,14 +430,16 @@ def scan_text(
             continue
         considered += 1
         first_link = min(at)
-        linked_here = set(at)
-        # A line that also links the fragment is not a missing link: the link
-        # is right there, and asking for a second one on the same line is the
-        # redundancy shared/workflow/challenge-redundant-content.md rejects.
+        linked_blocks = {blocks[idx] for idx in at if idx in blocks}
+        # A paragraph that also links the fragment is not a missing link: the
+        # link is right there, and asking for a second one is the redundancy
+        # shared/workflow/challenge-redundant-content.md rejects.  The block
+        # rather than the line, because this corpus writes semantic line
+        # breaks, so the sentence carrying the link spans several lines.
         bare = [
             idx
             for idx in bare_lines(lines, name, first_link)
-            if idx not in linked_here
+            if blocks.get(idx) not in linked_blocks
         ]
         if not bare:
             continue
@@ -474,7 +493,7 @@ def collect(
         "root": str(root),
         "files_scanned": scanned,
         "case_records_skipped": skipped_cases,
-        "links_considered": considered,
+        "fragments_considered": considered,
         "findings": findings,
         "exempt": exempt,
     }
@@ -484,7 +503,7 @@ def format_report(report: dict, limit: int) -> str:
     out: list[str] = []
     out.append(
         f"Examined {report['files_scanned']} file(s), "
-        f"{report['links_considered']} linked fragment reference(s); "
+        f"{report['fragments_considered']} linked fragment(s) considered; "
         f"skipped {report['case_records_skipped']} .cases.md companion(s)."
     )
     findings = report["findings"]

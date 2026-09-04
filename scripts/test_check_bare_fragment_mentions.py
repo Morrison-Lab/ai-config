@@ -98,6 +98,22 @@ check(
     scan(LINKED + "\nAlso [quotable-findings](other.md) here.\n") == [],
 )
 check(
+    "a bare mention on the line that carries the link is not reported",
+    scan("See [`quotable-findings`](quotable-findings.md) --- the quotable-findings rule.\n\nNothing else.\n")
+    == [],
+)
+check(
+    "a bare mention on the linking paragraph's continuation line is not reported",
+    # This corpus writes semantic line breaks, so the sentence carrying the
+    # link wraps and the reference lands on the next line of the same block.
+    scan(LINKED + "and the quotable-findings rule applies.\n") == [],
+)
+check(
+    "a bare mention in a later paragraph is still reported",
+    [f["bare_lines"] for f in scan(LINKED + "\nThe quotable-findings rule applies.\n")]
+    == [[3]],
+)
+check(
     "a blockquoted mention is not a bare mention",
     # Quoted review text names a fragment it is reporting on.
     scan(LINKED + "\n> the quotable-findings rule\n") == [],
@@ -298,7 +314,7 @@ with tempfile.TemporaryDirectory() as tmp:
     check(
         "collect reports what it examined, not only what it found",
         # A run that scanned nothing must be distinguishable from a clean corpus.
-        report["files_scanned"] == 2 and report["links_considered"] == 1,
+        report["files_scanned"] == 2 and report["fragments_considered"] == 1,
     )
 
 # --- the command-line surface ------------------------------------------------
@@ -338,12 +354,12 @@ payload = json.loads(buffer.getvalue())
 check(
     "--json emits every bucket, so a caller can tell empty from unrun",
     set(payload)
-    >= {"files_scanned", "case_records_skipped", "links_considered",
+    >= {"files_scanned", "case_records_skipped", "fragments_considered",
         "findings", "exempt"},
 )
 check(
     "the real corpus is actually scanned",
-    payload["files_scanned"] > 0 and payload["links_considered"] > 0,
+    payload["files_scanned"] > 0 and payload["fragments_considered"] > 0,
 )
 
 print(f"\n{passes} passed, {failures} failed")

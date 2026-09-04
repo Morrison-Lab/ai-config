@@ -223,9 +223,18 @@ What step 3's own directory-wide grep would have done is checkable:
 and the owner is not among them,
 because the owner is `shared/writing/semantic-line-breaks.md`,
 which a search of `memories/` cannot reach.
-What the [`skill-builder`](../../skills/skill-builder/SKILL.md) step 0 query would have done is checkable too:
-`git grep -il "issue reference" 3935bfff -- skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md` returns eight files at that ref ---
-`hooks/test-no-unauthorized-merge.py`, `hooks/warn-stale-issue-edit.py`, `memories/github.md`, `memories/preferences.md`, `memories/r-quarto.md`, `shared/workflow/address-every-comment.md`, `shared/writing/semantic-line-breaks.md` and `skills/promote-memory/SKILL.md` ---
+What the [`skill-builder`](../../skills/skill-builder/SKILL.md) step 0 query
+would have done is checkable too:
+`git grep -il "issue reference" 3935bfff -- skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md`
+returns eight files at that ref ---
+`hooks/test-no-unauthorized-merge.py`,
+`hooks/warn-stale-issue-edit.py`,
+`memories/github.md`,
+`memories/preferences.md`,
+`memories/r-quarto.md`,
+`shared/workflow/address-every-comment.md`,
+`shared/writing/semantic-line-breaks.md`
+and `skills/promote-memory/SKILL.md` ---
 with the owner among them.
 The same `memories/` query returns four at `2156b439`:
 the three above plus `memories/markdownlint.md`, the file the entry was added to,
@@ -235,7 +244,7 @@ Every commit on #3060's branch is still reachable on `origin` from `refs/pull/30
 (`git ls-remote origin refs/pull/3060/head` returns `f9068299`,
 and after `git fetch --depth=200 origin refs/pull/3060/head`, `git rev-list --count 3935bfff..FETCH_HEAD` returns 33).
 The default refspec does not bring `refs/pull/3060/head` down
-(`git config --get-all remote.origin.fetch` returned `+refs/heads/*:refs/remotes/origin/*` in the measuring clone),
+(`git config --get-all remote.origin.fetch` returns `+refs/heads/*:refs/remotes/origin/*` in the measuring clone),
 and a shallow clone walks only to its fetch depth,
 so this record anchors on `main` commits, which a full fetch of `main` brings down
 (`git merge-base --is-ancestor 3935bfff origin/main` and the same for `2156b439` both exit 0).

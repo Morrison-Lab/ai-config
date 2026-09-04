@@ -119,7 +119,7 @@ see [`issue-first`](../workflow/issue-first.md)'s
 **Which direction it fails in decides how much fixing it is worth, and "safe direction" is not the same as "cheap".**
 GitHub's parser fails destructively and invisibly:
 it closes somebody's live work, and the sentence's author gets no signal at all.
-`no-unfiled-finding.py` fails in the safe direction and still `block`s the reply,
+`no-unfiled-finding.py` fails in the safe direction and still blocks the reply,
 so the cost is a stalled turn plus a dupe-check the session should arguably have run anyway ---
 recoverable, unlike a closed issue, and not free either.
 Rank the fix from both axes rather than from the direction alone:

@@ -287,6 +287,24 @@ class TestConsumerLeftovers(unittest.TestCase):
         self.assertIn("symlink -> ", res["leftovers"][0])
         self.assertEqual(res["doubled_skills"], [])
 
+    def test_whole_skills_directory_symlinked_outside_a_checkout_is_not_a_leftover(self):
+        # The provenance half of the branch above: pointing `~/.claude/skills`
+        # at your own dotfiles skills folder is a real setup, and reporting it
+        # as a settled-provenance leftover is the expensive false positive.
+        outside = tempfile.TemporaryDirectory()
+        self.addCleanup(outside.cleanup)
+        mine = Path(outside.name)
+        (mine / "ums").mkdir()
+        (mine / "my-skill").mkdir()
+        self.symlink(mine, self.home / "skills")
+        self.enable_plugin()
+        res = doctor.check_consumer_leftovers()
+        # It falls through to the ordinary walk, so the shared name is
+        # reported as the doubled-listing symptom and nothing is reported
+        # as a settled-provenance leftover.
+        self.assertEqual(res["leftovers"], [])
+        self.assertEqual(res["doubled_skills"], ["ums"])
+
     def test_personal_skill_inside_claude_home_is_not_a_leftover(self):
         # `~/.claude/CLAUDE.md` is the standard user memory file and a
         # leftover `hooks/` copy supplies `hooks/hooks.json`, so an
@@ -303,6 +321,10 @@ class TestConsumerLeftovers(unittest.TestCase):
         self.assertEqual(res["leftovers"], [f"{self.home / 'hooks'} (copy)"])
 
     def test_ignores_client_sync_bucket_and_personal_skills(self):
+        # Pins the depth of the walk: `ums` is one of this repo's skills, so
+        # a recursive walk would report the bucket's copy of it. Only the
+        # `synced` entry itself is examined, and it is neither a symlink into
+        # a checkout nor a name this repo ships.
         self.enable_plugin()
         synced = self.home / "skills" / "synced" / "bucket-id"
         synced.mkdir(parents=True)
@@ -312,6 +334,21 @@ class TestConsumerLeftovers(unittest.TestCase):
         self.assertTrue(res["ok"])
         self.assertEqual(res["leftovers"], [])
         self.assertEqual(res["doubled_skills"], [])
+
+    def test_any_truthy_entry_in_one_file_enables_the_sweep(self):
+        # Within one file the entries are unioned, not intersected: a second
+        # marketplace's copy loads the same plugin, so one truthy
+        # `ai-config@*` entry is enough even beside an explicit `false`.
+        (self.home / "settings.json").write_text(
+            json.dumps(
+                {"enabledPlugins": {"ai-config@Morrison-Lab": False, "ai-config@other": True}}
+            ),
+            encoding="utf-8",
+        )
+        (self.home / "shared").mkdir()
+        res = doctor.check_consumer_leftovers()
+        self.assertTrue(res["plugin_enabled"])
+        self.assertEqual(len(res["leftovers"]), 1)
 
     def test_higher_scope_false_beats_user_scope_true(self):
         # `enabledPlugins` resolves by precedence rather than by unioning,
@@ -389,6 +426,43 @@ class TestConsumerLeftovers(unittest.TestCase):
         res = doctor.check_consumer_leftovers()
         self.assertEqual(res["leftovers"], [])
         self.assertEqual(res["doubled_skills"], [])
+
+    def test_documented_shared_symlink_does_not_turn_the_check_red(self):
+        # README.md tells a reader with a global `~/.claude/CLAUDE.md` to
+        # place `shared/` by hand until ai-config#2352 lands, so red here
+        # would leave `--strict` red by construction on a conformant machine.
+        self.enable_plugin()
+        self.symlink(REPO_ROOT / "shared", self.home / "shared")
+        res = doctor.check_consumer_leftovers()
+        self.assertTrue(res["ok"])
+        self.assertEqual(res["status"], "OK")
+        self.assertEqual(res["leftovers"], [])
+        self.assertEqual(len(res["documented"]), 1)
+        self.assertIn("documented manual link", res["details"])
+
+    def test_documented_exemption_covers_only_a_shared_symlink(self):
+        # The exemption is scoped three ways, and each way is a leftover:
+        # a `shared` copy does not track the checkout, a `shared` symlink
+        # landing outside one is not the documented step, and `hooks` has
+        # no documented manual step at all.
+        self.enable_plugin()
+        outside = tempfile.TemporaryDirectory()
+        self.addCleanup(outside.cleanup)
+        self.symlink(Path(outside.name), self.home / "shared")
+        self.symlink(REPO_ROOT / "hooks", self.home / "hooks")
+        (self.home / "memories").mkdir()
+        res = doctor.check_consumer_leftovers()
+        self.assertFalse(res["ok"])
+        self.assertEqual(res["documented"], [])
+        self.assertEqual(len(res["leftovers"]), 3)
+
+    def test_shared_copy_is_still_a_leftover(self):
+        self.enable_plugin()
+        (self.home / "shared").mkdir()
+        res = doctor.check_consumer_leftovers()
+        self.assertFalse(res["ok"])
+        self.assertEqual(res["documented"], [])
+        self.assertEqual(res["leftovers"], [f"{self.home / 'shared'} (copy)"])
 
     def test_name_match_reports_symptom_without_prescribing_removal(self):
         self.enable_plugin()

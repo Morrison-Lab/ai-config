@@ -343,10 +343,13 @@ def check_ai_clis() -> Dict[str, Any]:
 # or by the manual step README.md documents while that issue is open.
 LEFTOVER_NAMES = ("shared", "hooks", "memories")
 
-# The client populates this bucket under `~/.claude/skills` with an
-# account-level sync whose directory names match this repo's skills without
-# any of them being a leftover, so a name test has to skip it.
-CLIENT_SKILL_SYNC_DIR = "synced"
+# README.md tells a reader with a global `~/.claude/CLAUDE.md` to place
+# `shared/` by hand until ai-config#2352 lands, so a `~/.claude/shared`
+# symlink resolving into a checkout is the documented configuration rather
+# than a leftover, and reporting it red would leave `--strict` red by
+# construction on a README-conformant machine. A *copy* stays a leftover:
+# it does not track the checkout, so it goes stale silently.
+DOCUMENTED_MANUAL_LINKS = ("shared",)
 
 
 def claude_home() -> Path:
@@ -469,6 +472,12 @@ def find_skill_leftovers(home: Path) -> tuple[List[str], List[str]]:
     is settled. `doubled` entries only share a name with this repo's skills,
     which is the doubled-listing symptom rather than proof of a leftover --
     a user's own skill may legitimately carry the same name.
+
+    The walk is one level deep, which is what keeps the client's
+    account-level `synced/` bucket out of both lists: its skill-named
+    directories sit at `synced/<bucket-id>/<name>` and are never reached,
+    so only the `synced` entry itself is examined and it matches neither
+    test. Deepening the walk would need a skip for that bucket.
     """
     skills = home / "skills"
     if skills.is_symlink() and points_into_ai_config(skills):
@@ -480,8 +489,6 @@ def find_skill_leftovers(home: Path) -> tuple[List[str], List[str]]:
     linked: List[str] = []
     doubled: List[str] = []
     for entry in sorted(skills.iterdir()):
-        if entry.name == CLIENT_SKILL_SYNC_DIR:
-            continue
         if entry.is_symlink():
             if points_into_ai_config(entry):
                 linked.append(f"{entry} ({describe_path(entry)})")
@@ -502,6 +509,7 @@ def check_consumer_leftovers() -> Dict[str, Any]:
             "plugin_enabled": None,
             "leftovers": [],
             "doubled_skills": [],
+            "documented": [],
             "details": f"Not swept: {source} did not parse ({parse_error}), so whether the plugin route is in use is unknown.",
         }
 
@@ -518,16 +526,30 @@ def check_consumer_leftovers() -> Dict[str, Any]:
             "plugin_enabled": False,
             "leftovers": [],
             "doubled_skills": [],
+            "documented": [],
             "details": f"Skipped: {decided} (managed settings and command-line arguments are not read), so a ~/.claude copy may be this machine's only install.",
         }
 
-    leftovers = [
-        f"{home / name} ({describe_path(home / name)})"
-        for name in LEFTOVER_NAMES
-        if (home / name).is_symlink() or (home / name).exists()
-    ]
+    leftovers: List[str] = []
+    documented: List[str] = []
+    for name in LEFTOVER_NAMES:
+        path = home / name
+        if not (path.is_symlink() or path.exists()):
+            continue
+        entry = f"{path} ({describe_path(path)})"
+        if name in DOCUMENTED_MANUAL_LINKS and path.is_symlink() and points_into_ai_config(path):
+            documented.append(entry)
+        else:
+            leftovers.append(entry)
     linked_skills, doubled_skills = find_skill_leftovers(home)
     leftovers.extend(linked_skills)
+
+    documented_note = (
+        f" {len(documented)} documented manual link(s), not leftovers: {'; '.join(documented)}"
+        " -- README.md documents placing ~/.claude/shared by hand while ai-config#2352 is open."
+        if documented
+        else ""
+    )
 
     if not leftovers and not doubled_skills:
         return {
@@ -537,7 +559,8 @@ def check_consumer_leftovers() -> Dict[str, Any]:
             "plugin_enabled": True,
             "leftovers": [],
             "doubled_skills": [],
-            "details": f"No pre-plugin install leftovers under {home}.",
+            "documented": documented,
+            "details": f"No pre-plugin install leftovers under {home}.{documented_note}",
         }
 
     parts = []
@@ -554,7 +577,8 @@ def check_consumer_leftovers() -> Dict[str, Any]:
         "plugin_enabled": True,
         "leftovers": leftovers,
         "doubled_skills": doubled_skills,
-        "details": f"Under {home}: {'. '.join(parts)}. Swept because {source} enables the ai-config plugin. Reported only -- inspect each by hand before removing anything: ~/.claude/skills also holds your own skills, and README.md documents placing ~/.claude/shared by hand while ai-config#2352 is open (see shared/workflow/keep-checkouts-fresh.md).",
+        "documented": documented,
+        "details": f"Under {home}: {'. '.join(parts)}. Swept because {source} enables the ai-config plugin.{documented_note} Reported only -- inspect each by hand before removing anything: ~/.claude/skills also holds your own skills (see shared/workflow/keep-checkouts-fresh.md).",
     }
 
 

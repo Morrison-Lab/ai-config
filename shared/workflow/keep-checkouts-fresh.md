@@ -25,12 +25,20 @@ In every session --- at session start, and again periodically during long sessio
    `python3 scripts/doctor.py` sweeps all four paths and reports rather than deletes ([#2528](https://github.com/Morrison-Lab/ai-config/issues/2528)).
    Its `consumer_leftovers` check settles provenance only for a symlink resolving into an ai-config checkout;
    a bare name match it reports as the doubled-listing symptom to investigate by hand.
-   It skips the client's `synced/` bucket, and skips the sweep entirely when no ai-config plugin is enabled, since a `~/.claude` copy is then likely the machine's only install.
+   Its walk of `~/.claude/skills` is one level deep, which is what keeps that bucket out of the report:
+   the bucket's skill-named directories sit at `synced/<bucket-id>/<name>` and are never reached, so only the `synced` entry itself is examined and it matches neither test.
+   It skips the sweep entirely when no ai-config plugin is enabled, since a `~/.claude` copy is then likely the machine's only install.
    **That gate resolves `enabledPlugins` by scope precedence --- local, then project, then user --- rather than reading one file**, matching `skills/ai-config-hooks/run-hook.sh`.
    `enabledPlugins` resolves by precedence rather than by unioning truthy names across files, so the first file naming an `ai-config@*` entry decides and an explicit `false` there is final --- see [`claude-code-settings`](../../memories/claude-code-settings.md).
    **Two scopes above those three stay unread, so the gate can be wrong in both directions.**
    A managed-settings `false` over a walked `true` runs the sweep on a machine whose plugin is disabled, and reports its only install as leftovers.
    A managed-settings or command-line `true` with no walked entry makes the sweep skip.
+
+   **A `~/.claude/shared` symlink resolving into a checkout is the documented configuration rather than a leftover, so the check reports it separately and stays green.**
+   README.md tells a reader with a global `~/.claude/CLAUDE.md` to place `shared/` by hand until [#2352](https://github.com/Morrison-Lab/ai-config/issues/2352) lands, so calling it a leftover would leave `python3 scripts/doctor.py --strict` red by construction on a machine that follows the documentation.
+   A check that is red on the recommended configuration teaches its reader to ignore it, which is the opposite of what an instrument buys.
+   A *copy* of `shared/` stays a leftover, because it does not track the checkout and so goes stale with nothing to say so.
+   `hooks/` and `memories/` have no documented manual step, so both stay leftovers whatever placed them.
 
    - **Do:** include `skills/` when sweeping `~/.claude` for leftovers.
    - **Do:** read a doubled listing (a bare name beside an `ai-config:`-prefixed one) as the symptom, since the cost is otherwise invisible.
@@ -40,8 +48,10 @@ In every session --- at session start, and again periodically during long sessio
    - **Don't:** read its name-match finding as proof of a leftover --- provenance is what a symlink into a checkout settles and a shared name does not.
    - **Don't:** read that skip as proof the machine has no plugin --- managed settings and command-line arguments are not read.
    - **Don't:** read its leftover list as proof the plugin is enabled --- a managed-settings `false` over a lower-scope `true` produces the same list.
+   - **Do:** place `~/.claude/shared` as a symlink into the checkout rather than as a copy, so the documented step reads as green and stays fresh on a pull.
    - **Don't:** delete `~/.claude/skills` on presence or on a name match;
      neither distinguishes a leftover from the client's own skills.
+   - **Don't:** read a green `consumer_leftovers` as proof `~/.claude/shared` is absent --- the documented symlink is reported outside the leftover list.
 
    The dedicated verification instrument this section used to name (`check-install.py`, which compared installed copies against the checkout and repaired drift with `--fix`) was removed along with that symlink install and has no replacement yet either.
    Until one lands, use the manual branch-plus-diff check in this file's "The blast radius is the whole consumer surface" paragraph below, which does not depend on that instrument and still works whether the local copy is a symlink or a real copy.

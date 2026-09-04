@@ -390,6 +390,45 @@ ALL_BARE_SEGMENT_CITATIONS_MUST_NOT_FIRE = (
 EXTENSION_LESS_BARE_SEGMENT_CITATIONS_MUST_NOT_FIRE = (
     "No matches in Morrison-Lab/gha, Support/glab-cli were found."
 )
+# The MIXED shape, which the two fixtures above between them do not cover
+# and which route 11's own bare-segment clause first got wrong: one
+# extension-less bare-segment citation (`Morrison-Lab/gha`) beside one that
+# ends in a real extension (`ai-config/memories/tools.md`). Both pieces are
+# genuine citations, so the hook must stay silent -- and it did, on
+# `origin/main`, where neither piece parsed as an enumeration item at all.
+# The first version of the clause demanded that EVERY piece be
+# extension-less, so one extension anywhere closed it, control fell through
+# to the per-piece `looks_like_citation` test that cannot recognize an
+# extension-less bare-segment piece, and the whole list was nagged as a
+# hand-typed enumeration. Pinned in all four orderings -- the
+# extension-less piece first and last, at two and at three items -- since
+# the clause is quantified over the whole list, so position and length are
+# exactly what a future re-narrowing would get wrong.
+MIXED_BARE_SEGMENT_CITATIONS_EXTENSION_LESS_FIRST_MUST_NOT_FIRE = (
+    "No matches in Morrison-Lab/gha, ai-config/memories/tools.md were found."
+)
+MIXED_BARE_SEGMENT_CITATIONS_EXTENSION_LESS_LAST_MUST_NOT_FIRE = (
+    "No matches in ai-config/memories/tools.md, Morrison-Lab/gha were found."
+)
+MIXED_BARE_SEGMENT_CITATIONS_THREE_ITEM_EXTENSION_LESS_FIRST_MUST_NOT_FIRE = (
+    "See files Morrison-Lab/gha, Support/glab-cli/config.yml, "
+    "ai-config/memories/tools.md for details."
+)
+MIXED_BARE_SEGMENT_CITATIONS_THREE_ITEM_EXTENSION_LESS_LAST_MUST_NOT_FIRE = (
+    "TOKEN failed on real files: ai-config/memories/tools.md, "
+    "Support/glab-cli/config.yml, Morrison-Lab/gha."
+)
+# The residual the fix above deliberately does NOT close, pinned so a
+# future edit has to break a named case rather than discover it: an
+# extension-less bare-segment citation beside an all-TOKEN one. The list is
+# not bare-segment homogeneous, so the clause never opens and the claim is
+# reported -- the same verdict `origin/main` gives this sentence, and the
+# price of keeping `COINCIDENTAL_SLASH_BRANCH_SUFFIX` below firing, whose
+# `cycle-charge-flee/main` has the same shape as `Morrison-Lab/gha` in the
+# same position: a bare segment trailing a `TOKEN`-shaped one.
+ACCEPTED_MISFIRE_EXTENSION_LESS_BESIDE_ALL_TOKEN = (
+    "No matches in local-bin/encrypt-gh-token.sh, Morrison-Lab/gha were found."
+)
 # The price of `ENUM_SEPARATOR` reading an unspaced `/` as path structure:
 # a list of recalled identifiers joined that way is no longer parsed as a
 # list at all.
@@ -1054,6 +1093,25 @@ def unit_checks(mod):
           mod.find_claims(ALL_BARE_SEGMENT_CITATIONS_MUST_NOT_FIRE), [])
     check("find_claims silent on an extension-less pair of bare-segment citations",
           mod.find_claims(EXTENSION_LESS_BARE_SEGMENT_CITATIONS_MUST_NOT_FIRE), [])
+    # The mixed shape: an extension-less bare-segment citation beside one
+    # that ends in an extension. All four orderings, since the clause that
+    # recognizes them is quantified over the whole list.
+    for label, fixture in (
+        ("extension-less first",
+         MIXED_BARE_SEGMENT_CITATIONS_EXTENSION_LESS_FIRST_MUST_NOT_FIRE),
+        ("extension-less last",
+         MIXED_BARE_SEGMENT_CITATIONS_EXTENSION_LESS_LAST_MUST_NOT_FIRE),
+        ("three items, extension-less first",
+         MIXED_BARE_SEGMENT_CITATIONS_THREE_ITEM_EXTENSION_LESS_FIRST_MUST_NOT_FIRE),
+        ("three items, extension-less last",
+         MIXED_BARE_SEGMENT_CITATIONS_THREE_ITEM_EXTENSION_LESS_LAST_MUST_NOT_FIRE),
+    ):
+        check(f"find_claims silent on a mixed extension/extension-less citation list ({label})",
+              mod.find_claims(fixture), [])
+    claims = mod.find_claims(ACCEPTED_MISFIRE_EXTENSION_LESS_BESIDE_ALL_TOKEN)
+    enum_claims = [c for c in claims if c[0] == "enumeration"]
+    check("find_claims ACCEPTS misfiring on an extension-less citation beside an all-TOKEN one",
+          bool(enum_claims), True)
     check("find_claims ACCEPTS missing an unspaced slash-joined identifier list",
           mod.find_claims(ACCEPTED_MISS_UNSPACED_SLASH_IDENTIFIER_LIST), [])
     # The separator half of the same fix: an unspaced `/` is path

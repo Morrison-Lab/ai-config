@@ -990,22 +990,54 @@ def looks_like_one_path(group_text, continuation=""):
     path -- because it names one, directory and all -- is exempted.
 
     Checked first, ahead of that per-piece test: a comma-joined list whose
-    pieces are ALL extension-less `PATH_TOKEN` paths, at least one of them
-    carrying a bare segment (`Morrison-Lab/gha, ai-config/memories`), is
-    citations too. `looks_like_citation` cannot see those one at a time --
-    it has no extension and no trailing `/` to key on, and the same
-    TOKEN-then-bare shape is also a recalled identifier beside a branch
-    name (`cycle-charge-flee/main`, pinned as
+    pieces ALL carry a bare segment and parse as `PATH_TOKEN` paths, at
+    least one of them extension-less (`Morrison-Lab/gha,
+    ai-config/memories/tools.md`), is citations too. `looks_like_citation`
+    cannot see the extension-less piece one at a time -- it has no
+    extension and no trailing `/` to key on -- and the same TOKEN-then-bare
+    shape is also a recalled identifier beside a branch name
+    (`cycle-charge-flee/main`, pinned as
     `COINCIDENTAL_SLASH_BRANCH_SUFFIX`), which is why the whole list, not
     the piece, is what carries the answer.
+
+    WHICH property the list has to share is the whole content of that
+    clause, and the first version of it shared the wrong one. It demanded
+    that EVERY piece be extension-less and that only ONE carry a bare
+    segment, so a single extension anywhere in the list closed the clause
+    -- control fell through to the per-piece test, where an extension-less
+    bare-segment piece can never pass, and a list of nothing but real
+    citations (`Morrison-Lab/gha, ai-config/memories/tools.md`) was
+    reported as a hand-typed enumeration. That is a WRONG NAG on the
+    commonest citation-list shape there is, since most real lists mix a
+    repo path with a file path, and route 11 is what created it: before
+    `PATH_TOKEN`, neither piece parsed as an item at all.
+
+    The quantifiers are therefore swapped: the BARE SEGMENT is what every
+    piece must carry, and the missing extension is what only one must have.
+    `COINCIDENTAL_SLASH_BRANCH_SUFFIX` keeps firing under that reading
+    because its citation half (`local-bin/encrypt-gh-token.sh`) is
+    TOKEN-shaped in every segment, so the list is not bare-segment
+    homogeneous and the clause never opens -- the branch suffix stays a
+    recalled identifier rather than becoming a citation.
+
+    ACCEPTED RESIDUAL (`ACCEPTED_MISFIRE_EXTENSION_LESS_BESIDE_ALL_TOKEN`),
+    unchanged by this fix and measured firing on `origin/main` too: a
+    genuine extension-less bare-segment citation listed beside an
+    all-TOKEN one (`local-bin/encrypt-gh-token.sh, Morrison-Lab/gha`)
+    still fires, because that list has the same SHAPE as the branch-suffix
+    one above -- `gha` and `main` are both bare segments trailing a
+    `TOKEN`-shaped one, in a list whose other piece carries an extension --
+    so no rule keyed on shape can separate a repo citation from a recalled
+    identifier here. It is pinned rather than guessed at, on the same
+    reasoning route 7 gives for leaving `/main` unclassified.
     """
     pieces = COMMA_SPLIT_RE.split(group_text)
     if len(pieces) > 1 and all(
             "/" in piece
             and PATH_TOKEN_RE.fullmatch(piece)
-            and not PATH_EXTENSION_RE.search(piece)
+            and ONLY_BARE_SEGMENT_RE.search(piece)
             for piece in pieces) and any(
-            ONLY_BARE_SEGMENT_RE.search(piece) for piece in pieces):
+            not PATH_EXTENSION_RE.search(piece) for piece in pieces):
         return True
     last = len(pieces) - 1
     return all(

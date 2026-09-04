@@ -99,9 +99,10 @@ That is the one chaining form that silently satisfies the guard while making no 
 - **Do:** narrow the response with a flag on the POST itself rather than a downstream pipe.
 - **Don't:** pipe the POST anywhere, including to `tail`, `head`, or `jq` --- the hook cannot tell a formatting pipe from a chained verification, because the shell does not either.
 
-**Recent, detailed familiarity with this exact rule does not protect you from breaking it at the moment of acting.**
+**A later, distinct incident: recent, detailed familiarity with this exact rule does not protect you from breaking it at the moment of acting.**
 
-A session that had just merged a fix diagnosing precisely this shape (a non-last reviewer request satisfying the guard) issued its own reviewer request four turns later as `cd <dir> && gh api ... | tail -3` --- a `cd` prefix and a trailing pipe, non-last on both counts at once, in the same call.
+This is a separate failure from the message-wording gap the next entry names below, not another count against it --- an execution mistake rather than an ambiguous instruction, so it does not bear on that entry's `deterministic-tools` third-occurrence reasoning.
+On 2026-09-04, a session that had just merged a fix diagnosing precisely this non-last-request shape issued its own reviewer request four turns later as `cd <dir> && gh api ... | tail -3` --- a `cd` prefix and a trailing pipe, non-last on both counts at once, in the same call.
 Reciting the rule correctly is a different skill from applying it while composing a command under time pressure;
 the two do not transfer automatically, and treating recent authorship of the fix as inoculation is the failure mode itself.
 

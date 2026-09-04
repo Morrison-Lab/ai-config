@@ -1375,5 +1375,5 @@ The remedy is the same one this file gives for code: run the thing before descri
 - **Don't:** treat a plausible-sounding claim about your own tests as needing no check merely because it is about testing infrastructure rather than about the feature --- it is exactly as checkable, and exactly as likely to be wrong.
 - **Don't:** read "the code is right" as "the PR is ready" while claims about the code's own verification remain unmeasured.
 
-See [gha's `memories/prose-about-my-own-tests-overclaims.md`](https://github.com/Morrison-Lab/gha) (project-local memory in `Morrison-Lab/gha`, not yet promoted here) for the session that produced this: roughly eleven adversarial review rounds on one PR, where the code was correct by round two and every one of the remaining rounds found a claim of exactly the shapes listed above.
+(A session working in `Morrison-Lab/gha` recorded the incident that produced this section in its own local `prose-about-my-own-tests-overclaims.md` --- project-local Claude Code auto-memory, not a file committed to any repository, so there is no link to give here: roughly eleven adversarial review rounds on one PR, where the code was correct by round two and every one of the remaining rounds found a claim of exactly the shapes listed above.)
 

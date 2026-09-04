@@ -44,23 +44,26 @@ Multi-line heredoc-style commands in chained terminal commands get garbled or si
 Always write multi-line content to a temp file first, then reference it:
 
 ```sh
-cat > "$SCRATCHPAD/msg.txt" << 'EOF'
+cat > /tmp/msg.txt << 'EOF'
 line 1
 line 2
 EOF
-git commit -F "$SCRATCHPAD/msg.txt"
+git commit -F /tmp/msg.txt
 ```
 
 Never inline heredocs in chained commands.
 Applies to git commit messages, MR descriptions, and any other multi-line content passed to CLI tools.
 (Learned during HACtions MR !37.)
 
-**A bare `/tmp/<name>.txt` is not a safe destination for this, because `/tmp` is shared across every concurrent session on the machine.**
+**A literal, predictable `/tmp/<name>.txt` like the one in the example above is not a safe destination for this, because `/tmp` is shared across every concurrent session on the machine.**
 A second, unrelated session can pick the same obvious filename (`msg.txt`, `patch.diff`) at the same time, and whichever session writes last silently wins --- the first session's `git commit -F` then commits the *other* session's content with no error at any step.
-Use the session-specific scratchpad directory instead of a literal `/tmp/<name>` path: it is already namespaced per session (see [`claude-code.md`](claude-code.md), "The scratchpad directory path's trailing UUID is a usable stand-in for the harness session id"), so two sessions cannot collide on it by construction.
+Use the session's own scratchpad directory instead: the system prompt's "Scratchpad Directory" section names the actual, session-specific path (a long `/private/tmp/claude-<pid>/<sanitized-cwd>/<uuid>/scratchpad` form --- see [`claude-code.md`](claude-code.md), "The scratchpad directory path's trailing UUID is a usable stand-in for the harness session id"), so two sessions cannot collide on it by construction.
+Substitute that literal path in place of `/tmp` above;
+there is no standard environment variable that already holds it.
 
-- **Do:** write a commit-message (or any other multi-line CLI-input) file to the session scratchpad directory, not to a bare `/tmp/<name>` path.
+- **Do:** write a commit-message (or any other multi-line CLI-input) file to the exact scratchpad path the current session's system prompt names, not to a bare `/tmp/<name>` path.
 - **Don't:** use a plain, predictable `/tmp` filename for content another concurrent session could plausibly also choose --- the collision is silent, and the resulting commit looks normal until someone reads its body.
+- **Don't:** assume a `$SCRATCHPAD`-style variable already holds the path --- it doesn't, and a script that references one silently writes to the wrong place (or fails outright) when the variable is unset.
 
 (Measured 2026-09-04: `git commit --amend -F /tmp/msg.txt` picked up a different concurrent session's message from the same shared path, silently replacing the intended PR's subject and body.)
 

@@ -217,6 +217,8 @@ check("and fires on each tool it names there",
       _catalog.matcher_matches("Edit", "Bash, Edit", "PreToolUse") is True
       and _catalog.matcher_matches("Write", "Bash, Edit",
                                    "PreToolUse") is False)
+check("a fast-path matcher naming nothing fires on nothing",
+      _catalog.matcher_matches("Bash", "|", "PreToolUse") is False)
 check("off a wide-class event a comma-joined matcher is a regex instead",
       _catalog.matcher_names("Write, Edit", "Stop") == frozenset()
       and _catalog.matcher_matches("Edit", "Bash, Edit", "Stop") is False)

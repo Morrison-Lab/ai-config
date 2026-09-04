@@ -138,7 +138,16 @@ ROW = re.compile(
 #       if (!n || n === "*") return true;
 #       let y = dls(n, r, o), E = pur(e, d, p);
 #       if (y !== undefined) return y.includes(e) || E.some(v => y.includes(v));
-#       try { return new RegExp(n).test(e) } catch { return false }
+#       try {
+#         let v = new RegExp(n);
+#         if (v.test(e)) return true;
+#         if (mls.test(n) && E.some(R => v.test(R))) return true;
+#         for (let R of c8t(e)) if (v.test(R)) return true;
+#         for (let R of J8(e, o)) if (v.test(R)) return true;
+#         return false;
+#       } catch {
+#         return t(`Invalid regex pattern in hook matcher: ${n}`), false;
+#       }
 #     }
 #
 # So there are three branches, and the first two are NOT regex matching:
@@ -180,6 +189,19 @@ def _fast_path(event):
     return PLAIN_MATCHER, SEPARATOR
 
 
+def _fast_path_names(matcher, event):
+    """The fast path's names, or None when `matcher` is not on the fast path.
+
+    `dls` returns undefined only when the class test fails, so a fast-path
+    matcher naming nothing is an empty set here rather than a regex.
+    """
+    pattern, separator = _fast_path(event)
+    if not pattern.match(matcher):
+        return None
+    return frozenset(
+        part.strip() for part in separator.split(matcher) if part.strip())
+
+
 def matcher_matches(tool, matcher, event):
     """Whether `matcher` fires on a call to `tool`, per the semantics above.
 
@@ -190,8 +212,8 @@ def matcher_matches(tool, matcher, event):
     """
     if matcher in CATCH_ALL:
         return True
-    names = matcher_names(matcher, event)
-    if names:
+    names = _fast_path_names(matcher, event)
+    if names is not None:
         return tool in names
     try:
         return re.search(matcher, tool) is not None
@@ -206,11 +228,10 @@ def matcher_names(matcher, event):
     The harness knows the full tool list and this check does not, so the
     vocabulary is built from what hooks.json itself spells out.
     """
-    pattern, separator = _fast_path(event)
-    if matcher in CATCH_ALL or not pattern.match(matcher):
+    if matcher in CATCH_ALL:
         return frozenset()
-    return frozenset(
-        part.strip() for part in separator.split(matcher) if part.strip())
+    names = _fast_path_names(matcher, event)
+    return frozenset() if names is None else names
 
 
 def overlapping_tools(first, second, vocabulary, event):

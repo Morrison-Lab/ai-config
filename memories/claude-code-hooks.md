@@ -260,16 +260,19 @@ the `@anthropic-ai/claude-code` npm package installed beside that binary was sti
 // `wide` is fur.has(hook_event_name); `A` is the query, `q` the matcher.
 function names(q, wide) {
   if (!(wide ? /^[a-zA-Z0-9_|, -]+$/ : /^[a-zA-Z0-9_|]+$/).test(q)) return;
-  return q.split(wide ? /[|,]/ : "|").map((y) => y.trim()).filter(Boolean);
+  return q.split(wide ? /[|,]/ : "|").map((y) => y.trim()).filter(Boolean)
+          .flatMap((y) => aliasForms(y));
 }
 if (!q || q === "*") return true;
 const parts = names(q, wide);
 if (parts !== undefined)
   return parts.includes(A) || aliases(A).some((v) => parts.includes(v));
+// The regex is also tried against the alias and reverse-alias forms of `A`.
 try { return new RegExp(q).test(A) } catch { return false }
 ```
 
 `A` is the match query (`tool_name` for `PreToolUse`), `q` is the group's `matcher`, and `aliases` yields the alias forms of the tool name.
+Every branch is tried against alias forms, not only the fast path: `names` expands the matcher's own parts through `aliasForms`, and the regex branch tests the alias and reverse-alias forms of `A` as well as `A` itself.
 So:
 
 | matcher | evaluated as | fires on a `NotebookEdit` call? |

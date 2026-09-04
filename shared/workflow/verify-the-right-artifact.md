@@ -916,3 +916,146 @@ whose `is_task_notification` branch sits at `hooks/no-push-without-self-review.p
 `git log -L 1400,1417:hooks/no-push-without-self-review.py` names that commit in one command;
 no such command was run, because an open issue looked like the answer.
 The docstring was still uncorrected on that branch as this was written.)
+
+**A twelfth: a pull request's check-run names, standing in for the branch's own workflow definitions.**
+
+The seventh and eleventh shapes above are both substitutions across time, and the eleventh is unaware too, so what is new here is that **the artifact offers nothing to date**.
+The seventh reads a future state for the present one knowingly, because the future state is the one being worked toward.
+The eleventh reads a stale past one from a citable artifact: an issue carries a number and a timestamp, so its staleness is checkable by anyone who thinks to check, and what defeats it is that nothing prompts the read.
+A check-run **name** carries neither.
+`Spellcheck` is the same ten characters whenever it was produced, so there is no field to inspect and no version to compare --- the thing you would have to date is not in what you read.
+A pull request's check runs are current, complete, and correct.
+What they describe is the workflow definitions **in force when each run executed** --- resolved from the pushed commit for a `push` run, and from the head-into-base merge for a `pull_request` one.
+Neither of those is the default branch as of now, and the name carries no trace of which moment or which resolution produced it.
+
+The tell is a claim of the form "this repository emits X", derived from observing X somewhere.
+A check run is produced by a workflow file, and a workflow file is versioned like any other, so a rename, a job restructuring, or a migration from inline jobs to a called reusable workflow changes every context string the repository publishes from that moment on.
+A check run therefore records the definitions **in force when that run executed**, and its name carries no trace of when that was.
+
+Two facts about a run decide which definitions it used, and a check-run name shows neither.
+**When** it executed, and **which ref** it resolved the workflow file from.
+For a `push` run that ref is the pushed commit;
+for a `pull_request` run it is the merge of the head into the base, so a head that edits the workflow file overrides the base's copy while a head that does not simply gets whatever the base carries at that moment.
+That second case is worth stating plainly, because the intuitive rule --- an old head publishes old names --- is false: an untouched workflow file follows the base, so a pull request opened long before a migration publishes the *new* names on its next run.
+
+The staleness that does bite is therefore temporal rather than positional.
+A name observed at time T is a fact about time T, and any later merge to the default branch retires it without touching the pull request you read.
+Merged-ness is what conceals that.
+A merged pull request feels like it *became* the branch, and in the ordinary case it did;
+what it did not become is the branch as of any later moment, and nothing about a merged status says which moment you are reading.
+
+The consequence for a required status check is unusually expensive, because it fails in the direction nothing reports.
+A required context naming a check that no workflow emits does not error, does not turn red, and does not appear in any run.
+It sits as `Expected`, and the only diagnosis is noticing that a check listed as required never appears at all.
+How far that spreads is a question about runs rather than about settings.
+An open pull request keeps whatever check runs it already has, so one that last ran before the workflow change still shows the old names and still looks satisfied.
+Its next **push** re-resolves the workflow file through the current base and publishes the new names, after which the required context is unreportable on that pull request.
+A *re-run* does not do this: GitHub re-runs reuse the original event's `GITHUB_SHA` and `GITHUB_REF`, so re-running a pre-change run republishes the old names and looks like evidence that nothing changed.
+So the requirement is retired one pull request at a time, as each one is next pushed to, and nothing about that transition is announced.
+Date the check runs you are reading before describing the blast radius;
+a rollup showing a required context green may be showing a week-old run.
+
+The authoritative artifact is the default branch's own workflow definitions, confirmed against a run **of that branch**:
+
+```bash
+gh api "repos/<o>/<r>/contents/.github/workflows?ref=<default-branch>" --jq '.[].name'
+gh api "repos/<o>/<r>/contents/.github/workflows/<file>?ref=<default-branch>" --jq .content | base64 -d
+gh api "repos/<o>/<r>/actions/runs/<run-id-on-that-branch>/jobs" --jq '.jobs[].name'
+```
+
+Read the definition rather than only the run, because a run answers only for the workflows that happened to trigger on that push.
+A caller job `check:` invoking `uses: <org>/gha/.github/workflows/spellcheck.yml@v2`, in a workflow whose own `name:` is `Spellcheck`, publishes `check / spellcheck`.
+The workflow-level `name:` does not appear at all.
+What appears on each side of the slash is a **job** display name --- the caller job's, then the called workflow's inner job's --- and a job's display name is its `name:` where one is set and its key otherwise.
+So the string is derivable from the file, and reading it off any observed check run is derivable from the wrong file.
+
+This is also [`run-ums-proactively`](run-ums-proactively.md)'s false-*state*-claim case in its purest form.
+No belief about reusable workflows was ever held and then corrected;
+the wrong thing was simply looked up, so the reusable lesson is the query rather than the value.
+
+One clause on the corroborating run, because the obvious reading of it is unsatisfiable.
+The workflow definition on the default branch is the authority;
+the run is corroboration that the definition composes the string you think it does.
+A workflow triggered only by `pull_request` produces no run at all on an ordinary push to the default branch, so for that class the corroborating run is usually a pull-request run.
+The exception is worth taking when it exists: a pull request opened *from* the default branch into some other base carries that branch's copy of the file on its head side, so its run reads what you want unless the base has diverged on that same file.
+Failing that, a pull-request run resolved the workflow file from the merge of its head into its base, so it corroborates the **default branch's** copy only when two things hold together.
+Its base is the default branch --- `gh pr view <N> --json baseRefName` --- since a stacked pull request or one targeting a release branch resolves the file from that other base instead, and would corroborate a different branch's copy while looking identical.
+And its head does not touch that one file --- `gh pr diff <N> --name-only`, matching the single path rather than the `.github/workflows/` directory, since a head editing some other workflow is irrelevant.
+The first condition is the one that goes unstated, and omitting it reinstates this shape's own substitution by way of its remedy.
+Prefer a recent run, since an older one may predate the definition you just read.
+
+- **Do:** derive a required-context string from the default branch's workflow definitions, and use a run only to corroborate how those definitions compose.
+- **Do:** date every check-run observation by the commit its run executed, and say what has landed on the default branch since.
+- **Don't:** accept a pull-request run as corroboration without reading its `baseRefName` --- a head that leaves the workflow file alone is necessary and not sufficient.
+- **Don't:** read check names off a pull request, however recent, and generalize them to the repository.
+- **Don't:** treat a pull request having merged as evidence its check names still describe the branch --- they described it at one instant, and a later merge can retire them without touching that pull request at all.
+
+See [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md), "A merged pull request's check names written into a live ruleset".
+
+## Existence of a mechanism is not reachability of it
+
+[`The four shapes`](#the-four-shapes) above names a counterpart that is **missing** ---
+a cache `save` with no `restore`, a marketplace entry with no install.
+This shape is the one where the counterpart is present, correct, and never reached.
+The clearing branch is in the source, it does exactly what it should,
+and the normal path never produces the input it reads ---
+so the mechanism is real and the behaviour it promises is unavailable.
+
+It is more convincing than the missing-counterpart case,
+because finding the code that would have prevented a false positive feels like having explained the false positive.
+Reading it produces a genuine and correct conclusion --- this guard clears on a terminal state ---
+and that conclusion is about the source rather than about the run.
+Existence and reachability are different claims,
+and confirming the first is exactly what checking the second would feel like.
+
+[`The test`](#the-test) above supplies the question, so ask it of reachability rather than of existence:
+what would have to be true for this mechanism never to fire,
+and does the normal path produce the input it matches on?
+Trace the input backwards to whatever emits it.
+Where the emitter is a command, read that command's actual output
+rather than assuming it carries the fields the matcher wants.
+
+- **Do:** name the producer of a mechanism's input, and read what that producer actually emits, before saying the mechanism works.
+- **Do:** treat "the clearing branch exists" as an answer about the source and an open question about the run.
+- **Don't:** close an incident on the strength of having found the code that should have prevented it.
+- **Don't:** read a matcher's field list as evidence those fields ever arrive --- a matcher is a claim about its input, not a supply of one.
+
+(Measured 2026-09-03, and the record is the rule applied to itself three times.
+A `Stop` hook demanded a per-HEAD reviewer request on an already-merged pull request.
+The hook was read, a terminal-state matcher was found in it,
+and the incident was written off as the guard behaving correctly given what it could see ---
+a claim about the source presented as a claim about the run.
+The first retraction asserted a *cause*:
+that `gh pr merge`'s own success output carries none of that matcher's fields,
+so merging without a later `--json state` probe would leave an obligation that can never discharge.
+Adversarial review refuted that from the source of `hooks/no-unreviewed-pr.py`,
+finding a second clearing branch --- `close_ident` ---
+that discharges a merge structurally, from the command's argv and exit status,
+with the terminal-state matcher reserved for a merge performed OUTSIDE the session.
+The second retraction adopted that reading, and was wrong in the identical way,
+because it too was reasoned from the code rather than run against the artifact.
+Running the hook's own `close_ident` on the command the session actually issued settles it:
+
+```python
+close_ident("ALLOW_MERGE=1 gh pr merge 3101 -R Morrison-Lab/ai-config "
+            "--squash --delete-branch 2>&1 | tail -3")
+# -> (False, None, None, False)
+```
+
+Two independent defeats, either sufficient alone.
+The environment-variable prefix makes the first token of the parsed argv something other than `gh`,
+so the structural recogniser rejects the command outright;
+and the merge is not the last simple command in the pipeline,
+which the call site treats as ambiguous rather than as a discharge.
+The idealized command with neither feature returns a clear,
+which is the value both retractions were reasoning about.
+So both clearing branches were reachable in principle and the run reached neither ---
+one defeated by the command's shape, the other never fed its input.
+[#3152](https://github.com/Morrison-Lab/ai-config/issues/3152) was filed on the first mistaken premise;
+the correction is posted on its thread.
+The lesson survives three wrong causes intact, and is sharper for them:
+reading a matcher tells you what it would accept, and reading a recogniser tells you what it would recognize.
+Neither tells you which branch this run took.
+Only running the reader against the exact artifact does, and
+[`mistake-patterns`](../../memories/mistake-patterns.md) Pattern 17 names that move ---
+which is worth stating twice, because it was cited in the same change that failed to perform it.)

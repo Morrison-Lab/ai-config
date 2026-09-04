@@ -593,12 +593,24 @@ gh api repos/<owner>/<repo>/issues/<N>/comments --paginate \
 
 `memories/gh-cli.md` carries the full statement, including the placeholder-wording trap when polling a run still in flight.
 
-**Also check formal GitHub reviews, not just issue-style comments — a human's `CHANGES_REQUESTED` can be invisible to a comments-only scan.** A review submitted via GitHub's review UI (as opposed to a plain PR comment) shows up in `gh pr view N --json reviews`, and its top-level `body` is frequently **empty** — the actual finding lives entirely in a per-line inline comment, which only appears via `gh api repos/<owner>/<repo>/pulls/N/comments` (a different endpoint from issue comments). Checking `--json comments` alone can miss the review's existence entirely. Before declaring a PR ready, also run:
+**Also check formal GitHub reviews, not just issue-style comments --- a review's findings can live somewhere a comments-only scan never looks, whatever the reviewer's identity and whatever state the review carries.**
+A review submitted via GitHub's review UI (as opposed to a plain PR comment) shows up in `gh pr view N --json reviews`, and its top-level `body` is frequently **empty** --- the actual finding lives entirely in a per-line inline comment, which only appears via `gh api repos/<owner>/<repo>/pulls/N/comments` (a different endpoint from issue comments).
+The mirror case is the one a threads-only check misses just as completely: a finding stated in the top-level `body` with no inline comment at all, or in inline comments GitHub collapses under `Suppressed comments`, which create no review thread for a thread query to return.
+Checking `--json comments` alone can miss the review's existence entirely, and reading only unresolved threads can miss its findings.
+Neither qualifier this rule used to carry was load-bearing.
+A bot's `COMMENTED` review whose body reads "Changes recommended" blocks a merge exactly as much as a human's `CHANGES_REQUESTED`, because the blind spot is about *where the finding sits*, not about who posted it or which state they picked.
+Before declaring a PR ready, also run:
 ```
-gh pr view N --json reviews --jq '.reviews[] | select(.state == "CHANGES_REQUESTED") | "\(.author.login) \(.submittedAt)"'
+gh pr view N --json reviews --jq '.reviews[] | "\(.state) \(.author.login) \(.submittedAt) \(.body)"'
 gh api repos/<owner>/<repo>/pulls/N/comments --jq '.[] | "\(.path):\(.line // .original_line // "?") \(.user.login) \(.body)"'
 ```
-A `CHANGES_REQUESTED` state is blocking regardless of whether an automated re-review later says "Ready for merge" — that bot verdict doesn't clear a human's own review state, which only the human (or an explicit dismissal) can resolve.
+A `CHANGES_REQUESTED` state is blocking regardless of whether an automated re-review later says "Ready for merge" --- that bot verdict doesn't clear a human's own review state, which only the human (or an explicit dismissal) can resolve.
+The first command above is deliberately unfiltered: add `select(.state == "CHANGES_REQUESTED")` only as a follow-up narrowing, after you have read every review's state and body.
+
+- **Do:** read every formal review's state and body, whoever posted it, and treat a finding carried in a body or a suppressed inline comment as blocking.
+- **Do:** keep any state filter as a second, deliberately narrow query, run after the unfiltered listing rather than instead of it.
+- **Don't:** pass over a review because its author is a bot or its state is `COMMENTED` --- neither attribute is why the blind spot exists.
+- **Don't:** read an empty or fully-resolved thread list as an empty review population.
 
 (A specific case of the standing **never assume; always verify** rule in `memories/preferences.md` — confirm the verdict with a fresh query, don't recall it.)
 

@@ -22,6 +22,23 @@ def transcript(commands):
     return path
 
 
+def timestamped_transcript(pairs):
+    """Records carrying their own timestamps, written in the given FILE order.
+
+    A context compaction replays earlier records, appending them below newer
+    ones while they keep their original timestamps, so file order and time
+    order disagree (`memories/claude-code-transcripts.md`).
+    """
+    handle, path = tempfile.mkstemp()
+    with os.fdopen(handle, "w") as stream:
+        for stamp, command in pairs:
+            record = {"type": "assistant", "timestamp": stamp, "message": {"content": [{
+                "type": "tool_use", "name": "Bash", "input": {"command": command}
+            }]}}
+            stream.write(json.dumps(record) + "\n")
+    return path
+
+
 def antigravity_transcript(commands, assistant_text=""):
     handle, path = tempfile.mkstemp()
     with os.fdopen(handle, "w") as stream:
@@ -662,6 +679,472 @@ try:
             shutil.rmtree(_p, ignore_errors=True)
         for _p in (wt2_transcript, wt_clean_transcript, sw_transcript, sw_dropped_transcript, unrelated_pushed_transcript):
             os.unlink(_p)
+
+    # --- ai-config#2422: another tool's dormant worktree is not this
+    # session's debt. A leftover Antigravity/Cursor worktree whose PR has
+    # already squash-merged still holds local commits no remote carries, and
+    # a session cannot always safely delete it. Visiting one to read its
+    # state used to make it relevant, so every Stop blocked on a debt this
+    # session never incurred --- three consecutive firings in the measured
+    # 2026-09-02 case. Relevance is now scoped to the calls that COMMITTED.
+    dormant_root, dormant_bare, dormant_run = gitrepo(
+        BASE,
+        "git remote add origin BARE",
+        "git push -q -u origin main",
+    )
+    # A dormant branch whose remote still exists: an ordinary ahead-by-one.
+    dormant_wt = tempfile.mkdtemp()
+    dormant_run(f"git worktree add -q -b agy-dormant {dormant_wt} main")
+    dormant_run("git push -q -u origin agy-dormant", cwd=dormant_wt)
+    dormant_run("git commit --allow-empty -m dormant-leftover", cwd=dormant_wt)
+    # A dormant branch whose PR squash-merged and whose remote branch was
+    # then deleted: `@{u}` no longer resolves, so the count is undefined and
+    # the old code blocked via the pending-plus-undefined path instead.
+    gone_wt = tempfile.mkdtemp()
+    dormant_run(f"git worktree add -q -b agy-gone {gone_wt} main")
+    dormant_run("git push -q -u origin agy-gone", cwd=gone_wt)
+    dormant_run("git push -q origin --delete agy-gone", cwd=gone_wt)
+    dormant_run("git commit --allow-empty -m gone-leftover", cwd=gone_wt)
+    dormant_run("git fetch -q --prune origin", cwd=gone_wt)
+
+    # A `cd` persists across tool calls, so a session that visits a dormant
+    # worktree and then commits its own work `cd`s back first --- which is
+    # what makes the visit stop counting.
+    visit_only = transcript([
+        f"cd {dormant_wt} && git status",
+        f"git -C {gone_wt} log -1 --oneline",
+        f"cd {dormant_root} && git commit -m hook",
+        "git push origin main",
+    ])
+    visit_then_pending = transcript([
+        f"cd {gone_wt} && git log -1 --oneline",
+        f"cd {dormant_root} && git commit -m hook",
+    ])
+    commit_in_dormant = transcript([
+        f"cd {dormant_wt} && git status",
+        f"git -C {dormant_wt} commit -m hook",
+    ])
+    # The `cd` that persists: the commit call names no directory of its own,
+    # so the shell's running directory is what attributes it. Dropping that
+    # carry-forward silently disabled the linked-worktree scan for a commit
+    # the session unambiguously made itself.
+    cd_then_commit_later = transcript([
+        f"cd {dormant_wt}",
+        "git add -A",
+        "git commit -m mine",
+    ])
+    # `git checkout -` switches back while naming no branch, so it has to
+    # supersede the dormant branch rather than leave it standing.
+    checkout_back = transcript([
+        "git checkout agy-dormant && git log -1",
+        "git checkout -",
+        "git commit -m mine",
+        "git push origin main",
+    ])
+    # The SAME-CALL spelling of the case above, which the multi-call fixture
+    # cannot see: supersession has to read the text before the commit, not
+    # only whole earlier calls, or the inspect-then-return route stays open
+    # whenever it is written as one call. The directory half already read it
+    # that way, so the two halves disagreed about a shape this corpus writes
+    # routinely.
+    checkout_back_same_call = transcript([
+        "git checkout agy-dormant && git log -1",
+        "git checkout - && git commit -m mine",
+    ])
+    # The whole round trip in ONE call. Supersession is decided by the LAST
+    # head-moving command before the commit, not by all of them at once:
+    # unioning every match let the named checkout outvote the `git checkout -`
+    # that superseded it, so the branch the session only inspected claimed the
+    # commit anyway --- ai-config#2422's own false block, spelled inline.
+    checkout_back_whole_round_trip = transcript([
+        "git checkout agy-dormant && git log -1 && git checkout - && git commit -m mine",
+    ])
+    # The same two head-moving commands in one EARLIER call, with the commit
+    # in the next one. The carry has to fold in source order too, or the
+    # inspected branch survives the return and is carried into the commit.
+    checkout_back_two_moves_earlier = transcript([
+        "git checkout agy-dormant && git log -1 && git checkout -",
+        "git commit -m mine",
+    ])
+    # The `git checkout <base> && git pull --ff-only && git checkout -b <new>`
+    # opening this corpus writes constantly. The shell ends on the new branch,
+    # so the base must not be carried into the commit --- a base that happens
+    # to sit ahead of its upstream would otherwise block every Stop in the
+    # session over a branch nothing was committed on. `agy-dormant` stands in
+    # for that ahead-of-upstream base, since this repo's `main` is pushed.
+    base_then_new_branch = transcript([
+        "git checkout agy-dormant && git pull --ff-only && git checkout -b fix-x",
+        "git commit -m mine",
+    ])
+    # `git worktree add -b` creates the branch in a SECOND checkout and leaves
+    # this shell's HEAD where it stood, so it must not displace the branch the
+    # commit actually landed on --- doing so would fail open on a real
+    # unshipped commit and name one the shell never entered in its place.
+    worktree_add_b_keeps_branch = transcript([
+        "git checkout agy-dormant && git log -1",
+        f"git worktree add -b side {gone_wt}-side main && git commit -m mine",
+    ])
+    # The other direction on that axis, and the conductor shape this corpus
+    # writes constantly: a session that creates subagent worktrees and then
+    # commits its OWN work. Contributing each created name additively made it
+    # permanent, since only a later head-moving switch removes one, so any
+    # subagent's unpushed commit blocked this session's every Stop --- a debt
+    # it never incurred. Two adds, because one is indistinguishable from a
+    # carry that happens to match nothing.
+    worktree_adds_then_own_commit = transcript([
+        f"git worktree add -b agy-dormant {dormant_wt} main",
+        f"git worktree add -b agy-gone {gone_wt} main",
+        "git commit -m mine",
+    ])
+    # The SAME-CALL spelling of that shape, which the multi-call fixture
+    # cannot see: the created branch and its checkout sit in the very call
+    # that commits, so the call's own text is what a false attribution reads.
+    # An additive branch source blocked here on a checkout the shell never
+    # entered, and the two spellings have to agree.
+    worktree_add_then_own_commit_same_call = transcript([
+        f"git worktree add -b agy-dormant {dormant_wt} main && git commit -m mine",
+    ])
+    # The positive control on the same axis: entering the created checkout is
+    # what attributes a commit to it, and the directory axis is what sees
+    # that. Dropping the branch contribution must not cost this block.
+    worktree_add_then_cd_in = transcript([
+        f"git worktree add -b agy-dormant {dormant_wt} main && cd {dormant_wt} && git commit -m mine",
+    ])
+    # `git branch` names a branch without switching to it, so a commit that
+    # follows one lands wherever the shell already stood. Reading these as
+    # switches made `git branch -d agy-dormant` --- the cleanup a
+    # squash-merged leftover invites --- claim the next commit, and a delete
+    # git refuses as unmerged left the session blocked on a branch it never
+    # committed on.
+    branch_delete_attributes_nothing = transcript([
+        "git branch -d agy-dormant",
+        "git commit -m mine",
+    ])
+    branch_contains_attributes_nothing = transcript([
+        "git branch --contains agy-dormant",
+        "git commit -m mine",
+    ])
+    # The other direction on the same axis: `git branch` moves HEAD nowhere,
+    # so it must not CLEAR a genuinely carried branch either.
+    branch_subcommand_keeps_branch = transcript([
+        "git checkout agy-dormant && git log -1",
+        "git branch -d some-other",
+        "git commit -m mine",
+    ])
+    # A call can commit, move, and commit again. Attributing only the first
+    # match left the second unclaimed, so an unshipped commit went unreported
+    # and the Stop was allowed --- fail-open, and invisible to every fixture
+    # that puts one commit in a call.
+    two_commits_one_call = transcript([
+        f"cd {dormant_root} && git commit -m mine && cd {dormant_wt} && git commit -m mine",
+    ])
+    # A `cd` AFTER the commit in the same call names where the shell ends up,
+    # never where it stood when the commit ran. Attributing the commit to it
+    # is the same false attribution to a merely-visited directory that the
+    # whole of ai-config#2422 is about.
+    commit_then_cd_away = transcript([
+        f"cd {dormant_root}",
+        f"git commit -m mine && cd {dormant_wt}",
+    ])
+    # `git checkout -p` stages hunks and switches nothing, and
+    # `git worktree add <path> <branch>` creates a second checkout while
+    # leaving this one where it stood. Neither may clear the carried branch:
+    # doing so drops the switched-branch detection of ai-config#2737.
+    patch_mode_keeps_branch = transcript([
+        "git checkout agy-dormant && git log -1",
+        "git checkout -p",
+        "git commit -m mine",
+    ])
+    worktree_add_keeps_branch = transcript([
+        "git checkout agy-dormant && git log -1",
+        f"git worktree add {gone_wt}-extra main",
+        "git commit -m mine",
+    ])
+    # `git checkout-index` is plumbing that copies files out of the index and
+    # moves HEAD nowhere --- the hyphenated-sibling trap this file already
+    # records for `git commit-tree`, now on the switch side.
+    checkout_index_keeps_branch = transcript([
+        "git checkout agy-dormant && git log -1",
+        "git checkout-index -a -f",
+        "git commit -m mine",
+    ])
+    # A bare `cd` goes home, `pushd` moves, and `popd` moves somewhere this
+    # scan cannot name. All three leave the dormant worktree behind, and none
+    # of them names a directory the way `cd <dir>` does.
+    bare_cd_moves_home = transcript([
+        f"cd {dormant_wt}",
+        "cd",
+        "git commit -m mine",
+    ])
+    pushd_supersedes = transcript([
+        f"cd {dormant_wt}",
+        f"pushd {dormant_root}",
+        "git commit -m mine",
+    ])
+    popd_supersedes = transcript([
+        f"cd {dormant_wt}",
+        "popd",
+        "git commit -m mine",
+    ])
+    # A `cd` inside `( ... )` moves the SUBSHELL and dies with it, so the
+    # parent shell never left. `(cd <other-worktree> && git status)` is the
+    # routine way to read another checkout without leaving your own, and
+    # reading it as a move let a merely-visited dormant worktree claim a
+    # commit made later somewhere else.
+    subshell_cd = transcript([
+        f"(cd {dormant_wt} && git status)",
+        "git commit -m mine",
+    ])
+    subshell_cd_semicolon = transcript([
+        f"( cd {dormant_wt}; git log -1 )",
+        "git commit -m mine",
+    ])
+    # Negative control on the same axis: a `cd` OUTSIDE the parens still
+    # moves the shell, so the subshell skip narrowed the tracking rather
+    # than disabling it. The shell ends up in the dormant worktree here, and
+    # the commit that follows genuinely lands there.
+    subshell_beside_real_cd = transcript([
+        f"cd {dormant_wt} && (cd {dormant_root} && git status)",
+        "git commit -m mine",
+    ])
+    # The other half of the same axis: a commit that shares the subshell
+    # really did run in the directory the subshell moved to, so it is
+    # attributed there rather than dying with the parens. Skipping every
+    # `cd` above depth 0 answered only the parent-shell half and left this
+    # commit attributed to no directory at all, so an unshipped commit made
+    # in another checkout via the one-liner went unreported.
+    subshell_commit_inside = transcript([
+        f"(cd {dormant_wt} && git add -A && git commit -m mine)",
+    ])
+    # Two SIBLING subshells share a nesting depth and share nothing else: the
+    # first one's `cd` dies at its own `)`, so the second opens from the
+    # parent shell and the commit inside it lands where the parent stood.
+    # Keying the directory on depth alone carried the visited worktree
+    # across the boundary and blocked the Stop for a commit made elsewhere,
+    # which is ai-config#2422's own false-block failure respelt.
+    sibling_subshell_commit = transcript([
+        f"(cd {dormant_wt} && git status) && (git add -A && git commit -m mine)",
+    ])
+    # A recorded call can be TRUNCATED mid-subshell, leaving the `(` unclosed
+    # --- `unwrap_command` exists for exactly that text. The parent shell
+    # still never entered the parens, so the carry between calls must read
+    # the caller's own shell rather than the subshell the text stopped in.
+    truncated_subshell_cd = transcript([
+        f"(cd {dormant_wt} && git log --oneline -5",
+        "git commit -m mine",
+    ])
+    # `git checkout [<tree-ish>] -- <paths>` restores files and moves HEAD
+    # nowhere, so it must not clear the carried branch --- reading the
+    # pathspec as a branch name replaced `agy-dormant` with `README.md` and
+    # lost the switched-branch attribution of ai-config#2737.
+    pathspec_keeps_branch = transcript([
+        "git checkout agy-dormant && git log -1",
+        "git checkout -- README.md",
+        "git commit -m mine",
+    ])
+    treeish_pathspec_keeps_branch = transcript([
+        "git checkout agy-dormant && git log -1",
+        "git checkout main -- README.md",
+        "git commit -m mine",
+    ])
+    # The `--`-less form is NOT decidable from the command text: git resolves
+    # it as a ref when one exists and as a path otherwise, and both spellings
+    # are legal branch names. It reads as a switch, which clears the carried
+    # branch and names one no worktree holds, so the guard falls silent
+    # rather than blocking --- the direction ai-config#2422 requires.
+    bare_path_checkout_falls_open = transcript([
+        "git checkout agy-dormant && git log -1",
+        "git checkout README.md",
+        "git commit -m mine",
+    ])
+    # A `git -C` AFTER the commit reads another repository without running
+    # the commit there --- the `cd`-after-the-commit misattribution spelled
+    # with a different flag.
+    commit_then_git_c_away = transcript([
+        f"cd {dormant_root}",
+        f"git commit -m mine && git -C {dormant_wt} log -1",
+    ])
+    # And a `git -C` BEFORE it, in the same call, is the inspect-then-commit
+    # shape: the commit still runs where the shell stood.
+    git_c_before_commit = transcript([
+        f"cd {dormant_root}",
+        f"git -C {dormant_wt} log -1 && git commit -m mine",
+    ])
+    # A compaction replays the first record below the second, carrying its
+    # original timestamp, so the last `cd` IN FILE ORDER is one the session
+    # left minutes earlier. Sorting by each record's own timestamp is what
+    # keeps the commit attributed to where the shell actually stood.
+    replay_commands = [
+        f"cd {dormant_wt} && git status",
+        f"cd {dormant_root}",
+        f"cd {dormant_wt} && git status",
+        "git commit -m mine",
+    ]
+    replayed_cd = timestamped_transcript(list(zip(
+        ["2026-09-03T10:00:00.000Z", "2026-09-03T10:01:00.000Z",
+         "2026-09-03T10:00:00.000Z", "2026-09-03T10:02:00.000Z"],
+        replay_commands)))
+    unstamped_replay = transcript(replay_commands)
+    try:
+        # Reading a dormant foreign worktree is not committing in it.
+        assert subject.decide(dormant_root, visit_only) == "", "a dormant foreign worktree the session only visited must not block (ai-config#2422)"
+        # The same holds when the transcript still carries a pending commit
+        # and the visited worktree's upstream is gone, which is the shape the
+        # undefined-count branch of decide() reports on.
+        assert subject.decide(dormant_root, visit_then_pending) == "", "a visited squash-merged worktree must not block via the undefined-count path (ai-config#2422)"
+        # Negative control: committing in that same worktree still blocks, so
+        # the scoping narrowed the check rather than disabling it.
+        _d_reason = subject.decide(dormant_root, commit_in_dormant)
+        assert "agy-dormant" in _d_reason, _d_reason
+        assert _d_reason.startswith("1 commit(s) on worktree"), _d_reason
+        # Negative control: a `cd` in an EARLIER call still attributes the
+        # commit, so the narrowing did not blind the worktree scan.
+        _cd_reason = subject.decide(dormant_root, cd_then_commit_later)
+        assert "agy-dormant" in _cd_reason, _cd_reason
+        assert _cd_reason.startswith("1 commit(s) on worktree"), _cd_reason
+        # Inspecting a dormant branch and switching back with `git checkout -`
+        # leaves it unattributed, the branch-side twin of the `cd` route.
+        assert subject.decide(dormant_root, checkout_back) == "", \
+            "a dormant branch switched away from with `git checkout -` must not block (ai-config#2422)"
+        # The same, written as one call: supersession reads the text before
+        # the commit, not only whole earlier calls.
+        assert subject.decide(dormant_root, checkout_back_same_call) == "", \
+            "`git checkout - && git commit` must supersede the inspected branch (ai-config#2422)"
+        # `git worktree add -b` creates a branch in a SECOND checkout and
+        # contributes NOTHING to the carry, in either position: it neither
+        # names a branch a commit beside it lands on nor clears the one the
+        # shell is actually standing on. Asserted directly because a `decide`
+        # fixture cannot separate "contributed nothing" from "contributed a
+        # name that happened to match no worktree".
+        assert subject.branches_after(
+            "git worktree add -b side /tmp/s main",
+            {"feature"}) == {"feature"}, "an add names a branch in another checkout, not this one"
+        assert subject.branches_after(
+            "git checkout - && git worktree add -b side /tmp/s main",
+            {"feature"}) == set(), "an add after a clearing switch adds nothing back"
+        # The whole round trip in one call, and the same two moves in one
+        # earlier call: the LAST move before the commit decides, so the
+        # inspected branch is superseded in both spellings.
+        for _name, _t in (("one call", checkout_back_whole_round_trip),
+                          ("two moves, earlier call", checkout_back_two_moves_earlier)):
+            assert subject.decide(dormant_root, _t) == "", \
+                f"`git checkout -` must supersede an earlier named checkout ({_name}, ai-config#2422)"
+        # A base branch checked out, pulled, and then left for a new branch is
+        # not the branch the commit lands on.
+        assert subject.decide(dormant_root, base_then_new_branch) == "", \
+            "a base branch left for a new one must not claim the commit (ai-config#2422)"
+        # A `git worktree add -b` in the committing call must not displace the
+        # branch the commit landed on.
+        _wtb_reason = subject.decide(dormant_root, worktree_add_b_keeps_branch)
+        assert "agy-dormant" in _wtb_reason, _wtb_reason
+        # Nor may it claim a commit for the checkout it created: the shell
+        # never entered it, so this session owes nothing there.
+        assert subject.decide(dormant_root, worktree_adds_then_own_commit) == "", \
+            "created subagent worktrees must not claim this session's own commit (ai-config#2422)"
+        assert subject.decide(dormant_root, worktree_add_then_own_commit_same_call) == "", \
+            "the same-call spelling must not claim it either (ai-config#2422)"
+        # Negative control: a `cd` into the created checkout still attributes
+        # the commit to it, so the narrowing did not disable the block.
+        _wtcd_reason = subject.decide(dormant_root, worktree_add_then_cd_in)
+        assert "agy-dormant" in _wtcd_reason, _wtcd_reason
+        assert _wtcd_reason.startswith("1 commit(s) on worktree"), _wtcd_reason
+        # `git branch` names a branch without moving HEAD, so no commit may
+        # be attributed to one it merely mentions.
+        for _name, _t in (("git branch -d", branch_delete_attributes_nothing),
+                          ("git branch --contains", branch_contains_attributes_nothing)):
+            assert subject.decide(dormant_root, _t) == "", \
+                f"`{_name}` names a branch without committing on it (ai-config#2422)"
+        # Negative control on that axis: it must not clear a carried branch
+        # either, or the switched-branch attribution of ai-config#2737 is lost.
+        _b_reason = subject.decide(dormant_root, branch_subcommand_keeps_branch)
+        assert "agy-dormant" in _b_reason, _b_reason
+        # Every commit in a call is attributed, not only the first.
+        _two_reason = subject.decide(dormant_root, two_commits_one_call)
+        assert "agy-dormant" in _two_reason, _two_reason
+        assert _two_reason.startswith("1 commit(s) on worktree"), _two_reason
+        # A `cd` after the commit in the same call attributes nothing.
+        assert subject.decide(dormant_root, commit_then_cd_away) == "", \
+            "a `cd` AFTER the commit must not attribute the commit to where the shell ended up (ai-config#2422)"
+        # Negative controls on the branch axis: neither a patch-mode checkout
+        # nor a `git worktree add` moves HEAD, so the carried branch stands.
+        for _name, _t in (("git checkout -p", patch_mode_keeps_branch),
+                          ("git worktree add", worktree_add_keeps_branch),
+                          ("git checkout-index", checkout_index_keeps_branch)):
+            _reason = subject.decide(dormant_root, _t)
+            assert "agy-dormant" in _reason, f"{_name}: {_reason}"
+        # Bare `cd`, `pushd` and `popd` all move the shell off the dormant
+        # worktree while naming it nowhere.
+        for _name, _t in (("cd", bare_cd_moves_home), ("pushd", pushd_supersedes),
+                          ("popd", popd_supersedes)):
+            assert subject.decide(dormant_root, _t) == "", \
+                f"`{_name}` must supersede the visited worktree (ai-config#2422)"
+        # A subshell `cd` never moves the parent shell, in either spelling.
+        for _name, _t in (("&&", subshell_cd), (";", subshell_cd_semicolon)):
+            assert subject.decide(dormant_root, _t) == "", \
+                f"a subshell `cd` ({_name}) must not claim a later commit (ai-config#2422)"
+        # Negative control: the `cd` outside the parens still moves the shell,
+        # so the commit beside it is still attributed to where it landed.
+        _sb_reason = subject.decide(dormant_root, subshell_beside_real_cd)
+        assert "agy-dormant" in _sb_reason, _sb_reason
+        # And a commit INSIDE the parens is attributed to the subshell's own
+        # directory rather than lost with it.
+        _si_reason = subject.decide(dormant_root, subshell_commit_inside)
+        assert "agy-dormant" in _si_reason, _si_reason
+        # A commit in the NEXT subshell along did not run in the one before
+        # it, however equal their nesting depths.
+        assert subject.decide(dormant_root, sibling_subshell_commit) == "", \
+            "a sibling subshell must not inherit the previous one's `cd` (ai-config#2422)"
+        # An unclosed `(` leaves the text ending inside the subshell, which
+        # the parent shell never entered.
+        assert subject.decide(dormant_root, truncated_subshell_cd) == "", \
+            "a truncated subshell `cd` must not claim a later commit (ai-config#2422)"
+        # A pathspec checkout moves HEAD nowhere, so the carried branch stands.
+        for _name, _t in (("git checkout -- <path>", pathspec_keeps_branch),
+                          ("git checkout <tree-ish> -- <path>", treeish_pathspec_keeps_branch)):
+            _reason = subject.decide(dormant_root, _t)
+            assert "agy-dormant" in _reason, f"{_name}: {_reason}"
+        # The undecidable `--`-less form falls open rather than blocking.
+        assert subject.decide(dormant_root, bare_path_checkout_falls_open) == "", \
+            "an undecidable `git checkout <path>` must fall open, not block (ai-config#2422)"
+        # A `git -C` after the commit, and one before it in the same call,
+        # each name a repository the commit did not run in.
+        for _name, _t in (("after", commit_then_git_c_away),
+                          ("before", git_c_before_commit)):
+            assert subject.decide(dormant_root, _t) == "", \
+                f"a `git -C` {_name} the commit must not attribute it (ai-config#2422)"
+        # File order is not time order after a compaction replay.
+        assert subject.decide(dormant_root, replayed_cd) == "", \
+            "a replayed `cd` carrying an older timestamp must not claim a later commit"
+        # Negative control: the same commands with no timestamps have no total
+        # order to impose, so file order stands and the replayed `cd` does
+        # claim the commit --- which is what the sort above is fixing.
+        _u_reason = subject.decide(dormant_root, unstamped_replay)
+        assert "agy-dormant" in _u_reason, _u_reason
+    finally:
+        for _p in (dormant_root, dormant_bare, dormant_wt, gone_wt):
+            shutil.rmtree(_p, ignore_errors=True)
+        shutil.rmtree(f"{gone_wt}-extra", ignore_errors=True)
+        shutil.rmtree(f"{gone_wt}-side", ignore_errors=True)
+        for _p in (visit_only, visit_then_pending, commit_in_dormant,
+                   cd_then_commit_later, checkout_back,
+                   checkout_back_same_call,
+                   checkout_back_whole_round_trip,
+                   checkout_back_two_moves_earlier, base_then_new_branch,
+                   worktree_add_b_keeps_branch,
+                   branch_delete_attributes_nothing,
+                   branch_contains_attributes_nothing,
+                   branch_subcommand_keeps_branch, two_commits_one_call,
+                   commit_then_cd_away,
+                   patch_mode_keeps_branch, worktree_add_keeps_branch,
+                   checkout_index_keeps_branch,
+                   bare_cd_moves_home, pushd_supersedes, popd_supersedes,
+                   subshell_cd, subshell_cd_semicolon, subshell_beside_real_cd,
+                   subshell_commit_inside, sibling_subshell_commit,
+                   pathspec_keeps_branch, treeish_pathspec_keeps_branch,
+                   bare_path_checkout_falls_open,
+                   commit_then_git_c_away, git_c_before_commit,
+                   replayed_cd, unstamped_replay):
+            os.unlink(_p)
 finally:
     for _root in (dropped_root, unpushed_root, pushed_root, no_upstream_root,
                   plain_push_root, scoped_root, behind_root, other,
@@ -718,4 +1201,5 @@ print("PASS: no-upstream falls back to the transcript, and staleness is not unsh
 print("PASS: without a cwd the verdict falls back to the transcript scan")
 print("PASS: main() blocks on the payload cwd's state once, then the sentinel holds")
 print("PASS: multi-worktree cross-checkout and branch-switch unpushed commits block accurately (ai-config#2737)")
+print("PASS: another tool's dormant worktree blocks only when this session committed in it (ai-config#2422)")
 print("PASS: fallback regexes in hook match scripts/lib/git_cmd.py and stderr diagnostic logs on failure")

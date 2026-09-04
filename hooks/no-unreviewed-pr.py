@@ -347,13 +347,28 @@ def _argv_request(argv):
     # `gh api`/`curl`/`wget` hitting the requested_reviewers endpoint with a
     # POST. The same endpoint is read via GET (to CHECK who is requested), and
     # a GET must NOT discharge, which is why the method is required.
+    #
+    # The endpoint has to BE the request path, exactly as in _argv_probe: a
+    # scan over every argv token read `gh api repos/o/r/issues/9/comments -X
+    # POST -f 'body=asked at repos/o/r/pulls/1038/requested_reviewers'` -- a
+    # comment-posting WRITE -- as a reviewer request for whatever pull its
+    # prose quoted, discharging that PR without a reviewer ever being added
+    # (ai-config#3086 review). So the candidates come from _api_path_tokens
+    # and the pattern is `.match()`-anchored to the token start.
     api = (a0 == "gh" and len(argv) >= 2 and argv[1] == "api") \
         or a0 in ("curl", "wget")
-    if api:
-        url = next((t for t in argv if "requested_reviewers" in t), None)
-        if url and _post_method(argv):
-            num, repo = _url_ident(url)
-            return True, num, repo
+    if api and _post_method(argv):
+        for t in _api_path_tokens(argv):
+            m = RX_CMD_REVIEWERS.match(t)
+            if m:
+                return True, m.group(3), f"{m.group(1)}/{m.group(2)}"
+            # A path token built from shell variables
+            # (`"repos/$O/$R/pulls/$N/requested_reviewers"`) is a genuine
+            # request whose identity the command cannot supply; the result
+            # backfills it. Anchored like its sibling rather than tested as a
+            # substring, so this arm cannot re-admit the payload it replaced.
+            if RX_CMD_REVIEWERS_ANY.match(t):
+                return True, None, None
     return False, None, None
 
 
@@ -767,22 +782,218 @@ def close_ident(cmd):
     return False, None, None, False
 
 
-def _argv_probe(argv):
-    """(is_probe, num, repo) for a read-only single-PR status read.
+# Flags whose VALUE is a payload, a header, or a method rather than the request
+# path. `gh api ... -f 'body=see repos/o/r/pulls/1038'` posts a COMMENT, and its
+# field value can quote any pull at all, so a scan over every token read that
+# write as a status read of PR 1038 and discharged its reviewer obligation
+# (ai-config#3086 review). `--url` is deliberately absent: its value IS the
+# request path, so it stays a candidate.
+_API_VALUE_FLAGS = {
+    "-f", "--field", "-F", "--raw-field", "-H", "--header",
+    "-X", "--method", "--request", "-q", "--jq", "-t", "--template",
+    "--input", "-p", "--preview", "--hostname", "--cache",
+    "-d", "--data", "--data-raw", "--data-binary", "--data-urlencode",
+    "-o", "--output", "-u", "--user", "-A", "--user-agent",
+    "-e", "--referer", "-b", "--cookie", "-T", "--upload-file",
+    "--post-data", "--post-file",
+}
 
-    `gh pr view <N>` / `gh pr checks <N>`. These discharge nothing by
-    themselves -- they are only the CHANNEL through which a PR merged OUTSIDE
-    this session (by a human, or by the merge queue) becomes visible in the
-    transcript. The discharge additionally requires the result body to report a
-    terminal state, and the probe must name a PR number, so a repo-wide
-    `gh pr list` -- whose body mentions many PRs and whose first match need not
-    be the obligation's -- is deliberately NOT a probe.
+
+def _api_path_tokens(argv):
+    """The tokens of a `gh api`/`curl`/`wget` argv that could be its PATH.
+
+    A flag is never a path, and neither is the value of a flag that carries
+    payload or metadata. An `=`-joined flag (`--field=x`, `-XPOST`) starts with
+    `-` and is skipped as a flag. Anything left is a positional token, and the
+    caller still anchors its own pattern to the token's start, so a value this
+    filter fails to recognise cannot match a path in the middle of prose.
+
+    Skipping too much only costs a probe unrecognised, which leaves the guard
+    armed and warning -- the safe direction.
     """
-    if not argv or argv[0] != "gh" or len(argv) < 3 or argv[1] != "pr":
+    skip = False
+    for t in argv[1:]:
+        if skip:
+            skip = False
+            continue
+        if t.startswith("-"):
+            skip = t in _API_VALUE_FLAGS
+            continue
+        yield t
+
+
+# The `gh pr view` field selections whose VALUES cannot carry free text, and
+# the subset of them that actually reports a terminal state. A `gh pr view`
+# result is only a status read when both hold: every selected field is machine
+# shaped, and at least one of them names the state.
+#
+# `_PROBE_STATE_FIELDS` is the second half of RX_TERMINAL_STATE's vocabulary,
+# kept as a set of gh field names rather than derived from that pattern, since
+# the pattern also has to match REST snake_case bodies gh never emits.
+_PROBE_STATE_FIELDS = {"state", "merged", "mergedat", "closed", "closedat"}
+_PROBE_SAFE_FIELDS = _PROBE_STATE_FIELDS | {
+    "isdraft", "number", "url", "id", "mergeable", "reviewdecision",
+}
+
+
+def _probe_selection(rest):
+    """True when a `gh pr view`/`gh pr checks` selection is a STATUS read.
+
+    An allowlist rather than a denylist of free-text fields, because a field
+    this filter fails to recognise must cost a probe (leaving the guard armed
+    and warning) rather than admit one.
+
+    `--comments` and `--json comments,reviews` are the shell twins of the MCP
+    `get_comments`/`get_reviews` methods PROBE_TOOL_METHODS excludes: their
+    bodies are arbitrary comment text, and a comment quoting an API response --
+    which PRs in this corpus do constantly -- would otherwise report a terminal
+    state for a PR that has none (ai-config#3086 review). Requiring one state
+    field in the selection is the second half: `--json number` reports no
+    state at all, so reading it is not the observation that discharges.
+
+    A selection is REQUIRED, so a bare `gh pr view <N>` is not a status read
+    either. gh's non-TTY output for that form is not JSON at all: it prints
+    tab-separated headers -- `state:` carrying a bare `OPEN` that
+    RX_TERMINAL_STATE can never match -- and then the PR BODY verbatim. So the
+    unselected form can only ever discharge on free text the description
+    quotes, which is the `--comments` hole reached by asking for nothing rather
+    than for the wrong thing (ai-config#3086 review). Requiring the selection
+    also matches what the block message prescribes: `--json state,closed`.
+
+    `--jq`/`--template` need no separate handling HERE: both project from
+    whatever `--json` selected, so the allowlist already bounds what they can
+    emit. The `gh api` arm of _argv_probe has no `--json` to bound, so it
+    refuses a projection outright instead (see _api_projects).
+    """
+    fields = None
+    for i, a in enumerate(rest):
+        if a == "--comments":
+            return False
+        if a == "--json" and i + 1 < len(rest):
+            fields = rest[i + 1]
+        elif a.startswith("--json="):
+            fields = a.split("=", 1)[1]
+    if fields is None:
+        return False
+    sel = {f.strip().lower() for f in fields.split(",") if f.strip()}
+    return sel <= _PROBE_SAFE_FIELDS and bool(sel & _PROBE_STATE_FIELDS)
+
+
+# Flags that project a SUBSET of a `gh api` response body. `gh api` has no
+# field selection of its own -- it always fetches the whole pull object -- so
+# there is no allowlist to bound what a projection emits, unlike the `gh pr
+# view` arm `_probe_selection` gates. `--jq .body` on an OPEN pull prints the
+# DESCRIPTION as raw prose, and a description quoting an API response -- which
+# PRs in this corpus do constantly -- then carries a terminal-state literal
+# RX_TERMINAL_STATE matches, discharging the obligation with no reviewer
+# requested and no close (ai-config#3086 review). The un-projected body cannot
+# do that: there the description's own quotes are escaped inside gh's JSON, so
+# the literal is double-escaped and the pattern does not reach it.
+#
+# So a projection costs the probe. That is the same armed direction
+# _api_path_tokens and _probe_selection already prefer: a status read spelled
+# this way is simply not recognised, and the guard keeps warning.
+_API_PROJECTION_FLAGS = ("-q", "--jq", "-t", "--template")
+
+# `gh` is a cobra/pflag program, so a shorthand also arrives inside a CLUSTER:
+# `gh api ... -iq .body` is `--include` followed by `--jq`, whose value is the
+# NEXT argument because nothing follows `q` in the cluster. pflag's
+# parseSingleShortArg reads a bool shorthand (`-i` has a NoOptDefVal) without
+# consuming a value and hands the rest of the cluster back to the loop, so the
+# `q` is a flag rather than a value. An exact-token test does not see it, and
+# not seeing it ADMITS the probe -- the unsafe direction, and the same hole
+# `--jq .body` was refused for (ai-config#3086 review).
+#
+# So any single-dash token whose letters reach a `q` or a `t` counts. That
+# over-refuses a cluster where the letter is really an attached value
+# (`-Xstatus` is `--method status`), which costs a probe and nothing else --
+# again the armed direction.
+RX_API_SHORTHAND_PROJECTION = re.compile(r"-[A-Za-z]*[qt]")
+
+
+def _api_projects(argv):
+    """True when a `gh api`/`curl`/`wget` argv projects part of the body.
+
+    Covers the long forms -- the bare flag and the `=`-joined spelling -- and
+    every single-dash shorthand spelling the parser accepts: the bare `-q`, a
+    value attached (`-q.body`), and a `q` or `t` inside a CLUSTER (`-iq .body`)
+    (RX_API_SHORTHAND_PROJECTION).
+    Scanned over the WHOLE argv for the same reason RX_DIFF_MEDIA is -- a
+    projection flag's value is one _api_path_tokens skips, and refusing a probe
+    only costs a warning.
+    """
+    for t in argv[1:]:
+        if t in _API_PROJECTION_FLAGS:
+            return True
+        if t.startswith(("--jq=", "--template=")):
+            return True
+        if not t.startswith("--") and RX_API_SHORTHAND_PROJECTION.match(t):
+            return True
+    return False
+
+
+def _argv_probe(argv):
+    """(is_probe, num, repo) for a single-PR status read.
+
+    `gh pr view <N>` / `gh pr checks <N>` whose selection can only report the
+    state (_probe_selection), or an API call naming ONE pull --
+    `gh api repos/o/r/pulls/<N>`. These discharge nothing by themselves -- they
+    are only the CHANNEL through which a PR retired OUTSIDE this session (by a
+    human, by the merge queue, or by a REST call this hook does not model as an
+    action) becomes visible in the transcript. The discharge additionally
+    requires the result body to report a terminal state, and the probe must name
+    a PR number, so a repo-wide `gh pr list` -- whose body mentions many PRs and
+    whose first match need not be the obligation's -- is deliberately NOT a
+    probe.
+
+    The API arm covers the REST close, `gh api repos/o/r/pulls/<N> -X PATCH -f
+    state=closed`, which is neither a `gh pr` verb nor a structured tool and so
+    reached no other path: the guard stayed armed on a PR the session had just
+    closed (ai-config#3086 review). Method is deliberately NOT constrained here,
+    unlike _argv_request's POST requirement, because every JSON method of that
+    path returns the state -- and the discharge is gated on the RESULT reporting
+    a terminal one, so a GET against a still-open PR clears nothing. What the
+    method does not settle is the REPRESENTATION: the same path serves the
+    pull's raw diff under an `Accept: application/vnd.github.diff` header, whose
+    body is diff text and says nothing about the PR's state, so that header
+    disqualifies the probe (RX_DIFF_MEDIA). Without it a PR whose diff touches
+    an API fixture or a JSON snapshot discharged itself merely by having that
+    diff read -- the shell twin of the MCP `get_diff` hole, reached through the
+    REST spelling rather than through `gh pr diff` (ai-config#3086 review). A
+    `--jq`/`--template` PROJECTION narrows the representation the same way and
+    disqualifies the probe for the same reason (_api_projects).
+    The path must name the pull ITSELF, with no sub-resource, so
+    `pulls/<N>/requested_reviewers` is not a probe. And it must be the request
+    PATH: scanning every token instead let a `-f body=...` payload quoting a
+    pull URL register a comment-posting WRITE as a status read of whatever pull
+    its prose mentioned (ai-config#3086 review), which is the silent-discharge
+    class every releasing path here refuses.
+    """
+    if not argv:
         return False, None, None
-    if argv[2] in ("view", "checks"):
+    if argv[0] == "gh" and len(argv) >= 3 and argv[1] == "pr" \
+            and argv[2] in ("view", "checks"):
+        if not _probe_selection(argv[3:]):
+            return False, None, None
         num, repo = _verb_ident(argv)
         return (num is not None), num, repo
+    api = (argv[0] == "gh" and len(argv) >= 2 and argv[1] == "api") \
+        or argv[0] in ("curl", "wget")
+    if api:
+        # Scanned over the WHOLE argv, unlike the path: the header is a value
+        # _api_path_tokens deliberately skips, and refusing a probe is the
+        # armed direction anyway, so a stray media type costs a warning.
+        if any(RX_DIFF_MEDIA.search(t) for t in argv):
+            return False, None, None
+        # The representation can also be narrowed by PROJECTION rather than by
+        # header, and the pull's own free text is one of the things it can
+        # project (see _api_projects).
+        if _api_projects(argv):
+            return False, None, None
+        for t in _api_path_tokens(argv):
+            m = RX_CMD_PULL.match(t)
+            if m:
+                return True, m.group(3), f"{m.group(1)}/{m.group(2)}"
     return False, None, None
 
 
@@ -1049,26 +1260,108 @@ REQ_TOOLS = {"request_copilot_review", "mcp__github__request_copilot_review"}
 PUSH_TOOLS = {"push_files", "mcp__github__push_files",
               "create_or_update_file", "mcp__github__create_or_update_file"}
 CLOSE_TOOLS = {"merge_pull_request", "mcp__github__merge_pull_request"}
+# Structured tools that READ one PR's state. Every other structured path here
+# has an MCP twin and this one did not, so a remote/web session -- where `gh` is
+# not on PATH at all -- had no way to make an outside close visible, and the
+# guard's own prescribed remedy was unrunnable (ai-config#3086 review).
+PROBE_TOOLS = {"pull_request_read", "mcp__github__pull_request_read"}
+# ... and the ONLY method of that tool which reports the PR's own state. The
+# same tool also serves `get_diff`, `get_files`, `get_comments`, `get_reviews`
+# and friends, whose bodies are arbitrary diff or comment text -- so an
+# ungated registration let any PR whose diff touches an API fixture or a JSON
+# snapshot discharge its own obligation merely by having that diff read
+# (ai-config#3086 review). The shell arm needs the same restriction and does
+# not get it by construction: `gh pr diff`, the twin of `get_diff`, is indeed
+# not a probe, but `gh pr view <N> --comments` and `--json comments,reviews`
+# are the twins of `get_comments`/`get_reviews`, and the `gh pr view` arm
+# matched them until _probe_selection was added -- so a comment quoting an API
+# response discharged the PR it was posted on (ai-config#3086 review).
+# `method` is REQUIRED by the tool's schema
+# (measured 2026-09-04 against the server's own input schema), so demanding it
+# explicitly rejects no legitimate call, and a missing one is treated as
+# not-a-probe -- the direction that leaves the guard armed.
+PROBE_TOOL_METHODS = {"get"}
 
 # A result body reporting that a PR has reached a terminal state -- merged or
 # closed. Tolerates the escaped quotes of a json.dumps'd tool_result, exactly as
 # RX_RES_NUM does. Only ever consulted for a result whose own command named a
 # single PR (see _argv_probe), so a body listing many PRs cannot discharge an
 # obligation for one of them.
+#
+# The `closed`/`closedAt` alternatives mirror the `merged`/`mergedAt` ones, and
+# their absence was a real asymmetry rather than a tidiness point: a probe that
+# selects the FIELDS rather than the state string --
+# `gh pr view <N> --json merged,mergedAt` -- discharged a merged PR, while the
+# close-side equivalent `--json closed,closedAt` did not, so a PR closed
+# without merging stayed armed and the guard demanded a reviewer request that
+# GitHub answers with HTTP 200 and nobody added (ai-config#3086). `closed` is
+# true for a merged PR too, which is correct here: both states are terminal for
+# review purposes, and neither can take a reviewer that ever reviews.
+#
+# The `_?` in `merged_?At`/`closed_?At` covers the REST spellings, since the
+# same field is `mergedAt` in gh's GraphQL-backed `--json` output and
+# `merged_at` in a raw `gh api` body or an MCP `pull_request_read` result. The
+# two channels report the same fact and only one of them was matched.
 RX_TERMINAL_STATE = re.compile(
     r"\\?\"state\\?\"\s*:\s*\\?\"(?:MERGED|CLOSED)\\?\""
     r"|\\?\"merged\\?\"\s*:\s*true"
-    r"|\\?\"mergedAt\\?\"\s*:\s*\\?\"\d",
+    r"|\\?\"merged_?At\\?\"\s*:\s*\\?\"\d"
+    r"|\\?\"closed\\?\"\s*:\s*true"
+    r"|\\?\"closed_?At\\?\"\s*:\s*\\?\"\d",
     re.I,
 )
 
 # A PR API path (`repos/o/r/pulls/1038`) inside a shell command, used by
-# _url_ident to read identity from a request command's own `gh api` URL. Open,
-# draft, and request identity are all resolved STRUCTURALLY from the specific
-# simple command (open_ident/draft_ident/request_ident), never from a
-# whole-string scan -- a decoy PR number chained ahead would otherwise mislabel
-# the obligation (see open_ident).
+# _url_ident and thence by _pr_ident alone: it attaches the redaction EXEMPTION
+# to whatever PR-naming command a session was going to run anyway. Deliberately
+# UNANCHORED, unlike RX_CMD_PULL and RX_CMD_REVIEWERS, which the probe and
+# request paths use instead precisely so a pull path quoted in a payload cannot
+# supply identity (ai-config#3086 review). Open, draft, and request identity are
+# all resolved STRUCTURALLY from the specific simple command
+# (open_ident/draft_ident/request_ident), never from a whole-string scan -- a
+# decoy PR number chained ahead would otherwise mislabel the obligation (see
+# open_ident).
 RX_CMD_API = re.compile(r"repos/([\w.-]+)/([\w.-]+)/pulls?/(\d+)", re.I)
+
+# The same path with NOTHING after the number, used by _argv_probe to spot an
+# API call about one pull itself rather than about one of its sub-resources.
+# `pulls/1038/requested_reviewers` is a request, not a status read, and must not
+# register as a probe; `pulls/1038` and `pulls/1038?foo=1` must.
+#
+# Applied with `.match()`, so it is anchored to the START of a token, and the
+# optional host covers the `curl`/`wget` spelling
+# (`https://api.github.com/repos/...`, or a GHES `/api/v3/` prefix). Anchoring
+# is the second half of the fix _api_path_tokens begins: together they mean a
+# pull path has to BE the request path rather than merely appear somewhere in
+# the command line (ai-config#3086 review).
+RX_CMD_PULL = re.compile(
+    r"(?:https?://[^/\s]+)?/?(?:api/v3/)?"
+    r"repos/([\w.-]+)/([\w.-]+)/pulls?/(\d+)(?:[?#]|$)", re.I)
+
+# The same path with `/requested_reviewers` after the number, used by
+# _argv_request for the same reason and with the same anchoring: the endpoint
+# has to BE the request path, not a string quoted inside a `-f body=` payload.
+RX_CMD_REVIEWERS = re.compile(
+    r"(?:https?://[^/\s]+)?/?(?:api/v3/)?"
+    r"repos/([\w.-]+)/([\w.-]+)/pulls?/(\d+)/requested_reviewers(?:[?#]|$)",
+    re.I)
+
+# The same endpoint with the owner, repo, and number left unread, for the path
+# a session assembled from shell variables (`repos/$O/$R/pulls/$N/...`). That
+# is a genuine request whose identity the command cannot supply, so it is
+# recorded number-less and the result backfills it.
+RX_CMD_REVIEWERS_ANY = re.compile(
+    r"(?:https?://[^/\s]+)?/?(?:api/v3/)?"
+    r"repos/\S*/requested_reviewers(?:[?#]|$)", re.I)
+
+# An `Accept:` media type asking for a pull's DIFF or PATCH instead of its JSON.
+# GitHub selects the representation by header alone, so `.../pulls/<N>` with
+# `application/vnd.github.diff` (or the versioned `...github.v3.diff`, or the
+# `.patch` sibling) returns raw diff text from the very path a status read uses
+# -- which is why _argv_probe cannot decide on the path alone. `+json` does not
+# match, so the ordinary `application/vnd.github+json` probe is unaffected.
+RX_DIFF_MEDIA = re.compile(
+    r"application/vnd\.github(?:\.[\w.+-]+)?\.(?:diff|patch)", re.I)
 
 # A PR identity carried by a tool RESULT: the PR URL (owner/repo/number), gh's
 # `Pull request owner/repo#N` success line, or a bare `"number"` field.
@@ -1882,6 +2175,21 @@ def scan(path):
                     cn, cr = input_ident(inp)
                     pending_close[tid] = (cn, cr, True)
                     continue
+                if name in PROBE_TOOLS:
+                    # A read, not an action: it discharges nothing by itself.
+                    # The RESULT must still report a terminal state and must
+                    # not have failed. Atomic, so `last` is True.
+                    #
+                    # Only the state-reading METHOD registers, mirroring the
+                    # shell arm's restriction to `gh pr view`/`gh pr checks`
+                    # (see PROBE_TOOL_METHODS): every other method returns a
+                    # diff or a comment thread, over which a terminal-state
+                    # match says nothing about this PR.
+                    if str(inp.get("method") or "") not in PROBE_TOOL_METHODS:
+                        continue
+                    qn, qr = input_ident(inp)
+                    pending_probe[tid] = (qn, qr, True)
+                    continue
                 if name not in SHELL_TOOLS:
                     continue  # never text-match a non-shell tool
 
@@ -2180,7 +2488,25 @@ def main() -> int:
             "      --jq '{head: .headRefOid[0:8], copilot: [.reviews[] "
             "| select((.author.login // \"\") | startswith(\"copilot\")) "
             "| {sha: .commit.oid[0:8], at: .submittedAt}]}'\n\n"
-            "Two legitimate reasons to defer, and neither is silence:\n\n"
+            "Three legitimate reasons to defer, and none is silence:\n\n"
+            "  * The PR is CLOSED without merging, or already MERGED. Nothing "
+            "is owed there: GitHub answers the request POST with HTTP 200 and "
+            "adds nobody, so no review ever lands and the verification above "
+            "can never succeed -- the obligation is undischargeable by the "
+            "means prescribed here (ai-config#3086). This guard clears a "
+            "terminal PR on its own, so seeing this means it has not "
+            "CREDITED the transition -- either the transition never appeared "
+            "in this transcript at all, or the close was chained ahead of "
+            "another command or failed, so its own exit status could not be "
+            "attributed to it, or the state was read in a form this "
+            "guard does not credit as a status read. In each case, "
+            "make the state visible with a single-PR status read, as "
+            "the only command in its call:\n\n"
+            "        gh pr view \"<N>\" -R \"<owner>/<repo>\" "
+            "--json state,closed\n\n"
+            "    Where `gh` is unavailable (a remote or web session), the "
+            "MCP twin reads the same state: `pull_request_read` with "
+            "method `get`, `pullNumber` <N>, and the owner/repo.\n\n"
             "  * The PR is deliberately a DRAFT -- a draft does not trigger "
             "the review bot (see shared/workflow/pr-on-claim.md). Say so "
             "explicitly.\n"

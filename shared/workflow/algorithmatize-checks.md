@@ -287,6 +287,80 @@ Ask it of the character rather than of the input, since the input you would have
 (Measured on [ai-config#1968](https://github.com/Morrison-Lab/ai-config/pull/1968), merged 2026-08-22.
 `(?<![\w/-])` entered `hooks/no-empty-promise.py` in [#1724](https://github.com/Morrison-Lab/ai-config/pull/1724) and stood unchanged on `main` until #1968 replaced it, so for that whole interval a dispatch prompt saying `/ums` did not discharge a promise.)
 
+### A lookaround excludes what sits on its own side of the anchor, not what the excluded form "contains"
+
+The section above asks what *else* an excluded character means.
+This asks something cheaper and prior: whether the character is reachable from
+where the clause sits at all.
+A lookbehind reads left of the match and a lookahead reads right of it, so a
+form whose distinguishing character follows the operator cannot be excluded by
+a lookbehind.
+The clause does not fail visibly either --- it silently excludes some other
+operator that carries the same character on the left.
+
+The worked example is a stdout-redirect matcher:
+
+```python
+RX_STDOUT_REDIRECT = r"(?<![2-9&<>])>>?\s*([^\s;&|]+)(?![&>])"
+```
+
+`&` went into the lookbehind to exclude `>&2`.
+The `&` of `>&2` sits *after* the `>`, where only the lookahead can see it, and
+the lookahead already refused it.
+What the lookbehind actually excluded was `&>` and `&>>`, the combined
+stdout-and-stderr redirect, which is a redirect to a file and needed the
+opposite verdict.
+
+Both directions stay invisible at once.
+The intended exclusion still holds, because a different clause is doing it, and
+the accidental exclusion removes a form nobody wrote a case for.
+
+- **Do:** for each character in a lookaround, name the operator it is meant to
+  exclude and check which side of the anchor that character sits on.
+- **Do:** test the operator you meant to exclude *and* every operator that
+  shares the character.
+- **Don't:** add a character to a lookbehind because the form to exclude
+  "contains" it --- containment says nothing about position.
+
+(Measured 2026-09-04 on
+[ai-config#3251](https://github.com/Morrison-Lab/ai-config/pull/3251):
+a `date ... &>>notebook.md` write read as a print rather than a file write and
+so discharged the guard it should have tripped.)
+
+### A reviewer's proposed widening of a class can overshoot the bug it fixes
+
+The sections above govern the exclusion clause you wrote.
+This governs the widening someone else proposes for it, which arrives with a
+reason attached and so escapes the same enumeration.
+The reason is almost always a claim about an *earlier stage* --- the splitter
+already removed the operators, the stripper already removed the quotes, so the
+class need not defend against them.
+That claim is about a pattern you did not write and are not looking at, and it
+is one command to open.
+
+The reported bug was real: `RX_PRINTED_VAR`'s `[^;&|\n]*` refused a `|` sitting
+inside a quoted `echo` argument.
+The proposed fix was `[^\n]*`, reasoning that the segment splitter had already
+removed every real operator.
+Reading the splitter refutes it.
+It splits on `;`, `&&`, and `||` only, so a single `|` --- as in
+`echo done | grep -c $t` --- is still a live pipe inside the segment, and the
+widened class would have swallowed it and discharged the guard.
+
+The fix that held blanked operator characters inside quoted spans and kept the
+class, so the quoted form passes without readmitting the operator.
+
+- **Do:** read the earlier stage's own pattern before accepting that it removed
+  what a proposed widening assumes it removed.
+- **Do:** test the operator the class was protecting against alongside the
+  quoted form the widening is for; a widening is right only if both pass.
+- **Don't:** accept "the splitter already handled it" as a premise --- it names
+  a regex, and reading it settles the question.
+
+(Measured 2026-09-04 on
+[ai-config#3251](https://github.com/Morrison-Lab/ai-config/pull/3251),
+review round 3.)
+
 ### An attribution claim in a guide-for-future-edits comment is settled by mutation, not by re-reading it
 
 "Test the instrument against the incident that prompted it, verbatim"'s closing **Don't** governs a comment claiming *what* a matcher matches.
@@ -1442,10 +1516,46 @@ Where it does not enter both measurements with the same magnitude, the ratio amp
 - **Don't:** assume min-of-N filters two measurements equally when one is much longer than the other.
 - **Don't:** read a ratio's stability on an idle machine as evidence that it is load-independent.
 
+### The same ratio compresses when the nuisance cost lands in the denominator
+
+The section above measures load pushing a growth ratio *up*, and that is one of two directions it can move.
+A ratio is large over small, so a nuisance cost that lands mostly in the **denominator** compresses it instead, and a genuinely quadratic scan then reads as sub-quadratic.
+
+Measured 2026-09-03: the negative control in `hooks/test-no-unauthorized-merge.py`, a deliberately quadratic scan whose growth then had to clear an 8x bound, read 14.5-15.3x over five runs on an idle container and 7.3x on a loaded GitHub runner, going red on a PR whose whole diff was two `memories/*.md` files ([#3098](https://github.com/Morrison-Lab/ai-config/issues/3098)).
+Nothing about the code differed between the two readings.
+
+The direction inverts what the failure looks like, which is why it is worth naming separately.
+An inflated ratio reports a regression that is not there, and reads as a finding about the code.
+A compressed one reports that the control cannot discriminate, and reads as a broken control --- so the instrument accuses itself, and the tempting repair is to loosen a bound that was working.
+
+Two repairs are on offer, and which one fits turns on whether the distortion is additive or multiplicative.
+That is measurable rather than assumable, so measure it --- and measure it under the load the distortion appears under, since an idle reading of the same quantity looks like the same number and answers a different question.
+Here it could not be: the fixed cost timeable off the runner is 0.62ms of a 6.2ms baseline, for the loop plus one zero-length scan call, which bounds the *interpreter's* share and says nothing about the runner's, since scheduler latency and a cold cache are load-dependent by construction.
+So the distortion's shape stayed a hypothesis, and the repair was chosen for surviving either shape rather than for ruling one out.
+Widening the input-size gap does that, because the quadratic term outruns the bound: at a size step of `s` the reading is `s ** 2` and the halfway bound is `s ** 1.5`, so the margin is `sqrt(s)` --- 1.9x at a 4x step against 3.6-3.7x at a 16x step, measured.
+
+**Widening the gap while leaving the bound fixed is the trap**, and it hides well because the number in the bound never changes, so nothing looks edited.
+A bound of 8.0 is the halfway line for a 4x step and sits *exactly on* the 8x a genuinely linear scan grows at an 8x step, so widening that far leaves it no margin against the shape it exists to reject.
+Measured, a linear scan read 7.55-8.09x at an 8x step on one container and 7.83-8.11x on another, crossing 8.0 in 1 run of 12 and in 3 of 12.
+At the 16x step the control actually runs at, a linear scan read 15.7-16.0x and cleared 8.0 in all six runs, so a widened control against the old bound would pass for either shape --- the one thing a control exists to rule out.
+Recompute the bound at whatever step it is read against, and pin the separation with a positive control of the opposite shape rather than arguing it.
+
+The 0.62ms, 3.6-3.7x and 7.55-8.09x figures here were read on one 4-core Linux container at load average ~2.5, through `time.process_time`, as the minimum of three baseline runs over the minimum of two target runs;
+the 7.83-8.11x and 15.7-16.0x figures came from a second 4-core container at load average ~4.1 under the same protocol, and the 14.5-15.3x readings from a quieter one at load average ~0.5.
+A timing figure is a claim about a machine, so re-measure rather than porting these.
+
+- **Do:** ask which term a nuisance cost lands in, since load can push a ratio either way.
+- **Do:** measure a fixed cost under the load it appears under before subtracting it, since an idle reading bounds the interpreter's share and not the runner's.
+- **Do:** prefer the repair that survives both shapes of distortion when you cannot measure which shape you have.
+- **Do:** recompute a bound at the size step it is read against, and pin the separation with a control of the opposite shape.
+- **Don't:** read a control's "I cannot discriminate" as evidence about the code it controls.
+- **Don't:** widen a ratio's input-size gap while leaving a bound that was derived for the old gap.
+- **Don't:** rest a causal classification on a measurement taken where the cause cannot appear.
+
 ## A slow wall-clock reading is a claim about the machine before it is a finding about the code
 
-The two sections above govern a timing **bound written into a test** --- which clock it uses, and whether a ratio cancels the noise it is meant to cancel.
-Neither reaches the reading you take **once**, by hand, in the middle of diagnosing something, and then report as a defect.
+The three sections above govern a timing **bound written into a test** --- which clock it uses, and whether a ratio cancels the noise it is meant to cancel or is instead inflated or compressed by it.
+None of them reaches the reading you take **once**, by hand, in the middle of diagnosing something, and then report as a defect.
 No assertion is being authored there and no threshold is being chosen, so nothing about the moment resembles the situation those sections describe.
 
 **The reading is self-authenticating in a way a wrong value is not**, and that is the whole of the trap.
@@ -1523,7 +1633,7 @@ rather than a decaying average over a window you did not choose.
 A reading you cannot reproduce is not a measurement of the code, and a spread that
 spans an order of magnitude names its own cause.
 
-**A timing assertion written as a regression guard is the same exposure, and the two sections above answer it** --- they are about exactly this, a busy machine inflating a wall-clock reading.
+**A timing assertion written as a regression guard is the same exposure, and the sections above answer it** --- they are about exactly this, a busy machine distorting a timed reading in either direction.
 What those sections do not separate, and what a session that has just learned its own machine was loaded most needs, is **which question the assertion asks**.
 
 A **regression bound** asks whether the code got slower.

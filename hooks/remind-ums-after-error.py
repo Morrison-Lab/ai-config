@@ -38,8 +38,21 @@ UMS-mentioning subagent dispatch, or a `ums` invocation recorded LATER in the
 transcript than the admission clears the obligation. So a turn that admits an
 error and immediately records it is never nagged.
 
-Fires once per distinct admission (sentinel keyed by content hash), because a
-reminder repeated every turn is noise, and noise is what gets a guard ignored.
+An admission in the irrealis mood is not an admission, so a hypothetical
+("even if I misread the status") is skipped -- see `IRREALIS_LEAD`.
+
+Fires once per distinct admission PHRASE, bounded by transcript DISTANCE
+rather than by session lifetime. The sentinel is still keyed by content hash
+and transcript path, and NOT by record index -- putting the index in the KEY
+reintroduced the original #2997 bug, where explaining a misfire names the same
+phrase again a few records later and that read as a brand-new admission.
+Instead the sentinel's file CONTENT holds the record index of the last firing
+(see `_sentinel_gate`, `LOOP_WINDOW`): a later occurrence of the same phrase is
+a repeat only within LOOP_WINDOW records of it, and fires again beyond that
+window. An existence-only sentinel (fire once, ever, per phrase) was wrong the
+other direction -- it suppressed a genuinely later, unrelated admission that
+happened to share a short common phrase with an earlier one, for the rest of
+the session (ai-config#2997 review finding).
 
 Fails OPEN and SILENT: any parse trouble prints nothing at all.
 """
@@ -65,7 +78,7 @@ _APOS = "['\u2019]"
 # which the docstring above says this regex must never match. Found on
 # ai-config#1752's review for the `should have` alternative, which was anchored
 # then while its six siblings were not (ai-config#1756).
-ADMISSION = re.compile(
+_ADMISSION_RE = re.compile(
     r"""(
       \bi\s+was\s+(wrong|mistaken|incorrect)
     | \bi\s+got\s+(that|this|it)\s+wrong
@@ -123,6 +136,133 @@ ADMISSION = re.compile(
     )""",
     re.I | re.X,
 )
+
+# Irrealis guard (ai-config#2997). Every alternative above is anchored on a
+# verb, and mood is invisible to a verb. So "a posted review is caught even if
+# I misread the job status" matched -- a hypothetical describing a mistake that
+# explicitly has NOT happened, in a sentence justifying the design that makes
+# it not matter. That is the opposite of an admission.
+#
+# `visible_prose()` below does not reach it: that guard strips fences,
+# blockquotes and inline code, which is where a QUOTATION of the rule lives.
+# This is ordinary prose whose grammatical mood inverts its meaning.
+#
+# Matched against the text immediately BEFORE a hit, anchored to end-of-window,
+# so only a marker introducing that very clause counts. `\b` leads the
+# alternation because "a gif I misread" would otherwise supply the `if`.
+#
+# Bare `if` is included, and the issue flagged that as the one debatable call
+# --- "if I was wrong, ..." is occasionally a hedged real admission. It asked
+# for the question to be settled by grepping transcripts rather than by
+# intuition, and the transcripts reachable from this container are only the
+# session that filed the issue, in which every hit is a quotation of the issue
+# text itself. So the corpus could not settle it, and the tie was broken on
+# cost: a hedged admission almost always continues into an unhedged one
+# ("... then my earlier claim was wrong"), which the alternatives above still
+# catch, whereas a false positive here is documented to cost six firings.
+#
+# The trailing whitespace class allows AT MOST ONE newline between the marker
+# and the clause it introduces, so a marker hard-wrapped across one line break
+# ("even if\nI misread the status") still counts as irrealis. A run of
+# horizontal whitespace matches outright; a newline matches only when the
+# lookahead cannot find a further newline (with nothing but horizontal
+# whitespace before it), which is exactly a blank line. That keeps a real
+# paragraph break ("even if\n\nI was wrong") from being swallowed: the first
+# newline's lookahead finds the second one, so the alternative fails and the
+# whole match cannot reach `$` (ai-config#2997 review nit).
+IRREALIS_LEAD = re.compile(
+    r"""\b(?:
+        (?:even\s+)?if
+      | unless
+      | in\s+case
+      | whether(?:\s+or\s+not)?
+      | lest
+      | supposing
+      | suppose(?:\s+that)?
+      | assuming(?:\s+that)?
+    )(?:[^\S\n]|\n(?![^\S\n]*\n))+$""",
+    re.I | re.X,
+)
+
+# 40 characters holds the longest marker above ("whether or not") plus a
+# wrapped line's trailing space, the one newline `IRREALIS_LEAD` now accepts,
+# and up to eight columns of indentation on the line the admission continues
+# on. Adjacency is enforced by the anchor in `IRREALIS_LEAD`, not by this
+# bound.
+LEAD_WINDOW = 40
+
+
+class _AdmissionMatcher:
+    """`_ADMISSION_RE` with the irrealis guard applied.
+
+    Exposes `search()` and nothing else, because `search()` plus `.group(0)`
+    on what it returns is the entire surface the three consumers use
+    (`no-mistake-without-a-hook.py`, `remind-ums-on-scrutiny.py`, and this
+    module). Filtering HERE rather than at each call site is what keeps the
+    shared-import contract intact: the siblings import `ADMISSION` precisely so
+    the detectors cannot drift, and a guard applied in one consumer would
+    reintroduce exactly that drift.
+
+    A guarded hit is skipped rather than ending the search, so "even if I
+    misread the status. I was wrong about the base branch." still fires on the
+    second clause.
+    """
+
+    def __init__(self, regex, lead=IRREALIS_LEAD, window=LEAD_WINDOW):
+        self.regex = regex
+        self.lead = lead
+        self.window = window
+
+    def search(self, text, *args, **kwargs):
+        for hit in self.regex.finditer(text, *args, **kwargs):
+            before = text[max(0, hit.start() - self.window):hit.start()]
+            if self.lead.search(before):
+                continue
+            return hit
+        return None
+
+
+ADMISSION = _AdmissionMatcher(_ADMISSION_RE)
+
+# Measured from the loop ai-config#2997 itself was filed over: the
+# re-explanation that named the admitted phrase again landed 2 records after
+# the original admission (a user question, then the assistant's reply). A
+# real re-explanation exchange can run a turn or two longer than that single
+# question-and-answer, so this is not the bare minimum observed but that
+# minimum doubled plus a margin -- 6 records, i.e. three user/assistant turn
+# pairs -- so an ordinary multi-turn discussion of the same misfire still
+# reads as one admission rather than a fresh one partway through.
+LOOP_WINDOW = 6
+
+
+def _sentinel_gate(sentinel_path, admit_at, window=LOOP_WINDOW):
+    """Return True iff this occurrence of the phrase should fire.
+
+    The sentinel file's CONTENT is the record index of the last firing, not
+    just its existence, so this can tell a repeat (the same explanation
+    naming the same phrase a few records later) from a later, unrelated
+    admission that happens to share a short common phrase with an earlier
+    one. Only the first case is suppressed; the file is updated on every
+    actual firing, never on a suppressed repeat, so the window is always
+    measured from the most recent firing rather than drifting forward on
+    each silent repeat.
+    """
+    last_at = None
+    if os.path.exists(sentinel_path):
+        try:
+            with open(sentinel_path) as fh:
+                last_at = int(fh.read().strip())
+        except Exception:
+            last_at = None  # unreadable sentinel -- treat as no prior firing
+    if last_at is not None and admit_at - last_at <= window:
+        return False
+    try:
+        with open(sentinel_path, "w") as fh:
+            fh.write(str(admit_at))
+    except Exception:
+        pass
+    return True
+
 
 # A write to any of these is a recorded learning.
 UMS_PATH = re.compile(
@@ -297,17 +437,13 @@ def main() -> int:
         return 0
 
     # Keyed on the transcript path too, so the sentinel is per session. Without
-    # it, two sessions producing the same admission at the same record index
-    # share one sentinel in /tmp, and the second session's reminder is
-    # suppressed for as long as that /tmp survives.
-    key = hashlib.sha256(f"{path}:{admit_txt}:{admit_at}".encode()).hexdigest()[:16]
+    # it, two sessions producing the same admission share one sentinel in
+    # /tmp, and the second session's reminder is suppressed for as long as
+    # that /tmp survives.
+    key = hashlib.sha256(f"{path}:{admit_txt}".encode()).hexdigest()[:16]
     sentinel = os.path.join(tempfile.gettempdir(), f".claude-ums-after-error-{key}")
-    if os.path.exists(sentinel):
+    if not _sentinel_gate(sentinel, admit_at):
         return 0
-    try:
-        open(sentinel, "w").close()
-    except Exception:
-        pass
 
     print(
         "UMS reminder: an earlier turn in this session admitted an error "
@@ -321,7 +457,10 @@ def main() -> int:
         "'Record both the pattern and the anti-pattern'. Delegate the pass to "
         "a subagent; that is pre-authorized standing sidecar work.\n"
         "If this reminder is a false positive (you were correcting someone "
-        "else's claim, or quoting the rule), disregard it and carry on."
+        "else's claim, quoting the rule, or writing a hypothetical such as "
+        "'even if I misread it'), disregard it and carry on. Writing about the "
+        "misfire will not re-fire it: this fires once per distinct phrase per "
+        "session, and a phrase wrapped in backticks is not matched at all."
     )
     return 0
 

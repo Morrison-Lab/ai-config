@@ -72,18 +72,25 @@ glab issue list --search "<keywords>" --per-page=20 2>&1 | cat
 gh issue create --title "<concise title>" --body "<what & why>
 
 **Done when:** <acceptance criteria>
-<scope notes / out-of-scope>"   # CREATE_ISSUE
+<scope notes / out-of-scope>" \
+  --label ai-authored --label "model:<model-id>"   # CREATE_ISSUE
 
 # GitLab
 glab issue create --title "<concise title>" --description "<what & why>
 
-**Done when:** <acceptance criteria>"
+**Done when:** <acceptance criteria>" \
+  --label "ai-authored,model:<model-id>"
 ```
 
 - Keep scope tight — **one concern per issue** (see `split-concerns`). If the
   task is really several concerns, file several issues.
 - Capture acceptance criteria so "done" is unambiguous later.
-- Label it if the repo uses labels.
+- The two labels above are not optional: every issue an agent files into a
+  repo we administrate carries `ai-authored` and `model:<model-id>`, per
+  [`issue-first`](../../shared/workflow/issue-first.md).
+  Normalize the model id and create the labels where they are missing, per
+  [`label-agent-filed-issues`](../../shared/workflow/label-agent-filed-issues.md).
+- Add any further labels the repo's own taxonomy calls for.
 - Then **claim it** (`claim-pr` pattern) so a parallel session / the `@claude`
   bot doesn't collide:
   ```bash

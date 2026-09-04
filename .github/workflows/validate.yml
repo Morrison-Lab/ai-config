@@ -81,6 +81,14 @@ jobs:
         run: python3 scripts/check_regex_patterns.py
       - name: Run regex pattern check tests
         run: python3 scripts/test_check_regex_patterns.py
+      - name: Check Python strings for invalid escape sequences
+        # ai-config#3114: these modules quote regex source in their prose, so a
+        # docstring carrying `\s` is an invalid escape. The warning is silent
+        # on 3.11 (DeprecationWarning) and printed on 3.12+ (SyntaxWarning), so
+        # a maintainer and CI disagree; this gate keys on the message text.
+        run: python3 scripts/check-python-escapes.py
+      - name: Run invalid-escape check tests
+        run: python3 scripts/test_check_python_escapes.py
       - name: Run git command regex helper tests
         run: python3 scripts/test_git_cmd.py
       - name: Run orchestrator tests
@@ -115,6 +123,14 @@ jobs:
         run: python3 scripts/test_check_verdict_scan_parity.py
       - name: Run check-user-quote tests
         run: python3 scripts/test_check_user_quote.py
+      - name: Check lead-in counts against their enumerations
+        # ai-config#3005. A lead-in count goes stale when a later edit splits
+        # or merges one item, and a reader who counts along never reaches the
+        # last one. Nothing else here sees it: no broken link, well-formed
+        # lines, fluent prose either way.
+        run: python3 scripts/check-leadin-counts.py
+      - name: Run check-leadin-counts tests
+        run: python3 scripts/test_check_leadin_counts.py
       - name: Run check-doi-bib tests
         run: python3 scripts/test_check_doi_bib.py
       - name: Run test_pull_request tests
@@ -203,6 +219,15 @@ jobs:
         # sweep in CI would prove nothing. Its classification logic is pure
         # over the GraphQL payload shape, so the tests cover it offline.
         run: python3 scripts/test_pr_sweep.py
+      - name: Run PR-scope tests
+        # Only the tests run here. pr-scope.py's --repo mode shells out to
+        # `gh`, which a runner cannot do unauthenticated, but its predicate
+        # is pure over the PR payload shape, so the table covers every arm
+        # offline -- including the negative control, which asserts that a
+        # classifier with the exclusion veto removed lets vetoed PRs
+        # through. A table that cannot fail is indistinguishable from one
+        # that never ran.
+        run: python3 scripts/test_pr_scope.py
       - name: Run PR-overlap tests
         # Same reasoning as pr-sweep above: only the tests run here, since
         # pr-overlap.py queries the GitHub API via `gh`. Its classification,
@@ -398,6 +423,11 @@ jobs:
         run: python3 scripts/check-memory-file-size.py --strict
       - name: Run stale-record check tests
         run: python3 scripts/test_check_stale_records.py
+      - name: Run bare-fragment-mention check tests
+        # ai-config#3034. The negative control: until the detector has been
+        # seen to produce a non-zero, a zero from the corpus scan below is not
+        # evidence of anything.
+        run: python3 scripts/test_check_bare_fragment_mentions.py
       - name: Run backlog-triage instrument tests
         run: python3 scripts/test_triage_backlog.py
       - name: Check for stale and orphaned records (advisory)
@@ -420,6 +450,21 @@ jobs:
         # NUMBERS in the log on each run, and specifically the orphan list,
         # which is a link-graph fact the shallow clone does not affect.
         run: python3 scripts/check-stale-records.py
+      - name: Check for bare fragment mentions (advisory)
+        # ai-config#3034. Non-blocking: the script's main() ends `return 0`
+        # unconditionally, so this step reports and cannot gate a PR.
+        #
+        # Advisory by construction rather than by choice. Whether a bare
+        # occurrence is a missing link or ordinary English is a judgment the
+        # corpus cannot settle -- names like `fail-fast` and `plain-prose`
+        # are both a fragment and a phrase -- so the exempt bucket reports
+        # the drops instead of the script guessing, and the findings are a
+        # reading prompt.
+        #
+        # The value is the numbers in the log on each run: a file that links
+        # a fragment once and then names it bare is the miss this corpus
+        # states in prose and, before this step, had no instrument for.
+        run: python3 scripts/check-bare-fragment-mentions.py
   lint-qmd:
     uses: Morrison-Lab/gha/.github/workflows/lint-qmd.yml@v2
 

@@ -168,6 +168,26 @@ The full rule, including the Do/Don't pair, is
 Questioning alone does not owe a pass: the check has to show the claim
 was wrong.
 
+## Run UMS before every pause
+
+Before ending a turn to wait on anything --- CI, a review round,
+a subagent, or an answer from the user --- run `ums` first.
+A wait's length is not knowable when it begins, so the learnings sit in
+conversation state for however long it runs, and a pause is the likeliest
+point for compaction or a session nobody resumes.
+"Resume every non-clean pause" above obliges a wake mechanism at this same
+moment; this obliges the pass alongside it.
+The pass is owed by accumulated learnings rather than by the number of waits,
+so a monitoring loop and a run of separately posed questions each get it at
+the first pause and again only once new learnings accumulate.
+The full rule, including the rationale and the other pairs, is
+[`shared/workflow/run-ums-proactively.md`](shared/workflow/run-ums-proactively.md).
+
+- **Do:** run the pass before the pause, not once the wait turns out to be long, whenever learnings have accumulated since the last pass.
+- **Do:** run it at the first pause, whether the waits that follow are a monitoring loop's re-arms or a run of separately posed questions.
+- **Don't:** re-run it at a second consecutive pause that has learned nothing since the first.
+- **Don't:** defer the pass to when the wait ends --- the resumption may land in another session or never come.
+
 ## Help your subagents improve over time
 
 An orchestrator owns the three things that set a dispatched agent's
@@ -398,12 +418,16 @@ Check any replacement marker against that script's `REVIEW_BODY_MARKERS` and `RE
 
 Scope: comment bodies, on every surface --- claims, releases, status notes, review replies, self-reviews, issue comments filed on the user's behalf.
 Not commit messages, not titles, not issue bodies, not PR bodies, each of which has its own attribution convention.
+An issue body's convention is a pair of **labels** rather than a marker line: every issue an agent files into a repo we administrate carries `ai-authored` and `model:<model-id>`, set in the command that creates it.
+See [`shared/workflow/label-agent-filed-issues.md`](shared/workflow/label-agent-filed-issues.md) for the `gh`, `glab`, and MCP forms and for normalizing the model id.
 Two exemptions.
 A comment another machine parses as a command (`@dependabot rebase`), where the test is the audience rather than the length.
 And a comment posted under a genuine bot token, where the forge already reports `type: Bot` and the marker adds nothing.
 
 - **Do:** append the marker to every agent-posted comment, including ones whose prose already identifies the session.
+- **Do:** label an agent-filed issue `ai-authored` and `model:<model-id>` in the creating command, since the marker line does not go in an issue body.
 - **Don't:** use the robot emoji in the marker, and don't read "the account holder knows an agent is running" as making the disclosure unnecessary --- the reader is whoever finds the thread later.
+- **Don't:** put the marker in an issue body in place of those labels, or file an unlabelled issue on the grounds that the body carries no marker.
 
 ## File formatting & links
 
@@ -416,7 +440,10 @@ And a comment posted under a genuine bot token, where the forge already reports 
   always format them as clickable markdown hyperlinks to their forge URLs
   (e.g. `[PR #123](https://github.com/<owner>/<repo>/pull/123)`),
   never as bare unlinked text (such as `#123`),
-  except for forge issue-closing syntax (such as `Closes #123`).
+  except for forge issue-closing syntax (such as `Closes #123`)
+  and for the illustrative tokens the Don't bullet below covers.
+- **Do:** link every pull request or issue you cite as a source, whether or not the reader can open its repository.
+- **Don't:** link a `#NNN` or `owner/repo#NNN` a passage is displaying rather than citing --- a linter's truncation example, a spell-check false positive --- because the link destroys what the passage demonstrates.
 - Preserve semantic line breaks (SemBr) and formatting conventions when editing markdown docs.
 
 ## Deliver completed implementation work

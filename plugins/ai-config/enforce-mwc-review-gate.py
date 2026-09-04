@@ -24,13 +24,15 @@ merged over a "Needs more work" verdict (reverted in sparta#1429):
   allow-path on that state alone made it dead code), and a standing
   CHANGES_REQUESTED denies. A body-derived approval is bounded so it
   cannot become a self-approval route: it never counts from the PR's own
-  author, never from a body carrying the agent-disclosure marker, never
-  past a `Reviewed commit:` other than the head, never from a
-  conditional headline, and never over findings-shaped follow-on
-  sections; a later non-approving review from the same human retracts
-  it. Those bounds preserve the property above -- an agent posting under
-  the user's login cannot approve its own merge -- across the reviews
-  channel as well as the comments channel;
+  author, never from an `authorAssociation` outside the repository,
+  never from a review whose own `commit.oid` is not the head, never from
+  a raw body carrying the agent-disclosure marker (quoted or fenced
+  included), never past a `Reviewed commit:` other than the head, never
+  from a conditional headline, and never over a follow-on bullet,
+  numbered item, or heading; a later non-approving review from the same
+  human retracts it. Those bounds preserve the property above -- an
+  agent posting under the user's login cannot approve its own merge --
+  across the reviews channel as well as the comments channel;
 - a verdict naming a `Reviewed commit:` other than the PR head is stale and
   denies;
 - `--admin` merges (server-rule bypass) and GraphQL mergePullRequest
@@ -101,6 +103,11 @@ CONDITIONAL_HEADLINE_RE = re.compile(
 # *zero* follow-on bullets under any heading. An approving headline over a
 # findings section is the sparta#1427 shape, and NOT_CLEAN_VERDICT_RE
 # matches verdict phrasings only, so ordinary findings prose passes it.
+# The veto is therefore structural rather than lexical. Requiring findings
+# vocabulary as well let an unlabelled bullet list ("- the parser drops
+# tokens") sit under an approving headline and still approve, which is that
+# same shape. FINDINGS_VOCAB_RE now covers only the unbulleted label line
+# ("Open items:"), which has no structure of its own to key on.
 FINDINGS_VOCAB_RE = re.compile(
     r"\b(findings?|issues?|remaining|open items?|blockers?|non-?blocking"
     r"|minor|nits?|nitpicks?|suggestions?|consider|could improve"
@@ -116,6 +123,13 @@ AGENT_AUTHORSHIP_RE = re.compile(
     r"posted by\b[^\n]*\(ai agent\)|\*\*claude finished|\U0001f916",
     re.IGNORECASE,
 )
+# `authorAssociation` values that mark a reviewer as belonging to the
+# repository. A COMMENTED review is an ordinary drive-by comment that anyone
+# with read access can post, so without this bound any stranger's "Ready for
+# merge." would authorize the merge; a formal APPROVED review is a distinct
+# authorizing act GitHub records, which is why its fast path needs no such
+# check.
+TRUSTED_REVIEW_ASSOCIATIONS = {"OWNER", "MEMBER", "COLLABORATOR"}
 PR_URL_RE = re.compile(r"github\.com/([\w.-]+/[\w.-]+)/pull/(\d+)")
 # "&" also covers "&&"; "$(" and "`" catch command substitution. Substring
 # matching can over-fire on quoted bodies -- that direction fails closed.
@@ -165,22 +179,29 @@ def human_review_body_approves(body, head_oid=""):
     looser than the `APPROVED` state it stands in for:
 
     - a body carrying the agent-disclosure marker is not human approval,
-      whichever login submitted the review;
+      whichever login submitted the review. That one test reads the RAW
+      body rather than the blanked one, because blanking works the other
+      way here: it exists to stop a quoted *approval* counting, so
+      running it first let one `>` character delete the disclosure and
+      turn an agent's own review into a human approval;
     - a body whose `Reviewed commit:` is not the PR head is stale and
-      denies, exactly as `classify_verdict_body` treats a verdict comment
-      -- GitHub never dismisses a COMMENTED review, so without this an
-      approval written ten pushes ago would still stand;
+      denies, exactly as `classify_verdict_body` treats a verdict
+      comment. That footer is a bot convention, so a human review body
+      does not carry one and this check usually does not fire; the head
+      binding that does is the review's own `commit.oid`, in
+      `body_approval_is_admissible`;
     - the headline must *begin* with an approval phrase and carry no
       conditional or interrogative marker, so "Ready for merge once you
       rebase" and "Two questions before I approve" do not approve;
-    - a findings-shaped follow-on section vetoes, per the zero-findings
-      bar in skills/pr-status/SKILL.md.
+    - any follow-on bullet, numbered item, or heading vetoes, per the
+      zero-findings bar in skills/pr-status/SKILL.md, whatever its
+      wording.
     """
     if not body:
         return False
-    blanked = FENCE_RE.sub("", BLOCKQUOTE_LINE_RE.sub("", body))
-    if AGENT_AUTHORSHIP_RE.search(blanked):
+    if AGENT_AUTHORSHIP_RE.search(body):
         return False
+    blanked = FENCE_RE.sub("", BLOCKQUOTE_LINE_RE.sub("", body))
     if NOT_CLEAN_VERDICT_RE.search(blanked):
         return False
     shas = REVIEWED_COMMIT_RE.findall(blanked)
@@ -197,10 +218,39 @@ def human_review_body_approves(body, head_oid=""):
     if not CLEAN_VERDICT_RE.match(headline):
         return False
     return not any(
-        FINDINGS_VOCAB_RE.search(line)
-        and (FINDINGS_STRUCTURE_RE.match(line) or line.endswith(":"))
+        FINDINGS_STRUCTURE_RE.match(line)
+        or (line.endswith(":") and FINDINGS_VOCAB_RE.search(line))
         for line in lines[1:]
     )
+
+
+def body_approval_is_admissible(review, head_oid):
+    """Whether a COMMENTED review's metadata permits reading approval from it.
+
+    Two bounds, both on the review record rather than on its prose, so they
+    hold whatever the body says:
+
+    - `authorAssociation` must mark the reviewer as belonging to the
+      repository. Submitting a COMMENTED review is what any commenter can
+      do, so trusting a non-bot login alone would let a stranger's "Ready
+      for merge." authorize the merge.
+    - the review's own `commit.oid` must be the PR head. GitHub records the
+      commit every review was submitted against, and never dismisses a
+      COMMENTED review, so this is what makes a body-derived approval
+      head-bound like every other allow path here; a `Reviewed commit:`
+      footer is a bot convention a human body does not carry, so it is a
+      secondary check rather than the head binding.
+
+    Each fails closed on an absent value: a payload that cannot show the
+    review was submitted by a repository member against the head cannot
+    show the approval is admissible, and an unverifiable approval is
+    treated as no approval.
+    """
+    assoc = (review.get("authorAssociation") or "").upper()
+    if assoc not in TRUSTED_REVIEW_ASSOCIATIONS:
+        return False
+    oid = ((review.get("commit") or {}).get("oid") or "")
+    return bool(oid and head_oid and head_oid.startswith(oid))
 
 
 def latest_human_review_states(reviews, head_oid="", pr_author=""):
@@ -212,8 +262,9 @@ def latest_human_review_states(reviews, head_oid="", pr_author=""):
     which never allows.
 
     PENDING never changes an author's standing, and COMMENTED changes it
-    only when the review body affirmatively approves (see
-    `human_review_body_approves`). GitHub marks a dismissed review by
+    only when the review record admits a body-derived approval (see
+    `body_approval_is_admissible`) and the body affirmatively approves
+    (see `human_review_body_approves`). GitHub marks a dismissed review by
     mutating its state to DISMISSED in place; handle a trailing DISMISSED
     entry too, so either payload shape clears standing.
 
@@ -251,7 +302,9 @@ def latest_human_review_states(reviews, head_oid="", pr_author=""):
             states.pop(login, None)
             inferred.discard(login)
         elif state == "COMMENTED" and states.get(login) != "CHANGES_REQUESTED":
-            if human_review_body_approves(r.get("body", "") or "", head_oid):
+            if (body_approval_is_admissible(r, head_oid)
+                    and human_review_body_approves(
+                        r.get("body", "") or "", head_oid)):
                 states[login] = (
                     "SELF_APPROVED" if login == pr_author else "APPROVED"
                 )

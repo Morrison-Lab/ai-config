@@ -36,8 +36,18 @@ def comment(body, login="github-actions"):
     return {"author": {"login": login}, "body": body}
 
 
-def review(login, state, body=""):
-    return {"author": {"login": login}, "state": state, "body": body}
+def review(login, state, body="", commit=HEAD, assoc="MEMBER"):
+    """A review record in `gh pr view --json reviews`' own shape.
+
+    `commit.oid` and `authorAssociation` default to admissible values so a
+    case exercising some other bound is not silently denied by these two;
+    the cases that exercise them pass explicit values.
+    """
+    r = {"author": {"login": login}, "state": state, "body": body,
+         "authorAssociation": assoc}
+    if commit is not None:
+        r["commit"] = {"oid": commit}
+    return r
 
 
 def pr(reviews=(), comments=(), checks=(), head=HEAD,
@@ -301,6 +311,57 @@ class TestEvaluate(unittest.TestCase):
                      "No findings.\n\n- Findings: the migration is missing "
                      "a down-step.",
                      "Approved.\n\nOpen items:\n- rework the parser"):
+            state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+            self.assertEqual(
+                gate.evaluate(MERGE_CMD, state)["decision"], "deny", body)
+
+    def test_agent_disclosure_in_a_quoted_or_fenced_region_still_denies(self):
+        """The marker test reads the raw body: blanking exists to stop a
+        quoted *approval* counting, so running it first would let one `>`
+        character delete an agent's own disclosure."""
+        marker = "_Posted by Claude Code (AI agent) --- not written by a human._"
+        for body in (f"Ready for merge.\n\n> {marker}",
+                     f"Ready for merge.\n\n```\n{marker}\n```"):
+            state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+            self.assertEqual(
+                gate.evaluate(MERGE_CMD, state)["decision"], "deny", body)
+
+    def test_body_approval_on_a_non_head_review_commit_denies(self):
+        """A human body carries no `Reviewed commit:` footer, so the review's
+        own commit.oid is what head-binds a body-derived approval."""
+        stale = review("d-morrison", "COMMENTED", "Ready for merge.",
+                       commit="b" * 40)
+        self.assertEqual(
+            gate.evaluate(MERGE_CMD, pr(reviews=[stale]))["decision"], "deny")
+
+    def test_body_approval_without_a_review_commit_denies(self):
+        """Fail closed: a payload that cannot show the review was submitted
+        against the head cannot show the approval is current."""
+        unbound = review("d-morrison", "COMMENTED", "Ready for merge.",
+                         commit=None)
+        self.assertEqual(
+            gate.evaluate(MERGE_CMD, pr(reviews=[unbound]))["decision"], "deny")
+
+    def test_non_repository_reviewer_body_approval_denies(self):
+        """Anyone with read access can submit a COMMENTED review, so the
+        allow-path is bounded by authorAssociation; a formal APPROVED review
+        is a distinct authorizing act and keeps its own fast path."""
+        for assoc in ("NONE", "CONTRIBUTOR", "FIRST_TIME_CONTRIBUTOR", ""):
+            state = pr(reviews=[review("random-passerby", "COMMENTED",
+                                       "Ready for merge.", assoc=assoc)])
+            self.assertEqual(
+                gate.evaluate(MERGE_CMD, state)["decision"], "deny", assoc)
+        allowed = pr(reviews=[review("random-passerby", "COMMENTED",
+                                     "Ready for merge.", assoc="COLLABORATOR")])
+        self.assertEqual(gate.evaluate(MERGE_CMD, allowed)["decision"], "allow")
+
+    def test_unlabelled_follow_on_bullets_do_not_approve(self):
+        """The bar is structural, not lexical: a findings list whose wording
+        dodges the findings vocabulary is still the sparta#1427 shape."""
+        for body in ("Ready for merge.\n\n## Notes\n\n"
+                     "- the parser drops tokens\n- rename x",
+                     "Approved.\n\n1. the migration lacks a down-step",
+                     "No findings.\n\n### Notes\n\nJust one thought."):
             state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
             self.assertEqual(
                 gate.evaluate(MERGE_CMD, state)["decision"], "deny", body)

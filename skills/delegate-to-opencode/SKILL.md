@@ -72,7 +72,7 @@ One measurement bounds the exception rather than establishing a capability: one 
 The separate "result must conform to a schema and you have no cheap validator" bullet is untouched by any of this.
 It never bound on that measurement, whose result was an R refactor with no schema to conform to, and it still binds on its own terms wherever a schema is required and no validator is cheap.
 
-- **Do:** delegate authoring work to a free-tier model only when the brief carries literal paths and exact expected content, per [step 2, "Prepare the prompt"](#2-prepare-the-prompt), *and* a mechanical acceptance test --- a test suite, a linter, a byte comparison --- decides correctness on its own.
+- **Do:** delegate authoring work to a free-tier model only when the brief carries literal paths, per [step 2, "Prepare the prompt"](#2-prepare-the-prompt), and exact expected content, *and* a mechanical acceptance test --- a test suite, a linter, a byte comparison --- decides correctness on its own.
 - **Do:** settle the data question before the shape question --- a mechanical acceptance test does not license a hosted dispatch the consuming repo's data rules forbid.
 - **Don't:** condition the dispatch on the acceptance test alone --- a vague brief with a passing check is a combination nobody measured.
 - **Don't:** let your own reading of the returned diff stand in for the mechanical check.

@@ -746,3 +746,66 @@ At `c6ea044c`, [#3154](https://github.com/Morrison-Lab/ai-config/pull/3154) has 
 Jules's round for the previous head had returned `block` over "prompt injection in the project rules file", the repository's own agent-instruction text, outside the diff;
 its next round approved without comment, so the block is superseded rather than answered.
 A pre-merge adversarial verdict at the shipping head follows once the slot the #3166 verdict holds frees, matching the bar applied to #3166.
+
+## 19:14 PDT --- the session limit and its reset; #3095 ships as #3171
+
+Between 18:10 and 19:10 PDT every subagent launch returned HTTP 429 ("session limit, resets 2:10am UTC"):
+the pre-merge verdict for [#3166](https://github.com/Morrison-Lab/ai-config/pull/3166) at `147710bb`, the wave-1 and wave-2 fix loops' remaining rounds, and eighteen wave-3 agents all died on it.
+The user reported the reset at 19:14 PDT.
+The forge state had not moved in the gap:
+[#3154](https://github.com/Morrison-Lab/ai-config/pull/3154) at `c6ea044c` and #3166 at `147710bb` both read mergeable clean with every check run green and the three reviewers' latest rounds clean, so one pre-merge adversarial verdict per PR was dispatched at 19:15 PDT (two of the five slots).
+Wave 1's loop had verified [#3095](https://github.com/Morrison-Lab/ai-config/issues/3095) at `da0d8883` before the limit hit;
+`main` merged in at `9a31d9d5` (after #3167 landed), gates and the checker's own test file passed, the expired claim was re-posted, and the branch is [#3171](https://github.com/Morrison-Lab/ai-config/pull/3171) with Copilot and Jules requested.
+The other wave-1 and wave-2 branches stay unverified in their worktrees;
+their next fix loop is generated from the heads on disk rather than from the earlier result files, since the rounds that did run moved the SHAs.
+
+## 19:18 PDT --- fix loops regenerated from disk for the sixteen unverified wave-1 and wave-2 branches
+
+Two serial loops start each branch with a fresh recheck at its on-disk head, then run up to three fix-and-recheck rounds:
+`gia-wave1-fix-loop-r2.js` (run `wf_ba0735d4-897`)
+and `gia-wave2-fix-loop-r2.js` (run `wf_803eba98-5c1`).
+They differ from the first loops in two lines of the briefs:
+the verifier treats an uncommitted change as a finding (`wt-3068` carries an interrupted round's edits to `README.md` and the hook-output-shape test), and the fixer merges `origin/main` before its gates when the branch is behind.
+Four of the five slots are in use: the two loops plus the two pre-merge verdicts.
+
+## 19:26 PDT --- #3166's pre-merge verdict at `147710bb`: an unscoped "never", and a "both" with three candidates
+
+The verdict reproduced every count in the measurement block and found two wording defects, neither a false claim.
+The Do bullet "anchor ... as `^[+][+]` ... never `^+`" was unscoped, and two bullets earlier the section recommends the three-dot read where `^+` is the correct anchor, so a reader applying the bullet to that read would get exactly the silent zero the section warns about;
+the bullet now says "in a combined diff" and names the three-dot read's anchor.
+"Both calls above exit 0" had three `ls-remote` calls before it, the nearest not one of the two it meant;
+it now names the console block.
+Pushed as `2c1b5bd4` with Copilot and Jules re-requested.
+[#3171](https://github.com/Morrison-Lab/ai-config/pull/3171) reached the full forge quorum at its first push (claude-review, Copilot with zero comments, Jules) and its pre-merge verdict is running.
+The transferable lesson, for the memory pass: a rule stated as "never X" needs the read it applies to in the same clause when the neighbouring bullet recommends a read where X is right.
+
+## 19:29 PDT --- #3171 merged at `f0e26649`; a local-check figure measured before the merge of main
+
+[#3171](https://github.com/Morrison-Lab/ai-config/pull/3171) (closes [#3095](https://github.com/Morrison-Lab/ai-config/issues/3095)) reached the full forge quorum on its first push and its pre-merge verdict at `9a31d9d5` returned Ready for merge with no blocking finding;
+the verdict reproduced the pre-fix failure against `origin/main`'s copy of the script and mutation-tested each new check.
+Merged under the standing ai-config grant (squash, hand-written body, since `77f819aa`'s body carried the "always-loaded fragment" claim its successor retracts).
+Worktrees `wt-3095`, `wt-3060` (the merged #3060 branch), and `wt-2513` (released) removed with their local branches.
+
+One finding was real and mine: the PR body said "markdownlint-cli2 0.23.0: 740 files", measured before `origin/main` was merged in, and the same command at `9a31d9d5` reports 743.
+The "Local checks at `<sha>`" heading names a head, so every figure under it has to be measured at that head, after the merge of `main`, not carried over from the pre-merge run.
+Fixed in the body before merging.
+The verdict's other notes were left as they were:
+the merge commit carries no trailers, which the squash drops,
+and a Do/Don't bullet restates the prose sentence above it, which is the corpus convention the verdict itself names.
+
+Lesson for the memory pass: run the local checks once more after merging `main`, and write the figures from that run.
+
+## 19:32 PDT --- #3154's pre-merge verdict at `c6ea044c`: a causal clause nobody measured
+
+The verdict reproduced every count and file list in the case record and found the one sentence that was not pinned to a command:
+"reachable from no remote ref since the branch was rebased before merge".
+Measured now: `origin` still advertises `refs/pull/3060/head` at `f9068299`, the branch's final head, so one commit is reachable;
+the three earlier commits the record first cited are not fetchable;
+and nothing in the reflog or the PR shows a rebase.
+The sentence was written from the 17:40 PDT discovery that those three SHAs were unfetchable, and "rebased" was the explanation that came with it, never a measurement.
+Rewritten to the two measurements at `e698c456`, with five prose fixes (an undefined "the owner", an antecedent-less "the same collision", a "one" seventeen lines from its noun, a redundant "(step 3)", a break inside "checklist item").
+The `###` demotion was declined.
+Copilot and Jules re-requested; a verdict at `e698c456` is running alongside #3166's at `2c1b5bd4`.
+
+Lesson for the memory pass: in a case record, a "because" clause is a claim like any other and needs its own command;
+the near-miss is writing the cause that arrived with the discovery.

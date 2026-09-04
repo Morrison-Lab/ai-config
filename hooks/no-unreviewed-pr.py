@@ -380,16 +380,17 @@ def _requests_in(cmd):
     return found, cmds
 
 
-def request_ident(cmd):
+def request_ident(cmd, _reqs=None):
     """(is_request, num, repo, last): does `cmd` genuinely request a reviewer?
 
     `last` is True when the matched request is the LAST simple command in the
     chain. That is exactly when the harness `is_error` exit status (which
     reflects the WHOLE call) is authoritative for the request's own outcome.
-    In last position after `&&` or `;` there are two ways the call can end:
-    the request ran and its status is the call's, or an earlier `&&` failed
-    and short-circuited it away, leaving a failure status the discharge
-    withholds on. Both are safe.
+    In last position after `;`, the request always runs and its status is the
+    call's own exit status. In last position after `&&`, either the request ran
+    and its status is the call's, or an earlier command failed and
+    short-circuited it away, leaving a failure status the discharge withholds
+    on. Both are safe.
 
     A last-position request after `||` is NOT safe, and this is a known hole
     rather than an impossibility: `gh pr view ... || <POST>` exits 0 when the
@@ -404,14 +405,14 @@ def request_ident(cmd):
     `&&` so the status can be the request's own. The discharge therefore
     treats a non-last request as unattributable and does not fire.
     """
-    found, cmds = _requests_in(cmd)
+    found, cmds = _requests_in(cmd) if _reqs is None else _reqs
     if not found:
         return False, None, None, False
     i, num, repo = found[0]
     return True, num, repo, (i == len(cmds) - 1)
 
 
-def undischargeable_requests(cmd):
+def undischargeable_requests(cmd, _reqs=None):
     """Every reviewer request in `cmd` this call's discharge cannot credit.
 
     `request_ident` stops at the first match, which is right for the discharge
@@ -440,7 +441,7 @@ def undischargeable_requests(cmd):
 
     Including it over-warns at worst, since nothing on this path discharges.
     """
-    found, cmds = _requests_in(cmd)
+    found, cmds = _requests_in(cmd) if _reqs is None else _reqs
     if not found:
         return []
     if len(found) == 1 and found[0][0] == len(cmds) - 1:
@@ -1883,7 +1884,8 @@ def scan(path):
                 draft = bool(RX_DRAFT.search(cmd_open))
                 opened = bool(RX_OPEN.search(cmd_open)) and not draft
                 onum, orepo = open_ident(cmd_raw)
-                requested, rnum, rrepo, rlast = request_ident(cmd_raw)
+                reqs_parsed = _requests_in(cmd_raw)
+                requested, rnum, rrepo, rlast = request_ident(cmd_raw, _reqs=reqs_parsed)
                 _dok, dnum, drepo, dlast = draft_ident(cmd_raw)
                 pushed = push_ident(cmd_raw)
                 # Draft is checked first: `gh pr ready --undo` matches RX_OPEN
@@ -1945,7 +1947,7 @@ def scan(path):
                 # separate pending request here.
                 if requested and not opened:
                     pending[tid] = (rnum, rrepo, rlast)
-                for _rn, _rr in undischargeable_requests(cmd_raw):
+                for _rn, _rr in undischargeable_requests(cmd_raw, _reqs=reqs_parsed):
                     # EVERY request in the chain that will not discharge,
                     # not just the first: `request_ident` returns one match,
                     # so a call requesting reviewers for two PRs named only

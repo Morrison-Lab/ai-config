@@ -521,6 +521,90 @@ Both called it through `< <(...)`, so the refusal was inert; the shape was
 caught in review before it shipped, and the empty-array consequence was
 reproduced directly rather than reasoned about.)
 
+## A `trap ... EXIT` installed inside a function fires when a SUBSHELL exits
+
+`errexit` is the file's subject, and it is one instance of a wider property:
+a construct you read as "the script" is frequently two shells,
+and the second one has its own lifetime.
+A cleanup trap is the case where that costs you data rather than a status.
+
+A function that installs its own `trap ... EXIT` is installing it in whatever shell is running the function.
+Call the function normally and that is the script's shell,
+so the trap fires at script exit, which is what you wanted.
+Capture the function in a command substitution and it runs in a subshell ---
+so the subshell's exit, one line into the script, fires the cleanup:
+
+```bash
+set -euo pipefail
+f=$(mktemp); echo hi > "$f"
+gather() { trap 'rm -f "$f"' EXIT; echo out; }
+out=$(gather)      # subshell exits here -- the trap runs
+cat "$f"           # gone
+```
+
+Note which case does *not* bite,
+because assuming the wrong one sends the diagnosis somewhere unproductive.
+A trap installed in the parent **before** the substitution is reset to default in the subshell,
+so it does not fire *at the substitution* --- not for an ordinary return,
+not for a failing command,
+and not for an `exit` inside the substituted function.
+Only a trap installed *within* the subshell fires there.
+Note what that does not say:
+an `exit` inside the substituted function still becomes the substitution's status,
+so under `errexit` it terminates the parent,
+and the parent's own `EXIT` trap then runs at parent exit as designed (measured:
+bash 5.3.15 prints the parent trap's output and exits 3).
+The parent trap is exonerated for the *early* deletion,
+not removed from the script.
+So the shape to look for is a self-cleaning helper, not a script-level cleanup.
+
+The failure presents far from its cause.
+Nothing errors at the substitution;
+the next several readers of the file get empty input,
+and each reports its own unrelated-looking failure.
+
+Guard the trap on the shell it was meant for:
+
+```bash
+gather() { trap '[[ $BASHPID == $$ ]] && rm -f "$f"' EXIT; echo out; }
+```
+
+`$$` is the script's PID and stays fixed across subshells,
+while `BASHPID` is the current shell's,
+so the comparison is false in every subshell and true only in the shell that installed the trap.
+
+**That guard stops the premature deletion and does not by itself restore the cleanup**,
+which is the half worth stating because the guarded snippet looks complete.
+If `gather` is only ever called in a substitution,
+the trap is only ever installed in a subshell,
+the guard is false every time it runs, and the temp file survives the script ---
+silent data loss traded for a silent leak.
+Measured on bash 5.3.15 with exactly the snippet above:
+the file is present after the substitution and still on disk after the script exits.
+So the guard is the right fix only alongside a cleanup whose lifetime is the script's,
+which in practice means installing the trap at the top level and letting the helper stay stateless.
+
+- **Do:** install cleanup at the script's top level,
+  where its lifetime is unambiguous,
+  rather than inside a helper that may be captured.
+- **Do:** guard a function-installed `EXIT` trap with `[[ $BASHPID == $$ ]]` when the trap must stay in the helper,
+  and confirm the helper is also reached outside a substitution ---
+  otherwise the guarded trap never fires at all.
+- **Don't:** conclude a temp file was never written when several consumers report empty input ---
+  check whether anything between the write and the read ran in a subshell.
+- **Don't:** assume a parent's trap is the one that fired;
+  the subshell resets inherited traps, so the culprit is a trap set inside it.
+- **Don't:** read the `BASHPID` guard as a drop-in repair;
+  it removes the deletion and leaves nothing in its place.
+
+(Measured 2026-09-03, bash 5.3.15:
+`out=$(run_gather ...)` deleted the temp file the next line read,
+and five downstream checks failed with empty input.
+Both forms were reproduced on the same shell ---
+the naive form deletes at the substitution,
+and the guarded form survives it and then leaks,
+which is how the incomplete-remedy half above was found.)
+
 ## In review
 
 Flag a pipeline or command under `set -e` whose left-hand side routinely

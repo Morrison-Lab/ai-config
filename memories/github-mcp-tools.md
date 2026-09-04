@@ -1027,8 +1027,8 @@ See ai-config#694 for the precedent.
   The MCP writes carried `d-morrison` in this container on 2026-09-04;
   re-derive that per the entry above rather than carrying it.
   `github-remote-sessions.md`'s "Don't reach for `workflow_dispatch` or an
-  `@claude review` comment" bullet describes the raw-API route, and this
-  is the MCP route it does not cover.
+  `@claude review` comment" bullet covers the raw-API route and points
+  here for the MCP route.
 
   Where a dispatched run's check-runs land depends on the `ref` the
   dispatch passed, not on its being a dispatch.

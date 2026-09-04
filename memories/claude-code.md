@@ -1009,7 +1009,8 @@ A Python script under `python3 - <<PY`, unquoted to interpolate one scratchpad p
 filed issue ai-config#3219, opened PRs #3220 through #3229, and posted their claim comments.
 Every backtick span in those bodies ran as a shell command and was replaced by its empty output,
 so #3219 read `The branch records ... in and performs no such audit`,
-each code span replaced by nothing but the spaces around it.
+each code span deleted so that the two spaces flanking it met
+(the quote here shows one space, since the reflow script collapses a doubled one).
 All twenty-one were repaired by PATCH from a quoted-delimiter rerun,
 with the path passed as `export S=...` and read by `os.environ['S']`.
 
@@ -1022,7 +1023,7 @@ but a foreground tool call returns only when the command ends,
 and this one command both composed and posted:
 issue #3219 was created at 21:16:48Z and the last claim comment at 21:17:12Z,
 so the lines were readable only once all twenty-one bodies were live.
-They are a detector usable before posting only when composing and posting are separate tool calls,
+Those stderr lines are a detector usable before posting only when composing and posting are separate tool calls,
 or a dry run precedes the batch.
 The detector is one-sided:
 it fires only when a substituted command fails and prints;
@@ -1037,7 +1038,8 @@ and the condition is decidable,
 a `PreToolUse` regex over the Bash command for an unquoted delimiter with a backtick or dollar sign in the heredoc body,
 so `hooks/no-mistake-without-a-hook.py`'s one discharge (a mistake that cannot be mechanized) does not apply,
 and `shared/principles/deterministic-tools.md`'s third-occurrence bar is about repeated work, not a repeated mistake.
-Issue #3230 carries that hook as its done-when.
+Issue #3230's done-when asks only that a guard be considered, for a stderr-conditioned check;
+the `PreToolUse` regex above is the decidable half of that check, and building it is what closes the gap.
 
 - **Do:** compose the bodies in one tool call and post them in a second,
   and treat `command not found` or `No such file or directory` on the first call's stderr as the payload probably having been substituted,

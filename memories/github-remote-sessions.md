@@ -91,7 +91,7 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
   Do not rely on local `Stop` hook enforcement to prevent placeholder turns when running in remote/web cloud sessions --- adhere to `CLAUDE.md`'s "Always produce a reply" rule directly in every turn.
 - **This session's GitHub identity varies BY OPERATION, and which routes exist follows from that rather than from any single probe.**
   The credential is proxy-substituted (the literal value begins `prox`), and it does not resolve to one actor.
-  Measured 2026-09-02 in a remote session scoped to `Morrison-Lab/ai-config`:
+  Measured 2026-09-02 in a remote session scoped to `Morrison-Lab/ai-config`, except the row that carries its own date:
 
   | operation | identity observed | how it was read |
   |---|---|---|

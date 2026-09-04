@@ -54,7 +54,8 @@ The mirror of the #1718 case above.
 There the squash body carried a keyword the author had not wanted;
 here the keyword the merger expected was absent, and the absence was right.
 
-Under a squash merge, what closes an issue is the whole squash commit message as entered, title included, plus the PR body, all parsed.
+Under a squash merge, what closes an issue is the whole squash commit message as entered,
+title included, plus the PR body, all parsed.
 This repo sets `squash_merge_commit_title` to `COMMIT_OR_PR_TITLE` (read 2026-09-04),
 which GitHub documents as the sole commit's subject on a one-commit PR and the PR title otherwise;
 so a keyword in either of those reaches `main` without anyone typing it at merge time.
@@ -66,9 +67,12 @@ and the message actually entered is what to read once it exists.
 The repo also allows merge commits and rebase merges (read 2026-09-04);
 either lands every branch commit message on `main` unchanged, where the parser reads each one.
 
-Measured 2026-09-04 on the six wave-1 PRs, the loop scripts of the r5 fix loop (the shape ai-config#3203 proposed), issue #3068's timeline, and a run of `hooks/remind-brief-premises.py`.
+Measured 2026-09-04 on the six wave-1 PRs,
+on the fix-loop scripts from the first wave-1 script through r5 (r5 alone carries the shape ai-config#3203 proposed),
+on issue #3068's timeline,
+and on a run of `hooks/remind-brief-premises.py`.
 The fixer brief asserted for every branch that its first commit already carried the closing keyword.
-The sentence entered the loop's brief on 2026-09-03, in the r1 script,
+The sentence entered the loop's brief on 2026-09-03, in the first wave-1 script,
 and was copied into each later script through r5 without anyone re-reading the branches.
 It was never true for `fix/3102-memory-size-approach`,
 which says `Refs #3102` because PR #3215 shipped one of the issue's two parts;
@@ -92,11 +96,15 @@ it keys on a corpus path or a count, and a claim about a branch's commits carrie
   `git log --regexp-ignore-case --extended-regexp --grep='(close[sd]?|fix(es|ed)?|resolve[sd]?):? *([A-Za-z0-9._-]+/[A-Za-z0-9._-]+)?#[0-9]+' --format='%h %s' origin/main..HEAD`.
 - **Don't:** treat having written the PR body as having read the squash body;
   the #1718 case above is a `Refs` PR body over a `Closes` squash body.
-- **Do:** put whatever keyword the merge should carry in the PR body, scoped per [`issue-first.md`](../shared/workflow/issue-first.md).
-  Under a squash merge whose body you write, the PR body, the squash title, and that body are the surfaces that decide;
-  under a merge commit, a rebase merge, or a squash with the default body, the branch commits are one as well.
+- **Do:** put whatever keyword the merge should carry in the PR body, scoped per [`issue-first.md`](../shared/workflow/issue-first.md),
+  then read every surface the parser will see for the merge method in use.
+  Under a squash merge whose body you write: the PR body, the squash title, and the squash body you write.
+  Under a squash merge with the default body: the same three, with the branch commits concatenated into the body.
+  Under a merge commit: the PR body, the branch commits, and the merge commit's body,
+  which this repo fills from the PR title (`merge_commit_message` read as `PR_TITLE` on 2026-09-04).
+  Under a rebase merge: the PR body and the branch commits.
 - **Don't:** read only the squash body you typed;
-  nobody reads the title it inherits from the PR or the sole commit.
+  the title the squash commit inherits from the PR or the sole commit is parsed without any human having read it.
 - **Do:** when a branch carries `Refs` where a `Closes` was expected,
   read its commit messages for the reason before treating the absence as an omission,
   and look for the acceptance item a deliberate removal names.
@@ -113,13 +121,11 @@ it keys on a corpus path or a count, and a claim about a branch's commits carrie
 - **Don't:** close an issue by hand because its PR merged,
   or because the required items that remain unmet are the hard ones.
 
-## Do / Don't
+## Do / Don't for the negated-keyword case
 
 - **Do:** if you must mention a closing keyword you are not using, keep the
   number off the keyword (`the closing keyword was not used for #1717`;
   `Refs #1717` only).
-- **Do:** read the squash / merge commit message, not only the PR body,
-  before assuming a tracker stayed open.
 - **Don't:** write `Closes #N is deliberately NOT used` (or any
   `Closes` / `Fixes` / `Resolves` `#N` substring) in a commit message or
   PR body.

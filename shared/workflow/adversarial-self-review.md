@@ -126,7 +126,9 @@ and only the first of them can ever appear on `PATH`:
 
 1. **A local CLI**, probed with `command -v` --- `agy`, `opencode`, `codex`, `claude`, `cursor`.
 2. **A forge-side bot**, which runs on the forge and so is invisible to `PATH` in principle.
-3. **An API key** for a provider with no CLI installed, probed in the environment.
+3. **An API key** for a provider with no CLI installed, probed in the environment ---
+   `OPENROUTER_API_KEY` and `GEMINI_API_KEY` among them,
+   with the rest of the ladder in [`delegation.md`](../../memories/delegation.md).
 
 A null `command -v` sweep is therefore evidence about `PATH` and about nothing else.
 That is [`grep-is-not-coverage`](grep-is-not-coverage.md)'s shape,
@@ -139,34 +141,68 @@ so its providers are enumerated here rather than left to be inferred:
 
 | provider | how it is reached |
 | --- | --- |
-| Copilot | `mcp__github__request_copilot_review`, or the `requested_reviewers` REST endpoint |
-| Jules | an `@jules review` comment on the PR, which fires `.github/workflows/jules-review.yml` |
-| Antigravity | an `@agy` or `@antigravity` comment, or `workflow_dispatch` on `.github/workflows/antigravity-review.yml` |
+| Copilot | a reviewer request on the pull request, where the repository has Copilot review enabled |
+| Jules | a mention comment, where the repository carries a Jules review workflow |
+| Antigravity | a mention comment or a manual workflow run, where the repository carries an Antigravity review workflow |
 
-Each of those runs a different model on a different harness from a Claude session,
-so each qualifies for the merge gate above on both axes.
-Read the table as a starting list rather than as the population.
-The two comment-triggered rows depend on a workflow that one PR can add or remove,
-so derive them from the repo's own `on:` blocks
-per [`claude-review-dispatch`](../../memories/claude-review-dispatch.md).
+The concrete dispatch mechanism behind each row --- the endpoint, the tool name, the workflow file ---
+varies by harness and by repository,
+so it lives in [`claude-review-dispatch`](../../memories/claude-review-dispatch.md)
+and [`gh-cli`](../../memories/gh-cli.md)
+rather than here.
+
+**Read the table as a starting list rather than as the population, and re-derive every row per repository.**
+All three rows are repository-conditional, not only the two comment-triggered ones:
+a review workflow is added or removed by one pull request,
+so derive those rows from the repository's own `on:` blocks,
+and Copilot review is switched on and off per repository by a ruleset rule
+and per user by quota,
+so derive that row from the repository's rulesets.
+
+**Copilot is a fourth state the other rows do not have: reachable and withheld.**
+A standing maintainer directive forbids requesting Copilot code review
+on any pull request in any repository while the moratorium stands.
+Read its live expiry from the `MORATORIUM_END` constant
+in [`no-unreviewed-pr.py`](../../hooks/no-unreviewed-pr.py),
+never from a date copied into prose,
+per [`avoid-hardcoding-external-data`](../coding/avoid-hardcoding-external-data.md);
+that constant read 2026-12-01 when this section was written on 2026-09-03,
+so the moratorium was live and the row's recorded state was "reachable, withheld".
+The full statement and its measurements are in [`gh-cli`](../../memories/gh-cli.md).
+
+Each of these runs on a harness distinct from the authoring session's.
+Whether any of them satisfies the **merge** gate is a separate question this section does not settle:
+the ladder and its Do bullet above are unchanged by this inventory,
+and the multi-backend rule stated there still has to be applied per provider,
+since a caller that passes an empty model input resolves that model downstream
+and the value has to be read where it is resolved rather than assumed here.
 
 **So "blocked on reviewer availability" owes an enumeration, not a probe.**
 That status is honest only after naming every known provider and the state it was found in,
-which is what the pinned quorum below already requires
+which is what [`Query all available providers sequentially`](#query-all-available-providers-sequentially)
+already requires
 and what a single failed sweep never establishes.
 
 - **Do:** run the availability check as a list of provider routes --- local CLI, forge bot, API key --- and record each provider's state.
-- **Do:** name every known provider and its state before writing "blocked on reviewer availability".
+- **Do:** name every known provider and its state before writing "blocked on reviewer availability",
+  a provider that is reachable but withheld by policy included.
+- **Do:** re-derive every forge-side row against the repository in hand,
+  since a workflow, a ruleset rule, and a quota each turn one of them on or off.
 - **Don't:** read a null `command -v` sweep as an availability verdict;
   it reports what is on `PATH` and stops there.
 - **Don't:** treat the machine inventory above as the provider population, since a forge-side reviewer cannot appear in it.
+- **Don't:** record a withheld provider as available,
+  or read its row as licence to dispatch it.
 
 (Measured 2026-09-03 on ai-config#3105:
 a session held two green PRs for roughly seven hours as
 "blocked on reviewer availability",
 on a `command -v` sweep over eight CLIs that correctly found none of them installed.
-Copilot, Jules, and Antigravity were all reachable throughout,
-and a Copilot request on #3084 produced a running check the same day.)
+Jules and Antigravity were reachable and permitted throughout.
+Copilot was reachable and withheld:
+the moratorium had been extended the previous day and was read as expired,
+so the Copilot request made on #3084 that day was a breach of the directive
+rather than a measurement, and is recorded here as the slippage it was.)
 
 ## What "separate" requires
 

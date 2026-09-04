@@ -177,9 +177,10 @@ def main() -> int:
     if done_at >= admit_at:
         return 0
 
-    # Once per distinct admission phrase per session (ai-config#2997). The
-    # mode is in the key because this hook is registered on both
-    # UserPromptSubmit and Stop, and each registration owes its own firing.
+    # Once per distinct admission phrase per session, per registration
+    # (ai-config#2997). The mode is in the key because this hook is
+    # registered on both UserPromptSubmit and Stop, and each registration
+    # owes its own firing.
     mode = os.getenv("AI_CONFIG_STOP") or ""
     key = hashlib.sha256(f"{path}:{admit_txt}:{mode}".encode()).hexdigest()[:16]
     sentinel = os.path.join(
@@ -217,9 +218,7 @@ def main() -> int:
         "be owed at once.\n\n"
         "If this is a false positive -- you were correcting someone else's "
         "claim, quoting the rule, or writing a hypothetical -- disregard it "
-        "and carry on. A phrase wrapped in backticks is not matched at all, "
-        "and this fires once per distinct phrase per session, so writing "
-        "about the misfire will not re-fire it."
+        "and carry on. A phrase wrapped in backticks is not matched at all."
     )
     if os.getenv("AI_CONFIG_STOP") == "1":
         print(json.dumps({"decision": "block", "reason": message}))

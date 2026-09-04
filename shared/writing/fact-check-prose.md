@@ -959,6 +959,51 @@ the paragraph's content was "split at the clause boundary",
 and the honest form carries no numbers at all.
 Tracked as [#3158](https://github.com/Morrison-Lab/ai-config/issues/3158).)
 
+## A tool's behaviour quoted in a commit message is written after the measurement, not before
+
+The section above covers a figure in a commit message.
+This covers a quotation: the error text a tool printed, the exit status it returned,
+or the behaviour a reviewer ascribed to it,
+written into the body as the reason for the change.
+The inherited-claims bullet near the top of this file governs restating such a claim in a doc or a comment,
+and "A block presented as program output is a claim, so capture it rather than composing it" above governs a block composed from memory in a doc;
+this governs the commit body, where the sentence is inherited from a reviewer's paraphrase and the draft usually precedes the measurement.
+
+A commit message is usually drafted before the commit,
+and often before the measurement the message describes has been read,
+because the change was made to answer a reviewer's finding
+and the finding already says what the tool does.
+So the body inherits the reviewer's phrasing of the tool's behaviour,
+and the phrasing is checked against nothing:
+the reviewer paraphrased, the author copied, and the tool's own output never entered the text.
+For the reason the section above gives (rewriting destroys the copy a later reader would check),
+the correction goes on the PR and into the squash body rather than into an amend,
+and the wrong quotation stays in the history.
+The same `address-every-comment` bullet the section above cites recommends the amend for a wrong figure;
+under squash merge the intermediate body never reaches `main`,
+so the squash body is the copy that rule is about, and the two agree.
+
+- **Do:** run the command, read its output and status on screen, and only then write the sentence that quotes them.
+- **Do:** when the change answers a reviewer's description of a tool's behaviour,
+  treat that description as a claim to measure before it becomes the commit's own.
+- **Don't:** write a tool's error text or exit status into a commit body from a reviewer's wording
+  or from the result you expect.
+- **Don't:** draft the body before the gate chain runs and leave it untouched after the chain prints something else.
+
+(Morrison-Lab/ai-config#3154, 2026-09-03, three times in one evening on grep alone.
+`75829fad`'s body said a `-zz` subject "exits 2 with \"invalid option\"";
+on GNU grep 3.11 `-zz` is the valid `-z` flag twice, so grep took the first path as its pattern and searched the current directory instead,
+exiting on whether that accidental pattern matched; `-Q` is the case that exits 2.
+`a51a170f`'s body quoted the error for a `[` subject as "Unmatched [", the reviewer's wording, where the tool prints "Invalid regular expression".
+The prose line that same commit added, and the prepared squash body, said a bare `(` motivates `-F`;
+`(` is a literal in grep's default BRE mode, and of the four characters the two versions of that prose line name (`[`, `(`, `.`, `*`) only `[` errors, which `27bb9588` corrected.
+The `(` case was caught by an adversarial verdict that ran the command;
+the other two surfaced while re-measuring for the next round's PR comment,
+and each correction went onto the PR and into the squash body rather than into an amend.
+The same day's fourth case was not grep:
+`e698c456`'s body called three commits "not fetchable" from a short-SHA fetch on a shallow clone,
+retracted in `709bc612`'s body on the same PR.)
+
 ## An elapsed-time claim is a computation, not a memory
 
 The section on claims inherited from upstream discussion covers a figure you

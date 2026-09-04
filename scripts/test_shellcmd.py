@@ -311,6 +311,37 @@ check("`pushd <dir>` moves like `cd`",
 check("an unexpanded variable target is indeterminate",
       shellcmd.resolve_cd_target(["cd", "$WT"], "/srv/repo"), None)
 
+# ------------------------------------------------- subshell nesting depth
+#
+# `simple_commands` FLATTENS `( ... )`, which is right for a caller asking
+# which programs ran and wrong for one modelling the shell's own state: a
+# `cd` inside a subshell moves that subshell and dies with it, so the parent
+# never left. `(cd /other && git status)` is the routine way to read another
+# checkout without leaving your own.
+check("a subshell cd is flattened away by simple_commands",
+      shellcmd.simple_commands("(cd /a && git status)"),
+      [["cd", "/a"], ["git", "status"]])
+check("the depth-aware split keeps the nesting",
+      shellcmd.simple_commands_with_depth("(cd /a && git status)"),
+      [(1, ["cd", "/a"]), (1, ["git", "status"])])
+check("a cd outside the parens stays at depth 0",
+      shellcmd.simple_commands_with_depth("cd /r && (cd /a && ls) && git commit"),
+      [(0, ["cd", "/r"]), (1, ["cd", "/a"]), (1, ["ls"]),
+       (0, ["git", "commit"])])
+# `shlex` emits a closing run like `));` as ONE separator token, so the depth
+# has to come off the token's own paren COUNT rather than off one paren per
+# separator --- otherwise the trailing command reads as still nested.
+check("a run of closing parens in one token closes every level",
+      shellcmd.simple_commands_with_depth("(cd /a && (cd /b; ls)); cd /c"),
+      [(1, ["cd", "/a"]), (2, ["cd", "/b"]), (2, ["ls"]), (0, ["cd", "/c"])])
+# `{ ... }` runs in the CURRENT shell, so a `cd` inside one does move the
+# caller and must not be counted as nesting.
+check("brace grouping is not subshell nesting",
+      shellcmd.simple_commands_with_depth("f() { cd /a; }"),
+      [(0, ["f"]), (0, ["{", "cd", "/a"]), (0, ["}"])])
+check("a parse error is None on the depth-aware split too",
+      shellcmd.simple_commands_with_depth("git commit -m \'unclosed"), None)
+
 # ------------------------------------------------- source-level hygiene
 #
 # THIS MODULE QUOTES REGEX SOURCE IN ITS PROSE, so a docstring can carry an

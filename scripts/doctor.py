@@ -443,9 +443,9 @@ def resolve_plugin_enabled(home: Path) -> tuple[Optional[bool], Optional[Path], 
         settings, parse_error = read_settings(path)
         if parse_error is not None:
             return None, path, parse_error
-        plugins = settings.get("enabledPlugins")
-        if plugins is not None and not isinstance(plugins, dict):
-            return None, path, f"enabledPlugins is {type(plugins).__name__}, not an object"
+        if "enabledPlugins" in settings and not isinstance(settings["enabledPlugins"], dict):
+            kind = type(settings["enabledPlugins"]).__name__
+            return None, path, f"enabledPlugins is {kind}, not an object"
         entries = ai_config_entries(settings)
         if entries:
             return any(entries.values()), path, None

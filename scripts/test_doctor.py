@@ -273,6 +273,19 @@ class TestConsumerLeftovers(unittest.TestCase):
         self.assertIsNone(res["plugin_enabled"])
         self.assertIn("enabledPlugins is list, not an object", res["details"])
 
+    def test_null_enabled_plugins_is_reported_not_swallowed(self):
+        # An explicit `null` is present and is not an object either, so it
+        # must report rather than read as a scope naming no entry.
+        (self.home / "settings.json").write_text(
+            json.dumps({"enabledPlugins": None}),
+            encoding="utf-8",
+        )
+        res = doctor.check_consumer_leftovers()
+        self.assertFalse(res["ok"])
+        self.assertEqual(res["status"], "WARN")
+        self.assertIsNone(res["plugin_enabled"])
+        self.assertIn("enabledPlugins is NoneType, not an object", res["details"])
+
     def test_clean_home_reports_ok(self):
         self.enable_plugin()
         res = doctor.check_consumer_leftovers()

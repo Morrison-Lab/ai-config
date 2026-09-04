@@ -117,12 +117,13 @@ committed pass.
      (
        repo="${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/ums rev-parse --show-toplevel 2>/dev/null || pwd)}"
        test -f "$repo/CLAUDE.md" && test -d "$repo/shared" || { echo "not an ai-config checkout: $repo" >&2; exit 1; }
-       cd "$repo" && grep -rilI -- "<subject>" skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md
+       cd "$repo" && grep -rilIF -- "<subject>" skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md
      )
      ```
      The query runs over the files on disk,
      so an entry that exists only on a branch not checked out there is out of reach
      (see the unmerged-PR section of [`grep-is-not-coverage`](../../shared/workflow/grep-is-not-coverage.md)).
+     `-F` matches the subject as a fixed string, so an API call or error string carrying `[` or `(` is searched for as written;
      `-I` skips binary files, bytecode caches included,
      which a plain `grep -r` would otherwise report as hits.
      A rule can be owned by a `shared/` fragment or a skill as easily as by a memory,

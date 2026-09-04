@@ -613,7 +613,7 @@ NLB_PATHS_IGNORE='codex-skills/**,docs/**,_site/**,.quarto/**' \
 That path is the file `scripts/lib/nlb_gate.py` loads.
 Refreshing it after an action-pin bump is `python3 scripts/sync-nlb-checker.py`.
 
-**That script used to take no arguments and run the sync on any invocation, including `--help`.**
+**That script used to run the sync on any invocation, including `--help`.**
 It had no `argparse` or usage guard,
 so `--help` was not special-cased and ran the full fetch-and-write path at whatever SHA `validate.yml` pinned.
 Measured 2026-09-02: `python3 scripts/sync-nlb-checker.py --help` fetched the vendored checker at the pinned SHA and rewrote `scripts/vendor/gha-check-new-line-breaks.py` plus its `.pin`.
@@ -626,9 +626,10 @@ The no-argument invocation is still the sync.
   `scripts/lib/nlb_gate.py`'s `assert_pin_matches_ci` refuses to load if the three disagree.
 - **Do:** run the script with `--help` to read its usage;
   it now prints the docstring and exits without fetching or writing.
-- **Don't:** run the script with no arguments to see what it does.
+- **Don't:** run the script with no arguments before bumping the `uses:` SHA,
+  or on a tree carrying local edits to `scripts/vendor/gha-check-new-line-breaks.py`.
   The bare invocation is still the sync,
-  and it overwrites `scripts/vendor/gha-check-new-line-breaks.py` and its `.pin`.
+  and it overwrites that file and its `.pin`.
 (Measured 2026-09-02 on [Morrison-Lab/gha#826](https://github.com/Morrison-Lab/gha/pull/826)
 and [ai-config#3089](https://github.com/Morrison-Lab/ai-config/pull/3089);
 reported as [ai-config#3095](https://github.com/Morrison-Lab/ai-config/issues/3095).)

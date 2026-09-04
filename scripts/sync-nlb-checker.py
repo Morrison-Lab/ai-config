@@ -73,8 +73,10 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     The sync fetches over the network and rewrites two tracked files, so a
     reader who runs `--help` to learn the usage must not trigger it: before a
     pin bump that is a surprise write, and over local edits to the vendored
-    copy it is a silent overwrite (ai-config#3095). The parser takes no
-    arguments, so an unknown one exits 2 rather than being ignored.
+    copy it is a silent overwrite (ai-config#3095). The parser defines no
+    arguments beyond argparse's own `-h`/`--help`, and `parse_args` (not
+    `parse_known_args`) is what rejects an unrecognized one, so an unknown
+    argument exits 2 rather than being ignored.
     """
     parser = argparse.ArgumentParser(
         prog=Path(__file__).name,

@@ -202,9 +202,6 @@ Filed as [#3196](https://github.com/Morrison-Lab/ai-config/issues/3196) (the dif
 
 ## 03:29 PDT --- notebook branch: adversarial rounds with no PR open yet, and the per-round entries are cut
 
-As of `0c99f5e6`, the head round 9 reviewed, nine adversarial rounds had run on this branch with no PR open, returning eleven, six, four, four, four, eleven, four, three, and one findings.
-Round 1's were nine figures and mechanism claims written from recollection where the instrument was one command away (line counts, a character count, a PR's `updated_at` written as its open time, a grep search target, a `rev-list` direction, a bare UTC stamp, an index row) and two ambiguous references.
+As of `70d7aa97`, the head round 10 reviewed, ten adversarial rounds had run on this branch with no PR open, returning eleven, six, four, four, four, eleven, four, three, one, and two findings.
 The 84 that should have been 82 was also in #3196's body, corrected there at 02:50 PDT.
-Rounds 2 to 4 found defects in older entries (dangling "the HH:MM entry" pointers, a merge heading a minute late against its commit, an ancestry parenthetical left uncorrected in place) and in the narrating entries the fix commits had appended: a wrong entry named, an unmeasured line distance, a miscount, a self-description the same entry contradicted, a claim about #3196's body that went stale within the minute, and a citation of the `ums` anti-pattern for a shape it does not record.
-Those three narrating entries, appended by the commits answering rounds 1 to 3, were deleted rather than patched at `48380505`, the commit answering round 4, and this entry took their place.
-Rounds 5 to 9 found figures in older entries no round had re-measured (a file count, two commit distances, two opened-PR heading minutes, an issue number given a branch, a PR linked through the issues path, a placeholder pointer, a UTC-relative "yesterday", a line count attributed to the wrong commit) and wording in this entry that its own contents, the transcripts, or the branch's history contradicted.
+The three entries that narrated rounds 1 to 3, appended by the commits answering those rounds, were deleted rather than patched at `48380505`, the commit answering round 4, and this entry took their place.

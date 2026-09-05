@@ -137,42 +137,82 @@ def _mask_heredocs(command: str) -> str:
     string, matching this hook's general fail-toward-silence posture for
     malformed input -- nothing downstream should trust content that never
     reaches a real terminator.
+
+    Several heredocs can be introduced on ONE line (`cmd <<A <<B`), and the
+    shell delivers their bodies in order immediately after that line, before
+    the command runs at all. Advancing `pos` to the first tag's own
+    terminator and resuming the outer search from there missed every later
+    tag on the same intro line -- their `<<TAG` tokens sit BEFORE that
+    position, so a forward-only search past the first body's terminator
+    never finds them, and their bodies are never masked (measured
+    2026-09-05 review, second pass). All tags sharing one intro line are
+    therefore collected up front, and their bodies are masked in order
+    before the outer loop resumes.
     """
     out = list(command)
-    pos = 0
+    pos, n = 0, len(command)
     while True:
         m = HEREDOC_START.search(command, pos)
         if not m:
             break
-        tag = m.group(2)
-        strip_indent = m.group(0).startswith("<<-")
         line_end = command.find("\n", m.end())
         if line_end == -1:
-            break  # no body possible; nothing left to scan
+            break  # no body possible for any heredoc on this line
+
+        tags = [m]
+        search_from = m.end()
+        while True:
+            nxt = HEREDOC_START.search(command, search_from)
+            if nxt is None or nxt.start() >= line_end:
+                break
+            tags.append(nxt)
+            search_from = nxt.end()
+
         body_start = line_end + 1
-        pattern = r"^[ \t]*" if strip_indent else r"^"
-        terminator = re.compile(pattern + re.escape(tag) + r"$", re.M)
-        term_match = terminator.search(command, body_start)
-        mask_end = term_match.end() if term_match else len(command)
-        for i in range(body_start, mask_end):
-            out[i] = "x"
-        pos = mask_end
+        for tag_match in tags:
+            tag = tag_match.group(2)
+            strip_indent = tag_match.group(0).startswith("<<-")
+            pattern = r"^[ \t]*" if strip_indent else r"^"
+            terminator = re.compile(pattern + re.escape(tag) + r"$", re.M)
+            term_match = terminator.search(command, body_start)
+            mask_end = term_match.end() if term_match else n
+            for i in range(body_start, mask_end):
+                out[i] = "x"
+            if term_match is None:
+                body_start = n
+                break
+            body_start = (mask_end + 1 if mask_end < n
+                          and command[mask_end] == "\n" else mask_end)
+        pos = body_start
     return "".join(out)
 
 
 def _mask(command: str) -> str:
-    """`command` with line continuations joined, heredoc bodies masked, and
+    """`command` with heredoc bodies masked, line continuations joined, and
     quoted-string interiors replaced by `x` -- all same length, so an
     operator inside any of those cannot split a segment and a `git push`
     mentioned inside any of those cannot match.
 
-    Continuations are joined first (a `\\` + newline is whitespace, not a
-    separator, and not part of any string or heredoc syntax), then heredoc
-    bodies are masked, then quotes -- so a quote appearing only inside a
-    heredoc body never enters the quote scan below.
+    Heredocs are masked FIRST, on the pristine command, so `_mask_heredocs`'s
+    terminator search sees the heredoc's REAL newlines. Continuation-joining
+    a QUOTED heredoc tag's body is wrong -- unlike an unquoted tag, a quoted
+    one (`<<'EOF'`) suppresses parameter/command expansion but NOT the
+    literal content, so a body line ending in a genuine trailing backslash
+    keeps its own newline. Joining first erased that newline, the
+    terminator's `^TAG$` no longer matched at any line start, the heredoc
+    read as unterminated, and masking ran to the end of the string --
+    swallowing a real chained command after it (measured 2026-09-05 review,
+    second pass). Masking heredocs before joining keeps every heredoc's
+    terminator search anchored to real line boundaries; a continuation
+    outside any heredoc is untouched by heredoc-masking and is still joined
+    correctly on the next line, and one INSIDE a masked body is moot -- that
+    span is already all `x` by the time continuation-joining runs.
+
+    Quotes are masked last, so a quote appearing only inside a heredoc body
+    never enters the quote scan below.
     """
-    command = CONTINUATION_RE.sub(lambda m: " " * len(m.group(0)), command)
     command = _mask_heredocs(command)
+    command = CONTINUATION_RE.sub(lambda m: " " * len(m.group(0)), command)
     out = []
     i, n = 0, len(command)
     while i < n:

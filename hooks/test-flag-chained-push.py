@@ -70,6 +70,17 @@ FIRES = [
      "cat <<'EOF' && git push\nbody line\nEOF"),
     ("chained push on the same line as an indented (<<-) heredoc introducer",
      "cat <<-'EOF' && git push\n  body line\n  EOF"),
+    # A QUOTED heredoc tag ('EOF') does not strip a trailing backslash inside
+    # its own body -- that suppression only applies to command/parameter
+    # EXPANSION, not to literal content. Joining continuations before
+    # masking heredocs erased the newline right before this body's own
+    # trailing backslash, so the terminator's `^EOF$` no longer matched at
+    # any line start, the heredoc read as unterminated, and masking ran to
+    # the end of the string -- swallowing the real `&& git push` after it
+    # (measured 2026-09-05 review, second pass).
+    ("chained push after a heredoc whose body ends in a real backslash",
+     "cat <<'EOF'\nsome body line" + chr(92) + chr(10)
+     + "EOF\n&& git push"),
 ]
 
 QUIET = [
@@ -90,6 +101,14 @@ QUIET = [
      "cat <<'EOF' && echo unrelated\ngit push origin main\nEOF"),
     ("git push inside an indented (<<-) heredoc body",
      "cat <<-'EOF'\n  git push origin main\n  EOF"),
+    # Two heredocs introduced on ONE line deliver their bodies in order,
+    # immediately after that line. Advancing past only the FIRST tag's
+    # terminator before resuming the outer search left the second tag's
+    # `<<TAG` token -- which sits BEFORE the resumed position, on the shared
+    # intro line -- unfound, so its body was never masked and a `git push`
+    # inside it matched (measured 2026-09-05 review, second pass).
+    ("git push inside the SECOND of two heredocs sharing one intro line",
+     "cat <<'A' <<'B'\nbodyA\nA\ngit push origin main\nB"),
 ]
 
 

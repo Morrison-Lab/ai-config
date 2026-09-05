@@ -136,7 +136,7 @@ to `memories/github-mcp-tools.md`, and
 That paragraph was also the subject of ucdavis/bcs#908, which the session had
 inspected at the start, seen was open, and deliberately deferred to on that
 exact sentence.
-#908 merged at 2026-09-03T23:55:21Z --- roughly four and a half hours later,
+That PR merged at 2026-09-03T23:55:21Z --- roughly four and a half hours later,
 mid-session --- as commit `f36b0c2f`, replacing "known exactly by
 construction" with a Monte Carlo standard-error bound computed inline.
 The session's later commits kept editing the pre-#908 paragraph, so the branch

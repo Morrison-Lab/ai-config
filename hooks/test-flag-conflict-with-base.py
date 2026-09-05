@@ -70,11 +70,18 @@ def _origin(default_branch="main"):
     return d
 
 
-def _clone(origin):
+def _clone(origin, branch="main"):
+    """A working clone pinned to `branch`.
+
+    The branch is passed explicitly rather than inherited from the origin's
+    HEAD: a fixture that inherits it silently follows whatever
+    `init.defaultBranch` the host is configured with, so the same test reads
+    a different branch on two machines.
+    """
     d = tempfile.mkdtemp(prefix="base-conflict-work-")
     TEMP_DIRS.append(d)
-    subprocess.run(["git", "clone", "-q", origin, d], capture_output=True,
-                   text=True, env=ENV, check=True)
+    subprocess.run(["git", "clone", "-q", "-b", branch, origin, d],
+                   capture_output=True, text=True, env=ENV, check=True)
     return d
 
 
@@ -88,7 +95,7 @@ def build(default_branch="main", branch="feat/estimand", conflict=True,
           fetch_into_clone=True, stay_on_base=False, branch_commits=True):
     """An (origin, clone) pair in one of the fixture shapes."""
     origin = _origin(default_branch)
-    work = _clone(origin)
+    work = _clone(origin, default_branch)
     _advance_origin(origin)
     if fetch_into_clone:
         _git(work, "fetch", "-q", "origin", default_branch)

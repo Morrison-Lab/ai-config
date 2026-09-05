@@ -1006,20 +1006,34 @@ edit.
 (Morrison-Lab/ai-config#3060 and #3167, 2026-09-03, recorded here rather than
 as a sibling section because it is this same rule failing rather than a second
 one.
-The two PRs carried three unmeasured or false figures across their commit
-messages, and the attribution matters because the pattern is a chain rather
-than one PR's accident.
-#3060 carried two: "into the corpus's 60-to-80 range" when the resulting lines
-measured 54, 84 and 81 --- the case already recorded above --- and then "three
-lines below" when the gap was ten, the second written into the commit
-correcting the first.
-#3167, which added the section above, then carried "twelve lines above" when
-the gap was thirteen.
-All three were positional or dimensional, and none was load-bearing.
-Attribution is derivable for the last two --- `git log --grep` finds them in
-`2156b439d` and `d29d33c71` respectively --- and not for the first, whose
-message was amended away, which is the evidence-destroying property this
-section is about.
+Both PRs put positional figures into commit messages --- "into the corpus's
+60-to-80 range", "three lines below", "twelve lines above" --- and none was
+load-bearing.
+
+What this record can honestly say about them is less than three attempts at it
+assumed, and the shortfall is the point.
+Every message that *asserted* one of these figures was amended away, so each
+survives only as a quotation inside the message that replaced it: `d29d33c71`
+carries "twelve lines above" only to disavow it.
+A grep hit on the string is therefore evidence about the correction, not about
+the assertion --- which is
+[`verify-the-right-artifact`](../workflow/verify-the-right-artifact.md)'s
+substitution, committed while writing the paragraph that warns about it.
+
+Three specific claims were tried here and withdrawn, each refuted by the
+history rather than by argument.
+That the figures formed a chain, each written into the commit fixing the
+previous: `git log --grep` places "three lines below" in `e64e7362f`, which
+`git merge-base --is-ancestor` puts 39 commits *before* the "60-to-80" commit
+`f9068299`, so the sequence runs backwards.
+That the gap was ten: not re-derivable, and the nearest reading of
+`e64e7362f^` makes the original "three lines below" correct.
+That the gap was thirteen: it cites a message that no longer exists.
+
+So the transferable finding is not a count or a chain.
+It is that a rewritten message destroys the copy a later reader would check,
+and that the loss is invisible --- three rounds of review each produced a
+confident reconstruction, and each was wrong in a different way.
 
 That a rule gets broken while being authored is not itself the finding, and is
 already stated in this corpus three times over:

@@ -111,6 +111,24 @@ def build(default_branch="main", branch="feat/estimand", conflict=True,
     return work
 
 
+def build_upstream_remote():
+    """A conflicting clone whose real remote is `upstream`, not `origin`.
+
+    `origin` is deliberately left pointing at an EMPTY repository carrying no
+    base branch at all. A guard that hard-codes `origin` therefore finds no
+    base and skips silently, so this fixture separates "resolved the right
+    remote" from "warned for any reason".
+    """
+    work = build()
+    empty = tempfile.mkdtemp(prefix="base-conflict-empty-")
+    TEMP_DIRS.append(empty)
+    _git(empty, "init", "-q", "--bare", "-b", "main")
+    _git(work, "remote", "rename", "origin", "upstream")
+    _git(work, "remote", "add", "origin", empty)
+    _git(work, "fetch", "-q", "upstream", "main")
+    return work
+
+
 # Conflicting branch, remote-tracking ref already current: the plain case.
 REPO_CONFLICT = build()
 # Same, but the default branch is named `trunk`.
@@ -124,6 +142,8 @@ REPO_CLEAN = build(conflict=False)
 REPO_ON_BASE = build(stay_on_base=True)
 # Branch has no commits of its own: behind the base, not diverged.
 REPO_BEHIND = build(branch_commits=False)
+# Conflicting branch pushed to `upstream`; `origin` exists but is empty.
+REPO_UPSTREAM = build_upstream_remote()
 
 # The hook's own fetch ADVANCES `REPO_STALE`'s remote-tracking ref, so the
 # fixture stops being stale the first time any case runs against it -- and the
@@ -177,6 +197,10 @@ SHOULD_WARN = [
      "a repository whose default branch is `trunk` still warns"),
     ("W5", "git push origin feat/estimand", REPO_STALE, None, restale,
      "the hook's own fetch surfaces a conflict the clone could not yet see"),
+    ("W6", "git push upstream feat/estimand", REPO_UPSTREAM, None, None,
+     "the base is resolved against the remote the push names, not `origin`"),
+    ("W7", "git push --repo upstream feat/estimand", REPO_UPSTREAM, None, None,
+     "`--repo <remote>` names the remote when no positional one does"),
 ]
 
 SHOULD_STAY_SILENT = [
@@ -271,23 +295,30 @@ MUTATIONS = {
         "its status can never fire",
         [('["merge-tree", "--write-tree", base_ref, "HEAD"]',
           '["merge-tree", base_ref, base_ref, "HEAD"]')],
-        {"W1", "W2", "W3", "W4", "W5"},
+        {"W1", "W2", "W3", "W4", "W5", "W6", "W7"},
     ),
     "fetch the base": (
         "without the fetch, a stale clone reports clean",
-        [('got = _git(["fetch", "--quiet", "origin", base], cwd=git_root, timeout=20)',
+        [('got = _git(["fetch", "--quiet", remote, base], cwd=git_root, timeout=20)',
           'got = None')],
         {"W5"},
     ),
     "M3 resolve base": (
         "assuming the base is named `main` misses a repository whose default "
         "is not",
-        [('    head = _git_ok(["symbolic-ref", "--short", "refs/remotes/origin/HEAD"],\n'
+        [('    head = _git_ok(["symbolic-ref", "--short", f"refs/remotes/{remote}/HEAD"],\n'
           '                   cwd=git_root)',
           '    head = None'),
          ('FALLBACK_BASES = ("main", "master", "trunk", "develop", "devel")',
           'FALLBACK_BASES = ("main",)')],
         {"W4"},
+    ),
+    "resolve the pushed remote": (
+        "without reading the remote off the push, the base is looked up "
+        "under `origin`, which in these fixtures is empty",
+        [("        remote = push_remote(rest, git_root)",
+          '        remote = "origin"')],
+        {"W6", "W7"},
     ),
     "M4 skip the base": (
         "without the base-branch skip, pushing the base itself warns about "

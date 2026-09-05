@@ -154,6 +154,9 @@ def _load_sibling():
 
 _SIBLING = _load_sibling()
 
+# Marks `--repo` having been seen, so its VALUE is the next token.
+_NEXT = object()
+
 
 def _git(args, cwd=None, timeout=10):
     """Run git; `(returncode, stdout)`, or `None` when it could not run."""
@@ -177,7 +180,83 @@ def _git_root(directory):
     return _git_ok(["rev-parse", "--show-toplevel"], cwd=directory) or None
 
 
-def resolve_base_branch(git_root):
+# `git push` options that consume the NEXT token, so that token is a value
+# rather than the positional remote. `--repo` is handled separately because
+# its value IS the remote.
+_PUSH_VALUE_OPTS = {"-o", "--push-option", "--receive-pack", "--exec"}
+
+
+def push_remote(argv, cwd):
+    """The remote a `git push` actually targets, defaulting to `origin`.
+
+    Mirrors `no-clobbering-push.py`'s `_target`: `--repo <r>` names the remote
+    when no positional one does, otherwise the first positional after `push`
+    is the remote, otherwise the checked-out branch's configured remote,
+    otherwise `origin`.
+
+    Hard-coding `origin` was the earlier behaviour and is wrong in two ways at
+    once. Where no `origin` exists the guard finds no base and skips silently,
+    and in a fork-style checkout carrying both remotes it compares against a
+    base the push was never aimed at. Either way the answer is about a branch
+    nobody is pushing.
+
+    `argv` is the token list `iter_pushes` yields, `git push ...` included, so
+    this walks past the leading `git`, any pre-command git options, and `push`
+    itself before reading positionals.
+
+    `_PUSH_VALUE_OPTS` lists ONLY options whose value is a separate token.
+    `--force-with-lease`, `--force-if-includes`, `--signed` and
+    `--recurse-submodules` take a value in their `=` form alone, so listing
+    them would eat the following token -- which is the remote. Measured while
+    writing this: with `--force-with-lease` listed,
+    `git push --force-with-lease origin feat/x` resolved to `feat/x`.
+    """
+    tokens = list(argv)
+    while tokens and tokens[0] != "push":
+        tokens.pop(0)
+    if tokens:
+        tokens.pop(0)  # drop `push` itself
+
+    repo_opt = None
+    positionals = []
+    skip = False
+    for tok in tokens:
+        if skip:
+            skip = False
+            continue
+        if tok == "--":
+            continue
+        if tok.startswith("--repo="):
+            repo_opt = tok[len("--repo="):]
+            continue
+        if tok == "--repo":
+            repo_opt = _NEXT
+            continue
+        if repo_opt is _NEXT:
+            repo_opt = tok
+            continue
+        if tok in _PUSH_VALUE_OPTS:
+            skip = True
+            continue
+        if tok.startswith("-"):
+            continue
+        positionals.append(tok)
+
+    if repo_opt and repo_opt is not _NEXT:
+        return repo_opt
+    if positionals:
+        return positionals[0]
+
+    head = _git_ok(["rev-parse", "--abbrev-ref", "HEAD"], cwd=cwd)
+    if head and head != "HEAD":
+        configured = _git_ok(["config", "--get", f"branch.{head}.remote"],
+                             cwd=cwd)
+        if configured:
+            return configured
+    return "origin"
+
+
+def resolve_base_branch(git_root, remote="origin"):
     """The repository's default branch NAME, or None.
 
     Resolved from the repository rather than assumed. `origin/main` is only
@@ -190,14 +269,15 @@ def resolve_base_branch(git_root):
     if pinned:
         return pinned
 
-    head = _git_ok(["symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
+    prefix = f"{remote}/"
+    head = _git_ok(["symbolic-ref", "--short", f"refs/remotes/{remote}/HEAD"],
                    cwd=git_root)
     if head:
-        return head[len("origin/"):] if head.startswith("origin/") else head
+        return head[len(prefix):] if head.startswith(prefix) else head
 
     for name in FALLBACK_BASES:
         if _git_ok(["rev-parse", "--verify", "--quiet",
-                    f"refs/remotes/origin/{name}^{{commit}}"], cwd=git_root):
+                    f"refs/remotes/{remote}/{name}^{{commit}}"], cwd=git_root):
             return name
     return None
 
@@ -232,8 +312,8 @@ def conflicting_paths(git_root, base_ref):
     return paths or ["(path not reported by git merge-tree)"]
 
 
-def _fetch_base(git_root, base):
-    """Refresh `origin/<base>` only. True on success.
+def _fetch_base(git_root, base, remote="origin"):
+    """Refresh `<remote>/<base>` only. True on success.
 
     Deliberately never fetches the branch being pushed: that ref is what a
     `--force-with-lease` compares against, and refreshing it would satisfy a
@@ -241,12 +321,12 @@ def _fetch_base(git_root, base):
     """
     if os.environ.get(NO_FETCH_ENV, "").strip() == "1":
         return False
-    got = _git(["fetch", "--quiet", "origin", base], cwd=git_root, timeout=20)
+    got = _git(["fetch", "--quiet", remote, base], cwd=git_root, timeout=20)
     return got is not None and got[0] == 0
 
 
 NOTE = (
-    "`git merge-tree --write-tree origin/{base} HEAD` reports this branch "
+    "`git merge-tree --write-tree {base_ref} HEAD` reports this branch "
     "CONFLICTS with `{base}`, in {count} file(s):\n\n"
     "{paths}\n\n"
     "{freshness}"
@@ -261,18 +341,18 @@ NOTE = (
     "A deferral to another open PR is a claim about LIVE STATE, and it "
     "expires. The record of the decision survives; its premise does not.\n\n"
     "Before pushing, merge the base in and read what the merge did:\n\n"
-    "    git merge origin/{base}\n"
+    "    git merge {base_ref}\n"
     "    git diff <pre-merge-tip> HEAD -- <each conflicting path>\n\n"
     "A line appearing there only as a DELETION, with nothing re-added in the "
     "same hunk, is a fix the resolution discarded. Note that "
-    "`git diff origin/{base}...HEAD` cannot show this: a reverted line now "
+    "`git diff {base_ref}...HEAD` cannot show this: a reverted line now "
     "matches the base again, so it produces no diff at all."
 )
 
 FRESH_OK = ""
 FRESH_STALE = (
-    "(The `git fetch origin {base}` could not be run, so this compares "
-    "against the `origin/{base}` already in your object store. The conflict "
+    "(The `git fetch {remote} {base}` could not be run, so this compares "
+    "against the `{base_ref}` already in your object store. The conflict "
     "reported is real; a CLEAN result would not have been trustworthy.)\n\n"
 )
 
@@ -290,21 +370,22 @@ def evaluate(command):
         return None
 
     redirected = getattr(_SIBLING, "REDIRECTED", object())
-    for _env, _rest, directory in pushes:
+    for _env, rest, directory in pushes:
         if directory is redirected:
             continue  # M2: the sibling could not say which repository
         git_root = _git_root(directory if directory is not None else os.getcwd())
         if not git_root:
             continue
 
-        base = resolve_base_branch(git_root)  # M3
+        remote = push_remote(rest, git_root)
+        base = resolve_base_branch(git_root, remote)  # M3
         if not base:
             continue
         if _current_branch(git_root) == base:
             continue  # M4: pushing the base itself; nothing to compare
 
-        fresh = _fetch_base(git_root, base)
-        base_ref = f"origin/{base}"
+        fresh = _fetch_base(git_root, base, remote)
+        base_ref = f"{remote}/{base}"
         if not _git_ok(["rev-parse", "--verify", "--quiet",
                         f"{base_ref}^{{commit}}"], cwd=git_root):
             continue
@@ -323,8 +404,10 @@ def evaluate(command):
             listing += f"\n    ... and {len(paths) - len(shown)} more"
 
         note = NOTE.format(
-            base=base, count=len(paths), paths=listing,
-            freshness=FRESH_OK if fresh else FRESH_STALE.format(base=base),
+            base=base, base_ref=base_ref, count=len(paths), paths=listing,
+            freshness=(FRESH_OK if fresh
+                       else FRESH_STALE.format(base=base, base_ref=base_ref,
+                                               remote=remote)),
         )
         summary = (
             f"`git push` carries a branch that conflicts with `{base}` in "

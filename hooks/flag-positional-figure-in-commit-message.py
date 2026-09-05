@@ -260,9 +260,12 @@ RX_SHORT_CLUSTER = re.compile(r"-[A-Za-z]+$")
 
 # Short flags of `git commit` that consume a value. The first of these in a
 # cluster takes the rest of the token, so only the ones carrying a MESSAGE
-# (`m`, `F`) can yield one. Verified against real git rather than the manual:
-# `-Cm x`, `-cm x`, `-tm x`, `-Sm x` and `-um x` each fail in a way showing
-# the leading letter ate the `m`, while `-am` and `-sm` commit normally.
+# (`m`, `F`) can yield one. Verified against real git rather than the manual,
+# on git 2.50.1: `-Cm x`, `-cm x`, `-tm x`, `-Sm x` and `-um x` each fail in a
+# way showing the leading letter ate the `m`, while `-am` and `-sm` commit
+# normally. The set is a property of a git VERSION rather than of a date, so
+# re-derive it from `git commit -h` if a later git adds a value-taking short
+# flag --- a letter missing here is a live false positive.
 VALUE_TAKING_SHORT_FLAGS = frozenset("CcFmtSu")
 
 
@@ -285,7 +288,8 @@ def short_flag_value(tok):
     such is a false-positive source rather than a missed case. `git commit`
     also takes a value for `-C`, `-c`, `-t`, `-S` and `-u`, so in `-Cm` the
     `C` consumes the `m` and there is no message in the token at all.
-    Measured against real git: `-Cm x` gives "could not lookup commit 'm'",
+    Measured against real git 2.50.1: `-Cm x` gives "could not lookup commit
+    'm'",
     `-cm x` the same, `-tm x` treats `x` as a pathspec, `-Sm x` likewise,
     and `-um x` gives "Invalid untracked files mode 'm'" -- while `-am` and
     `-sm` do carry a message, because `a` and `s` take no value.

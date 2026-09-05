@@ -324,3 +324,34 @@ When a hook emits a multi-paragraph message with blank lines (`\n\n`), each blan
 To keep warnings legible and avoid visual clutter:
 - Format warn-only `Stop` hook `systemMessage` strings as a concise, single-line actionable reminder.
 - Avoid internal double newlines (`\n\n`) in `systemMessage` payloads emitted by `Stop` guards.
+
+## An invoked skill's body arrives as user-role transcript text and can arm an issue-scanning hook on an unrelated repo
+
+A slash-command invocation (e.g. `/daytb`) injects the whole `SKILL.md` body,
+worked-example case records included, into the transcript as a **user-role**
+entry.
+A hook that scans for "the user named a forge issue" (`hooks/warn-stale-issue-edit.py`)
+cannot distinguish that injected text from typed prose, so a bare
+`owner/repo#N` citation inside a skill's own case record (not the session's
+target repo) arms the guard for the rest of the session --- surfacing as a
+warning like "Issue-driven edit without a fresh state check for
+`Morrison-Lab/gha#240`" on a completely unrelated `Write`/`Edit`, in a session
+that never mentioned that repo.
+
+- **Do:** recognize an issue-scanning-hook warning that names a repo the
+  session has no relationship to as this symptom, and check whether a skill
+  was invoked earlier in the turn before treating the cited issue as real
+  session state.
+- **Do:** treat the warning's suggested remedy (`gh issue view <N>` on the
+  cited repo) as wasted motion once the mismatch is confirmed, rather than
+  running it.
+- **Don't:** assume the hook's issue citation is something the user or a
+  prior turn actually referenced, just because the hook fired.
+- **Don't:** re-diagnose this from scratch --- it is filed as
+  [ai-config#3266](https://github.com/Morrison-Lab/ai-config/issues/3266)
+  with the full root cause (`is_user_prose()` admits any user-role text block
+  and does not exclude injected skill/command content) and a suggested fix.
+
+(Measured 2026-09-04 in a `ucdavis/hac.sap` session: invoking `/daytb` armed
+the guard on `Morrison-Lab/gha#240`, cited only in that skill's own case
+record, which then fired on the next unrelated memory-file edit.)

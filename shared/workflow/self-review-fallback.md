@@ -8,6 +8,18 @@ See [`memories/mention-triggers.md`](../../memories/mention-triggers.md).
 
 **Quota-skipped:** surfaces as a bot comment --- either `Claude review skipped --- API quota exhausted` (the review workflow) or `You've hit your org's monthly spend limit` (the agent workflow).
 Both mean no bot will respond on this run; re-running the workflow only helps once the quota actually resets.
+A second reviewer's quota-skip carries the same shape but a different tell: `copilot-pull-request-reviewer` posts a normal-looking `COMMENTED` review, with a real `commit_id` and timestamp, whose entire body is *"Copilot was unable to review this pull request because the user who requested the review has reached their quota limit."* --- a check keyed on "did a review object land on this head" reads it as a review;
+only the body distinguishes it (see [`review-verdict-pitfalls.md`](review-verdict-pitfalls.md)'s quota-refusal case and [`memories/github-mcp-tools.md`](../../memories/github-mcp-tools.md)'s `request_copilot_review` note).
+
+**Provider quotas reset independently, and each has to be checked on its own, not inferred from another provider's state.**
+[`memories/github-mcp-tools.md`](../../memories/github-mcp-tools.md) already records that Copilot and `claude-review` **fail** independently (one quota-dead does not mean the other is);
+the same independence applies to **resetting**.
+Your own Claude weekly quota resetting is a fact about *your* usage against Anthropic's service;
+it says nothing about GitHub Copilot's separately-metered review quota, which resets on its own schedule and can still be exhausted the moment yours clears.
+Requesting a Copilot review because "quota reset, so reviews should work now" skips exactly the check that would have caught the refusal --- treat each reviewer's availability as a fact to re-query per reviewer, never as a fact that transfers across reviewers because they happened to be checked at the same moment.
+
+- **Do:** re-check each reviewer's own quota/availability before relying on it, even when a different provider's quota is known to have just reset.
+- **Don't:** read your own quota reset as evidence that another provider's reviewer is now reachable.
 
 **Stub review:** the review job reports success (`is_error: false`, real cost/turns logged) but the posted comment never states a `### Verdict` --- the run genuinely executed but got cut short before reaching a conclusion (e.g. by escalating permission denials on tool calls it needed).
 This looks superficially fine (green check, a comment exists) so it's easy to mistake for a real review --- read the comment body for an actual verdict section before trusting it.

@@ -142,6 +142,12 @@ join that would fail the gate is split rather than written.
   Recurred 2026-09-02 in a `/gia` session:
   `--write` rewrapped three clause-broken prose additions into single lines up to 398 characters long,
   and the fix was `git checkout <prior-commit> -- <files>` and re-breaking by hand.
+  Recurred 2026-09-04 on `memories/github-closing-keywords.md`:
+  one `--write` run joined that file's clause lines into long ones
+  while leaving the same run's session-notebook target correct,
+  so the invocation's behaviour differed by file
+  and its own verdict said nothing about either.
+  Restored from a backup and re-broken by hand.
 
 (Morrison-Lab/ai-config, 2026-08-15, measured on this machine with the gate at
 `Morrison-Lab/gha@da46419`, whose `_DEFAULT_CLAUSE_BREAKS` is `True` and
@@ -613,18 +619,26 @@ NLB_PATHS_IGNORE='codex-skills/**,docs/**,_site/**,.quarto/**' \
 That path is the file `scripts/lib/nlb_gate.py` loads.
 Refreshing it after an action-pin bump is `python3 scripts/sync-nlb-checker.py`.
 
-**That script takes no arguments and runs the sync on any invocation, including `--help`.**
-It has no `argparse` or usage guard,
-so `--help` is not special-cased and runs the full fetch-and-write path at whatever SHA `validate.yml` currently pins.
+**That script used to run the sync on any invocation, including `--help`.**
+It had no `argparse` or usage guard,
+so `--help` was not special-cased and ran the full fetch-and-write path at whatever SHA `validate.yml` pinned.
 Measured 2026-09-02: `python3 scripts/sync-nlb-checker.py --help` fetched the vendored checker at the pinned SHA and rewrote `scripts/vendor/gha-check-new-line-breaks.py` plus its `.pin`.
 The run was a no-op only because the pin had not moved yet.
+The script now parses its command line before anything is fetched,
+so `--help` and `-h` print the module docstring and exit 0 without touching the network or the working tree,
+and an unknown argument exits 2 rather than being ignored.
+The no-argument invocation is still the sync.
 - **Do:** bump the `uses:` SHA in `.github/workflows/validate.yml` first, run the script with no arguments, then commit the workflow, the vendored script, and the `.pin` together.
   `scripts/lib/nlb_gate.py`'s `assert_pin_matches_ci` refuses to load if the three disagree.
-- **Don't:** run the script with `--help` to learn its usage.
-  Read its module docstring instead.
+- **Do:** run the script with `--help` to read its usage;
+  it now prints the docstring and exits without fetching or writing.
+- **Don't:** run the script with no arguments before bumping the `uses:` SHA,
+  or on a tree carrying local edits to `scripts/vendor/gha-check-new-line-breaks.py`.
+  The bare invocation is still the sync,
+  and it overwrites that file and its `.pin`.
 (Measured 2026-09-02 on [Morrison-Lab/gha#826](https://github.com/Morrison-Lab/gha/pull/826)
 and [ai-config#3089](https://github.com/Morrison-Lab/ai-config/pull/3089);
-tracked as [ai-config#3095](https://github.com/Morrison-Lab/ai-config/issues/3095).)
+reported as [ai-config#3095](https://github.com/Morrison-Lab/ai-config/issues/3095).)
 
 **`NLB_PATHS_IGNORE` is the one input the local run needs and does not
 default to**, so a command without it over-reports on generated files this
@@ -1125,3 +1139,65 @@ word of content changed.
 each from exactly 1200 to 1201 lines, failing `validate` with no content
 change; fixed by re-wrapping the same sentences at a different clause
 boundary, restoring both to 1200.)
+
+**Neither gate can tell a clause reflow from a line-wise fill to 80 columns over the same sentences, so a green run is weak evidence that a reflow was done right.**
+
+Both instruments are described at length above, and what matters here is how little of a line's shape they look at.
+The gate asks two questions: does this line hold more than one sentence, and does an 80-plus-character line carry a mid-line semicolon.
+The second is a within-sentence placement rule, and it is the only interior *break* position either instrument examines --- `MD013`, which would notice a column boundary directly, is the rule this repo disables, as noted near the top of this file.
+
+The blindness turns on the **operation**, not on the input, and getting that backwards is what made two review rounds contradict each other.
+A **line-wise** fill --- wrapping each source line separately --- merges no sentences and adds no semicolon, so it passes cleanly.
+A **paragraph refill** --- `fmt`, `par`, an editor's fill-paragraph, which rejoins lines before wrapping --- does merge sentences, and turns the gate red on the very same input.
+Measured on [ai-config#3103](https://github.com/Morrison-Lab/ai-config/pull/3103) (merged 2026-09-03) against its merge base `ba9657270`, classifying every added non-blank Markdown line with the gate's own `classify_line`:
+
+| state | ref | added lines | sentence flags | clause flags | longest line | lines 76-80 | mid-phrase endings |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| unreflowed original | `02cbf00d8` | 184 | 0 | 0 | 630 | 7 | 0 |
+| line-wise fill to 80 | `2d3e18fcf` | 440 | 0 | 0 | 84 | 83 | 36 |
+| clause-boundary reflow | `ba265b546` | 362 | 0 | 0 | 184 | 31 | 0 |
+| paragraph refill of the original | constructed | 336 | 82 | 1 | --- | --- | --- |
+
+The fourth row is built from `02cbf00d8`'s added lines against the same base: contiguous non-blank runs rejoined into paragraphs, then `textwrap.wrap(width=80)` at Python's defaults, then classified the same way.
+Its line count is sensitive to that construction --- passing `break_on_hyphens=False` at the same width gives 342 --- while the sentence-flag count holds at 82 across both, and the flag count is the figure the row is making a claim about.
+
+The first three rows are states the PR actually had, and the gate cannot separate them.
+The fourth is a construction, included because a reviewer produced it while trying to reproduce this measurement and reported its 83 flags as a refutation --- a correct measurement of a tree that never existed.
+Citing the gate over the first three rows is the vacuous verification
+[`algorithmatize-checks`](../workflow/algorithmatize-checks.md)'s
+"A checker that returns the same verdict on the broken tree is not evidence the fix worked" section describes.
+
+Re-derive rather than trusting those refs: #3103 squash-merged as `2ba27cc7b`, and `git branch -r --contains 02cbf00d8` returns nothing, so the three shas survive only in a local clone.
+
+Two measurements do discriminate, both run once per state rather than once over the branch.
+
+The **longest added line** is the sharpest: a fill to 80 columns cannot exceed it by more than a token, so a ceiling of 84 against 630 and 184 identifies the fill immediately.
+The 76-to-80 band is a supporting ratio rather than a second test --- 83 of 440 lines against 7 of 184 and 31 of 362 --- since clause-broken prose lands in that band too, just less often.
+
+```bash
+for ref in "$BEFORE" "$AFTER"; do
+  git diff "$BASE" "$ref" -- '*.md' | grep '^+[^+]' | cut -c2- |
+    awk 'length > 0 { print length }' | sort -n | tail -1
+done
+```
+
+Then count added lines that end mid-phrase --- on an article, a preposition, a conjunction, or an open bracket --- which separates the fill from both hand-broken layouts at 36 against 0 and 0.
+
+```bash
+for ref in "$BEFORE" "$AFTER"; do
+  git diff "$BASE" "$ref" -- '*.md' | grep '^+[^+]' | cut -c2- |
+    grep -cE '\b(a|an|the|of|to|in|on|for|and|or|is|that|with|by|as|at)$|[[(]$' || true
+done
+```
+
+Both figures depend on the definition as much as on the tree, so publish the base, the refs, and the pattern beside them, per
+[`grep-is-not-coverage`](../workflow/grep-is-not-coverage.md)'s
+"A published count needs the ref and the flags it was measured with".
+This regex counts every added line rather than only prose lines, and the gate's own `prose_line_numbers` gives a stricter population, so a figure derived the other way will differ.
+
+- **Do:** compare the longest added line and the mid-phrase count across the before and after refs before reporting a reflow verified.
+- **Do:** publish the base, the refs, and the pattern with any of those figures, since none is defined by the gate.
+- **Do:** say which fill operation you are describing, since a line-wise wrap and a paragraph refill land on opposite sides of the gate.
+- **Don't:** cite the `new-line-breaks` gate or markdownlint as evidence that breaks landed at clause boundaries --- between two hand-broken layouts of the same sentences, both are silent.
+- **Don't:** read a green gate on the reflowed tree as discriminating.
+  Confirm the gate goes red on the **unreflowed** tree first, and drop the citation when it does not.

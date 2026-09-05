@@ -287,6 +287,80 @@ Ask it of the character rather than of the input, since the input you would have
 (Measured on [ai-config#1968](https://github.com/Morrison-Lab/ai-config/pull/1968), merged 2026-08-22.
 `(?<![\w/-])` entered `hooks/no-empty-promise.py` in [#1724](https://github.com/Morrison-Lab/ai-config/pull/1724) and stood unchanged on `main` until #1968 replaced it, so for that whole interval a dispatch prompt saying `/ums` did not discharge a promise.)
 
+### A lookaround excludes what sits on its own side of the anchor, not what the excluded form "contains"
+
+The section above asks what *else* an excluded character means.
+This asks something cheaper and prior: whether the character is reachable from
+where the clause sits at all.
+A lookbehind reads left of the match and a lookahead reads right of it, so a
+form whose distinguishing character follows the operator cannot be excluded by
+a lookbehind.
+The clause does not fail visibly either --- it silently excludes some other
+operator that carries the same character on the left.
+
+The worked example is a stdout-redirect matcher:
+
+```python
+RX_STDOUT_REDIRECT = r"(?<![2-9&<>])>>?\s*([^\s;&|]+)(?![&>])"
+```
+
+`&` went into the lookbehind to exclude `>&2`.
+The `&` of `>&2` sits *after* the `>`, where only the lookahead can see it, and
+the lookahead already refused it.
+What the lookbehind actually excluded was `&>` and `&>>`, the combined
+stdout-and-stderr redirect, which is a redirect to a file and needed the
+opposite verdict.
+
+Both directions stay invisible at once.
+The intended exclusion still holds, because a different clause is doing it, and
+the accidental exclusion removes a form nobody wrote a case for.
+
+- **Do:** for each character in a lookaround, name the operator it is meant to
+  exclude and check which side of the anchor that character sits on.
+- **Do:** test the operator you meant to exclude *and* every operator that
+  shares the character.
+- **Don't:** add a character to a lookbehind because the form to exclude
+  "contains" it --- containment says nothing about position.
+
+(Measured 2026-09-04 on
+[ai-config#3251](https://github.com/Morrison-Lab/ai-config/pull/3251):
+a `date ... &>>notebook.md` write read as a print rather than a file write and
+so discharged the guard it should have tripped.)
+
+### A reviewer's proposed widening of a class can overshoot the bug it fixes
+
+The sections above govern the exclusion clause you wrote.
+This governs the widening someone else proposes for it, which arrives with a
+reason attached and so escapes the same enumeration.
+The reason is almost always a claim about an *earlier stage* --- the splitter
+already removed the operators, the stripper already removed the quotes, so the
+class need not defend against them.
+That claim is about a pattern you did not write and are not looking at, and it
+is one command to open.
+
+The reported bug was real: `RX_PRINTED_VAR`'s `[^;&|\n]*` refused a `|` sitting
+inside a quoted `echo` argument.
+The proposed fix was `[^\n]*`, reasoning that the segment splitter had already
+removed every real operator.
+Reading the splitter refutes it.
+It splits on `;`, `&&`, and `||` only, so a single `|` --- as in
+`echo done | grep -c $t` --- is still a live pipe inside the segment, and the
+widened class would have swallowed it and discharged the guard.
+
+The fix that held blanked operator characters inside quoted spans and kept the
+class, so the quoted form passes without readmitting the operator.
+
+- **Do:** read the earlier stage's own pattern before accepting that it removed
+  what a proposed widening assumes it removed.
+- **Do:** test the operator the class was protecting against alongside the
+  quoted form the widening is for; a widening is right only if both pass.
+- **Don't:** accept "the splitter already handled it" as a premise --- it names
+  a regex, and reading it settles the question.
+
+(Measured 2026-09-04 on
+[ai-config#3251](https://github.com/Morrison-Lab/ai-config/pull/3251),
+review round 3.)
+
 ### An attribution claim in a guide-for-future-edits comment is settled by mutation, not by re-reading it
 
 "Test the instrument against the incident that prompted it, verbatim"'s closing **Don't** governs a comment claiming *what* a matcher matches.
@@ -402,6 +476,32 @@ Remove only that citation and keep the same clean heading: `clean` again.
 So main's not-clean flag on the cited body was never a detection of anything the body's own current verdict says;
 it was produced entirely by the literal bolded phrase inside the citation, matched exactly as if it were a live statement --- the exact false positive the PR exists to remove.
 A comparison that read the branch's `clean` on this body as "worse than main" would have had it backwards: the branch was not losing a detection main had earned, it was correctly declining to make the one main was making by accident, and isolating the citation is what showed that rather than another vocabulary patch on the branch's own scan.)
+
+## A checker that returns the same verdict on the broken tree is not evidence the fix worked
+
+The two sections above audit a control built for one comparison.
+This audits a **pre-existing** checker cited as verification --- the CI gate, the linter, the repo script you ran after the fix and reported green.
+
+Citing one feels like the strongest move available, because it is mechanical rather than a judgment, and because the rest of this file argues for exactly that.
+But an instrument earns a citation by *discriminating*, and a green verdict alone cannot say whether it did.
+A check that is silent on the property under repair reports clean on the fixed tree, on the broken tree, and on the untouched original, and all three readings are indistinguishable.
+The verification is then vacuous while reading as the most rigorous sentence in the reply.
+
+This is the default outcome rather than a rare one.
+A gate is often configured **lenient** on exactly the property a style fix is about, since a rule the corpus already violates at scale is the rule a repo turns off to get a green baseline --- so read a check's configuration rather than assuming the rule is on.
+And a green result invites no follow-up, so nobody asks the one question that settles it.
+
+So run the check against the **unfixed** tree before citing it.
+If it is green there too, it is not the instrument for this claim, and the job is to find one that discriminates --- which usually means measuring the property directly rather than looking for a gate that already exists.
+A distribution beats a pass/fail here: a property's *signature* is visible in a histogram where a threshold shows nothing.
+
+- **Do:** run the cited check against the pre-fix tree and confirm it goes red before reporting it as verification.
+- **Do:** read a check's own configuration for whether the relevant rule is enabled at all, rather than inferring it from a clean run.
+- **Do:** measure the property directly, and prefer a distribution or a count over a pass/fail, when no existing gate discriminates.
+- **Don't:** cite a green gate as evidence a fix landed --- green is the same answer it gives to no fix at all.
+- **Don't:** treat "two independent checks agree" as corroboration when neither has been shown able to disagree.
+
+See [`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md), "A citation to a check that answers the same on every tree, and two retractions of it".
 
 ## Widening an instrument invalidates every figure it produced, not only the one that exposed it
 
@@ -527,7 +627,7 @@ picking the script whose name matches the property.
   that measures it.
 
 (Measured 2026-08-19 on ai-config.
-`scripts/check-memory-file-size.py` exits `0` while printing that
+`scripts/check-memory-file-size.py` exited `0` while printing that
 `memories/github-actions.md` was over its 1200-line threshold, so the crossing
 was reported here as advisory and pushed.
 `validate` went red on both parallel runs: `scripts/test_check_memory_file_size.py`
@@ -901,6 +1001,26 @@ A grep sees all three, so it does not matter that only the last is ever printed.
 The needle was the phrase `chained AHEAD`, and `git show origin/main:hooks/no-unreviewed-pr.py | grep -n 'chained AHEAD'` returns 6 hits the fix never touches: three docstrings (lines 356, 418, 672), two inline comments (1522, 1550), and the label-exemption message (1917).
 So the assertion passed against the unfixed script, and the pre-fix control that was supposed to fail did not.)
 
+**A live guard's own substring needle has the identical failure mode, and it fires on the message that discharges it rather than only on a test fixture.**
+
+The section above is about a test's needle matching the fixture's own pre-existing text.
+The same collision reaches a shipped `Stop`/`PreToolUse` hook whenever its trigger phrase is one the corpus has to be able to *discuss*: a guard keyed on a cleanliness phrase fires on the very message that **retracts** an earlier, unsupported use of that phrase, because the retraction has to name the phrase to withdraw it.
+The guard is technically correct that the string appears --- it is wrong that the string's *appearance* still means what the guard was built to catch, because the sentence containing it is doing the opposite job: undoing the claim rather than making it.
+
+`no-placeholder-reply.py`'s whole-message anchoring, already named above, is the general answer: match the **whole** stripped message rather than a substring, specifically because this corpus quotes its own banned strings constantly.
+The same fix generalizes past that one hook.
+
+- **Do:** anchor a guard's needle on the whole message (or an unambiguous structural position within it), not a bare substring, whenever the corpus must be able to discuss the phrase it flags.
+- **Do:** exempt a sentence carrying a first-person negation of the claim ("I never ran ...", "I said X --- I never verified it") from a substring match, when whole-message anchoring is not available.
+- **Don't:** ship a guard whose needle is a bare substring of the phrase its own remedy has to use --- the remedy then trips the guard it exists to satisfy.
+- **Don't:** assume a guard is safe because its test fixtures don't happen to include a retraction of the guard's own vocabulary;
+  write that fixture deliberately.
+
+(Measured 2026-09-02: `hooks/no-incomplete-check-enumeration.py` blocked a message asserting two PRs were "clean by every instrument" on nothing but `gh pr checks` --- correctly, that is the exact short surface the guard exists to catch.
+The **next** message retracted it ("I said #3010 and #3029 were 'clean by every instrument' at merge.
+I never ran `check-pr-fully-clean.py` on either.") and the same guard, on the same phrase, blocked that retraction too --- twice, across two consecutive turns.
+Tracked as [ai-config#3053](https://github.com/Morrison-Lab/ai-config/issues/3053).)
+
 **A tenth outcome: the property under test is enforced at more than
 one independent site, and mutating one leaves the others standing
 guard.**
@@ -951,14 +1071,42 @@ unless it is written down.
   record --- it explains the survivor and loses the structural fact
   that produced it.
 
+**An eleventh outcome, and the one a hand-built mutation reaches
+first: the edit landed at the intended spot and the surrounding
+GRAMMAR absorbed it.**
+
+Outcome four covers a mutant corrupted in transit, and outcome nine a mutant that edited the wrong occurrence.
+This is neither.
+The occurrence was right, the inserted text is exactly what was intended, and the file parses.
+The construct under test nonetheless still does what it did, because the insertion changed what the *neighbouring* code is attached to.
+
+Insertion is the risky operation, and moving a statement is the risky intent.
+A move is spelled as an insertion plus a deletion, and only the insertion has a grammar to get wrong.
+In an indentation-scoped language the hazard is a block boundary: text placed at loop-body indent immediately above an `elif` re-parents that whole chain, so a guard "relocated past" an earlier branch is still governed by it.
+A brace language has the same hazard at a brace, and a template language at a block close.
+
+The result is the worst-reading outcome in this list, because SURVIVED is a publishable finding.
+A malformed mutant that crashes announces itself.
+This one produces a clean "no behaviour change", which is indistinguishable from a correct negative control, and confident enough to rebut a reviewer with.
+
+- **Do:** read the mutated source **in context** --- the lines above and below the edit, not the diff hunk alone --- before scoring any mutation, and especially before reporting SURVIVED.
+- **Do:** treat a relocation as two edits, and confirm the moved statement's new block parent is the one you meant.
+- **Do:** prefer an edit anchored on the enclosing structure, such as an AST rewrite or a whole-block replacement, over a string insertion, wherever the language's scoping is positional.
+- **Don't:** read "it parses and the suite is green" as "the mutation expressed the change I described" --- a re-parented neighbour does both.
+- **Don't:** defend a SURVIVED result against a reviewer's doubt by citing the exit code.
+  The reviewer is asking about the mutant, and only the mutant's source answers.
+
+See [`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md),
+"A relocated skip that re-parented an elif chain".
+
 **When a mutation survives, the first hypothesis is that the mutation
 was wrong --- mis-targeted, incomplete, or vacuous --- not that the
 test coverage is weak.**
 
-The ten outcomes above are what "wrong" actually looks like: a mutant
-that never applied, one that applied to the wrong spot, one that
-applied to only one of several guardians, a fixture a sibling clause
-absorbs.
+The outcomes above are what "wrong" actually looks like: a mutant
+that never applied, one that applied to the wrong spot, one whose
+insertion re-parented the code around it, one that applied to only
+one of several guardians, a fixture a sibling clause absorbs.
 Every one of them reads as a coverage gap from the outside, and every
 one of them is a defect in the mutation, not in the suite.
 Doubting the suite first spends the same effort on the wrong side of
@@ -1288,6 +1436,83 @@ Two newer hooks each re-derived a weaker version instead of reusing it.
 - **Don't:** treat a command-position anchor as covering quoted text;
   strip heredoc bodies first.
 
+**When every candidate discharge is satisfiable by typing the right characters, ship the guard with no discharge at all.**
+The section above assumes the discharge can be anchored well enough to be sound, and asks for the same care the trigger gets.
+Some obligations have no such matcher.
+The design question there is whether to write a discharge at all.
+
+The recognizable case is an obligation to have **derived** something, where every observable trace of the derivation is a string.
+A guard warning that a required status-check context was set without deriving it from the default branch has no honest discharge: a run-jobs read names no branch, so it cannot show which branch was consulted;
+`gh run list --branch <name>` accepts any branch, so its presence proves only that a branch was named;
+and any transcript scan for the derived context string is satisfied by typing that string in a comment.
+Each candidate is a check the obligation's own subject can write by hand, so it fails open in [`fail-fast`](../principles/fail-fast.md)'s sense --- "a precondition that can never fire is indistinguishable from one that fires correctly and finds nothing".
+
+A guard with no discharge warns every time.
+That is a real cost and it is the *right* one for a warning-only guard, because the alternative is not a quieter guard but a silent one --- and by the argument above, silence is indistinguishable from compliance.
+The asymmetry decides it: a repeated warning is visible and annoying, while a typable discharge is invisible and permanent.
+Note the boundary with the reminder-guard pattern, which does need a discharge because its obligation (run UMS, post a review) leaves a durable artifact a scan can anchor to.
+The distinction is whether the obligation's satisfaction is *observable outside the transcript*, not whether the guard is a reminder.
+
+- **Do:** enumerate the candidate discharges explicitly, and say in the guard which ones were rejected and why.
+- **Do:** ship no discharge when every candidate is satisfiable by typing, and keep the guard warning-only so the cost stays a note rather than a block.
+- **Don't:** add a weak discharge to reduce noise --- it converts a visible cost into an invisible one.
+- **Don't:** read "this guard has no discharge" as an unfinished design;
+  for an obligation with no artifact outside the transcript, it is the design.
+
+(ai-config#3039 proposes such a guard, on ruleset and branch-protection writes.
+Read as of 2026-09-03, its filed body carries a discharge this section would reject: the guard fires only when the transcript contains no default-branch job-name derivation, given as `gh run list ... --branch <default>` followed by `actions/runs/<id>/jobs`, "or an equivalent".
+Both halves are strings a session can type, and neither names a workflow definition or the branch a run's job names came from, so the pair is the third candidate above wearing two commands.
+The issue is open and no hook file exists on `main`, so this section is the argument that its discharge should be dropped rather than a description of a shipped file;
+a comment recording that argument was posted on the issue on 2026-09-03.)
+
+## Your own command's shape is part of a transcript-read discharge condition
+
+The section above is the guard author's side of a discharge: does the matcher separate the obligation from prose that merely quotes it?
+This is the **subject's** side.
+[`pr-on-claim`](pr-on-claim.md) already states it for one hook --- run the `requested_reviewers` POST as the sole or last command, and pipe it nowhere --- and what follows generalizes that from one hook to every transcript-read guard, because the reason it holds there has nothing to do with that hook.
+
+A guard that reads the transcript sees the text of your command and the text of its output.
+It cannot see the effect the command had.
+So an ordinary formatting choice can destroy the evidence while the action itself succeeds perfectly, and the two outcomes are indistinguishable from where you are sitting: the thing you wanted happened, and the guard fired anyway.
+The reliable tell is that the first conclusion is always *the guard is broken*, because the action visibly worked.
+
+Two shapes, measured in one session, and they break different things:
+
+- `gh pr view --json state` narrowed with `--jq` to pretty-print flattened `"state":"MERGED"` into `state=MERGED`, so the hook's terminal-state discharge regex, written against the JSON, could not match.
+  What the guard reads is the output's **spelling**, and reshaping it is what destroys the record.
+- A `requested_reviewers` POST written as `... ; echo rc=$?` and as `... | head` moved out of last-command position, so its exit status could no longer be attributed to it.
+  What that guard needs there is the **position**, which is what makes the status attributable.
+
+The distinction decides the remedy, and getting it wrong forbids the right shape.
+`pr-on-claim` recommends narrowing that POST's response "with a flag on the POST itself rather than a downstream pipe".
+That is safe, and the reason is worth stating rather than assuming: the same hook does read the request's body --- a `"status":4xx` shape marks a failed request --- but a genuinely failed `gh api` also exits non-zero, so a projection cannot manufacture a false success by itself.
+The `gh pr view` above had no such second signal *for the fact in question*.
+Exit status distinguishes a failed read from a successful one and cannot distinguish MERGED from OPEN, so the terminal state has exactly one reader --- a regex written against the JSON spelling, which `--jq` rewrote.
+
+So ask what the guard reads, and expect the answer to name more than one thing.
+`no-unreviewed-pr.py` consults the output's text, the command's position, and its exit status, all three in one discharge, which is why "the position is what matters here" is not a licence to reshape the body.
+
+What the two shapes share is the moment.
+`--jq`, a trailing `echo`, and a pipe are each applied for readability, while composing the command, with no thought of the guard --- and each is applied to the very thing that was going to serve as the record.
+So the rule is about *which* commands get formatted rather than about formatting in general: a command that carries discharge evidence gets run bare, alone, and unchained, and the tidying goes on a separate follow-up call.
+
+**The mirror is a check reading a different artifact, and that failure has nothing to do with the subject's command.**
+The same session ran a CI-gate checker against the committed head while the fix sat uncommitted in the working tree.
+The checker was right, and the first conclusion was again that it was broken.
+That is [`verify-the-right-artifact`](verify-the-right-artifact.md)'s working-directory shape pointed the other way: there a stale checkout stands in for the authoritative revision, and here the authoritative revision stands in for the uncommitted change.
+That fragment covers only the first direction today ([#3130](https://github.com/Morrison-Lab/ai-config/issues/3130)), so this is adjacent to it rather than owned by it --- and it is still not this section's subject, since no command shape is involved.
+It is named here only because it wears the same disguise: an action that visibly worked, and a check that says it did not.
+Committing costs one command and settles it.
+
+- **Do:** run a discharge-relevant command alone and unchained, so the transcript carries its result verbatim.
+- **Do:** ask what the guard reads --- the output's text, the command's position, its exit status --- and expect more than one of those to matter at once.
+- **Do:** tidy or reshape that output in a separate call afterwards, when you want it readable.
+- **Do:** ask whether a disagreeing check is reading the artifact you changed, before diagnosing the check.
+- **Don't:** reshape the output of a command whose *text* is the evidence --- `--jq`, a downstream pipe, a formatting flag --- or chain anything after a command whose *position* is.
+- **Don't:** read those as alternatives;
+  a single guard can consult all three at once, so establishing that position matters says nothing about whether the body is inert.
+- **Don't:** conclude a guard is defective from the fact that the underlying action worked --- the guard measures the record, not the effect.
+
 ## Measure CPU time, not wall clock, when the assertion is about work done
 
 A performance regression test asserts something about the *code*.
@@ -1344,6 +1569,183 @@ Where it does not enter both measurements with the same magnitude, the ratio amp
 - **Do:** fix the instrument when the noise is instrument-borne, rather than building a statistic that tolerates it.
 - **Don't:** assume min-of-N filters two measurements equally when one is much longer than the other.
 - **Don't:** read a ratio's stability on an idle machine as evidence that it is load-independent.
+
+### The same ratio compresses when the nuisance cost lands in the denominator
+
+The section above measures load pushing a growth ratio *up*, and that is one of two directions it can move.
+A ratio is large over small, so a nuisance cost that lands mostly in the **denominator** compresses it instead, and a genuinely quadratic scan then reads as sub-quadratic.
+
+Measured 2026-09-03: the negative control in `hooks/test-no-unauthorized-merge.py`, a deliberately quadratic scan whose growth then had to clear an 8x bound, read 14.5-15.3x over five runs on an idle container and 7.3x on a loaded GitHub runner, going red on a PR whose whole diff was two `memories/*.md` files ([#3098](https://github.com/Morrison-Lab/ai-config/issues/3098)).
+Nothing about the code differed between the two readings.
+
+The direction inverts what the failure looks like, which is why it is worth naming separately.
+An inflated ratio reports a regression that is not there, and reads as a finding about the code.
+A compressed one reports that the control cannot discriminate, and reads as a broken control --- so the instrument accuses itself, and the tempting repair is to loosen a bound that was working.
+
+Two repairs are on offer, and which one fits turns on whether the distortion is additive or multiplicative.
+That is measurable rather than assumable, so measure it --- and measure it under the load the distortion appears under, since an idle reading of the same quantity looks like the same number and answers a different question.
+Here it could not be: the fixed cost timeable off the runner is 0.62ms of a 6.2ms baseline, for the loop plus one zero-length scan call, which bounds the *interpreter's* share and says nothing about the runner's, since scheduler latency and a cold cache are load-dependent by construction.
+So the distortion's shape stayed a hypothesis, and the repair was chosen for surviving either shape rather than for ruling one out.
+Widening the input-size gap does that, because the quadratic term outruns the bound: at a size step of `s` the reading is `s ** 2` and the halfway bound is `s ** 1.5`, so the margin is `sqrt(s)` --- 1.9x at a 4x step against 3.6-3.7x at a 16x step, measured.
+
+**Widening the gap while leaving the bound fixed is the trap**, and it hides well because the number in the bound never changes, so nothing looks edited.
+A bound of 8.0 is the halfway line for a 4x step and sits *exactly on* the 8x a genuinely linear scan grows at an 8x step, so widening that far leaves it no margin against the shape it exists to reject.
+Measured, a linear scan read 7.55-8.09x at an 8x step on one container and 7.83-8.11x on another, crossing 8.0 in 1 run of 12 and in 3 of 12.
+At the 16x step the control actually runs at, a linear scan read 15.7-16.0x and cleared 8.0 in all six runs, so a widened control against the old bound would pass for either shape --- the one thing a control exists to rule out.
+Recompute the bound at whatever step it is read against, and pin the separation with a positive control of the opposite shape rather than arguing it.
+
+The 0.62ms, 3.6-3.7x and 7.55-8.09x figures here were read on one 4-core Linux container at load average ~2.5, through `time.process_time`, as the minimum of three baseline runs over the minimum of two target runs;
+the 7.83-8.11x and 15.7-16.0x figures came from a second 4-core container at load average ~4.1 under the same protocol, and the 14.5-15.3x readings from a quieter one at load average ~0.5.
+A timing figure is a claim about a machine, so re-measure rather than porting these.
+
+- **Do:** ask which term a nuisance cost lands in, since load can push a ratio either way.
+- **Do:** measure a fixed cost under the load it appears under before subtracting it, since an idle reading bounds the interpreter's share and not the runner's.
+- **Do:** prefer the repair that survives both shapes of distortion when you cannot measure which shape you have.
+- **Do:** recompute a bound at the size step it is read against, and pin the separation with a control of the opposite shape.
+- **Don't:** read a control's "I cannot discriminate" as evidence about the code it controls.
+- **Don't:** widen a ratio's input-size gap while leaving a bound that was derived for the old gap.
+- **Don't:** rest a causal classification on a measurement taken where the cause cannot appear.
+
+## A slow wall-clock reading is a claim about the machine before it is a finding about the code
+
+The three sections above govern a timing **bound written into a test** --- which clock it uses, and whether a ratio cancels the noise it is meant to cancel or is instead inflated or compressed by it.
+None of them reaches the reading you take **once**, by hand, in the middle of diagnosing something, and then report as a defect.
+No assertion is being authored there and no threshold is being chosen, so nothing about the moment resembles the situation those sections describe.
+
+**The reading is self-authenticating in a way a wrong value is not**, and that is the whole of the trap.
+A number you computed incorrectly still looks like a number you might have computed incorrectly.
+A stopwatch reading feels like a measurement rather than a guess, so it goes into a report as an observation instead of as a hypothesis --- and the question of what else was running on the machine is never posed, because posing it requires first noticing that the reading has a second input.
+
+**The session iterating fastest is the session most likely to have saturated its own machine**, which inverts the intuition that a busy machine is somebody else's problem.
+Background test runs, a re-invoked suite that was never reaped, several agents dispatched at once: each is a normal artifact of working quickly, and together they are the load that makes the next reading meaningless.
+So the readings likeliest to be wrong are the ones taken during exactly the kind of session that generates a lot of them.
+
+The figures below are reported from
+[ai-config#3059](https://github.com/Morrison-Lab/ai-config/issues/3059), which is
+the filed record of the session that took them.
+They name no hook, command, or machine, so treat them as an illustration of the
+spread's *shape* rather than as a magnitude to cite --- which is itself the
+lesson, since a reading with no provenance is the one most easily quoted back as
+established.
+
+An end-to-end hook run took **8.0s** against a declared 10s timeout, which read as
+a serious performance defect worth filing.
+Profiling the internals put them under **0.6s** in total, which is the discrepancy
+that prompted looking further.
+`uptime` then reported a load average of **376**, attributed in that record to the
+session's own stacked background runs.
+Re-running the identical command varied between **0.59s and 8.0s** with nothing
+about the code changed.
+That last figure is the load-bearing one: a range spanning more than an order of
+magnitude on unchanged code needs no attribution to make its point.
+
+The check is two steps, and the **second** is the one that decides:
+
+```bash
+uptime                                   # step 1: load average
+for i in 1 2 3 4 5; do                   # step 2: the one that decides
+  ( TIMEFORMAT=%R; time <the command> >/dev/null 2>/dev/null \
+      || echo "  ^ FAILED (exit $?)"; ) 2>&1
+done                                     # -> one elapsed-seconds figure per run
+```
+
+The loop uses the shell's **reserved word** `time` rather than `/usr/bin/time -f %e`, which is the form that first suggested itself and does not run: the binary is absent from this corpus's own remote containers (`exit 127`, measured), and `-f` is GNU-only where it is present, so the step the prose calls decisive would have printed nothing and left the reader holding only the load average.
+
+Four details in that one construct, each measured rather than reasoned:
+
+- **Reserved word, not a builtin**, which is worth getting right because the misnomer invites the natural prefix form and that form does not do what it looks like:
+  `type -t time` reports `keyword` and `compgen -b` does not list it.
+  An assignment prefix **demotes** `time` from reserved word to an ordinary command word, so `TIMEFORMAT=%R time <cmd>` stops invoking the shell construct and looks `time` up on `PATH` instead.
+  What you then see depends on the machine, which is why the symptom alone is the wrong thing to record:
+  where no `time` binary is installed --- this corpus's own remote containers, as above --- it dies with `time: command not found`;
+  where a `time` binary is installed, that binary runs instead and ignores `TIMEFORMAT`, which it has never read --- measured not here but by the reviewer who raised this, on a runner carrying `/usr/bin/time`.
+  The mechanism is the transferable half and the demotion is directly checkable:
+  put an executable named `time` on `PATH`, and the prefix form runs it while the bare form still prints `%R`.
+  Note what this rules out --- the reserved word does not "take precedence and merely fail to apply `TIMEFORMAT`";
+  a different program is running, which is why the variable goes unused.
+- **Parentheses rather than braces**, because a brace group is not a subshell and `TIMEFORMAT` would leak into the calling shell, silently reformatting every later `time` in that session.
+  Measured: the brace form leaves `TIMEFORMAT=%R` set afterwards, the paren form leaves it unset.
+- **`2>&1` is load-bearing**, since `time` writes to stderr.
+  With it, `| tee` captured `0.202`;
+  without it, `tee` captured an empty file.
+- **Both streams discarded, and a failure still announced.**
+  The construct writes to stderr, so a timed command that warns on stderr interleaves its warnings with the elapsed figures and the spread stops being readable --- measured, a `stderr warning` line landed above every timing line until `2>/dev/null` was added.
+  But discarding both streams leaves nothing to distinguish a fast command from one that never ran: measured, a nonexistent command reported `0.007 / 0.003 / 0.003`, a tight and entirely plausible spread.
+  That is this section's own thesis inverted --- a reading that cannot return false --- and it is the live case here, since `/usr/bin/time` is absent from this corpus's own containers, so the shell reports 127.
+  Hence the `|| echo`: silent on success, and on failure it prints the exit status under the figure.
+
+Read `uptime` first, but do not stop there.
+Its figures are 1-, 5- and 15-minute *decaying* averages, so a burst that inflated
+the run you care about can be gone from the 1-minute figure by the time you look,
+and a high reading persists for minutes after the load has cleared.
+A low number therefore does not clear the run, and a high one does not tell you
+the run overlapped it.
+
+So re-run the timed command several times and report the **spread**.
+That is what settles it, because it measures the interval you actually care about
+rather than a decaying average over a window you did not choose.
+A reading you cannot reproduce is not a measurement of the code, and a spread that
+spans an order of magnitude names its own cause.
+
+**A timing assertion written as a regression guard is the same exposure, and the sections above answer it** --- they are about exactly this, a busy machine distorting a timed reading in either direction.
+What those sections do not separate, and what a session that has just learned its own machine was loaded most needs, is **which question the assertion asks**.
+
+A **regression bound** asks whether the code got slower.
+It compares against a figure chosen earlier, so it is the case those sections govern, and widening it under load is the wrong repair --- [`hooks/test-no-unauthorized-merge.py`](../../hooks/test-no-unauthorized-merge.py) states why in its own comment: "Any bound tight enough to catch a regression sits inside that spread, so it goes red on PRs that never touched this hook, which is how a gating check stops being read."
+`process_time` is the repair there, and the section above measures it at 3.96--4.31x under load against `perf_counter`'s 2.18--4.58x --- reproducible across machines and load rather than immune to either.
+
+A **watchdog** asks whether the code finishes at all, and that is a question about elapsed time by construction, so it stays wall-clock.
+This repo's own catastrophic-backtracking checker is exactly that shape: [`scripts/check_regex_patterns.py`](../../scripts/check_regex_patterns.py) arms `signal.setitimer(signal.ITIMER_REAL, timeout)` against a `DEFAULT_TIMEOUT` of 0.25 seconds, with a thread-join fallback, and `validate.yml` gates on it.
+A backtracking probe is therefore not the exception that proves a `process_time` rule.
+It is a **second** exception, and it needs its own reason rather than the blocking one's, which does not reach it: that carve-out is stated as "keep a wall-clock ceiling only where the measured code can actually block", and its rationale is that "the one thing CPU time cannot see is a span that blocks on I/O instead of burning cycles".
+A runaway regex burns cycles, so CPU time sees it perfectly well and the blocking carve-out excludes it by construction.
+What justifies wall-clock here is different and narrower, and it is not availability: a CPU-time interval timer interrupts a runaway regex perfectly well (`ITIMER_VIRTUAL` fires on the same catastrophic pattern in 0.253s against `ITIMER_REAL`'s 0.250s, measured), so the choice is not forced by what exists.
+It is forced by what is being budgeted.
+A watchdog spends a **termination budget**, which is a real-time quantity by definition --- the question it answers is "has this taken too long", and too long is measured on the clock the caller is waiting on.
+
+So ask which question the assertion asks before reaching for either repair.
+The `< 1.0s` probe that prompted this entry was a *regression guard shaped like a watchdog*, which is why it was ambiguous and why it could flake.
+
+- **Do:** read the load average before reporting a timing observation as a finding.
+- **Do:** re-run a timed command several times and report the spread, so a reading that cannot be reproduced is visible as one.
+- **Do:** reap your own background runs before timing anything, since they are the likeliest cause of the load you are about to measure through.
+- **Do:** ask whether a timing assertion is a regression bound or a watchdog before repairing it --- the first wants `process_time`, the second stays wall-clock.
+- **Don't:** treat a stopwatch reading as evidence about the code merely because it was measured rather than guessed.
+- **Don't:** assume a fast-moving session is running on an idle machine --- it is the session most likely to have loaded it.
+
+(Recorded 2026-09-03 from
+[ai-config#3059](https://github.com/Morrison-Lab/ai-config/issues/3059), during a
+nine-round adversarial hook iteration.
+That session's PR also carried a `< 1.0s` wall-clock assertion as a
+backtracking regression guard, which under the same load could have flaked ---
+the case the paragraph on regression guards above answers, and the reason it
+answers it with `process_time` rather than with a wider bound.)
+
+### A REPEATED measurement is not a CONTROLLED one
+
+The section above governs the one-off reading and names the load's likeliest source.
+This governs what happens **next**, when you disbelieve the reading and run it again --- and it is the step at which a flake gets promoted to a regression, because repetition is the one check that cannot detect sustained load.
+
+When the same result comes back a second and a third time, the failure reads as settled: it reproduces, so it is deterministic, so the change in the working tree caused it.
+That inference is wrong, and it is wrong in a way repetition can never expose.
+Re-running holds the tree constant, which is what makes it feel like a control --- and it holds the **confounder** constant with exactly the same fidelity.
+A busy machine does not stop being busy between two consecutive runs.
+
+So the section above's remedy of re-running and reporting the spread is necessary and not sufficient.
+A wide spread does establish that the machine is the variable, as that section's own 0.59s-to-8.0s re-run shows.
+A *narrow* one establishes nothing, because sustained load can hold every run in a batch at the same wrong value --- and narrowness is the reading most easily mistaken for precision.
+
+The control that repetition imitates is a **clean copy**: apply the same change to a pristine `cp -a` of the tree, run it N times there, and compare.
+Tally failures **by name** rather than by count, since the same total twice over says nothing about whether it was the same test both times, and a rotating failure is the signature of load rather than of code.
+And run the *unchanged* copy the same N times, so a green run has something to be green against.
+
+- **Do:** reproduce a suspected regression in a pristine copy of the tree before attributing it to the change.
+- **Do:** record which test failed, not how many, and read a rotating name as a flake.
+- **Do:** read a *narrow* spread across repeated runs as consistent with sustained load, not as evidence against it.
+- **Don't:** read three identical results as a control --- consecutive runs share every confounder they were meant to rule out.
+- **Don't:** report an attribution from a suite whose assertions include a wall-clock bound until the bound has been ruled out.
+
+See [`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md), "A repeated measurement is not a controlled one".
 
 ## Reading an instrument's PROSE instead of its exit status, generalized past the PR checker
 
@@ -1515,3 +1917,45 @@ one echoed by the run that depends on it is checked on every execution.**
   the refutations are evidence the information is not in the artifact.
 - **Don't:** leave a validity assumption as prose in a README while the run
   that depends on it logs nothing.
+
+## A log's file order is an assumption, so state it before keying an instrument on position
+
+The sections above test an instrument's matcher.
+This one tests its **ordering** assumption,
+which is invisible precisely because it is never written down:
+a last-wins reader over an append-only log assumes file order is time order,
+and nothing in the code says so.
+
+That assumption fails whenever the log is rewritten, replayed, or merged,
+and it fails in the worst possible way ---
+every record parses correctly and the reader holds a real one, just not the newest,
+so there is no malformed input to notice.
+A Claude Code transcript after a context compaction is the measured case, per
+[`claude-code-transcripts`](../../memories/claude-code-transcripts.md).
+
+**When a guard's refusal contradicts your own read of the session, run its own reader against the artifact rather than theorizing about why it fired.**
+That is already
+[`mistake-patterns`](../../memories/mistake-patterns.md) Pattern 17,
+and it is what separates an ordering fault from a matcher fault:
+both produce an identical refusal message,
+and only executing the parser prints which record it actually held.
+
+**A guard being wrong does not make its escape valve available.**
+The two failures compose rather than cancelling.
+On 2026-09-03 the sanctioned `ALLOW_UNREVIEWED_PUSH=1` override was classifier-denied
+at the same moment the guard was holding a compaction-replayed stale verdict
+([#2899](https://github.com/Morrison-Lab/ai-config/issues/2899)),
+so the refusal was wrong and its documented remedy unreachable together.
+The unblock was to satisfy the guard honestly ---
+dispatch a second review so a fresher record lands last ---
+rather than to keep rephrasing the override,
+per [`mistake-patterns`](../../memories/mistake-patterns.md) Pattern 43.
+
+- **Do:** key a "most recent" reader on each record's own timestamp, and say in the code why position is not enough.
+- **Do:** run the instrument's own parsing function against the live artifact, printing what it held, before writing down a mechanism-level explanation.
+- **Do:** produce a fresh record to satisfy a position-keyed guard honestly,
+  once its own parser has been run and shown to hold a replayed record,
+  and when both the guard and its override are unavailable at once.
+- **Don't:** append a fresher record before that check --- a guard holding a current verdict is refusing on the merits, and appending over it is not an unblock.
+- **Don't:** treat an append-only log as sorted --- that is an assumption about the writer, not a property of the file.
+- **Don't:** diagnose a last-wins reader's wrong answer as a matcher bug without first checking the order of what it read.

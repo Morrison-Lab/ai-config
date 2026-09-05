@@ -65,6 +65,36 @@ for the formal review itself, and two of those threads being resolved read as
 the review question settled.
 The defect reached `main` and needed a follow-up PR.)
 
+**The rollup trap above has an earlier form:
+naming a cause the signal never confirmed, and reporting that to a human.**
+The trap above needs a real, checked cause before it closes.
+This one needs none.
+[`metacognitive-monitoring`](metacognitive-monitoring.md)'s "Read the artifact that failed, not the one beside it" and "A story that fits the evidence is not a finding" own the mechanism and the remedy:
+proximity is not evidence,
+and a cause no experiment discriminates is reported as not established rather than as the likeliest candidate.
+One thing here is local to a rollup.
+`mergeable_state: blocked` reports that at least one input is non-passing and never which,
+so every input you can see is equally available as an explanation,
+and the field can neither confirm nor refute whichever one you pick.
+
+The other is who acts on it.
+`blocked` prompts a re-check, which costs a query.
+`blocked waiting for your approval` sends a person to approve something that needed no approval,
+and they cannot tell from the message that the cause was inferred rather than derived.
+
+- **Do:** name the field a reported cause came from --- `statusCheckRollup`, `reviewDecision`, the branch-protection endpoint --- none of which is `mergeable_state`.
+- **Don't:** put an underived cause in a sentence someone else will act on;
+  `blocked, cause not yet derived` costs them a query, where a wrong cause costs them an action.
+
+(Measured 2026-09-03 on ai-config#3115:
+a fresh reading of the PR's `mergeable_state` field returned `blocked` while every review sat at `COMMENTED` rather than `APPROVED`,
+and that was reported to the user as branch protection holding the PR for a human approving review.
+Nothing in the field said so.
+Re-queried about an hour later, with no push and no approval between,
+it returned `clean` and the PR merged on the standing grant.
+Which input was non-passing at the first reading was never derived.
+The record establishes only that nothing in the field confirmed the reported cause, which is all the argument needs.)
+
 **In a remote/web session the instrument still runs, and hand-checking the
 axes in its place is not acceptable** (user directive, 2026-08-29,
 ai-config#2441).
@@ -668,8 +698,46 @@ and the verdict's own conclusion every round.**
   and create zero inline comments
   while placing substantive findings inside a collapsed
   `<details>` suppression block in the review body.
-  Match case-insensitively on `suppressed` **inside the `<summary>`
-  heading**, not anywhere in the body.
+  Match case-insensitively on `suppressed` **in a `<summary>` element, or
+  in an ATX heading inside a collapsed `<details>` region** --- not
+  anywhere in the body, which flags ordinary overview prose.
+  Measured 2026-09-03 on ai-config#3084 review `5098574802`, the block
+  arrives as `### Suppressed comments (1)` under
+  `<summary>Review details</summary>`, which a `<summary>`-only match
+  returns zero against, while that same body wraps its `Pull request
+  overview` and `File summaries` prose in collapsed `<details>` regions of
+  their own --- so a collapsed region is no longer a proxy for "not
+  ordinary overview prose".
+  That is a reason to prefer the heading anchor, not to forbid the wider
+  match.
+  The comparison was measured on 2026-09-04 by enumerating Copilot review
+  bodies from the `reviews` endpoint, rather than by grepping this corpus's
+  own prose for `suppressed`: 137 bodies across 39 PRs, drawn from
+  ai-config PRs 1000 through 1100 and 3060 through 3130, plus
+  ai-config#660, ai-config#2913 and ai-config#2976.
+  Region-wide has exactly one measured false positive in that set, and
+  body-wide has two.
+  The two wider forms are nested rather than parallel: an occurrence inside
+  a `<details>` region is by definition an occurrence in the body, so every
+  body region-wide flags is also a body-wide hit.
+  Body-wide hit 80 bodies, region-wide 79, and the heading anchor 78.
+  Body-wide alone flags ai-config#1038 review `4837572117`, whose
+  uncollapsed overview sentence reads "Aligns ARDI-family guidance on
+  deadlocks, sweep scheduling, and suppressed Copilot findings" while its
+  body carries no suppression block.
+  Both wider forms flag ai-config#1036 review `4837539268`, whose collapsed
+  `Show a summary per file` table reads "Detects suppressed Copilot
+  findings." and whose body likewise carries no suppression block --- the
+  settling counter-example an earlier version of this passage asserted the
+  measured set did not contain.
+  The heading anchor excludes both controls, a `<summary>`-only match
+  returns zero against 50 of those 78, and the only body the region-wide
+  form flagged and the heading anchor did not is `4837539268`.
+  So region-scoping buys no measured coverage and costs one false positive
+  in 137.
+  Keep it as a fallback on the cost asymmetry alone --- a false zero merges
+  over real findings, while a false positive costs one re-read --- and not
+  on any claim that it has never fired wrongly.
   See [`fully-clean.cases.md`](fully-clean.cases.md),
   "The collapsed-block case (Morrison-Lab/ai-config#1029)".
 - **"No verdict" is its own state, distinct from "a verdict with no
@@ -696,23 +764,124 @@ and the verdict's own conclusion every round.**
   Re-fetch `get_review_comments` on every review wake and act on the whole
   set, never on the wake's own payload.
 
+- **The instrument that prints `FULLY CLEAN` reads the verdict body and its
+  conclusion, and none of the other surfaces --- and its verdict is what gets
+  mistaken for this section having been performed.**
+  Every bullet above says no single check sees all the surfaces.
+  What none of them says is *which* check, and that omission is where the
+  section loses its force: a reader who runs
+  `scripts/check-pr-fully-clean.py`, gets `FULLY CLEAN`, and reports the PR
+  ready has run the tool this fragment's own criteria are named after, in
+  the vocabulary this fragment uses, and has consulted exactly one surface.
+  The instrument is sound for what it measures --- check runs, and the
+  verdict-bearing review items --- and the gap is in what a pre-merge check
+  must *additionally run*, not in the tool.
+
+  Two of the surfaces above are outside it mechanically rather than by
+  oversight.
+  Both halves of the mechanism have to be checked, because
+  `scripts/lib/payload_fetcher.py` governs only the `--from-json` path ---
+  reading it alone would miss a call added on the default one.
+  It covers, in its own words, "`gh pr view`, `gh repo view`, and the two
+  `gh api` reads".
+  The default path's call sites are the other half, and there are five:
+  `gh pr view --json` and the `/check-runs` read in
+  `scripts/lib/pull_request.py`, `gh repo view` for repo resolution, and two
+  `/actions/runs/` reads in the checker itself.
+  `pulls/<N>/comments` appears in neither half, so **inline comments are
+  never fetched at all** --- not fetched and left unresolved, never fetched.
+  And no `<summary>`-scoped match on `suppressed` exists anywhere under
+  `scripts/`, so the check prescribed by "A clean overview can hide a
+  collapsed findings block" above is prescribed and not implemented.
+  A third surface sits outside it for a different reason.
+  A body carrying findings under no parsable verdict *is* fetched, and
+  simply not counted, because the verdict scan has nothing to key on.
+  No query fixes that one --- only your reading the body does.
+
+  So run these three beside the instrument, every round, and read what they
+  print rather than the instrument's exit code, as the answer to this
+  section:
+
+  ```bash
+  # inline review comments -- never fetched by the instrument at all
+  gh api repos/<owner>/<repo>/pulls/<N>/comments --paginate \
+    --jq '.[] | "\(.user.login) \(.path):\(.line // .original_line)\n\(.body)\n"'
+  # formal review bodies -- where a collapsed suppressed block hides
+  gh api repos/<owner>/<repo>/pulls/<N>/reviews --paginate \
+    --jq '.[] | "\(.user.login) \(.commit_id[0:8]) \(.state)\n\(.body)\n"'
+  # issue comments -- where this repo's own review verdicts actually land
+  gh api repos/<owner>/<repo>/issues/<N>/comments --paginate \
+    --jq '.[] | "\(.user.login)\n\(.body)\n"'
+  ```
+
+  Three deliberate choices in those, each of which a shorter form gets
+  wrong.
+  **Each prints `.body`**, because a projection of ids and paths tells you a
+  comment exists and never what it says, which is not something you can act
+  on.
+  **None filters on the head SHA.**
+  A standing not-clean from an earlier head still vetoes, per this file's
+  own rule, so a head-filtered query drops exactly the finding that has been
+  open longest --- and on #3167 it would have returned one of the two
+  findings and hidden the other, since they landed at different heads.
+  **The third query is not redundant with the second.**
+  `pulls/<N>/reviews` returns formal reviews only, while a completed
+  `@claude` run posts its verdict as an *issue* comment --- which is why
+  `CLAUDE.md`'s own verdict query reads `issues/<N>/comments`, and why the
+  instrument reads both.
+  Measured on #3167: its `issues` endpoint carries three
+  `**Claude finished review` bodies that appear nowhere in its `pulls`
+  reviews.
+
+  Measured on [#3167](https://github.com/Morrison-Lab/ai-config/pull/3167),
+  which the instrument called `FULLY CLEAN` twice over a standing finding:
+  at head `16544c50` an inline comment flagged a malformed code span, and at
+  head `7e1294b0` a suppressed "previously missed" item named a missing
+  cross-reference link.
+  Both heads are pre-squash, so they are reachable from no branch --- fetch
+  them from `refs/pull/3167/head`; the squash commit on `main` is
+  `d29d33c71`.
+  Both were genuine, both were fixed, and neither was reachable from what
+  the instrument reads.
+  The instrument-side gaps are tracked as
+  [#3079](https://github.com/Morrison-Lab/ai-config/issues/3079) (threads)
+  and [#3170](https://github.com/Morrison-Lab/ai-config/issues/3170)
+  (the suppressed block); until they close, the queries above are the
+  coverage.
+
 - **Do:** read all review surfaces before calling a PR clean,
   every round,
   including collapsed suppressed-comments blocks.
+- **Do:** run the region-wide match as a fallback behind the heading
+  anchor, and re-read the region on a hit only the fallback finds ---
+  its one measured shape is a collapsed per-file summary table carrying
+  no block at all.
 - **Do:** distinguish "no findings" from "no verdict" explicitly, and treat
   the latter as unreviewed.
+- **Do:** run all three queries above alongside
+  `scripts/check-pr-fully-clean.py`, unfiltered by head SHA and printing
+  each body, and cite what they showed when reporting a PR ready.
 - **Don't:** report clean on a zero thread count, however many checks are
   green.
 - **Don't:** treat an empty review body as an all-clear without checking the
   inline comments.
 - **Don't:** treat a "generated no new comments" overview as an all-clear
-  until every `<summary>` heading has been checked case-insensitively for
-  `suppressed` --- not until the whole body has, which flags ordinary
-  overview prose that merely mentions suppressed findings.
+  until every `<summary>` element and every ATX heading inside a collapsed
+  `<details>` region has been checked case-insensitively for `suppressed`
+  --- not until the whole body has, which flags ordinary overview prose
+  that merely mentions suppressed findings, and not `<summary>` alone,
+  which misses a block nested one heading deeper.
+- **Don't:** rule the region-wide match out on the strength of that
+  proxy's failure --- one false positive in 137 measured bodies makes it
+  the weaker anchor, not a wrong one.
 - **Don't:** read a reviewer's silence as a verdict --- a job that posted
   nothing leaves the same zero counts as a job that found nothing.
 - **Don't:** act on a review wake's own payload --- it is one comment out of
   however many the round posted, and it never says which.
+- **Don't:** read `FULLY CLEAN` from `scripts/check-pr-fully-clean.py` as
+  having performed this section --- it covers check runs and verdict-bearing
+  review items, and the inline comments and the suppressed block are outside
+  what it fetches.
 
 **A comment can be evidence-dense, correct throughout, and state no verdict at
 all --- and its density is what gets read as the conclusion.**

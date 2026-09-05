@@ -82,8 +82,14 @@
 
   ```text
   `gh` is not installed or not on PATH.
-  This script requires the GitHub CLI; -R cannot substitute for it.
+  `-R` alone cannot substitute for it, but the GitHub CLI is not required: score a JSON payload instead. `build-pr-payload.py` assembles one from plain REST, and needs GITHUB_TOKEN or GH_TOKEN set:
+    python3 <scripts>/build-pr-payload.py OWNER/REPO N /tmp/pr.json
+    python3 <scripts>/check-pr-fully-clean.py N -R OWNER/REPO --from-json /tmp/pr.json
   ```
+
+  The two commands print as absolute paths derived from the script's own
+  location, so they are runnable as printed from whatever directory the
+  failing invocation used (ai-config#3113).
 
   It exits **2**, never 1 --- 1 is this script's "not clean" code, so a missing
   binary would otherwise read as a verdict rather than an environment failure.
@@ -462,6 +468,29 @@
   ```
   On `ucdavis/bcs` (2026-07-30) ruleset `19248641`, scoped to `~DEFAULT_BRANCH`, returns `{"review_on_push":true,"review_draft_pull_requests":true}` -- which is why draft PRs there get Copilot reviews at all.
   Check this before concluding that a Copilot review was requested by a person, or that its absence means nobody asked.
+
+  **A required-context STRING is derivable from the default branch's workflow files, and a PR's check-run names are not the place to read it.**
+  A caller job invoking a reusable workflow publishes `<caller job> / <inner job>`, where each half is a **job** display name -- its `name:` where one is set, its key otherwise -- and the caller *workflow*'s `name:` appears nowhere.
+  So `check: {uses: Morrison-Lab/gha/.github/workflows/spellcheck.yml@v2}` in a workflow whose `name:` is `Spellcheck` publishes `check / spellcheck`, not `Spellcheck`.
+  Both branches of that rule are locally measured on `ucdavis/rampp` (2026-09-03).
+  Run `33688762211` prints `check / spellcheck`, where neither job sets `name:`, so both halves are keys.
+  Run `33727364476` prints `Check-Changelog / Check Changelog Action`, where the left half is the **caller**'s job key in the repo's own `news.yaml` and the right half is the `name:` on `check-news.yml@v2`'s inner job -- whose key, also `Check-Changelog`, never appears.
+  The coincidence of those two names is why this example needs spelling out: read the caller's job key for the left half, always, however the called workflow happens to key its own job.
+  Read the definitions off the default branch by ref, never off a checkout and never off a PR's rollup:
+  ```bash
+  gh api "repos/<o>/<r>/contents/.github/workflows?ref=<default-branch>" --jq '.[].name'
+  gh api "repos/<o>/<r>/contents/.github/workflows/<file>?ref=<default-branch>" --jq .content | base64 -d
+  ```
+  A run can corroborate that those definitions compose as you read them, but **which** run is usable is the subtle half -- a `pull_request` run resolves the file from the head-into-base merge, so its base and its touched paths both matter.
+  [`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md)'s twelfth shape carries those conditions.
+  Do not reconstruct them from a `gh api .../jobs` line here, since a placeholder that names no branch is exactly what drops them.
+  - **Do:** read the workflow file at `?ref=<default-branch>` and compose the context string from its job names.
+  - **Don't:** read a required-context string off any pull request's check runs -- merged, recent, or green.
+  (ucdavis/rampp, 2026-09-03: bare `Spellcheck` and `Check Changelog Action` were added to ruleset `3889405` on the strength of check-run names read off merged PR #157.
+  Those names were accurate for `main` when #157 merged.
+  The move to called reusable workflows landed on `main` three hours later via #153, retiring them.
+  `main` now emits `check / spellcheck` and `Check-Changelog / Check Changelog Action`.
+  Such a context never turns red -- it sits as `Expected`, so there is no failing signal to find the mistake by.)
 
 - **GitHub PR Reviews REST API (`POST /repos/{owner}/{repo}/pulls/{number}/reviews`) Requirements & Fallbacks**:
   - `pull_number` MUST be an explicit integer in the URL path (e.g. `/pulls/412/reviews`), not `'current'` or branch names.
@@ -887,3 +916,24 @@ one update-plus-rerun cycle each.)
   then start the next PR's update (or use a merge queue where configured).
 - **Don't:** batch-update the whole queue without a merge queue --- every PR but the next one
   goes `BEHIND` again before its turn, and its re-run is wasted.
+
+## `gh pr merge` can land with no output surfaced at all
+
+Measured 2026-09-03 on `Morrison-Lab/ai-config` through the Claude Code Bash tool: `gh pr merge <N> --squash --delete-branch` came back with no stdout, no stderr, and no error surfaced, and the merge had in fact landed.
+
+One observation cannot separate `gh` printing nothing from the harness surfacing nothing, since the two are identical from here.
+So the durable claim is about the *reading* rather than about which layer swallowed the output, and it covers any forge command whose effect is separately checkable --- [`claude-code.md`](claude-code.md) already draws the sibling line for a bounded probe, that empty output is not evidence it did nothing.
+Settling the layer needs the same merge run outside the tool, which this measurement did not do.
+
+Empty output is therefore not a signal in either direction here, and the two readings it invites are both wrong and both expensive.
+Read as a failure, it prompts a retry, which then fails on the PR's already-merged state and reads as a second, different problem.
+Read as a success, it is right by luck rather than by evidence.
+
+One query settles it, and it is cheaper than either misreading:
+
+```bash
+gh pr view <N> --json state,mergedAt,mergeCommit
+```
+
+- **Do:** confirm a merge from a state query rather than from the merge command's own output.
+- **Don't:** read empty output from `gh pr merge` as failure, and don't retry on it.

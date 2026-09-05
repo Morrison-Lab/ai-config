@@ -36,18 +36,30 @@ def comment(body, login="github-actions"):
     return {"author": {"login": login}, "body": body}
 
 
-def review(login, state):
-    return {"author": {"login": login}, "state": state}
+def review(login, state, body="", commit=HEAD, assoc="MEMBER"):
+    """A review record in `gh pr view --json reviews`' own shape.
+
+    `commit.oid` and `authorAssociation` default to admissible values so a
+    case exercising some other bound is not silently denied by these two;
+    the cases that exercise them pass explicit values.
+    """
+    r = {"author": {"login": login}, "state": state, "body": body,
+         "authorAssociation": assoc}
+    if commit is not None:
+        r["commit"] = {"oid": commit}
+    return r
 
 
 def pr(reviews=(), comments=(), checks=(), head=HEAD,
-       url="https://github.com/Lacaedemon/sparta/pull/1427"):
+       url="https://github.com/Lacaedemon/sparta/pull/1427",
+       author="pr-opener"):
     return {
         "reviews": list(reviews),
         "comments": list(comments),
         "statusCheckRollup": list(checks),
         "headRefOid": head,
         "url": url,
+        "author": {"login": author},
     }
 
 
@@ -169,6 +181,474 @@ class TestEvaluate(unittest.TestCase):
     def test_human_commented_review_does_not_approve(self):
         state = pr(reviews=[review("d-morrison", "COMMENTED")])
         self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "deny")
+
+    def test_human_commented_review_with_approving_body_allows(self):
+        """ai-config#3062: reviewers here submit COMMENTED, never APPROVED,
+        so approval has to be readable from the body's substance too --
+        otherwise the human-approval allow-path can never fire. The
+        reachable shape is the approval and nothing else: bare, emphasized,
+        terminated, or under a `### Verdict` heading."""
+        for body in ("Ready for merge.",
+                     "Approved",
+                     "**Ready for merge**.",
+                     "### Verdict\n\n**Ready for merge**"):
+            state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+            self.assertEqual(
+                gate.evaluate(MERGE_CMD, state)["decision"], "allow", body)
+
+    def test_human_commented_body_negated_approval_denies(self):
+        for body in ("Cannot approve yet; the migration is missing.",
+                     "This isn't ready for merge.",
+                     "Ready for merge? No -- changes requested."):
+            state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+            self.assertEqual(
+                gate.evaluate(MERGE_CMD, state)["decision"], "deny", body)
+
+    def test_incidental_approval_word_in_review_body_does_not_approve(self):
+        """The whole body must reduce to one non-empty line, so prose
+        mentioning an approved helper cannot launder itself into an
+        approval."""
+        body = ("Two notes on the parser.\n\n"
+                "It reuses the approved validation helper, which is fine.")
+        state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "deny")
+
+    def test_blocker_above_verdict_heading_still_vetoes(self):
+        """The not-clean sweep covers the whole body, not just the section
+        under `### Verdict`, so a blocker stated above the heading holds."""
+        body = "The migration is not ready.\n\n### Verdict\nReady for merge."
+        state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "deny")
+
+    def test_quoted_approval_in_review_body_does_not_approve(self):
+        body = "Quoting the earlier round:\n> Ready for merge\n\nStill checking."
+        state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "deny")
+
+    def test_body_approval_does_not_clear_standing_changes_requested(self):
+        """An inferred approval is weaker than the formal state it would
+        override: only APPROVED or a dismissal clears CHANGES_REQUESTED."""
+        state = pr(
+            reviews=[review("d-morrison", "CHANGES_REQUESTED"),
+                     review("d-morrison", "COMMENTED", "Ready for merge.")],
+            comments=[CLEAN_VERDICT],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("CHANGES_REQUESTED", decision["reason"])
+
+    def test_bot_commented_review_with_approving_body_does_not_approve(self):
+        state = pr(
+            reviews=[review("copilot-pull-request-reviewer[bot]", "COMMENTED",
+                            "Ready for merge.")],
+            comments=[NEEDS_WORK_VERDICT],
+        )
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "deny")
+
+    def test_body_approval_does_not_override_not_clean_verdict(self):
+        state = pr(
+            reviews=[review("d-morrison", "COMMENTED", "Ready for merge.")],
+            comments=[NEEDS_WORK_VERDICT],
+        )
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "deny")
+
+    def test_pending_review_with_approving_body_does_not_approve(self):
+        state = pr(reviews=[review("d-morrison", "PENDING", "Ready for merge.")])
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "deny")
+
+    def test_pr_authors_own_body_approval_does_not_authorize_merge(self):
+        """The self-approval property must hold across the reviews channel
+        too: `gh pr review --comment` is an agent surface, so an approving
+        review from the PR's own author cannot authorize its merge."""
+        state = pr(
+            reviews=[review("d-morrison", "COMMENTED",
+                            "### Verdict\n\n**Ready for merge**")],
+            author="d-morrison",
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("its own work", decision["reason"])
+
+    def test_body_approval_from_another_human_still_allows(self):
+        """The self-approval guard is keyed on the PR author, so it must not
+        re-kill the allow-path ai-config#3062 exists to revive."""
+        state = pr(reviews=[review("d-morrison", "COMMENTED", "Ready for merge.")],
+                   author="someone-else")
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "allow")
+
+    def test_agent_disclosed_review_body_does_not_approve(self):
+        """A body declaring itself agent-written is not human approval,
+        whichever login submitted the review."""
+        body = ("### Verdict\n**Ready for merge** --- no findings.\n\n"
+                f"Reviewed commit: {HEAD}\n\n"
+                "_Posted by Claude Code (AI agent) --- not written by a human._")
+        state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "deny")
+
+    def test_body_approval_naming_a_non_head_commit_is_stale(self):
+        """GitHub never dismisses a COMMENTED review, so an approval written
+        before ten further pushes must not stand. The review's own
+        `commit.oid` is what head-binds it; a `Reviewed commit:` footer is
+        one more line, so the emptiness bar refuses this body regardless."""
+        body = ("### Verdict\n**Ready for merge**\n\n"
+                "Reviewed commit: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+        state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "deny")
+
+    def test_conditional_approval_headline_does_not_approve(self):
+        """A human review body has no `### Verdict` structure, so its first
+        line is arbitrary prose: a substring hit cannot distinguish an
+        approval from a sentence explicitly withholding one."""
+        for body in ("Two questions before I approve.",
+                     "Who approved this design?",
+                     "I'd approve if the tests covered the empty case.",
+                     "Ready for merge once you rebase.",
+                     "Ready to merge after the NEWS bullet lands.",
+                     "Ready for merge but please fix the typo in the docstring.",
+                     "Approved, though the docstring drifts from the code.",
+                     "Approved except for the missing NEWS bullet."):
+            state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+            self.assertEqual(
+                gate.evaluate(MERGE_CMD, state)["decision"], "deny", body)
+
+    def test_approving_headline_over_findings_does_not_approve(self):
+        """Findings under an approving line leave more than one non-empty
+        line, so the body cannot reduce to the approval itself."""
+        for body in ("Ready for merge.\n\n### Minor findings\n"
+                     "- consider renaming `x`\n- the docstring drifts",
+                     "No findings.\n\n- Findings: the migration is missing "
+                     "a down-step.",
+                     "Approved.\n\nOpen items:\n- rework the parser"):
+            state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+            self.assertEqual(
+                gate.evaluate(MERGE_CMD, state)["decision"], "deny", body)
+
+    def test_findings_above_the_verdict_heading_do_not_approve(self):
+        """This corpus's own review layout puts `### Findings` *above*
+        `### Verdict` (shared/workflow/self-review-fallback.md), so a veto
+        scoped to the post-heading text would be defeated by section order
+        rather than by substance. The lead-in is held to the same
+        emptiness bar, so prose withholding approval above the heading
+        vetoes the heading's own headline."""
+        for body in ("### Findings\n\n- the migration lacks a down-step\n"
+                     "- the parser drops tokens\n\n### Verdict\n\n"
+                     "**Ready for merge**",
+                     "Open items:\n\n### Verdict\n\nReady for merge.",
+                     "I'd want tests first.\n\n### Verdict\nReady for merge."):
+            state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+            self.assertEqual(
+                gate.evaluate(MERGE_CMD, state)["decision"], "deny", body)
+
+    def test_withholding_prose_below_the_headline_does_not_approve(self):
+        """The withholding half of a qualified approval survives a line
+        break, so anchoring any test on the headline alone let the same
+        sentence families through one newline lower."""
+        for body in ("Ready for merge.\nBut please fix the typo in the "
+                     "docstring.",
+                     "Approved.\n\nThough the docstring drifts from the "
+                     "code.",
+                     "Approved.\n\nTwo questions before you land it.",
+                     "Approved.\n\nI'd want tests for the empty case first.",
+                     "Ready for merge.\n\nWhy did you drop the test?"):
+            state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+            self.assertEqual(
+                gate.evaluate(MERGE_CMD, state)["decision"], "deny", body)
+
+    def test_withholding_prose_below_the_verdict_heading_does_not_approve(self):
+        """The mirror of the lead-in case: the same words that veto above a
+        `### Verdict` heading must veto below it, or section order decides
+        the merge rather than substance."""
+        body = "### Verdict\nReady for merge.\n\nI'd want tests first."
+        state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "deny")
+
+    def test_findings_table_under_an_approving_headline_does_not_approve(self):
+        """A table is an ordinary way to list findings, so a structural veto
+        seeing bullets, numbered items, and headings only readmitted the
+        sparta#1427 shape it exists to close."""
+        body = ("Ready for merge.\n\n| file | issue |\n| --- | --- |\n"
+                "| a.py | drops tokens |")
+        state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "deny")
+
+    def test_prose_after_the_approval_sentence_does_not_approve(self):
+        """The withholding sentence carries no vetoed word, so a lexical
+        veto could not see it: "Please fix the typo." and "The parser drops
+        tokens." are open requests under an approving headline, and the
+        second names no request verb at all. The bar after the approval
+        sentence is therefore emptiness, not vocabulary."""
+        for body in ("Ready for merge.\n\nPlease fix the typo in the "
+                     "docstring.",
+                     "Ready for merge.\n\nThe parser drops tokens.",
+                     "Ready for merge.\n\nI want tests for the empty case.",
+                     "Ready for merge. Please fix the typo."):
+            state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+            self.assertEqual(
+                gate.evaluate(MERGE_CMD, state)["decision"], "deny", body)
+
+    def test_clause_joined_request_after_the_approval_does_not_approve(self):
+        """A sentence-punctuation split reads only `.`, `!`, and `?`, so
+        every other clause joiner kept the open request inside the approval
+        sentence and merged over it. The bar is the whole line matched end
+        to end, so the joiner cannot decide the merge."""
+        for body in ("Ready for merge; please fix the typo in the docstring.",
+                     "Ready for merge, please fix the typo in the docstring.",
+                     "Ready for merge: the parser drops tokens.",
+                     "Ready for merge -- please fix the typo in the "
+                     "docstring.",
+                     "Ready for merge --- please fix the typo in the "
+                     "docstring.",
+                     "Approved --- nothing further from me."):
+            state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+            self.assertEqual(
+                gate.evaluate(MERGE_CMD, state)["decision"], "deny", body)
+
+    def test_quoted_or_fenced_remainder_after_the_approval_denies(self):
+        """Blanking is sound in the approval direction and unsound in the
+        veto direction: it would delete the region before the emptiness
+        test ever saw it, so a reviewer quoting the line they want changed,
+        or pasting the offending snippet in a fence, would merge over an
+        open request. Nothing is blanked here, so both add lines."""
+        for body in ("Ready for merge.\n\n> Please fix the typo in the "
+                     "docstring.",
+                     "Ready for merge.\n\n```\nPlease fix the typo.\n```"):
+            state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+            self.assertEqual(
+                gate.evaluate(MERGE_CMD, state)["decision"], "deny", body)
+
+    def test_lone_quoted_approval_does_not_approve(self):
+        """The other half of not blanking: with the blockquote markers left
+        in place, a one-line body quoting someone else's approval would
+        otherwise be trimmed down to that approval."""
+        for body in ("> Ready for merge.", ">> Approved"):
+            state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+            self.assertEqual(
+                gate.evaluate(MERGE_CMD, state)["decision"], "deny", body)
+
+    def test_praise_after_the_approval_sentence_also_does_not_approve(self):
+        """The deliberate boundary of the case above: no lexical rule
+        separates "The fix is exactly what I would have written." from
+        "The parser drops tokens.", so both deny. Enumerating in the allow
+        direction fails closed; enumerating in the veto direction
+        authorizes a merge over whatever the list omits."""
+        for body in ("Approved. Nice work, this is much cleaner than before.",
+                     "Ready for merge. The fix is exactly what I would have "
+                     "written.",
+                     "Ready for merge. I checked the docs after reading the "
+                     "diff."):
+            state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+            self.assertEqual(
+                gate.evaluate(MERGE_CMD, state)["decision"], "deny", body)
+
+    def test_pipeless_findings_table_above_the_heading_does_not_approve(self):
+        """GitHub Flavored Markdown renders a table with no leading pipe
+        identically, so a structural veto keyed on the leading pipe saw
+        only half of them. No cell here carries findings vocabulary either,
+        so nothing but the emptiness bar can deny it."""
+        body = ("file | note\n--- | ---\na.py | drops tokens\n\n"
+                "### Verdict\n\nReady for merge.")
+        state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "deny")
+
+    def test_mid_line_colon_nit_above_the_heading_does_not_approve(self):
+        """A nit stated above the heading is a line, so the emptiness bar
+        denies it wherever the colon sits. An end-anchored colon test never
+        fired on "Minor: consider renaming x" at all."""
+        for body in ("Minor: consider renaming x.\n\n### Verdict\n\n"
+                     "Ready for merge.",
+                     "One nit: rename x.\n\n### Verdict\n\n"
+                     "Ready for merge."):
+            state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+            self.assertEqual(
+                gate.evaluate(MERGE_CMD, state)["decision"], "deny", body)
+
+    def test_body_approval_on_a_pr_opened_by_someone_else_allows(self):
+        """The self-approval bound is keyed on the PR author, so it does not
+        fire on a chore PR someone else opened: what stands between an
+        agent's own review and an allow there is the disclosure marker
+        hooks/require-agent-disclosure.py obliges it to carry. Keying the
+        veto on the merging account instead would deny the human reviews
+        this repo actually gets, since reviewer and merging agent share one
+        login here."""
+        state = pr(reviews=[review("d-morrison", "COMMENTED", "Ready for merge.",
+                                   assoc="OWNER")],
+                   author="dependabot[bot]")
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "allow")
+        disclosed = pr(
+            reviews=[review("d-morrison", "COMMENTED",
+                            "Ready for merge.\n\n_Posted by Claude Code "
+                            "(AI agent) --- not written by a human._",
+                            assoc="OWNER")],
+            author="dependabot[bot]",
+        )
+        self.assertEqual(
+            gate.evaluate(MERGE_CMD, disclosed)["decision"], "deny")
+
+    def test_lead_in_above_the_verdict_heading_does_not_approve(self):
+        """One bar governs both zones. Exempting the lead-in from the
+        emptiness test only relocated the findings: this corpus's own
+        review layout puts them above the heading, so a lexical bar there
+        let "Please fix the typo." authorize the merge it denied one line
+        lower. Innocuous narration denies with them, which is the
+        deliberate cost -- no lexical rule separates "I read the whole
+        diff." from "The parser drops tokens."""
+        for body in ("I read the whole diff.\n\n### Verdict\n\n"
+                     "Ready for merge.",
+                     "Please fix the typo in the docstring.\n\n"
+                     "### Verdict\n\nReady for merge.",
+                     "The parser drops tokens.\n\n### Verdict\n\n"
+                     "Ready for merge.",
+                     "I want tests for the empty case.\n\n### Verdict\n\n"
+                     "Ready for merge."):
+            state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+            self.assertEqual(
+                gate.evaluate(MERGE_CMD, state)["decision"], "deny", body)
+
+    def test_agent_disclosure_in_a_quoted_or_fenced_region_still_denies(self):
+        """The marker test reads the raw body: blanking exists to stop a
+        quoted *approval* counting, so running it first would let one `>`
+        character delete an agent's own disclosure."""
+        marker = "_Posted by Claude Code (AI agent) --- not written by a human._"
+        for body in (f"Ready for merge.\n\n> {marker}",
+                     f"Ready for merge.\n\n```\n{marker}\n```"):
+            state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+            self.assertEqual(
+                gate.evaluate(MERGE_CMD, state)["decision"], "deny", body)
+
+    def test_body_approval_on_a_non_head_review_commit_denies(self):
+        """A human body carries no `Reviewed commit:` footer, so the review's
+        own commit.oid is what head-binds a body-derived approval."""
+        stale = review("d-morrison", "COMMENTED", "Ready for merge.",
+                       commit="b" * 40)
+        self.assertEqual(
+            gate.evaluate(MERGE_CMD, pr(reviews=[stale]))["decision"], "deny")
+
+    def test_body_approval_without_a_review_commit_denies(self):
+        """Fail closed: a payload that cannot show the review was submitted
+        against the head cannot show the approval is current."""
+        unbound = review("d-morrison", "COMMENTED", "Ready for merge.",
+                         commit=None)
+        self.assertEqual(
+            gate.evaluate(MERGE_CMD, pr(reviews=[unbound]))["decision"], "deny")
+
+    def test_non_repository_reviewer_body_approval_denies(self):
+        """Anyone with read access can submit a COMMENTED review, so the
+        allow-path is bounded by authorAssociation; a formal APPROVED review
+        is a distinct authorizing act and keeps its own fast path."""
+        for assoc in ("NONE", "CONTRIBUTOR", "FIRST_TIME_CONTRIBUTOR", ""):
+            state = pr(reviews=[review("random-passerby", "COMMENTED",
+                                       "Ready for merge.", assoc=assoc)])
+            self.assertEqual(
+                gate.evaluate(MERGE_CMD, state)["decision"], "deny", assoc)
+        allowed = pr(reviews=[review("random-passerby", "COMMENTED",
+                                     "Ready for merge.", assoc="COLLABORATOR")])
+        self.assertEqual(gate.evaluate(MERGE_CMD, allowed)["decision"], "allow")
+
+    def test_unlabelled_follow_on_bullets_do_not_approve(self):
+        """The bar is emptiness, not vocabulary: a findings list whose
+        wording dodges the findings vocabulary still leaves extra lines."""
+        for body in ("Ready for merge.\n\n## Notes\n\n"
+                     "- the parser drops tokens\n- rename x",
+                     "Approved.\n\n1. the migration lacks a down-step",
+                     "No findings.\n\n### Notes\n\nJust one thought."):
+            state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+            self.assertEqual(
+                gate.evaluate(MERGE_CMD, state)["decision"], "deny", body)
+
+    def test_later_non_approving_review_retracts_body_approval(self):
+        """A body-derived approval is the latest word, not a sticky one: no
+        DISMISSED state ever arrives for a COMMENTED review, and
+        `evaluate_verdict` reads issue comments only, so nothing else sees
+        the retraction."""
+        state = pr(reviews=[
+            review("d-morrison", "COMMENTED", "Ready for merge."),
+            review("d-morrison", "COMMENTED", "Needs more work: found a blocker."),
+        ])
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "deny")
+
+    def test_another_humans_not_clean_review_body_vetoes_an_approval(self):
+        """The reviews channel is read in both directions: one human's
+        stated blocker denies beside another human's body approval,
+        whichever order the two reviews arrive in."""
+        blocker = review("bob", "COMMENTED",
+                         "Needs more work: the parser drops tokens.")
+        approval = review("alice", "COMMENTED", "Ready for merge.")
+        for reviews in ([approval, blocker], [blocker, approval]):
+            decision = gate.evaluate(MERGE_CMD, pr(reviews=list(reviews)))
+            self.assertEqual(decision["decision"], "deny")
+            self.assertIn("not clean", decision["reason"])
+
+    def test_not_clean_body_denies_beside_another_humans_approval(self):
+        """A blocker from the human who approved earlier denies even with a
+        second human's approving review standing."""
+        state = pr(reviews=[
+            review("alice", "COMMENTED", "Ready for merge."),
+            review("bob", "COMMENTED", "Approved."),
+            review("alice", "COMMENTED", "Needs more work."),
+        ])
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "deny")
+
+    def test_list_marked_approval_does_not_approve(self):
+        """A list marker is not emphasis, so a bulleted or numbered line
+        must not trim back to the bare approval phrase."""
+        for body in ("* Ready for merge.", "- Ready for merge.",
+                     "1. Approved."):
+            state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+            self.assertEqual(
+                gate.evaluate(MERGE_CMD, state)["decision"], "deny", body)
+            self.assertFalse(gate.human_review_body_approves(body), body)
+
+    def test_struck_through_approval_does_not_approve(self):
+        """Strikethrough is a retraction, not emphasis, so `~~` must not be
+        trimmed back to the bare approval phrase."""
+        for body in ("~~Ready for merge~~", "~~Approved~~"):
+            state = pr(reviews=[review("d-morrison", "COMMENTED", body)])
+            self.assertEqual(
+                gate.evaluate(MERGE_CMD, state)["decision"], "deny", body)
+            self.assertFalse(gate.human_review_body_approves(body), body)
+
+    def test_body_approval_without_a_named_pr_author_denies(self):
+        """The self-approval bound fails closed like every other bound here:
+        a payload that cannot name the author cannot show the reviewer is
+        someone else."""
+        for author in (None, "absent"):
+            state = pr(reviews=[review("d-morrison", "COMMENTED",
+                                       "Ready for merge.")])
+            if author is None:
+                state["author"] = None
+            else:
+                del state["author"]
+            decision = gate.evaluate(MERGE_CMD, state)
+            self.assertEqual(decision["decision"], "deny", author)
+            self.assertIn("its own work", decision["reason"])
+
+    def test_one_character_review_commit_is_not_head_bound(self):
+        short = review("d-morrison", "COMMENTED", "Ready for merge.",
+                       commit=HEAD[0])
+        self.assertEqual(
+            gate.evaluate(MERGE_CMD, pr(reviews=[short]))["decision"], "deny")
+
+    def test_chatty_follow_up_does_not_retract_formal_approval(self):
+        """Only the approval a body *established* is retractable, so
+        follow-up prose cannot clobber a formal APPROVED state.
+
+        The second sequence is the one with teeth: an approving COMMENTED
+        review *between* the two makes the retraction branch reachable for
+        a login whose standing is formal, so without the guard the chatty
+        third review pops the APPROVED and the gate denies a merge GitHub
+        itself records as approved. The first sequence passes either way."""
+        state = pr(reviews=[
+            review("d-morrison", "APPROVED"),
+            review("d-morrison", "COMMENTED", "Thanks for the quick turnaround."),
+        ])
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "allow")
+        restated = pr(reviews=[
+            review("d-morrison", "APPROVED"),
+            review("d-morrison", "COMMENTED", "Ready for merge."),
+            review("d-morrison", "COMMENTED", "Thanks for the quick turnaround."),
+        ])
+        self.assertEqual(
+            gate.evaluate(MERGE_CMD, restated)["decision"], "allow")
 
     def test_bot_suffix_login_ignored_but_botlike_human_counts(self):
         """`talbot` is a human: their CHANGES_REQUESTED must deny even with a
@@ -413,7 +893,8 @@ class TestMain(unittest.TestCase):
         if side_effect is None:
             state = view if view is not None else pr()
             view_payload = {k: state[k] for k in
-                            ("url", "reviews", "statusCheckRollup", "headRefOid")}
+                            ("url", "author", "reviews",
+                             "statusCheckRollup", "headRefOid")}
             side_effect = [
                 gh_result(stdout=json.dumps(view_payload)),
                 gh_result(stdout=json.dumps(comments if comments is not None
@@ -574,7 +1055,8 @@ class TestMain(unittest.TestCase):
     def test_comments_fetch_failure_denies(self):
         state = pr(comments=[CLEAN_VERDICT])
         view_payload = {k: state[k] for k in
-                        ("url", "reviews", "statusCheckRollup", "headRefOid")}
+                        ("url", "author", "reviews", "statusCheckRollup",
+                         "headRefOid")}
         decision, _ = self.run_main(
             self.payload(MERGE_CMD),
             side_effect=[gh_result(stdout=json.dumps(view_payload)),
@@ -595,7 +1077,8 @@ class TestMain(unittest.TestCase):
         must govern."""
         state = pr()
         view_payload = {k: state[k] for k in
-                        ("url", "reviews", "statusCheckRollup", "headRefOid")}
+                        ("url", "author", "reviews", "statusCheckRollup",
+                         "headRefOid")}
         pages = (json.dumps([NEEDS_WORK_VERDICT]) + "\n"
                  + json.dumps([CLEAN_VERDICT]))
         decision, _ = self.run_main(

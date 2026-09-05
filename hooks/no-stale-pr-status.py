@@ -137,6 +137,286 @@ RX_NEGATION = re.compile(
 # parse prose correctly.
 RX_SENTENCE_BREAK = re.compile(r"[.!?;][\"'\)\]*_`]*(?:\s|$)|\n")
 
+# Retraction vocabulary. A correction is rarely phrased as "the PR is not
+# fully clean"; it says the earlier claim "was wrong". `RX_NEGATION` matches
+# none of that, so a reply WITHDRAWING a cleanliness claim read as making one
+# and was blocked -- measured 2026-09-02 on the sentence: But "fully clean"
+# was wrong too, and for a third reason (ai-config#3038).
+#
+# Blocking a correction specifically is worse than an ordinary false positive:
+# the cheapest way to satisfy the guard is to stop mentioning the earlier
+# claim at all, which is the opposite of what CLAUDE.md asks for.
+#
+# The word list is taken from `hooks/remind-ums-after-error.py`, which already
+# enumerates this family for the same reason (ai-config#1210 -- a retraction of
+# a figure rarely carries an explicit "incorrectly"), plus four terms that file
+# does not carry: `inaccurate`, `premature`, `misstated`, `misspoke`.
+#
+# What is NOT taken from it is its first-person anchor. That file anchors most
+# of its alternatives on an explicit `I`/`my` subject -- `correcting this` and
+# `retracting that claim` among the several that do not -- because its job is
+# to detect an admission, and "the review was wrong" is a statement about
+# someone else. This guard's job is different, and the issue's own measured
+# sentence proves the anchor cannot transfer: in `But "fully clean" was wrong
+# too` the subject is the quoted claim, not a person. Attachment does that
+# work here instead -- see RX_CLAUSE_SEPARATOR below.
+#
+# The copula is required for the adjective forms, because bare `wrong` is most
+# often attributive ("the wrong branch", "the wrong file") and says nothing
+# about a claim being withdrawn.
+RX_RETRACTION = re.compile(
+    r"\b(?:was|were|is|are)\s+"
+    r"(?:wrong|incorrect|false|mistaken|inaccurate|premature)\b"
+    r"|\b(?:over|under)(?:stated|estimated|counted|reported|claimed)\b"
+    r"|\bretract(?:ing|ed|s)?\b"
+    r"|\bcorrecting\s+(?:myself|my|this)\b"
+    r"|\bmis(?:read|counted|stated|characterized|spoke)\b",
+    re.I,
+)
+
+# A retraction withdraws the ASSERT phrase only when it ATTACHES to it. This
+# is what keeps the widening from causing the opposite, invisible failure --
+# a genuine stale-clean claim silently suppressed because some other clause of
+# the same sentence happens to say "wrong". Every one of these blocks:
+#
+#   The reviewer was wrong about the lint failure, but all checks green.
+#   PR #1689 is fully clean -- the earlier blocker was inaccurate.
+#   All checks green, but the reviewer overstated the risk.
+#   All checks green after I misread the earlier log.
+#
+# In each, the retraction and the claim sit in DIFFERENT clauses, and the text
+# between them says so: a comma, a prose dash, a coordinating or subordinating
+# conjunction, the bracket or paren opening an aside, or a markdown boundary (a
+# table cell, a new list item). None of those appears between the claim and its
+# retraction in the measured sentence, where the two are adjacent.
+#
+# Attachment replaces the character window an earlier round used. A window
+# cannot tell "green -- the badge is wrong" from "green was wrong", since both
+# put the retraction within a few characters; a clause separator can.
+#
+# Two families of separator are direction-asymmetric, so the set is split
+# rather than shared. `when` is a complementizer: in "I was wrong when I said
+# all checks green." the claim is the content of the retracted saying, so
+# `when` must not break a LEADING retraction off the claim it withdraws. After
+# the claim the same word opens a separate clause, so it still breaks there.
+# The relative pronouns `where`, `which`, `who`, `whose`, and `whom` are the
+# second family, for the same reason. Before the claim they can take it as
+# their own object, so "Correcting my earlier status which claimed all checks
+# green." withdraws exactly the claim that follows. After the claim they open
+# a relative clause about a different noun instead, so "#1689 is fully clean
+# per the reviewer whose note was wrong." leaves the claim standing and still
+# has to block. USUALLY, not always: when the head noun refers back to the
+# claim itself the relative clause withdraws exactly the assertion this guard
+# protects, and RX_METALINGUISTIC_HEAD below is that carve-out.
+#
+# `that` belongs in the same set, and it is the commonest relative pronoun in
+# English -- so omitting it left the guard switchable off by one word, the same
+# defect the dash spelling had. It is the complementizer leading ("I was wrong
+# that all checks green.") and the restrictive relative pronoun trailing
+# ("#1689 is fully clean per the note that was wrong."), which is exactly the
+# trailing-only shape. It cannot join the shared set, because the leading
+# reading is the plainest correction there is. Adding it is also what forced
+# the carve-out: the metalinguistic hole was already open for the `which`
+# spelling and rare there, and `that` is the spelling people actually write on
+# a restrictive relative, so widening without the carve-out would have turned a
+# rare false block into a common one.
+#
+# `:` is a clause boundary in BOTH directions and stays in the shared set. It
+# introduces the CORRECTED claim at least as often as the retracted one --
+# "I was wrong: all checks green now." withdraws some earlier claim and then
+# asserts a fresh, stale one -- so reading it as attachment silently disables
+# the guard on a genuine stale-clean assertion. That is the invisible failure,
+# since a suppressed guard emits nothing, and the identical sentence with a
+# period ("I was wrong. All checks green now.") already blocks, so nothing
+# should turn on the one character. The cost of the symmetric reading is a
+# visible warning on "I overstated it: 11 pass was the pre-push reading.",
+# whose own text already discloses the reading is pre-push; the cost of the
+# asymmetric one is a stale claim that nothing reports.
+#
+# A prose DASH is the same case as `:`, and listing only the ASCII double
+# hyphen left the guard switchable off by one keystroke: "PR #1689 is fully
+# clean -- the earlier blocker was inaccurate." blocked while the identical
+# sentence spelled with an em-dash, an en-dash, or a spaced single hyphen did
+# not. The text this guard reads is assistant prose in a transcript, which
+# `shared/coding/ascii-punctuation-in-source.md` does not govern, so every
+# spelling has to be listed -- as `\uXXXX` escapes, so this file itself stays
+# ASCII. Only the ASCII hyphen and the slash need surrounding whitespace,
+# because those two also sit inside ordinary words and paths
+# (`conflict-free`, `pre-push`, `hooks/foo.py`); the other glyphs never do.
+#
+# A square-bracketed aside is the same case as a parenthesized one AFTER the
+# claim, and listing only the parens made the verdict turn on the bracket
+# style: "All checks green (the earlier note was wrong)." blocked while the
+# identical sentence in brackets did not. Both open an aside about something
+# other than the claim, so both break the TRAILING attachment.
+#
+# The brackets stay SHARED, exactly as the parens do, and the leading direction
+# is handled by removing markdown rather than by exempting the character. A
+# leading bracketed span in this corpus is usually markdown rather than an
+# aside -- a reference-style link ("[#1689][pr]"), a footnote marker ("[^1]"),
+# an inline link -- so reading it as a clause break blocks the plain retraction
+# it sits inside: "Retracting the status [#1689][pr] all checks green." and "I
+# misread [^1] all checks green." both flipped from ALLOW to BLOCK when the
+# brackets were first shared, which is the false-block class this guard exists
+# to stop. Exempting the bracket CHARACTER instead is what an earlier round
+# tried, and it reintroduces the defect this same block was written to remove,
+# one direction over: with the brackets trailing-only, "[The earlier note was
+# wrong] all checks green." allowed while the identical sentence in parens
+# blocked, so the verdict turned on the bracket style again. RX_MARKDOWN_SPAN
+# below deletes the markdown shapes from the connector and leaves every other
+# bracket standing, which keeps the two families in step.
+#
+# Nothing else moves. `because`, `since`, `after`, `before`, `until`, `once`,
+# `unless`, `if`, and `now that` introduce a reason or a time rather than the
+# retraction's object, so a retraction reaching across one of them is about a
+# different proposition and STAYS blocked in both directions -- "All checks
+# green because the earlier reading was wrong." still asserts green. `until`
+# belongs beside them on that same ground, and not on a shared part of speech:
+# what follows it is a time, so the retraction in "All checks green until I
+# noticed my earlier count was overstated." is about the COUNT rather than
+# about the claim. Its terminative sense ("P until Q" ends P at Q) is a
+# different question, and one this guard does not read: a claim bounded by a
+# time is still a claim, and only the retraction vocabulary withdraws one. The
+# two-word `now that` has to be spelled out, since a bare `now` is no
+# separator at all.
+_CLAUSE_SEPARATORS = (
+    r"--|[,;:()\[\]|]"
+    r"|[\u2013\u2014\u2192\u2026]|\s[-/]\s"
+    r"|\n[ \t]*[-*+>#]"
+    r"|\b(?:but|and|or|so|yet|however|though|although|while|whereas"
+    r"|after|before|until|since|because|once|unless|if|now\s+that)\b"
+)
+# The complementizers and the relative pronouns, which break attachment only
+# AFTER the claim -- before it a pronoun can take the claim as its own object.
+_TRAILING_ONLY_SEPARATORS = (
+    r"|\b(?:when|that|where|which|who|whose|whom)\b"
+)
+
+# The markdown spans that are not clause breaks in either direction: a footnote
+# marker, a reference-style link, an inline link. They are deleted from the
+# connector before it is scanned, so the brackets can stay in the shared set
+# without a citation inside a retraction reading as an aside. A bare "[ci]" is
+# deliberately NOT here: nothing distinguishes a shortcut link from a bracketed
+# aside, and the aside is the reading that keeps the guard on.
+RX_MARKDOWN_SPAN = re.compile(
+    r"\[\^[^\[\]]*\]"
+    r"|\[[^\[\]]*\](?:\[[^\[\]]*\]|\([^()]*\))"
+)
+RX_CLAUSE_SEPARATOR = re.compile(
+    _CLAUSE_SEPARATORS + _TRAILING_ONLY_SEPARATORS, re.I)
+RX_LEADING_SEPARATOR = re.compile(_CLAUSE_SEPARATORS, re.I)
+
+# The one shape where a trailing relative pronoun does NOT open a clause about
+# a different noun: the head noun refers back to the claim itself. "All checks
+# green is a claim that was wrong." names the assertion and then withdraws it,
+# so breaking on the pronoun blocks a plain retraction -- the very class this
+# guard exists to stop blocking. The hole predates `that`: measured against the
+# previous commit, "All checks green is a claim which was wrong." already
+# blocked before `that` joined the set.
+#
+# Only this head phrase is dropped from the connector, never the rest of it, so
+# a separator anywhere else still breaks: "All checks green is a claim that
+# survives, though my count was wrong." still blocks on the comma, and "All
+# checks green because the note is a claim that was wrong." still blocks on
+# `because`. The LEFT end stays unanchored because an ASSERT match often ends
+# mid-phrase (`\ball (checks|green)\b` matches only "All checks"), so the
+# connector opens with the tail of the claim rather than with the copula.
+#
+# The RIGHT end is anchored, and leaving it open was a fail-open. Keying on the
+# head noun alone never asks what the relative clause is ABOUT, so any sentence
+# putting the error on some other noun -- "#1689 is fully clean is the note
+# that the reviewer misread.", "All checks green is the reading that the
+# earlier reviewer overstated." -- had its head phrase stripped and went
+# silently ALLOW, which is the direction that emits nothing. The grammar
+# decides it: in a SUBJECT relative the pronoun IS the claim and the verb
+# follows it directly, while an OBJECT relative puts its own subject in
+# between. So the carve-out must reach the retraction.
+RX_METALINGUISTIC_HEAD = re.compile(
+    r"\b(?:is|was|were|are)\s+"
+    r"(?:the|a|an|this|that|my|our|its)?\s*"
+    r"(?:earlier|prior|previous|one|only|original)?\s*"
+    r"(?:claim|statement|line|note|status|report|reading|call|verdict"
+    r"|assertion|assessment|sentence|wording)\s+"
+    r"(?:that|which)\s+"
+    r"(?:(?:was|were|is|are|has|had|have|been)\s+"
+    r"|(?:clearly|plainly|simply|obviously|evidently|apparently|admittedly"
+    r"|wrongly|incorrectly|mistakenly|badly|wildly|grossly|overwhelmingly"
+    r"|entirely|partly|largely|mostly|probably|certainly|frankly|honestly"
+    r"|actually|really)\s+"
+    r"|(?:now|then|later|already|always|still|never|ever|just|once|again)\s+)*\Z",
+    re.I,
+)
+
+# The trailing scan deliberately does NOT treat a bare newline as a sentence
+# end, mirroring `scripts/check-pr-fully-clean.py`'s SENTENCE_END. This corpus
+# writes semantic line breaks, so a retraction routinely wraps onto the next
+# line ('My earlier "fully clean" call\nwas wrong'), and terminating on `\n`
+# would hide exactly the correction this guard must stop blocking. The prefix
+# scan keeps RX_SENTENCE_BREAK, where a bare newline IS a boundary because a
+# table row or list item is an independent clause (ai-config#1764); the
+# markdown alternatives in RX_CLAUSE_SEPARATOR above are what keep the trailing
+# scan from crossing one of those.
+RX_TRAILING_BREAK = re.compile(r"[.!?;]|\n[ \t]*\n")
+
+
+def _sentence_start(text, hit):
+    """Start of the sentence containing `hit`, coarsely."""
+    start = 0
+    for boundary in RX_SENTENCE_BREAK.finditer(text, 0, hit.start()):
+        start = boundary.end()
+    return start
+
+
+def _trailing_end(text, hit):
+    """End of the clause following `hit`, for the retraction scan."""
+    end = RX_TRAILING_BREAK.search(text, hit.end())
+    return end.start() if end else len(text)
+
+
+def _attaches(connector, separators=RX_CLAUSE_SEPARATOR):
+    """True when nothing in `connector` breaks a retraction off the claim."""
+    return not separators.search(connector)
+
+
+def _is_retracted(text, hit):
+    """True if a retraction attaches to the ASSERT match, either side of it.
+
+    The trailing scan falls THROUGH when its match does not attach, rather than
+    returning that verdict. A trailing retraction belonging to another clause
+    says nothing about a leading one that does attach, and returning on it
+    suppressed the leading retraction whenever an unrelated retraction word
+    followed in the same clause -- "I was wrong that #1689 is fully clean, and
+    the count was overstated too." blocked, which is the very class this guard
+    was widened to stop blocking.
+    """
+    for after in RX_RETRACTION.finditer(text, hit.end(), _trailing_end(text, hit)):
+        connector = RX_METALINGUISTIC_HEAD.sub(
+            "", RX_MARKDOWN_SPAN.sub("", text[hit.end():after.start()]), count=1)
+        if _attaches(connector):
+            return True
+        break
+    start = _sentence_start(text, hit)
+    before = None
+    for before in RX_RETRACTION.finditer(text, start, hit.start()):
+        pass
+    return before is not None and _attaches(
+        RX_MARKDOWN_SPAN.sub("", text[before.end():hit.start()]),
+        RX_LEADING_SEPARATOR)
+
+
+def _is_negated(text, hit):
+    """True if the ASSERT match is negated or retracted within its sentence.
+
+    Plain negation stays scoped to the text BEFORE the phrase, which is the
+    pre-existing behaviour and must not be widened: "All checks green at this
+    head, and I have not merged it yet" is a genuine stale-clean claim whose
+    trailing negation is about something else entirely. Only the retraction
+    vocabulary reads in both directions, and only when it attaches.
+    """
+    if RX_NEGATION.search(text[_sentence_start(text, hit):hit.start()]):
+        return True
+    return _is_retracted(text, hit)
+
 
 def all_unnegated_asserts(text):
     """Every un-negated ASSERT match, in textual order.
@@ -146,24 +426,13 @@ def all_unnegated_asserts(text):
     worded", because the strongest claim in a message is not always the
     earliest one.
     """
-    out = []
-    for hit in RX_ASSERT.finditer(text):
-        sentence_start = 0
-        for boundary in RX_SENTENCE_BREAK.finditer(text, 0, hit.start()):
-            sentence_start = boundary.end()
-        if not RX_NEGATION.search(text[sentence_start:hit.start()]):
-            out.append(hit)
-    return out
+    return [hit for hit in RX_ASSERT.finditer(text) if not _is_negated(text, hit)]
 
 
 def find_unnegated_assert(text):
-    """Return the first ASSERT match not negated earlier in its sentence."""
+    """Return the first ASSERT match not negated or retracted in its sentence."""
     for hit in RX_ASSERT.finditer(text):
-        sentence_start = 0
-        for boundary in RX_SENTENCE_BREAK.finditer(text, 0, hit.start()):
-            sentence_start = boundary.end()
-        preceding = text[sentence_start:hit.start()]
-        if not RX_NEGATION.search(preceding):
+        if not _is_negated(text, hit):
             return hit
     return None
 

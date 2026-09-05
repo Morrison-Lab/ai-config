@@ -157,19 +157,21 @@ recurrence.
    A blocking guard on a suggestive condition refuses correct work, and the
    corpus's own repeated finding is that such a guard gets switched off ---
    which costs every true positive it would ever have caught, not just the
-   false ones. Where the information needed to decide is *not in the artifact
-   the hook can see*, no amount of recurrence makes it decisive.
+   false ones.
+   Where the information needed to decide is *not in the artifact the hook can
+   see*, no amount of recurrence makes it decisive.
 2. **Does the warning already name the concrete remedy?**
    A note that says "this is wrong" and a note that supplies the exact
-   rewrite are different instruments. Escalating before the note is
-   actionable escalates the wrong thing.
+   rewrite are different instruments.
+   Escalating before the note is actionable escalates the wrong thing.
 3. **Only then: did it fire, get read, and get ignored?**
    If 1 and 2 both hold and the mistake still recurs, the failure is in
    reading rather than in detection, and a `PreToolUse` `additionalContext`
    note is structurally weak against it --- the note arrives alongside a tool
    call the model has already composed, so it argues against a decision
-   already made. That is a real limit and it is a limit of the *class*, not a
-   defect in the individual hook.
+   already made.
+   That is a real limit, and a limit of the *class* rather than a defect in
+   the individual hook.
 
 - **Do:** ask whether the condition is decisive before treating a recurrence as
   an escalation signal.

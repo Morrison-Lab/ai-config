@@ -223,9 +223,10 @@ Confirm which physical branch is "ours" before you reach for `--ours` /
 - ❌ Restoring a whole file from a pre-merge commit
   (`git show <old>:<path> > <path>`) to recover one entry --- that reverts every
   other change the file has taken, including everything the merge just brought
-  in. Rebuild the resolution from the conflict stages (`:1:`/`:2:`/`:3:`, above)
-  and swap in only the hunk you came for. Note that `git show :<path>` is not a
-  safe baseline here: while the path is conflicted it has no stage 0 and the
+  in.
+  Rebuild the resolution from the conflict stages (`:1:`/`:2:`/`:3:`, above)
+  and swap in only the hunk you came for.
+  Note that `git show :<path>` is not a safe baseline here: while the path is conflicted it has no stage 0 and the
   command fails, and once you have staged a resolution stage 0 holds *your*
   content --- so if the bad restore is what you staged, that is what comes back.
   See

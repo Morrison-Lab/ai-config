@@ -202,10 +202,14 @@ _SHORT_VALUE_OPTS = "o"
 def push_remote(argv, cwd):
     """The remote a `git push` actually targets, defaulting to `origin`.
 
-    Mirrors `no-clobbering-push.py`'s `_target`: `--repo <r>` names the remote
-    when no positional one does, otherwise the first positional after `push`
-    is the remote, otherwise the checked-out branch's configured remote,
-    otherwise `origin`.
+    The first positional after `push` is the remote; failing that `--repo <r>`
+    names it; failing that the checked-out branch's configured remote; failing
+    that `origin`.
+
+    This follows `no-clobbering-push.py`'s `_target` in everything but the
+    order of those first two, where that function checks `--repo` first and
+    this one follows git's documented precedence instead. See the comment at
+    the resolution itself.
 
     Hard-coding `origin` was the earlier behaviour and is wrong in two ways at
     once. Where no `origin` exists the guard finds no base and skips silently,
@@ -280,10 +284,20 @@ def push_remote(argv, cwd):
             continue
         positionals.append(tok)
 
-    if repo_opt and repo_opt is not _NEXT:
-        return repo_opt
+    # The POSITIONAL wins over `--repo`. git's own manual is explicit:
+    # "--repo=<repository> ... This option is equivalent to the <repository>
+    # argument. If both are specified, the command-line argument takes
+    # precedence." So `git push --repo=upstream origin main` targets `origin`.
+    #
+    # `no-clobbering-push.py`'s `_target`, which this otherwise mirrors, checks
+    # `repo_opt` first and so answers `upstream` here. That is a pre-existing
+    # deviation in already-shipped code rather than something to reproduce for
+    # symmetry's sake, and it is filed separately; this function follows the
+    # documented behaviour.
     if positionals:
         return positionals[0]
+    if repo_opt and repo_opt is not _NEXT:
+        return repo_opt
 
     head = _git_ok(["rev-parse", "--abbrev-ref", "HEAD"], cwd=cwd)
     if head and head != "HEAD":

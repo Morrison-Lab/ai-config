@@ -200,7 +200,12 @@ SHOULD_WARN = [
      "the hook's own fetch surfaces a conflict the clone could not yet see"),
     ("W6", "git push upstream feat/estimand", REPO_UPSTREAM, None, None,
      "the base is resolved against the remote the push names, not `origin`"),
-    ("W7", "git push --repo upstream feat/estimand", REPO_UPSTREAM, None, None,
+    # No positional here, deliberately. `git push --repo upstream
+    # feat/estimand` would target a remote NAMED `feat/estimand`, because
+    # git's manual gives the positional precedence over `--repo`; written
+    # that way this case asserted the opposite of git's behaviour and passed
+    # only because the parser had the same inversion.
+    ("W7", "git push --repo upstream", REPO_UPSTREAM, None, None,
      "`--repo <remote>` names the remote when no positional one does"),
 ]
 
@@ -255,6 +260,10 @@ PUSH_REMOTE_CASES = [
     (["git", "push", "origin", "main"], "origin", "the ordinary case"),
     (["git", "push", "--repo", "upstream"], "upstream", "--repo separated"),
     (["git", "push", "--repo=upstream"], "upstream", "--repo inline"),
+    (["git", "push", "--repo=upstream", "origin", "main"], "origin",
+     "a POSITIONAL beats --repo, per git's own manual"),
+    (["git", "push", "--repo", "upstream", "origin", "main"], "origin",
+     "and the separated form of it too"),
     (["git", "push", "-f", "upstream", "main"], "upstream", "a valueless short flag"),
     (["git", "push", "-o", "ci.skip", "upstream", "main"], "upstream",
      "-o takes the next token"),

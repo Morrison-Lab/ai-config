@@ -1040,7 +1040,8 @@ Where you cannot, report the sample as evidence about the population it did enum
 
 (Measured 2026-09-03, ai-config[#3141](https://github.com/Morrison-Lab/ai-config/issues/3141).
 A 240-second `ps` sample captured 20 distinct hook command lines, all from `$HOME/.claude/hooks/` and none from a plugin root, and was read as showing the plugin registration path inert.
-`hooks/no-unreviewed-pr.py` never fired during that window, so the sample is evidence about the registration path in general and none about the firings in question.
+`hooks/no-unreviewed-pr.py` never fired during that window --- it fires only with an unreviewed PR open --- so what the sample enumerated is the `settings.json`-registered hooks, and it says nothing about the firings in question.
+Both registration paths are live at once, which is why enumerating one of them refutes nothing about the other.
 The same session settled which copy fires when the guard is deliberately triggered, by the opposite procedure: `ps -eo args` sampled at 0.05s **while causing the event** named a copy under `~/Library/Application Support/Claude/local-agent-mode-sessions/` that no pass had looked at.
 Whether that same copy served the earlier firings is not established, and [`keep-checkouts-fresh`](keep-checkouts-fresh.md) says so where it records the capture --- so the remedy below is "cause the event inside the window", not "one capture settles the question".
 That instance is recorded case-specifically in [`keep-checkouts-fresh`](keep-checkouts-fresh.md) and in [`mistake-patterns`](../../memories/mistake-patterns.md)'s Pattern 43 occurrence bullet, both added by [#3267](https://github.com/Morrison-Lab/ai-config/pull/3267).
@@ -1128,9 +1129,7 @@ the section's standing Do/Don't list is the one that follows this paragraph.
   not reported that they pass.
 - **Don't:** treat [`grep-is-not-coverage`](grep-is-not-coverage.md) as a
   rival rule here.
-  That fragment is the **null-result** instance of this shape --- a zero-hit
-  search read as evidence about a pattern --- so it is the sharper tool when
-  the measurement returned nothing, and this section is the general form.
+  That fragment is the **null-result** instance of this shape --- a zero-hit search read as evidence about a pattern --- so it is the sharper tool when the measurement returned nothing, and this section is the general form.
   Instance 4 of the first case record below is itself a null result, so both reach it.
   Finding a positive result read as a neighbouring fact is the case only this
   section covers.

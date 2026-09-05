@@ -1063,3 +1063,19 @@ A clean automated review from every available provider evaluating the current HE
   No single fix;
   each guard's own backfill/discharge logic would need a matching update (as `no-unreviewed-pr.py`'s `RX_CMD_REVIEWERS_ANY` already attempts for a bare shell-variable PR number, without extending to a loop bundling several such calls).
   What generalizes is the review habit: when a command-text-parsing gap is found and fixed in one hook, grep the other `PreToolUse`/`Stop` hooks for the same "reads raw command text" shape before closing the finding as hook-specific.
+
+## Pattern 51: Trusting a Visible, Already-Discharged Reviewer Request Instead of Re-Checking Against the Current Head
+- **Mistake**: Treating a Copilot (or other) reviewer request on a PR as still satisfying the review obligation because `gh pr view <N> --json reviews` shows a real, successful review from earlier in the session, without checking whether any commits landed on that PR after the reviewed commit.
+- **Example**: 2026-09-05, `Morrison-Lab/ai-config` GIA sweep sidecar session: a Copilot review had been requested on a PR, confirmed via `gh pr view <N> --json reviews`, and treated as done.
+  Three further commits were then pushed to the same PR.
+  `hooks/no-unreviewed-pr.py` refused to let the turn end, because the PR's head had moved past the reviewed commit and nothing had requested a review of the new code.
+  The visible earlier review was real and was not the problem.
+  It was simply for a commit that was no longer the head.
+- **Canonical Rule**: [`hooks/no-unreviewed-pr.py`](../hooks/no-unreviewed-pr.py)'s own docstring: "A reviewer request is per-HEAD, not per-PR, so the same obligation re-arms on every push that re-heads a tracked PR."
+  A push re-arms the obligation regardless of how many earlier heads on that same PR were already reviewed.
+- **Fix**: After every push to an open PR, re-request the reviewer for the new head, even when `gh pr view --json reviews` already shows a successful review from an earlier round on that same PR.
+  This is already the standing ARDI/ardia/gia rule for the `@claude` reviewer (re-request after every push, including a Rebut/Defer-only round with no push).
+  The near-miss this pattern names is specific to Copilot's `requested_reviewers` mutation, where the visible past success is what makes the stale state look current.
+- **Algorithmatizable?**
+  Yes, and already built: `hooks/no-unreviewed-pr.py` re-arms itself on a push whenever the session has exactly one live tracked PR, per its own "attribution by exclusion" design.
+  What is not automated is the human/session habit of reading `gh pr view --json reviews` and stopping there instead of also checking the reviewed commit against the current head.

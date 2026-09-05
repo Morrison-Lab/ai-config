@@ -788,6 +788,61 @@ Tracked as [ai-config#2981](https://github.com/Morrison-Lab/ai-config/issues/298
 - **Don't:** export `ALLOW_UNREVIEWED_PUSH=1` for the whole session to work
   around the false positive; that also waives the guard for the real push.
 
+## `git push`'s option-argument grammar: required vs optional vs boolean vs clustered
+
+Measured on git 2.50.1 while writing `hooks/flag-conflict-with-base.py`'s
+argument parser (ai-config#3175).
+Four distinct shapes, and confusing them misresolves which token is the
+option's value and which is the positional remote:
+
+1. **Required argument.**
+   Accepts the space form even where the manual's synopsis prints only the
+   `=` form.
+   `--recurse-submodules on-demand` consumes `on-demand` as the value; the
+   manual shows `--recurse-submodules=check|on-demand|only|no` and nowhere
+   shows the space form, but git's `parse-options` accepts it for every
+   option whose argument is required.
+   Reading the manual's synopsis alone and concluding the space form is
+   invalid is the trap: the discriminator is required-vs-optional, not what
+   the page happens to print.
+2. **Optional argument.**
+   Takes a value only in its `=` form; the space form does not attach it, so
+   the next token is read as something else entirely (typically the
+   positional remote).
+   `--force-with-lease` and `--signed` are both this shape: `git push
+   --force-with-lease origin main` targets `origin`, not
+   `--force-with-lease`'s own value.
+3. **Pure boolean.**
+   Takes no value in any form, and is not a variant of the optional-argument
+   case even though both never consume a following token.
+   `--[no-]force-if-includes` is this shape --- git's own synopsis marks it
+   `[--force-if-includes]` with no `=` anywhere, unlike
+   `--force-with-lease[=<refname>[:<expect>]]` right beside it.
+4. **Clustered short options.**
+   A short option can arrive bundled with others in one token, and a
+   value-taking letter consumes the rest of that token (or the next token,
+   if it ends the cluster).
+   `-fo ci.skip` is git's own parse of `-f -o ci.skip`; a check for the exact
+   token `-o` misses it, since `-o` never appears as its own argv entry.
+
+- **Do:** classify a `git push` option as required-argument,
+  optional-argument, or pure-boolean before deciding whether it can take a
+  space-separated value --- the manual's synopsis alone under-determines the
+  first case and over-determines the third.
+- **Do:** walk a short-option cluster letter by letter when parsing `git
+  push` argv, so a bundled value-taking letter is not read as a bare flag.
+- **Don't:** assume an option prints its exact accepted forms in the
+  manual's synopsis line --- `--recurse-submodules=check|on-demand|only|no`
+  omits a form git actually accepts.
+- **Don't:** treat `--force-if-includes` as a third instance of the
+  optional-argument shape merely because it also takes no space-separated
+  value; it has no `=` form at all, which the other two do.
+
+(Measured 2026-09-05, `Morrison-Lab/ai-config#3175`: two review rounds each
+corrected one of these confusions in the same parser --- `--recurse-submodules`
+was first excluded from the value-consuming set on the false belief that only
+its `=` form was valid, then `--force-if-includes` was grouped with the
+optional-argument options it does not share a grammar with.)
 
 ## `git commit --amend` after a merge amends the MERGE, and the result reads as a duplicate commit
 
@@ -829,3 +884,50 @@ Where the amend also changes content, the equality no longer holds and `git diff
 - **Do:** assert tree-hash equality across a message-only rewrite.
 - **Don't:** read two same-titled consecutive commits as a duplicate to drop;
   check the parent count first.
+
+## Probing git's own argument parsing in-session: `git push --dry-run` is exempt from the self-review guard; `-h` is not
+
+`hooks/no-push-without-self-review.py` reuses `no-unreviewed-pr.py`'s
+`_argv_push`/`_push_re_heads` classification, which excludes `--dry-run`/`-n`
+and `--delete`/`-d` outright: neither re-heads a branch, so there is nothing
+for a self-review to have covered, and the guard never even reaches the
+verdict check for them.
+That makes `git push --dry-run` (optionally against a scratch repository, or
+`--repo=/nonexistent` to guarantee no network contact) the sanctioned way to
+observe git's own push behaviour --- which remote it resolves, which option
+consumes a value --- from inside a session that has not yet dispatched a
+self-review, without needing the override or a real push.
+The guard's own docstring uses exactly this form to document its measurements
+(`git push --dry-run --repo=/nonexistent origin main`).
+
+`-h`/`--help` is not on that exclusion list.
+It prints usage and touches no ref, so it is exempt for the same reason
+`--dry-run` is, but the classifier does not special-case it, so a bare `git
+push -h` with no prior clean verdict in the transcript is blocked exactly
+like a real push.
+
+`man git-push` is not a safe substitute for measuring, either.
+Its synopsis for `--recurse-submodules` prints only the `=` form
+(`--recurse-submodules=check|on-demand|only|no`), while git's `parse-options`
+accepts the space form for any required-argument option --- see this file's
+"`git push`'s option-argument grammar" section.
+A manual read settles what an option *means*; only running the command settles
+what forms it *accepts*.
+
+- **Do:** use `git push --dry-run` (against a scratch repository or a
+  nonexistent path when network contact must be avoided) to measure git's own
+  push-argument behaviour in-session, ahead of a self-review dispatch.
+- **Do:** treat a manual page as a starting hypothesis about accepted option
+  forms, and confirm it against a real invocation before relying on it.
+- **Don't:** run `git push -h` expecting it to be exempt like `--dry-run` ---
+  it is not on the guard's exclusion list and gets refused like a real push
+  with no clean verdict on record.
+- **Don't:** read the manual's synopsis line as the complete set of forms an
+  option accepts.
+
+(Measured 2026-09-05 while writing `hooks/flag-conflict-with-base.py`'s
+argument parser, `Morrison-Lab/ai-config#3175`: `git push -h` was blocked
+mid-session with no self-review yet dispatched, and `git push --dry-run
+--repo=/nonexistent origin main` was the fallback that measured git's `--repo`
+precedence without a real push or the override.)
+

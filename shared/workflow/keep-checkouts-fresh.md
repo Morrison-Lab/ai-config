@@ -335,7 +335,12 @@ a dated constant is the one payload for which *not reaching the session* is not 
 - **Do:** read the constant from the copy that actually ran, when a guard demands something a standing directive forbids --- that demand is a freshness symptom before it is a policy question.
   Resolve which copy that is in this order, since the answer is frequently not the plugin at all: grep `~/.claude/settings.json` for a direct non-plugin registration of the script and read that file if one exists;
   check `enabledPlugins` for whether the plugin path is live on this machine at all;
-  then read the per-scope pin in `~/.claude/plugins/installed_plugins.json`, which names the snapshot the plugin loader serves.
+  then read the per-scope pin in `~/.claude/plugins/installed_plugins.json`, which names the snapshot the `~/.claude` plugin loader serves;
+  and --- in a desktop-app agent session, where none of the above is what runs --- the per-session snapshot under `~/Library/Application Support/Claude/local-agent-mode-sessions/<session>/.../rpm/plugin_<id>/hooks/`.
+  Three passes over this incident missed that last one because no step of this corpus mentioned it, so read the list as incomplete by construction and prefer the capture below to any list.
+- **Do:** capture the path instead of deducing it, when a guard fires repeatedly.
+  `ps -eo args` sampled every 0.05s while you deliberately trigger the guard prints the interpreter's own argv, which is the resolved path and not an inference from one.
+  The block is the measurement, so a guard you cannot satisfy is the easiest case rather than the hardest.
 - **Don't:** identify the loaded copy by the newest directory under `~/.claude/plugins/cache/`.
   Pattern 43's own Fix section already rules that proxy out --- "not the marketplace clone, and not merely the newest directory under the cache" --- and it isolates nothing when many cache directories carry the same value.
 - **Don't:** read "the guard re-armed" as evidence the suppression period actually ended.
@@ -344,14 +349,23 @@ a dated constant is the one payload for which *not reaching the session* is not 
 - **Don't:** answer this by moving the switch into the environment;
   the pair above refuses that for a separate reason --- an env-readable clock or kill flag is a one-variable bypass of the guard in production --- and that refusal is untouched here.
 
-**The hazard above is a property of the construct, argued rather than measured, and the incident that prompted it is worth reading for how badly the diagnosis went.**
+**The hazard above is measured, and the incident that established it is worth reading for how long the wrong artifact held out.**
 On 2026-09-03 `hooks/no-unreviewed-pr.py` demanded a Copilot review on two PRs while the all-repos moratorium ran to `MORATORIUM_END = 2026-12-01` ([#3078](https://github.com/Morrison-Lab/ai-config/pull/3078)).
-What is established stops well short of a mechanism.
+The mechanism is exactly the one this section describes.
+The copy that fired is a **per-session snapshot** at `~/Library/Application Support/Claude/local-agent-mode-sessions/<session>/.../rpm/plugin_<id>/hooks/no-unreviewed-pr.py`, mtime 2026-09-01 22:42, carrying `MORATORIUM_END = 2026-09-01`;
+importing it and calling `moratorium_active()` returns `False`.
+It was captured by sampling `ps -eo args` at 0.05s while deliberately triggering the guard, after three firings.
+Note the pairing that makes this the worst case for a dated constant: the snapshot is frozen for the life of the session, so its payload keeps aging while the artifact carrying it cannot be updated --- this one was taken hours *before* its own `MORATORIUM_END`, and a long-lived session is then guaranteed to cross the date.
+Only a new session takes a new snapshot.
+
+**Everything below is what the diagnosis looked like before that capture, and every line of it is true and was useless.**
 The copy registered directly in `~/.claude/settings.json` --- `python3 "$HOME/.claude/hooks/no-unreviewed-pr.py"`, present on disk --- carries `2026-12-01`, and its `main()` returns 0 on an active moratorium before reading the transcript, so that copy cannot be what fired.
 `enabledPlugins["ai-config@Morrison-Lab"]` is `false`.
 That a plugin copy ran at all rests on one thing only --- the refusal message named `${CLAUDE_PLUGIN_ROOT}/hooks/no-unreviewed-pr.py` --- which is an inference from a message string, not an observation of a process.
-A later measurement pushes against it: a 240-second `ps -eo args` sample at 0.15s intervals, taken 2026-09-03, captured twenty distinct hook command lines and **all twenty** ran from `$HOME/.claude/hooks/`, none from `plugins/cache`, `plugins/marketplaces`, or an unexpanded `${CLAUDE_PLUGIN_ROOT}`.
-That sample cannot close the question either, and its limit is the same shape as the incident's: `no-unreviewed-pr.py` never fired during the window, since it only fires while an unreviewed PR is open, so its absence from the capture is evidence about the registration path in general and none at all about the firings in question.
+A 240-second `ps` sample taken 2026-09-03 captured twenty distinct hook command lines, **all twenty** from `$HOME/.claude/hooks/` and none from a plugin root --- and it misled, in the direction of doubting a mechanism that was real.
+Its defect was population, not method: it ran while `no-unreviewed-pr.py` *could not fire*, since that guard only fires with an unreviewed PR open, so it sampled the `settings.json`-registered hooks and none of the ones in question.
+Both registration paths are live at once.
+A sample drawn when the event of interest is impossible measures the complement of what it was aimed at, and reports a clean number for doing so.
 `installed_plugins.json` pins `a9ded3e1a9df` at user scope, whose hook carries **no `MORATORIUM_END` at all**, plus a project-scope pin whose directory is absent.
 The cache holds copies in three different states at once: directories carrying `2026-09-01`, a `b0f279f8e8bd` entry carrying `2026-12-01`, and the pinned copy carrying no constant.
 No *current* count is given, deliberately.
@@ -359,12 +373,13 @@ The cache is garbage-collected, so the number decays: nine directories carried `
 Derive it rather than citing one --- `find ~/.claude/plugins/cache -name no-unreviewed-pr.py | xargs grep -l 'MORATORIUM_END = datetime.date(2026, 9, 1)' | wc -l` --- since the argument needs only that several carry the same value, which is what makes "newest" isolate nothing.
 A second marketplace, `ai-config@d-morrison`, carries its own user-scope pin to a separate cache tree, so "which copy ran" has more candidate answers than the one marketplace suggests.
 
-**The cause is unknown, and the candidate explanations do not reduce to two.**
-*If* a plugin copy fired, one observation cannot separate the obvious pair: a copy whose constant has expired demands the review because the date passed, while a copy with no moratorium logic demands it unconditionally, and no date is stale because no date exists.
-Both produce exactly the demand that was seen.
-But that pair is not exhaustive, and the `ps` sample above is why: "no plugin copy fired at all, and some registration path not yet identified served the hook" is a third branch, and the twenty captured command lines point at it rather than away from it.
-So settling it needs the registration actually used at firing time, which this incident never established --- `${CLAUDE_PLUGIN_ROOT}`'s resolution answers that only on the branch where a plugin copy fired, and probing it while a third branch is live is the wrong-artifact substitution this section closes on.
-[#3141](https://github.com/Morrison-Lab/ai-config/issues/3141) carries the incident and now records its cause as unestablished, so cite it for the open question rather than for a mechanism.
+**The reasoning above enumerated two explanations, then three, and the true one was in neither list.**
+The pair was an expired constant and an absent one, both in `~/.claude/plugins/cache/`.
+The third branch added later --- "some registration path not yet identified" --- was correct in form and was reached by doubting the mechanism rather than by doubting the *search space*, which is why it named no place to look.
+Enumerating explanations over a candidate set nobody had established is what cost three passes: each list was internally sound, and every member of every list was drawn from the trees already known.
+Widening the set is not a matter of adding a branch to the enumeration;
+it takes an observation that can name a path the enumeration never contained, which is what the `ps` capture does and what no amount of further reasoning would have done.
+[#3141](https://github.com/Morrison-Lab/ai-config/issues/3141) carries the incident, the three firings, and the capture.
 
 **The diagnosis itself is the transferable failure, and it is a plain instance of the rule two bullets above.**
 "The loaded copy" was identified as the cache's newest per-commit directory --- the one proxy Pattern 43's Fix section explicitly rules out --- while several directories carried the same value, so "newest" isolated nothing.

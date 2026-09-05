@@ -884,8 +884,10 @@ A clean automated review from every available provider evaluating the current HE
   Several cache directories carried the same value, so newest isolated nothing --- derive the count rather than citing one, since the cache is garbage-collected and it fell from nine to five between 2026-09-03 and 2026-09-04 with no edit in between.
   The label above names the diagnostic failure rather than a stale cache, because the cause that would justify the latter is exactly what stayed unestablished.
   What the resolution order would have surfaced: the copy registered directly in `~/.claude/settings.json` carries the correct date and returns 0 before reading the transcript, `enabledPlugins` for this plugin is `false`, and the user-scope pin in `installed_plugins.json` names a hook with **no `MORATORIUM_END` at all**.
-  So an expired constant and an absent one produce the identical demand, and the cause stays unestablished --- as does whether a plugin copy fired at all, since a later `ps` sample caught twenty hook invocations and none from a plugin root.
-  Settling it needs the registration actually used at firing time, not `${CLAUDE_PLUGIN_ROOT}`'s resolution, which answers only on the branch where a plugin copy fired.
+  Resolved 2026-09-04 by capture rather than by reasoning: `ps -eo args` sampled at 0.05s while deliberately triggering the guard named a **per-session snapshot** under `~/Library/Application Support/Claude/local-agent-mode-sessions/`, carrying the expired constant.
+  No pass had looked there, and no corpus step named it.
+  Three passes enumerated explanations --- two, then three --- over a candidate set nobody had established, and each list was internally sound while the true answer sat outside all of them.
+  The transferable step is to capture the resolved path (`ps` while the guard fires) instead of deducing it from registration files, since a guard that fires repeatedly hands you the measurement for free.
   See [`keep-checkouts-fresh.md`](../shared/workflow/keep-checkouts-fresh.md)'s dated-constant section for the resolution order and for the fail-open hazard, which is argued from the construct rather than measured here.
 - **Algorithmatizable?**
   Partially.

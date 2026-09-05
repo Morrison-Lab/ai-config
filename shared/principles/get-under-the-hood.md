@@ -149,17 +149,14 @@ Two measured shapes, from 2026-09-02 and the small hours of 2026-09-03 Pacific:
   committed 2026-09-02 at 23:41 PDT, under an hour before these attempts.
   The clause was skipped five times in favour of the command example printed below it.
 
-**A third occurrence, 2026-09-05, where the qualifier was NOT in the message.**
-The same hook and the same last-simple-command condition, three refusals, and a request written as `gh api ... >/tmp/rr.txt 2>&1; echo rc=$?; head -c 400 /tmp/rr.txt` --- redirected away and followed by two more commands.
-Two of the three responses went to the forge instead: they checked whether a *review existed*, found one at the right commit, and concluded the guard was wrong about the world.
-Run bare, the identical request cleared it.
+**A third occurrence, 2026-09-05, of the second shape above.**
+Same hook, same last-simple-command condition, three refusals, and a request written as `gh api ... >/tmp/rr.txt 2>&1; echo rc=$?; head -c 400 /tmp/rr.txt` --- redirected away and followed by two more commands.
+Two of the three responses went to the forge instead of to the source: they checked whether a *review existed*, found one at the right commit, and concluded the guard was wrong about the world.
+Run bare, the identical request cleared it on the first try.
 
-What separates this from the five above is that the clause was not there to skip.
-Enumerating every copy of the hook on the machine splits them cleanly: the copies carrying `MORATORIUM_END = 2026-12-01` return before reading the transcript and cannot fire at all today, and every copy that *can* fire carries the expired `2026-09-01` value and prints no second paragraph in any wording.
-So the refusal was complete at one sentence, and reading it again would not have resolved it.
-Only opening the source did.
-
-That inverts the weighting of the two Do bullets below for an installed corpus that may be stale ([#3141](https://github.com/Morrison-Lab/ai-config/issues/3141), [#3094](https://github.com/Morrison-Lab/ai-config/issues/3094)): read the message first because it is free, but treat its silence as uninformative rather than as evidence the condition is absent, since the copy that refused you may be older than the copy that explains itself.
+It is the paragraph below that this occurrence bears on: the mechanism had been read, written into this corpus, and merged earlier the same day, and it was violated on the next call anyway.
+What the occurrence adds is which wrong move comes first.
+Going to the forge answers a question about the world when the refusal is a claim about the record --- and it always finds something, so it always feels like progress, which is why it took two responses rather than one.
 
 **Diagnosing a guard and changing the habit are separate acts**,
 which is the sharper half and the one no amount of reading prevents.

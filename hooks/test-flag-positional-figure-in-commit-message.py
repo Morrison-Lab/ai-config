@@ -173,11 +173,12 @@ def run(payload, extra_args=(), cwd=None):
     """Run the hook end-to-end; return the parsed stdout payload, or {}.
 
     A FRESH `TMPDIR` per call: the fire-once sentinel lives in
-    `tempfile.gettempdir()`, so a sentinel written by one case could suppress
-    a later one. Defence rather than a fix for a live collision -- the key is
-    the whole command and all 45 cases carry distinct commands, so no
-    suppression is possible today. It keeps a future case that reuses a
-    command from being silently skipped.
+    `tempfile.gettempdir()`, so a sentinel written by one call could suppress
+    a later one. Belt-and-braces rather than the operative protection --- the
+    key is (transcript path, command, figure), and `write_transcript` below
+    mints a new `mkstemp` path on every call, so two calls never share a key
+    even when they run the identical command. Both defences would have to go
+    before one case could silence another.
     """
     tpath = write_transcript([PROMPT])
     tmpdir = tempfile.mkdtemp()

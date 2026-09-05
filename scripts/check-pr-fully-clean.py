@@ -33,8 +33,13 @@ Copilot finding inside a collapsed `<details>` block is invisible too
 count performed here can see it. Measured on ai-config#3167, where this
 script printed FULLY CLEAN twice over a standing finding -- an inline comment
 at head 16544c50, and a suppressed "previously missed" item at head 7e1294b0.
-A caller reporting a PR ready runs those two queries alongside this script;
-the fragment carries their exact form.
+A caller reporting a PR ready runs the fragment's three queries alongside
+this script --- `pulls/<N>/comments`, `pulls/<N>/reviews` and
+`issues/<N>/comments` --- unfiltered by head SHA and printing each body. Two
+of them cover the blind spots named above; the third is there because a
+verdict-bearing review body can land as an issue comment rather than as a
+review, which this script's own scan reads but a caller checking only the
+`pulls` endpoints would miss.
 
 Which repository is being asked about is resolved once, at startup, and threaded
 through every `gh` call. It is NOT hardcoded: the same value reaches the PR

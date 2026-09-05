@@ -1003,15 +1003,23 @@ edit.
   that it is true right now; the next insertion falsifies it and nobody
   re-reads it.
 
-(Morrison-Lab/ai-config#3167, 2026-09-03, recorded here rather than as a
-sibling section because it is this same rule failing rather than a second one.
-The PR that added the section above carried three unmeasured or false figures
-in its own commit messages, each introduced by the commit fixing the previous
-one: "into the corpus's 60-to-80 range" when the resulting lines measured 54,
-84 and 81 --- the case already recorded above, from #3060 --- then "three
-lines below" when the gap was ten, then "twelve lines above" when it was
-thirteen.
+(Morrison-Lab/ai-config#3060 and #3167, 2026-09-03, recorded here rather than
+as a sibling section because it is this same rule failing rather than a second
+one.
+The two PRs carried three unmeasured or false figures across their commit
+messages, and the attribution matters because the pattern is a chain rather
+than one PR's accident.
+#3060 carried two: "into the corpus's 60-to-80 range" when the resulting lines
+measured 54, 84 and 81 --- the case already recorded above --- and then "three
+lines below" when the gap was ten, the second written into the commit
+correcting the first.
+#3167, which added the section above, then carried "twelve lines above" when
+the gap was thirteen.
 All three were positional or dimensional, and none was load-bearing.
+Attribution is derivable for the last two --- `git log --grep` finds them in
+`2156b439d` and `d29d33c71` respectively --- and not for the first, whose
+message was amended away, which is the evidence-destroying property this
+section is about.
 
 That a rule gets broken while being authored is not itself the finding, and is
 already stated in this corpus three times over:

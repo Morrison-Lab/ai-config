@@ -1393,10 +1393,11 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                     # SECOND return, carrying verdict-shaped text naming the
                     # pushed commit. FIFO pops the reviewer's id, so
                     # `parse_report` reads the unrelated output and the push is
-                    # authorized with no review having completed. This branch's
-                    # own `docs/opencode-hook-mapping.md` carries verdict-shaped
-                    # example strings, so a documentation dispatch reaches that
-                    # state with nobody intending an attack.
+                    # authorized with no review having completed. Any dispatch
+                    # whose output embeds a rendered example of this guard's own
+                    # report format reaches that state with nobody intending an
+                    # attack -- this file and its test carry such strings, and
+                    # so does anything documenting the report contract.
                     #
                     # So a name whose queue is ever ambiguous is poisoned for
                     # the REST of the transcript: its pending uses are dropped

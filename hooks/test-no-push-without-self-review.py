@@ -1776,8 +1776,8 @@ def omo_cases() -> tuple[int, int]:
     #
     #     The reviewer here never returns. The only result belongs to a
     #     documentation dispatch whose output happens to contain verdict-shaped
-    #     text -- which `docs/opencode-hook-mapping.md` in this same branch
-    #     genuinely contains, so nobody has to be attacking for this to fire.
+    #     text -- which anything documenting this guard's report contract will,
+    #     so nobody has to be attacking for this to fire.
     rc, out = run_hook(PUSH, [
         omo_use("task", {"subagentType": "adversarial-reviewer",
                          "description": "review", "prompt": "Review the diff"}),

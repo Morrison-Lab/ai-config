@@ -353,6 +353,44 @@ reminder that the empirical one-liner outranks any quoted documentation,
 including a reviewer's. (ucdavis/rampp #138/#111, 2026-07-17;
 re-verified on ai-config#611, 2026-07-18.)
 
+**The same failure generalizes past language/library behavior to any
+checkable claim about the repo, and it recurred at a higher rate.**
+
+Measured 2026-09-04 on `ucdavis/hac.sap` PR #37: six review rounds, and
+every round after the first found a false claim in comment prose the
+session had written, never in the mechanics. Each was a one-query-checkable
+repo-state claim: a locale probe documented as "verify the PROPERTY, not
+the name" that verified neither (it measured bash's own fallback, so a
+nonexistent locale still passed; see `fact-check-code-logic.md`'s "proof
+step has its own vacuous mode"); a cited "negative control below" that did
+not exist; a claim that `git grep X` "returns that line and nothing else,"
+false and self-referentially so, since the comment itself was a second
+match; a wrong issue-number citation; a code site named as a consumer of a
+variable it never references; "whose only gate is X" when three more
+existed; an "all four sites" claim false under its own context; and
+"exactly two" where the query returns three.
+
+The mechanism: writing a comment reads as explaining, not asserting, so the
+claim-checking reflex `metacognitive-monitoring.md` names for State and
+Scope claims does not fire on it by default. `flag-uncounted-comment-claims.py`
+and `flag-uncited-rebuttal.py` gate only outgoing `gh`/`glab` comment
+bodies, and `fact-check-prose.md` explicitly excludes code comments, so a
+false claim written into shipped code is invisible to every existing guard.
+
+- **Do:** before any PR reply, ARD explanation, or code comment asserts a
+  checkable repo fact (a grep result, an issue's scope, a call site's
+  consumers, a count), run the query and cite what it returned.
+- **Do:** name a drafted comment's claim type (state, scope, count) before
+  posting or committing it.
+- **Don't:** let expository framing ("to verify X", "the only consumer is
+  Z") substitute for having verified X or enumerated every consumer of Z.
+- **Don't:** treat correct mechanics as proof the accompanying prose is
+  correct; here it wasn't, five times running.
+
+See [ai-config#3150](https://github.com/Morrison-Lab/ai-config/issues/3150)
+(open hook-level fix for `gh`/`glab` comment bodies; it does not reach
+comments written into shipped code, which is this gap).
+
 ## Python regex features must fit the oldest runtime that will run the script
 
 Do not choose a regex construct only because CI accepts it.
@@ -1066,69 +1104,13 @@ a document separator that truncates the generated script.)
 
 ## awk brace handling differs by implementation, in both directions
 
-The section above covers two gotchas that come from **embedding** an awk program
-in a single-quoted shell string.
-This one is about the awk **implementation** the machine happens to provide,
-and it is the same file's third recorded trap.
-
-`mawk` is `awk` on Debian and Ubuntu, so a script that says `awk` gets it by
-default there, and it mishandles braces in two opposite ways:
-
-- **A brace you meant literally is read as an interval.**
-  `/\^{}$/` dies with `regular expression compile failed (bad interval
-  expression)`.
-  Bracket each brace (`\^[{][}]`) to make it a literal in every awk.
-  [`memories/git-tags.md`](git-tags.md) records this one, in the tag-peeling one-liner
-  that needed it.
-- **An interval you meant as an interval can abort the process.**
-  On `mawk 1.3.4 20240123`, the Ubuntu 24.04 build, `/^#{1,6}([ \t]|$)/` dies
-  with `REcompile() - panic: values still on machine stack`:
-  ```console
-  $ echo '## heading' | mawk '{ if ($0 ~ /^#{1,6}([ \t]|$)/) print "M"; else print "NO-M" }'
-  REcompile() - panic:  values still on machine stack for ^#{1,6}([ \t]|$)
-  ```
-  It prints **neither** branch.
-  Bracketing does not help, because here the interval is the thing you want:
-  avoid `{m,n}` outright, with `^#+([ \t]|$)` plus a length check on the run,
-  or the unrolled `^##?#?#?#?#?([ \t]|$)`.
-
-Three things about the pair.
-
-**Neither error leads a reader to the other.**
-[`memories/git-tags.md`](git-tags.md) records the first direction only, inside a
-tag-peeling one-liner and indexed by the literal-brace symptom that produced
-it --- it names neither the panic nor an interval you actually want.
-So arriving with the panic finds nothing there, and arriving with the
-bad-interval error finds a note that stops at the first direction.
-That is why both directions are written out here rather than cross-referenced.
-
-**The second direction fails toward silence at the caller.**
-mawk dies rather than returning a verdict, so a script that pipes a body
-through the awk gets an empty stream and reports whatever its no-match branch
-says --- which for a matcher is `false` on every input.
-
-**CI being green says nothing about it.**
-Whichever awk GitHub's `ubuntu-latest` provides does not hit the panic, so a
-`{m,n}` can sit in a shipped script indefinitely while every run passes.
-It surfaces only where `runs-on` is a consumer-settable input, or in a
-container.
-
-(Morrison-Lab/gha#448, 2026-08-12, in `strip-non-invoking-markup.sh` again:
-the panic took `detect-review-request.sh`'s verdict with it, so its own suite
-reported `30 of 64 detect-review-request case(s) did not behave as expected`
-while `_selftest.yml` was green on `main`.)
-
-- **Do:** assume `awk` is `mawk` in any program that ships to Debian or
-  Ubuntu, and bracket every brace you mean literally (`\^[{][}]`).
-- **Do:** express a bounded repetition without `{m,n}` --- `^#+([ \t]|$)` plus
-  a length check on the run, or the unrolled `^##?#?#?#?#?([ \t]|$)` --- when
-  the awk runs anywhere you do not control.
-- **Don't:** reach for the bracketing remedy on an interval you meant as an
-  interval; that is the fix for the opposite direction, and the two errors are
-  filed apart.
-- **Don't:** read a green `ubuntu-latest` run as evidence the awk is portable
-  --- whatever awk that runner provides does not hit the panic, so the defect
-  stays latent until a consumer sets `runs-on`.
+Moved to [`awk-brace-handling.md`](awk-brace-handling.md) (ai-config#694
+pattern, at the 1250-line gate): `mawk` (the default `awk` on Debian/Ubuntu)
+treats a literal `{}` as an interval (bracket it: `\^[{][}]`) and can
+PANIC on a genuine `{m,n}` interval (avoid it: `^#+([ 	]|$)` or unrolled).
+Neither error leads to the other, and `ubuntu-latest` CI does not hit the
+panic, so a shipped `{m,n}` can stay latent until a consumer sets
+`runs-on`.
 
 ## validate-skills.py token validation
 

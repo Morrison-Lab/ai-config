@@ -117,6 +117,54 @@ GIT_PUSH_RE = re.compile(r"\bgit\s+(?:-C\s+\S+\s+)?push\b")
 REDIRECT_RE = re.compile(r"&>{1,2}|\d*>{1,2}&?\d*")
 
 
+def _quote_spans(command: str):
+    """Yield `(start, end, closed)` for every single- or double-quoted span in
+    `command` -- `start`/`end` exclusive and quote characters included,
+    `closed` False when the string ends before a matching quote is found.
+
+    The ONE place quoting is understood, shared by `_quoted_ranges` (which
+    only needs the ranges, to keep heredoc detection out of them) and
+    `_mask_quotes` (which needs to know whether a span actually closed, to
+    mask only its interior).
+
+    A quote character preceded by an escaping backslash OUTSIDE any quote is
+    a literal character, not an opener -- real shell syntax escapes the very
+    next character that way. Both this scanner's predecessor loops tested
+    `ch in "'\\\""` with no such check, so `echo \\" && git push` read the
+    escaped `"` as opening a genuinely unterminated quoted span and masked
+    everything after it to the end of the string, silently swallowing the
+    real chained `git push` (measured 2026-09-05 review, fourth pass) -- the
+    same over-consuming failure the heredoc fixes above already went
+    through, arriving from the opposite direction (a real escape mistaken
+    for punctuation, rather than fabricated punctuation mistaken for real).
+
+    Escaping INSIDE a double-quoted span still applies only there: a
+    double-quoted backslash escapes the next character (so a quote character
+    it precedes does not close the string); a single-quoted one does not.
+    """
+    i, n = 0, len(command)
+    while i < n:
+        ch = command[i]
+        if ch == "\\" and i + 1 < n:
+            i += 2  # an escaped literal outside any quote; never an opener
+            continue
+        if ch in "'\"":
+            quote = ch
+            start = i
+            i += 1
+            while i < n and command[i] != quote:
+                if quote == '"' and command[i] == "\\" and i + 1 < n:
+                    i += 2
+                    continue
+                i += 1
+            closed = i < n
+            end = i + 1 if closed else i
+            yield start, end, closed
+            i = end
+        else:
+            i += 1
+
+
 def _quoted_ranges(command: str) -> list[tuple[int, int]]:
     """`(start, end)` ranges (exclusive, quote characters included) covering
     every single- or double-quoted span in `command`.
@@ -128,29 +176,9 @@ def _quoted_ranges(command: str) -> list[tuple[int, int]]:
     any quote awareness existed, so it found the fabricated tag, found no
     real terminator for it, and masked everything to the end of the string
     -- silently swallowing a real chained `git push` after it (measured
-    2026-09-05 review, third pass). Escaping rules match the quote-masking
-    pass in `_mask`: a double-quoted backslash escapes the next character,
-    a single-quoted one does not.
+    2026-09-05 review, third pass).
     """
-    ranges = []
-    i, n = 0, len(command)
-    while i < n:
-        ch = command[i]
-        if ch in "'\"":
-            quote = ch
-            start = i
-            i += 1
-            while i < n and command[i] != quote:
-                if quote == '"' and command[i] == "\\" and i + 1 < n:
-                    i += 2
-                    continue
-                i += 1
-            if i < n:
-                i += 1  # consume the closing quote
-            ranges.append((start, i))
-        else:
-            i += 1
-    return ranges
+    return [(start, end) for start, end, _closed in _quote_spans(command)]
 
 
 def _next_heredoc_start(command: str, pos: int, quoted: list[tuple[int, int]]):
@@ -266,32 +294,26 @@ def _mask(command: str) -> str:
     correctly on the next line, and one INSIDE a masked body is moot -- that
     span is already all `x` by the time continuation-joining runs.
 
-    Quotes are masked last, so a quote appearing only inside a heredoc body
-    never enters the quote scan below.
+    Quotes are masked last, via the same `_quote_spans` scanner
+    `_quoted_ranges` uses, so a quote appearing only inside a heredoc body
+    never enters the quote scan and an escaped quote outside any real
+    quoting is never mistaken for one (see `_quote_spans`'s docstring).
     """
     command = _mask_heredocs(command)
     command = CONTINUATION_RE.sub(lambda m: " " * len(m.group(0)), command)
-    out = []
-    i, n = 0, len(command)
-    while i < n:
-        ch = command[i]
-        if ch in "'\"":
-            quote = ch
-            out.append(ch)
-            i += 1
-            while i < n and command[i] != quote:
-                if quote == '"' and command[i] == "\\" and i + 1 < n:
-                    out.append("xx")
-                    i += 2
-                    continue
-                out.append("x")
-                i += 1
-            if i < n:
-                out.append(command[i])
-                i += 1
-        else:
-            out.append(ch)
-            i += 1
+    return _mask_quotes(command)
+
+
+def _mask_quotes(command: str) -> str:
+    """`command` with every quoted span's INTERIOR replaced by `x`, same
+    length -- the quote characters themselves, and an escaped quote outside
+    any real quoting, are left untouched.
+    """
+    out = list(command)
+    for start, end, closed in _quote_spans(command):
+        interior_end = end - 1 if closed else end
+        for i in range(start + 1, interior_end):
+            out[i] = "x"
     return "".join(out)
 
 

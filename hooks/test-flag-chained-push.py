@@ -98,6 +98,16 @@ FIRES = [
     # it (via the newline following the terminator) still fires.
     ("chained push after a real heredoc, with a quoted << earlier on the line",
      'echo "a << b" && cat <<EOF\nbody\nEOF\ngit push'),
+    # A backslash-escaped quote OUTSIDE any real quoting is a literal
+    # character, not an opener -- real shell syntax escapes the very next
+    # character that way. Treating it as an opener read the rest of the
+    # command as one giant unterminated quoted span and masked all of it
+    # away, silently swallowing the real chained `git push` after it
+    # (measured 2026-09-05 review, fourth pass).
+    ("chained push after an escaped double-quote outside any real quoting",
+     "echo " + chr(92) + '" && git push'),
+    ("chained push after an escaped single-quote outside any real quoting",
+     "echo " + chr(92) + "' && git push"),
 ]
 
 QUIET = [

@@ -98,14 +98,14 @@ commonest commit invocations there is, and a token-equality test against
 `-m` sees none of it -- so the first draft of this guard was silently blind
 on a large fraction of real traffic while every test passed.
 
-The `_ENV` and `_GIT_FLAGS` patterns are COPIED from
-`no-unshipped-commit.py`, byte-identical to the definitions there, not
-imported from it. The consequence is worth stating rather than leaving to be
-discovered: this is a DRY violation, so a fix to either copy does not reach
-the other, and a change to how a `git commit` invocation is recognised has
-to be made in both places. Copying rather than importing is the local
-convention for these two one-line patterns; the sibling hooks that import
-(`flag-unmeasured-timestamp.py`'s `_sibling()`) do so for whole functions.
+The `COMMIT` pattern is IMPORTED from `scripts/lib/git_cmd.py`, which is
+also where `no-unshipped-commit.py` gets it, so the two guards cannot drift
+apart on what a `git commit` invocation looks like. An earlier revision
+copied the patterns instead, and that copy is exactly how this hook
+inherited catastrophic backtracking after the original had been fixed
+(ai-config#3172). Change git-command recognition in `scripts/lib/git_cmd.py`
+and both guards get it; do not reintroduce a local `_ENV` or `_GIT_FLAGS`
+here.
 
 The command word is guarded with `(?![\\w-])`, not `\\b`, for the reason that
 file documents at length: a word boundary sits happily between `commit` and

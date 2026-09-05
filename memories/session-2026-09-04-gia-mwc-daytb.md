@@ -673,3 +673,276 @@ Wave 3 has one agent left (51/50).
 - UMS rounds 12 (4 findings) and 7 (5 findings) both not-ready on small wording items;
   fixed at b900b8a7 (wt-ums5) and 42237cd5 (wt-ums6) and pushed as PRs rather than running further self-review rounds: the repo's own reviewers take it from here.
 - This notebook (part 4) rebased onto main after PR #3245 merged: main's copy is a prefix of the working copy, so the new entries were carried over unchanged.
+
+## 15:51 PDT --- PR #3256 and PR #3237 merged; four wave-3 review findings dispatched to fixers
+
+- Merged PR #3256 (f0ea951a, Closes #3002) and PR #3237 (081523d3, Closes #2510;
+  Jules "comment" WARN reworded at dd809845, claude Ready on that head).
+  Unsubscribed, main at 081523d3, wt-3002 and wt-2510 removed.
+- Wave-3 review rounds: PR #3251 claude "Needs more work" (RX_CAPTURE_ASSIGN paren exclusion;
+  1> lookbehind), PR #3257 Jules WARN (cluster ending in a value-taking short does not consume the next token), PR #3250 claude Ready with a real boundary-line masking gap plus a Jules deprecation claim that measures false, PR #3252 Jules NIT (irrealis marker across a single newline).
+  Four fixer subagents (one opus, three sonnet) dispatched into wt-2991, wt-2524, wt-2986, wt-2997 with no push authority;
+  the driving session pushes after reading each diff.
+- PR #3255 claude Ready @ 958ccecd, Jules still reviewing.
+  PR #3249, PR #3253, PR #3254 Jules approve, claude pending.
+  PR #3248 Jules pending.
+
+## 15:54 PDT --- PR #3253, PR #3260, PR #3258 merged; more wave-3 findings
+
+- Merged PR #3253 (42db3bfa, Closes #2919), PR #3260 (14e08a5f, notebook part 4), PR #3258 (a07727a7, Refs #3203), each on claude Ready + Jules approve + green checks.
+  Unsubscribed, main at a07727a7, wt-2919 and wt-ums5 removed;
+  this notebook re-cut as part 5 on the new main.
+- PR #3254 (2404): claude "Needs more work", a mixed-extension citation list now false-positives (looks_like_one_path's all-extension-less gate);
+  fix pending a free subagent slot.
+- PR #3252 (2997): claude "Needs more work", the phrase-only sentinel key suppresses a later unrelated admission with the same phrase;
+  the running fixer was told to bound the cap by transcript distance, fix the hooks.json "why", and test "supposing".
+- PR #3249 (3005): claude Ready with an 88-versus-89 docstring inconsistency;
+  a fifth subagent re-measures and fixes.
+- PR #3255 (3015): Ready, checks green, Jules still silent since 22:43Z.
+  PR #3248 Jules approve, claude pending.
+  PR #3259 Jules approve, claude pending.
+
+## 15:54 PDT --- PR #3259 merged
+
+- Merged PR #3259 (1cecdf9e, Refs #3230) on claude Ready @ 42237cd5 + Jules approve + green checks;
+  unsubscribed, main at 1cecdf9e, wt-ums6 removed.
+  Both UMS entries from this session are now on main.
+
+## 15:55 PDT --- PR #3255 merged
+
+- Merged PR #3255 (da78fefc, Closes #3015) once Jules approved at 22:54Z;
+  the squash body was authored fresh so the two trailerless merge commits and the stale commit-message claim never reached main.
+  Unsubscribed, main at da78fefc, wt-3015 removed.
+
+## 15:57 PDT --- PR #3250 fix pushed; PR #3248 finding queued
+
+- PR #3250: span-level masking pushed at d30ba63b (both boundary reproductions now report;
+  corpus count unchanged at 25);
+  commented, and rebutted the Jules generate_tokens deprecation claim with a -W error measurement.
+- PR #3254 fixer dispatched (opus) into wt-2404 for the mixed-extension citation-list false positive.
+- PR #3248 (2451): claude "Needs more work", a case pattern's closing paren inside a subshell pops the scope tracker early, so a push later in the case body reads the outer directory;
+  reproduced against W8's fixture.
+  Fix queued behind the five-subagent cap.
+
+## 16:00 PDT --- PR #3257 and PR #3249 fixes pushed; PR #3248 fixer dispatched
+
+- PR #3257: cluster-value fix pushed at 6f243288 (the sonnet fixer left its edits uncommitted after a Monitor call;
+  I ran the suite, committed with the trailers, pushed, commented).
+- PR #3249: figures reconciled at ac01fb5a (88 accepted;
+  89 only with the tail bound off;
+  the copula-only figure measured 70 of 88, not 20);
+  pushed, commented.
+- PR #3248 fixer (opus) dispatched into wt-2451 for the case-pattern paren scope pop.
+- Still running: fixers for PR #3251 (opus), PR #3252 (sonnet, with the sentinel-window brief), PR #3254 (opus), PR #3248 (opus).
+
+## 16:01 PDT --- PR #3250 merged
+
+- Merged PR #3250 (d0428b49, Closes #2986) on claude Ready @ d30ba63b + green checks;
+  Jules's deprecation WARN rebutted by measurement.
+  Unsubscribed, main at d0428b49, wt-2986 removed.
+- PR #3251: Jules timed out on the old head 8f298378;
+  re-mention after the fixer's push.
+
+## 16:06 PDT --- PR #3249 figures pinned to a commit
+
+- The re-review measured 89 accepted lead-ins on the merge ref against 88 at the branch base 7927fc44 (main gained lead-ins from the UMS entries merged since), and the test comment still said "20 of the 88".
+  All three sites now name the commit and say the total moves;
+  pushed at e3fbb964, commented.
+
+## 16:07 PDT --- PR #3251 fix pushed
+
+- Capture-assignment scanner and the 1> lookbehind fix pushed at 1bd63d5c (opus fixer;
+  67/67, test_hooks 56/56);
+  commented and re-mentioned Jules after its timeout on the old head.
+  Note for the loop briefs: scripts/check-python-escapes.py exists on main but not on branches cut before it landed, so fixer briefs should say "if present".
+- Fixers still running: PR #3252 (sentinel window), PR #3254 (mixed-extension list), PR #3248 (case paren).
+
+## 16:09 PDT --- #3252 round pushed
+
+Pushed `75d48084` on `fix/2997-admission-irrealis` (PR #3252): newline-tolerant `IRREALIS_LEAD`, `LEAD_WINDOW` 40, `LOOP_WINDOW = 6` sentinel gate shared by both hooks, hooks.json/README wording, `supposing` test.
+Comment posted addressing all three findings plus the earlier nit.
+Jules dedups re-mentions, so no re-mention; the push re-triggers claude-review.
+Next: merge on Ready (Closes #2997).
+Still open from wave 3: #3248 (opus fixer running), #3254 (opus fixer running), #3249, #3251, #3257 (awaiting re-review).
+
+## 16:13 PDT --- PR #3249 figures dropped
+
+- Round 3 review (Ready, one non-blocking finding): direct measurement at the pinned commit gave 78/63, not 88/70;
+  three rounds, three totals.
+  Took option (a): all three sites now state the copula trade-off qualitatively and say why no count is quoted.
+  Pushed b9b11162, commented.
+  Lesson for UMS: a figure derived by ad hoc instrumentation has no source of truth;
+  either ship the instrument that derives it or do not quote it.
+- Waiting: claude-review on #3257 (since 16:01) and #3251 (since 16:08);
+  fixers for #3254 and #3248 still running.
+
+## 16:15 PDT --- PR #3254 fix pushed; residual filed as #3261
+
+- Opus fixer swapped the quantifiers in `looks_like_one_path()`'s citation-list clause (every piece bare-segment, one extension-less);
+  pushed 09aa4ccd, commented.
+  Its 800-frame sweep showed the branch still fires on 200 citation frames versus 107 on main: a second family (extension-less all-TOKEN directory beside a file citation) whose shape-based fix would exempt the `COINCIDENTAL_SLASH_BRANCH_SUFFIX` must-fire fixture.
+  Filed as #3261 under #2404 rather than deciding it in the round;
+  the comment invites the reviewer to pick a side.
+
+## 16:18 PDT --- PR #3257 merged; PR #3251 round 2 pushed
+
+- Merged PR #3257 (581d730f, Closes #2524) on claude Ready @ 6f243288 + green checks;
+  Jules's WARN was the cluster bug fixed by that push, Copilot quota-skipped.
+  Unsubscribed, main fast-forwarded, wt-2524 removed.
+- PR #3251 round 2: reviewer found the `&` in RX_STDOUT_REDIRECT's lookbehind swallowed `&>`/`&>>` (the `>&2` case it targeted is refused by the lookahead).
+  Dropped it, bounded RX_CAPTURE_HEAD to a shell-word start for the non-blocking note, four new cases, 71/71.
+  Pushed 12219113 inline (no fixer), commented.
+- Lesson for UMS: a lookbehind written for a form whose distinguishing character sits AFTER the operator excludes the wrong operator entirely;
+  write the test for the operator you meant to exclude and the one that shares the character.
+
+## 16:19 PDT --- PR #3249 merged; check-in re-armed
+
+- Merged PR #3249 (b69e4a8b, Closes #3005) on claude Ready @ b9b11162 (no findings) + Jules approve + green checks;
+  Copilot quota-skipped.
+  Unsubscribed, main fast-forwarded, wt-3005 removed.
+- Check-in trigger trig_019bfVjTY9CcfRUCtswSaB5G fires 00:19Z = 17:19 PDT;
+  its prompt now describes the wave-3 tail (#3248, #3251, #3252, #3254), the part-5 notebook PR, and the owed UMS pass.
+- Open from wave 3: #3248 (fixer running), #3251 (12219113 awaiting re-review), #3252 (75d48084 awaiting re-review), #3254 (09aa4ccd awaiting re-review).
+
+## 16:19 PDT --- PR #3254 merged
+
+- Merged PR #3254 (d6e83f6f, Closes #2404) on claude Ready @ 09aa4ccd (no findings) + Jules approve + all 15 check runs green.
+  The reviewer did not take a side on the #3261 trade-off, which stays filed as a sub-issue of #2404.
+  Unsubscribed, main fast-forwarded, wt-2404 removed.
+- Open from wave 3: #3248 (fixer running), #3251 (12219113 awaiting re-review), #3252 (75d48084 awaiting re-review).
+- Correction: the two headings above were first written as "16:20" and "16:23" without a clock read, extrapolated from the 16:17 reading;
+  the next real read came back 16:19, so both are restated at 16:19.
+  Same failure `CLAUDE.md`'s timestamp section measured on 2026-09-01; UMS item.
+
+## 16:20 PDT --- PR #3252 merged
+
+- Merged PR #3252 (4fa36c20, Closes #2997) on claude Ready @ 75d48084 (no new issues;
+  both prior findings and the minor confirmed fixed) + Jules approve + green checks.
+  Unsubscribed, main fast-forwarded, wt-2997 removed.
+- Open from wave 3: #3248 (fixer running), #3251 (12219113 awaiting re-review).
+
+## 16:22 PDT --- PR #3248 fix pushed
+
+- Opus fixer added `_track_case` to `hooks/no-clobbering-push.py` so a case pattern's `)` no longer pops a subshell scope (pattern position starts at `in`;
+  `;;` restores it);
+  64/64 cases, 42/42 clauses.
+  Pushed c0135b9b, commented.
+  Jules approved 57601fdd; merge on Ready.
+- Remaining wave 3: #3248 (awaiting re-review of c0135b9b), #3251 (re-review of 12219113 running since 16:17).
+
+## 16:25 PDT --- UMS pass dispatched; hook gaps filed
+
+- UMS agent (opus, wt-ums7 on `ums/2026-09-04-wave3-lessons`) recording five lessons: hand-derived figures need an instrument or no number (#3249);
+  a lookbehind for a character that sits after the operator (#3251);
+  the notebook-heading extrapolation recurrence and the in-command date read that fixes it;
+  "if present" for recently-added gates in fixer briefs;
+  semantic-line-breaks --write joining lines.
+  No push authority; I review, push, open the PR.
+- Filed #3262: the #2947 notebook-timestamp hook is bound to Write/Edit/NotebookEdit only, so a Bash heredoc write is unwarned.
+  Commented on #2004 with today's measurement that no hook is active in this remote session (settings.json has no hooks, no enabledPlugins).
+
+## 16:27 PDT --- PR #3251 round 3 pushed
+
+- Reviewer found RX_PRINTED_VAR's `[^;&|\n]*` excluding quoted punctuation (`echo "a|b $t"`) and suggested `[^\n]*`;
+  that would misread a real pipe (`echo done | grep -c $t`), since the splitter only splits on `;`, `&&`, `||`.
+  Fixed by searching over the segment with operators inside quoted/substituted spans blanked (`_mask_quoted_operators`);
+  four cases pin both directions, 75/75.
+  Pushed 824169e2 inline, commented.
+  Jules re-running on the head before this one; timeout does not block.
+- Lesson for UMS: a reviewer's suggested fix for a character-class bug can overshoot;
+  check what the splitter already removed before widening the class.
+
+## 16:31 PDT --- UMS branch pushed; #3262 closed as wrong-premise
+
+- UMS agent committed 4082e942 (CLAUDE.md +3, CLAUDE.cases.md, avoid-hardcoding-external-data.md, algorithmatize-checks.md x2 sections, challenge-the-assignment.md, semantic-line-breaks.md);
+  gates clean;
+  context-closure still over budget (advisory, pre-existing).
+  Pushed `ums/2026-09-04-wave3-lessons`; PR next.
+- The agent derived rather than adopted my "settled query" and found it false: flag-unmeasured-timestamp.py IS bound on Bash and reads heredoc notebook writes.
+  Verified via json.load on hooks.json.
+  Closed #3262 as not planned with the correction;
+  #2004 (hooks inert in remote sessions) is the real cause.
+  False-state-claim trigger: the lesson (a grep that matched a different hook's Bash entry) is the kind the cases entry now carries.
+
+## 16:32 PDT --- UMS PR #3263 opened
+
+- PR #3263 (`ums/2026-09-04-wave3-lessons`, 4082e942, Refs #3203/#3249/#3251/#2004) opened via MCP, claimed with @jules review, Copilot requested, subscribed.
+  Merge under the standing ai-config grant once fully clean.
+- Open PRs this session: #3248 (re-review of c0135b9b running), #3251 (re-review of 824169e2 running;
+  Jules re-running), #3263 (new).
+
+## 16:35 PDT --- PR #3248 merged
+
+- Merged PR #3248 (48e74f18, Closes #2451) on claude Ready @ c0135b9b (no findings;
+  the reviewer probed alternation, nested case, and fallthrough terminators) + Jules approve + all 15 check runs green.
+  Unsubscribed, main fast-forwarded, wt-2451 removed.
+- Open PRs this session: #3251 (re-review of 824169e2 running), #3263 (UMS;
+  Jules approved, claude review pending).
+  Wave 3 tail: only #3251 left.
+
+## 16:37 PDT --- UMS PR #3263 merged; PR #3251 round 4
+
+- Merged PR #3263 (8c5f9481, Refs #3203) on claude Ready @ 4082e942 + Jules approve + all 15 checks green, under the standing ai-config grant.
+  Unsubscribed, main fast-forwarded, wt-ums7 removed.
+- PR #3251 round 4 (Needs more work, non-blocking bug): RX_STDOUT_REDIRECT runs over the raw segment, so a literal `>` inside a quoted format string (`date "+%H:%M -> Checkpoint"`) reads as a redirect (over-fire direction only).
+  Fixing inline: mask `<`/`>` inside quoted spans only, not inside groups, since `{ date > f; }` must keep reading as a redirect.
+
+## 16:38 PDT --- PR #3251 round 4 pushed
+
+- Added `_mask_quoted(text, chars)` (quotes only, not groups) and ran RX_STDOUT_REDIRECT over the segment with quoted `<>` blanked;
+  three cases (double-quoted arrow, single-quoted arrow, brace-group redirect still a redirect), 78/78.
+  Pushed f177e8e6, commented.
+
+## 16:43 PDT --- PR #3251: review workflow did not fire on f177e8e6
+
+- The push at 16:38 PDT triggered only validate.yml (4 check runs);
+  no claude-review.yml run appeared for f177e8e6 (`actions/runs?head_sha=` listed one run, the validate one).
+  Dispatched claude-review.yml via workflow_dispatch on ref `fix/2991-clock-read-captured-unprinted` with pr_number 3251, the shape measured on #3239 to attach check runs to the PR head.
+  Jules re-running after its third timeout.
+
+## 16:51 PDT --- PR #3251 Ready at f177e8e6, then synced with main
+
+- Dispatched review returned Ready at f177e8e6 with no findings, but the PR was `dirty` against main.
+  Merged origin/main (58b56d28);
+  one conflict in CLAUDE.md's timestamp section between this branch's Don't (captured reading is not a measurement) and #3263's Do (derive the file heading from an in-command date read).
+  Kept both, rephrasing the Don't: the capture counts for a chat/comment claim only when also printed.
+  Gates clean, pushed, commented.
+  Next: confirm the review workflow fired on 58b56d28 (dispatch if not), merge on Ready.
+
+## 17:00 PDT --- PR #3251 round 5 pushed
+
+- Round 5 on 58b56d28 (Needs more work, dangerous direction): an inline `$(date ...)` passed to `gh pr comment --body` or `curl -d` was classed as printing.
+  Added `_mask_substitutions` (on `_substitution_end`/`_backtick_end`) and `RX_REPRINTING_HEAD`;
+  a read inside a substitution or heredoc body prints only under echo/printf/print/cat/tee, otherwise it waits for the tool result.
+  Four cases, 82/82.
+  Pushed 35b5b2ff, commented.
+  Jules: four timeouts on this branch, not re-mentioning.
+- First masker draft mishandled a quote inside the substitution (blanked the trailing text);
+  caught by printing repr() before running the suite, which had passed anyway because the case only affected direct-read detection.
+  Rewrote on the existing walkers.
+
+## 17:11 PDT --- PR #3251 round 6 pushed
+
+- Round 6 on 35b5b2ff was Ready with one non-blocking finding (the head regex's `\S*` env value breaks on a quoted space).
+  Replaced it with `_head_word`, a quote-aware walker; 83/83.
+  Pushed a44855e2, commented.
+  Merge on the next Ready.
+
+## 17:17 PDT --- PR #3251 round 7 pushed
+
+- Round 7 on a44855e2 was Ready and noted, without raising, that an unquoted `$( )` with a space in an env value ends the value early.
+  Closed it by skipping substitutions whole in `_head_word` (84/84);
+  pushed 2b3a88e6, commented.
+  Merge on the next Ready.
+- Seven rounds on this hook, every one a quoting or operator edge in a regex;
+  the UMS entries in #3263 cover the class.
+  The remaining code-level lesson for a later pass: a shell-parsing hook wants one tokenizer that every regex consumes, not per-regex masking.
+
+## 17:25 PDT --- PR #3251 merged; wave 3 complete
+
+- Merged PR #3251 (adaaaad8, Closes #2991) on claude Ready @ 2b3a88e6 (round 8, no findings) + all 15 check runs green;
+  Jules timed out four times and Copilot was quota-skipped, neither blocks.
+  Unsubscribed, main fast-forwarded, wt-2991 removed.
+- Wave 3 is terminal: all ten PRs (#3248 to #3257) merged.
+  The UMS pass for the wave merged as #3263.
+  Remaining: this notebook's part-5 PR.

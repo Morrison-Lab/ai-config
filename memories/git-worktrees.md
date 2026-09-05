@@ -1167,7 +1167,7 @@ The hook then blocked `Stop`, reporting four of a live peer's unpushed commits (
 
 Filed as [ai-config#3272](https://github.com/Morrison-Lab/ai-config/issues/3272) (open; do not re-file).
 Its own follow-up comment names the mechanism as it stood at filing time: a read-only visit and a failed checkout both registered as "touched."
-**Do not cite that comment's function or variable names as current** --- `no-unshipped-commit.py` has since accumulated several unrelated attribution fixes per its own docstrings (ai-config#2422, #2737, #3236), so a name correct at filing time can already be stale;
+**Do not cite that comment's function or variable names as current** --- `no-unshipped-commit.py` has since accumulated several unrelated attribution fixes per its own docstrings (ai-config#2422, #2737), so a name correct at filing time can already be stale;
 re-derive from the live source before quoting internals, which is this entry's own near-miss on the first draft (an adversarial review caught fabricated names and a stale line range copied from the issue rather than re-checked against the code).
 A re-read of the current `scan_transcript` found that a call containing only a `cd`/`checkout` with no `git commit` in it no longer contributes to the tracked branches or paths at all (the function's own docstring: "Visiting is not committing," ai-config#2422), so the plain read-only-`cd` trigger may already be closed.
 Whether a *refused* checkout inside the same call as a real commit still registers (the command is read as text, with no exit-status check visible in that read) was not re-verified here.

@@ -693,12 +693,8 @@ header rather than with comparing figures.)
 
 ## A nested worktree inflates a whole-tree instrument, because the worktree lives INSIDE the repo
 
-Moved to [`nested-worktree-instrument-inflation.md`](nested-worktree-instrument-inflation.md)
-(ai-config#694 pattern, at the 1250-line gate): `isolation: "worktree"`
-nests a second checkout inside the repo, and a root-globbing instrument
-(e.g. `markdownlint-cli2`) silently counts its files too, while a
-named-directory glob, a closure walk, or a `git ls-files` enumeration stays
-immune. Run `git worktree list` before publishing any whole-tree count.
+Moved to [`nested-worktree-instrument-inflation.md`](nested-worktree-instrument-inflation.md) (ai-config#694 pattern, at the 1250-line gate): `isolation: "worktree"` nests a second checkout inside the repo, and a root-globbing instrument (e.g. `markdownlint-cli2`) silently counts its files too, while a named-directory glob, a closure walk, or a `git ls-files` enumeration stays immune.
+Run `git worktree list` before publishing any whole-tree count.
 
 ## A quiet worktree is not evidence the session working it has stopped
 
@@ -1164,38 +1160,23 @@ consequence.)
 
 ## A read-only `cd` into a peer's worktree, or a REFUSED checkout, still arms `no-unshipped-commit.py`
 
-Sibling to the section above, same family (a repo scan drawing a conclusion
-from context that is not the session's own), different mechanism:
-`no-unshipped-commit.py` (unpushed commits, not uncommitted diffs) fires
-from inspecting a separate PEER worktree, not from working inside the
-primary one.
+Sibling to the section above, same family (a repo scan drawing a conclusion from context that is not the session's own), different mechanism: `no-unshipped-commit.py` (unpushed commits, not uncommitted diffs) fires from inspecting a separate PEER worktree, not from working inside the primary one.
 
-It scopes its `Stop` check to worktrees "active in this session" (`cwd`,
-touched paths, touched branches; `no-unshipped-commit.py:468-489`). The
-scoping is correct; what counts as "active" is not. A read-only visit and a
-git-refused command both register as activity.
+It scopes its `Stop` check to worktrees "active in this session" (`cwd`, touched paths, touched branches;
+`no-unshipped-commit.py:468-489`).
+The scoping is correct; what counts as "active" is not.
+A read-only visit and a git-refused command both register as activity.
 
-Measured 2026-09-04 on `ucdavis/hac.sap`: a session `cd`'d into a peer's
-worktree only to inspect it, exactly what [`CLAUDE.md`](../CLAUDE.md)'s
-"Subagent worktrees are assigned" section requires, and separately ran a
-`git checkout -B` that git refused (`fatal: ... already used by worktree`).
-Both left a mark: the `cd` populated `extract_touched_paths`'s targets, and
-the refused checkout still added the branch to `touched_branches`, since
-`BRANCH_CMD` matches command text, not exit status. The hook then blocked
-`Stop`, reporting four of a live peer's unpushed commits (one a breaking
-`fix!:`) as this session's to push.
+Measured 2026-09-04 on `ucdavis/hac.sap`: a session `cd`'d into a peer's worktree only to inspect it, exactly what [`CLAUDE.md`](../CLAUDE.md)'s "Subagent worktrees are assigned" section requires, and separately ran a `git checkout -B` that git refused (`fatal: ... already used by worktree`).
+Both left a mark: the `cd` populated `extract_touched_paths`'s targets, and the refused checkout still added the branch to `touched_branches`, since `BRANCH_CMD` matches command text, not exit status.
+The hook then blocked `Stop`, reporting four of a live peer's unpushed commits (one a breaking `fix!:`) as this session's to push.
 
-Filed as [ai-config#3272](https://github.com/Morrison-Lab/ai-config/issues/3272)
-(open; do not re-file, its own follow-up comment already corrects the cause
-to this mechanism). Until it lands:
+Filed as [ai-config#3272](https://github.com/Morrison-Lab/ai-config/issues/3272) (open;
+do not re-file, its own follow-up comment already corrects the cause to this mechanism).
+Until it lands:
 
-- **Do:** inspect a peer worktree with `git -C <path>` reads (`status`,
-  `log`, `rev-parse`), never a bare `cd`.
-- **Do:** expect a refused `checkout`/`switch`/`branch` to still register
-  as touched.
-- **Don't:** trust a failed command left no trace; `touched_branches` does
-  not check exit status.
-- **Don't:** comply with "push the branch" when the flagged worktree
-  belongs to a peer confirmed live; publishing another session's
-  unreviewed, possibly mid-amend commits is unsafe regardless of the
-  trigger.
+- **Do:** inspect a peer worktree with `git -C <path>` reads (`status`, `log`, `rev-parse`), never a bare `cd`.
+- **Do:** expect a refused `checkout`/`switch`/`branch` to still register as touched.
+- **Don't:** trust a failed command left no trace; `touched_branches` does not check exit status.
+- **Don't:** comply with "push the branch" when the flagged worktree belongs to a peer confirmed live;
+  publishing another session's unreviewed, possibly mid-amend commits is unsafe regardless of the trigger.

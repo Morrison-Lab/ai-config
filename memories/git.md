@@ -608,9 +608,9 @@ That ref points at the PR's final head, so it reaches that head and its
 ancestors and nothing else.
 Anything a force-push removed from that line --- a message that was amended, a
 commit dropped or reordered in a rebase, an intermediate squashed away --- is
-on no ancestry at all and is unfetchable by anyone.
-There the honest record says the commit does not survive, rather than citing a
-SHA no reader can reach.
+on no ancestry at all, so no ref reaches it and no fetch brings it down.
+There the honest record says so, rather than citing a SHA and leaving the
+reader to discover there is nothing to fetch.
 `shared/writing/fact-check-prose.md`'s "When each rewrite is refuted on a NEW
 clause" section is what that costs when the record tries to reconstruct it
 anyway.
@@ -630,7 +630,9 @@ anyway.
 
 (Morrison-Lab/ai-config#3180, 2026-09-04, which broke this rule in two of its
 own passages --- `fully-clean.md` and `check-pr-fully-clean.py` both cited
-`16544c50` and `7e1294b0`, pre-squash heads of #3167, caught in `7a797d3f8`.
+`16544c50` and `7e1294b0`, pre-squash heads of #3167, caught in `7a797d3f8`
+--- which is itself pre-squash on #3180, so the two SHAs and the commit that
+caught them are fetched from different refs.
 A pre-existing instance is open as
 [#3275](https://github.com/Morrison-Lab/ai-config/issues/3275).
 [`grep-is-not-coverage`](../shared/workflow/grep-is-not-coverage.md) carries

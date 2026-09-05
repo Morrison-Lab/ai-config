@@ -636,8 +636,8 @@ unrecoverable, and deletes the connective tissue between them.
 That version is usually much shorter, and it is not a hedge.
 "This cannot be recovered, and here is why" is a claim a reader can check,
 where a softened reconstruction is the same unsupported claim with a smaller
-adverb --- which
-[`address-every-comment`](../workflow/address-every-comment.md)'s closing
+adverb ---
+which [`address-every-comment`](../workflow/address-every-comment.md)'s closing
 section rejects for exactly that reason.
 
 **This does not contradict

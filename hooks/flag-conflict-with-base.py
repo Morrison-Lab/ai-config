@@ -87,8 +87,14 @@ write.
       assumption; `memories/preferences.md` records a measured
       `fatal: invalid reference: origin/main` on a repo whose default is
       named otherwise
-  M4  HEAD is not the base branch itself, and HEAD is not already at or
-      behind the base
+  M4  HEAD is not the base branch itself. This half is load-bearing:
+      without it, pushing the base warns about its own divergence.
+  M4b HEAD is not already at or behind the base. This half is a pure
+      short-circuit and guards no correctness case. When HEAD is an
+      ancestor of the base, the merge base IS HEAD, so one side of the
+      three-way diff is empty by construction and `merge-tree` cannot
+      report a conflict whatever the content. Removing it changes no
+      verdict, only the cost of a subprocess carrying a 20s timeout.
   M5  `git merge-tree --write-tree origin/<base> HEAD` exits non-zero, whose
       status IS the signal for this form. The legacy three-argument form
       always exits 0, which is why it is not used here

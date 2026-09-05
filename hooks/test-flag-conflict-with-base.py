@@ -297,12 +297,18 @@ MUTATIONS = {
         {"S2"},
     ),
     "M4 skip contained": (
-        "without the ancestor skip, a branch merely behind the base is "
-        "reported as diverged",
+        "the ancestor skip is a performance short-circuit, not a "
+        "correctness guard: merge-tree cannot report a conflict when "
+        "HEAD is an ancestor of the base, so nothing flips",
         [('        if _git_ok(["merge-base", "--is-ancestor", "HEAD", base_ref],\n'
           '                   cwd=git_root) is not None:\n            continue',
           '        if False:\n            continue')],
-        {},
+        # Deliberately empty, and the one clause here that is meant to be:
+        # this asserts the skip is inert for correctness, which is the
+        # claim the docstring's M4b bullet makes. A later edit that makes
+        # something flip here means the skip has acquired a correctness
+        # role and both this entry and M4b need rewriting.
+        set(),
     ),
 }
 

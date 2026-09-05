@@ -328,8 +328,10 @@ That composes with this file's plugin-cache material into a worse failure than e
 Those paragraphs --- in "On the plugin path nothing else is needed", well above this section --- explain why a merged fix does not reach a running session;
 a dated constant is the one payload for which *not reaching the session* is not merely a delay but an inversion, because the stale copy does not hold the old behaviour --- it computes a new, wrong one.
 
-- **Do:** gate the re-arm on a freshness signal from outside the snapshot --- the pinned rev in `~/.claude/plugins/installed_plugins.json`, or a network read --- and keep suppressing when that signal is unavailable.
+- **Do:** gate the re-arm on a freshness signal from outside the snapshot --- the `lastUpdated` timestamp in `~/.claude/plugins/installed_plugins.json`, or a network read --- and keep suppressing when that signal is unavailable.
   A corpus file the guard reads at runtime is not such a signal, since it is frozen in the same snapshot the constant is.
+  Neither is the pin's own `version`/`gitCommitSha`, which is an identity rather than a recency measure: it says which snapshot is served and cannot say whether that snapshot is old, so a gate reading it can never fire --- [`fail-fast`](../principles/fail-fast.md)'s precondition that "is indistinguishable from one that fires correctly and finds nothing".
+  `lastUpdated` sits beside the rev in the same entry and does carry recency.
 - **Do:** read the constant from the copy that actually ran, when a guard demands something a standing directive forbids --- that demand is a freshness symptom before it is a policy question.
   Resolve which copy that is in this order, since the answer is frequently not the plugin at all: grep `~/.claude/settings.json` for a direct non-plugin registration of the script and read that file if one exists;
   check `enabledPlugins` for whether the plugin path is live on this machine at all;
@@ -346,9 +348,15 @@ a dated constant is the one payload for which *not reaching the session* is not 
 On 2026-09-03 `hooks/no-unreviewed-pr.py` demanded a Copilot review on two PRs while the all-repos moratorium ran to `MORATORIUM_END = 2026-12-01` ([#3078](https://github.com/Morrison-Lab/ai-config/pull/3078)).
 What is established stops well short of a mechanism.
 The copy registered directly in `~/.claude/settings.json` --- `python3 "$HOME/.claude/hooks/no-unreviewed-pr.py"`, present on disk --- carries `2026-12-01`, and its `main()` returns 0 on an active moratorium before reading the transcript, so that copy cannot be what fired.
-`enabledPlugins["ai-config@Morrison-Lab"]` is `false`, and the plugin path ran anyway.
+`enabledPlugins["ai-config@Morrison-Lab"]` is `false`.
+That a plugin copy ran at all rests on one thing only --- the refusal message named `${CLAUDE_PLUGIN_ROOT}/hooks/no-unreviewed-pr.py` --- which is an inference from a message string, not an observation of a process.
+A later measurement pushes against it: a 240-second `ps -eo args` sample at 0.15s intervals, taken 2026-09-03, captured twenty distinct hook command lines and **all twenty** ran from `$HOME/.claude/hooks/`, none from `plugins/cache`, `plugins/marketplaces`, or an unexpanded `${CLAUDE_PLUGIN_ROOT}`.
+That sample cannot close the question either, and its limit is the same shape as the incident's: `no-unreviewed-pr.py` never fired during the window, since it only fires while an unreviewed PR is open, so its absence from the capture is evidence about the registration path in general and none at all about the firings in question.
 `installed_plugins.json` pins `a9ded3e1a9df` at user scope, whose hook carries **no `MORATORIUM_END` at all**, plus a project-scope pin whose directory is absent.
-The cache holds copies in three different states at once (counted 2026-09-03): nine directories carrying `2026-09-01`, a `b0f279f8e8bd` entry carrying `2026-12-01`, and the pinned copy carrying no constant.
+The cache holds copies in three different states at once: directories carrying `2026-09-01`, a `b0f279f8e8bd` entry carrying `2026-12-01`, and the pinned copy carrying no constant.
+No count is given deliberately.
+The cache is garbage-collected, so the number decays: nine directories carried `2026-09-01` on 2026-09-03 and five carried it on 2026-09-04, with no edit in between.
+Derive it rather than citing one --- `find ~/.claude/plugins/cache -name no-unreviewed-pr.py | xargs grep -l 'MORATORIUM_END = datetime.date(2026, 9, 1)' | wc -l` --- since the argument needs only that several carry the same value, which is what makes "newest" isolate nothing.
 A second marketplace, `ai-config@d-morrison`, carries its own user-scope pin to a separate cache tree, so "which copy ran" has more candidate answers than the one marketplace suggests.
 
 **The cause is unknown, and one observation cannot separate the two explanations.**

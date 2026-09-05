@@ -879,9 +879,10 @@ A clean automated review from every available provider evaluating the current HE
   followed by `Reviewed-Commit: <HEAD sha>` (the parser accepts 7-40 hex characters; give the full 40).
   A foreground dispatch is the simplest credited path and the one the hook's own refusal message recommends,
   but background fallback dispatches, tracked `TaskOutput` reads, and task notifications are credited too, per Pattern 22.
-- **2nd occurrence of the stale-cache class, 2026-09-03** ([#3141](https://github.com/Morrison-Lab/ai-config/issues/3141), recorded in [#3156](https://github.com/Morrison-Lab/ai-config/issues/3156)), and it is an occurrence of **this bullet's own Fix step being skipped** rather than of a new mechanism.
+- **2nd occurrence of the misidentified-hook-copy class, 2026-09-03** ([#3141](https://github.com/Morrison-Lab/ai-config/issues/3141), recorded in [#3156](https://github.com/Morrison-Lab/ai-config/issues/3156)), and it is an occurrence of **this bullet's own Fix step being skipped** rather than of a new mechanism.
   `hooks/no-unreviewed-pr.py` demanded a Copilot review while the moratorium ran to `2026-12-01`, and the session identified "the loaded copy" as the newest per-commit directory under `~/.claude/plugins/cache/` --- the exact proxy the Fix above rules out.
-  Nine cache directories carried the same value (counted 2026-09-03), so newest isolated nothing.
+  Several cache directories carried the same value, so newest isolated nothing --- derive the count rather than citing one, since the cache is garbage-collected and it fell from nine to five between 2026-09-03 and 2026-09-04 with no edit in between.
+  The label above names the diagnostic failure rather than a stale cache, because the cause that would justify the latter is exactly what stayed unestablished.
   What the resolution order would have surfaced: the copy registered directly in `~/.claude/settings.json` carries the correct date and returns 0 before reading the transcript, `enabledPlugins` for this plugin is `false`, and the user-scope pin in `installed_plugins.json` names a hook with **no `MORATORIUM_END` at all**.
   So an expired constant and an absent one produce the identical demand, and the cause stays unestablished;
   only reading the file `${CLAUDE_PLUGIN_ROOT}` resolved to at firing time would settle it.

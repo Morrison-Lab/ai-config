@@ -748,7 +748,7 @@ An overwritten slot is exactly the first case.
 A genuine clean verdict for the exact commit was produced and is simply no longer the pair the guard holds, so the override reports the situation accurately rather than papering over an unreviewed push.
 What licenses it is the mechanical evidence, not the recollection: run the guard's own `read_latest_review`/`parse_report` over the transcript, as this file's "A verdict phrase separated from its heading by a line break is no verdict" section already requires of any refusal you believe is wrong, and paste what it parsed alongside the retained report's own `Reviewed-Commit:` line.
 An amend or a fixup between the review and the push is enough to make a confident narrative false.
-Re-dispatching instead spends a full adversarial pass --- **about 125k subagent tokens, measured** --- to re-derive a verdict that already existed for that exact SHA, and lands in the slot the other branch will need next.
+Re-dispatching instead spends a full adversarial pass --- **about 125k subagent tokens for one round over a four-file, 105-line prose diff, measured 2026-09-03** --- to re-derive a verdict that already existed for that exact SHA, and lands in the slot the other branch will need next.
 
 Locating the defect in the guard is the reading the pair above rules out, and it rules that reading out for the wrong reason.
 It is right that the guard has no notion of branch to be defective about;

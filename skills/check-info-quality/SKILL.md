@@ -108,7 +108,12 @@ deprecation state, a guideline, a headcount, a "as of <date>" statement):
 Grep starting points for likely staleness carriers: version-looking
 tokens (`\bv?\d+\.\d+(\.\d+)?\b`), date-anchored phrases ("currently",
 "as of", "the latest", "now supports"), and deprecation language
-("deprecated", "no longer", "legacy").
+("deprecated", "no longer", "legacy"):
+
+```bash
+# Grep for likely staleness carriers: versions, dates, temporal and deprecation phrases
+rg -niE '\bv?\d+\.\d+(\.\d+)?\b|\b(currently|as of|the latest|now supports|deprecated|no longer|legacy)\b' <target>
+```
 
 ### B. Irrelevant information
 

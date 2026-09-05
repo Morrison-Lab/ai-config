@@ -25,6 +25,20 @@ jobs:
         run: python3 scripts/validate-skills.py
       - name: Check markdown links
         run: python3 scripts/check-links.py
+      - name: Run check-links tests
+        # ai-config#2881: CommonMark autolinks and relative link verification.
+        run: python3 scripts/test_check_links.py
+      - name: Check ASCII punctuation in source files
+        # ai-config#2550: ensure .py and .R source files obey the ASCII punctuation policy.
+        run: python3 scripts/check-ascii-punctuation.py
+      - name: Run check-ascii-punctuation tests
+        run: python3 scripts/test_check_ascii_punctuation.py
+      - name: Check mistake-pattern numbering
+        # ai-config#2946: `## Pattern N:` headings unique and sequential; the
+        # test below dogfoods the live file, so this step names the defect.
+        run: python3 scripts/check-mistake-patterns.py
+      - name: Run check-mistake-patterns tests
+        run: python3 scripts/test_check_mistake_patterns.py
       - name: Check Jules mention-dispatch wrap
         # ai-config#2280: a uses: step with GITHUB_EVENT_NAME in env looks
         # like a wrap and is a no-op. This gate fails if the mention path
@@ -47,6 +61,12 @@ jobs:
         run: python3 scripts/check-tui-alloc-readme.py
       - name: Run skills-validator tests
         run: python3 scripts/test_validate_skills.py
+      - name: Check the hooks-only skills-directory plugin is in sync
+        run: python3 scripts/gen-hooks-plugin.py --check
+      - name: Run gen-hooks-plugin tests
+        run: python3 scripts/test_gen_hooks_plugin.py
+      - name: Run run-hook.sh tests
+        run: python3 scripts/test_run_hook.py
       - name: Validate OAICopilot model-template policy
         run: python3 scripts/test_oaicopilot_models_template.py
       - name: Check for unpinned git fixtures
@@ -55,6 +75,22 @@ jobs:
         run: python3 scripts/test_check_unpinned_git_fixtures.py
       - name: Run check-pr-fully-clean tests
         run: python3 scripts/test_check_pr_fully_clean.py
+      - name: Run check-review-body tests
+        run: python3 scripts/test_check_review_body.py
+      - name: Check regex patterns for catastrophic backtracking
+        run: python3 scripts/check_regex_patterns.py
+      - name: Run regex pattern check tests
+        run: python3 scripts/test_check_regex_patterns.py
+      - name: Check Python strings for invalid escape sequences
+        # ai-config#3114: these modules quote regex source in their prose, so a
+        # docstring carrying `\s` is an invalid escape. The warning is silent
+        # on 3.11 (DeprecationWarning) and printed on 3.12+ (SyntaxWarning), so
+        # a maintainer and CI disagree; this gate keys on the message text.
+        run: python3 scripts/check-python-escapes.py
+      - name: Run invalid-escape check tests
+        run: python3 scripts/test_check_python_escapes.py
+      - name: Run git command regex helper tests
+        run: python3 scripts/test_git_cmd.py
       - name: Run orchestrator tests
         # ai-config#2627: this suite existed and ran nowhere, so the
         # orchestrator's own behaviour was unpinned -- which is how a literal
@@ -77,16 +113,34 @@ jobs:
         # must never be mistaken for one. See shared/workflow/fully-clean.md
         # for why that, rather than a false clean, is the hazard.
         run: python3 scripts/test_payload_fetcher.py
+      - name: Run build-pr-payload tests
+        # ai-config#2908: a remote/web session's GraphQL surface can be
+        # pinned to a fixed operation set while plain REST stays reachable,
+        # so build-pr-payload.py builds a --from-json payload from REST
+        # alone. Tested against canned REST fixtures, no token or network.
+        run: python3 scripts/test_build_pr_payload.py
       - name: Run verdict-scan parity tool tests
         run: python3 scripts/test_check_verdict_scan_parity.py
       - name: Run check-user-quote tests
         run: python3 scripts/test_check_user_quote.py
+      - name: Check lead-in counts against their enumerations
+        # ai-config#3005. A lead-in count goes stale when a later edit splits
+        # or merges one item, and a reader who counts along never reaches the
+        # last one. Nothing else here sees it: no broken link, well-formed
+        # lines, fluent prose either way.
+        run: python3 scripts/check-leadin-counts.py
+      - name: Run check-leadin-counts tests
+        run: python3 scripts/test_check_leadin_counts.py
+      - name: Run check-doi-bib tests
+        run: python3 scripts/test_check_doi_bib.py
       - name: Run test_pull_request tests
         run: python3 scripts/test_pull_request.py
       - name: Run check-pr-body-figures tests
         run: python3 scripts/test_check_pr_body_figures.py
       - name: Run semantic-line-break tool tests
         run: python3 scripts/test_slb.py
+      - name: Run sync-nlb-checker fetch and CLI tests
+        run: python3 scripts/test_sync_nlb_checker.py
       - name: Run memory-file-size check tests
         run: python3 scripts/test_check_memory_file_size.py
       - name: Run tui-alloc README check tests
@@ -111,9 +165,27 @@ jobs:
       - name: Run doctor tests
         # ai-config#2540: doctor.py install diagnostics and path checks.
         run: python3 scripts/test_doctor.py
+      - name: Run AI CLI helper and detection tests
+        # ai-config#2543: scripts/lib/ai_cli.py tool availability detection.
+        run: python3 scripts/test_ai_cli.py
       - name: Run markdown fences library tests
         # ai-config#2540: scripts/lib/fences.py code block and code span parsing.
         run: python3 scripts/test_fences.py
+      - name: Run shell-command library tests
+        # ai-config#2992: scripts/lib/shellcmd.py argv splitting, heredoc
+        # blanking, and git-invocation classification.
+        run: python3 scripts/test_shellcmd.py
+      - name: Run check-rendered-references tests
+        # ai-config#2879: verify broken rendered reference checking and footnote isolation.
+        run: python3 scripts/test_check_rendered_references.py
+      - name: Run local-validation runner tests
+        # ai-config#1940 / #1262: scripts/run-local-validation.py derives the
+        # pre-push check list from THIS file; its dogfood case asserts the
+        # derived plan names every scripts/test_*.py suite.
+        run: python3 scripts/test_run_local_validation.py
+      - name: Run validate-workflow guard tests
+        # ai-config#1730: the new-line-breaks job's pull_request gate and base-ref.
+        run: python3 scripts/test_validate_workflow.py
       - name: Check that all scripts/test_*.py test suites are gated
         # ai-config#2540: verify every test suite in scripts/ is gated in CI.
         run: python3 scripts/check-test-suites-covered.py
@@ -147,6 +219,15 @@ jobs:
         # sweep in CI would prove nothing. Its classification logic is pure
         # over the GraphQL payload shape, so the tests cover it offline.
         run: python3 scripts/test_pr_sweep.py
+      - name: Run PR-scope tests
+        # Only the tests run here. pr-scope.py's --repo mode shells out to
+        # `gh`, which a runner cannot do unauthenticated, but its predicate
+        # is pure over the PR payload shape, so the table covers every arm
+        # offline -- including the negative control, which asserts that a
+        # classifier with the exclusion veto removed lets vetoed PRs
+        # through. A table that cannot fail is indistinguishable from one
+        # that never ran.
+        run: python3 scripts/test_pr_scope.py
       - name: Run PR-overlap tests
         # Same reasoning as pr-sweep above: only the tests run here, since
         # pr-overlap.py queries the GitHub API via `gh`. Its classification,
@@ -157,6 +238,11 @@ jobs:
         # `batch-merge-and-resolve.md` warns about, and it is what the
         # hand-run prototype this script replaces actually had.
         run: python3 scripts/test_pr_overlap.py
+      - name: Run upload-skills tests
+        # Only the tests run here. upload_skills.sh itself requires a live
+        # workspace API key, so the offline test suite exercises change
+        # detection, deletion propagation, and state caching with mock curl.
+        run: python3 scripts/test_upload_skills.py
       - name: Run context-closure tests
         run: python3 scripts/test_check_context_closure.py
       - name: Run ai-session MWC grant tests
@@ -175,9 +261,18 @@ jobs:
         # with its subject AND flags any hook missing a test (ai-config#1080),
         # so a tested guard cannot regress and an untested one cannot hide.
         run: python3 scripts/test_hooks.py
+      - name: Run PreToolUse dry-run tests
+        # Tests --dry-run and simulation mode support across PreToolUse hooks offline (ai-config#2557).
+        run: python3 scripts/test_pretooluse_dry_run.py
       - name: Run Antigravity hook adapter tests
         # Tests the Antigravity lifecycle adapter and manifest translation in hermetic isolation.
         run: python3 scripts/test_agy_hook_adapter.py
+      - name: Run Aider hook adapter tests
+        # Tests Aider markdown history parsing, JSONL generation, and hook translation (ai-config#2659).
+        run: python3 scripts/test_aider_hook_adapter.py
+      - name: Run Codex hook adapter tests
+        # Tests Codex dispatch, matcher aliases, and canonical catalog reuse.
+        run: python3 scripts/test_codex_hook_adapter.py
       - name: Run Antigravity merge-gate tests
         # Verdict-parsing and merge-command gating for the Antigravity plugin's
         # enforce-mwc-review-gate.py, incl. the sparta#1427 regression (#2676).
@@ -231,17 +326,20 @@ jobs:
         run: python3 scripts/test_adversarial_reviewer_readonly_hedge.py
       - name: Measure the auto-loaded context closure (advisory) and gate its hard caps
         # The BUDGET half reports rather than gates, and deliberately so:
-        # the reasoning was that this repo sat far over the shipped budget
-        # (ai-config#897), so a blocking form would be red on every PR and
-        # would train everyone to ignore it -- the failure mode
+        # the original reasoning was that this repo sat far over the shipped
+        # budget (ai-config#897), so a blocking form would be red on every PR
+        # and would train everyone to ignore it -- the failure mode
         # algorithmatize-checks warns about.
         #
-        # That premise no longer holds. Measured 2026-08-29 PT: the closure is
-        # 184,016 bytes against the 200,000-byte budget, i.e. 0.92x. What
-        # recovered the headroom is NOT established here -- the closure also
-        # went from 74 files to 5, a structural change to what is auto-loaded
-        # rather than a prose trim -- so this states the measurement and makes
-        # no causal claim. Whether the check should now gate is ai-config#2636.
+        # That premise no longer holds. Measured 2026-08-31 PDT: the closure is
+        # 185,857 bytes across 6 files against the 200,000-byte budget, i.e. ~0.93x
+        # (ai-config#2636).
+        #
+        # The check remains advisory: the closure sits within ~7% of the budget
+        # (14,143 bytes of headroom), so gating the total on every PR risks
+        # flapping on legitimate doc changes. Crossing the soft target is a
+        # prompt for pruning or architectural restructure (ai-config#695),
+        # not a broken build on an unrelated PR.
         #
         # The root file's CHARACTER CAP is the exception, and gates without
         # --strict (ai-config#897, #1258). It is not our budget but the
@@ -318,15 +416,20 @@ jobs:
             exit 0
           fi
           python3 scripts/check-context-closure.py --baseline "$REV" || true
-      - name: Check for oversized memory files (advisory)
-        # Non-blocking (ai-config#695): memory files are read on demand, so
-        # length is a real per-use cost -- but crossing the threshold is a
-        # prompt to consider splitting, not a defect that should block an
-        # unrelated PR. See the script's docstring for the threshold's
-        # rationale.
-        run: python3 scripts/check-memory-file-size.py
+      - name: Check for oversized memory files
+        # ai-config#695, #2970: memory files are read on demand, so length is
+        # a real per-use cost. Gated strictly at 1250 lines in CI so the pre-push
+        # check and CI agree.
+        run: python3 scripts/check-memory-file-size.py --strict
       - name: Run stale-record check tests
         run: python3 scripts/test_check_stale_records.py
+      - name: Run bare-fragment-mention check tests
+        # ai-config#3034. The negative control: until the detector has been
+        # seen to produce a non-zero, a zero from the corpus scan below is not
+        # evidence of anything.
+        run: python3 scripts/test_check_bare_fragment_mentions.py
+      - name: Run backlog-triage instrument tests
+        run: python3 scripts/test_triage_backlog.py
       - name: Check for stale and orphaned records (advisory)
         # ai-config#1544. Non-blocking, and for two separate reasons.
         #
@@ -347,10 +450,36 @@ jobs:
         # NUMBERS in the log on each run, and specifically the orphan list,
         # which is a link-graph fact the shallow clone does not affect.
         run: python3 scripts/check-stale-records.py
+      - name: Check for bare fragment mentions (advisory)
+        # ai-config#3034. Non-blocking: the script's main() ends `return 0`
+        # unconditionally, so this step reports and cannot gate a PR.
+        #
+        # Advisory by construction rather than by choice. Whether a bare
+        # occurrence is a missing link or ordinary English is a judgment the
+        # corpus cannot settle -- names like `fail-fast` and `plain-prose`
+        # are both a fragment and a phrase -- so the exempt bucket reports
+        # the drops instead of the script guessing, and the findings are a
+        # reading prompt.
+        #
+        # The value is the numbers in the log on each run: a file that links
+        # a fragment once and then names it bare is the miss this corpus
+        # states in prose and, before this step, had no instrument for.
+        run: python3 scripts/check-bare-fragment-mentions.py
   lint-qmd:
     uses: Morrison-Lab/gha/.github/workflows/lint-qmd.yml@v2
 
   new-line-breaks:
+    # Only a pull_request event supplies a base to diff against. On a push
+    # run the action used to skip with a warning and conclude `success`, which
+    # on the PR page is indistinguishable from having run and passed
+    # (ai-config#1730: one PR showed a passing push run and a failing PR run
+    # at the same commit). Gating the job makes a push run report `skipped`
+    # instead. A pull_request run can still skip with the same warning when
+    # the diff cannot be computed (the action's own shallow-clone path), so
+    # this fixes the missing-base push status and nothing more.
+    # scripts/test_validate_workflow.py pins this guard and the base-ref
+    # expression below.
+    if: github.event_name == 'pull_request'
     # Diff-scoped, blocking (ai-config#682, ported to gha#300): MD013 is off
     # repo-wide (see .markdownlint-cli2.jsonc) because most of the corpus has
     # drifted from the last semantic-line-breaks reformat. This only flags
@@ -396,7 +525,7 @@ jobs:
           # the gate vacuous without turning anything red.
           fetch-depth: 0
       - name: Check new markdown lines for missing semantic breaks
-        uses: Morrison-Lab/gha/check-new-line-breaks@fdaeccc47273fb8c542d05b00d488242b8563b15 # v2, gha#300
+        uses: Morrison-Lab/gha/check-new-line-breaks@b91ecffc4db85baa2065c4ab2f0e7d25db74460f # v2, gha#826
         with:
           # This value is a git pathspec, not a shell glob: `*.md` already
           # matches at any depth (CLAUDE.md and shared/**/foo.md alike), while
@@ -408,12 +537,12 @@ jobs:
           # Quoted: a composite action's inputs are strings, unlike the
           # reusable workflow's typed `boolean`.
           fail: 'true'
-          # On PRs, check only lines added relative to the base; otherwise
-          # (push to main) there is no base to diff against, so the check
-          # skips cleanly instead of scanning the whole tree. This reproduces
-          # the expression the reusable workflow supplied, which is why no
-          # `if: github.event_name == 'pull_request'` guard is needed.
-          base-ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
+          # Lines added relative to the PR base. The job-level `if:` above
+          # already restricts this job to pull_request events, so the
+          # expression can name the base SHA directly; the action's own
+          # skip-with-a-warning path (no base ref) is no longer reachable
+          # from here.
+          base-ref: ${{ github.event.pull_request.base.sha }}
 
   lint-markdown:
     uses: Morrison-Lab/gha/.github/workflows/lint-markdown.yml@v2

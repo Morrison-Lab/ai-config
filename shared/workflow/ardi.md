@@ -151,9 +151,12 @@ When the timer fires:
 - If the reviewer failed, was canceled, skipped with no replacement (e.g. quota limit), or produced a stub review with no stated verdict: invoke self-review fallback per [`self-review-fallback.md`](self-review-fallback.md) rather than stalling the loop.
 - Otherwise, fix any underlying workflow or dispatch issues discovered along the way and schedule another timer to maintain continuous monitoring until a review lands, self-review fallback triggers, or CI completes.
 This applies transitively to PR-driving
-workflows such as `gi`, `gii`, and `ardia`; only monitor PRs the session owns or
-has explicitly claimed, so the rule does not authorize changing someone else's
-work.
+workflows such as `gi`, `gii`, and `ardia`;
+only monitor PRs that pass `memories/reviewing-prs.md`'s scope test
+(opened by or assigned to the invoking user, explicitly requested by name,
+or authored by the GitHub Actions app),
+so the rule does not authorize changing someone else's work,
+and a claim comment does not bring another member's PR into scope.
 
 The loop's terminal action is to **report the PR ready, not to merge it**.
 Merging is human-gated --- it happens only on an explicit human "merge it" (the
@@ -264,6 +267,121 @@ discovers a project's documented conventions --- self-apply them first.
 
 See [`ardi.cases.md`](ardi.cases.md), "A review round surfacing five findings
 your own conventions already covered".
+
+**Three or more review rounds that each returned findings is a question about
+the process, not about the PR.**
+When a PR has been through three finding-bearing rounds --- one reviewer
+returning findings three times over, or several reviewers disagreeing about
+whether it is clean --- ask whether the way you are working the PR is wrong, and
+act on the answer inside the same round.
+The issue that prompted this rule phrased the trigger as "without reaching a
+consensus of clean review verdicts".
+Read that as the reviewers agreeing the PR is clean, not as the per-item
+agreement between you and one reviewer that
+[`ardi`](../../skills/ardi/SKILL.md)'s deadlock rule calls consensus.
+
+Count only the rounds that raised a finding.
+A round that reads not-clean because the reviewer's own instrument reported its
+own check pending, rather than because it raised a finding, is not one of the
+three --- see [`fully-clean`](fully-clean.md)'s ai-config#2442 record, where
+three rounds produced one nit, one nit, and then nothing while the instrument
+reported not-clean in all three.
+
+This is not the round-count stopping guard.
+[`ardi`](../../skills/ardi/SKILL.md)'s "Stopping conditions" bans that guard and
+it stays banned, and so does
+[`address-every-comment`](address-every-comment.md)'s "a round count is never a
+reason to stop".
+Neither is displaced here: the count still licenses no stop, only a changed
+procedure.
+That guard asks the *user* whether to accept the current state, which hands
+triage back and stops the loop.
+This asks *you* whether the procedure that produced three finding-bearing
+rounds should change, and the loop keeps running either way.
+So the deliverable is a changed procedure, never a stop, and never a sentence
+ending "shall we accept the current state?".
+
+"Reflect on the process" decides nothing on its own, so examine three specific
+things:
+
+- **The local checks.**
+  The self-apply-your-conventions rule directly above already requires running
+  the project's own review skills against your own diff before every push.
+  The increment at round three is to name the one check that would have caught
+  *this* round's findings, and to run it from then on.
+- **The approach.**
+  Ask whether the diff itself is the problem rather than its defects --- too
+  large to review as a unit
+  ([`split-concerns`](../../skills/split-concerns/SKILL.md), sequenced with
+  [`stack-prs`](../../skills/stack-prs/SKILL.md)), built on a design that was
+  never settled ([`brainstorm`](../../skills/brainstorm/SKILL.md)), or solving a
+  problem the repo solves elsewhere
+  ([`prefer-upstream`](../../skills/prefer-upstream/SKILL.md)).
+  A round-three finding that contradicts a round-one fix is evidence for this
+  rather than for another fix.
+- **The independence of the reviewer.**
+  The pre-push checklist below already requires an `adversarial-reviewer`
+  subagent pass on every push, and that pass is same-family by construction.
+  The increment at round three is a *cross-family* round on top of it, never in
+  place of it.
+  A forge round is metered and slower than a local one --- the three rounds on
+  ai-config#2442 cost $4.60 between them, per
+  [`fully-clean`](fully-clean.md) --- so spend the forge round on what survives
+  the local one.
+  Dispatch in [`adversarial-self-review`](adversarial-self-review.md)'s
+  independence-and-availability order --- the `agy` CLI or
+  [`delegate-to-opencode`](../../skills/delegate-to-opencode/SKILL.md) first,
+  then [`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md) --- which
+  overrides the cost-first delegation order rather than expressing it.
+  A rung qualifies only when both its model and its harness differ from the
+  authoring session, and the dispatch waits rather than falling through to a
+  same-model or same-harness reviewer.
+  Route the `opencode` rung to an OpenCode Go tier or an OpenRouter stealth or
+  frontier id, since
+  [`delegate-to-opencode`](../../skills/delegate-to-opencode/SKILL.md)'s "When
+  NOT to delegate" section bars the hosted-free Zen ids from judgment-bearing
+  work.
+  `scripts/pre-push-review.py` defaults to `--engine auto`, whose chain starts
+  at `claude`, so name an engine rather than invoking it unqualified;
+  [`adv`](../../skills/adv/SKILL.md) already names one:
+  `--engine alternate --exclude-engine "$AGENT_NAME"`.
+
+Read the three rounds' findings together rather than round by round, because
+the classes are the evidence and no single round carries them.
+This is the loop-scale form of
+[`learn-from-review-findings`](learn-from-review-findings.md)'s "count the knob
+rather than the rounds" and of
+[`address-every-comment`](address-every-comment.md)'s growth-rate check, applied
+to the procedure that produced the rounds rather than to one finding's class.
+One recurring class is evidence for a missing local check *or* for a missing
+generalization: ai-config#1777's three rounds of one class resolved to a writing
+rule rather than to a check, per
+[`metacognitive-monitoring`](metacognitive-monitoring.md).
+Three rounds of unrelated classes point at the approach instead.
+
+- **Do:** at the third finding-bearing round and at every later one, name the
+  check, the reviewer, or the change of approach that would have caught this
+  round's findings before the push, and apply it in the same round.
+- **Do:** at that round, escalate the *independence* of the pre-push review
+  already required below, dispatching a different model family through a CLI
+  rather than repeating the same-family pass.
+- **Don't:** turn the count into a question to the user about whether to
+  accept unaddressed findings --- that is the stopping guard, and it is still
+  banned.
+- **Don't:** read the cross-family round as where local review begins;
+  [`adversarial-self-review`](adversarial-self-review.md) requires a local pass
+  on every push, from the first.
+- **Don't:** report having considered the process when nothing about the next
+  round changed;
+  the round count is a prompt to change something, not a step to record.
+
+(Directive from the user, 2026-09-03: "if a PR has gone through three or more
+reviews without reaching a consensus of clean review verdicts, consider if
+we're doing something wrong", asking whether more local checks belong before
+the push, whether the whole approach is wrong, and whether cheap or free
+models run through CLIs could give a rough preliminary review before a more
+expensive forge review.
+Tracked as ai-config#3110.)
 
 ### Pre-push checklist
 
@@ -826,7 +944,11 @@ is never in your diff --- so grep for it rather than expecting to be reminded.**
   at the sentence saying someone already did.
 
 - **Do:** grep the repository for the defect, the workaround, and the behaviour
-  you changed, before calling a fix complete.
+  you changed, before calling a fix complete --- after **every round's** fix on
+  a PR under review, since a fix made mid-review stales prose of its own and
+  the next round's fix regenerates it (see
+  [`ardi.cases.md`](ardi.cases.md), "Prose staled by its own fixes, round after
+  round").
 - **Do:** mark a superseded entry as history and name the change that ended it,
   rather than deleting it, when the old behaviour still explains other text.
 - **Don't:** treat a clean grep over the diff as coverage --- the stale prose is
@@ -855,6 +977,17 @@ the tool broadly does.**
 **A regression test written alongside a fix can lock the bug in rather than
 catch it --- assert the two paths that diverge, not the one you just
 touched.**
+
+**And when you mutation-test the fix (revert it, expect the test to fail),
+confirm the test actually EXECUTED under the reverted state, not just that
+its failure count stayed at zero.**
+Identical before/after counts are not reassurance --- an identically-zero
+`FAILED` line is what a test that never ran and a test that ran and passed
+both print.
+Check for `ERROR`/`SKIP` on the specific test in the reverted run before
+reading a matching count as "the guard doesn't need this fix".
+See [`ardi.cases.md`](ardi.cases.md), "A mutation test whose reverted run
+never reached its assertion".
 
 **A systematic audit done by skimming is worse than the one-at-a-time
 version it replaces.**

@@ -239,6 +239,25 @@ Details: [references/citations.md](references/citations.md)
 
 ## Common Workflows
 
+### Rendering and Previewing Documents
+
+Run standard Quarto CLI commands to render, preview, and inspect documents:
+
+```bash
+# Render a single document to HTML or PDF
+quarto render document.qmd --to html
+quarto render document.qmd --to pdf
+
+# Live preview in browser with automatic reload on save
+quarto preview document.qmd
+
+# Render the entire project or book
+quarto render
+
+# Check Quarto installation, dependencies, and environment
+quarto check
+```
+
 ### Creating an HTML Document
 
 ```yaml

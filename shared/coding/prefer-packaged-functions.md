@@ -1,4 +1,4 @@
-Before writing a function, **look for an existing packaged one that already
+Before writing a function, **perform a research step to look for an existing packaged one that already
 does the job** --- and prefer it over rolling your own:
 
 - Check, roughly in this order: base R and the **tidyverse / r-lib** packages,

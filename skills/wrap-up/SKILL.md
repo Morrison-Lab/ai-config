@@ -37,8 +37,8 @@ your model's tool via [`tool-mappings.md`](../../tool-mappings.md) instead of
 the `gh` command shown if this session doesn't have `gh`:
 
 ```bash
-gh pr list --state open --json number,title,headRefName,author,mergeable,mergeStateStatus,comments \
-  --jq '.[] | "#\(.number) [\(.author.login)] \(.title) [\(.mergeable)]"'   # LIST_PRS
+gh pr list --state open --json number,title,headRefName,author,assignees,mergeable,mergeStateStatus,comments \
+  --jq '.[] | "#\(.number) \(.headRefName) [\(.author.login); assignees: \([.assignees[].login] | join(","))] \(.title) [\(.mergeable)]"'   # LIST_PRS
 gh issue list --state open --json number,title --jq '.[] | "#\(.number) \(.title)"'   # LIST_ISSUES
 git status --short                         # uncommitted work?
 git worktree list                          # leftover worktrees (agent isolation / session-lock)?
@@ -51,10 +51,14 @@ git log --oneline -5 origin/main           # what actually landed on main
   by the user, and vice-versa.
 - If the session touched **other repos** (e.g. an upstream dependency),
   check those too — `gh pr list --repo <owner>/<repo> --state open
-  --json number,title,headRefName,author,mergeable,mergeStateStatus,comments`
+  --json number,title,headRefName,author,assignees,mergeable,mergeStateStatus,comments`
   (`LIST_PRS`).
 - **Merge conflict sweep.** Before closing out, check every open PR's
-  `mergeable` field. For each PR with `mergeable == "CONFLICTING"` **or
+  `mergeable` field.
+  Filter the list by `memories/reviewing-prs.md`'s scope test first, as
+  `ardia` step 1 does; report an out-of-scope conflicting PR to the user and
+  leave it untouched (no comment, no push).
+  For each in-scope PR with `mergeable == "CONFLICTING"` **or
   `"UNKNOWN"`** (see `resolve-conflicts`, "Verify before you act" —
   `UNKNOWN` can mean GitHub hasn't finished computing yet), verify with
   `git merge-tree --write-tree origin/main origin/<branch>` (git ≥ 2.38) before acting,
@@ -129,6 +133,15 @@ reference, not a confirmation.
 - **Clean stopping point reached** (nothing open or pending) — end with an explicit stopping-point statement, e.g. `**Stopping Point**: Clean stopping point reached` ("This session is at a good stopping point."). A silent trailing summary leaves the user unsure whether you're actually done or just paused.
 - **Not a clean stopping point** (something open or in flight) — an ambiguous review item, a deadlock needing a human reviewer, pending CI/review jobs, unmerged PRs, or a choice only the user can make — state explicitly `**Stopping Point**: Not a clean stopping point — [reason/open items]`, and end the reply **with the open question(s) / pending tasks**, last and clearly visible.
 
+## Proactive hook compliance
+
+Active Stop hooks validate the close-out response (see [`memories/hooks.md`](../../memories/hooks.md)):
+- **`require-stopping-point.py`**: Conclude with an explicit stopping-point statement (`**Stopping Point**: Clean stopping point reached` or `**Stopping Point**: Not a clean stopping point --- [reason]`).
+- **`no-unmeasured-clock-claim.py`**: Execute `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"` fresh before including timestamps in recaps.
+- **`no-empty-promise.py`**: Any commitments made in the wrap-up must ship their mechanism in the same turn or arm an explicit timer.
+- **`no-offer-to-file.py` & `no-unfiled-finding.py`**: File deferred issues or update memories directly in the same turn instead of offering to do so.
+- **`flag-cop-out-offer.py`**: Avoid ending the recap on an open offer for already-authorized tasks.
+- **`no-placeholder-reply.py`**: Deliver a complete, substantive closing report.
 
 ## Relationship to other skills
 

@@ -35,7 +35,10 @@ import sys
 # That direction is a false NEGATIVE -- the guard would wave the command
 # through -- which is worse here than the false positive the anchor was added
 # to fix.
-LEAD = r"""^\s*(?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S*)\s+)*gh\s+"""
+# Keywords and wrappers whose operand is itself a command word at command position.
+KEYWORD_PREFIX = r"""(?:(?:!|\{|time|nohup|sudo|then|else|do|if|elif|while|until)\s+)*"""
+ENV_WRAP = r"""(?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S*)\s+)*"""
+LEAD = r"""^\s*""" + KEYWORD_PREFIX + ENV_WRAP + r"""gh\s+"""
 
 GATED = [
     (LEAD + r"secret\s+(set|delete|remove)\b", "gh secret set/delete"),
@@ -68,12 +71,429 @@ HAS_REPO_FLAG = re.compile(
     r"(^|\s)(-R\b|--repo(=|\s)|-o\b|--org(=|\s)|-u\b|--user\b)"
 )
 
-# Split on shell operators so `cd x && gh secret set Y` is judged per segment.
-SPLIT = re.compile(r"&&|\|\||;|\||\n")
+# Match heredoc openers: `<<`, `<<-`, `<<~` followed by quoted, backslash-escaped,
+# or bare word delimiter.
+HEREDOC_OPEN = re.compile(
+    r"""(?<!<)[0-9]*<<([-~]?)[ \t]*(?:'([^']+)'|"([^"]+)"|\\([^\s;|&<>()]+)|([A-Za-z_][A-Za-z0-9_\-]*))"""
+)
+
+
+
+def split_command(command: str) -> list[str]:
+    """Split a shell command into executable segments, respecting quotes and subshells."""
+    segments = []
+    current = []
+    stack = ["ROOT"]
+    escaped = False
+    i = 0
+    n = len(command)
+
+    while i < n:
+        c = command[i]
+
+        if escaped:
+            current.append(c)
+            escaped = False
+            i += 1
+            continue
+
+        top = stack[-1]
+
+        if top == "SINGLE_QUOTE":
+            if c == "'":
+                stack.pop()
+            current.append(c)
+            i += 1
+            continue
+
+        if c == "\\" and top != "SINGLE_QUOTE":
+            escaped = True
+            current.append(c)
+            i += 1
+            continue
+
+        if top == "DOUBLE_QUOTE":
+            if c == '"':
+                stack.pop()
+                current.append(c)
+                i += 1
+                continue
+            if c == "$" and i + 1 < n and command[i + 1] == "(":
+                seg = "".join(current).strip()
+                if seg:
+                    segments.append(seg)
+                current = []
+                stack.append("COMMAND_SUBST")
+                i += 2
+                continue
+            if c == "`":
+                seg = "".join(current).strip()
+                if seg:
+                    segments.append(seg)
+                current = []
+                stack.append("BACKTICK")
+                i += 1
+                continue
+            current.append(c)
+            i += 1
+            continue
+
+        # top is ROOT, PAREN, COMMAND_SUBST, or BACKTICK
+        if c == "'":
+            stack.append("SINGLE_QUOTE")
+            current.append(c)
+            i += 1
+            continue
+
+        if c == '"':
+            stack.append("DOUBLE_QUOTE")
+            current.append(c)
+            i += 1
+            continue
+
+        if c == "$" and i + 1 < n and command[i + 1] == "(":
+            seg = "".join(current).strip()
+            if seg:
+                segments.append(seg)
+            current = []
+            stack.append("COMMAND_SUBST")
+            i += 2
+            continue
+
+        if c == "`":
+            if top == "BACKTICK":
+                seg = "".join(current).strip()
+                if seg:
+                    segments.append(seg)
+                current = []
+                stack.pop()
+                i += 1
+                continue
+            else:
+                seg = "".join(current).strip()
+                if seg:
+                    segments.append(seg)
+                current = []
+                stack.append("BACKTICK")
+                i += 1
+                continue
+
+        if c == "(":
+            seg = "".join(current).strip()
+            if seg:
+                segments.append(seg)
+            current = []
+            stack.append("PAREN")
+            i += 1
+            continue
+
+        if c == ")":
+            seg = "".join(current).strip()
+            if seg:
+                segments.append(seg)
+            current = []
+            if top in ("PAREN", "COMMAND_SUBST"):
+                stack.pop()
+            i += 1
+            continue
+
+        # 2-char operators: &&, ||, |&, ;;
+        if i + 1 < n and command[i:i + 2] in ("&&", "||", "|&", ";;"):
+            seg = "".join(current).strip()
+            if seg:
+                segments.append(seg)
+            current = []
+            i += 2
+            continue
+
+        # 1-char operators / delimiters: ;, |, \n
+        if c in (";", "|", "\n"):
+            seg = "".join(current).strip()
+            if seg:
+                segments.append(seg)
+            current = []
+            i += 1
+            continue
+
+        # Standalone & (background operator, not part of &>, >&, or 2>&1)
+        if c == "&":
+            prev_char = command[i - 1] if i > 0 else ""
+            next_char = command[i + 1] if i + 1 < n else ""
+            if prev_char == ">" or next_char == ">":
+                current.append(c)
+                i += 1
+                continue
+            seg = "".join(current).strip()
+            if seg:
+                segments.append(seg)
+            current = []
+            i += 1
+            continue
+
+        current.append(c)
+        i += 1
+
+    seg = "".join(current).strip()
+    if seg:
+        if stack[-1] in ("SINGLE_QUOTE", "DOUBLE_QUOTE"):
+            for fallback_seg in re.split(r"(?:&&|\|\||[;&|\n])", seg):
+                s = fallback_seg.strip().strip("'\"")
+                if s:
+                    segments.append(s)
+        else:
+            segments.append(seg)
+
+    return segments
+
+
+def mask_comments_and_arithmetic(command: str) -> str:
+    """Mask comments, strings (preserving heredoc openers & command substitutions), and arithmetic expansions."""
+    out = []
+    stack = ["ROOT"]
+    escaped = False
+    i = 0
+    n = len(command)
+
+    while i < n:
+        c = command[i]
+        top = stack[-1]
+
+        if escaped:
+            escaped = False
+            out.append(c)
+            i += 1
+            continue
+
+        if c == "\\" and top != "SINGLE_QUOTE":
+            escaped = True
+            out.append(c)
+            i += 1
+            continue
+
+        if top == "SINGLE_QUOTE":
+            if c == "'":
+                stack.pop()
+                out.append(c)
+            else:
+                out.append("\n" if c == "\n" else " ")
+            i += 1
+            continue
+
+        if top == "DOUBLE_QUOTE":
+            if c == '"':
+                stack.pop()
+                out.append(c)
+                i += 1
+                continue
+            if c == "$" and command.startswith("$((", i):
+                start = i
+                i += 3
+                depth = 2
+                sub_sq = False
+                sub_dq = False
+                sub_escaped = False
+                while i < n and depth > 0:
+                    sc = command[i]
+                    if sub_escaped:
+                        sub_escaped = False
+                        i += 1
+                        continue
+                    if sc == "\\":
+                        sub_escaped = True
+                        i += 1
+                        continue
+                    if sc == "'" and not sub_dq:
+                        sub_sq = not sub_sq
+                    elif sc == '"' and not sub_sq:
+                        sub_dq = not sub_dq
+                    elif not sub_sq and not sub_dq:
+                        if sc == "(":
+                            depth += 1
+                        elif sc == ")":
+                            depth -= 1
+                    i += 1
+                span = command[start:i]
+                for sc in span:
+                    out.append("\n" if sc == "\n" else " ")
+                continue
+            if c == "$" and command.startswith("$[", i):
+                start = i
+                i += 2
+                depth = 1
+                while i < n and depth > 0:
+                    if command[i] == "[":
+                        depth += 1
+                    elif command[i] == "]":
+                        depth -= 1
+                    i += 1
+                span = command[start:i]
+                for sc in span:
+                    out.append("\n" if sc == "\n" else " ")
+                continue
+            if c == "$" and i + 1 < n and command[i + 1] == "(":
+                stack.append("COMMAND_SUBST")
+                out.append("$(")
+                i += 2
+                continue
+            if c == "`":
+                stack.append("BACKTICK")
+                out.append("`")
+                i += 1
+                continue
+            out.append("\n" if c == "\n" else " ")
+            i += 1
+            continue
+
+        # top is ROOT, PAREN, COMMAND_SUBST, or BACKTICK
+        if c == "#" and (i == 0 or command[i - 1] in " \t\r\n;|&()<>"):
+            while i < n and command[i] != "\n":
+                out.append(" ")
+                i += 1
+            continue
+
+        if command.startswith("$((", i) or command.startswith("((", i):
+            is_subst = command.startswith("$((", i)
+            start = i
+            i += 3 if is_subst else 2
+            depth = 2
+            sub_sq = False
+            sub_dq = False
+            sub_escaped = False
+            while i < n and depth > 0:
+                sc = command[i]
+                if sub_escaped:
+                    sub_escaped = False
+                    i += 1
+                    continue
+                if sc == "\\":
+                    sub_escaped = True
+                    i += 1
+                    continue
+                if sc == "'" and not sub_dq:
+                    sub_sq = not sub_sq
+                elif sc == '"' and not sub_sq:
+                    sub_dq = not sub_dq
+                elif not sub_sq and not sub_dq:
+                    if sc == "(":
+                        depth += 1
+                    elif sc == ")":
+                        depth -= 1
+                i += 1
+            span = command[start:i]
+            for sc in span:
+                out.append("\n" if sc == "\n" else " ")
+            continue
+
+        if command.startswith("$[", i):
+            start = i
+            i += 2
+            depth = 1
+            while i < n and depth > 0:
+                if command[i] == "[":
+                    depth += 1
+                elif command[i] == "]":
+                    depth -= 1
+                i += 1
+            span = command[start:i]
+            for sc in span:
+                out.append("\n" if sc == "\n" else " ")
+            continue
+
+        if c == "'":
+            stack.append("SINGLE_QUOTE")
+            out.append(c)
+            i += 1
+            continue
+
+        if c == '"':
+            stack.append("DOUBLE_QUOTE")
+            out.append(c)
+            i += 1
+            continue
+
+        if c == "$" and i + 1 < n and command[i + 1] == "(":
+            stack.append("COMMAND_SUBST")
+            out.append("$(")
+            i += 2
+            continue
+
+        if c == "`":
+            if top == "BACKTICK":
+                stack.pop()
+            else:
+                stack.append("BACKTICK")
+            out.append("`")
+            i += 1
+            continue
+
+        if c == "(":
+            stack.append("PAREN")
+            out.append(c)
+            i += 1
+            continue
+
+        if c == ")":
+            if top in ("PAREN", "COMMAND_SUBST"):
+                stack.pop()
+            out.append(c)
+            i += 1
+            continue
+
+        out.append(c)
+        i += 1
+
+    return "".join(out)
+
+
+def strip_heredocs(command: str) -> str:
+    """Drop heredoc body lines and delimiters so interior text is not scanned as commands."""
+    # Mask arithmetic expansions and comments across the whole command before parsing openers,
+    # preserving line breaks so line counts stay synchronized.
+    command_for_openers = mask_comments_and_arithmetic(command)
+    lines_orig = command.split("\n")
+    lines_masked = command_for_openers.split("\n")
+
+    out = []
+    pending_heredocs = []  # list of (delim: str, is_tab_strip: bool)
+    current_heredoc_buffer = []
+
+    for orig_line, masked_line in zip(lines_orig, lines_masked):
+        if pending_heredocs:
+            delim, is_tab_strip = pending_heredocs[0]
+            clean_line = orig_line.rstrip("\r")
+            if is_tab_strip:
+                # <<- strips leading tabs (and spaces for robustness)
+                matched = (clean_line.lstrip("\t ") == delim)
+            else:
+                matched = (clean_line == delim)
+            if matched:
+                pending_heredocs.pop(0)
+                current_heredoc_buffer.clear()
+            else:
+                current_heredoc_buffer.append(orig_line)
+            continue
+
+        out.append(orig_line)
+        for m in HEREDOC_OPEN.finditer(masked_line):
+            rest = masked_line[m.end():]
+            if re.match(r"^\s*\)\)", rest):
+                continue
+            strip_flag = m.group(1)
+            orig_m = HEREDOC_OPEN.search(orig_line, pos=m.start())
+            delim = (orig_m.group(2) or orig_m.group(3) or orig_m.group(4) or orig_m.group(5)) if orig_m else (m.group(2) or m.group(3) or m.group(4) or m.group(5))
+            if delim:
+                pending_heredocs.append((delim, bool(strip_flag)))
+
+    # If any heredocs were left unclosed at EOF, keep their buffered lines (fail-safe)
+    if pending_heredocs:
+        out.extend(current_heredoc_buffer)
+
+    return "\n".join(out)
 
 
 def offending(command: str):
-    for segment in SPLIT.split(command):
+    command_scannable = strip_heredocs(command)
+    for segment in split_command(command_scannable):
         if "gh" not in segment:
             continue
         if HAS_REPO_FLAG.search(segment):
@@ -86,11 +506,34 @@ def offending(command: str):
     return None
 
 
-def main() -> int:
+def _read_payload() -> tuple[dict, bool]:
+    """Parse payload from sys.argv (--dry-run / --simulate) or sys.stdin."""
+    args = sys.argv[1:]
+    is_dry_run = "--dry-run" in args or "--simulate" in args
+    if is_dry_run:
+        positional = [a for a in args if not a.startswith("-")]
+        if positional:
+            raw_cmd = positional[0].strip()
+            if raw_cmd.startswith("{") and raw_cmd.endswith("}"):
+                try:
+                    return json.loads(raw_cmd), True
+                except Exception:
+                    pass
+            return {"tool_name": "Bash", "tool_input": {"command": raw_cmd}}, True
+
     try:
         payload = json.load(sys.stdin)
-    except Exception as exc:  # fail open, but say so
-        print(f"require-gh-repo-flag: unreadable hook input ({exc})", file=sys.stderr)
+        return (payload if isinstance(payload, dict) else {}), is_dry_run
+    except Exception as exc:
+        print(f"require-gh-repo-flag: unreadable hook input ({exc})",
+
+              file=sys.stderr)
+        return {}, is_dry_run
+
+
+def main() -> int:
+    payload, is_dry_run = _read_payload()
+    if not payload:
         return 0
 
     if payload.get("tool_name") not in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
@@ -100,6 +543,8 @@ def main() -> int:
     command = inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or inp.get("script") or ""
     hit = offending(command)
     if not hit:
+        if is_dry_run:
+            print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
         return 0
 
     label, segment = hit

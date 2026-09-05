@@ -116,6 +116,14 @@ Not wanting another PR is a preference, and a preference does not license the an
 - **Don't:** defer a pass to keep the open-PR count down, or until an unrelated PR merges.
 - **Don't:** treat "I will write it once #N lands" as a commitment --- it is the announced-and-never-run failure with a due date attached.
 
+**"Don't start a new wave" is the same deferral wearing an instruction, and the instruction does not say what it is read to say.**
+A `gii`/`gia` wave boundary, or a "finish the current wave but don't start a new one" from the user, caps *issue grabs*.
+A UMS pass is not a grab: it records what the wave taught, and it is owed at the wave's own clean verdicts and merges by the bullets above.
+So the pass runs, and its PR opens, inside the cap --- see [`gii`](../../skills/gii/SKILL.md)'s "A UMS pass is not a new wave" paragraph, which carries the user's directive.
+
+- **Do:** run the owed pass under a no-new-wave instruction, exactly as under no instruction.
+- **Don't:** hold the pass until the next wave is authorized, on the reading that its PR would be a new wave.
+
 **Correcting your own understanding of a technical issue is itself a trigger, and it fires immediately rather than at the next checkpoint.**
 Every trigger above is an event in the *work*: a verdict lands, a PR merges, a poll reports a merge, a stopping point gets proposed.
 This one is an event in what you *believe*, and it leaves no artifact behind.
@@ -207,6 +215,27 @@ then any critical feedback,
 then every time your work or your claims are questioned,
 then the worked example that questioning triggers UMS if the claim was wrong.
 Tracked as [ai-config#2261](https://github.com/Morrison-Lab/ai-config/issues/2261).)
+
+**Every pause is a UMS trigger, whatever the session is waiting for.**
+Most triggers above name something that *happened* --- a verdict landed, a PR merged, a claim turned out false, a review arrived --- and the one that does not, recommending that the session end, names the most final pause there is rather than an ordinary mid-session wait.
+So read the pause as the general rule, that section as its terminal case, and the event triggers as the ones that fire even when no pause follows.
+
+A pause leaves the session's learnings held only in conversation state, and that is where they are most exposed, because a wait's length is not knowable when it begins --- a review round can take minutes or days --- and it is the likeliest point for compaction, a `/clear`, or a session nobody resumes.
+[`flag-session-boundaries`](flag-session-boundaries.md)'s "Arm resumption before every non-clean pause" section already obliges a wake mechanism at that same moment;
+this obliges the pass alongside it.
+
+The pass is owed by accumulated learnings rather than by the number of waits: `CLAUDE.md`'s ["Monitor every pushed PR head to completion"](../../CLAUDE.md) re-arms a poll on a short timer (120s in its own example), and posing decisions one at a time ends one turn per queued question, so run it at the first pause and again only once new learnings accumulate.
+The near-miss runs the other way --- a first wait that looks too short to count, or one waiting on the very trigger a rule above names, such as a CI run whose verdict will itself be a checkpoint.
+Deferring the pass to when the wait ends is the announced-and-never-run failure with a due date attached, since the resumption may land in a different session or never come.
+
+- **Do:** run the pass before ending a turn to wait on CI, a review, or an answer from the user, whenever learnings have accumulated since the last pass.
+- **Do:** run it at the first pause, whether the waits that follow are a monitoring loop's re-arms or a run of separately posed questions.
+- **Don't:** re-run it at a second consecutive pause that has learned nothing since the first, which across a multi-hour poll spends more than it records.
+- **Don't:** defer the pass to when the wait ends, on the reading that the resumption will carry it.
+- **Don't:** treat a routine-looking first wait as too small to be a boundary.
+
+(Directive from the user, filed 2026-09-01 as [ai-config#2905](https://github.com/Morrison-Lab/ai-config/issues/2905):
+"if you're about to pause and wait for external triggers (CI, reviews, user input), always run ums first".)
 
 **Folding or pruning a finished record is a step of the pass, and which records are outstanding is a link-graph fact rather than something you remember.**
 `CLAUDE.md`'s ["Keep a running on-disk session lab notebook"](../../CLAUDE.md) section already names the moment: fold a finished notebook into durable memory, or prune it, during UMS once its content is captured elsewhere.

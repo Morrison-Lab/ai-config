@@ -7,7 +7,9 @@ jeremylongshore/claude-code-plugins-plus-skills (`validate-skills-schema.py`).
 No source was copied; see CREDITS.md.
 
 Checks:
-  * every skills/<name>/ has a SKILL.md with parseable YAML frontmatter
+  * every skills/<name>/ has a SKILL.md with parseable YAML frontmatter,
+    except a skills-directory plugin (a .claude-plugin/plugin.json and no
+    SKILL.md), whose manifest must name its directory
   * frontmatter has non-empty `name` and `description`
   * `name` matches the directory name
   * `user-invocable` (if present) is a bool
@@ -32,7 +34,7 @@ from pathlib import Path
 try:
     import yaml
 except ImportError:  # pragma: no cover
-    sys.exit("validate-skills: PyYAML is required — run `pip install pyyaml`.")
+    sys.exit("validate-skills: PyYAML is required --- run `pip install pyyaml`.")
 
 ROOT = Path(__file__).resolve().parent.parent
 errors: list[str] = []
@@ -70,7 +72,15 @@ MARKETPLACE_DESCRIPTION_LIMIT = 1024
 # directories are the obvious candidates, being a second listing entry apiece
 # for a skill already listed; ai-config#1852 tracks that work. If routing
 # quality degrades before then, this number comes back down rather than up.
-SKILL_LISTING_BUDGET_CHARS = 9_000
+#
+# Stepped again 2026-09-03 (ai-config#2928). The 9,000 step lasted about two
+# weeks: the catalog reached 7 characters of headroom, so the next skill added
+# anywhere in the repo was blocked with nothing wrong in it -- the same failure
+# the 8,000 cap produced. 9,400 is the same deliberately modest step, restoring
+# about nine entries of runway rather than a comfortable cushion, so the
+# catalog's growth stays visible. It buys time again and still does not fix the
+# cause; #1852 remains the lever that scales.
+SKILL_LISTING_BUDGET_CHARS = 9_400
 LISTING_ENTRY_OVERHEAD_CHARS = 8
 
 # How close to the cap counts as "nearly spent", expressed in ENTRIES rather
@@ -101,6 +111,33 @@ def parse_frontmatter(text: str, where: str):
         errors.append(f"{where}: frontmatter is not a mapping")
         return None
     return data
+
+
+def is_skills_dir_plugin(child: Path) -> bool:
+    """A `skills/<name>/` with a plugin manifest and no SKILL.md is a plugin.
+
+    Claude Code loads such a folder in place as `<name>@skills-dir` (with its
+    own hooks, agents, and skills) rather than as one skill, so it carries no
+    SKILL.md of its own. `skills/ai-config-hooks/` is the one in this repo
+    (ai-config#2004).
+    """
+    return ((child / ".claude-plugin" / "plugin.json").is_file()
+            and not (child / "SKILL.md").exists())
+
+
+def check_skills_dir_plugin(plugin_dir: Path) -> None:
+    manifest = plugin_dir / ".claude-plugin" / "plugin.json"
+    rel = manifest.relative_to(ROOT)
+    try:
+        data = json.loads(manifest.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        errors.append(f"{rel}: invalid JSON ({exc})")
+        return
+    if data.get("name") != plugin_dir.name:
+        errors.append(f"{rel}: name {data.get('name')!r} != directory "
+                      f"{plugin_dir.name!r}")
+    if not data.get("description"):
+        errors.append(f"{rel}: empty description")
 
 
 def check_skill(skill_dir: Path) -> None:
@@ -221,11 +258,17 @@ def check_skills() -> None:
         warnings.append("no skills/ directory")
         return
     count = 0
+    plugins = 0
     for child in sorted(skills_dir.iterdir()):
-        if child.is_dir() and not child.name.startswith("."):
-            count += 1
-            check_skill(child)
-    print(f"  checked {count} skills")
+        if not child.is_dir() or child.name.startswith("."):
+            continue
+        if is_skills_dir_plugin(child):
+            plugins += 1
+            check_skills_dir_plugin(child)
+            continue
+        count += 1
+        check_skill(child)
+    print(f"  checked {count} skills, {plugins} skills-directory plugins")
     check_listing_budget(sorted(skills_dir.glob("*/SKILL.md")), "skills/")
 
 
@@ -233,7 +276,7 @@ TOKEN_PATTERN = re.compile(r"`([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)`")
 
 # Backtick-wrapped ALL_CAPS_WITH_UNDERSCORE tokens already in skill prose for
 # reasons unrelated to the tool-mappings.yml abstract-operation-token pilot
-# (ai-config#195) — env vars, git refs, API constants. Not every such token is
+# (ai-config#195) --- env vars, git refs, API constants. Not every such token is
 # meant to resolve via the registry, so they're exempted rather than flagged.
 NON_OPERATION_TOKENS = {
     # env var: names a session to ai-session.sh, and is where
@@ -247,6 +290,7 @@ NON_OPERATION_TOKENS = {
     "CLAUDE_PROJECT_DIR",  # env var, one of the roots the .mwc marker is resolved from
     "CLAUDE_SESSION_ID",  # env var, the harness's own session id; AI_SESSION_ID's fallback
     "ENTITY_NUMBER",
+    "MORATORIUM_END",  # hooks/no-unreviewed-pr.py constant, not an operation token
     "EPI202_TOKEN",
     "ERR_TUNNEL_CONNECTION_FAILED",
     "GEMINI_API_KEY",
@@ -260,6 +304,11 @@ NON_OPERATION_TOKENS = {
     "OPENROUTER_API_KEY",
     "PROJECT_ID",
     "PR_NUMBER",
+    # env vars: the chores skill's scope inputs (aliases of the invoking user,
+    # PR numbers named in the request), per memories/reviewing-prs.md
+    "PR_SCOPE_ALIASES",
+    "PR_SCOPE_EXCLUDED",
+    "PR_SCOPE_REQUESTED",
     "REBASE_HEAD",
     "REVERT_HEAD",
     "R_LIBS_USER",

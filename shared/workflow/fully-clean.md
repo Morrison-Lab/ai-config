@@ -3,11 +3,21 @@ A GitHub PR is **fully clean** when **both** of these hold, verified via `python
 For a GitLab MR, establish the same criteria from GitLab's current-head pipeline, review, and discussion APIs;
 `check-pr-fully-clean.py` queries GitHub and cannot verify a GitLab MR.
 
+**Active monitoring and polling are required after every push until fully clean.**
+Reaching fully clean requires an active polling loop or scheduled wake mechanism after each push.
+Do not pause passively or assume check runs and reviews will complete without polling.
+Actively query the current head's CI/pipeline runs and review verdicts (`gh` for GitHub, `glab` for GitLab) until each round reaches a terminal state, re-arming the poll while work remains.
+
+- **Do:** actively poll and re-arm monitoring after every push until CI and review reach a terminal state at the current head.
+- **Don't:** stop polling while CI or reviews are in flight, or assume automated pipelines completed without querying the forge.
+
 **A forge's `mergeable` result is an integration-state signal, not a review verdict.**
 It can be true while a reviewer has left resolvable findings open.
 Do not report a PR/MR fully clean, ready to merge, or merge it until the review thread sweep is also clear.
 
-- **Do:** for a GitLab MR, page through `projects/<project>/merge_requests/<iid>/discussions` and confirm that every resolvable note with an actionable finding is resolved before reporting it fully clean.
+- **Do:** for a GitLab MR, page through `projects/<project>/merge_requests/<iid>/notes` and confirm that every resolvable, actionable `DiffNote` is resolved before reporting it fully clean.
+  The notes endpoint is authoritative because it can expose unresolved diff notes absent from a discussion-level sweep;
+  use `discussions` to resolve the thread after finding it.
 - **Do:** for a GitLab MR, obtain the current head SHA and page through every pipeline on that SHA;
   confirm each has completed successfully or was skipped.
 - **Do:** accept a GitLab review verdict as current-head evidence only when its body names that SHA or its diff discussion has `position.head_sha` equal to it;
@@ -22,6 +32,69 @@ Do not report a PR/MR fully clean, ready to merge, or merge it until the review 
   findings can appear in an overall review note without a resolvable discussion.
 - **Don't:** let an earlier review's green pipeline or later code push erase an unresolved finding without a reviewer-confirmed clean round.
 
+**Finding a cause for an aggregate rollup signal is not finding all of its causes, and a satisfied explanation is what stops you looking for a second one.**
+`mergeable_state: unstable` (GitHub) or a comparable aggregate integration
+signal is a single value computed from several independent inputs --- a
+pending status check, a stale branch, an unresolved review, more than one
+provider's own required-checks list.
+Chasing it down to one genuine, checkable cause (a pending third-party
+status, say) explains the value completely from the inside: the signal was
+`unstable`, a cause was found, the cause was real, and the reasoning closes.
+Nothing about that chain tests whether it was the *only* input, because a
+rollup does not report which of its several inputs are currently non-passing,
+only that at least one is.
+
+- **Do:** after explaining an aggregate signal with one confirmed cause, ask
+  what else the same rollup can mean before treating it as accounted for ---
+  and re-derive the rollup once the confirmed cause clears, rather than
+  reading its earlier `unstable` reading as now resolved.
+- **Don't:** read "I found a cause for this and it checks out" as "I found
+  the cause" for a value that is, by construction, an aggregate of several
+  independent signals.
+
+(Morrison-Lab/ai-config#3084, 2026-09-03: `mergeable_state: unstable` was
+chased to a pending `jules/review` commit status, which was real and
+correctly diagnosed.
+When that status cleared, `unstable` was treated as explained and the PR was
+merged.
+A Copilot formal review carrying a real, unaddressed finding --- posted to
+the PR's `reviews` list, not as an inline thread --- had submitted on the
+exact head that merged, 4 minutes 47 seconds earlier, and was never read: the
+pre-merge check called `get_review_comments` for threads, never `get_reviews`
+for the formal review itself, and two of those threads being resolved read as
+the review question settled.
+The defect reached `main` and needed a follow-up PR.)
+
+**The rollup trap above has an earlier form:
+naming a cause the signal never confirmed, and reporting that to a human.**
+The trap above needs a real, checked cause before it closes.
+This one needs none.
+[`metacognitive-monitoring`](metacognitive-monitoring.md)'s "Read the artifact that failed, not the one beside it" and "A story that fits the evidence is not a finding" own the mechanism and the remedy:
+proximity is not evidence,
+and a cause no experiment discriminates is reported as not established rather than as the likeliest candidate.
+One thing here is local to a rollup.
+`mergeable_state: blocked` reports that at least one input is non-passing and never which,
+so every input you can see is equally available as an explanation,
+and the field can neither confirm nor refute whichever one you pick.
+
+The other is who acts on it.
+`blocked` prompts a re-check, which costs a query.
+`blocked waiting for your approval` sends a person to approve something that needed no approval,
+and they cannot tell from the message that the cause was inferred rather than derived.
+
+- **Do:** name the field a reported cause came from --- `statusCheckRollup`, `reviewDecision`, the branch-protection endpoint --- none of which is `mergeable_state`.
+- **Don't:** put an underived cause in a sentence someone else will act on;
+  `blocked, cause not yet derived` costs them a query, where a wrong cause costs them an action.
+
+(Measured 2026-09-03 on ai-config#3115:
+a fresh reading of the PR's `mergeable_state` field returned `blocked` while every review sat at `COMMENTED` rather than `APPROVED`,
+and that was reported to the user as branch protection holding the PR for a human approving review.
+Nothing in the field said so.
+Re-queried about an hour later, with no push and no approval between,
+it returned `clean` and the PR merged on the standing grant.
+Which input was non-passing at the first reading was never derived.
+The record establishes only that nothing in the field confirmed the reported cause, which is all the argument needs.)
+
 **In a remote/web session the instrument still runs, and hand-checking the
 axes in its place is not acceptable** (user directive, 2026-08-29,
 ai-config#2441).
@@ -30,12 +103,30 @@ a Python subprocess, so the split is that the **agent** retrieves and the
 **script** judges: gather the PR's state via MCP, write it to a file, and pass
 `--from-json <file>`.
 
+Build that file with the repo's own builder rather than by hand:
+
+```bash
+python3 scripts/build-pr-payload.py OWNER/REPO N out.json
+python3 scripts/check-pr-fully-clean.py N -R OWNER/REPO --from-json out.json
+```
+
+`scripts/build-pr-payload.py` (ai-config#2908) assembles the whole payload
+from plain REST, which a remote session's proxy does reach even where its
+GraphQL surface is pinned.
+The table below documents the payload's shape so the builder can be checked
+and extended, and is the fallback when the builder itself cannot run;
+it is not an instruction to transcribe MCP output by hand.
+A session that did transcribe it by hand had the transcribing commands
+denied three times and reported the gate as blocked for hours, while the
+one-line builder was named in the instrument's own `--help`
+(ai-config#2938).
+
 | Payload key | Gather with | Notes |
 | :--- | :--- | :--- |
 | `repo` | the `OWNER/REPO` under check | Or pass `-R` instead. |
 | `pr` | `pull_request_read` (`get`, `get_reviews`, `get_comments`) | See the field list below. |
 | `check_runs` | `pull_request_read` (`get_check_runs`) | Bare list or the REST `{"check_runs": [...]}` envelope. |
-| `actions_runs` | `actions_get` (`get_workflow_run`), keyed by run id | Omitting it changes verdicts --- see below. |
+| `actions_runs` | `actions_get` (`get_workflow_run`), keyed by run id; `build-pr-payload.py` fills it from each check run's run id ([#1697](https://github.com/Morrison-Lab/ai-config/issues/1697)) | Omitting it changes verdicts --- see below. |
 
 `pr` needs `headRefOid`, `headRefName`, `state`, `reviewDecision`, and
 `commits[].committedDate`, plus two nested shapes the scan reads directly:
@@ -154,9 +245,25 @@ Worked-example case records for the rules below live in
    **Why the two surfaces disagree is unexplained, so do not assert a
    mechanism for it.**
 
+   **`commits/<sha>/status` reports the combined state of an EMPTY status set
+   as `pending`, not `success` or absence --- so a gate that tests the rollup
+   `state` alone reads every PR with no legacy commit statuses as not-clean,
+   which is most PRs in a repo that has none configured.**
+   The condition has to be on the members, not the rollup: `total_count == 0`
+   means no commit statuses exist, which is the ordinary case and not a
+   blocker, while `total_count > 0` with any member `pending` or `failure` is
+   genuinely not-clean --- name the offending `context` when it is.
+   The same `pending` state means opposite things depending on `total_count`
+   alone: `state: pending, total_count: 0, statuses: []` is silence, and
+   `state: pending, total_count: 1, jules/review -- "Jules is reviewing..."`
+   is a real in-flight reviewer.
+
    - **Do:** take the check-run half of criterion 1 from the paginated
      check-runs endpoint, and add `commits/<sha>/status` where the repo uses
      commit statuses, rather than treating either query as sufficient alone.
+   - **Do:** branch on `total_count`, not on the combined `state` alone, when
+     reading `commits/<sha>/status` --- an empty set reports `pending` and is
+     not a finding.
    - **Do:** report both counts when the endpoint and the rollup disagree, so
      the gap stays visible to whoever reads the status next.
    - **Do:** re-derive check state from that endpoint on the PR's current
@@ -171,6 +278,17 @@ Worked-example case records for the rules below live in
      --- [`ardi`](ardi.md)'s superseded-head case is a **red** wake inviting
      a needless fix, and this is its **green**-sounding mirror, inviting a
      needless merge.
+   - **Don't:** treat an empty `commits/<sha>/status` response's `pending`
+     state as a finding --- the check has to read `total_count`, not the
+     rollup, or the ordinary case (no commit statuses at all) reads as
+     blocking on every PR.
+
+   (Morrison-Lab/ai-config#3106, 2026-09-03: the issue's own suggested fix
+   proposed treating a `pending` combined state as not-clean, then a
+   follow-up comment on that same issue caught that the suggestion would
+   misfire on most PRs, an hour after it was written --- the rollup-versus-
+   population bug this section already warns about, reintroduced into the
+   proposed fix for it.)
 
    **A paginated sweep with an inconsistent page size silently skips items, and every response still reads as complete coverage.**
    `--paginate` above is the CLI answer;
@@ -359,7 +477,13 @@ Worked-example case records for the rules below live in
    This is the mirror at the run level, and it is worse, because nothing about the green one looks partial: it reports the same check name, it completed, and it passed.
 
    The mechanism is a workflow that needs a base to diff against.
-   `check-new-line-breaks.yml` passes `base-ref` only when `github.event_name == 'pull_request'`, so the `push`-triggered run of the identical workflow has no base, examines zero added lines, and passes having measured nothing.
+   `check-new-line-breaks.yml` passed `base-ref` only when `github.event_name == 'pull_request'`, so the `push`-triggered run of the identical workflow had no base, examined zero added lines, and passed having measured nothing.
+   In this repository the `new-line-breaks` job in `validate.yml` is now gated with `if: github.event_name == 'pull_request'` ([ai-config#1730](https://github.com/Morrison-Lab/ai-config/issues/1730)),
+   so its push run reports `skipped` rather than `success`.
+   That closes the missing-base push case only:
+   a `pull_request` run can still skip with the same warning when the diff cannot be computed,
+   so read the job log before trusting a green run whose base could have been unreachable.
+   The rest of this subsection still governs any workflow of this shape that lacks the guard.
    Both runs attach to the same commit, so `gh pr checks` prints two rows with one name, one `pass` and one `fail`, and reading the list top-down finds whichever came first.
 
    The vacuous run is the one to discard, and the trigger event is the only field that separates them.
@@ -377,7 +501,7 @@ Worked-example case records for the rules below live in
    - **Don't:** resolve a same-name disagreement by workflow name.
      On this shape both runs carry the same one.
 
-   (Measured 2026-08-22 on [ai-config#1884](https://github.com/Morrison-Lab/ai-config/pull/1884).
+   (Measured 2026-08-21 on [ai-config#1884](https://github.com/Morrison-Lab/ai-config/pull/1884).
    Run `32545283504` (`event=push`) and run `32545289903` (`event=pull_request`) both had `head_sha=8c456074`, both were named `new-line-breaks / check-new-line-breaks`, and they concluded `success` and `failure` respectively.
    The push run was read first and taken as the verdict.
    The PR run was the one carrying four real findings.)
@@ -574,8 +698,46 @@ and the verdict's own conclusion every round.**
   and create zero inline comments
   while placing substantive findings inside a collapsed
   `<details>` suppression block in the review body.
-  Match case-insensitively on `suppressed` **inside the `<summary>`
-  heading**, not anywhere in the body.
+  Match case-insensitively on `suppressed` **in a `<summary>` element, or
+  in an ATX heading inside a collapsed `<details>` region** --- not
+  anywhere in the body, which flags ordinary overview prose.
+  Measured 2026-09-03 on ai-config#3084 review `5098574802`, the block
+  arrives as `### Suppressed comments (1)` under
+  `<summary>Review details</summary>`, which a `<summary>`-only match
+  returns zero against, while that same body wraps its `Pull request
+  overview` and `File summaries` prose in collapsed `<details>` regions of
+  their own --- so a collapsed region is no longer a proxy for "not
+  ordinary overview prose".
+  That is a reason to prefer the heading anchor, not to forbid the wider
+  match.
+  The comparison was measured on 2026-09-04 by enumerating Copilot review
+  bodies from the `reviews` endpoint, rather than by grepping this corpus's
+  own prose for `suppressed`: 137 bodies across 39 PRs, drawn from
+  ai-config PRs 1000 through 1100 and 3060 through 3130, plus
+  ai-config#660, ai-config#2913 and ai-config#2976.
+  Region-wide has exactly one measured false positive in that set, and
+  body-wide has two.
+  The two wider forms are nested rather than parallel: an occurrence inside
+  a `<details>` region is by definition an occurrence in the body, so every
+  body region-wide flags is also a body-wide hit.
+  Body-wide hit 80 bodies, region-wide 79, and the heading anchor 78.
+  Body-wide alone flags ai-config#1038 review `4837572117`, whose
+  uncollapsed overview sentence reads "Aligns ARDI-family guidance on
+  deadlocks, sweep scheduling, and suppressed Copilot findings" while its
+  body carries no suppression block.
+  Both wider forms flag ai-config#1036 review `4837539268`, whose collapsed
+  `Show a summary per file` table reads "Detects suppressed Copilot
+  findings." and whose body likewise carries no suppression block --- the
+  settling counter-example an earlier version of this passage asserted the
+  measured set did not contain.
+  The heading anchor excludes both controls, a `<summary>`-only match
+  returns zero against 50 of those 78, and the only body the region-wide
+  form flagged and the heading anchor did not is `4837539268`.
+  So region-scoping buys no measured coverage and costs one false positive
+  in 137.
+  Keep it as a fallback on the cost asymmetry alone --- a false zero merges
+  over real findings, while a false positive costs one re-read --- and not
+  on any claim that it has never fired wrongly.
   See [`fully-clean.cases.md`](fully-clean.cases.md),
   "The collapsed-block case (Morrison-Lab/ai-config#1029)".
 - **"No verdict" is its own state, distinct from "a verdict with no
@@ -605,6 +767,10 @@ and the verdict's own conclusion every round.**
 - **Do:** read all review surfaces before calling a PR clean,
   every round,
   including collapsed suppressed-comments blocks.
+- **Do:** run the region-wide match as a fallback behind the heading
+  anchor, and re-read the region on a hit only the fallback finds ---
+  its one measured shape is a collapsed per-file summary table carrying
+  no block at all.
 - **Do:** distinguish "no findings" from "no verdict" explicitly, and treat
   the latter as unreviewed.
 - **Don't:** report clean on a zero thread count, however many checks are
@@ -612,9 +778,14 @@ and the verdict's own conclusion every round.**
 - **Don't:** treat an empty review body as an all-clear without checking the
   inline comments.
 - **Don't:** treat a "generated no new comments" overview as an all-clear
-  until every `<summary>` heading has been checked case-insensitively for
-  `suppressed` --- not until the whole body has, which flags ordinary
-  overview prose that merely mentions suppressed findings.
+  until every `<summary>` element and every ATX heading inside a collapsed
+  `<details>` region has been checked case-insensitively for `suppressed`
+  --- not until the whole body has, which flags ordinary overview prose
+  that merely mentions suppressed findings, and not `<summary>` alone,
+  which misses a block nested one heading deeper.
+- **Don't:** rule the region-wide match out on the strength of that
+  proxy's failure --- one false positive in 137 measured bodies makes it
+  the weaker anchor, not a wrong one.
 - **Don't:** read a reviewer's silence as a verdict --- a job that posted
   nothing leaves the same zero counts as a job that found nothing.
 - **Don't:** act on a review wake's own payload --- it is one comment out of
@@ -672,6 +843,34 @@ NOT clean over a clean verdict.**
   against a review whose prose merely discusses finding vocabulary.
 - **Don't:** treat a `contains findings (matched pattern ...)` line as a real
   finding without reading the verdict body it matched.
+
+**One shape of that false positive is deliberate, and the fix for it is on the
+reviewer's side: a resolution log filed under a `Findings` heading.**
+A confirming review that writes
+`### Findings --- all three from the prior rounds are now resolved` and lists
+`1. **Previously: X.** Now fixed --- <explanation of the fix>` scores as open
+findings, because the explanation after the verb is free prose and no lexical
+rule can tell "Now fixed; the pathspec is quoted" from "Now fixed; the query
+leaks memory on every call".
+The same comment's structured `CLEAN` payload does not change that, since it is
+the same author's verdict line in JSON, and the rule above says findings win.
+Two narrowing attempts, a caveat word-list and a payload gate, were withdrawn
+in [#2950](https://github.com/Morrison-Lab/ai-config/pull/2950); the tests
+that pin the safe behaviour are in `scripts/test_check_pr_fully_clean.py`
+([#2945](https://github.com/Morrison-Lab/ai-config/issues/2945)).
+What reads clean today is the format the checker was built for: resolved
+prior findings under a heading that is not a `Findings` heading
+(`### Resolved since the last round`), and `### Findings` reporting `None.`
+A resolution whose whole disposition closes the line
+(`**Previously: X.** Now fixed in abc1234.`) also resolves, provided the
+`Findings` heading itself is marked resolved or non-blocking; under a bare
+`### Findings` heading even a closing-line item stays open, since the heading
+is what admits the section to the item test.
+
+- **Do:** when a review of yours must recount resolved prior findings, file
+  them under a non-`Findings` heading and keep `### Findings` for open ones.
+- **Don't:** ask the checker to read a free-prose explanation as a resolution;
+  the human reading the verdict body is the fallback the rule above names.
 
 **Calling the checker is not consuming it: grepping its PROSE instead of
 reading its EXIT STATUS re-opens the whole failure one layer up.**
@@ -1025,6 +1224,35 @@ it points the confident direction: the run object's own
 See [`fully-clean.cases.md`](fully-clean.cases.md), "`pull_requests[].head.sha`
 named a commit pushed after the run started".
 
+**A fourth surface is the one a script parses first, and it can name a commit
+that exists on no branch: the `commit_sha` field inside the review's own
+structured JSON block.**
+That field reports whatever `git rev-parse HEAD` returned in the reviewer's
+checkout, and on a `pull_request`-triggered run that is the synthetic merge
+commit GitHub builds at `refs/pull/N/merge`, not the branch tip.
+The `Reviewed commit:` trailer the workflow appends beneath the JSON named the
+branch tip in every case observed.
+The same reviewer emits a trustworthy field on one trigger and a
+misleading one on the other, with nothing in the comment saying which.
+The failure this produces is a needless re-request: a script comparing
+JSON `commit_sha` against the PR's `head.sha` reads a verdict on the current
+head as a verdict on an unknown commit.
+
+- **Do:** take the reviewed commit from the `Reviewed commit:` trailer, and
+  fall back to the run's `head_sha` per the surfaces above.
+- **Do:** when the JSON field and the trailer disagree, resolve the JSON's
+  SHA with `git fetch origin <sha>` and read its parents before concluding
+  anything; a two-parent commit whose second parent is your tip is the
+  merge ref, and the verdict covers your tip.
+- **Don't:** compare the JSON `commit_sha` against the PR head to decide
+  staleness --- on a `pull_request`-triggered review it never matches, even
+  when the review is current.
+- **Don't:** read the two repositories' agreement or disagreement as a
+  property of the repository; it is a property of the trigger.
+
+See [`fully-clean.cases.md`](fully-clean.cases.md),
+"The review JSON's `commit_sha` named the synthetic merge commit".
+
 **`check-pr-fully-clean.py` uses the same unreliable body-text surface, and
 whichever SHA that text happens to contain --- present, absent, or wrong ---
 is incidental to which head the run actually reviewed.**
@@ -1066,10 +1294,198 @@ before reporting a PR ready, not just trust the last green run.
 `mergeStateStatus: CLEAN` means conflict-free plus passing commit status (GitHub's `mergeable` field), not merge-ready.
 A PR without a clean review verdict on the latest commit is not merge-ready.
 
+**A head green on its own branch can turn `main` red on merge, when the base gained a new CI check after the PR's latest CI run.**
+A `pull_request` run uses the workflow definition current at that run,
+so the gap opens when `main` gains a check afterwards
+and no new PR event re-runs CI.
+A check added to `main` after that run never fires on the PR until a new PR event synthesizes a fresh `refs/pull/N/merge`,
+so there is nothing red to see: the check simply never ran.
+Measured 2026-09-01 (Pacific) on [#2965](https://github.com/Morrison-Lab/ai-config/pull/2965).
+That branch added hook bindings to `hooks/hooks.json` before [#2967](https://github.com/Morrison-Lab/ai-config/pull/2967) landed the generated `skills/ai-config-hooks/hooks/hooks.json` and its `gen-hooks-plugin.py --check` gate on `main`.
+`check-pr-fully-clean.py` reported [#2965](https://github.com/Morrison-Lab/ai-config/pull/2965) FULLY CLEAN,
+a GIA session merged it under `mwc`,
+and `validate` on `main` went red at `da1a2d03` until [#2983](https://github.com/Morrison-Lab/ai-config/pull/2983) regenerated the manifest.
+The head-only verdict cannot see this, and no path diff can prove the base gained no check through a script or a reusable workflow,
+so for a direct merge the rule is the one [`sync-with-main`](sync-with-main.md) already states: a stale merge-base means update first.
+Under a merge queue where every clean-gate check both executes for `merge_group` and is required (or aggregated behind a required check),
+the queue's speculative merge test will cover this once [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030) defines the queue form of the gate,
+and [`merge-queue`](merge-queue.md) forbids the manual update loop there.
+Until then a base that requires a merge queue stops the merge.
+The conditions below are what that form has to prove.
+A `pull_request`-only workflow added to the base does not run on the queue's branch,
+and a workflow that lists `merge_group` can still carry a job or step whose `if:` skips that event,
+which branch protection then counts as passing.
+This corpus's clean gate counts every check, not only the required ones,
+while the queue advances on the required checks alone ([`merge-queue`](merge-queue.md)),
+and a failing non-required check has been measured to leave a PR mergeable ([`github-actions`](../../memories/github-actions.md), the bcs `test-coverage` entry).
+So two conditions hold before the manual update is skipped:
+every clean-gate check executes for `merge_group`, job and step conditions included,
+and every clean-gate check is a required status check on the base, or is aggregated behind one that is.
+A clean-gate check the queue cannot block on is a check the queue does not run as a gate.
+`gh pr checks --required` (present in `gh` 2.98.0) lists the required checks among those in the current rollup, but a required check absent from that rollup, one the base gained after the head's last run, is exactly the case here, and no `gh pr checks` output says whether a check executes on `merge_group`, so the rules query and the workflow read below are what settle both ([`gh-cli`](../../memories/gh-cli.md) carries the same distinction).
+Those two conditions are the specification the queue form of this gate has to prove ([#3030](https://github.com/Morrison-Lab/ai-config/issues/3030)), and until it lands the exception is unavailable: a base that requires a merge queue stops the merge, since a required check supplied by a GitHub App cannot be verified from workflow files at all.
+The proof will read the required checks from `gh api --paginate "repos/<owner>/<repo>/rules/branches/<base-encoded>"` (encode the base name as one path segment, `jq -rn --arg b "<base>" '$b|@uri'`, since `release/1.x` would otherwise split into two, and paginate, since the first page can omit rules), and each clean-gate workflow's `on:` block and job and step `if:` conditions for `merge_group`.
+
+The rule splits by merge mode: a direct merge from a session with `git` and `gh`, a direct merge from a remote session without `git`, and, once [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030) lands, a merge queue.
+It is GitHub-specific as written (`headRefOid`, `gh`, the compare endpoint, the update-branch and merge pins), so a GitLab merge has no equivalent gate until [#3021](https://github.com/Morrison-Lab/ai-config/issues/3021) supplies one, and `merge-it`, `mwc`, and `chores` inherit that scope.
+It binds every direct-merge path, including the dependency-bump merges in [`chores`](../../skills/chores/SKILL.md), not only `mwc` and `merge-it`.
+For a bot bump, the gate to rerun after an update is CI plus conflict state, which is what those PRs are gated on, since `@claude` review is skipped on them by design.
+`chores` states that form.
+A deferred merge (`gh pr merge --auto`, or a `@dependabot` merge command) stays out of every direct-merge path.
+Auto-merge stays enabled across a later push by anyone with write access (GitHub disables it only for a push from someone without write permission, or a base switch) and fires on required checks alone, so a pin on the enabling request protects nothing after it, and the sync-only-push rule in this fragment already forbids arming it after a new head.
+Merge synchronously, right after the check, with the merge command pinned.
+
+- **Do:** for a direct merge from a session with `git` and `gh`, record `headRefOid` and `baseRefName` before the clean gate runs, so the gate's verdict is tied to one head and one target.
+  Then, before the merge command, confirm the live `baseRefName` is still the recorded one, fetch that base, confirm the live PR head is still the recorded SHA, and confirm the merge-base with it is that base's current tip.
+  A retarget to another branch at the same tip during the gate would otherwise pass both the ancestry check and the head pin with a verdict produced for the old target.
+  A concurrent push after the gate can already contain the base tip, so an ancestry check alone would admit a head no verdict covers.
+  Until [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) wires this into `check-pr-fully-clean.py`, which [`mwc`](../../skills/mwc/SKILL.md) already runs, both [`mwc`](../../skills/mwc/SKILL.md) and [`merge-it`](../../skills/merge-it/SKILL.md) name it as a manual step after their readiness check and before the merge command:
+  `url=$(gh repo view "<owner>/<repo>" --json url -q .url) && b=$(gh pr view "<N>" -R "<owner>/<repo>" --json baseRefName -q .baseRefName) && [ -n "$url" ] && [ -n "$b" ] && [ "$b" = "<pinned-base>" ] && git fetch "$url" "$b" && tip=$(git rev-parse --verify FETCH_HEAD) && git fetch "$url" "refs/pull/<N>/head" && head=$(git rev-parse --verify FETCH_HEAD) && [ "$head" = "<pinned-sha>" ] && [ "$(git merge-base "$tip" "$head")" = "$tip" ] && echo "$tip"`,
+  where `<pinned-sha>` and `<pinned-base>` are the `headRefOid` and `baseRefName` recorded before the gate ran.
+  The trailing `echo` prints the tested base tip: record it as `<pinned-tip>` before the gate reruns, since a shell variable does not survive into the later tool call that makes the pre-merge comparison.
+  The live base name is compared to the pin rather than trusted, so a retarget fails the check instead of steering the fetch.
+  `git merge-base` needs both tips' history: in a shallow clone the two can appear disjoint ([`claude-code-consumer-wiring`](../../memories/claude-code-consumer-wiring.md) records the bogus merge-base), so run `git fetch --unshallow` (or `--deepen=<n>` with a depth that reaches the common ancestor) first, or use the compare endpoint, which is unaffected.
+  Both fetches name the repository the `-R` reads came from, not the checkout's `origin`, which in a fork or another checkout can be a different repository whose same-numbered PR would let the gate compare unrelated commits.
+  Each result is assigned inside the `&&` chain so an unresolved branch or a failed command fails the check rather than comparing two empty strings as equal.
+  Reading `FETCH_HEAD` after each fetch uses the tip the fetch just returned and writes no remote-tracking ref, so it holds in a single-branch clone (where a bare `git fetch origin` leaves `origin/<branch>` stale) and under `fetch.prune=true` (where an explicit `branch:refs/remotes/origin/branch` refspec was measured to delete the ref and fail `rev-parse` on its first run).
+  The base comes from the PR, not from the repository's default branch: a stacked or release PR targets another branch, and [`merge-it`](../../skills/merge-it/SKILL.md) already warns not to assume `main` for those.
+- **Do:** for a direct merge from a remote session without `git`, re-read the PR's `headRefOid` and `baseRefName` and require both to equal the recorded pins, then read the compare endpoint instead of `git merge-base`, `gh api "repos/<owner>/<repo>/compare/<base-encoded>...<head-sha>"`, with the base name encoded as one path segment (`jq -rn --arg b "<base>" '$b|@uri'`, so `release/1.x` does not split the path), and require `behind_by` of 0.
+  The pin comparison is the same one the local path makes, since `expectedHeadSha` on the merge protects the head and nothing protects the target branch.
+  When `behind_by` is 0, record the response's `base_commit.sha` as `<pinned-tip>` (the base tip at that moment, equal to `merge_base_commit.sha` in that state).
+  The pre-merge comparison re-reads the same endpoint and requires both `behind_by` of 0 again and `base_commit.sha` equal to `<pinned-tip>`, since with an unchanged head `merge_base_commit.sha` keeps the old ancestor after the base moves and would compare equal on its own.
+  Without that record the remote path has nothing to compare.
+  Measured 2026-09-02 (Pacific) on [#2989](https://github.com/Morrison-Lab/ai-config/pull/2989): `behind_by` was 0 and `base_commit.sha` and `merge_base_commit.sha` were both the base tip, the same answer the `git merge-base` form gives.
+  Where no raw API call is available either, as in an MCP-only session whose tools expose neither endpoint, the gate cannot run, so do not merge from that session until [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) supplies the tool.
+  That is the fail-closed direction, per [`fail-fast`](../principles/fail-fast.md).
+- **Do:** when the merge-base is not that tip and the merge is direct, update the branch pinned to the recorded head (the `expected_head_sha` update call, or `update_pull_request_branch` with `expectedHeadSha` remotely), then rerun the whole clean gate on the new head, review included, before merging.
+  The update is a new head, so a clean verdict on the old one no longer counts, per [`sync-with-main`](sync-with-main.md).
+  The update is asynchronous: the REST endpoint answers `202 Accepted` while the merge is still in progress, and the MCP tool reports that answer as success, so a gate rerun started at once can read the old head.
+  Pin the update itself to the head that failed the currency check.
+  Locally that is `gh api -X PUT "repos/<owner>/<repo>/pulls/<N>/update-branch" -f expected_head_sha="<pinned-sha>"`, since the `gh pr update-branch` wrapper has no flag for it in `gh` 2.98.0.
+  Remotely it is `expectedHeadSha` on the MCP `update_pull_request_branch` tool.
+  A `422` whose message names an expected-head mismatch means the head already moved.
+  Match on the substring `expected head sha`, since the live text carries a curly apostrophe and a trailing period that this ASCII rendering cannot show.
+  That is the another-writer signal, so it routes to the ownership rule (settle who owns the branch per [`claim-pr`](claim-pr.md)) instead of merging the base into someone else's push.
+  The endpoint uses `422` for other validation failures too, so any other message is a failed update: stop and read it rather than treating it as a moved head.
+  Measured 2026-09-02 (Pacific) on [#2989](https://github.com/Morrison-Lab/ai-config/pull/2989): a deliberately wrong `expected_head_sha` returned `422` with a message reading "expected head sha didn't match current head ref." (curly apostrophe in the live text) and changed nothing.
+  Then poll `headRefOid` until it changes, with a deadline (five minutes is generous for a merge commit GitHub has accepted), and treat expiry as a failed update to stop on and report, since a `202` can be returned without a new head ever appearing.
+  Once it changes, record that SHA, rerun the base-currency check on it, and only then rerun the gate, pinned to that SHA.
+  The gate itself takes minutes, so the base can advance again while it runs, and so can the head: a concurrent push that already contains the current base passes a currency-only recheck while the gate's verdict belongs to the earlier SHA ([`github`](../../memories/github.md) records that unpinned-head race).
+  So immediately before the merge command, check that the live `headRefOid` still equals the pinned SHA, that `baseRefName` is still the branch the gate ran against (a retarget to another branch at the same commit would otherwise pass a tip comparison), and that the live base tip still equals `<pinned-tip>`, and repeat the update-and-gate cycle when any of them moved.
+  Then make the merge itself carry the pin: `gh pr merge --match-head-commit "<pinned-sha>"` (measured 2026-09-02 (Pacific) in `gh` 2.98.0: the flag is documented as the commit SHA the head must match to allow the merge), or `expectedHeadSha` on the MCP `merge_pull_request` tool, so a push in the seconds after the read is refused by the API rather than merged.
+  A remote session's bash has neither: `gh` is absent, and the MCP tool belongs to the agent rather than to the shell.
+  The third form is plain REST, and it takes the pin as `sha`:
+  `curl -X PUT -H "Authorization: Bearer $GITHUB_TOKEN" ".../repos/<owner>/<repo>/pulls/<N>/merge" -d '{"merge_method":"squash","sha":"<pinned-sha>"}'`.
+  That `sha` is the same guarantee the other two spell differently --- the API refuses the merge when the head has moved --- so a session without `gh` is not thereby excused the pin.
+  Measured 2026-09-03 on [#3035](https://github.com/Morrison-Lab/ai-config/pull/3035) and [#3043](https://github.com/Morrison-Lab/ai-config/pull/3043), both merged this way after `gh` returned `command not found`.
+  It merges but does not tidy: `--delete-branch` has no REST counterpart here, and `DELETE /git/refs/heads/<branch>` is refused by the agent proxy itself, so the remote branch outlives the merge and only the local one can be cleaned up.
+  The pre-merge read still runs first, because it is what says which ref moved.
+  The pin closes only the head side: no merge API pins the base, so the base can still advance between that read and the merge, and a direct merge on a base without an up-to-date-branch requirement keeps that window open.
+  **Sync with `git` rather than `update-branch` where the review gate excludes bot senders**, since the update makes the new head *bot-authored* and the gate then skips the very verdict this rule goes on to require.
+  `Morrison-Lab/gha`'s `claude-code-review.yml` gates on `github.event.sender.type != 'Bot'`, so a head produced by the API call reports every review job `skipped` while CI stays green --- a state that reads like a review not yet started rather than one that will never run.
+  Rebasing onto the base and force-pushing (with `--force-with-lease --force-if-includes`) reaches the same base currency and triggers the review normally, because a `git` push carries a User identity where a REST write does not ([`github-remote-sessions`](../../memories/github-remote-sessions.md)).
+  Confirm the rebase preserved the change rather than assuming it: compare the tree hashes when the base did not move, and the diff against the base when it did.
+  The `expected_head_sha` machinery above still applies to the API route, which stays correct wherever the gate admits bot senders.
+- **Do:** measure the base's merge interval against one gate cycle before starting a third sync, rather than chasing.
+  `git log origin/<default-branch> --first-parent -8 --format='%ct'` gives the interval and the review run's own timestamps give the cycle;
+  when the interval is the shorter of the two, serial syncing cannot converge ([`batch-merge-and-resolve`](batch-merge-and-resolve.md)), and each attempt spends a paid review round.
+  Measured 2026-09-02 on [#3035](https://github.com/Morrison-Lab/ai-config/pull/3035): a median interval of 221s against a ~6 min cycle, three merges landing inside 30s, and four review rounds spent before the base held still long enough to merge.
+  The escape is to wait for a quiet window and sync then --- which is a real strategy rather than a stall, since the cadence is bursty --- or to raise the server-side closure with whoever owns the ruleset.
+  Read a repository's `rulesets` endpoint rather than assuming: `strict_required_status_checks_policy` false and no merge-queue rule means the closure this rule points to does not exist there, and branch protection may read `403` for the session's own token.
+  Where the base must be stable, only a server-side gate closes it, a merge queue or the up-to-date-branch requirement (with every clean-gate check required or aggregated, per the exception above), and the direct-merge entry points say so.
+  The cycle repeats for either ref, so a repeat says which one to look at rather than which remedy applies.
+  When the base moved twice it is advancing faster than the gate runs, which [`batch-merge-and-resolve`](batch-merge-and-resolve.md) measures: stop chasing and merge under strict up-to-date protection (or through a merge queue once [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030) lands), or batch the pending merges per that fragment.
+  When the head moved, another writer is pushing to the branch, and no queue or protection setting stabilizes that: find the writer per [`claim-pr`](claim-pr.md) and settle who owns the branch before rerunning.
+- **Do:** on a base that requires a merge queue, stop and report rather than merging: the queue form of this gate (the coverage proof, a retarget check before enqueue, and the asynchronous enrollment state machine) is [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030), and until it lands no agent path in this corpus merges through a queue.
+  Whether the pinned base requires one is read before any merge command, from the same rules query: `gh api --paginate "repos/<owner>/<repo>/rules/branches/<base-encoded>" --jq '[.[] | select(.type == "merge_queue")] | length'`, a nonzero count being the stop.
+  The merge command cannot serve as the probe, since `gh pr merge` enqueues rather than refuses.
+  Measured 2026-09-02 (Pacific) on this repository's `main`: the count is 0 and the rule types present are `deletion`, `non_fast_forward`, `pull_request`, `required_linear_history`, and `required_status_checks`.
+  A manual update repairs neither case, since it cannot make a check block or make a workflow run on `merge_group`.
+  Make every clean-gate check required (or aggregated behind one) and `merge_group`-triggered, or merge directly where the repository permits it, with the direct-merge checks above.
+- **Don't:** read a head-only FULLY CLEAN verdict as a merge-safe verdict when the base has advanced.
+- **Don't:** substitute a path diff of `.github/workflows/` for the update.
+  It cannot see a check that arrived through a script or a reusable workflow.
+
+Tracked as [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982).
+
 - **Do:** always check for merge conflicts (e.g., using `gh pr view <number> --json mergeable` or `gh pr checks`) at the same time you check for CI and review status.
 - **Do:** report a PR as blocked on review when HEAD has no authentic clean verdict, even if GitHub says `CLEAN`.
 - **Don't:** treat green CI plus a clean review as sufficient without independently re-checking merge-conflict state.
 - **Don't:** describe a PR that lacks a clean HEAD review as merge-ready, ready to merge, or "green and merge-ready."
+
+**Because a clean CI run and a clean review verdict are a snapshot, a reading
+you took over a live PR cannot be re-derived later --- so capture the command
+and its output verbatim at the moment a decision starts to rest on it.**
+
+"A clean CI run and a clean review verdict are a snapshot" says the state
+moves; this is what that costs when you try to explain a reading afterwards.
+Re-running the command answers a question about the PR *now*, and it is
+presented in exactly the form of an answer about the PR *then*, so a
+disagreement between the two invites a hunt for a cause --- a tool version, a
+change in wording, a bug --- when the only established fact is that the PR
+moved.
+That hunt is expensive and it converges on something plausible, because
+plausible explanations for a tool disagreeing with itself are cheap.
+
+It is worse than an ordinary lost measurement because a remembered reading and
+a mis-remembered one are indistinguishable from the inside, and the reading is
+usually the whole basis for whatever was decided next.
+
+- **Do:** paste the command and its verbatim output --- exit status included ---
+  into the issue, PR, or notebook entry at the moment you act on it, as
+  [`algorithmatize-checks`](algorithmatize-checks.md) and
+  [`grep-is-not-coverage`](grep-is-not-coverage.md) already require for a
+  derived figure; what is new here is that a live PR makes the reading
+  unrepeatable, so the paste is the only copy there will ever be.
+- **Do:** report the cause as not established when a later re-run disagrees and
+  nothing was captured, rather than naming the likeliest mechanism.
+- **Don't:** treat a re-run as reproducing an earlier reading over a live PR ---
+  the input differs, so the two are separate measurements.
+- **Don't:** file or record a diagnosis whose only evidence is a reading you can
+  no longer produce.
+
+(Measured 2026-09-02 on `Morrison-Lab/ai-config`: differing
+`check-pr-fully-clean.py` readings across `Morrison-Lab/gha#811`, `#814` and
+`#820` were attributed first to a vocabulary false positive and then to a stale
+checker.
+A controlled re-run varied the checker version and held the three PRs fixed:
+the stale clone at `240650120` and a worktree at `origin/main` each returned
+`#814` rc=0, `#820` rc=0, `#811` rc=1 --- every PR the same under both
+versions.
+That is a direct test of the stale-checker explanation, and it fails.
+It is no test at all of the wording explanation, which is a claim about
+readings that no longer exist.
+What the re-run leaves is the residual --- the PRs' own state moved between the
+original runs --- which ai-config#3031 records as the remaining explanation.
+That is elimination rather than measurement, and this section's own bullets say
+to report it as such.
+What it cannot establish is which reading each original run produced, because
+none was captured.
+ai-config#3022 was closed after review falsified two successive stated causes,
+and ai-config#3032 for that plus a guard that was a no-op at a third layer.)
+
+**A sync-only push invalidates a clean verdict just as thoroughly as a code push, and arming auto-merge after a sync violates the HEAD review gate.**
+When `main` moves and a direct merge is refused because the branch is not up to date,
+merging `origin/main` in and pushing creates a new HEAD commit ref.
+Arming `gh pr merge --auto` immediately after that sync push ---
+reasoning about it as scheduling a merge already verified rather than authorizing an unreviewed head ---
+violates [Pattern 12](../../memories/mistake-patterns.md).
+GitHub auto-merge fires the moment CI passes,
+racing ahead of and potentially merging before any automated or adversarial reviewer can evaluate the new HEAD commit.
+The sync is content-free (no author code changes),
+which is why it does not feel like a new head needing a new verdict,
+but the new HEAD commit ref is completely unreviewed until a fresh review round posts for that exact SHA.
+
+- **Do:** re-run `scripts/check-pr-fully-clean.py <N>` against the new HEAD commit after any sync push,
+  wait for clean reviews and green CI at that HEAD,
+  and merge directly/synchronously.
+- **Do:** accept that a fast-moving `main` may require repeating the sync-and-verify cycle rather than attempting to bypass it with auto-merge.
+- **Don't:** arm `gh pr merge --auto` after a sync-only push under the impression that prior verification at an older commit carries forward.
+- **Don't:** assume GitHub auto-merge will wait for review comments ---
+  it gates only on native branch protection checks.
+
+See [`fully-clean.cases.md`](fully-clean.cases.md),
+"Auto-merge armed after a sync-only push, having verified the previous head (#2556)".
 
 **Re-check version parity in that same sweep, not only conflict-freedom.**
 

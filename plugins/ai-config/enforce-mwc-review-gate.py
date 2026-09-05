@@ -1,25 +1,47 @@
 """PreToolUse gate for Antigravity: deny PR merges that lack a clean review.
 
 Fires on `run_command` tool calls that look like merges. Denies unless the
-PR carries an affirmative approval: a human APPROVED review, or a
-verdict-bearing bot comment whose latest verdict is clean for the current
-head. Fails closed on ambiguity: an unparseable state denies with a reason
-rather than allowing.
+PR carries an affirmative approval: a human APPROVED review, a human
+review whose body affirmatively approves (bounded per the reviews bullet
+below), or a verdict-bearing bot comment whose latest verdict is clean for
+the current head. Fails closed on ambiguity: an unparseable state denies
+with a reason rather than allowing.
 
 Hardened per Morrison-Lab/ai-config#2676 after Lacaedemon/sparta#1427 was
 merged over a "Needs more work" verdict (reverted in sparta#1429):
 - the verdict comes from the latest comment carrying a `### Verdict`
   heading outside blockquotes and code fences, not from whichever bot
   comment happens to be last (on sparta that was a demo-diff snapshot);
-  a human-authored verdict counts for deny but never for allow, so an
-  agent posting under the user's login cannot approve its own merge;
+  a human-authored verdict *comment* counts for deny but never for
+  allow (only a review can carry human approval; see below);
   a standing not-clean verdict vetoes merge even beside a human
   APPROVED review (ai-config#2274);
 - only the text under `### Verdict` is classified, and negated approvals
   ("cannot approve", "not approved") classify as not-clean;
 - a formal review's mere existence no longer satisfies the gate (Copilot's
-  COMMENTED review used to), and a human review counts only when its latest
-  state is APPROVED -- a standing CHANGES_REQUESTED denies;
+  COMMENTED review used to); a human review counts as approval when its
+  latest state is APPROVED or its body affirmatively approves
+  (ai-config#3062 -- reviewers here never submit APPROVED, so keying the
+  allow-path on that state alone made it dead code), and a standing
+  CHANGES_REQUESTED denies. A body-derived approval is bounded so it
+  cannot become a self-approval route: it never counts from the PR's own
+  author, never from an `authorAssociation` outside the repository,
+  never from a review whose own `commit.oid` is not the head, never from
+  a raw body carrying the agent-disclosure marker (quoted or fenced
+  included), and never from a body that says anything besides the
+  approval itself -- one line, under an optional `### Verdict` heading,
+  matched end to end, with no lead-in, no trailing clause, and no later
+  line; a later non-approving review from the same human retracts it.
+  Those bounds carry a narrower property across the reviews channel
+  than the comments channel enforces: an agent posting under the user's
+  login cannot approve the merge of a PR it opened. On a PR someone else
+  opened (a bot's chore PR, another member's), the author key does not
+  fire, and what stands between an agent's own review and an allow is
+  the disclosure marker `hooks/require-agent-disclosure.py` obliges it
+  to carry -- a convention rather than a property of the record.
+  Keying the veto on the merging account instead would deny the human
+  reviews this repo actually gets, since the reviewer and the merging
+  agent share one login here (ai-config#3062);
 - a verdict naming a `Reviewed commit:` other than the PR head is stale and
   denies;
 - `--admin` merges (server-rule bypass) and GraphQL mergePullRequest
@@ -73,6 +95,29 @@ NOT_CLEAN_VERDICT_RE = re.compile(
 REVIEWED_COMMIT_RE = re.compile(
     r"Reviewed[-\s]commit[:\s]+`?([0-9a-f]{7,40})`?", re.IGNORECASE
 )
+# Shortest sha abbreviation a head-binding prefix test will accept.
+ABBREV_SHA_LEN = 7
+# Markdown emphasis and terminal punctuation around an approval headline,
+# so `**Ready for merge**.` reads as the phrase itself. Heading, quote, and
+# strikethrough markers are deliberately absent: a human approval must be
+# the bare phrase, and a quoted or struck-through line is not it.
+HEADLINE_TRIM_RE = re.compile(r"^[\s*_`]+|[\s*_`.!]+$")
+LIST_ITEM_RE = re.compile(r"^([-+*]|\d+[.)])\s")
+# The corpus-mandated agent-disclosure marker, plus the headers review
+# workflows post under. `gh pr review --comment` is a first-class agent
+# surface (hooks/require-agent-disclosure.py gates it), so a review body
+# declaring itself agent-written is not human approval, whoever submitted it.
+AGENT_AUTHORSHIP_RE = re.compile(
+    r"posted by\b[^\n]*\(ai agent\)|\*\*claude finished|\U0001f916",
+    re.IGNORECASE,
+)
+# `authorAssociation` values that mark a reviewer as belonging to the
+# repository. A COMMENTED review is an ordinary drive-by comment that anyone
+# with read access can post, so without this bound any stranger's "Ready for
+# merge." would authorize the merge; a formal APPROVED review is a distinct
+# authorizing act GitHub records, which is why its fast path needs no such
+# check.
+TRUSTED_REVIEW_ASSOCIATIONS = {"OWNER", "MEMBER", "COLLABORATOR"}
 PR_URL_RE = re.compile(r"github\.com/([\w.-]+/[\w.-]+)/pull/(\d+)")
 # "&" also covers "&&"; "$(" and "`" catch command substitution. Substring
 # matching can over-fire on quoted bodies -- that direction fails closed.
@@ -97,14 +142,141 @@ def is_bot_login(login):
             or login.removesuffix("[bot]") in REVIEWER_BOT_LOGINS)
 
 
-def latest_human_review_states(reviews):
-    """Latest APPROVED/CHANGES_REQUESTED state per non-bot author.
+def human_review_body_approves(body):
+    """Whether a human review body affirmatively approves the PR.
 
-    COMMENTED and PENDING never change an author's standing. GitHub marks a
-    dismissed review by mutating its state to DISMISSED in place; handle a
-    trailing DISMISSED entry too, so either payload shape clears standing.
+    An `APPROVED` state alone cannot carry human approval in this corpus,
+    so keying the allow-path on it made that branch dead (ai-config#3062).
+    Measured 2026-09-02 over the 25 most recently merged
+    Morrison-Lab/ai-config PRs: 168 of 168 reviews were COMMENTED and none
+    was APPROVED, and shared/workflow/fully-clean.md tells reviewers not to
+    wait for a formal APPROVED review. So read the body's substance beside
+    the state.
+
+    The rule is that a reviewer who wants to authorize writes the approval
+    and stops. One bar governs the whole body, not one bar per zone: every
+    non-empty line is collected, an optional `### Verdict` heading may
+    stand above them, and exactly one line may remain -- the approval
+    phrase itself, once Markdown emphasis and a terminal `.` or `!` are
+    trimmed, matched end to end rather than as a substring.
+
+    That bar is emptiness rather than a word list because the ways of
+    withholding an approval are unbounded while an approval is not.
+    Enumerating in the allow direction fails closed; enumerating in the
+    veto direction authorizes a merge over whatever the list omits. Three
+    earlier attempts at the veto direction each shipped a hole a reviewer
+    could walk through in ordinary prose: a conditional word list let
+    "Ready for merge." stand over "Please fix the typo."; splitting the
+    headline on sentence punctuation let the same request back in joined
+    by a semicolon, comma, colon, or dash; and exempting the lead-in above
+    a `### Verdict` heading let the findings stand wherever this corpus's
+    own review layout puts them (`### Findings` above `### Verdict`, per
+    shared/workflow/self-review-fallback.md).
+
+    Nothing is blanked before the count, either. Blockquoting and fencing
+    hide a region from a veto that reads text, so a quoted request or a
+    fenced snippet would otherwise vanish and leave a bare approval
+    standing. Here they add lines instead. `>` is also absent from the
+    trim, so a body quoting someone else's approval is not itself one.
+
+    Two further bounds, each closing a route by which this would be looser
+    than the `APPROVED` state it stands in for:
+
+    - a body carrying the agent-disclosure marker is not human approval,
+      whichever login submitted the review;
+    - the review must be head-bound and its author a repository member,
+      which `body_approval_is_admissible` checks on the review record
+      rather than on its prose.
+    """
+    if not body:
+        return False
+    if AGENT_AUTHORSHIP_RE.search(body):
+        return False
+    lines = [ln.strip() for ln in body.splitlines() if ln.strip()]
+    if lines and VERDICT_MARKER_RE.match(lines[0]):
+        rest = VERDICT_MARKER_RE.sub("", lines[0], count=1).strip()
+        lines = ([rest] if rest else []) + lines[1:]
+    if len(lines) != 1 or LIST_ITEM_RE.match(lines[0]):
+        return False
+    return bool(CLEAN_VERDICT_RE.fullmatch(HEADLINE_TRIM_RE.sub("", lines[0])))
+
+
+def body_approval_is_admissible(review, head_oid):
+    """Whether a COMMENTED review's metadata permits reading approval from it.
+
+    Two bounds, both on the review record rather than on its prose, so they
+    hold whatever the body says:
+
+    - `authorAssociation` must mark the reviewer as belonging to the
+      repository. Submitting a COMMENTED review is what any commenter can
+      do, so trusting a non-bot login alone would let a stranger's "Ready
+      for merge." authorize the merge.
+    - the review's own `commit.oid` must be the PR head. GitHub records the
+      commit every review was submitted against, and never dismisses a
+      COMMENTED review, so this is what makes a body-derived approval
+      head-bound like every other allow path here; a `Reviewed commit:`
+      footer is a bot convention a human body does not carry, so it is a
+      secondary check rather than the head binding.
+
+    Each fails closed on an absent value: a payload that cannot show the
+    review was submitted by a repository member against the head cannot
+    show the approval is admissible, and an unverifiable approval is
+    treated as no approval.
+    """
+    assoc = (review.get("authorAssociation") or "").upper()
+    if assoc not in TRUSTED_REVIEW_ASSOCIATIONS:
+        return False
+    oid = ((review.get("commit") or {}).get("oid") or "")
+    if len(oid) < ABBREV_SHA_LEN:
+        return False
+    return bool(head_oid and head_oid.startswith(oid))
+
+
+def latest_human_review_states(reviews, head_oid="", pr_author=""):
+    """Latest standing per non-bot author.
+
+    Values are APPROVED, CHANGES_REQUESTED, NOT_CLEAN, or SELF_APPROVED.
+    NOT_CLEAN is a body-derived blocker: an admissible review body stating
+    the PR is not clean, matched over the raw body with quotes and fences
+    included. SELF_APPROVED is a body-derived approval that cannot be
+    attributed to someone other than the PR's own author, which is
+    recorded so the caller can say why it does not authorize a merge, and
+    which never allows.
+
+    PENDING never changes an author's standing, and COMMENTED changes it
+    only when the review record is admissible (see
+    `body_approval_is_admissible`) and the body either affirmatively
+    approves (see `human_review_body_approves`) or matches
+    `NOT_CLEAN_VERDICT_RE`. GitHub marks a dismissed review by
+    mutating its state to DISMISSED in place; handle a trailing DISMISSED
+    entry too, so either payload shape clears standing.
+
+    A body-derived approval deliberately cannot clear a standing
+    CHANGES_REQUESTED: CLAUDE.md holds that only that reviewer or an
+    explicit dismissal resolves one, and an inferred approval is weaker
+    evidence than the formal state it would be overriding.
+
+    It is also genuinely *latest* rather than sticky: a later
+    non-approving review from the same human retracts it, since GitHub
+    never dismisses a COMMENTED review and `evaluate_verdict` reads issue
+    comments only, so nothing else would see the retraction. Retraction is
+    keyed on the approval a body *established*, not on every body that
+    approves, so a formal APPROVED that a later approving COMMENTED review
+    merely restates stays formal, and chatty follow-up prose cannot clobber
+    it.
+
+    The PR author's own body-derived approval never counts. GitHub itself
+    forbids an author approving their own PR, which is why the formal
+    APPROVED fast path never needed the guard; `gh pr review --comment`
+    has no such restriction, so without this an agent running under the
+    user's login could authorize its own merge by posting its self-review
+    as a review rather than as a comment (which `evaluate_verdict`
+    already refuses). An empty `pr_author` fails closed the same way: a
+    payload that cannot name the author cannot show the reviewer is
+    someone else.
     """
     states = {}
+    inferred = set()
     for r in reviews:
         login = r.get("author", {}).get("login", "")
         if not login or is_bot_login(login):
@@ -112,8 +284,30 @@ def latest_human_review_states(reviews):
         state = r.get("state", "")
         if state in ("APPROVED", "CHANGES_REQUESTED"):
             states[login] = state
+            inferred.discard(login)
         elif state == "DISMISSED":
             states.pop(login, None)
+            inferred.discard(login)
+        elif state == "COMMENTED" and states.get(login) != "CHANGES_REQUESTED":
+            raw_body = r.get("body", "") or ""
+            admissible = body_approval_is_admissible(r, head_oid)
+            if admissible and human_review_body_approves(raw_body):
+                # Only an approval this body established is retractable.
+                # Marking the login inferred while a formal APPROVED already
+                # stands would let the next chatty review pop that formal
+                # state, which is a false deny.
+                if states.get(login) != "APPROVED" or login in inferred:
+                    inferred.add(login)
+                states[login] = (
+                    "APPROVED" if pr_author and login != pr_author
+                    else "SELF_APPROVED"
+                )
+            elif admissible and NOT_CLEAN_VERDICT_RE.search(raw_body):
+                states[login] = "NOT_CLEAN"
+                inferred.discard(login)
+            elif login in inferred:
+                states.pop(login, None)
+                inferred.discard(login)
     return states
 
 
@@ -203,6 +397,7 @@ def evaluate(cmd, pr_data):
     reviews = pr_data.get("reviews", []) or []
     comments = pr_data.get("comments", []) or []
     head_oid = pr_data.get("headRefOid", "") or ""
+    pr_author = (pr_data.get("author") or {}).get("login", "") or ""
 
     # CI first: never merge red or incomplete checks.
     status_rollup = pr_data.get("statusCheckRollup") or []
@@ -221,13 +416,21 @@ def evaluate(cmd, pr_data):
             "CI; wait for all checks to complete."
         )
 
-    human_states = latest_human_review_states(reviews)
+    human_states = latest_human_review_states(reviews, head_oid, pr_author)
     blockers = [k for k, v in human_states.items() if v == "CHANGES_REQUESTED"]
     if blockers:
         return deny(
             "Strict Merge Control Policy: standing CHANGES_REQUESTED review "
             f"from {', '.join(sorted(blockers))}. Only that reviewer (or an "
             "explicit dismissal) can clear it -- a later bot verdict cannot."
+        )
+    not_clean_bodies = [k for k, v in human_states.items() if v == "NOT_CLEAN"]
+    if not_clean_bodies:
+        return deny(
+            "Strict Merge Control Policy: a human review body from "
+            f"{', '.join(sorted(not_clean_bodies))} states this PR is not "
+            "clean. Disagreement among reviews is not fully clean; address "
+            "it and get an approving review on the current head."
         )
 
     verdict = evaluate_verdict(comments, head_oid)
@@ -240,6 +443,8 @@ def evaluate(cmd, pr_data):
         return ALLOW
     if verdict == "clean":
         return ALLOW
+    if verdict == "none" and "SELF_APPROVED" in human_states.values():
+        verdict = "self-approved"
     reasons = {
         "not-clean": (
             "the latest review verdict for this PR is not clean (e.g. "
@@ -260,8 +465,17 @@ def evaluate(cmd, pr_data):
             "the only clean verdict is a comment posted under a "
             "non-reviewer login, which cannot authorize a merge (an agent "
             "posting under the user's login must not approve its own "
-            "work). Get a clean verdict from the review workflow, or a "
-            "formal APPROVED review from a human."
+            "work). Get a clean verdict from the review workflow, or an "
+            "approving review from a human."
+        ),
+        "self-approved": (
+            "the only approving review is the PR author's own, or the PR "
+            "author is not named in the payload, which "
+            "cannot authorize a merge (an agent posting under the user's "
+            "login must not approve its own work -- posting the "
+            "self-review as a review rather than a comment does not "
+            "change that). Get a clean verdict from the review workflow, "
+            "or an approving review from someone else."
         ),
         "none": (
             "no review verdict and no human approval are present. You "
@@ -348,7 +562,9 @@ def fetch_pr_data(cmd, cwd):
             view_args += ["--repo", repo_match.group(1)]
 
     result = run_gh(
-        view_args + ["--json", "url,reviews,statusCheckRollup,headRefOid"], cwd
+        view_args
+        + ["--json", "url,author,reviews,statusCheckRollup,headRefOid"],
+        cwd,
     )
     if result.returncode != 0:
         return None, (

@@ -66,6 +66,16 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
     Large pages exceed the tool's token cap and get spilled to a file --- grep that file rather than reading it whole, and diff byte counts across two fetches to confirm you're looking at a genuinely new build rather than an unchanged one.
     Check the branch's own commit log (`mcp__github__list_commits` with `sha: gh-pages` --- the `LIST_COMMITS` operation in [`tool-mappings.md`](../tool-mappings.md), verified by use in the session below) to see which build is actually deployed before drawing conclusions;
     a preview comment's timestamp can precede the deploy of the commit you care about. (`UCD-SERG/serocalculator#392`, 2026-07-25: used this to verify six new topics appeared in a rendered altdoc sidebar, counting occurrences before and after the fix, after both `curl` and `WebFetch` 403'd.)
+- **[`gh-cli.md`](gh-cli.md)'s "A session's egress proxy can block GraphQL entirely" bullet is not `gh`-specific -- the same 403 answers a raw `curl` to `https://api.github.com/graphql` in a session with no `gh` binary at all.**
+  Measured 2026-09-01, no `gh` on `PATH`: `curl -H "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/repos/Morrison-Lab/wai/pulls/173` returned `200`, while the same token against `https://api.github.com/graphql` returned the identical `403` body that bullet quotes.
+  So this is not a quirk of the `gh` client, it is a property of the session's egress policy, and it confirms the mechanism in exactly the session class -- remote/web, no `gh` -- where `gh api graphql` was never available to test it with.
+  Since `gh pr view --json` depends on GraphQL fields for several of them, it is unavailable here even indirectly, not merely absent as a binary.
+  Don't assume plain REST shares its fate, since the REST call above succeeded in the same session.
+  `scripts/build-pr-payload.py` (ai-config#2908) assembles a `check-pr-fully-clean.py` `--from-json` payload from REST alone for exactly this case -- run it instead of hand-transcribing MCP tool output into the payload JSON, which is slow and error-prone:
+  ```
+  python3 scripts/build-pr-payload.py OWNER/REPO N out.json
+  python3 scripts/check-pr-fully-clean.py N -R OWNER/REPO --from-json out.json
+  ```
 - Consequence: you CANNOT poll PR review/CI state from a background Monitor.
   Rely on `mcp__github__subscribe_pr_activity`, which delivers review comments and CI *failures* --- but NOT CI success, new pushes, or merge-conflict transitions.
   A self-check-in scheduler may be absent: rme's instructions reference `send_later` (from the `claude-code-remote` MCP server), and the harness may expose its own (e.g. `ScheduleWakeup`) --- but in this remote rme session ToolSearch surfaced neither, so you can't arm the safety re-poll the watch-guidance suggests.
@@ -75,3 +85,38 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
   Reconcile BOTH before calling a PR clean;
   the agent post-step tends to drip 1-2 pre-existing cosmetic nits per round.
   That drip is a reason to keep iterating, never a reason to stop or to ask whether to stop --- see `skills/ardi/SKILL.md`, "Stopping conditions".
+- **`Stop` hooks in remote/web plugin sessions do not consistently fire on turn completions or context-summary resumptions.**
+  In local Claude Code sessions, `Stop` hooks in `hooks/hooks.json` intercept bare placeholders like `No response requested.` (ai-config#1579, #2943).
+  In remote/web cloud sessions, `Stop` hooks may not be dispatched by the web harness across turn boundaries or after context window summarization.
+  Do not rely on local `Stop` hook enforcement to prevent placeholder turns when running in remote/web cloud sessions --- adhere to `CLAUDE.md`'s "Always produce a reply" rule directly in every turn.
+- **This session's GitHub identity varies BY OPERATION, and which routes exist follows from that rather than from any single probe.**
+  The credential is proxy-substituted (the literal value begins `prox`), and it does not resolve to one actor.
+  Measured 2026-09-02 in a remote session scoped to `Morrison-Lab/ai-config`, except the row that carries its own date:
+
+  | operation | identity observed | how it was read |
+  |---|---|---|
+  | `GET /user` | `d-morrison` (User) | the response body; header says `allows_permissionless_access=true` |
+  | REST write (post a PR comment) | `claude[bot]` (Bot), `author_association: CONTRIBUTOR` | fetched the created comment and read its `user` |
+  | `git push` | `d-morrison` (User) | the Actions `actor` on every push-triggered run |
+  | MCP write (`mcp__github__*`, 2026-09-04) | `d-morrison` (User) | the created comment's `user`, and the dispatched run's `actor` |
+
+  So a `GET /user` probe answers nothing about what a write will look like, which is the trap:
+  it reports the friendly answer, and the write then lands under a different actor.
+  Read the artifact the write produced --- the comment's `user`, or the run's `actor` --- rather than the token's self-description.
+- **Two consequences follow, and both bite where a workflow gates on who acted.**
+  A REST write produces a **bot-authored** event, so any workflow gated on `github.event.sender.type != 'Bot'` skips for it;
+  `git push` produces a User-authored event and does not.
+  That covers **every** `pull_request` event a REST call originates, not only the `update-branch` one that first exposed it:
+  a PR **created** through `POST /repos/<owner>/<repo>/pulls` sends `pull_request.opened` as the bot, so it gets no automatic review at all.
+  The branch push beforehand does not rescue it, because a push to a branch with no PR yet fires no `pull_request` event --- so the one User-sent action happens too early to help.
+  Measured 2026-09-03 on [#3043](https://github.com/Morrison-Lab/ai-config/pull/3043), the PR recording this entry, which tripped the trap it documents:
+  its `Claude Code Review` run reported `completed success` with all six `review / *` jobs `skipped`, actor `claude[bot]`.
+  Read a review run's **jobs** rather than its conclusion, since the run is green either way.
+  The remedy is the same shape: push a further commit with `git` once the PR exists, which fires a User-sent `synchronize`.
+  And a bot-authored comment carries `author_association: CONTRIBUTOR`, which is not in the `OWNER`/`MEMBER`/`COLLABORATOR` set `Morrison-Lab/gha`'s `claude.yml` gates its agent on, so an `@claude review` comment posted this way is skipped by design.
+  `POST /actions/workflows/<file>/dispatches` is refused outright with `403 Resource not accessible by integration` --- "integration" is GitHub's word for an App, and the App's installation token carries `issues: write` and `pull_requests: write` but not `actions: write`.
+  Deleting a remote branch is refused by the proxy itself (`Write access to this GitHub API path is not permitted through this proxy`), so a merged branch is tidied locally and left on the remote.
+  Merging is not similarly blocked, and the absence of `gh` does not excuse the pre-merge head pin: plain REST takes it as `sha`, per [`fully-clean`](../shared/workflow/fully-clean.md)'s merge-pin bullet, which carries the exact call and the branch-tidying caveat above.
+  - **Do:** re-trigger a review by pushing with `git`, or by the MCP client's dispatch or mention, the writes here that carry a User identity.
+  - **Don't:** reach for `workflow_dispatch` or an `@claude review` comment as the fallback through the raw API --- in this session both are closed, for the two distinct reasons above;
+    the MCP client dispatches where GitHub refuses the raw call and mentions where the gate ignores the raw comment, per [`github-mcp-tools.md`](github-mcp-tools.md)'s recurrence bullet.

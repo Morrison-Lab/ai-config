@@ -65,8 +65,16 @@ Moved to [`gh-cli.md`](gh-cli.md).
 
 When starting a GII loop, do a cleanup pass before diving into ARDI:
 
-1. **List all open PRs** with `mcp__github__list_pull_requests`. Look for
-   stale bot-opened PRs that target the same issues as the queue.
+1. **List all open PRs** with `mcp__github__list_pull_requests` (fields
+   `number,title,user,assignees`).
+   Keep the full list for step 3's issue-coverage detection, which only reads
+   it, and apply `reviewing-prs.md`'s scope test (opened by or assigned to the
+   invoking user, explicitly requested, or authored by the GitHub Actions app)
+   immediately before every mutation in steps 2 through 4 (the close in step
+   2, the close and the note in step 3, the merge in step 4): an out-of-scope
+   PR is reported to the user rather than closed, commented on, or merged
+   into, and an issue it already covers is left to it rather than grabbed.
+   Look for stale bot-opened PRs that target the same issues as the queue.
 2. **Close empty PRs** — bot-opened branches with no commits (e.g. a `@claude`
    task run that posted a comment but never pushed code). Check `get_commits`
    on each PR before closing.
@@ -314,3 +322,4 @@ Capture the SHA `update-branch` produces (or re-read `head.sha` / `headRefOid` i
 **Follow-up, 2026-08-30: strict mode is confirmed active in this repo.**
 `gh api repos/Morrison-Lab/ai-config/branches/main/protection` reported `required_status_checks.strict: true` (read 2026-08-30, during the ai-config#2638 merge described in [`gh-cli.md`](gh-cli.md)'s update-branch section).
 That settles the setting's presence, not the #2470/#2480 asymmetry above --- the queue-ordering account of why one comparably-stale PR merged while the other was refused remains unverified.
+Enabling a GitHub merge queue ([`shared/workflow/merge-queue.md`](../shared/workflow/merge-queue.md)) eliminates the O(N^2) review rounds caused by this strict mode by building speculative merge trees on the forge side.

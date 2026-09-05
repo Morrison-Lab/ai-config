@@ -6,7 +6,7 @@ Worked-example case records for the rules below live in
 [`sync-with-main.cases.md`](sync-with-main.cases.md), moved out of the auto-loaded context.
 
 This fragment covers the single-branch-vs-`main` case. When orchestrating a
-multi-agent `ultracode` session, merges can happen at more points than that —
+multi-agent `ultracode` session, merges can happen at more points than that ---
 see [`ultracode-merge-conflicts`](ultracode-merge-conflicts.md) for the
 broader check (worktree-isolated agent branches, concurrent `parallel()`
 results) and the note on GitHub's mergeable indicator not evaluating custom
@@ -36,9 +36,15 @@ If the merge has conflicts, resolve them, run the project's standard pre-commit
 checks (render / lint / spell / tests), commit, then push. Don't push a
 half-resolved merge.
 
+**A sync-only push invalidates the previous commit's review verdict --- never arm auto-merge after syncing.**
+Merging `origin/main` in and pushing creates a new HEAD commit ref that is unreviewed until fresh reviews land.
+Arming `gh pr merge --auto` after a sync push risks merging an unreviewed head as soon as CI passes ([`fully-clean`](fully-clean.md), [Pattern 12](../../memories/mistake-patterns.md)).
+Always wait for fresh reviews and CI on the new head, re-verify with `check-pr-fully-clean.py`, and merge directly.
+
 **After merging main, re-check version parity.** In R packages with a
 `version-check` CI job, the branch's `DESCRIPTION` `Version:` must *exceed*
-main's. A conflict-free merge can silently put them at parity — main advanced
+main's.
+A conflict-free merge can silently put them at parity --- main advanced
 (e.g. another PR merged between when you last bumped and now). After every merge
 of main, compare versions:
 
@@ -99,13 +105,13 @@ extracted script, a doc example) needs the copy re-synced too, not just the
 conflicted file resolved.** When a PR extracts inline logic (e.g. a workflow
 step's shell block) into a standalone script for testability, and `main`
 independently changes that same inline logic while the PR is open, resolving
-the merge conflict in the workflow file is not enough — the extracted script
+the merge conflict in the workflow file is not enough --- the extracted script
 must be updated to match `main`'s new logic exactly, or the PR silently
 reverts `main`'s fix the moment it merges. Diff the extracted copy against
 `main`'s current inline version line-for-line (strip indentation, `diff`) to
 confirm an exact match, not just "looks about right." If the PR carries tests
 against the extracted copy (fixtures, unit tests), add regression coverage for
-whatever `main`'s change fixed — the merge is the natural moment to catch a
+whatever `main`'s change fixed --- the merge is the natural moment to catch a
 gap the original PR's tests didn't anticipate, and to prove the new fixtures
 actually catch the regression (temporarily revert the fix, confirm the test
 fails, then restore).
@@ -213,30 +219,39 @@ still edit that same inline block --- your merge just broke their textual
 diff, even though their intended change is usually trivial to re-apply to
 the new location.** This is the mirror image of the case above: there,
 you're the one resyncing after `main` moved a copy of your logic; here,
-*you* are the one who moved the logic, so the burden of noticing and fixing
-the resulting conflict falls on you, not on the sibling PR's author waiting
-to hit it. Don't wait for that PR's own merge/CI to surface the conflict ---
+*you* are the one who moved the logic, so the burden of noticing and
+surfacing the resulting conflict falls on you, not on the sibling PR's author
+waiting to hit it, and of fixing it where `memories/reviewing-prs.md`'s
+scope test permits.
+Don't wait for that PR's own merge/CI to surface the conflict ---
 check every open PR touching the same file right after your extraction
 merges: `git merge-tree "$(git merge-base origin/main origin/<sibling-branch>)" origin/main origin/<sibling-branch>`
 (or `gh pr diff <N>` against the new `main`) shows whether it still applies
-cleanly. Re-apply the
-sibling PR's actual semantic change (not a mechanical `--theirs`) to the new
-location, verify with a direct diff that the extracted unit now differs from
-`main` by exactly that PR's intended change and nothing else, then push to
-their branch and flag what you did in a PR comment.
+cleanly.
+That check reads the sibling branch and edits nothing, so it runs for every
+sibling PR.
+Then apply `memories/reviewing-prs.md`'s scope test before preparing
+anything: for a sibling PR that fails it, report the conflict to the user and
+leave the PR untouched, since they can assign or name it first.
+For one that passes, re-apply the sibling PR's actual semantic change (not a
+mechanical `--theirs`) to the new location, verify with a direct diff that
+the extracted unit now differs from `main` by exactly that PR's intended
+change and nothing else, then push and flag what you did in a PR comment.
 
 See [`sync-with-main.cases.md`](sync-with-main.cases.md), "Check other open
 PRs after merging an extraction".
 
-**That "push to their branch" is scoped by standing, not only by cause.**
+**That "push to their branch" is scoped by the scope test, not only by cause.**
 gha#201/#202 were CI workflow files in a repo the author drove, where a push
 saves the sibling's author a round and risks nothing they were relying on.
-The same push onto a branch you do not own --- a colleague's active work, and
-most sharply a release branch carrying an out-of-band process --- can disrupt
-something a comment would not.
-There, name the extraction, the deletion, or the rename
-and where the content went in a PR comment,
-and leave the push to whoever owns the branch.
+The same push onto a PR that fails the scope test --- a colleague's active
+work you were neither assigned nor asked to drive --- and, whatever the test
+says, onto a release branch carrying an out-of-band process, can disrupt
+something a report would not.
+There, report the extraction, the deletion, or the rename
+and where the content went to the user,
+who can assign or name the PR if they want it acted on,
+and leave the branch untouched.
 Causing the conflict obliges you to *surface* it.
 It does not by itself license editing someone else's branch.
 See [`batch-merge-and-resolve`](batch-merge-and-resolve.md),

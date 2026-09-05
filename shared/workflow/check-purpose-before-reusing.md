@@ -246,6 +246,39 @@ never mentioned it.
 The reviewer located the missing gate by asking what the position-reading path
 required.)
 
+**A sibling's DEFAULT is a guard too, and it is the easiest one to miss ---
+nothing marks a default argument as load-bearing, so a helper written beside
+a sibling that happens to call a *different* function inherits the shape and
+not the default.**
+
+A test helper modeled on a neighbouring test's call carried the same
+structure --- same helper pattern, same style of setup --- but the
+neighbouring test called a sibling simulation function that supplied its own
+default for a required argument (`noise_limits`).
+The function the new helper actually called had no such default; the
+argument was mandatory there.
+The helper omitted it anyway, because the sibling's call worked without it
+and nothing in the sibling's shape signalled that the omission was the
+sibling function's own default doing the work rather than the argument being
+optional in general.
+Every call through the new helper errored.
+
+The clause-by-clause diff this section already prescribes catches this the
+same way it catches a dropped `set -o pipefail` or a dropped carve-out: ask,
+for each argument the sibling's call omits, whether it omits it because the
+argument does not apply here or because *that function* supplies a default
+for it.
+The second case is the one that does not transfer.
+
+- **Do:** check each argument a sibling call omits against that sibling's
+  own function signature, not against the new function's --- an omission is
+  only safe to copy when the same function supplies the same default.
+- **Don't:** read "the sibling test's call works without this argument" as
+  evidence the argument is optional; it may only be optional for the
+  function the sibling calls.
+
+(`UCD-SERG/serocalculator#668`, 2026-09-01.)
+
 ## Reusing a CLAIM: its truth conditions travel with the question, not the sentence
 
 Every section above reuses a **structure** --- a template, a directory tree, a

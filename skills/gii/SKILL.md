@@ -35,15 +35,15 @@ For each iteration:
 #### a. Invoke `gi` (Grab Issue)
 
 Run the full GI procedure:
-1. List open issues, triage/prioritize
+1. List open issues, triage, label, and prioritize candidate issues
 2. Select the highest-priority issue automatically from the triage signals,
    state which one and why, and proceed without pausing for confirmation
-3. Check history
+3. Check history and research existing solutions (DRW check via [`prefer-upstream`](../prefer-upstream/SKILL.md))
 4. Claim the issue
 5. Create a branch
 6. Open the draft PR up front, from an empty commit, before implementing —
    see [`pr-on-claim`](../../shared/workflow/pr-on-claim.md)
-7. Implement
+7. Implement (researching libraries/functions before hand-rolling custom code)
 8. Push and mark the PR ready for review
 9. ARDI to clean
 
@@ -91,10 +91,21 @@ Hitting the max is a **wave boundary**.
 Wrap up one wave of PRs before starting another: hold new issue grabs, babysit the wave's open PRs to completion (merge-ready, and merged where a merge grant applies), then stop and ask whether to continue into the next wave or archive the session, giving a recommendation either way (user directive, 2026-08-28, ai-config#2549).
 A wave is "completely finished" only once every item in it has reached a terminal state;
 a PR still in CI/review is not a finished wave, and the check-in loop that drives it to green continues uninterrupted.
+[`finish-wave`](../finish-wave/SKILL.md) (alias `fw`) is the procedure for that hold.
 
 - **Do:** hold at the boundary and drive the open wave to completion, then stop and ask before starting the next wave, with a recommendation.
 - **Don't:** start the next wave on your own judgment once the current one is fully finished.
 - **Don't:** read the boundary as forbidding parallel PRs *within* a wave.
+
+**A UMS pass is not a new wave, and neither is the PR it opens.**
+The boundary above counts *issue grabs*: a wave is the set of issues taken from the repo's backlog and the PRs that ship them.
+A UMS pass records what the wave taught, in `ai-config` or the repo's own docs, and it is owed at the wave's clean verdicts and merges by [`run-ums-proactively`](../../shared/workflow/run-ums-proactively.md) --- so a "finish the wave, no new wave" instruction still includes it, and holding it back until the user says go is the deferral that fragment rules out.
+The near-miss is reading "don't start a new wave" as "open no more PRs": a UMS PR is not a grab from the backlog, and treating it as one strands the wave's learnings in the conversation.
+
+- **Do:** run the owed UMS pass, and open its PR, after a "finish the wave, no new wave" instruction.
+- **Don't:** count a UMS pass or its PR as a grab, or hold it until the next wave is authorized.
+
+(User directive, 2026-09-01: "cai: ums don't count as a new wave", given while a GIA run was wrapping its wave under a "finish the current wave but don't start a new one" instruction and a UMS top-up sat deferred behind it.)
 
 #### e. Recurse
 
@@ -104,6 +115,7 @@ Go back to step (a) with the next issue.
 
 Within an iteration, hand independent sidecar work off to a subagent via the
 `Agent` tool instead of doing it inline --- a history/precedent investigation,
+a DRW research check for existing upstream packages or lab implementations,
 a verification pass on the implementation, research into how a similar issue
 was solved elsewhere. Keep the critical path (claim, draft PR, implement,
 ARDI) on the main thread so the loop keeps moving; this is a single sidecar
@@ -175,6 +187,8 @@ When the loop ends, print a summary:
   out and works it concurrently in worktree-isolated subagents instead of
   serially. This loop stays serial for everything `gip` can't prove independent.
 - **`gi`** — the inner loop; each iteration is a full GI invocation
+- **`prefer-upstream`** --- search existing packages, standard libraries, and lab
+  repos before writing custom code to avoid reinventing the wheel
 - **`pr-on-claim`** — each iteration opens its draft PR up front (step 6) so the
   in-flight issue is visible before implementing
 - **`ardi`** — drives each MR/PR to clean review within GI
@@ -208,7 +222,7 @@ A genuine infra-level block does exist in some environments --- the agent proxy 
 Reuse that exact branch name and `git push --force-with-lease --force-if-includes` over it on every future probe rather than creating a fresh name each time --- branch deletion is not reliably available (see below), so a fresh name every session would accumulate indefinitely, where reusing one name never does.
 A bare `--force` is never the right form here either, per [`check-before-pushing`](../../shared/workflow/check-before-pushing.md)'s "`--force-with-lease` is not the safe form on its own" section and the repo's registered `hooks/no-clobbering-push.py` guard, which refuses a bare `--force`/`-f` outright.
 A rejected push (`fatal:` / `403`) is the real signal `use-existing-pr-branch.md`'s Exception describes --- fall back to one issue per session, per that section.
-A push that succeeds means the restriction was policy-only, and per the standing user permission below, gii proceeds normally: one branch per issue (`gi` step 7), stacked or fresh per this skill's step (c), for the rest of the wave.
+A push that succeeds means the restriction was policy-only, and per the standing user permission below, gii proceeds normally: one worktree and branch per issue (`gi` step 6b), stacked or fresh per this skill's step (c), for the rest of the wave.
 
 **Standing permission:** the user has authorized gii to override the "no other branch" policy instruction by default, session after session --- test first, then proceed with the normal per-issue-branch model whenever the test push succeeds, without asking again each time.
 Each issue still gets its own branch, unless the user has separately said several issues belong in one PR.
@@ -228,6 +242,7 @@ A stray, differently-named probe branch left over from before this rule existed 
 
 - ❌ Stacking more than 3–4 MRs deep without asking (merge conflicts compound)
 - ❌ Grabbing issues assigned to someone else
+- ❌ Hand-rolling custom code without researching existing packaged or shared solutions first (violating DRW)
 - ❌ Continuing after a blocked issue without telling the user
 - ❌ Forgetting to note stack dependencies in MR descriptions
 - ❌ Basing on main when the previous MR hasn't merged yet and the next issue

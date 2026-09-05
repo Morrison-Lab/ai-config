@@ -38,6 +38,36 @@ source repo instead --- see the `github/docs` bullet in `memories/claude-code.md
 statement --- it had moved to the "Triggering a workflow" article; caught by
 review.)
 
+**Second occurrence, 2026-09-02 on `Morrison-Lab/gha#811`, where the citations
+were never fetched at all rather than remembered from an earlier fetch.**
+Two `github/community` discussions were cited for a GitHub Actions deadlock
+message, and neither carries it: #30708 reports
+`Canceling since a higher priority waiting request ... exists`, whose cause is
+a `github.workflow` naming collision, and #43510 is a thread about reusable
+workflows being skipped, in which the default two-run limit is offered as one
+explanation and contested by a later poster.
+[rhysd/actionlint#538](https://github.com/rhysd/actionlint/issues/538) does
+carry it, as
+`Canceling since a deadlock for concurrency group '...' was detected between
+'top level workflow' and 'build-image'` --- the group name elided here, which
+on the page reads `ci-` followed by a forty-character hash.
+The rule above already prescribes the remedy.
+
+What is new is the **tell**, because this section states its cause as staleness
+--- a pairing that was once right --- and a citation that was never checked
+matches none of that wording.
+The cause here is that the message was *known to be real*, so the URLs were
+selected to support a claim already believed rather than read to establish one,
+which feels like sourcing rather than like asserting.
+The round-two commit that retracted them, `385d4f43`, states it plainly: "I
+cited two community discussions for the deadlock message without opening
+either."
+
+- **Do:** fetch a citation you are adding to support a claim you already
+  believe, on the same terms as one you are adding to establish a claim.
+- **Don't:** treat confidence in the underlying claim as evidence about the
+  URL --- a real message can be cited to two pages that do not carry it.
+
 **The other authoring-side counterpart: run the exact-substring check on your
 own quotation, not only on one a reviewer disputes.**
 The bullet further down
@@ -687,8 +717,12 @@ for one they can't, only checking the field directly against its target catches 
 A LaTeX document only prints entries reached by `\cite` (transitively, following any `\input`/`\include`), so an unused `.bib` entry can carry an arbitrary DOI with no reader ever seeing it render.
 Auditing it spends effort on a defect nobody can encounter, and skipping this scoping step risks reporting false urgency on an entry the document never surfaces.
 
-The mechanical half --- given a `.bib`, resolve each cited DOI and diff the returned title and first author against the entry --- is a deterministic check with an exact verdict, the shape [`algorithmatize-checks`](../workflow/algorithmatize-checks.md) says should not stay a prose instruction;
-it is not yet built here.
+The mechanical half --- given a `.bib`, resolve each cited DOI and diff the
+returned title and first author against the entry --- is a deterministic check
+with an exact verdict, the shape
+[`algorithmatize-checks`](../workflow/algorithmatize-checks.md) says should not
+stay a prose instruction;
+[`scripts/check_doi_bib.py`](../../scripts/check_doi_bib.py) implements it.
 
 - **Do:** verify a cited DOI resolves to a work whose title and authors match the citation, not just that it resolves.
 - **Do:** confirm which fields your document's actual citation style renders before trusting a compiled-PDF read to catch a wrong DOI.
@@ -699,3 +733,26 @@ it is not yet built here.
 
 (Pattern observed in `scdenney/open-science-skills`'s `citation-check`, CC BY-NC 4.0 --- pattern only, nothing copied;
 ai-config#882.)
+
+## A cross-reference by heading quotes the heading, or does not claim to
+
+A cross-reference of the form "see the section of the same name in X" asserts that X carries a heading identical to the one here.
+That is a claim about another file's text, and it is checkable by one grep --- so check it, and when the headings differ, say "the same rule" (or name the target heading verbatim) rather than "the same name".
+The near-miss is writing "same name" from memory of what the sibling entry is *about*, which reads as a precise pointer and sends the reader looking for a heading that is not there.
+
+- **Do:** grep the target file for the heading before writing "of the same name", and quote it verbatim when it differs.
+- **Don't:** write "the section of the same name" as a synonym for "the corresponding section".
+
+(Review finding on ai-config#2924, 2026-09-01: a `memories/delegation.md` entry pointed at `CLAUDE.md`'s "section of the same name", and the two headings differed;
+reworded to "section of the same rule".)
+
+## A figure carried from a source keeps the source's unit
+
+A count restated from a source is a claim about the source, so the unit travels with the number.
+"27 files whose signatures use the +4 form" and "27 signatures at +4" are different quantities, since one file can hold several, and only the first is what the cited comment measured.
+The near-miss is compressing the source's phrasing for rhythm and letting the unit change under the compression, which reads as a paraphrase and is a new, unmeasured claim.
+
+- **Do:** restate a cited figure with the noun the source counted, and re-run the count if you want the other unit.
+- **Don't:** shorten "27 files with X" to "27 X" in the name of concision.
+
+(Review finding on ai-config#2955, 2026-09-01: a case record wrote "27 multi-line signatures at +4" where the cited serocalculator#672 comment had counted 27 files.)

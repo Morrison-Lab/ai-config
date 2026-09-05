@@ -35,6 +35,20 @@ Check for this once per repo, right after the first push, rather than waiting to
 Treat "not configured" the same as the other two failure modes: self-review immediately, held to the same fact-check rigor "A fallback self-review is prone to being shallow, so hold it to the same bar as the bot it stands in for" requires (fact-check-prose, the cause check, the cited-source rule).
 Because a genuine config gap is a standing property of the repo rather than a one-off outage, also file a tracking issue on it per [`report-mistakes-proactively`](report-mistakes-proactively.md) --- wiring up review coverage is worth fixing, not just working around on every push.
 
+**Repository configuration defect (unusable API credential) is a fourth failure mode.**
+The pre-flight credential shape check in `Morrison-Lab/gha` (`check-credential-shape`, gha#686) detects when every configured API credential (`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`) carries INTERIOR whitespace --- a pasted PEM block, a JSON credential, or a wrapped terminal copy.
+Interior is the operative word: a trailing newline is trimmed and tolerated, because `gh secret set < file` writes one routinely, so stripping one is not the repair.
+Because an HTTP `Authorization` header cannot carry interior whitespace, the workflow aborts before making an API call, `review / require-review` and `review / require-clean-verdict` fail red, and no money is spent.
+The PR then carries a comment reading:
+
+```text
+> [!CAUTION]
+> **Claude review did not run: the configured API credential is unusable.**
+```
+
+Unlike a transient network failure or timeout, this is a deterministic repository defect: re-running the job without repairing the secret fails identically.
+Treat this the same as other verdict-blocking failures: perform a fallback adversarial self-review to keep the PR moving, but recognize that the PR is **not** externally clean and the required check remains red until a repository admin updates the secret under **Settings -> Secrets and variables -> Actions** to a single-line value carrying no interior whitespace (for example one from `claude setup-token`).
+
 **Post the self-review before doing anything else --- don't stall the PR waiting for the bot.
 Then, before writing the check off as permanently broken, try one manual re-run of the failed job --- even after the workflow's own built-in same-run retry (e.g. gha#185's stub-retry) also stubbed.**
 Two stubs back to back is a stronger signal than one, but it's still not conclusive: a separately-triggered re-run (`rerun_failed_jobs` via the GitHub Actions API/MCP tool, not just re-reading the same run) is an independent LLM invocation, and the failure modes behind stubs (permission-denial spirals, timing) don't always repeat.
@@ -199,9 +213,35 @@ An unparsed verdict surfaces only as a `NOTE: ... has a format the verdict
 classifier cannot read` line, which is deliberately **non-blocking** --- so it
 prints among the notes rather than among the findings.
 
+**Ask the classifier before posting, rather than after.**
+Every rule in this section is one the classifier already enforces, and it can
+be run against a draft:
+
+```bash
+python3 scripts/check-review-body.py draft.md
+```
+
+It reports what `check-pr-fully-clean.py` would make of that body -- whether
+it is skipped as a notice, whether it reads as a structured report, what
+verdict it carries, and which finding pattern matches -- and exits 0 only for
+a body that would classify CLEAN.
+It answers about the BODY alone: quorum, reviewer identity and head-SHA
+matching are the caller's business, so a CLEAN answer is not a guarantee of
+admission.
+
+The reason to reach for it is that a rejected review is silent.
+A body the classifier skips leaves whatever verdict was standing before it
+still standing, with nothing on the PR saying why -- so the failure looks
+like a stale not-clean rather than like a review that did not land.
+Three self-reviews were posted to `ucdavis/hac.sap#37` on 2026-09-03 before
+one counted, and each rejection was diagnosed by guessing at a rule the
+classifier would have answered for free.
+
 - **Do:** open or close the comment with the agent's own marker line, so the
   first or last line resolves to an agent.
 - **Do:** write `### Verdict: Clean` on one line.
+- **Do:** run the draft through `check-review-body.py` before posting it,
+  rather than diagnosing a rejection afterwards.
 - **Do:** read a `NOTE:` about an unreadable review as being about *your own*
   fallback, since a bot's report is already in the parsed form.
 - **Don't:** bury the marker mid-body under a heading of your own --- that is
@@ -250,17 +290,12 @@ Copilot beside `claude-review` is the common pairing, and
 separately-billed ChatGPT-plan CLI.
 Re-dispatching the reviewer that already ran is the weakest of the available options, since it re-reads the same diff through the same model.
 
-**Antigravity is not one of these any more, and the difference matters here more
-than anywhere else.**
-It is permanently out of service (user directive, 2026-08-20), confirmed the
-same day on a dispatched run that ended
-`request failed (code 429): Your prepayment credits are depleted` and
-`Execution failed: model unreachable`.
-That is not the transient outage this fragment otherwise teaches you to re-check
-each round --- re-checking it will never succeed.
-So the pairing above is now Copilot and `delegate-to-codex`.
-Copilot and that CLI reviewer are not interchangeable, which is why the preference still needs
-reading rather than collapsing to one name.
+**The automated Antigravity PR-review workflow is not one of these any more, and the difference matters here more than anywhere else.**
+The automated `antigravity-review.yml` / `antigravity-code-review.yml` dispatch stays out of service: its 2026-08-20 run ended `request failed (code 429): Your prepayment credits are depleted` and `Execution failed: model unreachable`, and a 2026-09-01 retest (`workflow_dispatch` run 33557587761) failed again with a different error, `Spend cap breached` (code 403).
+Two different failures a week apart both stop this dispatch path, so keep it disabled rather than re-running it on spec.
+**This is a separate claim from the `agy` CLI**, which is confirmed working on Windows as of 2026-09-02 (`memories/delegation.md`'s "agy on Windows" section) and is usable for a manually-dispatched second opinion, the same way `delegate-to-codex` is.
+So the pairing above is Copilot and `delegate-to-codex`, with a manual `agy --print` CLI dispatch as a further option once confirmed on your own platform.
+Copilot, `delegate-to-codex`, and a manual `agy` CLI dispatch are not interchangeable, which is why the preference still needs reading rather than collapsing to one name.
 Copilot is **requested** on the PR, and answers only where the org's licensing
 reaches it.
 `delegate-to-codex` is the billed ChatGPT-plan CLI this corpus

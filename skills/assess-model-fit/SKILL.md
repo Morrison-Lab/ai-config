@@ -70,3 +70,6 @@ you a go-ahead or chains into `select-model` with your task details.
   and let the script recommend a verdict and model.
 - **When in doubt:** Use executable mode — it's faster and catches nuance the
   manual checklist might miss.
+- **Broader stack recommendation ([recm](../recm/SKILL.md)):** Use `recm` when
+  deciding across harnesses, billing tiers, or multi-engine review rather than
+  within-session Claude escalation.

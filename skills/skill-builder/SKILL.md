@@ -38,7 +38,7 @@ Rule out extending an existing skill *before* scaffolding anything:
 1. **Search the whole corpus, not only `skills/`**, for something that already
    owns (or is adjacent to) this concern:
    ```bash
-   cd "$(git -C ~/.claude/skills/skill-builder rev-parse --show-toplevel)"   # the ai-config repo
+   cd "${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/skill-builder rev-parse --show-toplevel 2>/dev/null || pwd)}"   # the ai-config repo
    ls skills/ scripts/ hooks/
    grep -ril "<keywords>" skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md
    ```
@@ -165,6 +165,10 @@ allowed-tools:               # real skill: list its tools. alias: mirror the can
   [`shared/workflow/skill-checklists.md`](../../shared/workflow/skill-checklists.md):
   add one only for repeatable, high-cost, mechanically verifiable failure
   modes. If the skill is mostly judgment/exploration, skip checklist boilerplate.
+- **Include reusable, copy-pasteable shell commands where useful.**
+  Instead of leaving procedural steps as abstract prose ("grep for X", "check CI logs", "query PRs"),
+  provide concrete, tested shell command snippets with realistic placeholders (e.g. `gh pr list ...`, `rg -niE ...`).
+  This ensures agents and users don't have to reformulate or debug command pipelines every time they execute the skill.
 - **Pair short names with spelled-out aliases.** When the canonical skill has an
   acronym/short name (`gi`, `sup`, `ums`, `dc`), also create the spelled-out
   alias dir (`grab-issue`, `send-upstream`, `update-memories-and-skills`) — and
@@ -326,7 +330,7 @@ local-only. Commit via a **branch + PR** (not direct to main), request
 > `git branch --show-current` before committing.
 
 ```bash
-cd "$(git -C ~/.claude/skills/skill-builder rev-parse --show-toplevel)"   # ai-config root — NOTE: the MAIN checkout, NOT your worktree (see caveat above)
+cd "${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/skill-builder rev-parse --show-toplevel 2>/dev/null || pwd)}"   # ai-config root — NOTE: the MAIN checkout, NOT your worktree (see caveat above)
 git fetch origin main && git checkout -b add-<name>-skill origin/main   # FETCH, CREATE_BRANCH
 # write skills/<name>/SKILL.md (+ alias dir, + preferences/CLAUDE.md if it's a rule)
 python3 scripts/sync-codex-skill-wrappers.py   # regenerate codex-skills/ wrappers — REQUIRED for every new/renamed skill

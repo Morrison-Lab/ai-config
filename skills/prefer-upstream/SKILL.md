@@ -50,6 +50,10 @@ review-side application.
 ### JavaScript/TypeScript
 - npm ecosystem: well-maintained packages with good test coverage
 
+### AI Agent Plugins & Tools
+- Plugin marketplaces: `claude plugin marketplace list`, `codex plugin marketplace list`, `.agents/plugins.json`, `.cursor-plugin/`
+- MCP servers: official registries, package managers (`brew install <server>`), local typed CLI wrappers (see [`use-plugins`](../../shared/workflow/use-plugins.md) and [`use-mcp-servers`](../../shared/workflow/use-mcp-servers.md))
+
 ## Decision criteria
 
 | Factor | Build custom | Use upstream |

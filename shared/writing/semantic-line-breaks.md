@@ -87,6 +87,13 @@ Corpus practice is the clause-wrapped 60-to-80 range this file opens with.
 The construction #2085 closed is the pair of predicates the gate actually
 enforces (multi-sentence lines, and a line whose stripped text is at least 80
 characters with a mid-line semicolon), not every wrap a human would make.
+The tool stays narrower by design (ai-config#2586): natural language clause
+detection at comma and conjunction boundaries requires a syntactic parser;
+regex heuristics over-split clean prose (>50% false positive rate on commas),
+and whole-file `--all` reflow collapses ~31,000 hand-broken clause lines across
+375 files (measured 2026-08-31 over 458 Markdown files).
+Diff-scoping (the default under `--write`) isolates touched sentences and leaves
+untouched multi-line clause breaks intact (ai-config#1599).
 
 `MD013` is off repo-wide in `.markdownlint-cli2.jsonc`, so no width gate
 exists either.
@@ -126,12 +133,29 @@ join that would fail the gate is split rather than written.
   diff-scoped to added lines, and this script is not invoked by any workflow.
 - **Don't:** expect `--write` to wrap comma-clause chains to 80 columns.
   That is #2081, not the gate, and this construction does not close it.
+- **Do:** after any `--write` reflow,
+  print the longest added line's length with
+  `git diff | grep '^+[^+]' | awk '{ if (length > m) m = length } END { print m }'`
+  and re-break by hand when that number is past about 120,
+  since the gate does not flag a long comma-joined line with no mid-line semicolon.
+- **Don't:** ship a `--write` reflow on the gate's clean verdict alone.
+  Recurred 2026-09-02 in a `/gia` session:
+  `--write` rewrapped three clause-broken prose additions into single lines up to 398 characters long,
+  and the fix was `git checkout <prior-commit> -- <files>` and re-breaking by hand.
+  Recurred 2026-09-04 on `memories/github-closing-keywords.md`:
+  one `--write` run joined that file's clause lines into long ones
+  while leaving the same run's session-notebook target correct,
+  so the invocation's behaviour differed by file
+  and its own verdict said nothing about either.
+  Restored from a backup and re-broken by hand.
 
 (Morrison-Lab/ai-config, 2026-08-15, measured on this machine with the gate at
 `Morrison-Lab/gha@da46419`, whose `_DEFAULT_CLAUSE_BREAKS` is `True` and
 `_DEFAULT_CLAUSE_MIN_LENGTH` is 80.
 The construction that retired the manufactured-clause half landed 2026-08-26
-as ai-config#2085.)
+as ai-config#2085.
+The narrower-by-design disposition and corpus measurement were confirmed
+2026-08-31 for ai-config#2586.)
 
 **Third dated recurrence, 2026-08-21, and the tell is the tool's name.**
 An `ardia` sweep drove three PRs whose prose it had edited, ran
@@ -203,26 +227,155 @@ lesson, until review consolidated it here instead.
   After #2085, `--write` splits what `classify_line` flags.
   It still is not the diff-scoped CI job.
 
-**A green check run named for this gate may never have run it, and both runs
-carry the same name.**
+**Fifth dated recurrence, 2026-09-02: the gap costs review rounds, not only
+CI, since a reviewer applies the wider convention the script does not.**
+Four PRs pushed the same day
+([#3004](https://github.com/Morrison-Lab/ai-config/pull/3004),
+[#3007](https://github.com/Morrison-Lab/ai-config/pull/3007),
+[#3016](https://github.com/Morrison-Lab/ai-config/pull/3016),
+[#3036](https://github.com/Morrison-Lab/ai-config/pull/3036), all merged)
+each carried a scoped `semantic-line-breaks.py` run reporting clean, and
+**three of the four** still drew a Copilot finding citing this convention on
+a line the script had approved.
+Two of those are the clause-density case this entry is about:
+`shared/workflow/metacognitive-monitoring.md:1057` in #3007
+("uses compound sentences as physical lines ... contrary to this corpus's
+semantic-line-break convention of one clause per line"), and, in #3036,
+`skills/daytb/SKILL.md:86`
+("diverges from this repo's semantic line break convention (one clause per
+line)") alongside `shared/workflow/pr-on-claim.md:275`, which asks for the
+same reflow in different words
+("currently written as a few very long lines ... reflow this new block into
+clause/sentence-level line breaks").
+
+The third is a **different mechanism** and is counted separately for that
+reason rather than omitted:
+`memories/r-quarto.md:1053` in #3016 flagged two *sentences* sharing one
+physical line, which is the digit/parenthesis-opener case already recorded
+at [ai-config#2127](https://github.com/Morrison-Lab/ai-config/pull/2127)
+below, not a comma-or-conjunction clause join.
+Naming that split matters because the merged commit message for
+[#3036](https://github.com/Morrison-Lab/ai-config/pull/3036) (`52d6fa57`)
+gets it wrong in the other direction, calling the findings on
+[#3016](https://github.com/Morrison-Lab/ai-config/pull/3016) and
+[#3007](https://github.com/Morrison-Lab/ai-config/pull/3007)
+"the same finding" raised "twice".
+They are not, and a tally that silently drops one of them is how the
+conflation survives.
+Every line flagged for *clause* density joined its clauses with a comma or a
+coordinating conjunction and carried no mid-line semicolon, so the gate's
+own clause rule --- the semicolon predicate documented above --- had nothing
+to catch either.
+This is the narrower-by-design gap arriving as a review comment instead of
+a CI failure, which the script's own docstring already predicts but no
+prior recurrence here had measured.
+
+**Applying this convention can itself break `lint-markdown`, and it did so
+in the commit that recorded the paragraph above.**
+Putting one sentence on its own line is exactly what puts a bare `#NNNN` at
+column 1, and markdownlint reads a line-initial `#` followed by a non-space
+character as a malformed ATX heading:
+
+```
+MD018/no-missing-space-atx No space after hash on atx style heading
+  [Context: "#3004 drew none."]
+```
+
+Two such lines went red on
+[#3044](https://github.com/Morrison-Lab/ai-config/pull/3044), both created
+by splitting a sentence out onto its own line during the fix for the
+finding above.
+So the convention and the markdown linter interact: a PR or issue reference
+is safe mid-sentence and unsafe as the first characters of a line.
+
+The remedy costs nothing and is already required elsewhere: link the
+reference.
+`[#3004](https://github.com/Morrison-Lab/ai-config/pull/3004)` opens with
+`[`, so MD018 cannot fire, and `AGENTS.md` asks for the linked form anyway.
+A bare reference that must stay bare can instead be moved off the line
+opening.
+
+- **Do:** link a PR or issue reference that lands at the start of a line, or
+  reword so the line does not open with it.
+- **Don't:** assume a sentence-per-line split is lint-neutral --- it changes
+  which token sits at column 1, which is the only thing MD018 looks at.
+
+The reformatter also worked against the fix once found, in both directions
+already named above.
+On #3007, splitting a comma-and-conjunction line at the conjunction still
+left `scripts/semantic-line-breaks.py` wanting to rejoin the halves,
+because a comma-clause split creates no sentence-ending punctuation for it
+to preserve.
+On #3016 the split fell into this file's own digit/parenthesis-opener case,
+first recorded at
+[ai-config#2127](https://github.com/Morrison-Lab/ai-config/pull/2127): a
+hand-split second sentence there opened with
+`(Verified 2026-09-02, ...)`.
+Not a new mechanism, but confirmation that it still fires more than a week
+after #2085's rewrite, on a fresh instance neither tool sees.
+Both times, and in the pre-emptive fourth split on #3036, the fix was the
+same: rewrite the pair as one full sentence split into two, rather than a
+single sentence with a hand-inserted clause break, which satisfies the
+script and the gate at once instead of trading one off against the other.
+
+- **Do:** when the script and the convention disagree, restructure the
+  sentence --- usually splitting one long sentence into two --- so both
+  pass, rather than picking a side.
+- **Do:** read a clean scoped run of `scripts/semantic-line-breaks.py` as
+  "no multi-sentence or semicolon-clause lines," not as "this section
+  satisfies the one-clause-per-line convention" --- the two claims differ
+  in kind, not only in degree.
+- **Don't:** treat the reformatter's silence on a comma-or-conjunction-joined
+  line as clearance; a reviewer applying the convention by eye still flags
+  it, and did, twice, the same day.
+- **Don't:** fight the reformatter's rejoin by reinstating the same
+  hand-break; convert the clause pair into two genuine sentences instead.
+
+(Morrison-Lab/ai-config, 2026-09-02.
+Copilot findings read one endpoint at a time, since `gh api` takes a single
+endpoint per invocation:
+`for n in 3007 3016 3036; do gh api "repos/Morrison-Lab/ai-config/pulls/$n/comments"; done`
+--- all three that drew one, since a query over only the two clause-density PRs
+would have produced the undercount this entry now warns about.
+No such comment appeared on
+[#3004](https://github.com/Morrison-Lab/ai-config/pull/3004).
+The rejoin and restructure account is from the PRs' own commit messages, not
+inferred.
+Whether the reformatter should learn comma/conjunction clause boundaries
+was considered and declined: that is the
+[ai-config#2586](https://github.com/Morrison-Lab/ai-config/issues/2586)
+measurement above, over-splitting more than half of comma boundaries in
+clean prose, and nothing in this recurrence changes that trade-off.)
+
+**Until [ai-config#1730](https://github.com/Morrison-Lab/ai-config/issues/1730) gated the job,
+a green check run named for this gate might not have run it,
+and both runs carried the same name.**
 The reformatter trap above is about the wrong *tool*.
 This is about the right tool reporting success without measuring anything, and
 it is harder to catch because there is nothing to notice: the check run is
 green, its name is correct, and it sits in the same list as the real one.
 
-The workflow's base-ref input is `github.event.pull_request.base.sha` on a
-pull request and empty otherwise, which is deliberate --- it makes a push to
-`main` skip cleanly instead of scanning the whole tree
-(`.github/workflows/validate.yml`, the `new-line-breaks` job's own comment).
-The consequence for a *branch* push is the part worth stating: that run has no
-base ref either, so it skips the diff scan and concludes `success` having
+Until [ai-config#1730](https://github.com/Morrison-Lab/ai-config/issues/1730) was fixed, the workflow's base-ref input was
+`github.event.pull_request.base.sha` on a pull request and empty otherwise,
+which made a push to `main` skip cleanly instead of scanning the whole tree.
+The consequence for a *branch* push was the part worth stating: that run had no
+base ref either, so it skipped the diff scan and concluded `success` having
 examined nothing.
 
-A PR therefore shows **two** check runs called
+A PR therefore showed **two** check runs called
 `new-line-breaks / check-new-line-breaks`.
-Only the `pull_request`-triggered one is a verdict.
-The `push`-triggered one is green unconditionally, so reading either one, or
-reading "the check is green", answers a question it was never asked.
+Only the `pull_request`-triggered one was a verdict.
+The `push`-triggered one was green unconditionally, so reading either one, or
+reading "the check is green", answered a question it was never asked.
+
+The `new-line-breaks` job in `.github/workflows/validate.yml` now carries
+`if: github.event_name == 'pull_request'`, so the push-triggered run reports
+`skipped` rather than `success`.
+That closes the missing-base push case only: a `pull_request` run can still
+skip with the action's warning when the diff cannot be computed, so treat a
+green run as a verdict only when its log shows lines were examined.
+The rule below still applies to any other workflow of this shape, and to any
+repository whose copy of the job predates that guard.
 
 The asymmetry that makes this dangerous: the vacuous run can only ever say
 success, so it never disagrees with a real failure loudly enough to notice ---
@@ -231,11 +384,12 @@ and the green one is not evidence of anything.
 Distinguish them by the triggering event rather than by the name, and prefer
 the run whose `event` is `pull_request`.
 
-- **Do:** read the triggering event of a `new-line-breaks` run before treating
-  it as a verdict, since a PR carries one real run and one vacuous one under
-  the same name.
+- **Do:** read the triggering event of a base-diffing run before treating it
+  as a verdict wherever the job is not gated on `pull_request`, since such a PR
+  carries one real run and one vacuous one under the same name.
 - **Don't:** conclude the gate passed from a green check run alone --- confirm
-  it was the `pull_request`-triggered one.
+  it was the `pull_request`-triggered one, or that the job is gated so the
+  push run reports `skipped`.
 
 **The disagreement had a second, sharper form: the gate split a boundary the
 reformatter left whole.**
@@ -465,6 +619,27 @@ NLB_PATHS_IGNORE='codex-skills/**,docs/**,_site/**,.quarto/**' \
 That path is the file `scripts/lib/nlb_gate.py` loads.
 Refreshing it after an action-pin bump is `python3 scripts/sync-nlb-checker.py`.
 
+**That script used to run the sync on any invocation, including `--help`.**
+It had no `argparse` or usage guard,
+so `--help` was not special-cased and ran the full fetch-and-write path at whatever SHA `validate.yml` pinned.
+Measured 2026-09-02: `python3 scripts/sync-nlb-checker.py --help` fetched the vendored checker at the pinned SHA and rewrote `scripts/vendor/gha-check-new-line-breaks.py` plus its `.pin`.
+The run was a no-op only because the pin had not moved yet.
+The script now parses its command line before anything is fetched,
+so `--help` and `-h` print the module docstring and exit 0 without touching the network or the working tree,
+and an unknown argument exits 2 rather than being ignored.
+The no-argument invocation is still the sync.
+- **Do:** bump the `uses:` SHA in `.github/workflows/validate.yml` first, run the script with no arguments, then commit the workflow, the vendored script, and the `.pin` together.
+  `scripts/lib/nlb_gate.py`'s `assert_pin_matches_ci` refuses to load if the three disagree.
+- **Do:** run the script with `--help` to read its usage;
+  it now prints the docstring and exits without fetching or writing.
+- **Don't:** run the script with no arguments before bumping the `uses:` SHA,
+  or on a tree carrying local edits to `scripts/vendor/gha-check-new-line-breaks.py`.
+  The bare invocation is still the sync,
+  and it overwrites that file and its `.pin`.
+(Measured 2026-09-02 on [Morrison-Lab/gha#826](https://github.com/Morrison-Lab/gha/pull/826)
+and [ai-config#3089](https://github.com/Morrison-Lab/ai-config/pull/3089);
+reported as [ai-config#3095](https://github.com/Morrison-Lab/ai-config/issues/3095).)
+
 **`NLB_PATHS_IGNORE` is the one input the local run needs and does not
 default to**, so a command without it over-reports on generated files this
 repo's workflow excludes --- the `codex-skills/` wrappers most of all, since
@@ -522,7 +697,13 @@ a mechanism-keyed grep (`unified=0`) found both at once, per
 That recurrence count meets
 [`deterministic-tools`](../principles/deterministic-tools.md)'s bar for an
 instrument rather than more prose:
-a dirty-tree warning in the checker itself is tracked as ai-config#2382.)
+a dirty-tree warning in the checker itself is tracked as ai-config#2382.
+[Morrison-Lab/gha#826](https://github.com/Morrison-Lab/gha/pull/826) shipped that dirty-tree warning as `NLB_SCOPE=auto`, which widens the check to the working tree exactly when it is dirty.
+[`warn-new-line-breaks-on-push.py`](../../hooks/warn-new-line-breaks-on-push.py) now pins `NLB_SCOPE=committed`,
+so the pre-push hook keeps predicting CI on the pushed commits
+rather than also warning on uncommitted edits CI will never see.
+That pin closes the "hook over-warns" question [ai-config#3027](https://github.com/Morrison-Lab/ai-config/issues/3027) raised.
+(measured 2026-09-02 on [ai-config#3089](https://github.com/Morrison-Lab/ai-config/pull/3089).)
 
 **A third dirty-tree symptom, and the only one that flags a line you never
 touched: the line NUMBERS come from the commit and the line CONTENT comes

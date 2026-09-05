@@ -13,7 +13,7 @@
 # script to regenerate both. CI (`validate`) fails if either is out of sync.
 
 # How each model resolves an operation. Most agents converge on "use the
-# GitHub MCP tool when the session has it, otherwise the CLI command" — only
+# GitHub MCP tool when the session has it, otherwise the CLI command" --- only
 # the default differs, so we state the rule once here rather than repeating a
 # near-identical column per model.
 models:
@@ -50,6 +50,19 @@ models:
 # instead of silently redirecting. scripts/validate-skills.py enforces this by
 # testing the effect -- any `<` outside quotes in a command field -- rather
 # than by matching particular command spellings.
+#
+# Never chain a commit into a push inside one cli value. A PreToolUse deny
+# rejects the whole Bash invocation, so a refused push discards the commit
+# along with it, and hooks/no-commit-chained-to-push.py refuses that shape
+# outright. This registry is a place a model copies a command from verbatim,
+# so a chained example here becomes a chained call there.
+# hooks/test-no-commit-chained-to-push.py enforces this by sweeping every
+# `cli` value in this file through that guard, so a chained value
+# reintroduced here fails CI.
+#   Do: stop the cli value at the commit and reach for the PUSH operation
+#       as a separate call.
+#   Don't: join a commit to a push with `&&` in a cli value, however
+#       convenient the one-liner reads.
 operations:
   - id: VIEW_PR
     description: Read a pull request's details and metadata.
@@ -59,6 +72,10 @@ operations:
     description: List pull requests.
     cli: gh pr list
     github_mcp: mcp__github__list_pull_requests
+  - id: WHO_AM_I
+    description: Resolve the invoking user's login, for the PR-scope filter in `memories/reviewing-prs.md`.
+    cli: gh api user --jq .login
+    github_mcp: mcp__github__get_me
   - id: SEARCH_PRS
     description: Search pull requests by keyword / query string.
     cli: gh pr list --search "<query>"
@@ -96,13 +113,17 @@ operations:
     cli: gh pr edit "<N>"
     github_mcp: mcp__github__update_pull_request
   - id: MERGE_PR
-    description: Merge a pull request.
-    cli: gh pr merge "<N>"
-    github_mcp: mcp__github__merge_pull_request
+    description: Merge a pull request directly, pinned to the head the clean gate evaluated; a base that requires a merge queue is out of scope until [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030) lands.
+    cli: gh pr merge "<N>" -R "<owner>/<repo>" --match-head-commit "<sha>"
+    github_mcp: mcp__github__merge_pull_request (expectedHeadSha="<sha>")
   - id: MARK_PR_READY
     description: Flip a draft pull request to ready for review.
     cli: gh pr ready "<N>"
     github_mcp: mcp__github__update_pull_request (draft=false)
+  - id: UPDATE_PR_BRANCH
+    description: Merge the base branch into a pull request's head branch, pinned to the head that was checked.
+    cli: gh api -X PUT "repos/<owner>/<repo>/pulls/<N>/update-branch" -f expected_head_sha="<sha>"
+    github_mcp: mcp__github__update_pull_request_branch (expectedHeadSha="<sha>")
   - id: REOPEN_PR
     description: Reopen a closed pull request.
     cli: gh pr reopen "<N>"
@@ -156,7 +177,7 @@ operations:
     cli: gh api --paginate "repos/<owner>/<repo>/issues/<N>/timeline"
     github_mcp: (no GitHub MCP tool; approximate with SEARCH_PRS)
   - id: CREATE_ISSUE
-    description: Open a new issue.
+    description: Open a new issue. **An agent-filed issue carries the `ai-authored` and `model:<model-id>` labels** --- see [`issue-first`](shared/workflow/issue-first.md) and [`label-agent-filed-issues`](shared/workflow/label-agent-filed-issues.md). The MCP path accepts `labels` on `method=create`, and silently creates an unknown label name rather than rejecting it.
     cli: gh issue create
     github_mcp: mcp__github__issue_write (method=create)
   - id: COMMENT_ISSUE
@@ -231,6 +252,10 @@ operations:
     description: Create a new branch (e.g. off the default branch).
     cli: git switch -c "<branch>" "origin/<base>"
     github_mcp: mcp__github__create_branch
+  - id: CREATE_WORKTREE
+    description: Create a dedicated worktree on a new branch off the default branch, so parallel sessions never share a checkout (AGENTS.md "Worktree isolation").
+    cli: git worktree add "../<repo>-<slug>" -b "<branch>" "origin/<base>"
+    github_mcp: (use git; no GitHub MCP equivalent)
   - id: DELETE_REF
     description: Delete a remote branch or tag ref.
     cli: git push origin --delete "<branch>" (or git push origin ":refs/tags/<tag>")
@@ -246,8 +271,12 @@ operations:
     cli: git log "<branch>" (or gh api "repos/<owner>/<repo>/commits" -f "sha=<branch>")
     github_mcp: mcp__github__list_commits
   - id: WRITE_FILE
-    description: Create or update file(s) on a branch in a single commit.
-    cli: git add "<path>" && git commit -m "..." && git push
+    description: >-
+      Create or update file(s) on a branch. The MCP tools do it in one call;
+      the CLI path is two Bash calls, never one --- stage and commit here,
+      then run the PUSH operation separately;
+      hooks/no-commit-chained-to-push.py refuses the chained form.
+    cli: git add "<path>" && git commit -m "..."
     github_mcp: mcp__github__create_or_update_file (one file) / mcp__github__push_files (multiple)
   - id: LIST_SECRETS
     description: >-

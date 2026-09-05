@@ -51,6 +51,11 @@ several repos (e.g. a web session scoped to multiple repos). If the working dir
 isn't itself a single repo, or more than one repo is in scope, ask which repo's
 queue to clear before surveying --- don't assume the first one found.
 
+**Confirm whose PRs are in scope, too.**
+Both phases act only on PRs opened by the invoking user, assigned to that user, explicitly requested by name, or authored by the GitHub Actions app (app slug `github-actions`);
+`ardia`'s step 1 resolves that user, applies the filter, and reports what it dropped.
+An out-of-scope PR (one that fails that filter: another lab member's or another bot's that is neither assigned to the user nor explicitly requested) stays theirs, and an issue such a PR already fixes is left to it rather than grabbed.
+
 ### Phase 1 — ARDIA (existing open PRs/MRs)
 
 Run the full [`ardia`](../ardia/SKILL.md) procedure: list every open PR/MR and
@@ -117,6 +122,8 @@ stacks on it.
   A wave is "completely finished" only once every item in it has reached a terminal state;
   a PR still in CI/review is not a finished wave, and the check-in loop that drives it to green continues uninterrupted.
   This is a deliberate exception to the standing "don't stop to ask" grant the rest of this skill runs under: the wave boundary is the one place GIA hands the decision back, because a fresh wave is new, open-ended commitment (5 more issues, 5 more PRs, 5 more review rounds) rather than work already implied by the current wave.
+  A UMS pass, and the PR it opens, is work the current wave implies rather than a new wave --- run it at the boundary, per [`gii`](../gii/SKILL.md)'s "A UMS pass is not a new wave" paragraph.
+  [`finish-wave`](../finish-wave/SKILL.md) (alias `fw`) is the procedure for that hold.
 - If a PR or issue is blocked or ambiguous, **bypass** it — surface it and move
   on to the next item rather than halting the sweep. Stop only when every
   remaining item depends on that blocked one, so no independent work is left
@@ -162,3 +169,4 @@ and [`delegate-to-codex`](../delegate-to-codex/SKILL.md).
 - ❌ Running Phase 2 unbounded — keep GII's wave boundary.
 - ❌ Starting the next wave on your own once the current one is fully finished — stop and ask, with a recommendation, per "Stopping conditions".
 - ❌ Grabbing an issue a pending Phase-1 PR already closes.
+- ❌ Driving, reviewing, or editing a PR that was not opened by the user, not assigned to the user, not explicitly requested by name, and not authored by the Actions app --- "every open PR" means every PR that passes the filter.

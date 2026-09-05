@@ -48,6 +48,7 @@ air format .
 
 ## Coding
 
+* Before writing custom helper functions or hand-rolling utilities, research existing functions in base R, tidyverse/r-lib, ropensci, or existing dependencies per [`prefer-packaged-functions`](../../shared/coding/prefer-packaged-functions.md) and [`prefer-upstream`](../prefer-upstream/SKILL.md).
 * Always run `air format .` after generating code.
 * Use the base pipe operator (`|>`) not the magrittr pipe (`%>%`).
 * Use `\() ...` for single-line anonymous functions.
@@ -95,6 +96,7 @@ When the package already has an established `NEWS.md` style, match that existing
 This skill is a day-to-day dev-loop reference (load, test, document, format) with this author's own conventions.
 It does not replace, and does not cover:
 
+- [`prefer-packaged-functions`](../../shared/coding/prefer-packaged-functions.md) and [`prefer-upstream`](../prefer-upstream/SKILL.md) --- researching existing functions and package solutions before hand-rolling custom code.
 - [`r-pkg-check`](../r-pkg-check/SKILL.md) --- running and triaging `devtools::check()` output.
 - [`r-pkg-cran-checklist`](../r-pkg-cran-checklist/SKILL.md) --- the CRAN release mechanics (win-builder, revdep checks, `devtools::release()`).
 - [`cran-extrachecks`](../cran-extrachecks/SKILL.md) --- the ad-hoc/stylistic CRAN checklist (Title case, `@return` tags, URL hygiene) that `devtools::check()` doesn't catch on its own.

@@ -38,12 +38,20 @@ def exits(callable_, *args):
     return None
 
 
-# resolve_dependencies fails fast when gh is unresolvable.
+# resolve_dependencies fails fast when neither gh nor glab is resolvable,
+# and accepts either one alone: the monitor polls whichever is installed.
 real_which = shutil.which
 try:
-    shutil.which = lambda name: None if name == "gh" else real_which(name)
+    shutil.which = lambda name: None if name in ("gh", "glab") else real_which(name)
     message = exits(subject.resolve_dependencies)
-    check("missing gh refuses the install", message is not None and "gh" in message)
+    check("missing gh and glab refuses the install",
+          message is not None and "gh" in message and "glab" in message)
+    shutil.which = lambda name: None if name == "gh" else real_which(name) if name != "glab" else "/usr/bin/glab"
+    check("glab alone passes dependency resolution",
+          exits(subject.resolve_dependencies) is None)
+    shutil.which = lambda name: None if name == "glab" else real_which(name) if name != "gh" else "/usr/bin/gh"
+    check("gh alone passes dependency resolution",
+          exits(subject.resolve_dependencies) is None)
 finally:
     shutil.which = real_which
 

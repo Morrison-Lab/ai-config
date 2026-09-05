@@ -103,5 +103,6 @@ Ask the user which items (if any) they'd like you to implement. Offer to:
   pass (including prose and math, not just code) and runs automatically,
   not on demand; run `/tidy` when you want a full prioritized audit across
   all 5 axes on demand, not just complexity.
+- **`prune-dead-code`** (`pdc`) — the dedicated dead-code and orphaned-asset removal procedure for axis 1, systematically eliminating dead symbols, orphaned configs, and stale docs.
 - **`simplify`** — the narrow dead-code-removal counterpart, triggered
   after a refactor narrows invocation context, not an on-demand audit.

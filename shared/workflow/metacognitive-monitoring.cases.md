@@ -673,3 +673,118 @@ Any flag that skips environment setup --- a `--no-config`, a bare interpreter,
 a container built without the optional extras --- can shrink what is being
 measured without shrinking the figure reported.
 The shrunken run is usually the faster one, so the habit is self-reinforcing.
+
+## A mechanism verified, an unverified population asserted to fall under it
+
+`UCD-SERG/serocalculator#668`, 2026-09-01.
+A fix removed an RNG-kind leak from a simulation function, and part of
+reviewing the fix was predicting which existing snapshot tests would change
+once it landed --- a real cost, since a changed snapshot needs re-baselining
+and a reviewer's time to confirm the new values are still correct.
+
+The reasoning traced, correctly, which branch of `RNGseq_seed()` a call
+takes depending on whether a `.Random.seed` already exists in the session.
+That is the mechanism, and it was verified by reading the function.
+The claim built on top of it was that specific existing test calls would hit
+the fixed branch and their snapshots would change.
+
+Nobody checked what those calls actually ran under.
+They used the package's multi-core default for `num_cores`, which on the
+test runner's platform forks the R process for `%dopar%` rather than
+building a cluster --- so the leak the PR fixed, which the mechanism
+analysis correctly traced, never reached those particular calls at all.
+The prediction was withdrawn once `grep`-ing the test file for its
+`num_cores` argument showed the actual value.
+
+The mechanism was verified.
+The instance was asserted.
+Those are the two different propositions
+["A sound measurement does not license the claim standing next to it"](metacognitive-monitoring.md#a-sound-measurement-does-not-license-the-claim-standing-next-to-it)
+names: a claim about how `RNGseq_seed()` branches, and a claim about which
+recorded test calls take that branch, standing in one paragraph as though
+verifying the first settled the second.
+The remedy that section gives is the one that closed it here too --- derive
+the population (grep the calls' actual `num_cores`) rather than reasoning
+from the mechanism to the instance.
+
+## A defect attributed to the fix that merely sits beside it
+
+ai-config#3023, 2026-09-03.
+A review of `scripts/lib/shellcmd.py` found that `_heredoc_free` scanned only the first heredoc opener on a line, so `cat <<A > f1 && cat <<B > f2` left the second body as live text and a `git commit && git push` written inside it was refused.
+
+The fix was easy.
+The commit message was wrong: it called the defect "a regression of this PR's own opener-line fix", because the previous commit had reworked exactly that function and keeping the opener line's remainder was exactly the kind of change that could plausibly have introduced it.
+No check was run.
+The claim arrived as an admission and read as candour, which is what stopped it being read as a claim at all.
+
+The reviewer said it predated the fix.
+Settling it cost one command: `git show 7b54d28:scripts/lib/shellcmd.py`, then exercising that copy on the same input.
+The old version returns a blanked opener followed by both git commands as live text --- the same defect.
+The routes differ, which is why it was believable: the old code dropped the opener-line remainder and lost the second opener along with it, the new code kept the remainder and never rescanned it.
+Same observable failure, two mechanisms, and neither of them the new commit's doing.
+
+Two things generalize.
+The counterfactual is nearly free whenever the prior version is a commit away, so there is no cost argument for skipping it.
+And the reviewer's own attribution was equally a cause claim: agreeing with it because a reviewer said so would have produced the right answer by the wrong route, and the same command settles both.
+
+**The section written from this case opened with the same error, one level up.**
+Its first draft began "The two sections above govern a cause read off the wrong artifact and a justification written after the decision", which is a claim about the fragment's own structure --- and it was recalled rather than read.
+The section directly above is "A story that fits the evidence is not a finding", whose discriminating-experiment remedy the new section's counterfactual instantiates, so the entry presented itself as a fourth independent rule when it is a specialization of its immediate neighbour.
+Settling it cost one `grep -n '^## '`.
+
+That is the **scope** claim-type from the top of this fragment, committed inside a section about the **cause** claim-type, by an author who had just been corrected for an unchecked cause claim.
+Which is the transferable part: knowing a rule, and having just been burned by it, does not arm the check.
+Only asking what kind of claim a sentence is arms it, and "the two sections above" does not feel like a claim at all --- it feels like navigation.
+
+## One session, five wrong conclusions drawn from artifacts that were all real
+
+`Morrison-Lab/ai-config` and `ucdavis/rampp`, 2026-09-02/04.
+Five instances, four of them spanning ["A sound measurement does not license the claim standing next to it"](metacognitive-monitoring.md#a-sound-measurement-does-not-license-the-claim-standing-next-to-it) and [`verify-the-right-artifact`](verify-the-right-artifact.md) and one falling under neither, and worth recording as a set rather than as five bullets --- not because they share a taxonomy, since they do not, but because what they share is invisible in any one of them.
+
+**They do not fall under one rule, and saying so is the first thing this record has to get right.**
+Instances 1 and 2 are substitutions: each artifact was real and was not the one the claim was about, and both are filed that way by their own sources --- ai-config[#3039](https://github.com/Morrison-Lab/ai-config/issues/3039) says `verify-the-right-artifact` "names this exact substitution", and [`keep-checkouts-fresh`](keep-checkouts-fresh.md) says the same of instance 2 by name.
+Instances 3 and 4 have no substitution in them: the artifact is the right one, read correctly, and the sentence after the reading answers a question it does not address.
+Instance 5 is neither, and is the plainest of the five --- a field read wrongly.
+
+What they share is a **felt sense**, not a mechanism: in each one the erroneous step felt like *reading* the evidence rather than adding to it, which is why each survived self-review.
+That is the transferable observation, and it is also the reason the taxonomy question is worth keeping separate from it.
+Knowing which of the two rules governs an instance is what tells you where to look;
+knowing that the failure feels like reading is what tells you to look at all.
+
+**Instance 1 --- a merged PR's check-run names, read as what the default branch emits.**
+The names were real and were accurate for that pull request's head.
+A ruleset's `required_status_checks` matches what the **default branch** emits on every future pull request, which is a different set once a workflow has been renamed.
+Wrong contexts were written to a live ruleset, where a string no workflow emits sits as `Expected` forever and would block every merge in that repository until removed, with nothing red to point at.
+That consequence is how [#3039](https://github.com/Morrison-Lab/ai-config/issues/3039) and the guard's docstring both state it --- derived from the matching rule, not from an observed blocked merge.
+Recorded as ai-config[#3039](https://github.com/Morrison-Lab/ai-config/issues/3039) and guarded by `hooks/no-underived-required-check.py` ([#3137](https://github.com/Morrison-Lab/ai-config/pull/3137)), whose docstring carries the full account;
+the entry here is the inferential shape, not the guard.
+
+**Instance 2 --- the newest cache directory, read as the copy that runs.**
+A real directory carrying a real stale constant, and not the copy the later capture named.
+[`mistake-patterns`](../../memories/mistake-patterns.md)'s Pattern 43 Fix section already rules that proxy out by name, so this is an occurrence of a recorded Fix step being skipped rather than of a new mechanism.
+
+**Instance 3 --- a sample whose window excluded its own target.**
+Twenty distinct hook command lines captured over 240 seconds, all from `$HOME/.claude/hooks/` and none from a plugin root, read as showing the plugin path inert.
+The sample is sound;
+its population is the complement of what it was aimed at, because the hook of interest could not fire during the window.
+This is the one [`metacognitive-monitoring`](metacognitive-monitoring.md)'s new sub-case is written from, and the most reusable of the five: a sample drawn when the event of interest is impossible looks identical to a sample that found nothing.
+
+**Instance 4 --- a resolved path, extended into a lifetime claim and a remedy.**
+A `ps` capture correctly resolved the path of the copy that fired during that capture.
+That was extended to "a per-session snapshot, frozen for the life of the session" and to a "restart the session" remedy, neither of which the capture touches --- a capture names a path at an instant and says nothing about how long that path stays selected.
+Both were withdrawn.
+The remedy half is the sharper one, since ["An action you recommend is a claim about state"](metacognitive-monitoring.md#an-action-you-recommend-is-a-claim-about-state) governs it and a recommendation does not present itself as an assertion.
+
+**Instance 5 --- two blank `validate:` entries, read as passing.**
+`statusCheckRollup` reported them with no conclusion because they were in progress.
+[`gh-cli`](../../memories/gh-cli.md) already states the rule this violates --- gating code must require `CheckRun.status === 'COMPLETED'` and a terminal `StatusContext.state`, treating anything else as still in progress --- so this instance is listed for the count rather than because anything is missing from the corpus.
+
+**A sixth arrived while this record was being written, in the write-up itself, and it is the sharpest of them.**
+Drafting the over-warn entry this change adds to [`fail-fast`](../principles/fail-fast.md), this session ran `gh label list -R Morrison-Lab/ai-config`, saw `no-ai-review` returned, and wrote that ai-config[#1709](https://github.com/Morrison-Lab/ai-config/issues/1709)'s reopening comment had asserted an absent label that was in fact present --- convicting that comment of the very error this record catalogs.
+The label's `createdAt` is 47 minutes *after* that comment, and the comment is what caused it to be created, having proposed exactly that.
+The `gh` query was correct, current, and about a different moment than the claim it was used to settle.
+So the reading was a substitution along the **time** axis rather than the artifact axis: the repository now stood in for the repository then, which is a distinction no command in the query names.
+The fourth adversarial round on this change caught it.
+The transferable step is cheap: when a query is used to judge a dated claim, read the artifact's own timestamp --- `createdAt` on a label, `created_at` on a comment --- rather than only its present value.
+
+Tracked as ai-config[#3271](https://github.com/Morrison-Lab/ai-config/issues/3271).

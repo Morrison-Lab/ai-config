@@ -48,6 +48,53 @@ without asking confirmation before every merge.
   [`fully-clean`](../../shared/workflow/fully-clean.md) for the payload keys.
   A later all-clear from a different reviewer does not supersede a standing
   not-clean; only a later clean from the same reviewer does.
+  On GitHub (a GitLab MR has no equivalent gate until
+  [#3021](https://github.com/Morrison-Lab/ai-config/issues/3021)),
+  record `headRefOid` and `baseRefName` before the instrument runs and
+  require both live values to equal them immediately before every direct
+  merge, so a retarget at the same tip cannot pass with an old verdict and a
+  concurrent push that already contains the base cannot ride a
+  currency-only check past a verdict it never received.
+  After the instrument passes, run the base-currency check that
+  [`fully-clean`](../../shared/workflow/fully-clean.md) states in its stale-base rule
+  (the Do bullets beginning "for a direct merge") before the merge command,
+  by merge mode: the `git merge-base` form in a local session,
+  the compare endpoint's `behind_by` in a remote session without `git`,
+  no merge at all from a session that can run neither until
+  [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) wires it
+  into the instrument, and a stop on a base that requires a merge
+  queue until [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030)
+  lands.
+  On a direct merge a stale merge-base means an update pinned to the
+  recorded head (`PUT .../pulls/<N>/update-branch` with
+  `expected_head_sha`, or the MCP tool's `expectedHeadSha`; a `422`
+  whose message names an expected-head mismatch (match on the substring `expected head sha`, since the live text carries a curly apostrophe and a trailing period that this ASCII rendering cannot show)
+  means another writer moved the head, so settle ownership instead,
+  and any other `422` is a failed update to stop on),
+  a wait of a few minutes at most until `headRefOid` changes (the update is
+  asynchronous; expiry is a failed update to stop on and report),
+  recording that SHA,
+  a currency check on it,
+  a full re-run of the gate pinned to it,
+  then a check immediately before the merge command that the live head
+  is still that SHA, `baseRefName` is unchanged, and the base tip
+  still equals the `<pinned-tip>` the currency check printed (recorded
+  before the gate reran), repeating the cycle when any moved during the
+  gate,
+  and `--match-head-commit "<pinned-sha>"` (or `expectedHeadSha` on the
+  MCP merge tool) on the merge command itself, so the API refuses a
+  push that lands after the read.
+  No merge API pins the base, so on a repository without a merge queue
+  or an up-to-date-branch requirement the base can still move between
+  that read and the merge; where that must not happen, the server-side
+  gate is the only closure, per
+  [`fully-clean`](../../shared/workflow/fully-clean.md).
+  A repeat names the moving ref: when the base moved twice it outruns
+  the gate, so merge under strict up-to-date protection instead (or
+  through a merge queue once [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030)
+  lands), and when the head moved another writer is on the branch, so
+  settle ownership per [`claim-pr`](../claim-pr/SKILL.md) before
+  rerunning, per [`fully-clean`](../../shared/workflow/fully-clean.md).
 - **Session Duration**: The grant expires automatically when the session ends
   or when explicitly revoked via `/mwc revoke` or `disable-mwc`.
 
@@ -61,6 +108,10 @@ A session driving its own PRs finds a peer's sitting instrument-clean --- someti
 It is still the wrong default, because a peer may have further commits planned, and merging out from under a live session destroys work it was about to push.
 
 **A peer's PR may be merged once it has been ready to merge for more than twenty minutes** (maintainer directive, 2026-08-27).
+
+That peer's PR must itself pass `memories/reviewing-prs.md`'s scope test first: opened by or assigned to the invoking user, explicitly requested, or authored by the GitHub Actions app.
+A peer session running under your own login satisfies the author arm, which is the case this section was written for.
+Another lab member's PR that fails the test does not become yours by going quiet: it gets neither the warning comment nor the merge, and is reported to the user instead.
 
 The interval is what does the work here, and it is doing something specific rather than being a polite pause.
 A session actively driving a PR pushes again within a few minutes of a clean verdict, so twenty minutes of quiet distinguishes *waiting on a human* from *mid-round* --- which is the only thing you actually need to know, and the one thing you cannot ask the peer for reliably.
@@ -113,6 +164,45 @@ Measured 2026-08-27: a session driving #2433 and #2447 found #2448 --- a peer's 
 It held, and the peer then pushed a further commit fourteen minutes later before merging the PR itself.
 So the counterfactual is not hypothetical: merging at the five-minute mark would have discarded a commit that did not yet exist, and nothing about the PR at that moment distinguished it from one that was finished.
 That is the whole argument for the interval, and for the warning step on top of it.)
+
+**Broadcast to every listed peer rather than guessing the owner from a branch name,
+and read replies for risk flags too, not only hold-offs.**
+`ListAgents` names every peer session.
+Messaging only the peer whose branch name looks like a match
+skips the peers who are not the owner but still know something:
+another session tracking the same base,
+or one that already merged its own PR and can say so.
+
+- **Do:** send the merge-intent notice to every peer `ListAgents` lists,
+  not only the branch's apparent owner.
+- **Do:** read each reply for a substantive risk flag
+  (a correction on `main` not in the PR's base, a stale-red check from a known CI bug),
+  not only for an explicit hold-off.
+- **Don't:** message only the single peer a branch name suggests.
+- **Don't:** treat a reply that names a risk as clearance because it contains no hold-off.
+
+(Measured 2026-09-02 on `Morrison-Lab/ai-config`.
+Three peer-owned PRs,
+[#2999](https://github.com/Morrison-Lab/ai-config/pull/2999),
+[#3010](https://github.com/Morrison-Lab/ai-config/pull/3010),
+and [#3029](https://github.com/Morrison-Lab/ai-config/pull/3029),
+had each been clean for over twenty minutes.
+The session posted a merge-intent comment on each PR,
+sent the same notice to all seven local peer sessions via `ListAgents` and `SendMessage`,
+and waited about five minutes.
+Six of the seven peers replied.
+Four replied inside the window:
+the owner of [#2999](https://github.com/Morrison-Lab/ai-config/pull/2999) had merged that PR in the meantime,
+one peer owned an unrelated draft,
+one had nothing to add,
+and one flagged a real merge risk,
+a mid-file correction on `main` that [#3029](https://github.com/Morrison-Lab/ai-config/pull/3029)'s base did not carry.
+Two replied after the merges had landed:
+the owner of [#3010](https://github.com/Morrison-Lab/ai-config/pull/3010) and [#3029](https://github.com/Morrison-Lab/ai-config/pull/3029), with no hold-off,
+and a peer warning that red review checks from that afternoon's reusable-workflow bug
+stay red after the fix and need a full re-run rather than a `--failed` one.
+Neither late reply would have changed the merge decision,
+and a five-minute window is expected to miss a slow reply now and then.)
 
 ## The standing per-repository grant
 
@@ -255,7 +345,7 @@ When the user gives an MWC grant (e.g. `/mwc` or "merge when confident"):
 
 1. **Run the enabling step first, and confirm it took.**
    `skills/session-lock/scripts/ai-session.sh enable-mwc --id "<session id>"`
-   (or `~/.claude/skills/session-lock/scripts/ai-session.sh enable-mwc --id "<session id>"`)
+   (or `"${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/skills/session-lock/scripts/ai-session.sh}"` / `~/.claude/skills/session-lock/scripts/ai-session.sh`)
    sets the session merge-permission flag `no-unauthorized-merge.py` reads.
    This step is what makes the grant real: without the `.mwc` marker it creates,
    `no-unauthorized-merge.py` cannot see the grant and correctly keeps blocking.
@@ -277,7 +367,10 @@ When the user gives an MWC grant (e.g. `/mwc` or "merge when confident"):
    two sides resolved different ids, which is exactly what ai-config#1279 was.
 2. Proceed with the task (e.g. driving PRs to clean via `ardi`).
 3. When a PR reaches 100% clean state, merge it immediately
-   (default: squash merge via `gh pr merge <number> --squash --delete-branch`),
+   (default: `gh pr merge "<number>" -R "<owner>/<repo>" --squash --delete-branch --match-head-commit "<pinned-sha>"`,
+   the pin being the `headRefOid` recorded before the instrument ran;
+   on a base that requires a merge queue, stop and report instead, per
+   [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030)),
    verify the merge landed on GitHub/GitLab,
    and run the post-merge skill (`post-merge` / `ums`).
 4. If the user revokes the grant, run `skills/session-lock/scripts/ai-session.sh disable-mwc` immediately.

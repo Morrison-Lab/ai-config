@@ -118,3 +118,138 @@ Measured 2026-08 against Claude Code v2.1 CLI runtime (v2.1.236):
 - **Subagent forks (`context: fork`)**:
   Skills specifying `context: fork` automatically spawn a subagent
   rather than expanding inline into the current conversation turn.
+
+## A guard that reads `enabledPlugins` must resolve scope, not grep one file
+
+Measured 2026-09-01 on `skills/ai-config-hooks/run-hook.sh` (ai-config#2004):
+the first draft decided "is the marketplace plugin enabled" by grepping
+`~/.claude/settings.json` alone, the lowest-precedence scope.
+The adversarial review caught both failure directions this file already
+describes: a `false` in `.claude/settings.local.json` over a user-scope
+`true` would have silenced every hook, and a project-scope `true` with no
+user entry would have fired every hook twice.
+The corrected runner walks local, then project, then user settings and
+lets the first file that names an `ai-config@*` entry decide.
+
+- **Do:** walk the scopes in precedence order and stop at the first file
+  that names the plugin, honouring an explicit `false` there.
+- **Don't:** read one settings file as the answer, or union truthy names
+  across files.
+
+**The two readers in this repo share that walk and nothing else, so cite the
+walk alone and describe each file's own within-file rule.**
+The two rules are not two variants of one reading.
+`resolve_plugin_enabled` in `scripts/doctor.py` strips JSONC comments,
+parses the file, and reads `enabledPlugins` only, counting any truthy
+`ai-config@*` entry there --- a second marketplace's copy of the plugin
+loads the same content and so still supersedes a `~/.claude` install.
+`run-hook.sh` parses nothing: it greps the raw file text
+(`grep -Eo '"ai-config@[^"]+" *: *(true|false)' ... | head -1`) and takes the
+first textual match wherever it lands.
+
+That produces two separate divergences, and naming only the first leaves the
+larger one invisible.
+
+1. **Within `enabledPlugins`, first entry versus any truthy entry.**
+   They answer
+   `{"ai-config@Morrison-Lab": false, "ai-config@other": true}` differently:
+   the check reads the plugin as enabled, the runner as disabled and fires
+   the hook.
+2. **Where the text may sit.**
+   The runner's match need not be an entry, and need not be in
+   `enabledPlugins` at all.
+   Measured 2026-09-04 against a `~/.claude/settings.json` whose
+   `enabledPlugins` is empty: a commented-out
+   `// "ai-config@Morrison-Lab": true` made the runner exit 0 without firing
+   the hook, reading the plugin as enabled, while `resolve_plugin_enabled`
+   returned `(False, None, None)`.
+   `"somethingElse": {"ai-config@Morrison-Lab": true}` beside the same empty
+   `enabledPlugins` split the two the same way.
+   Commenting the line out is the natural way to disable a plugin by hand,
+   so this is the divergence a user is likeliest to meet.
+
+Neither reading is wrong for its own question --- the runner asks whether
+*this* hook would fire twice, the check asks whether *any* ai-config plugin
+is installed --- but a reader of either file will assume they match unless
+told otherwise (ai-config#2528).
+
+- **Do:** say the *scope walk* is the shared part, and describe each file's
+  own within-file rule --- the runner's raw-text grep as well as the check's
+  parsed `enabledPlugins` union.
+- **Don't:** call the two implementations equivalent, or present the
+  first-versus-union rule as the whole divergence when the runner also
+  matches commented-out and non-`enabledPlugins` text.
+
+## A cloud session in ai-config loads no plugin, so `hooks/hooks.json` is inert there unless a skills-directory plugin carries it
+
+The hook catalog reaches Claude Code only through a **plugin**: a project's
+`.claude/settings.json` can register hooks directly, but `hooks/hooks.json`
+is the plugin-hooks schema and nothing else reads it.
+A remote/web session that opens the ai-config checkout itself never installs
+the marketplace plugin, so every hook was inert there while the skills, which
+Claude Code discovers from `.claude/skills/` directly, loaded fine.
+Measured 2026-09-01 (Claude Code 2.1.258): no `~/.claude/settings.json`, an
+empty `~/.claude/plugins/synced/`, `CLAUDE_PLUGIN_ROOT` unset,
+`scripts/install-hooks.py` reporting `registered=0 missing=61`, and one
+`SessionStart` hook event in the transcript with no `UserPromptSubmit` event
+on the first prompt ([ai-config#2004](https://github.com/Morrison-Lab/ai-config/issues/2004)).
+
+The instrument is the transcript, not the settings files: grep the session
+JSONL for `"hookEvent"` and compare against the events the catalog declares.
+A hook that never registered produces the same observable as one that ran
+and approved.
+
+**The fix shape is a hooks-only skills-directory plugin**
+([#2967](https://github.com/Morrison-Lab/ai-config/pull/2967)):
+any folder under `.claude/skills/` carrying `.claude-plugin/plugin.json`
+loads in place as `<name>@skills-dir`, no marketplace, no cache copy, no
+install step, and bundling no skills so the listing is not doubled.
+Two limits it carries: a project-scope one loads only after the workspace
+trust gate at plugin-scan time (`claude plugin list` run as a subprocess
+reports it "skipped because this workspace was not trusted"), and hook
+changes need `/reload-plugins` or a restart.
+
+**The marketplace route was measured and rejected for this case**
+(measured 2026-09-01, Claude Code 2.1.258).
+`claude plugin marketplace add ./` with a `directory` source works from the
+CLI, but it copies the checkout into `~/.claude/plugins/cache/<mkt>/<plugin>/<sha>/`
+as a 16 MB snapshot pinned to HEAD at install time, which is #2439's pin lag
+on a branch that is editing the hooks; it writes an absolute path into
+settings; the settings reference lists `directory` as "for development
+only"; and `claude plugin marketplace remove` uninstalls every plugin from
+that marketplace as a side effect.
+
+**Two docs pages disagree on whether a project-declared plugin auto-installs
+in a cloud session, and the README snippet sits on the losing side.**
+The cloud-environments page's "What carries over" table says plugins
+declared in `.claude/settings.json` are installed at session start from the
+declared marketplace.
+The settings reference's `enabledPlugins` entry says a plugin from an
+external source (a GitHub repository, npm) enabled in a project's
+`.claude/settings.json` is never installed for other people, on every path
+that loads plugins, and the discover-plugins page's "Configure team
+marketplaces" section dates that behaviour to v2.1.195
+(both read 2026-09-01 from <https://code.claude.com/docs/en/settings-reference>
+and <https://code.claude.com/docs/en/discover-plugins>).
+The README's `extraKnownMarketplaces` / `enabledPlugins` snippet is a GitHub
+source, so it is the case the second passage rules out.
+Only a fresh cloud session on a branch carrying the config settles which
+passage governs.
+
+`claude plugin validate` does not follow a symlinked `hooks/` directory.
+Its own warning, measured 2026-09-01 on 2.1.258 against a plugin whose
+`hooks` was a symlink, reads "The hooks directory is a symlink and was not
+read -- hooks are read without following symlinks", and adds that the plugin
+loader has no such limit, so a plugin that wants to share a catalog should
+ship a real generated file rather than a symlink.
+
+- **Do:** verify hook registration from the transcript's hook events, in
+  the environment in question, before trusting any guard the corpus names.
+- **Do:** reach hooks in a checkout-as-project session through a
+  skills-directory plugin, and generate its manifest from the canonical
+  one.
+- **Don't:** read a green skill listing as evidence the hooks loaded; the
+  two arrive by different paths.
+- **Don't:** self-install the repo as a `directory` marketplace to get its
+  hooks, or cite the cloud-environments table alone as proof a declared
+  plugin will install.

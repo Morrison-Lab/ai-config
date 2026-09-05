@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""UserPromptSubmit hook that ensures the all-open-PR timer is running."""
+"""UserPromptSubmit hook that ensures the all-open-PR/MR timer is running."""
 import os
 import subprocess
 

@@ -71,10 +71,12 @@ commit existed, #732's by a reviewer.
 The second time is what makes this worth recording, since the entry above
 already existed and was not applied.)
 
-**Green on the push event is not green on the pull_request event, for a diff-scoped checker --- the two triggers diff different bases.**
+**Green on the push event is not green on the pull_request event, for a diff-scoped checker whose two triggers supply different diff inputs.**
 Same commit, ai-config#2074, 2026-08-24: the push-event `new-line-breaks / check-new-line-breaks` run passed on three consecutive heads while the pull_request-event run failed each time, because that run diffs lines added since the merge-base, which is the set the PR is actually judged on.
 Judge a branch by its pull_request-event runs.
 A green push-event run of the same check name proves nothing about the PR verdict.
+Since [ai-config#1730](https://github.com/Morrison-Lab/ai-config/issues/1730) this repository's `new-line-breaks` job is gated on `pull_request`, so its push-event run reports `skipped` rather than green;
+the disambiguation above still applies to any diff-scoped check whose push and pull_request runs receive different diff inputs, such as an ungated job whose push run has no base.
 
 ## Picking the diff range: `..` vs `...` vs the working tree
 
@@ -138,9 +140,97 @@ corroborating detail, and it had moved in the same commit that added the
 skills.
 The next review round retracted the finding once `main` was merged in.)
 
+## A merge commit's own content is visible to `git diff A...B` and invisible to `git log -p`
+
+The section above picks a **range**.
+This one picks a **read**, which the range does not settle:
+once a branch has merged `main` in,
+the same history is reported differently by `git diff`, `git log -p`, and the
+combined diff, and only one of the three hides what the merge commit itself
+introduced.
+
+**The belief this corrects**, written into `fix/ums-step3-corpus-scope` and
+caught by the round-one adversarial verdict on that branch:
+*a squash-merging repo's three-dot diff excludes merge-commit content, so a
+conflict-resolution re-add is invisible to review.*
+**The fact:** `git diff A...B` is a **tree** diff between the merge base and
+the tip rather than a walk of commits,
+so it carries whatever the merge commit put in the tree.
+Merging `main` in makes `main` an ancestor of the branch,
+so the merge base moves up to the merged `main` commit --- `main`'s tip, until `main` advances again ---
+and the three-dot range reports the branch's whole net effect,
+merge resolution included.
+That form is the corpus's own review read
+(`git diff origin/<default-branch>...HEAD`, per
+[`adversarial-self-review`](../shared/workflow/adversarial-self-review.md)),
+so the re-add faces review rather than escaping it.
+
+**The query that settles it.**
+Measured 2026-09-03 on git 2.43.0, in a scratch repo where `main` added a
+paragraph, a branch conflicted with it, and the conflict was resolved by
+re-adding a second copy of that paragraph inside the merge commit:
+
+```bash
+git diff main...feature                    | grep -c '^+SHARED'  # 1  shows it
+git log -p main..feature                   | grep -c '^+SHARED'  # 0  hides it
+git log -p -m main..feature                | grep -c '^+SHARED'  # 3  one diff per parent: 2 hits vs the feature parent, 1 vs main
+git log -p --diff-merges=on main..feature  | grep -c '^+SHARED'  # 3  same as -m
+git show <merge>                           | grep -c '^+SHARED'  # 0  see below
+git log -p --cc main..feature              | grep -c '^+SHARED'  # 0  see below
+```
+
+Three mechanics behind those numbers.
+
+`git log -p` defaults to `--diff-merges=off`,
+so it prints the merge commit's message with no patch at all;
+`cmp` reports `git log -p` and `git log -p --diff-merges=off` byte-identical.
+`-m` and `--diff-merges=on` restore the patch and are byte-identical to each
+other.
+A bare `--diff-merges` is rejected, because it swallows the next argument as
+its value:
+`fatal: invalid value for '--diff-merges': 'main..feature'`.
+
+`git show <merge>` defaults to the combined diff,
+byte-identical under `cmp` to `git show --cc <merge>`.
+`--cc` implies `-p`:
+`git log --cc main..feature` and `git log -p --cc main..feature` are byte-identical under `cmp` as well.
+
+**The last two commands do show the re-add, and the grep is what misses it.**
+A combined diff indents its `+` columns one per parent,
+so a two-parent merge emits `++SHARED paragraph.`,
+which matches `^[+][+]SHARED` and not `^+SHARED`.
+[`batch-merge-and-resolve`](../shared/workflow/batch-merge-and-resolve.md)
+records the same class for `git merge-tree`,
+whose conflict markers are diff-indented so `grep -c '^<<<<<<<'` returns 0 on a
+genuine conflict.
+
+- **Do:** read a merge commit's own content with `git diff <base>...<tip>`,
+  which is what review sees.
+- **Do:** pass `-m` or `--diff-merges=on` when you want `git log -p` to print
+  merge patches.
+- **Do:** anchor a grep for a two-parent merge's own content as `^[+][+]`
+  in a combined diff, one `+` per parent, never `^+` there
+  (`^+` is the right anchor for the single-column `git diff <base>...<tip>` read above).
+  A `+` in one column only marks a line one parent already carried
+  (`+ SHARED paragraph.` is the copy `main` had; ` +FEATURE paragraph.` is the
+  branch's own line),
+  and the wider anchor `^[ +-]*\+` counts those as the merge's:
+  on that merge's `git show`, `grep -c '^[ +-]*\+SHARED'` gives 2 under GNU
+  grep's default BRE, where `\+` is the one-or-more quantifier, and 1 under
+  `grep -E`, where it is a literal, while `grep -c '^[ +-]*\+FEATURE'` gives 1
+  for a line the merge did not add; `grep -c '^[+][+]SHARED'` gives 1 under both.
+- **Don't:** conclude that a conflict-resolution edit escapes review because
+  the repo squash-merges --- the three-dot diff carries it.
+- **Don't:** read an empty `git log -p` as evidence the merge changed nothing;
+  that is its default, not a finding.
+- **Don't:** write a bare `--diff-merges`, which requires a value.
+
+(Refs [ai-config#3129](https://github.com/Morrison-Lab/ai-config/pull/3129),
+whose notebook entry of 2026-09-03 records the correction.)
+
 ## A `git diff` self-check is blind to untracked files, whatever range you pick
 
-The section above chooses between `..`, `...`, and the bare worktree form.
+The "Picking the diff range" section above chooses between `..`, `...`, and the bare worktree form.
 None of the three sees a file git is not tracking yet.
 So a self-check driven by `git diff` skips a PR's brand-new file entirely, and a new file is usually the one carrying the most unreviewed added lines.
 `git add -N <path>` (or a plain `git add`) is what makes it visible;

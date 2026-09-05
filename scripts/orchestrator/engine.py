@@ -19,6 +19,34 @@ from .task_queue import TaskQueue
 logger = logging.getLogger("orchestrator")
 
 
+def ensure_git_identity(
+    author_name: str = "ai-config orchestrator",
+    author_email: str = "orchestrator@noreply.ai-config.local",
+) -> None:
+    """Ensure git author and committer identity environment variables are set.
+
+    Guarantees that git commits executed by subagents or in isolated worktrees
+    will not fail on fresh runners or containers lacking ambient git config.
+    Logs an observable warning when fallback identity is substituted.
+    """
+    applied_fallbacks = []
+    for var, val in [
+        ("GIT_AUTHOR_NAME", author_name),
+        ("GIT_AUTHOR_EMAIL", author_email),
+        ("GIT_COMMITTER_NAME", author_name),
+        ("GIT_COMMITTER_EMAIL", author_email),
+    ]:
+        if var not in os.environ:
+            os.environ[var] = val
+            applied_fallbacks.append(f"{var}={val}")
+
+    if applied_fallbacks:
+        logger.warning(
+            "Ambient Git identity unset; configured fallback Git environment: %s",
+            ", ".join(applied_fallbacks),
+        )
+
+
 class OrchestratorEngine:
     """Persistent Orchestration Engine managing the continuous task loop, worker pool,
 
@@ -52,6 +80,7 @@ class OrchestratorEngine:
 
     def start(self, run_in_background: bool = False) -> None:
         """Start the persistent orchestration loop."""
+        ensure_git_identity()
         self._running = True
         self._shutdown_event.clear()
         self._executor = ThreadPoolExecutor(max_workers=self.max_concurrency, thread_name_prefix="subagent-worker")

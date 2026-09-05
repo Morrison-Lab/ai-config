@@ -20,6 +20,10 @@ check against hooks/test-no-clobbering-push.py (case #5), and generalized
 via a bare "python3", since the same suspect mechanism (ai-config#2098)
 applies to every one of them, not just this one file.
 
+Test case #5c derives the population the suite timeout was measured on, so a
+comment claiming a count the suite has since outgrown FAILs here rather than
+waiting for a reviewer to notice it a third time (ai-config#2451).
+
 Run: python3 scripts/test_test_hooks.py
 """
 from __future__ import annotations
@@ -295,6 +299,101 @@ offenders = [
 ]
 check('no hooks/test-*.py spawns its hook via a bare "python3"',
       not offenders, repr(offenders))
+
+
+# --- 5c. The timeout comment's stated population is derived, not trusted --
+# The comment deriving DEFAULT_SUITE_TIMEOUT_S names the population it was
+# measured on and instructs a maintainer to re-state it as the suite grows.
+# Two reviews in a row found it stale regardless (ai-config#2451), which is
+# the recurrence `shared/principles/deterministic-tools.md` says to turn into
+# an instrument: derive the counts here rather than trust the instruction.
+
+runner_src = SCRIPT.read_text(encoding="utf-8")
+declared = re.findall(r"(\d+) cases plus (\d+) rounds", runner_src)
+case_ids = set(re.findall(r'\(\s*"([DWS]\d+)"\s*,', src))
+clauses = re.findall(r'^    "\w+": \($',
+                     src[src.index("MUTATIONS = {"):], re.M)
+check("the timeout comment states the population it was measured on",
+      bool(declared), "no 'N cases plus M rounds' reading in the comment")
+measured = (str(len(case_ids)), str(len(clauses)))
+check("the timeout comment's latest population matches the suite",
+      bool(declared) and declared[-1] == measured,
+      f"comment says {declared[-1:]}, suite has {measured}")
+
+
+# --- 6. Coverage allowlist branches and the two-subject FAIL (#1080) ------
+# KNOWN_UNTESTED is empty in production, so both of check_coverage()'s
+# allowlist branches would otherwise run only when a hook regresses; inject a
+# test allowlist so they are exercised every run.
+
+with tempfile.TemporaryDirectory(prefix="hook-runner-") as tmp:
+    hooks = Path(tmp)
+    (hooks / "untested.py").write_text("pass\n", encoding="utf-8")
+    _write_pair(hooks, "ok", OK)
+    old_hooks, old_allow = th.HOOKS, th.KNOWN_UNTESTED
+    th.HOOKS = str(hooks)
+    try:
+        th.KNOWN_UNTESTED = {"untested.py"}
+        (cov, stdout, _) = _capture(th.check_coverage)
+        check("an allowlisted hook without a test is a NOTE, not a failure",
+              cov[0] == 0 and "NOTE: untested.py has no test" in stdout, repr(stdout))
+        th.KNOWN_UNTESTED = set()
+        (cov, stdout, _) = _capture(th.check_coverage)
+        check("an unlisted hook without a test fails",
+              cov[0] == 1 and "FAIL: hooks/untested.py has no test" in stdout, repr(stdout))
+        th.KNOWN_UNTESTED = {"ok.py"}
+        (cov, stdout, _) = _capture(th.check_coverage)
+        # untested.py is still unlisted here, so that failure counts too.
+        check("a stale allowlist entry that now has a test fails",
+              cov[0] == 2 and "drop it from KNOWN_UNTESTED" in stdout, repr(stdout))
+        th.KNOWN_UNTESTED = {"untested.py", "ghost.py"}
+        (cov, stdout, _) = _capture(th.check_coverage)
+        check("an allowlist entry naming no hook in hooks/ fails",
+              cov[0] == 1 and "ghost.py is in KNOWN_UNTESTED but is not a hook" in stdout, repr(stdout))
+    finally:
+        th.HOOKS, th.KNOWN_UNTESTED = old_hooks, old_allow
+
+with tempfile.TemporaryDirectory(prefix="hook-runner-") as tmp:
+    hooks = Path(tmp)
+    _write_pair(hooks, "twin", OK)
+    (hooks / "twin.sh").write_text("exit 0\n", encoding="utf-8")
+    old_hooks = th.HOOKS
+    th.HOOKS = str(hooks)
+    try:
+        (counts, stdout, _) = _capture(lambda: th.run_suites(timeout=5))
+    finally:
+        th.HOOKS = old_hooks
+    check("a stem with both .py and .sh subjects is one failure",
+          counts == (1, 1), repr(counts))
+    check("the two-subject FAIL names both subjects",
+          "has two subjects" in stdout and "twin.py" in stdout and "twin.sh" in stdout, repr(stdout))
+    check("the ambiguous suite is not invoked",
+          "RUN:" not in stdout and "PASS:" not in stdout, repr(stdout))
+
+with tempfile.TemporaryDirectory(prefix="hook-runner-") as tmp:
+    hooks = Path(tmp)
+    (hooks / "test-shell.py").write_text(OK, encoding="utf-8")
+    (hooks / "shell.sh").write_text("exit 0\n", encoding="utf-8")
+    old_hooks = th.HOOKS
+    th.HOOKS = str(hooks)
+    try:
+        (counts, stdout, _) = _capture(lambda: th.run_suites(timeout=5))
+    finally:
+        th.HOOKS = old_hooks
+    check("a .sh-only subject resolves and its suite runs",
+          counts == (0, 1) and "PASS:" in stdout, repr((counts, stdout)))
+
+with tempfile.TemporaryDirectory(prefix="hook-runner-") as tmp:
+    hooks = Path(tmp)
+    (hooks / "test-orphan.py").write_text(OK, encoding="utf-8")
+    old_hooks = th.HOOKS
+    th.HOOKS = str(hooks)
+    try:
+        (counts, stdout, _) = _capture(lambda: th.run_suites(timeout=5))
+    finally:
+        th.HOOKS = old_hooks
+    check("a suite with no subject names both expected paths",
+          counts == (1, 1) and "orphan.py or " in stdout and "orphan.sh" in stdout, repr((counts, stdout)))
 
 
 print(f"\n{passes}/{passes + failures} checks passed")

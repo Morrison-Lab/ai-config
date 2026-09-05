@@ -4,6 +4,7 @@ description: "→ gi."
 user-invocable: true
 allowed-tools:
   - Bash
+  - Agent
   - Read
   - Edit
   - Write

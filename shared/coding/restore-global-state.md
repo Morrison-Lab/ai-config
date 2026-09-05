@@ -132,6 +132,65 @@ Two fixes, and they are not alternatives:
 session to `L'Ecuyer-CMRG` via `rngtools::RNGseq()` and never restores it; a
 new alphabetically-earlier test file broke four unrelated snapshot tests.)
 
+## The fix for the kind has a NULL case, and it is silent
+
+The rule above says restore the kind, not just the stream.
+The fix that lands still has one gap left, because `rngtools::RNGseed()` ---
+the getter a save/restore pair naturally reaches for --- returns `NULL` when
+no `.Random.seed` exists yet in the session.
+A fresh session, or one where nothing has drawn a random number, is exactly
+that state, so a save/restore pair built around `old <- rngtools::RNGseed()`
+followed by `rngtools::RNGseed(old)` captures nothing on a fresh session and
+restores nothing on exit.
+
+The restore side fails in a specific and non-obvious way.
+`rngtools::RNGseed(NULL)` does not error and does not leave the kind alone
+--- it **removes** `.Random.seed` from the session, which un-sets the seed
+without touching `RNGkind()`.
+So a function that changed the generator kind, then tried to restore a NULL
+baseline by calling `RNGseed(NULL)`, exits with `.Random.seed` gone but the
+changed kind still in effect --- the exact leak the section above describes,
+reintroduced by the fix meant to close it.
+
+The remedy is to capture the kind separately, since reading `RNGkind()` does
+not materialize a seed the way drawing a random number does:
+
+```r
+old_kind <- RNGkind()
+old_seed <- rngtools::RNGseed()   # may be NULL
+# ... code that may change the kind or the seed ...
+if (is.null(old_seed)) {
+  do.call(RNGkind, as.list(old_kind))
+  rngtools::RNGseed(NULL)
+} else {
+  rngtools::RNGseed(old_seed)
+}
+```
+
+`withr::local_preserve_seed()`, named in the "Two fixes" list above, does not
+have this gap --- it is the reason to prefer it over a hand-rolled pair even
+when the pair already restores the kind, since the NULL case is exactly the
+kind of branch a hand-rolled version omits.
+
+- **Do:** treat `rngtools::RNGseed()` returning `NULL` as a real state to
+  restore, not as "nothing to do".
+- **Do:** capture `RNGkind()` separately from the seed, and restore it
+  explicitly when the saved seed is `NULL`.
+- **Don't:** assume `RNGseed(old)` round-trips the kind when `old` can be
+  `NULL` --- `RNGseed(NULL)` removes `.Random.seed` and leaves the kind
+  wherever it currently is.
+- **Don't:** treat a save/restore pair that does not error on a fresh
+  session as evidence it restored the kind --- absence of an error is not
+  presence of the restored state (see
+  [`verify-the-right-artifact`](../workflow/verify-the-right-artifact.md)'s
+  sixth shape).
+
+(`UCD-SERG/serocalculator` #668, 2026-09-01, fixing #634 above: the first
+save/restore pair passed a pre-push check because the no-`.Random.seed` case
+did not error, which was read as coverage.
+It did not restore the kind.
+Caught by an adversarial reviewer, not by the check.)
+
 ## The better option is not to need it
 
 Restoring state is the fallback, not the goal.
@@ -160,3 +219,7 @@ Flag these with the same weight as the other coding rules:
   anything setting up parallel streams) with no restore --- the
   file-ordering section above is why this one is worth flagging even when the
   package's own tests are green.
+- A hand-rolled `RNGseed()` save/restore pair that never branches on the
+  saved value being `NULL` --- the fix-for-the-kind section above is where
+  that branch matters, and a passing pre-push check that only confirms the
+  no-seed case does not error is not evidence the branch is correct.

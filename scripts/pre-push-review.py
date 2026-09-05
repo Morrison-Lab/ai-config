@@ -17,6 +17,12 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from scripts.lib.ai_cli import (
+    DEFAULT_ENGINE_PRIORITY,
+    detect_available_engines as detect_cli_engines,
+    find_executable,
+    is_gh_available,
+)
 from scripts.lib.fences import count_unbalanced_fences, strip_fences
 from scripts.lib.review_payload import (
     extract_structured_review,
@@ -48,7 +54,7 @@ def get_git_root() -> str:
 
 def get_current_pr() -> Optional[int]:
     """Auto-detect PR number for current branch if one exists and gh CLI is available."""
-    if not shutil.which("gh"):
+    if not is_gh_available(use_cache=False):
         return None
     res = subprocess.run(
         ["gh", "pr", "view", "--json", "number"],
@@ -66,7 +72,7 @@ def get_current_pr() -> Optional[int]:
 
 def get_pr_base_branch(pr_number: int) -> Optional[str]:
     """Get the target base branch of a GitHub PR."""
-    if not shutil.which("gh"):
+    if not is_gh_available(use_cache=False):
         return None
     res = subprocess.run(
         ["gh", "pr", "view", str(pr_number), "--json", "baseRefName"],
@@ -87,7 +93,21 @@ def resolve_diff(head_sha: str, pr_number: Optional[int] = None, explicit_base: 
 
     Always diffs the provided head_sha to include unpushed commits.
     """
-    base_ref = explicit_base
+    base_ref = ""
+    if explicit_base:
+        if explicit_base.startswith("origin/"):
+            cands = [explicit_base, explicit_base[len("origin/"): ]]
+        else:
+            cands = [f"origin/{explicit_base}", explicit_base]
+        for cand in cands:
+            r = subprocess.run(["git", "rev-parse", "--verify", cand], capture_output=True, text=True)
+            if r.returncode == 0:
+                base_ref = cand
+                break
+        if not base_ref:
+            log_error(f"Could not resolve explicit base reference '{explicit_base}'.")
+            sys.exit(1)
+
     if not base_ref and pr_number:
         pr_base = get_pr_base_branch(pr_number)
         if pr_base:
@@ -99,7 +119,20 @@ def resolve_diff(head_sha: str, pr_number: Optional[int] = None, explicit_base: 
                     break
 
     if not base_ref:
-        for cand in ["origin/main", "origin/master", "main", "master"]:
+        candidates = []
+        # Check origin HEAD symbolic ref (e.g. origin/main)
+        r_origin_head = subprocess.run(
+            ["git", "symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
+            capture_output=True,
+            text=True,
+        )
+        if r_origin_head.returncode == 0:
+            sym_ref = r_origin_head.stdout.strip()
+            if sym_ref:
+                candidates.append(sym_ref)
+
+        candidates.extend(["origin/main", "origin/master", "main", "master"])
+        for cand in candidates:
             r = subprocess.run(["git", "rev-parse", "--verify", cand], capture_output=True, text=True)
             if r.returncode == 0:
                 base_ref = cand
@@ -134,7 +167,7 @@ def get_repo_guidelines(base_ref: str) -> str:
 
 def get_pr_head_sha(pr_number: int) -> Optional[str]:
     """Get the remote head commit SHA for a GitHub PR."""
-    if not shutil.which("gh"):
+    if not is_gh_available(use_cache=False):
         return None
     res = subprocess.run(
         ["gh", "pr", "view", str(pr_number), "--json", "headRefOid"],
@@ -253,8 +286,63 @@ _TRAILING_AFTER_FINGERPRINT = re.compile(
 )
 
 
-def _structured_contradiction(report: str) -> Optional[str]:
-    """Reason string when the report's structured payload blocks, else ``None``.
+def verify_working_state(repo_dir: str = ".", expected_commit_sha: str = "") -> Tuple[bool, str]:
+    """Verify that the repository working tree is clean and matches the expected commit.
+
+    Returns:
+        (is_valid, reason): True and success message if working tree is clean and matches
+        expected_commit_sha (if provided), or False and error message on dirty state or mismatch.
+    """
+    res_git = subprocess.run(
+        ["git", "rev-parse", "--show-toplevel"],
+        cwd=repo_dir,
+        capture_output=True,
+        text=True,
+    )
+    if res_git.returncode != 0:
+        return False, f"Not inside a git repository: {repo_dir}"
+
+    # Check for uncommitted tracked changes (staged or unstaged)
+    status_res = subprocess.run(
+        ["git", "status", "--porcelain", "-uno"],
+        cwd=repo_dir,
+        capture_output=True,
+        text=True,
+    )
+    if status_res.returncode != 0:
+        return False, f"Failed to check git status in {repo_dir}: {status_res.stderr.strip()}"
+
+    dirty_lines = [line for line in status_res.stdout.splitlines() if line.strip()]
+    if dirty_lines:
+        return False, (
+            "Working repository state is dirty (uncommitted changes detected). "
+            "Commit or stash changes before running pre-push review so the reviewed state matches the exact commit ref."
+        )
+
+    # Check HEAD commit
+    head_res = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo_dir,
+        capture_output=True,
+        text=True,
+    )
+    if head_res.returncode != 0:
+        return False, f"Failed to resolve HEAD in {repo_dir}: {head_res.stderr.strip()}"
+
+    current_head = head_res.stdout.strip().lower()
+
+    if expected_commit_sha:
+        exp = expected_commit_sha.strip().lower()
+        if current_head != exp and not (len(exp) >= 7 and current_head.startswith(exp)) and not (len(current_head) >= 7 and exp.startswith(current_head)):
+            return False, (
+                f"Working repository HEAD ({current_head[:8]}) does not match expected commit ref ({exp[:8]})."
+            )
+
+    return True, f"Working repository state is clean and at commit {current_head[:8]}."
+
+
+def _structured_contradiction(report: str, expected_commit_sha: str = "") -> Optional[str]:
+    """Reason string when the report's structured payload blocks or contradicts, else ``None``.
 
     ``build_review_prompt`` asks the reviewer to append a machine-readable
     ``<!-- review-data: {...} -->`` payload, and both verdict parsers below
@@ -273,6 +361,19 @@ def _structured_contradiction(report: str) -> Optional[str]:
     ``classify_verdict``'s ordering on the PR side.
     """
     structured = extract_structured_review(report)
+    if not structured:
+        return None
+
+    if expected_commit_sha:
+        payload_sha = str(structured.get("commit_sha") or "").strip().lower()
+        if payload_sha:
+            exp_sha = expected_commit_sha.strip().lower()
+            if payload_sha != exp_sha and not (len(payload_sha) >= 7 and exp_sha.startswith(payload_sha)) and not (len(exp_sha) >= 7 and payload_sha.startswith(exp_sha)):
+                return (
+                    f"Contradictory output: structured review-data commit_sha '{structured.get('commit_sha')}' "
+                    f"does not match expected reviewed commit '{expected_commit_sha[:8]}'."
+                )
+
     if not payload_is_blocking(structured):
         return None
     findings = payload_findings(structured)
@@ -363,13 +464,14 @@ def _parse_persona_verdict(report: str, expected_commit_sha: str = "") -> Tuple[
             return False, False, (
                 f"Missing required 'Reviewed-Commit: {expected_commit_sha[:8]}' fingerprint after the verdict."
             )
-        if reviewed_commit != expected_commit_sha.lower():
+        exp = expected_commit_sha.lower()
+        if reviewed_commit.lower() != exp and not (len(reviewed_commit) >= 7 and exp.startswith(reviewed_commit.lower())) and not (len(exp) >= 7 and reviewed_commit.lower().startswith(exp)):
             return False, False, (
                 f"Fingerprint SHA mismatch: found {reviewed_commit!r}, expected {expected_commit_sha!r}."
             )
 
     if verdict == "clean":
-        contradiction = _structured_contradiction(report)
+        contradiction = _structured_contradiction(report, expected_commit_sha=expected_commit_sha)
         if contradiction:
             return False, False, contradiction
         return True, True, "Clean (persona contract)"
@@ -446,7 +548,8 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
             return False, False, f"Missing required 'Reviewed-Commit: {expected_commit_sha[:8]}' fingerprint."
         exp_sha = expected_commit_sha.lower()
         for found_sha_raw in all_shas:
-            if found_sha_raw.lower() != exp_sha:
+            found_lower = found_sha_raw.lower()
+            if found_lower != exp_sha and not (len(found_lower) >= 7 and exp_sha.startswith(found_lower)) and not (len(exp_sha) >= 7 and found_lower.startswith(exp_sha)):
                 return False, False, f"Fingerprint SHA mismatch: found {found_sha_raw!r}, expected {expected_commit_sha!r}."
 
         # Also ensure the final fingerprint is anchored at the end of the report (allowing optional trailing status/disclosure footer)
@@ -582,7 +685,7 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
             return False, False, f"Contradictory output: clean verdict but report contains blocking phrase '{blocker_match.group(0)}'."
 
     if is_clean:
-        contradiction = _structured_contradiction(report)
+        contradiction = _structured_contradiction(report, expected_commit_sha=expected_commit_sha)
         if contradiction:
             return False, False, contradiction
 
@@ -600,24 +703,101 @@ def validate_review_output(report: Optional[str], expected_commit_sha: str = "")
     return is_valid
 
 
+def resolve_engine_executable(name: str) -> Optional[str]:
+    """Resolve executable path for AI engine across POSIX and Windows environments.
+
+    Checks:
+    1. System PATH via shutil.which (respecting PATHEXT on Windows).
+    2. User local bin (~/.local/bin, ~/bin, ~/.cargo/bin).
+    3. Windows-specific user and program directories (%APPDATA%/npm, %LOCALAPPDATA%/Programs).
+    """
+    found = shutil.which(name)
+    if found:
+        return found
+
+    home = os.path.expanduser("~")
+    candidate_dirs: List[str] = [
+        os.path.join(home, ".local", "bin"),
+        os.path.join(home, "bin"),
+        os.path.join(home, ".cargo", "bin"),
+    ]
+
+    is_windows = os.name == "nt" or sys.platform == "win32"
+    if is_windows:
+        appdata = os.environ.get("APPDATA")
+        if appdata:
+            candidate_dirs.append(os.path.join(appdata, "npm"))
+        localappdata = os.environ.get("LOCALAPPDATA")
+        if localappdata:
+            candidate_dirs.append(os.path.join(localappdata, "Programs", name))
+            candidate_dirs.append(os.path.join(localappdata, "Programs"))
+        candidate_dirs.extend([
+            os.path.join(home, "AppData", "Roaming", "npm"),
+            os.path.join(home, "AppData", "Local", "Programs", name),
+        ])
+
+    extensions = [""]
+    if is_windows:
+        pathext = os.environ.get("PATHEXT", ".COM;.EXE;.BAT;.CMD;.VBS;.JS;.WSF;.WSH")
+        ext_list = [ext.lower() for ext in pathext.split(";") if ext]
+        extensions = ext_list + [""]
+
+    for d in candidate_dirs:
+        for ext in extensions:
+            cand_str = os.path.join(d, f"{name}{ext}" if ext else name)
+            which_cand = shutil.which(cand_str)
+            if which_cand:
+                return which_cand
+            if os.path.isfile(cand_str) and (is_windows or os.access(cand_str, os.X_OK)):
+                return cand_str
+
+    return None
+
+
+def _prepare_subprocess_cmd(cmd: List[str]) -> List[str]:
+    """Wrap Windows batch/cmd scripts (.cmd, .bat) with comspec for execution when invoked on Windows."""
+    if (os.name == "nt" or sys.platform == "win32") and cmd:
+        exe = cmd[0]
+        if exe.lower().endswith((".cmd", ".bat")):
+            comspec = os.environ.get("COMSPEC", "cmd.exe")
+            return [comspec, "/c"] + cmd
+    return cmd
+
+
+def _clean_sandbox_configs(sandbox_dir: Path):
+    """Remove branch-controlled agent configs to enforce sandbox isolation portably across platforms."""
+    configs_to_remove = [
+        ".claude", ".claude.json", ".cursor", ".gemini", ".codex",
+        "AGENTS.md", "CLAUDE.md", "GEMINI.md", ".github/copilot-instructions.md",
+        ".vscode", "cursor.json", ".aider.conf.yml", ".agents", "opencode.json", ".mcp.json"
+    ]
+    for rel_path in configs_to_remove:
+        target = sandbox_dir / rel_path
+        try:
+            if target.is_dir() and not target.is_symlink():
+                shutil.rmtree(target, ignore_errors=True)
+            elif target.exists() or target.is_symlink():
+                target.unlink(missing_ok=True)
+        except Exception as e:
+            print(f"Warning: failed to remove {target}: {e}", file=sys.stderr)
+
+
 def run_antigravity_review(prompt: str, model: str = "", expected_commit_sha: str = "") -> Optional[str]:
-    agy_path = shutil.which("agy") or os.path.expanduser("~/.local/bin/agy")
-    if not os.path.isfile(agy_path) and not shutil.which("agy"):
+    agy_path = resolve_engine_executable("agy")
+    if not agy_path:
         return None
-
-
     if len(prompt.encode("utf-8")) > 800000:
         print("Notice: Prompt size exceeds ARG_MAX safe limit for Antigravity, skipping...", file=sys.stderr)
         return None
 
-    cmd = [agy_path, "--print", prompt]
+    cmd = [agy_path, "--print", "-"]
     if model:
         cmd.extend(["--model", model])
 
     label_suffix = f" (model: {model})" if model else ""
     print(f"Running local adversarial review via Google Antigravity (plan mode){label_suffix}...")
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=360)
+        res = subprocess.run(_prepare_subprocess_cmd(cmd), input=prompt, capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
         print("Notice: Antigravity review timed out after 360s.", file=sys.stderr)
         return None
@@ -634,18 +814,19 @@ def run_antigravity_review(prompt: str, model: str = "", expected_commit_sha: st
 
 
 def run_claude_review(prompt: str, model: str = "", expected_commit_sha: str = "") -> Optional[str]:
-    claude_path = shutil.which("claude") or os.path.expanduser("~/.local/bin/claude")
-    if not os.path.isfile(claude_path) and not shutil.which("claude"):
+    claude_path = resolve_engine_executable("claude")
+    if not claude_path:
         return None
 
-    cmd = [claude_path, "--permission-mode", "plan", "--safe-mode", "--strict-mcp-config", "-p", "-"]
+    cmd = [claude_path, "--permission-mode", "plan", "--safe-mode", "--strict-mcp-config"]
     if model:
         cmd.extend(["--model", model])
+    cmd.extend(["-p", "-"])
 
     label_suffix = f" (model: {model})" if model else ""
     print(f"Running local adversarial review via Claude CLI (plan mode){label_suffix}...")
     try:
-        res = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=600)
+        res = subprocess.run(_prepare_subprocess_cmd(cmd), input=prompt, capture_output=True, text=True, timeout=600)
     except subprocess.TimeoutExpired:
         print("Notice: Claude review timed out after 600s.", file=sys.stderr)
         return None
@@ -662,23 +843,22 @@ def run_claude_review(prompt: str, model: str = "", expected_commit_sha: str = "
 
 
 def run_cursor_review(prompt: str, model: str = "", expected_commit_sha: str = "") -> Optional[str]:
-    cursor_path = shutil.which("agent") or os.path.expanduser("~/.local/bin/agent")
-    if not os.path.isfile(cursor_path) and not shutil.which("agent"):
+    cursor_path = resolve_engine_executable("agent")
+    if not cursor_path:
         return None
-
 
     if len(prompt.encode("utf-8")) > 800000:
         print("Notice: Prompt size exceeds ARG_MAX safe limit for Cursor, skipping...", file=sys.stderr)
         return None
 
-    cmd = [cursor_path, "--print", prompt, "--mode", "plan", "--trust"]
+    cmd = [cursor_path, "--mode", "plan", "--trust", "--print", "-"]
     if model:
         cmd.extend(["--model", model])
 
     label_suffix = f" (model: {model})" if model else ""
     print(f"Running local adversarial review via Cursor Agent (plan mode){label_suffix}...")
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=360)
+        res = subprocess.run(_prepare_subprocess_cmd(cmd), input=prompt, capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
         print("Notice: Cursor review timed out after 360s.", file=sys.stderr)
         return None
@@ -695,18 +875,19 @@ def run_cursor_review(prompt: str, model: str = "", expected_commit_sha: str = "
 
 
 def run_codex_review(prompt: str, model: str = "", expected_commit_sha: str = "") -> Optional[str]:
-    codex_path = shutil.which("codex") or os.path.expanduser("~/.local/bin/codex")
-    if not os.path.isfile(codex_path) and not shutil.which("codex"):
+    codex_path = resolve_engine_executable("codex")
+    if not codex_path:
         return None
 
     label_suffix = f" (model: {model})" if model else " (ChatGPT quota)"
     print(f"Running local adversarial review via OpenAI Codex{label_suffix}...")
-    cmd = [codex_path, "exec", "-s", "read-only", "--skip-git-repo-check", "--ignore-user-config", "--ignore-rules", "--ephemeral", "-"]
+    cmd = [codex_path, "exec", "-s", "read-only", "--skip-git-repo-check", "--ignore-user-config", "--ignore-rules", "--ephemeral"]
     if model:
         cmd.extend(["-m", model])
+    cmd.append("-")
 
     try:
-        res = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=360)
+        res = subprocess.run(_prepare_subprocess_cmd(cmd), input=prompt, capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
         print("Notice: Codex review timed out after 360s.", file=sys.stderr)
         return None
@@ -723,8 +904,8 @@ def run_codex_review(prompt: str, model: str = "", expected_commit_sha: str = ""
 
 
 def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str = "") -> Optional[str]:
-    opencode_path = shutil.which("opencode") or os.path.expanduser("~/.local/bin/opencode")
-    if not os.path.isfile(opencode_path) and not shutil.which("opencode"):
+    opencode_path = resolve_engine_executable("opencode")
+    if not opencode_path:
         return None
 
     label_suffix = f" (model: {model})" if model else ""
@@ -733,12 +914,12 @@ def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str =
     prompt_file = None
     agent_file = None
     try:
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tf:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False, encoding="utf-8") as tf:
             tf.write(prompt)
             prompt_file = tf.name
         agent_dir = os.path.expanduser("~/.config/opencode/agents")
         os.makedirs(agent_dir, exist_ok=True)
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", dir=agent_dir, delete=False) as af:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", dir=agent_dir, delete=False, encoding="utf-8") as af:
             af.write("---\n")
             af.write("description: Adversarial Code Reviewer\n")
             af.write("mode: subagent\n")
@@ -753,11 +934,12 @@ def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str =
         if agent_name.endswith(".md"):
             agent_name = agent_name[:-3]
 
-        cmd = [opencode_path, "run", "--agent", agent_name, "--pure", "Review the attached diff.", "--file", prompt_file]
+        cmd = [opencode_path, "run", "--agent", agent_name, "--pure"]
         if model:
             cmd.extend(["-m", model])
+        cmd.extend(["Review the attached diff.", "--file", prompt_file])
 
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=360)
+        res = subprocess.run(_prepare_subprocess_cmd(cmd), capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
         print("Notice: OpenCode review timed out after 360s.", file=sys.stderr)
         return None
@@ -786,21 +968,10 @@ def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str =
 
 def detect_available_engines() -> List[str]:
     """Return available local engines in preferred fallback priority: claude -> cursor -> codex -> opencode -> agy."""
-    engines = []
-    if shutil.which("claude") or os.path.isfile(os.path.expanduser("~/.local/bin/claude")):
-        engines.append("claude")
-    if shutil.which("agent") or os.path.isfile(os.path.expanduser("~/.local/bin/agent")):
-        engines.append("cursor")
-    if shutil.which("codex") or os.path.isfile(os.path.expanduser("~/.local/bin/codex")):
-        engines.append("codex")
-    if shutil.which("opencode") or os.path.isfile(os.path.expanduser("~/.local/bin/opencode")):
-        engines.append("opencode")
-    if shutil.which("agy") or os.path.isfile(os.path.expanduser("~/.local/bin/agy")):
-        engines.append("antigravity")
-    return engines
+    return detect_cli_engines(ENGINE_ROTATION_ORDER, use_cache=False)
 
 
-ENGINE_ROTATION_ORDER = ["claude", "cursor", "codex", "opencode", "antigravity"]
+ENGINE_ROTATION_ORDER = DEFAULT_ENGINE_PRIORITY
 
 
 def get_next_alternate_engine(available_engines: List[str]) -> str:
@@ -1036,14 +1207,19 @@ def build_review_prompt(diff: str, ref_name: str, guidelines: str, head_sha: str
     prompt_parts = [
         "You are an ADVERSARIAL AI CODE REVIEWER conducting an independent, rigorous code audit.",
         f"Context: {branch_name} (diff against {ref_name})",
-        f"Reviewed-Commit: {head_sha}",
         "Review Standards & Expectations:",
-        "1. Be adversarial: actively search for regressions, edge-case failures, schema mismatches, syntax errors, omitted instances, and breaking contract changes.",
-        "2. Do NOT rubber-stamp. Scrutinize whether any other files or callers suffer from identical bugs.",
-        "3. Review the code strictly on what the diff and codebase state, not on assumptions.",
-        "4. Structure your response strictly with:",
+        "1. Conduct two independent, rigorous review passes:",
+        "   (a) Detailed implementation defect audit: actively search for regressions, edge-case failures, schema mismatches, syntax errors, omitted instances, and breaking contract changes.",
+        "   (b) Holistic change assessment: evaluate the whole change against requirements, intent, cross-file and cross-module consistency, architectural coherence, integration points, regression risk, and validation completeness.",
+        "2. Review outputs MUST explicitly report both passes, even when one has no findings.",
+        "3. Do NOT rubber-stamp. Scrutinize whether any other files or callers suffer from identical bugs.",
+        "4. Review the code strictly on what the diff and codebase state, not on assumptions.",
+        "5. Evaluate repository-derived values strictly against the reviewed commit and diff. Do NOT use adjacent checkouts, stale build artifacts, or unverified external states.",
+        "6. Structure your response strictly with:",
         "   - ### Summary Verdict",
         "     Verdict: Ready for merge (or Verdict: Needs work with concise reason)",
+        "   - ### Holistic Assessment",
+        "     (Explicit analysis of requirements, intent, architecture, cross-file consistency, integration, regression risk, and validation completeness; must be reported even when clean)",
         "   - ### Critical Findings",
         "     None. (or numbered list of blocking bugs / contract regressions)",
         "   - ### Observations & Non-Blocking Suggestions",
@@ -1100,6 +1276,13 @@ def main():
         help="Base git reference to diff against (defaults to PR base or origin/main)",
     )
     parser.add_argument(
+        "--head",
+        "--commit",
+        dest="head",
+        default="",
+        help="Commit ref or SHA to review (defaults to HEAD)",
+    )
+    parser.add_argument(
         "--engine",
         choices=[
             "auto", "alternate", "round-robin", "claude", "cursor", "codex", "dtc",
@@ -1140,11 +1323,26 @@ def main():
     os.chdir(git_root)
     pr_num = args.pr or get_current_pr()
 
-    initial_head = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
+    if args.head:
+        res_h = subprocess.run(
+            ["git", "rev-parse", "--verify", f"{args.head}^{{commit}}"],
+            capture_output=True,
+            text=True,
+        )
+        if res_h.returncode != 0:
+            log_error(f"Could not resolve commit ref '{args.head}': {res_h.stderr.strip()}")
+            sys.exit(1)
+        initial_head = res_h.stdout.strip()
+    else:
+        initial_head = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        is_clean_state, state_msg = verify_working_state(git_root, expected_commit_sha=initial_head)
+        if not is_clean_state:
+            log_error(state_msg)
+            sys.exit(1)
 
     diff, base_sha, base_ref, ref_name = resolve_diff(initial_head, pr_number=pr_num, explicit_base=args.base)
 
@@ -1164,20 +1362,25 @@ def main():
             os.chdir(temp_dir)
             subprocess.run(["git", "checkout", initial_head], check=True, capture_output=True)
             # Remove branch-controlled agent configs to enforce sandbox isolation
-            subprocess.run(["rm", "-rf", ".claude", ".claude.json", ".cursor", ".gemini", ".codex", "AGENTS.md", "CLAUDE.md", "GEMINI.md", ".github/copilot-instructions.md", ".vscode", "cursor.json", ".aider.conf.yml", ".agents", "opencode.json", ".mcp.json"], check=False)
+            _clean_sandbox_configs(Path(temp_dir))
             report, engine_label = execute_review(args.engine, full_prompt, model=args.model, expected_commit_sha=initial_head, exclude_engine=args.exclude_engine)
         finally:
             os.chdir(original_cwd)
 
-    current_head = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-
-    if current_head != initial_head:
-        log_error(f"HEAD moved during review (from {initial_head[:8]} to {current_head[:8]}). Verdict is bound to the old commit and cannot be posted/accepted.")
-        sys.exit(1)
+    if not args.head:
+        is_clean_state_post, state_msg_post = verify_working_state(git_root, expected_commit_sha=initial_head)
+        if not is_clean_state_post:
+            log_error(f"Working repository state changed during review: {state_msg_post}")
+            sys.exit(1)
+    else:
+        current_head = subprocess.run(
+            ["git", "rev-parse", args.head],
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        if current_head != initial_head and not (len(initial_head) >= 7 and current_head.startswith(initial_head)):
+            log_error(f"Target ref {args.head} moved during review (from {initial_head[:8]} to {current_head[:8]}). Verdict is bound to the old commit and cannot be posted/accepted.")
+            sys.exit(1)
 
     if not report:
         log_error("Adversarial review failed to produce a valid report across all attempted engines.")

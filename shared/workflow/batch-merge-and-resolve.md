@@ -131,20 +131,22 @@ So its empty answer and its broken answer look alike, per
 [`fail-fast`](../principles/fail-fast.md).
 Use the `git diff <merge>^1 <merge>` form above.
 
-Then match the response to standing, not only to cause.
-A conflict you caused on a branch you do not own is an explanatory comment
-naming the deletion or rename and where the content went, rather than a push.
-[`sync-with-main`](sync-with-main.md) does prescribe pushing the re-applied
-change to a sibling branch, and that fits a CI workflow in a repo you drive; it
-does not fit a release branch carrying an out-of-band process a push can
-disrupt.
+Then match the response to scope, not only to cause.
+A conflict you caused on a PR that fails `memories/reviewing-prs.md`'s scope
+test is a report to the user naming the deletion or rename and where the
+content went, and the PR is left untouched: no comment, no push.
+On a PR that passes the test, [`sync-with-main`](sync-with-main.md) does
+prescribe pushing the re-applied change to the sibling branch, and that fits
+a CI workflow in a repo you drive.
+It does not fit a release branch carrying an out-of-band process a push can
+disrupt, which gets the report instead however it scores on the test.
 
 - **Do:** derive the merge's own deleted and renamed paths, and intersect them
   with each conflict before claiming anything.
 - **Do:** report both counts --- conflicts found, and conflicts caused --- so
   the gap between them is visible rather than implied.
-- **Do:** comment rather than push when a conflict you caused sits on a branch
-  you do not own.
+- **Do:** report to the user rather than push or comment when a conflict you
+  caused sits on a PR that fails the scope test.
 - **Don't:** read a post-merge sweep's hit list as your work queue; on an old
   backlog most of it predates your merge.
 - **Don't:** derive that path set with `git show` --- it reports nothing for a
@@ -434,6 +436,53 @@ whose pass path print the same thing is not yet a check.
 - **Don't:** report a zero matrix as "no collisions" when nothing established
   that the detector can produce a non-zero.
 
+### A merge-simulation content check needs the same control, in a different shape
+
+The section above validates a *conflict detector's* zero.
+The same gap opens one step later,
+when the question is no longer "did this pair conflict"
+but "did the merge preserve a specific correction":
+a scratch-merged result is checked for whether an earlier fix survived,
+before that result is trusted enough to squash-merge a real PR.
+
+A grep for the text a correction **removed** returns `0`,
+and that `0` reads as "the correction is intact".
+That grep is not the presence check the claim needs.
+Absence of the old sentence is equally consistent with two different merges:
+one where the fix survived,
+and one where the whole passage, fix included, was dropped or never merged in.
+An absence check cannot tell those two merges apart,
+for the same reason the matrix of zeros above cannot tell a clean sweep from a detector that never ran:
+the absence check was never confirmed capable of producing a non-zero.
+
+The positive control here is not a known-conflicting pair,
+since no conflict detector is in play.
+The positive control is a grep for text the correction **added**.
+A non-zero hit on the merged result confirms the replacement text is present,
+and the absence check alone never confirms that.
+
+- **Do:** pair every absence grep on a merge result (for text a correction removed)
+  with a presence grep (for text that correction added),
+  and require both to read as expected before trusting the merge.
+- **Don't:** squash-merge on the strength of a zero count on removed text alone;
+  that zero is equally consistent with the correction never having landed.
+
+(Measured 2026-09-02 on `Morrison-Lab/ai-config`.
+[#3029](https://github.com/Morrison-Lab/ai-config/pull/3029) was about to be squash-merged,
+and its base predated the mid-file correction
+[#3036](https://github.com/Morrison-Lab/ai-config/pull/3036) had made to `shared/workflow/pr-on-claim.md`.
+A scratch worktree merged `origin/main`,
+then [#3010](https://github.com/Morrison-Lab/ai-config/pull/3010), another PR queued for merge that day,
+then [#3029](https://github.com/Morrison-Lab/ai-config/pull/3029),
+and the session grepped the result for the sentence [#3036](https://github.com/Morrison-Lab/ai-config/pull/3036) had removed.
+The count was `0`,
+and the session read that as "correction intact".
+A peer session pointed out that `0` is an absence check
+and cannot distinguish "correction intact" from "whole passage dropped by the merge".
+The positive control, a grep for "read a non-empty two-dot", the phrase [#3036](https://github.com/Morrison-Lab/ai-config/pull/3036) added,
+returned `1` on the same scratch merge result.
+That `1` is what confirmed the fix survived.)
+
 ## A `merge=union` driver makes the batch pass more necessary, not less
 
 [`configure-gitattributes`](../../skills/configure-gitattributes/SKILL.md)
@@ -453,10 +502,10 @@ direction --- see
 [`ultracode-merge-conflicts`](ultracode-merge-conflicts.md), which owns that
 fact.
 
-## Four silent failure modes arrive through a merge nothing flags
+## Five silent failure modes arrive through a merge nothing flags
 
 The reason "no conflict" is not an all-clear.
-All four landed through merges that left nothing in the PR diff to point at and no check turning red --- three through merges git resolved cleanly, and one through a marked conflict resolved the wrong way.
+All five landed through merges that left nothing in the PR diff to point at and no check turning red --- four through merges git resolved cleanly, and one through a marked conflict resolved the wrong way.
 
 **Version parity.**
 A clean merge of `main` can leave an R package's `DESCRIPTION` `Version:` at
@@ -523,6 +572,22 @@ What the capped-file case adds is that the signal is not merely absent but
 **misdirecting**: a second step enforces the same threshold, so the advisory
 label is accurate about its own step and false about the job.
 
+**Clean auto-merge of independently grown logic (fail-open union).**
+A merge uniting two independently developed versions of a file can be resolved
+cleanly by git with zero textual conflicts, yet combine mechanisms that interact
+pathologically or open silent loopholes.
+Because git merges non-overlapping regions automatically, neither side's test
+suite tests the cross-terms or combinations of both feature sets.
+The resulting file passes both suites while failing open on inputs neither
+side considered.
+(Measured on PR [#2736](https://github.com/Morrison-Lab/ai-config/pull/2736):
+merge `80398b90` auto-merged `scripts/check-pr-fully-clean.py` with zero conflicts
+--- 359 lines from `main`, 109 from the branch --- yet the post-merge adversarial
+review of the cleanly merged files (`scripts/check-pr-fully-clean.py` and
+`scripts/pre-push-review.py`, commit `cea1a533`) returned five fail-opens across the
+newly combined review-matching, payload-extraction, and disclosure-footer mechanisms.
+See Pattern 28 in [`mistake-patterns.md`](../../memories/mistake-patterns.md).)
+
 ### The instrument lesson, which is the transferable part
 
 A check keyed on **added lines** is blind to the splice by construction.
@@ -567,6 +632,8 @@ predicate runs on both sides.
 
 - **Do:** re-check version parity and run a splice-count delta after any merge
   that git resolved without conflict.
+- **Do:** write adversarial tests against the union of independently grown logic
+  even when git auto-merges with zero conflicts.
 - **Do:** convert a noisy absolute-count check into a before/after delta rather
   than discarding it.
 - **Do:** project a capped quantity as `a + b - base` across every pair of open
@@ -595,3 +662,6 @@ Stacking is the structural alternative when two PRs genuinely depend on each
 other rather than merely colliding --- see
 [`stack-dont-pause`](stack-dont-pause.md), which keeps the queue moving without
 waiting for a human merge.
+For repositories with strict branch protection,
+enabling a platform merge queue ([`merge-queue`](merge-queue.md))
+eliminates the need for manual batch chasing altogether by speculatively testing queued PRs on the forge side.

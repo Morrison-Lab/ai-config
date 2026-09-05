@@ -75,7 +75,22 @@ sits unread.
      skill's step 1 (`gh pr view <N> --comments` plus the inline-thread API).
 
      **Copilot code review doesn't post as a PR comment at all -- it's a
-     formal GitHub review**, invisible to the command above. Request it
+     formal GitHub review**, invisible to the command above.
+
+     **Do not request it while the Copilot moratorium stands.**
+     `MORATORIUM_END` in
+     [`hooks/no-unreviewed-pr.py`](../../hooks/no-unreviewed-pr.py) is the
+     live value, and `memories/gh-cli.md` carries the directive it
+     implements.
+     While that date is in the future, skip the request and read whatever
+     Copilot reviews already exist.
+     A missing Copilot verdict is then not a gap to fill but the expected
+     state, and
+     [`self-review-fallback.md`](../../shared/workflow/self-review-fallback.md)
+     governs the resulting absence exactly as it governs a quota-skipped
+     `@claude` round.
+
+     Otherwise request it
      (`REQUEST_COPILOT_REVIEW` -- abstract operation token; resolve to your
      model's tool via [`tool-mappings.md`](../../tool-mappings.md)) and check
      whether it posted a verdict *at the current head*. Finding a review
@@ -91,14 +106,17 @@ sits unread.
      ```bash
      set -o pipefail
      head="$(gh pr view "<N>" --json headRefOid -q .headRefOid)"
-     review_id="$(gh api "repos/<owner>/<repo>/pulls/<N>/reviews" --paginate \
-       | jq -s --arg head "$head" \
-       '[.[][] | select(.user.login=="copilot-pull-request-reviewer[bot]" and .commit_id==$head)] | last | .id')"
-     if [ -n "$review_id" ] && [ "$review_id" != "null" ]; then
-       gh api "repos/<owner>/<repo>/pulls/<N>/reviews/$review_id" --jq '{state, body}'
-       gh api "repos/<owner>/<repo>/pulls/<N>/comments" --paginate \
-         | jq -s --arg rid "$review_id" \
-         '[.[][] | select(.pull_request_review_id == ($rid | tonumber))] | .[] | {line: (.line // .original_line), body}'
+     review_ids="$(gh api "repos/<owner>/<repo>/pulls/<N>/reviews" --paginate \
+       | jq -r -s --arg head "$head" \
+       '[.[][] | select(.user.login=="copilot-pull-request-reviewer[bot]" and .commit_id==$head)] | .[].id')"
+     if [ -n "$review_ids" ]; then
+       comments="$(gh api "repos/<owner>/<repo>/pulls/<N>/comments" --paginate | jq -s '[.[][]]')"
+       for rid in $review_ids; do
+         gh api "repos/<owner>/<repo>/pulls/<N>/reviews/$rid" --jq '{state, body}'
+         jq --arg rid "$rid" \
+           '.[] | select(.pull_request_review_id == ($rid | tonumber)) | {line: (.line // .original_line), body}' \
+           <<<"$comments"
+       done
      else
        echo "no fresh review yet -- wait or re-request"
      fi
@@ -107,11 +125,18 @@ sits unread.
      Don't require a literally empty body; parse the overview for a zero-new-findings phrasing **and** confirm zero matched inline comments -- both, not either alone, since zero inline comments with no affirmative zero-findings overview doesn't rule out a non-verdict formal review.
      **A "no new comments" overview can still carry real findings in a collapsed suppression block** -- these are genuine flagged items under the fully-clean rule (address every finding regardless of confidence label), even though they never become formal inline comment objects the `/comments` endpoint returns (verified: PR #660's review 4767752501 read "generated no new comments" in its overview while its full body carried 3 suppressed findings; PR #1029 repeated the shape from round 3 onward).
      A third condition is required: the raw review **body** must not contain a suppression block at all.
-     **Match the suppression block inside its `<summary>` heading, case-insensitively on `suppressed` -- not on either exact phrase, and not anywhere in the body.**
+     **Match the suppression block on its heading --- a `<summary>` element, or an ATX heading inside a collapsed `<details>` region --- case-insensitively on `suppressed`, not on either exact phrase, not on `<summary>` alone, and not anywhere in the body.**
      GitHub changed the wording and dropped the reason: PR #660 emits `<summary>Comments suppressed due to low confidence (3)</summary>`, while PRs #1029 and #1031 emit `<summary>Suppressed comments (4)</summary>`.
      So a literal grep for `Comments suppressed` returns **zero** against a current body that plainly has the block, which produced a real false negative during the ai-config#1029 loop.
-     A body-wide match over-corrects, though, and would keep a clean PR permanently non-clean: ordinary overview prose contains the word, verified on review 4837572117, whose summary table reads "suppressed Copilot findings" outside any collapsed block.
-     Scope the match to `<summary>` elements (or parse the `<details>` block), and accept both headings.
+     A body-wide match over-corrects, though, and would keep a clean PR permanently non-clean: ordinary overview prose contains the word, verified on ai-config#1038 review 4837572117, whose uncollapsed overview sentence reads "Aligns ARDI-family guidance on deadlocks, sweep scheduling, and suppressed Copilot findings" while its body carries no suppression block, its summary table containing no occurrence of the word (re-read 2026-09-04).
+     Scope the match to headings rather than to `<summary>` alone, and accept every heading: measured 2026-09-03 on ai-config#3084 review `5098574802`, the block arrives as a `### Suppressed comments (1)` heading nested under `<summary>Review details</summary>`, so a `<summary>`-only match returns zero against a body that plainly has it.
+     Scoping to the whole `<details>` region instead would readmit the *class* of false positive a body-wide match produces, because that same review wraps its `Pull request overview` and `File summaries` prose in collapsed `<details>` regions of their own --- 4837572117's overview sentence was uncollapsed, so it controls only for prose sitting outside a `<details>` region.
+     A body does exercise that class: ai-config#1036 review `4837539268` collapses a `Show a summary per file` table reading "Detects suppressed Copilot findings." and carries no suppression block, so the region-wide form flags it and the heading anchor does not.
+     Enumerating Copilot review bodies from the `reviews` endpoint on 2026-09-04 --- 137 bodies across 39 PRs, from ai-config PRs 1000 through 1100 and 3060 through 3130 plus ai-config#660, ai-config#2913 and ai-config#2976 --- that is the region-wide form's only false positive and its only disagreement with the heading anchor.
+     Keep it as a fallback anyway, on the cost asymmetry rather than on a clean record: a false zero merges over real findings while a false positive costs one re-read.
+     So read a hit only the fallback finds as probably spurious, and re-read the region before treating it as a finding.
+     Apply all three to **every** Copilot review at the head, which is why the block above loops rather than reducing the id list with `| last`.
+     No per-author grouping rescues that reduction here, because every Copilot review shares one login.
 
      The stakes are why this matters: from round 3 of ai-config#1029 onward *every* substantive finding arrived suppressed, under a "generated no new comments" overview with zero inline comments -- including CRLF silently disabling a failure path repo-wide.
      So a suppressed finding is not a lower-value one, on the evidence available here --- which is a run of valuable suppressed findings, not a measured correlation.
@@ -137,7 +162,7 @@ sits unread.
    **When the loop reaches the local self-review step, don't perform it.**
    Hand the review to a separate [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md) subagent (foreground, read-only), briefed with the base ref, the paths, and the standards that apply --- never with your rationale for the change, which is what makes a reviewer agree with you.
    The session that wrote the diff knows what it was meant to say, so an inline pass reads the artifact and recovers the intent: confirmation rather than review, and indistinguishable from the real thing in the output (see [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md)).
-   Its brief covers what an inline pass would have done.
+   Its brief covers what an inline pass would have done: independently assessing both line-level implementation defects and the whole change (requirements, intent, cross-file consistency, integration, regression risk, and validation), explicitly reporting both passes in the structured verdict.
    This includes the current PR diff against its base, each changed call path and edge case, the focused tests, and the relevant lint/documentation checks.
    You must Address, Rebut, or Defer every finding it returns.
    If a provider skips or cannot produce a verdict (quota, offline), note the skip in your ARD summary comment.
@@ -174,9 +199,12 @@ sits unread.
    **Opportunistic conflict sweep.**
    After pushing (or after any round where all findings were Rebutted/Deferred with no push), scan other open PRs in the same repo for merge conflicts:
    ```bash
-   gh pr list --state open --json number,title,headRefName,mergeable,mergeStateStatus,comments   # LIST_PRS
+   gh pr list --state open --json number,title,headRefName,author,assignees,mergeable,mergeStateStatus,comments   # LIST_PRS
    ```
-   For each PR where `mergeable == "CONFLICTING"` **or `"UNKNOWN"`** (see `resolve-conflicts`, "Verify before you act" --- `UNKNOWN` can mean GitHub hasn't finished computing yet, not that there's no conflict), verify with `git merge-tree --write-tree origin/main origin/<branch>` (git ≥ 2.38) before acting, then check claim status (most recent comment) and fix unclaimed ones --- same cascade procedure as `post-merge` step 1.5 (claim → isolated worktree → fetch main → merge → `resolve-conflicts` skill → push → unclaim).
+   Filter that list by `memories/reviewing-prs.md`'s scope test first, as `ardia` step 1 does (opened by or assigned to the invoking user, explicitly requested by name, or authored by the GitHub Actions app (`github-actions`));
+   an out-of-scope conflicting PR is reported to the user and left untouched (no comment, no push);
+   they can assign or name it if they want it resolved.
+   For each in-scope PR where `mergeable == "CONFLICTING"` **or `"UNKNOWN"`** (see `resolve-conflicts`, "Verify before you act" --- `UNKNOWN` can mean GitHub hasn't finished computing yet, not that there's no conflict), verify with `git merge-tree --write-tree origin/main origin/<branch>` (git ≥ 2.38) before acting, then check claim status (most recent comment) and fix unclaimed ones --- same cascade procedure as `post-merge` step 1.5 (claim → isolated worktree → fetch main → merge → `resolve-conflicts` skill → push → unclaim).
    A merge to `main` during your ARDI loop can create new conflicts in sibling PRs; clearing them while waiting for the next verdict is better than letting them pile up.
 
 5. **Post the ARD summary** as a comment on the MR/PR (table format per the
@@ -243,10 +271,12 @@ How depends on the repo's review trigger first, and on whether this round pushed
    Other PRs in this repo can become conflicting at any time (someone merges to `main` while the review runs).
    Poll every few minutes with `/loop` or a manual re-check:
    ```bash
-   gh pr list --state open --json number,title,headRefName,mergeable,mergeStateStatus,comments \
+   gh pr list --state open --json number,title,headRefName,author,assignees,mergeable,mergeStateStatus,comments \
      --jq '.[] | select(.mergeable == "CONFLICTING" or .mergeable == "UNKNOWN")'   # LIST_PRS
    ```
-   Verify each candidate with `git merge-tree --write-tree origin/main
+   Apply the same scope test as the sweep above before touching a candidate;
+   an out-of-scope one is reported to the user and left untouched.
+   Verify each in-scope candidate with `git merge-tree --write-tree origin/main
    origin/<branch>` (git ≥ 2.38; see `resolve-conflicts`, "Verify before you act") before
    claiming --- `UNKNOWN` isn't proof of a real conflict, and `CONFLICTING` can
    be stale if a sibling PR merged since GitHub last computed it. Claim and
@@ -397,7 +427,7 @@ A round producing genuine, reproducible correctness bugs is indistinguishable fr
   The guard reintroduced at loop scale the thing that fragment bans at item scale.
 
 The tell is any sentence of the form "the reviewer keeps finding things, so maybe we should stop."
-Replace it with another review request.
+Replace it with another review request --- and, from the third finding-bearing round on, with a changed procedure alongside it, per [`ardi`](../../shared/workflow/ardi.md)'s "Three or more review rounds that each returned findings".
 
 Two things that are **not** this anti-pattern and stay:
 

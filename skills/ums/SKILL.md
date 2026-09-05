@@ -29,6 +29,10 @@ committed pass.
   **A user correction is a mandatory immediate trigger.** Persist the lesson
   before resuming the main task; never wait for the user to invoke UMS or
   remind you a second time.
+  **User profanity or frustration is an urgent trigger.**
+  It signals a severe mistake, broken assumption, or dropped preference
+  requiring immediate diagnosis, repair, and learning
+  (see [`user-profanity-signal`](../../shared/workflow/user-profanity-signal.md)).
 - **When you read a review of your work, receive critical feedback on it,
   or a questioned claim turns out to be wrong.**
   The trigger is the scrutiny, not Address, not a clean verdict, and not
@@ -66,11 +70,21 @@ committed pass.
   step, or a preference wasn't encoded)
 - When the user says "did you update memories?" (the answer should be "let
   me do that now")
-- **While paused waiting on a subagent or a long-running background process
-  to complete.** That idle stretch is exactly when there's time to survey
-  what's accumulated so far and persist it, rather than only running UMS at
-  a hard stop. Don't let a real wait sit fully idle when a useful pass is
-  available to run alongside it.
+- **Before ending a turn to wait on anything** --- a subagent,
+  a long-running background process, CI, a review round,
+  or an answer from the user.
+  Run the pass before the turn ends,
+  not once the wait turns out to be long:
+  a wait's length is not knowable when it begins,
+  and the learnings sit in conversation state until it ends.
+  A dispatched subagent or background job is the case
+  where the pass runs alongside the wait rather than delaying it,
+  so don't let a real wait sit fully idle.
+  The pass is owed at the first pause
+  and again only once new learnings accumulate,
+  rather than once per wait or once per re-arm of a timer.
+  See
+  [`run-ums-proactively`](../../shared/workflow/run-ums-proactively.md).
 
 ## Procedure
 
@@ -82,6 +96,11 @@ committed pass.
    - Debugging insights
    - Codebase conventions discovered
 
+   *(When delegating UMS to a subagent, prefer **conversation-inheriting dispatch**
+   (Agent `subagent_type: "fork"` or `/subtask` in Claude Code, or providing the transcript log path in clean-slate harnesses)
+   so the subagent surveys conversation history directly without manual serialization;
+   see [`use-subagents`](../../shared/workflow/use-subagents.md).)*
+
 2. **Categorize each learning.** For each item, decide:
    - Is it a **skill update**? (workflow step missing, procedure unclear)
    - Is it a **memory note**? (tool quirk, preference, debugging insight)
@@ -90,26 +109,60 @@ committed pass.
    - Is it **cross-project or project-specific**? (`memories/preferences.md`'s
      "Memory and skill storage" rule: cross-project lessons commit to
      `Morrison-Lab/ai-config`; a convention/gotcha tied to one repo we own
-     commits to *that* repo's own agent docs instead — see the checklist
+     commits to *that* repo's own agent docs instead --- see the checklist
      item below for where. This changes step 4's target, not just the
      content.)
 
 3. **Apply updates.** For each item:
    - Read the target file first (skill or memory) to understand current state
-   - **Grep that file for the item's specific subject** -- the tool name, the
+   - **Grep the corpus for the item's specific subject** -- the tool name, the
      API call, the error string -- before appending anything.
      Reading the region you're editing is not enough: a topical memory file
      runs to hundreds or a thousand-plus lines, so an existing entry on the
      same subject can sit far away in an unrelated cluster and never enter
      your view.
-     Grep the whole `memories/` directory rather than one file --
-     a fact can plausibly sit in either of two adjacent topical files.
-     When one exists, extend it in place; don't add a second bullet.
+     Grep [`skill-builder`](../skill-builder/SKILL.md) step 0's path list
+     rather than one file, and rather than only `memories/`:
+     ```bash
+     (
+       repo="${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/ums rev-parse --show-toplevel 2>/dev/null || git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+       test -f "$repo/CLAUDE.md" && test -d "$repo/shared" || { echo "not an ai-config checkout: $repo" >&2; exit 1; }
+       cd "$repo" && grep -rilIF -- "<subject>" skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md
+     )
+     ```
+     The query runs over the files on disk,
+     so an entry that exists only on a branch not checked out there is out of reach
+     (see the unmerged-PR section of [`grep-is-not-coverage`](../../shared/workflow/grep-is-not-coverage.md)).
+     `-F` matches the subject as a fixed string,
+     so an error string carrying `[`, `.`, or `*` is searched for as written;
+     `-I` skips binary files, bytecode caches included,
+     which a plain `grep -r` would otherwise report as hits.
+     A rule can be owned by a `shared/` fragment or a skill as easily as by a memory,
+     and a `memories/`-only grep stays outside those paths.
+     When the grep finds an existing entry on the subject, extend that entry in place;
+     don't add a second bullet.
      (ai-config#689: a `list_workflow_runs` cost bullet went in next to the
      related `get_check_runs` guidance while an entry on the same tool already
      sat ~2000 lines below in the write-access cluster -- caught by the review
      bot, not by the author.)
-   - **When the target memory file is already at the 1200-line cap**,
+   - **Run `python3 scripts/check-memory-file-size.py` before writing the
+     append, and read its warning band, not only its pass/fail line.**
+     The band names every memory file near the cap and how many lines each
+     has left (ai-config#3102), so a file with almost no
+     headroom is knowable here, while the entry can still be re-wrapped or the
+     file split, rather than by tripping the gate in step 4 once the append is
+     written.
+     Read each listed file's headroom, not its membership: the band opens 100
+     lines below the cap at the shipped default, so most of it is room rather
+     than a warning.
+     - **Do:** read the reported headroom of the file the entry topically
+       belongs in, and recover lines or split that file when its headroom does
+       not comfortably cover the entry.
+     - **Don't:** pick the destination by headroom rather than by subject,
+       or redirect or split on band membership alone --- a file with most of
+       the band still ahead of it can take this entry.
+   - **When the target memory file is already at the cap
+     `scripts/check-memory-file-size.py` reports**,
      recover lines (re-wrap or drop) or split the file.
      A fold has two shapes and neither escapes every gate: a new source
      line trips `scripts/test_check_memory_file_size.py`, while folding
@@ -119,21 +172,24 @@ committed pass.
      `scripts/test_check_memory_file_size.py`
      even when every new sentence is a real lesson
      (3rd occurrence, 2026-08-25 on `memories/preferences.md` in
-     ai-config#2262: `origin/main` was exactly 1200 lines, and a
-     +5-line append reddened `validate`.
+     ai-config#2262: `origin/main` sat exactly at the cap, 1200 lines as
+     that cap then stood, and a +5-line append reddened `validate`.
      Prior: `shared/writing/semantic-line-breaks.md` ai-config#1291;
      `shared/workflow/review-verdict-pitfalls.md` ai-config#811).
-   - **When step 2 routed the item to a repo other than ai-config, grep the
-     ai-config corpus too** -- "the whole `memories/` directory" above means
-     the *destination's*, so a repo-local entry can duplicate or contradict a
-     fragment nobody thought to search from that repo.
+   - **When step 2 routed the item to a repo other than ai-config, grep both
+     corpora.**
+     The query above searches an ai-config checkout,
+     so run a second pass in the destination repo, over that repo's own doc paths ---
+     a repo-local entry can otherwise duplicate or contradict a fragment
+     nobody thought to search from that repo.
      See
      [`grep-is-not-coverage`](../../shared/workflow/grep-is-not-coverage.md)'s
      "Searching the wrong corpus is the same error with no grep in it".
-   - **When that grep finds the corpus already covers this class, record the
+   - **When the subject grep finds an existing entry covering this class, record the
      recurrence on the existing entry, not just the new fact.**
-     The bullet above already says to extend in place rather than add a
-     sibling; what is missing is the count.
+     The **Grep the corpus** bullet above already says to extend in place
+     rather than add a sibling;
+     what is missing is the count.
      Write it on the entry -- "3rd occurrence, 2026-08-16", with a pointer to
      each prior record -- so the entry carries evidence about whether the
      written rule is actually holding.
@@ -158,11 +214,11 @@ committed pass.
      The reverse reading -- an entry that has never recurred and is never cited
      is a retirement candidate -- has **no** consumer today, so treat it as a
      property the count makes available rather than as a step anything runs.
-   - Make the edit — concise bullet points, not prose
+   - Make the edit --- concise bullet points, not prose
    - If updating a skill: the change should be specific enough that following
      the skill next time would avoid the mistake
 
-4. **Commit and push — via a branch + PR, not direct to `main`, in whichever
+4. **Commit and push --- via a branch + PR, not direct to `main`, in whichever
    repo step 2 routed the item to.**
 
    If the work will dispatch an expensive external action from a pinned commit
@@ -182,6 +238,18 @@ committed pass.
    every `git add`/`commit`/`push` from inside it -- never `cd` straight
    into the shared checkout itself to make a change.
 
+   **Run the repo's own gates on the files you touched before the commit**,
+   since a UMS PR fails CI on the same checks as any other:
+   `python3 scripts/check-memory-file-size.py --strict` (a memory file over
+   1250 lines fails; split it, as `memories/markdownlint.md` was split from
+   `tools.md` on 2026-09-01 when a UMS append crossed the budget),
+   `NLB_BASE_REF=origin/main python3 scripts/vendor/gha-check-new-line-breaks.py`,
+   `python3 scripts/check-links.py`, and `markdownlint` on the changed files.
+
+   `check-memory-file-size.py` prints its warning band here too, but this run
+   is the pass/fail one: the band is actionable in step 3, before the append is
+   written, and by now the append already exists.
+
    **If a push is rejected non-fast-forward:** fetch first and diff before
    assuming a real conflict -- the branch may have picked up another
    session's commit that needs separating out (`git revert <their-commit>`)
@@ -198,7 +266,7 @@ committed pass.
 
    **Cross-project items** (skills, cross-project memory notes): both live in
    the ai-config repo. Discover its path with
-   `git -C ~/.claude/skills/ums rev-parse --show-toplevel` — point
+   `${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/ums rev-parse --show-toplevel 2>/dev/null || pwd)}` — point
    `-C` at a **skill subdir** (any one), not the `~/.claude/skills` parent.
    `bootstrap.sh` may symlink skills *per-child* into a real `~/.claude/skills`
    directory (cloud/web sessions pre-populate it), so the parent itself isn't a
@@ -225,7 +293,7 @@ committed pass.
    *Already on the open PR's branch* (e.g. mid-ARDI): reuse a worktree for
    it, creating one if this is the first push in the worktree-ified flow.
    ```bash
-   repo="$(git -C ~/.claude/skills/ums rev-parse --show-toplevel)"
+   repo="${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/ums rev-parse --show-toplevel 2>/dev/null || pwd)}"
    wt="../ai-config-worktrees/<branch>"
    git -C "$repo" worktree add "$wt" "<branch>" 2>/dev/null || true   # no-op if it already exists
    cd "$wt"
@@ -239,7 +307,7 @@ committed pass.
 
    *Same-repo case* (this checkout's `origin` IS the repo you're targeting):
    ```bash
-   repo="$(git -C ~/.claude/skills/ums rev-parse --show-toplevel)"
+   repo="${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/ums rev-parse --show-toplevel 2>/dev/null || pwd)}"
    git -C "$repo" fetch origin main   # FETCH
    git -C "$repo" worktree add -b "ums-<topic>" "../ai-config-worktrees/ums-<topic>" origin/main   # CREATE_BRANCH
    cd "../ai-config-worktrees/ums-<topic>"
@@ -254,7 +322,7 @@ committed pass.
    branch. Fetch the intended **upstream** repo explicitly (not just look up
    its default-branch name) and branch the worktree from that fetched ref:
    ```bash
-   repo="$(git -C ~/.claude/skills/ums rev-parse --show-toplevel)"
+   repo="${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/ums rev-parse --show-toplevel 2>/dev/null || pwd)}"
    base="$(gh repo view "<upstream-owner>/<repo>" --json defaultBranchRef -q .defaultBranchRef.name)" \
      && git -C "$repo" fetch "https://github.com/<upstream-owner>/<repo>.git" "$base" \
      && git -C "$repo" worktree add -b "ums-<topic>" "../ai-config-worktrees/ums-<topic>" FETCH_HEAD
@@ -274,21 +342,21 @@ committed pass.
    `git -C "$repo" worktree remove "../ai-config-worktrees/<branch>"` (the
    `post-merge` skill's own tidy step does this automatically).
 
-   **After every push in UMS, verify PR state for the current branch in the intended base repo.** `gh pr list --head <owner>:<branch>` silently returns
-   empty for an owner-qualified head — it only matches a bare branch name,
-   even when a matching PR genuinely exists (verified directly: `gh pr list
-   --head <owner>:ums-pr635-lessons` returned `[]` against a real open PR
-   on that exact branch, while `gh pr list --head ums-pr635-lessons` found
-   it). Query the REST API instead, whose `head` filter does honor the
-   owner-qualified form:
+   **After every push in UMS, verify PR state for the current branch in the intended base repo.**
+   `gh pr list --head <owner>:<branch>` silently returns empty for an owner-qualified head ---
+   it only matches a bare branch name, even when a matching PR genuinely exists
+   (verified directly: `gh pr list --head <owner>:ums-pr635-lessons` returned `[]` against a real open PR on that exact branch,
+   while `gh pr list --head ums-pr635-lessons` found it).
+   Query the REST API instead, whose `head` filter does honor the owner-qualified form:
    `gh api --method GET "repos/<upstream-owner>/<repo>/pulls" -f "head=<head-owner>:<current-branch>" -f "state=open" --jq '.[] | {number, url, state}'`
    (for `dem-extra1/ai-config`, that is `gh api --method GET "repos/Morrison-Lab/ai-config/pulls" -f "head=dem-extra1:<current-branch>" -f "state=open" ...`).
-   If no open PR exists and upstream is accessible, open it as a cross-fork
-   PR: prepare explicit title and body first, show the draft for approval
-   (per the "always show the draft before posting" rule in
-   `memories/preferences.md`), then create non-interactively -- bare
-   `gh pr create` without `--fill`/`--title`/`--body` prompts interactively
-   and can hang a headless session:
+   If no open PR exists and upstream is accessible,
+   open it as a cross-fork PR immediately with an explicit title and body.
+   Do not pause for draft approval:
+   UMS updates are the durable record of a completed learning,
+   and the PR supplies the reviewable handoff.
+   Bare `gh pr create` without `--fill`/`--title`/`--body` prompts interactively and can hang a headless session:
+
    ```bash
    gh repo view "<upstream-owner>/<repo>" --json defaultBranchRef \
      -q .defaultBranchRef.name   # discover the base -- don't hard-code main
@@ -297,6 +365,7 @@ committed pass.
      --title "ums: <summary>" --body-file /tmp/ums-pr-body.md \
      --reviewer <reviewer>
    ```
+
    If upstream is not accessible in-session, push and explicitly hand off that
    upstream PR creation is still required.
 
@@ -304,24 +373,35 @@ committed pass.
    own): commit to *that* repo's own agent docs (`CLAUDE.md`,
    `.github/agents/*.md`, `.github/instructions/*.md`,
    `.github/copilot-instructions.md`, or checked-in `.claude/memories/`) via a branch + PR in
-   that repo — not ai-config. Discover its path the same way, `cd`-ing into
-   that repo's own checkout instead of the ai-config one, then follow the
-   same branch/commit/push/PR steps above, substituting that repo's own
-   default branch for every `main`/`origin main` reference above (don't
-   hard-code `main` -- a project routed here may default to `master` or
-   another name; discover it the same way: `gh repo view "<owner>/<repo>"
-   --json defaultBranchRef -q .defaultBranchRef.name`). If that repo has no
-   agent-doc infrastructure yet, write to its local Claude project memory
+   that repo --- not ai-config.
+   Discover its path the same way,
+   `cd`-ing into that repo's own checkout instead of the ai-config one,
+   then follow the same branch/commit/push/PR steps above,
+   substituting that repo's own default branch for every `main`/`origin main` reference above
+   (don't hard-code `main` --- a project routed here may default to `master` or another name;
+   discover it the same way:
+   `gh repo view "<owner>/<repo>" --json defaultBranchRef -q .defaultBranchRef.name`).
+   If that repo has no agent-doc infrastructure yet,
+   write to its local Claude project memory
    (`~/.claude/projects/<project-path>/memory/`) as short-lived staging
-   only -- this is not a durable destination; hand off that the project
-   repo still needs agent-doc infrastructure added (via a PR) and the
-   staged memory migrated there. See the checklist item below.
+   only --- this is not a durable destination;
+   hand off that the project repo still needs agent-doc infrastructure added (via a PR)
+   and the staged memory migrated there.
+   See the checklist item below.
 
    **Operational checklist (run in order):**
+
    - [ ] **Preflight:** confirm branch + cleanliness (`git branch --show-current` / `git status --short`)
    - [ ] **Safe write form:** for any external post with markdown/backticks, use file-backed bodies (`--body-file` or `-F "body=@<file>"`), never inline double-quoted body strings
-   - [ ] **Postcondition:** after push, verify open PR exists in the intended base repo for the head owner/branch (`gh api --method GET "repos/<upstream-owner>/<repo>/pulls" -f "head=<head-owner>:<branch>" -f "state=open" --jq '.[] | {number, url, state}'` — not `gh pr list --head <owner>:<branch>`, which silently returns empty for an owner-qualified head)
-   - [ ] **Recovery signature:** if shell logs `command not found` during a comment/create command, check whichever CLI the failing command actually invoked (`which gh` or `which glab` — not always `gh`). If `gh` is unavailable in this session (expected in remote/web sessions), fall back to the MCP tool mapping in `tool-mappings.md` instead of retrying the CLI — `tool-mappings.yml` has no `glab` operations, so a missing `glab` has no MCP fallback; hand off or block instead of retrying. If the CLI that failed *is* installed, the likely cause is backtick substitution mangling the body; re-run using a file-backed body and re-check posted content
+   - [ ] **Postcondition:** after push, verify open PR exists in the intended base repo for the head owner/branch (`gh api --method GET "repos/<upstream-owner>/<repo>/pulls" -f "head=<head-owner>:<branch>" -f "state=open" --jq '.[] | {number, url, state}'` --- not `gh pr list --head <owner>:<branch>`, which silently returns empty for an owner-qualified head)
+   - [ ] **Recovery signature:** if shell logs `command not found` during a comment/create command,
+     check whichever CLI the failing command actually invoked (`which gh` or `which glab` --- not always `gh`).
+     If `gh` is unavailable in this session (expected in remote/web sessions),
+     fall back to the MCP tool mapping in `tool-mappings.md` instead of retrying the CLI ---
+     `tool-mappings.yml` has no `glab` operations, so a missing `glab` has no MCP fallback;
+     hand off or block instead of retrying.
+     If the CLI that failed *is* installed, the likely cause is backtick substitution mangling the body;
+     re-run using a file-backed body and re-check posted content
 
 5. **Report what was updated.** Provide a brief summary table:
 
@@ -406,22 +486,22 @@ add a review gate for the cases that need one.
 - ❌ Saying "I'll remember that" without actually writing it down
 - ❌ Updating memories but not pushing skill changes to origin
 - ❌ Recording vague lessons ("be more careful") instead of specific ones
-  ("always poll for new review after pushing — check commit SHA matches")
-- ❌ Skipping the "check existing notes" step and creating duplicates --
+  ("always poll for new review after pushing --- check commit SHA matches")
+- ❌ Skipping step 3's dupe check and creating duplicates --
   specifically, reading only the region you're appending to instead of
-  grepping the whole target file for the subject (step 3)
+  grepping the corpus for the subject
 - ❌ Updating only preferences when a skill also needs the fix
-- ❌ `git add -A` — it sweeps unrelated in-flight edits (the user's work, other
+- ❌ `git add -A` --- it sweeps unrelated in-flight edits (the user's work, other
   draft skills) into your commit/PR. Stage the specific files you touched.
-- ❌ Creating `memories/repo/<repo>.md` for any repo — this pattern is retired.
+- ❌ Creating `memories/repo/<repo>.md` for any repo --- this pattern is retired.
   Put repo-specific lore in the repo's own agent docs (`.github/agents/`,
   `CLAUDE.md`, `.github/instructions/`, `.github/copilot-instructions.md`, or
   checked-in `.claude/memories/`) via a PR;
   if the repo has no agent-doc infrastructure yet, this session's own local
   project-memory mechanism (Claude Code: `~/.claude/projects/<project-path>/memory/`
-  — substitute the equivalent for a non-Claude agent) is short-lived staging
-  only — hand off that a PR adding those agent docs is still required. See the checklist
-  item above and `memories/preferences.md` for the full rule.
+  --- substitute the equivalent for a non-Claude agent) is short-lived staging
+  only --- hand off that a PR adding those agent docs is still required.
+  See the checklist item above and `memories/preferences.md` for the full rule.
 - ❌ Naming a tool, flag, or API identifier that appears **nowhere else in the
   corpus** without anchoring it somewhere checkable. A lone mention reads
   identically whether it is correct or hallucinated, so a later session has
@@ -479,3 +559,33 @@ add a review gate for the cases that need one.
   of inside it. (Caught by `@claude` review on ai-config#335: a new 0-indent
   bullet landed between two sibling sub-bullets of an existing parent,
   breaking the nesting.)
+- ❌ Patching a sentence the entry's point does not need, round after round.
+  When successive review rounds find defects in mechanism prose no reader
+  acts on, delete the prose rather than repair it; the tell is the third
+  round on the same paragraph (ai-config#3193: five successive commits,
+  `1fff7e63` to `4af1f1ea`, each re-patched the same protocol-mechanism
+  sentences, which the entry's Do/Don't never used and `e91dda59` deleted;
+  the deleted paragraphs were not restored).
+  The same shape recurs when a fix round appends prose narrating its own
+  fixes: that prose is fresh unmeasured text, so a round that fixes N
+  findings and adds a paragraph about them adds new claims to refute
+  (ai-config#3202: the three notebook entries narrating rounds 1 to 3 were
+  deleted rather than patched at `48380505`, and the summary entry that
+  replaced them kept being re-edited, its round count rebound to each new
+  head, until the merged file's "As of `75bc0fc2`, the head round 13
+  reviewed").
+  Write the fix with no narration;
+  ai-config#3203 proposes the same brief for a fix loop's fixer.
+
+## Proactive hook compliance
+
+- **`remind-ums-after-error.py`**: Prompt-injection hook that fires
+  when an admitted mistake has no subsequent memory or skill modification.
+  Satisfy it by executing `ums` immediately upon acknowledging an error.
+- **`remind-ums-on-scrutiny.py`**: Injects a reminder when a review was read
+  or a questioned claim was corrected without a recorded UMS pass.
+- **`remind-learn-from-review.py`**: Reminds when an accepted reviewer finding
+  has no accompanying learning or guard recorded.
+- **`no-mistake-without-a-hook.py`**: Stop guard and reminder that blocks after an admitted,
+  mechanizable mistake until a hook (`hooks/<name>.py`), test (`hooks/test-<name>.py`),
+  and manifest binding (`hooks/hooks.json`) are authored.

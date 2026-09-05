@@ -65,14 +65,19 @@ gh pr checks <N>
 In a remote/web session without `gh`, use the equivalent tool
 (`mcp__github__request_copilot_review`) instead.
 
-**Run that `requested_reviewers` POST as the sole (or last) command in its Bash call.**
-The [`no-unreviewed-pr`](../../hooks/no-unreviewed-pr.py) Stop hook discharges the reviewer-request obligation only on positive evidence the request itself succeeded, and the one reliable success signal is the whole Bash call's exit status --- which belongs to that call's **last** command.
+**Run that `requested_reviewers` POST as the sole command in its Bash call.**
+The [`no-unreviewed-pr`](../../hooks/no-unreviewed-pr.py) Stop hook discharges the reviewer-request obligation only on positive evidence the request itself succeeded, and the one reliable success signal is the whole Bash call's exit status --- which the hook attributes to a command only when that command is the call's **last**.
+It does not attribute it to the last command as a rule, which would be false: a failing `&&` short-circuits everything after it, so the status can be an *earlier* command's.
+What holds is the converse the hook actually relies on --- in last position after `&&` or `;`, the status is either that command's own or a short-circuit failure, and the discharge is safe under both.
+After `||` it is neither: a succeeding left operand skips the request and exits 0, so the hook discharges on a request that never ran ([ai-config#3139](https://github.com/Morrison-Lab/ai-config/issues/3139)).
+The rule above said "sole (or last)" until this hole was found;
+it now says sole, because the safe reading of "last" is only last after `&&` or `;` --- never `<read> || <POST>`, which is the one chaining form that silently satisfies the guard while making no request at all.
 So chaining the verification reads (`gh pr view ... --json reviews`, `gh pr checks`) *after* the POST in the same call makes the request non-last, which the hook treats as ambiguous: it keeps warning even though the POST returned 200.
 Run the POST alone, then do the pending/reviews/checks verification in a **separate** later call.
 This is [`fail-fast`](../principles/fail-fast.md)'s "a combined result cannot attribute a per-step outcome" applied to a review request;
 the same rule governs a `gh pr ready` draft transition the hook tracks.
 
-**"Nothing chained after it" includes a pipe added purely to trim the output.**
+**"Nothing chained before or after it" includes a pipe added purely to trim the output.**
 The rule above is stated in terms of *verification reads*, which is how it is usually broken and is also the version a reader recognizes themselves in.
 A formatting pipe does not feel like chaining a second step --- `| tail -3` or `| jq` is a decision about how much of one command's output to look at, not an extra command in a sequence --- so it slips past a reader who has just agreed with the rule as written.
 The shell does not draw that distinction: the last command in the pipeline owns the exit status either way, so `gh api ... | tail -3` leaves the POST non-last exactly as a chained `gh pr view` does.
@@ -107,8 +112,8 @@ pending reviewer, which the API can (unreliably) answer with either `201` or
 `422` --- don't spend a call resolving which; either response is consistent
 with the ruleset already having asked.
 Where you can't tell whether the repo has such a ruleset, request explicitly
-anyway --- a redundant request costs nothing, while skipping it on a repo
-without automatic review leaves Copilot unrequested.
+anyway --- a redundant request spends one call, the accepted risk, while
+skipping it on a repo without automatic review leaves Copilot unrequested.
 
 Run that request immediately after `gh pr create` for a non-draft PR, or immediately after `gh pr ready` for a draft PR, before writing any status report.
 Verify the request landed: the POST response should include the requested reviewer, then a fresh read should show either a pending review request or a new review/check from that reviewer on the current head.

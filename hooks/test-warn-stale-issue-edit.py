@@ -82,12 +82,14 @@ def run_hook(transcript_path, tool_name="Write", extra_input=None):
         "transcript_path": transcript_path,
         "hook_event_name": "PreToolUse",
     })
+    env = {k: v for k, v in os.environ.items() if k != "ANTIGRAVITY_AGENT"}
     proc = subprocess.run(
         [sys.executable, HOOK],
         input=payload,
         capture_output=True,
         text=True,
         timeout=10,
+        env=env,
     )
     if proc.returncode != 0:
         return {"_exit": proc.returncode, "_stderr": proc.stderr}
@@ -703,6 +705,62 @@ check(
     False,
 )
 
+
+# Heredoc stripping & bounding tests (ai-config#2536)
+check(
+    "strip_heredocs removes normal heredoc body",
+    subject.strip_heredocs("cat <<EOF > out.txt\ngh issue view 2282\nEOF\ngit fetch"),
+    "cat  > out.txt\ngit fetch",
+)
+check(
+    "strip_heredocs removes indented heredoc body",
+    subject.strip_heredocs("cat <<- EOF\nbody\n  EOF\ngit fetch"),
+    "cat \ngit fetch",
+)
+check(
+    "strip_heredocs strips body of unterminated opener to EOF",
+    subject.strip_heredocs("cat <<EOF > out.txt\nline1\nline2"),
+    "cat  > out.txt\n",
+)
+check(
+    "strip_heredocs preserves trailing content on terminator line",
+    subject.strip_heredocs("cat <<EOF > out.txt\nbody line\nEOF; echo done\ngit fetch"),
+    "cat  > out.txt\n; echo done\ngit fetch",
+)
+check(
+    "command_views_issue sees issue view chained onto terminator line",
+    subject.command_views_issue(
+        "cat <<EOF > out.txt\nbody line\nEOF; gh issue view 2282\ngit fetch",
+        issue,
+        stems["view_cli"],
+    ),
+    True,
+)
+check(
+    "strip_heredocs handles chained heredocs across terminator lines",
+    subject.strip_heredocs(
+        "cat <<EOF1 > a\nbody1\nEOF1; cat <<EOF2 > b\nbody2\nEOF2; echo done\ngit fetch"
+    ),
+    "cat  > a\n; cat  > b\n; echo done\ngit fetch",
+)
+
+# Performance test for unterminated openers (ai-config#2536)
+# Benchmarks both single large command (800 openers) and 20-command 1.9MB scenario
+import time
+
+bad_cmd = "echo start\n" + "cat <<EOF\nhello\n" * 800 + "echo end\n"
+t0 = time.perf_counter()
+subject.strip_heredocs(bad_cmd)
+elapsed = time.perf_counter() - t0
+check("strip_heredocs on 800 unterminated openers runs in under 0.05s", elapsed < 0.05, True)
+
+# Issue #2536 adversarial scenario: 20 commands of ~95KB (1.9MB total)
+cmd_95k = "echo start\n" + "cat <<EOF\nhello\n" * 6000 + "echo end\n"
+t0 = time.perf_counter()
+for _ in range(20):
+    subject.strip_heredocs(cmd_95k)
+elapsed_total = time.perf_counter() - t0
+check("strip_heredocs on 20x95KB (1.9MB) adversarial input runs in under 0.2s", elapsed_total < 0.2, True)
 
 if failures:
     sys.exit(f"{failures} failure(s)")

@@ -73,13 +73,17 @@ Agent briefs):
     PATH clause carries there: an unscoped "any plural noun" would fire on
     "three days" or "two people" just as readily as "18 files".
   * ENUMERATION -- a LISTABLE_NOUN followed shortly by a hand-typed list of
-    two or more IDENTIFIER-shaped tokens (a letter, then at least one
-    hyphen/underscore/dot-separated segment) joined by `/` or `,`. This is
-    the shape the incident's wrong list took --
+    two or more IDENTIFIER-shaped items joined by a comma or a spaced `/`
+    (`ENUM_SEPARATOR`). An item is a letter-led, `/`-joined path whose
+    segments may be bare, so long as at least ONE of them carries an
+    internal hyphen/underscore/dot (`PATH_TOKEN`, below); an UNSPACED `/`
+    is that path's own structure, never a list separator.
+    This is the shape the incident's wrong list took --
     "`cycle-charge-flee` / `interval-labels` / ..." -- and it fires even with
     no explicit numeral in front. The hyphen/underscore/dot requirement is
     what keeps this off ordinary prose lists this corpus posts constantly
-    ("Addressed, Rebutted, or Deferred" has no such token in it).
+    ("Addressed, Rebutted, or Deferred" has no such token in it, and neither
+    does an ordinary prose slash pair like `and/or`).
 
 DISCHARGE
 ---------
@@ -242,6 +246,90 @@ LISTABLE_NOUN_RE = re.compile(r"(?:" + LISTABLE_NOUN_PATTERN + r")", re.I)
 # has no such token), while still matching `cycle-charge-flee`, `foo.gd`,
 # `some_script`.
 TOKEN = r"[A-Za-z][A-Za-z0-9]*(?:[-_.][A-Za-z0-9]+)+"
+
+# A path SEGMENT that may itself be bare (no internal hyphen/underscore/dot
+# at all) -- deliberately looser than `TOKEN`, which requires at least one
+# such separator. Defined here, above `ENUM_RE`, because both the
+# enumeration ITEM grammar (`PATH_TOKEN`, next) and the dangling-`/`
+# continuation shape (`CONTINUATION_RE`, further down) are built from it.
+_BARE_SEGMENT = r"[A-Za-z][A-Za-z0-9]*(?:[-_.][A-Za-z0-9]+)*"
+
+# A path segment in a position where a digit may lead it -- an issue or run
+# number, a year, a version directory (`.../issues/1148`, `.../runs/3139`).
+# Only ever used AFTER the mandatory `TOKEN`, never before it, so no item
+# can begin with a bare number and ordinary numeric prose ("files 3/4 done",
+# "v1/v2") still matches nothing.
+_NUMBERED_SEGMENT = r"[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*"
+
+# One ENUMERATION ITEM: a `/`-joined path whose segments may be BARE, as
+# long as AT LEAST ONE segment is `TOKEN`-shaped (ai-config#2404).
+#
+# `TOKEN` alone required EVERY segment of a slash-joined citation to carry
+# its own internal hyphen/underscore/dot, so a real path with one bare
+# segment anywhere -- `ai-config/memories/tools.md`, `Support/glab-cli/
+# config.yml`, `Morrison-Lab/gha`, `tests/testthat.R` -- could never be
+# parsed as one enumeration item at all. The match truncated at the segment
+# before the bare one (or, when the bare segment led, never started), and
+# every recalled identifier after it fell outside the match, so a mixed
+# list (one real citation plus recalled bare identifiers -- the founding
+# incident's own composite shape) went silently unflagged. That is the
+# false-negative family ai-config#2404 was filed for, and the reason it
+# stayed open for a dedicated pass: the naive fix is to let a bare word be
+# an item, which throws away the precision mechanism entirely.
+#
+# The precision mechanism is preserved here rather than traded away. Bare
+# segments are admitted only BESIDE a still-mandatory `TOKEN`-shaped one,
+# so an item cannot be built from bare words alone: "Addressed, Rebutted,
+# or Deferred" matches nothing, and neither does an ordinary prose slash
+# pair (`and/or`, `CI/CD`, `input/output`) or a two-segment all-bare
+# directory (`shared/workflow`). What changes is only WHERE the
+# separator has to sit -- somewhere in the item, rather than in every
+# segment of it.
+#
+# Both hop counts are bounded at 8 rather than left unbounded. A `/` can be
+# read either as an item's own segment separator or as the list separator
+# between two items, so an unbounded chain of slashes admits exponentially
+# many parses of one failing span, per
+# `shared/coding/regex-backtracking-pitfalls.md`. No real citation
+# approaches nine hops on either side.
+#
+# Scoped to the INLINE route (`ENUM_RE`) only. `BULLET_TOKEN_RE` still
+# builds its per-item capture from `TOKEN`, deliberately: widening it there
+# would fold a bare trailing segment into the capture and hand the
+# following bare `/` to `_bullet_dangling_extends`, re-opening the round-11
+# regression that function exists to prevent (see its docstring). The
+# bulleted counterpart of this miss stays pinned as
+# `BULLETED_ACCEPTED_MISS_BARE_WORD_LEADING_SEGMENT_TWO_ITEM`, still under
+# ai-config#2404.
+PATH_TOKEN = (
+    rf"(?:{_BARE_SEGMENT}/){{0,8}}{TOKEN}(?:/{_NUMBERED_SEGMENT}){{0,8}}"
+)
+
+PATH_TOKEN_RE = re.compile(PATH_TOKEN)
+
+# A path segment carrying no internal hyphen/underscore/dot of its own.
+ONLY_BARE_SEGMENT_RE = re.compile(r"(?:^|/)[A-Za-z][A-Za-z0-9]*(?=/|$)")
+
+# What separates two ITEMS of a hand-typed list, now that an item can carry
+# its own internal `/`. A comma always separates -- no path contains one.
+# A `/` separates ONLY when whitespace sits on one side of it; an unspaced
+# `/` is path structure, since no path segment contains a space and no
+# hand-typed list of this corpus's own writing omits the spaces
+# ("`cycle-charge-flee` / `interval-labels` / ..." is the incident's own
+# shape). The leading `/?` is route 6's dangling-directory absorption
+# (`codex-skills/pre-push-review/, cycle-charge-flee`) and is unchanged.
+#
+# The previous separator accepted a bare unspaced `/`, which is what let a
+# lone path citation read as a multi-item list whenever it had no extension
+# to be recognized by -- `Morrison-Lab/gha/antigravity-review` split into
+# three "items" and fired. A two-sided sweep over 3441 path-like strings
+# harvested from this repo's own `shared/`, `skills/` and `memories/` prose,
+# each embedded in four single-citation review-comment frames, measured
+# 1572 such false positives before this change and 0 after, while the mixed
+# citation-plus-identifier frame this hook exists for gained 1293
+# detections and lost 7 (all of them harvest artifacts -- a captured
+# trailing `.`, an ellipsis, a dot-led `.github` segment).
+ENUM_SEPARATOR = r"\s*/?(?:,|(?<=\s)/|/(?=\s))\s*"
 
 # CARDINALITY: `\bCOUNT [ \t]+ (bounded gap) PLURAL_LISTABLE_NOUN\b`. Two
 # fixes layered on top of each other, both found by adversarial review of
@@ -460,9 +548,10 @@ CARDINALITY_RE = re.compile(
 #      own docstring. The underlying limitation (a bare-segment path is
 #      never detected as an enumeration ITEM at all, so a real citation
 #      shaped that way still goes unflagged when mixed with recalled
-#      identifiers) is tracked separately as ai-config#2404: fixing it means
-#      widening `TOKEN`, a materially larger and riskier change than
-#      anything routes 1-6 needed, and belongs in its own design pass.
+#      identifiers) was tracked separately as ai-config#2404, on the
+#      grounds that fixing it means widening `TOKEN` -- a materially
+#      larger and riskier change than anything routes 1-6 needed, and one
+#      that belonged in its own design pass. That pass is route 11 below.
 #
 #   7. Route 6's own `trailing_char` fix was ITSELF too coarse: it treated
 #      ANY `/` sitting immediately after the match as proof the preceding
@@ -513,7 +602,8 @@ CARDINALITY_RE = re.compile(
 #      in place rather than rewritten wholesale seven rounds into this PR.
 #      A genuinely NEW route 8 would need a shape none of the seven routes
 #      or this analysis anticipated; testing "all orderings" for route 7
-#      (see `ACCEPTED_MISS_COINCIDENTAL_SLASH_ITEM_FIRST` in the test suite)
+#      (see `COINCIDENTAL_SLASH_ITEM_FIRST_MUST_FIRE` in the test suite,
+#      an accepted miss then and a positive fixture since route 11)
 #      found exactly one more residual, and it traces to ai-config#2404's
 #      ALREADY-TRACKED limitation (a coincidental-slash identifier as the
 #      very FIRST list item defeats the token-list clause's own SEPARATOR,
@@ -534,12 +624,14 @@ CARDINALITY_RE = re.compile(
 #      ai-config#2404 family as the coincidental-slash-item-first residual
 #      above, confirmed by reproducing the identical silence with the
 #      version suffix removed entirely. Renamed to
-#      `ACCEPTED_MISS_BARE_WORD_TRUNCATION_*` to match. The extension-vs-
-#      version-tail confusion this route was ORIGINALLY named for is still
-#      real, just reachable through a different shape (a coincidental item
-#      whose OWN leading segment is independently `TOKEN`-shaped, so it
-#      joins the main match directly rather than via `continuation` at
-#      all) -- pinned separately as
+#      `ACCEPTED_MISS_BARE_WORD_TRUNCATION_*` to match, and renamed once
+#      more by route 11 below, which fixed the 3-item one outright and
+#      moved the 2-item one into the extension-vs-version residual.
+#      The extension-vs-version-tail confusion this route was ORIGINALLY
+#      named for is still real, just reachable through a different shape
+#      (a coincidental item whose OWN leading segment is independently
+#      `TOKEN`-shaped, so it joins the main match directly rather than
+#      via `continuation` at all) -- pinned separately as
 #      `ACCEPTED_MISS_GENUINE_EXTENSION_VS_VERSION_TWO_ITEM`. Both remain
 #      PINNED AS ACCEPTED RESIDUALS, not fixed with a ninth predicate; the
 #      lesson for future editors is to verify which code path a repro
@@ -600,9 +692,59 @@ CARDINALITY_RE = re.compile(
 #       result through the same `looks_like_one_path()` the inline path
 #       already uses, rather than inventing a second, bullet-specific
 #       classifier.
+#
+#   11. THE ROOT LIMITATION ITSELF, closed at last (ai-config#2404, filed
+#       out of round 6 and left open for a dedicated design pass). Every
+#       false negative above traces back to one property of `TOKEN`: it
+#       required EVERY segment of a slash-joined citation to carry its own
+#       internal hyphen/underscore/dot, so a real path with a single bare
+#       segment anywhere in it (`ai-config/memories/tools.md`,
+#       `Support/glab-cli/config.yml`, `Morrison-Lab/gha`,
+#       `tests/testthat.R`) could not be parsed as one enumeration ITEM at
+#       all -- the match truncated at the segment before the bare one, or
+#       never started when the bare segment led, and every recalled
+#       identifier after it fell outside the match. Closed by `PATH_TOKEN`
+#       (defined beside `TOKEN` above), which `ENUM_RE` now builds its
+#       items from: bare segments are admitted BEFORE and AFTER a still-
+#       mandatory `TOKEN`-shaped one, so the separator requirement moves
+#       from every segment to somewhere in the item. That is what keeps
+#       this from being the naive widening the issue warned against -- an
+#       all-bare span (`shared/workflow`, `and/or`, `CI/CD`) still matches
+#       nothing, so ordinary prose stays off `ENUM_RE` exactly as before.
+#       Two consequences for the fixtures above: the 3-item bare-word
+#       truncation miss is FIXED (renamed
+#       `BARE_SEGMENT_PATH_MIXED_THREE_ITEM_MUST_FIRE`), and its 2-item
+#       sibling stays silent for a DIFFERENT reason now that the item
+#       parses in full -- `v2.1` satisfies `PATH_EXTENSION_RE` -- so it is
+#       renamed `ACCEPTED_MISS_VERSION_TAIL_BARE_LEADING_SEGMENT_TWO_ITEM`
+#       and joins route 8's genuine extension-vs-version residual rather
+#       than this one. Scoped to the inline route: `BULLET_TOKEN_RE` still
+#       builds from `TOKEN`, for the reason given at `PATH_TOKEN`, so
+#       `BULLETED_ACCEPTED_MISS_BARE_WORD_LEADING_SEGMENT_TWO_ITEM` stays
+#       pinned and ai-config#2404 stays open for it.
+#
+#       WIDENING THE ITEM FORCED TIGHTENING THE SEPARATOR, and shipping
+#       only the first half would have been a net loss. Once an item can
+#       carry bare segments, a lone extension-less path citation
+#       (`Morrison-Lab/gha/antigravity-review`) is indistinguishable from
+#       a `/`-joined list of two, so it fired -- a WRONG NAG, the failure
+#       direction route 10 says stays in scope however far the standing
+#       pre-disposition reaches. `ENUM_SEPARATOR` (beside `PATH_TOKEN`)
+#       answers it by reading an unspaced `/` as path structure and only a
+#       comma, or a `/` with whitespace beside it, as a list separator.
+#       That also retires the SAME false positive for all-hyphenated
+#       extension-less paths, which predates this change: measured over
+#       3441 harvested path strings, 1572 single-citation false positives
+#       before and 0 after. Both halves are pinned --
+#       `BARE_*_SEGMENT_MIXED_LIST` for the widening,
+#       `EXTENSION_LESS_*_MUST_NOT_FIRE` for the tightening -- and route
+#       7's own coincidental-slash-item-first residual
+#       (`COINCIDENTAL_SLASH_ITEM_FIRST_MUST_FIRE`) is fixed in passing,
+#       since `_NUMBERED_SEGMENT` lets the item absorb the `/2026` that
+#       used to strand the rest of the list outside the match.
 ENUM_RE = re.compile(
     rf"\b(?:{LISTABLE_NOUN_PATTERN})\b(?![-_./])[^\n.:/]{{0,24}}?:?\s*"
-    rf"({TOKEN}(?:\s*/?(?:,|/)\s*{TOKEN}){{1,}})",
+    rf"({PATH_TOKEN}(?:{ENUM_SEPARATOR}{PATH_TOKEN}){{1,}})",
     re.I,
 )
 
@@ -654,8 +796,11 @@ COMMA_SPLIT_RE = re.compile(r"\s*,\s*")
 # separator) as the coincidental-slash-item-first residual documented
 # above `ENUM_RE`. Confirmed by removing the version suffix entirely
 # (`"...encrypt-gh-token.sh, feature was tested."`) and reproducing the
-# identical silence. Those two fixtures are renamed
-# `ACCEPTED_MISS_BARE_WORD_TRUNCATION_*` to match what actually causes them.
+# identical silence. Those two fixtures were renamed
+# `ACCEPTED_MISS_BARE_WORD_TRUNCATION_*` to match what caused them then;
+# route 11's `PATH_TOKEN` fix has since parsed `feature/v2.1` in full, so
+# the 3-item one now fires and the 2-item one is silenced by this very
+# regex instead -- see route 11 for both renames.
 #
 # The extension-vs-version-tail confusion this section originally described
 # is still real, just reachable through a DIFFERENT shape: a coincidental
@@ -676,13 +821,6 @@ COMMA_SPLIT_RE = re.compile(r"\s*,\s*")
 # fixture, not the bare-word-truncation ones, which need `TOKEN` itself
 # widened (the same larger, out-of-scope change that issue already tracks).
 PATH_EXTENSION_RE = re.compile(r"\.[A-Za-z0-9]{1,8}$")
-
-# A path SEGMENT that may itself be bare (no internal hyphen/underscore/dot
-# at all) -- deliberately looser than `TOKEN`, which requires at least one
-# such separator. Used only to describe what a genuine continuation past a
-# dangling `/` could look like, never to decide what counts as an
-# enumeration ITEM -- that job stays `TOKEN`'s alone.
-_BARE_SEGMENT = r"[A-Za-z][A-Za-z0-9]*(?:[-_.][A-Za-z0-9]+)*"
 
 # One or more `/segment` hops, each segment possibly bare, with an optional
 # final bare `/`. This is the SHAPE `looks_like_path_continuation` requires
@@ -750,8 +888,9 @@ def looks_like_path_continuation(continuation):
     right up until one more trailing slash is appended). Both are pinned
     as regression fixtures (`ACCEPTED_MISS_GENUINE_EXTENSION_VS_VERSION_*`
     and `ACCEPTED_MISS_TRAILING_SLASH_SUFFIX_*`) rather than narrowed
-    further; `ACCEPTED_MISS_BARE_WORD_TRUNCATION_*` is pinned separately,
-    nearer the enumeration-level matching it actually exercises, not here.
+    further; `ACCEPTED_MISS_VERSION_TAIL_BARE_LEADING_SEGMENT_TWO_ITEM`
+    is pinned separately, nearer the enumeration-level matching it
+    actually exercises, not here.
     """
     m = CONTINUATION_RE.match(continuation)
     if not m or m.end() != len(continuation):
@@ -807,10 +946,14 @@ def looks_like_citation(text, continuation=""):
     single character cannot tell a genuine continuation from a coincidental
     one (`cycle-charge-flee/2026`), which is why `continuation` is now the
     full non-whitespace run rather than one character, classified by
-    `looks_like_path_continuation`. Widening `TOKEN` itself to accept a
-    bare segment is a separate, much larger design question (it is the
-    precision mechanism that keeps ordinary English prose off this list in
-    the first place) and stays out of scope, tracked as ai-config#2404.
+    `looks_like_path_continuation`.
+
+    `ENUM_RE` now parses a bare-segment path as one item (`PATH_TOKEN`,
+    route 11 -- ai-config#2404), so the truncated fragment this paragraph
+    describes arises less often than it did. The check stays: the item
+    grammar still stops at a segment `PATH_TOKEN` cannot reach (one led by
+    a digit, say), and a genuine continuation must still be told from a
+    coincidental one when it does.
     """
     if text.endswith("/"):
         return True
@@ -845,8 +988,57 @@ def looks_like_one_path(group_text, continuation=""):
     (`foo.py, bar.py`), still fires: neither piece contains a `/`, so
     neither ever reads as a citation. Only a piece that itself looks like a
     path -- because it names one, directory and all -- is exempted.
+
+    Checked first, ahead of that per-piece test: a comma-joined list whose
+    pieces ALL carry a bare segment and parse as `PATH_TOKEN` paths, at
+    least one of them extension-less (`Morrison-Lab/gha,
+    ai-config/memories/tools.md`), is citations too. `looks_like_citation`
+    cannot see the extension-less piece one at a time -- it has no
+    extension and no trailing `/` to key on -- and the same TOKEN-then-bare
+    shape is also a recalled identifier beside a branch name
+    (`cycle-charge-flee/main`, pinned as
+    `COINCIDENTAL_SLASH_BRANCH_SUFFIX`), which is why the whole list, not
+    the piece, is what carries the answer.
+
+    WHICH property the list has to share is the whole content of that
+    clause, and the first version of it shared the wrong one. It demanded
+    that EVERY piece be extension-less and that only ONE carry a bare
+    segment, so a single extension anywhere in the list closed the clause
+    -- control fell through to the per-piece test, where an extension-less
+    bare-segment piece can never pass, and a list of nothing but real
+    citations (`Morrison-Lab/gha, ai-config/memories/tools.md`) was
+    reported as a hand-typed enumeration. That is a WRONG NAG on the
+    commonest citation-list shape there is, since most real lists mix a
+    repo path with a file path, and route 11 is what created it: before
+    `PATH_TOKEN`, neither piece parsed as an item at all.
+
+    The quantifiers are therefore swapped: the BARE SEGMENT is what every
+    piece must carry, and the missing extension is what only one must have.
+    `COINCIDENTAL_SLASH_BRANCH_SUFFIX` keeps firing under that reading
+    because its citation half (`local-bin/encrypt-gh-token.sh`) is
+    TOKEN-shaped in every segment, so the list is not bare-segment
+    homogeneous and the clause never opens -- the branch suffix stays a
+    recalled identifier rather than becoming a citation.
+
+    ACCEPTED RESIDUAL (`ACCEPTED_MISFIRE_EXTENSION_LESS_BESIDE_ALL_TOKEN`),
+    unchanged by this fix and measured firing on `origin/main` too: a
+    genuine extension-less bare-segment citation listed beside an
+    all-TOKEN one (`local-bin/encrypt-gh-token.sh, Morrison-Lab/gha`)
+    still fires, because that list has the same SHAPE as the branch-suffix
+    one above -- `gha` and `main` are both bare segments trailing a
+    `TOKEN`-shaped one, in a list whose other piece carries an extension --
+    so no rule keyed on shape can separate a repo citation from a recalled
+    identifier here. It is pinned rather than guessed at, on the same
+    reasoning route 7 gives for leaving `/main` unclassified.
     """
     pieces = COMMA_SPLIT_RE.split(group_text)
+    if len(pieces) > 1 and all(
+            "/" in piece
+            and PATH_TOKEN_RE.fullmatch(piece)
+            and ONLY_BARE_SEGMENT_RE.search(piece)
+            for piece in pieces) and any(
+            not PATH_EXTENSION_RE.search(piece) for piece in pieces):
+        return True
     last = len(pieces) - 1
     return all(
         looks_like_citation(piece, continuation if i == last else "")
@@ -1082,8 +1274,8 @@ def _bullet_dangling_extends(continuation):
 # findings; confirmed NOT a regression -- reproduces identically against
 # the pre-round-10 hook): because this regex is anchored to the bullet's
 # line start, a leading path segment that fails `TOKEN` (no internal
-# separator -- "tests" in "tests/testthat.R", same bare-word shape as
-# `ACCEPTED_MISS_BARE_WORD_TRUNCATION_*` above `PATH_EXTENSION_RE`) drops
+# separator -- "tests" in "tests/testthat.R", the same bare-segment shape
+# route 11's `PATH_TOKEN` fixed for the INLINE route only) drops
 # the WHOLE item from the token count rather than partially matching it.
 # In a 2-item bulleted list pairing one such citation with one bare
 # recalled identifier, this collapses the count to 1, under
@@ -1250,18 +1442,48 @@ NOTE = (
 )
 
 
-def main() -> int:
+def _read_payload() -> tuple[dict, bool]:
+    """Parse payload from sys.argv (--dry-run / --simulate) or sys.stdin."""
+    args = sys.argv[1:]
+    is_dry_run = "--dry-run" in args or "--simulate" in args
+    if is_dry_run:
+        positional = [a for a in args if not a.startswith("-")]
+        if positional:
+            raw_cmd = positional[0].strip()
+            if raw_cmd.startswith("{") and raw_cmd.endswith("}"):
+                try:
+                    return json.loads(raw_cmd), True
+                except Exception:
+                    pass
+            return {"tool_name": "Bash", "tool_input": {"command": raw_cmd}}, True
+
     try:
         payload = json.load(sys.stdin)
-    except Exception:
+        return (payload if isinstance(payload, dict) else {}), is_dry_run
+    except Exception as exc:
+        print(f"flag-uncounted-comment-claims: unreadable hook input ({exc})",
+
+              file=sys.stderr)
+        return {}, is_dry_run
+
+
+def main() -> int:
+    payload, is_dry_run = _read_payload()
+    if not payload:
         return 0
     if not isinstance(payload, dict) or payload.get("tool_name") not in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
+        if is_dry_run:
+            print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
         return 0
     tool_input = payload.get("tool_input")
     if not isinstance(tool_input, dict):
+        if is_dry_run:
+            print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
         return 0
     command = tool_input.get("command") or tool_input.get("CommandLine") or tool_input.get("cmd") or tool_input.get("script")
     if not isinstance(command, str) or not command.strip():
+        if is_dry_run:
+            print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
         return 0
 
     cwd = payload.get("cwd") or os.getcwd()
@@ -1272,19 +1494,20 @@ def main() -> int:
         if not undischarged:
             return 0
 
-        key = hashlib.sha256(
-            (tpath + "|" + command + "|"
-             + "|".join(q for _, q in undischarged)).encode()
-        ).hexdigest()[:16]
-        sentinel = os.path.join(
-            tempfile.gettempdir(), f".claude-comment-cardinality-{key}"
-        )
-        if os.path.exists(sentinel):
-            return 0
-        try:
-            open(sentinel, "w").close()
-        except Exception:
-            pass
+        if not is_dry_run:
+            key = hashlib.sha256(
+                (tpath + "|" + command + "|"
+                 + "|".join(q for _, q in undischarged)).encode()
+            ).hexdigest()[:16]
+            sentinel = os.path.join(
+                tempfile.gettempdir(), f".claude-comment-cardinality-{key}"
+            )
+            if os.path.exists(sentinel):
+                return 0
+            try:
+                open(sentinel, "w").close()
+            except Exception:
+                pass
 
         listed = "\n".join(
             f'  - [{k}] "{q}"' for k, q in undischarged[:3]

@@ -39,7 +39,9 @@ nothing must be distinguishable from a clean one.
 
 Read-only. It reports; it never pushes, comments, or merges. Reporting a PR
 as stalled is not authorization to drive it -- `shared/workflow/ardi.md`
-limits that to PRs a session owns or has explicitly claimed.
+limits that to PRs that pass `memories/reviewing-prs.md`'s scope test
+(opened by or assigned to the invoking user, explicitly requested by name,
+or authored by the GitHub Actions app).
 """
 from __future__ import annotations
 

@@ -6,7 +6,10 @@
   "It should be X" / "I left it as X" / "presumably X" / "no such tool exists" are all red flags; replace with a fresh check.
   Concretely: before querying CI or review for a PR, check its state first (`gh pr view <N> --json state`).
   A PR can merge between a "status?" call and a follow-up in the same session --- running `gh pr checks` on a merged PR returns stale data and delays noticing the merge.
-  If state is MERGED, trigger post-merge instead of reporting CI details. (Learned on ucdavis/bcs#266.)
+  If state is MERGED, trigger post-merge instead of reporting CI details.
+  (Learned on ucdavis/bcs#266;
+  recurred on Morrison-Lab/ai-config#2876, 2026-09-01,
+  when a cached pre-merge PR status was reported after the PR had merged.)
   Same principle for tool availability: before telling a user a capability doesn't exist in the current session (e.g. "no `subscribe_pr_activity` tool here"), run a live check (`ToolSearch`, or the equivalent discovery mechanism) rather than reciting what a memory entry or a prior session documented --- a local CLI session's tool roster isn't fixed, and reciting stale documentation as current fact is the exact failure this rule exists to prevent. (Sparta gii-ffdb93 session, 2026-07-14: initially told the user no GitHub MCP server was available in local sessions based on documented prior-session behavior, without running `ToolSearch` first.
   The user's pushback "can't you use the GitHub mcp server?" was the correct challenge, and a live check would have shown the tool was in fact reachable --- that check should have been run before stating unavailability as fact, not after being questioned.)
 - **A PR is not ready for merge without an up-to-date code review**:
@@ -22,6 +25,11 @@
 - When the user corrects my behavior or identifies a workflow gap, invoke UMS
   immediately and persist the lesson before resuming the main task. Do not wait
   for the user to say `ums` or to remind me again.
+- **Treat user profanity and frustration as an urgent defect signal**:
+  Profanity, exasperation, or intense frustration from the user is almost always a signal that an agent made a severe mistake, regressed behavior, dropped context, violated a preference, or gave a cop-out offer.
+  Never tone-police, scold the user, debate politeness, emit canned corporate apologies, or offer defensive excuses.
+  Immediately halt, inspect recent actions/state to diagnose the root cause, remediate the defect completely in that same turn, trigger an urgent UMS pass, and implement mechanical enforcement.
+  See [`shared/workflow/user-profanity-signal.md`](../shared/workflow/user-profanity-signal.md). (User directive / Issue #2644, 2026-08-31.)
 - **Do:** use hosted/cloud models for delegated work and adversarial review; if
   hosted quota is unavailable, report the blocker or use deterministic checks instead.
 - **Don't:** run Ollama, LM Studio, llama.cpp, or any other local/on-device model.
@@ -113,9 +121,9 @@
   Never fold UMS memory updates into an in-progress feature PR branch or claim UMS is finished without opening a dedicated UMS pull request. (User correction, 2026-08-05).
 - **Always fetch and merge `origin/main` into the UMS branch before opening a UMS PR.**
   When creating a dedicated `ums-<topic>` branch or preparing a UMS memory pass, always fetch `origin/main` and merge/rebase onto the latest default branch HEAD before opening the PR, ensuring zero initial merge conflicts. (User correction, 2026-08-05).
-- **ALWAYS run UMS IMMEDIATELY upon any user correction, incorrect claim, missed item, or scrutiny of the work.**
-  The moment the user corrects your behavior, you realize you made an incorrect claim or missed something, you read a review of your work, you receive critical feedback, or a questioned claim ("are you sure about that?") turns out to be wrong, run UMS right then --- do not wait for the task to finish, Address, a clean verdict, a first-person admission, a wrap-up prompt, or permission --- on a dedicated branch per the two bullets above.
-  This is the memory-file record of the triggers in `CLAUDE.md`'s "Run UMS proactively, as learnings accumulate" section --- a corrected understanding, a false claim about state, and a questioned claim that was wrong all fire immediately, and that section holds the rationale and case records (User directive / CAI, 2026-08-05 and 2026-08-25, [ai-config#2261](https://github.com/Morrison-Lab/ai-config/issues/2261)).
+- **ALWAYS run UMS IMMEDIATELY upon any user correction, incorrect claim, missed item, scrutiny of the work, or pause to wait on something external.**
+  The moment the user corrects your behavior, you realize you made an incorrect claim or missed something, you read a review of your work, you receive critical feedback, a questioned claim ("are you sure about that?") turns out to be wrong, or you are about to end a turn to wait on CI, a review round, or an answer from the user (at the first pause, and again only once new learnings accumulate, rather than once per wait or per re-arm of a monitoring timer), run UMS right then --- do not wait for the task to finish, Address, a clean verdict, a first-person admission, a wrap-up prompt, or permission --- on a dedicated branch per the two bullets above.
+  This is the memory-file record of the triggers in `CLAUDE.md`'s "Run UMS proactively, as learnings accumulate" section --- a corrected understanding, a false claim about state, a questioned claim that was wrong, and a pause before an external wait all fire immediately, and that section holds the rationale and case records (User directive / CAI, 2026-08-05, 2026-08-25, and 2026-09-01, [ai-config#2261](https://github.com/Morrison-Lab/ai-config/issues/2261) and [ai-config#2905](https://github.com/Morrison-Lab/ai-config/issues/2905)).
 - **Proactive Immediate Fixes for Self-Acknowledged / Realized Mistakes (In-Flight Work & Directives)**: Whenever realizing, discovering, or acknowledging a mistake, bug, gap, missed instruction, or oversight in your own in-flight work or directive-following (whether self-discovered or pointed out by the user), take immediate, proactive corrective action to fix it permanently (implement the fix/skill/memory update, commit on a dedicated branch, open a PR, request review, and drive to clean) in the exact same turn without waiting for a user prompt or follow-up instruction. (For out-of-scope codebase bugs discovered incidentally, file a tracking issue per `report-mistakes-proactively` instead). (User directive / correction, 2026-08-17.)
 - **Autonomously commit, push, and open PRs for completed changes**: When asked to implement, edit, or write up changes in a repository on a worktree/feature branch, do not finish the round by leaving modified files sitting uncommitted or unpushed in the working directory. Always finish the delivery cycle: stage and commit the changes (linking the tracking issue created per issue-first; see `shared/workflow/issue-first.md`), push the branch to origin, open a Pull Request (if one does not exist), request AI review (`@claude review` / review workflow), and drive to clean via ARDI. (User directive / CAI, 2026-08-18.)
   Reaffirmed 2026-08-26 as bare "always push and PR" on ai-config#2277 after a turn left four commits ahead of origin and ended with "say if you want those pushed".
@@ -310,7 +318,7 @@
   Merge the most-isolated PR (disjoint files) FIRST --- it rides through without a re-resync; sequence foundational/big same-file PRs LAST so lighter PRs rebase onto simpler `main`.
   An agent watching a PR must POLL its own `mergeable`/`mergeStateStatus` on EVERY watch tick (a newly-appearing conflict from someone else's merge is NOT a CI event, so a CI-completion monitor never fires on it), and on catching one immediately `git fetch origin main && git merge origin/main`, resolve, re-run checks, push --- staying in the watch loop until the PR is merged or closed (clean regresses to CONFLICTING when main moves).
   The coordinator's nudge is only a backstop for a genuinely-dead agent. (Learned on sparta 2026-07-01 merging the movement cluster.)
-  Beyond same-file collisions: after ANY merge that advances the base (`main`), proactively re-sync EVERY trailing open PR branch and resolve conflicts --- don't wait for a branch to show DIRTY or for the next review trigger.
+  Beyond same-file collisions: after ANY merge that advances the base (`main`), proactively re-sync EVERY trailing open PR branch that passes `memories/reviewing-prs.md`'s scope test and resolve conflicts (an out-of-scope branch is reported to the user and left untouched) --- don't wait for a branch to show DIRTY or for the next review trigger.
   In R packages the recurring conflicts are DESCRIPTION `Version:` (bump above main) and NEWS.md (union-merge, keeping both sides' bullets and one subsection per heading); the `@claude` bot auto-syncs non-conflicting branches but does NOT resolve these real DESCRIPTION/NEWS conflicts.
   Sequential merges cascade version-check reds and NEWS/DESCRIPTION conflicts down the whole stack of trailing PRs, so keeping them all synced after each merge keeps the queue mergeable; parallelize with worktree-isolated workers, capped at ~3 concurrent to respect shared CI runners. (Learned on ucdavis/bcs.)
   **The DESCRIPTION half of this cascade is obsolete once a repo adopts `Morrison-Lab/gha`'s new `bump-dev-version`/`version-check` capabilities (gha#390, tracking gha#388)** --- PRs stop touching `Version:` at all, so there's no version-bump conflict left to cascade down the stack.
@@ -389,8 +397,10 @@
   The existing instruction already covered this; the gap was execution discipline in a fast multi-merge loop, not missing guidance --- re-read this bullet at the top of every "pick the next backlog item" cycle.
   In a multi-AGENT pipeline, UMS runs at BOTH levels: each subagent runs UMS once ITS PR merges (it stops after reporting CLEAN, so the coordinator resumes it post-merge with a "your PR merged, run UMS" nudge --- or the agent-launch spec bakes in a final UMS step), and the coordinator runs its own UMS for the cross-PR orchestration learnings no single subagent can see (merge-order sequencing, conflict-cascade handling, pipeline mechanics).
   Each agent writes its OWN memory file plus one MEMORY.md index line to keep the conflict surface small; avoid rewriting shared memory bodies concurrently. (Learned on sparta 2026-07-01.)
-- After ANY PR merges to main (under mwc, post-merge, or manual merge), IMMEDIATELY and autonomously sweep all open PRs in the repository for merge conflicts (`gh pr list --state open --json number,title,headRefName,mergeable,mergeStateStatus`).
-  For any PR reporting `CONFLICTING` or `UNKNOWN`, fetch main, test the merge, resolve the conflict in an isolated worktree, and push the sync commit proactively without waiting for the user to point it out or ask for it. (Learned on ai-config, 2026-08-24: "cai: you should have checked PR conflicts on your own".)
+- After ANY PR merges to main (under mwc, post-merge, or manual merge), IMMEDIATELY and autonomously sweep all open PRs in the repository for merge conflicts (`gh pr list --state open --json number,title,headRefName,author,assignees,mergeable,mergeStateStatus`).
+  Filter that list by `memories/reviewing-prs.md`'s scope test first (opened by or assigned to the invoking user, explicitly requested by name, or authored by the GitHub Actions app);
+  an out-of-scope conflicting PR is reported to the user and left untouched.
+  For any in-scope PR reporting `CONFLICTING` or `UNKNOWN`, fetch main, test the merge, resolve the conflict in an isolated worktree, and push the sync commit proactively without waiting for the user to point it out or ask for it. (Learned on ai-config, 2026-08-24: "cai: you should have checked PR conflicts on your own".)
 - Keep it simple.
   Don't over-explain or ask permission for straightforward fixes --- just do them.
 - Don't re-ask a decision that's already settled and built.
@@ -459,7 +469,7 @@
   always format them as clickable markdown hyperlinks to their forge URLs
   (e.g. `[PR #123](https://github.com/<owner>/<repo>/pull/123)`),
   never as bare unlinked `#123` text
-  (except for forge issue-closing syntax like `Closes #123`).
+  (see [AGENTS.md](../AGENTS.md)'s "File formatting & links" rule for the exceptions).
   (User directive / CAI, 2026-08-30.)
   Don't leave a bare SHA, review id, or GitHub review-event name (`COMMENT`) as the only pointer --- wrap it in a markdown link.
   Example formats:
@@ -523,9 +533,12 @@
   Both additions were already on `main` in fuller form, and the diff had also rewritten three *correct* relative links into broken ones --- the `check-links.py` failure being blamed on that session all along.)
 
 - **Don't touch anyone else's branch.**
-  **Do:** only push to or modify branches I created in my own worktree.
-  **Don't:** push commits, force-push, checkout, or edit branches belonging to another session or user --- even if the content looks worth keeping or the branch looks abandoned.
-  If a branch needs work that isn't mine, flag it and let the owner handle it. (User directive, 2026-08-19.)
+  **Do:** only push to or modify branches I created in my own worktree, or a PR branch that passes `memories/reviewing-prs.md`'s scope test (opened by me, assigned to me, explicitly requested, or the Actions app's) and carries no live claim from another session.
+  **Don't:** push commits, force-push, checkout, or edit branches belonging to another session or user that fail that test --- even if the content looks worth keeping or the branch looks abandoned.
+  If a branch needs work that isn't mine, flag it and let the owner handle it.
+  A live claim on an in-scope branch still means waiting for it to expire, per `claim-pr`.
+  (User directive, 2026-08-19.
+  The scope-test carve-out follows the 2026-09-01 directives in `reviewing-prs.md`.)
 - **A delegated subagent runs in the parent session's working tree, so the "Use ONE worktree per branch/PR" rule above governs your own agents, not only other sessions.**
   The remedy is already written down: [`gip`](../skills/gip/SKILL.md) says to
   give every subagent `isolation: "worktree"`, and
@@ -677,13 +690,16 @@
     Caught it by checking `mergeable_state` output afterward; recovery was a `git reset --hard` to the last-good local commit plus `git push --force-with-lease` to undo the wrong-repo push before redoing it with an explicit `cd`. (Learned on ai-config#454/gha#215: an empty commit meant for `gha` landed on `ai-config`'s branch instead.)
 - Before pushing skill/memory changes to ai-config, run the local checks that `validate.yml` runs in CI --- at minimum `python3 scripts/validate-skills.py` and `python3 scripts/check-links.py`, for frontmatter and broken-relative-link errors --- before they cost an ARDI round.
   Derive the full list from `.github/workflows/validate.yml` rather than from this bullet, which named only those two while the job had grown well past them.
+  `python3 scripts/run-local-validation.py` is that derivation (ai-config#1940): `--list` shows the plan and `--only REGEX` runs a slice.
   The `scripts/test_*.py` steps are the half most easily skipped and the half that actually gates: several of them assert against the **live** corpus, so an edit elsewhere in the repo can turn one red without touching its subject.
   Running a production script is not running its test, and an "advisory" script can have a hard-gating twin in the same job --- see `memories/tools.md` on `check-context-closure.py` for the instance where editing `CLAUDE.md`'s `@`-import list is what trips it.
 - When creating a new acronym/short-name skill (e.g., `gi`, `sup`, `ums`), always also create a spelled-out alias skill (e.g., `grab-issue`, `send-upstream`, `update-memories-and-skills`) that points to the canonical file.
 - Some skills are platform/global --- present in the Claude Code skill registry but with NO local `skills/<name>/` directory (e.g. `deep-research`).
   Cross-references to them are valid.
   Automated reviewers (Copilot, the `@claude` bot) may wrongly flag such a reference as a "non-existent skill"; check the available-skills list presented to the agent (the Claude Code skill registry) before treating a skill cross-ref as a broken link, then rebut the false positive. (ai-config#120 flagged it 4x.)
-- **Do not request Copilot code review on any PR, in any repo, until September 2026.**
+- **Do not request Copilot code review on any PR, in any repo, while the moratorium stands.**
+  The live expiry is `MORATORIUM_END` in `hooks/no-unreviewed-pr.py`;
+  it was extended to December 2026 on 2026-09-02.
   Standing maintainer directive, restated and widened to all repos on 2026-08-19.
   It outranks `hooks/no-unreviewed-pr.py` and `shared/workflow/pr-on-claim.md`'s request-the-reviewer step.
   State the directive as the reason when a PR ships without one, and re-verify at the expiry.
@@ -772,7 +788,8 @@
   This shares the same root principle as the inline-R-expressions rule above: don't bake a volatile value into prose.
   The same goes for ephemeral example URLs --- PR-preview deploy links and PR numbers get deleted or superseded when the PR closes; parameterize the ephemeral part (`pr-<N>`) rather than hardcoding it. (ai-config#135 review: a `debugging.md` note cited `scout-peers/SKILL.md` lines 156/183, which #132's `bfc17ee` had already removed. ai-config#155 review: a hardcoded `pr-772` rme-preview URL was flagged --- ironically inside the new "verify math renders" rule, the very kind of stale-value-in-prose the rule warns against.)
 - Always leave yourself handoff notes proactively when pausing --- don't wait to be asked --- especially while a long-running job is in flight (SLURM arrays, builds, CI, background tasks, remote agents).
-  Snapshot branch/HEAD, unpushed commits, job IDs + how to check status, expected outputs + paths, backups, open decisions, and the exact pick-up steps into a project memory, and post a paused-state note on any active PR/MR.
+  Snapshot branch/HEAD, unpushed commits, job IDs + how to check status, expected outputs + paths, backups, open decisions, and the exact pick-up steps.
+  Post that snapshot on the forge --- a comment on the active PR/MR, a comment on the issue, a new issue when there is neither, or a committed file for state that outlives the thread --- and keep a project memory as the backup.
   The flip side --- READ before takeover: when taking over an in-flight PR someone else (a colleague or another session) started, scan the PR's comments for a handoff note FIRST, before checking out, editing, or re-reviewing.
   The branch shows only pushed commits; a handoff note captures the out-of-band state (uncommitted files, env changes, "reran X locally but didn't commit renv.lock", "what remains is to render Y") that you'd otherwise miss and either redo or break.
   `gh pr view <N> --json comments`, look for a "Handoff note" / "State as of ..." comment (usually from the PR author), follow its "What remains" list, and respect its local-only caveats.
@@ -790,7 +807,7 @@
   Worktrees are already the default, so most sessions start isolated; session-lock surfaces the rare SAME-WORKING-TREE collision before files get clobbered.
   This is the LOCAL counterpart to `claim-pr` (remote) and `sync-pr-branch` (reconcile with origin) --- use all three together on shared PR work.
   Registry lives under `.git/ai-sessions/` (never committed).
-  Script: `~/.claude/skills/session-lock/scripts/ai-session.sh`.
+  Script: `skills/session-lock/scripts/ai-session.sh` (or `~/.claude/skills/session-lock/scripts/ai-session.sh`).
 
 - When writing a description or comment that will reference a follow-up tracking issue, create the issue first, then use the specific issue URL (e.g. `#229`).
   Never use the generic issues list URL as a placeholder --- a reviewer will catch it and the fix costs an extra ARDI round. (Learned on ucdavis/bcs#226.)
@@ -1056,6 +1073,7 @@ Both were caught by the `@claude` review bot, not by me --- mentally (or actuall
 
 Moved to [delegation.md](delegation.md) --- the cost-first order,
 usage-window rules, and headless dispatch mechanics live there.
+Its "agy on Windows" section carries the 2026-09-02 install-and-mechanics writeup --- kept there rather than duplicated here.
 
 ## Ephemeral-session commit tension
 

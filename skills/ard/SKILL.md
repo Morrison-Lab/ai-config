@@ -24,10 +24,10 @@ Pure praise or neutral observations with **no** requested change ("nice refactor
 
 | Code | Meaning | Action required |
 |------|---------|-----------------|
-| **A** — Address | Valid and in-scope. | Fix it in this PR/MR and commit. |
-| **R** — Rebut | Incorrect, already handled, or a misunderstanding. | Explain *why*, citing concrete evidence (line, test, doc, spec). Specific enough that the reviewer can verify it without re-reading the whole PR. |
-| **D** — Defer | Valid but out of scope (new feature, broad refactor, needs design discussion). | File a follow-up issue (`CREATE_ISSUE` on GitHub — `gh issue create`; `glab issue create` on GitLab), link it, and add it to the PR/MR's **Deferred / Out-of-Scope** section. |
-| **K** — Acknowledge | Praise or a neutral observation with no change requested. | Give it a row so it's accounted for; no code change, no rebuttal needed. Don't stretch this to dodge a real finding. |
+| **A** --- Address | Valid and in-scope. | Fix it in this PR/MR and commit. |
+| **R** --- Rebut | Incorrect, already handled, or a misunderstanding. | Explain *why*, citing concrete evidence (line, test, doc, spec). Specific enough that the reviewer can verify it without re-reading the whole PR. |
+| **D** --- Defer | Valid but out of scope (new feature, broad refactor, needs design discussion). | File a follow-up issue (`CREATE_ISSUE` on GitHub --- `gh issue create`; `glab issue create` on GitLab), labelled `ai-authored` and `model:<model-id>` per [`issue-first`](../../shared/workflow/issue-first.md), link it, and add it to the PR/MR's **Deferred / Out-of-Scope** section. |
+| **K** --- Acknowledge | Praise or a neutral observation with no change requested. | Give it a row so it's accounted for; no code change, no rebuttal needed. Don't stretch this to dodge a real finding. |
 
 ### Decision order
 
@@ -93,10 +93,15 @@ gh api repos/{owner}/{repo}/pulls/<N>/comments       # READ_PR_REVIEW_COMMENTS �
 
 ```bash
 glab mr view <N> --comments                          # discussion notes
-glab api "projects/:id/merge_requests/<N>/discussions"   # inline threads
+glab api --paginate "projects/:id/merge_requests/<N>/notes?per_page=100"  # authoritative unresolved DiffNote sweep
+glab api "projects/:id/merge_requests/<N>/discussions"                    # thread identifiers for replies/resolution
 ```
 
 Bots often post the same finding twice — once inline and once in the summary comment. Collect the **union and dedupe** before numbering, so one issue doesn't get two rows (or two conflicting dispositions). Then number 1..n; every number must end up with a row in the summary.
+
+Filter the paginated notes response for `.resolvable == true and .resolved == false`;
+GitLab can return unresolved `DiffNote`s there even when a discussion-level timestamp filter finds no recent unresolved thread.
+The Discussions endpoint still owns the reply and resolution actions once the note has been identified.
 
 A PR can also carry **more than one review surface from different reviewers**: an inline code-review bot, a separate *agent* post-step that posts its own top-level summary, and Copilot are each distinct. `gh pr view <N> --comments` returns every top-level comment, so disposition each reviewer's findings — not just the inline review or the most recent comment. A whole review summary left un-dispositioned reads as ignored even when every inline thread was handled.
 
@@ -362,6 +367,26 @@ for a mechanical check (a lookup, confirming a file/symbol still exists); see
 directions. For a heavy fan-out verification pass, prefer a separately-billed
 provider (e.g. the `codex` CLI) first when available --- see
 [`delegate-to-codex`](../delegate-to-codex/SKILL.md).
+
+## Proactive hook compliance
+
+Active hooks guard review interactions and round responses (see [`memories/hooks.md`](../../memories/hooks.md)):
+- **`require-agent-disclosure.py`**: All posted round summaries and per-thread replies
+  must include `_Posted by <Agent Name> (AI agent) --- not written by a human._`
+  on its own line after a blank line.
+  Never use the robot emoji.
+- **`flag-uncited-rebuttal.py`**: If a reviewer finding cites an external documentation URL,
+  always fetch that URL via `WebFetch` or `WebSearch` before posting a rebuttal.
+- **`flag-uncounted-comment-claims.py`**: When stating file counts or listing identifiers in forge comments,
+  run and cite deriving commands (`grep -c`, `wc -l`) in the session.
+- **`flag-unmeasured-timestamp.py`**: A round summary or reply that carries a clock time
+  needs a fresh `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"` in the same turn.
+  Never infer the time from how many tool calls have run since the last reading.
+- **`no-handrolled-verdict-parse.py`**: Always run `python3 scripts/check-pr-fully-clean.py <pr>`
+  to verify review and CI cleanliness.
+  Do not grep comments for ad-hoc verdict keywords.
+- **`remind-learn-from-review.py` & `remind-ums-on-scrutiny.py`**: Whenever accepting valid reviewer concerns or scrutinizing feedback,
+  run an explicit UMS pass (`skills/ums`) to update memories or skills before ending the loop.
 
 ## Integration with ardi
 

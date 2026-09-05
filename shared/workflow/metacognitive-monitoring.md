@@ -1027,6 +1027,33 @@ interpreter, a container built without the optional extras.
 Each shrinks what is being measured without shrinking the figure reported, and
 each makes the run faster, so the habit reinforces itself.
 
+**A sample can be complete, non-zero, and drawn entirely from the complement of what it was aimed at, when the event of interest could not occur during the window.**
+The skip case above at least announces its own gap: a skip count is a number the tool prints, and reading it is the whole of the remedy.
+This one prints nothing.
+Every observation is real, none is skipped, the count is healthy, and the event the sample was taken to settle was impossible for the duration --- so what came back is a census of everything else.
+The reading is what makes it dangerous rather than merely useless: a clean sample is exactly what "the event cannot happen here" produces, and it is also what "the event does not happen here" produces, and those are different claims.
+No feature of the output separates them.
+
+So state the event a sample is meant to catch, and confirm the window could have contained one, before reading the result.
+Where the event is something you can cause --- a guard you can trigger, a request you can send, a job you can re-run --- cause it inside the window rather than waiting for it, which converts the sample from an observation into a test.
+Where you cannot, report the sample as evidence about the population it did enumerate, and say in the same sentence that the target event did not occur in it.
+
+(Measured 2026-09-03, ai-config[#3141](https://github.com/Morrison-Lab/ai-config/issues/3141).
+A 240-second `ps` sample captured 20 distinct hook command lines, all from `$HOME/.claude/hooks/` and none from a plugin root, and was read as showing the plugin registration path inert.
+`hooks/no-unreviewed-pr.py` never fired during that window --- it fires only with an unreviewed PR open --- so what the sample enumerated is the `settings.json`-registered hooks, and it says nothing about the firings in question.
+Both registration paths are live at once, which is why enumerating one of them refutes nothing about the other.
+The same session settled which copy fires when the guard is deliberately triggered, by the opposite procedure: `ps -eo args` sampled at 0.05s **while causing the event** named a copy under `~/Library/Application Support/Claude/local-agent-mode-sessions/` that no pass had looked at.
+Whether that same copy served the earlier firings is not established, and [`keep-checkouts-fresh`](keep-checkouts-fresh.md) says so where it records the capture --- so the remedy below is "cause the event inside the window", not "one capture settles the question".
+That instance is recorded case-specifically in [`keep-checkouts-fresh`](keep-checkouts-fresh.md) and in [`mistake-patterns`](../../memories/mistake-patterns.md)'s Pattern 43 occurrence bullet, both added by [#3267](https://github.com/Morrison-Lab/ai-config/pull/3267).
+`keep-checkouts-fresh` already states the observation in one line, in the middle of that incident's account --- "a sample drawn when the event of interest is impossible measures the complement of what it was aimed at, and reports a clean number for doing so" --- and this section deliberately reuses its phrasing rather than inventing a second vocabulary for the same thing.
+Both files also carry the remedy in its concrete form --- capture the path with `ps` while deliberately triggering the guard --- so what is added here is the generalized check (name the event, confirm the window could have contained one) and that remedy stated as a rule rather than as one incident's step, in the fragment a reader consults about their own claims rather than about a plugin install.)
+
+- **Do:** name the event a sample is meant to catch, and confirm the window could have contained one, before reading the result.
+- **Do:** trigger the event inside the window when you can cause it, rather than sampling and hoping one arrives.
+- **Don't:** read a clean sample as evidence the event does not occur, when the event was impossible for the window's duration --- that is the reading the sample gives either way.
+- **Don't:** treat a non-zero observation count as answering the skip case's question;
+  a sample with nothing skipped can still have enumerated only the complement.
+
 **A different instrument answering a similarly-shaped question is not the population gap above, because there is no shared measurement for either claim to widen.**
 Every case in this section so far shares one instrument: a single command was run, and the claim reached past the population that command actually covered.
 The branches-versus-refs gap and the pipe-lines-versus-rows gap both come from one `git` or `grep` invocation whose output got mis-described.
@@ -1050,6 +1077,30 @@ The cheap check that would have found the duplicates directly --- grep the suite
 - **Don't:** read "instrument A doesn't cover this shape" as "this shape is uncovered", when a different instrument (a test suite, a linter, a second corpus) was never itself checked.
 
 Those three rules belong to this case alone, not to the section's standing Do/Don't list.
+
+**A refutation is the same overreach delivered by someone else, and being its target is what suspends the check.**
+The paragraphs above treat the claim and the adjacent measurement as authored by one person, so "no preferred direction" reads as a note about mood --- confident or alarmed, approving or retracting.
+The mood framing undersells what happens when the neighbouring claim arrives from another party, aimed at something you asserted.
+A correction reads as work already done, and the posture it puts you in is the one where running your own check feels like defensiveness rather than diligence --- so the very rigour you would apply to your own claim goes unapplied to the claim replacing it, in the same exchange, within minutes.
+Accepting a finding is not exempt from this section's test merely because agreeing feels less like asserting than disagreeing does.
+
+(Measured 2026-09-01--02 on [Morrison-Lab/ai-config#2984](https://github.com/Morrison-Lab/ai-config/issues/2984).
+A build log for a Quarto site's CI check carried `Output created: _site/sap-template-revealjs.html` and `_site/sap-template.docx`, cited by a peer session against the claim that the check "never rendered revealjs, so it was silent on the config".
+Both lines were real, and neither was about the setting under discussion: they came from a `post-render: Rscript scripts/post-render.R` step, which renders one document, `sap-template.qmd`, that declares its own `format:` block --- exactly the document the project-level setting does not reach.
+The measurement established that revealjs output exists in the log.
+The claim it was taken to license was that the project-level setting produced it, a different proposition on the other side of a boundary the same log marks (`Running script 'Rscript'` precedes both lines).
+The original claim was re-measured and retracted on the strength of that citation, which was the regression: a later review round restored it once the `post-render` step was read.
+The Quarto-specific mechanics are proposed in [ai-config#3004](https://github.com/Morrison-Lab/ai-config/pull/3004) --- once merged, they live in `memories/quarto-sites.md`;
+this entry is the general one.)
+
+- **Do:** ask which mechanism produced a cited artifact before asking whether the artifact is real, for evidence offered against your own claim exactly as hard as for evidence supporting it.
+- **Do:** re-run the check you would run on your own claim before retracting it on someone else's evidence, not after.
+- **Don't:** let "this refutes what I said" stand in for "this shows that what I said is not what happened" --- the first is a role the evidence is asked to play, the second is what the evidence would actually have to show.
+- **Don't:** read acceptance of a peer's finding as exempt from this section's test on the grounds that agreeing is not asserting.
+
+Those four rules belong to this case alone, in the same way the three above it do;
+the section's standing Do/Don't list is the one that follows this paragraph.
+[`A correction inherits its instrument`](#a-correction-inherits-its-instrument-so-a-second-reading-is-not-a-check) above reaches the same place from the other direction, governing the retraction itself rather than the evidence offered for it.
 
 - **Do:** write what the measurement establishes and what you are claiming as
   two separate sentences, and confirm the second does not reach past the first.
@@ -1078,15 +1129,19 @@ Those three rules belong to this case alone, not to the section's standing Do/Do
   not reported that they pass.
 - **Don't:** treat [`grep-is-not-coverage`](grep-is-not-coverage.md) as a
   rival rule here.
-  That fragment is the **null-result** instance of this shape --- a zero-hit
-  search read as evidence about a pattern --- so it is the sharper tool when
-  the measurement returned nothing, and this section is the general form.
-  Instance 4 is itself a null result, so both reach it.
+  That fragment is the **null-result** instance of this shape --- a zero-hit search read as evidence about a pattern --- so it is the sharper tool when the measurement returned nothing, and this section is the general form.
+  Instance 4 of the first case record below is itself a null result, so both reach it.
   Finding a positive result read as a neighbouring fact is the case only this
   section covers.
 
 See [`metacognitive-monitoring.cases.md`](metacognitive-monitoring.cases.md),
-"Five sound measurements, five claims beside them".
+"Five sound measurements, five claims beside them", and, for the case where
+the two propositions are a verified **mechanism** and an unverified
+**instance** asserted to fall under it, "A mechanism verified, an unverified
+population asserted to fall under it".
+
+A second five-instance set, 2026-09-02/04, is recorded there as "One session, five wrong conclusions drawn from artifacts that were all real".
+Those five do not all fall under this section --- two are [`verify-the-right-artifact`](verify-the-right-artifact.md) substitutions and one is a plain misread --- and the record is worth reading for what they share instead: in each, the erroneous step felt like *reading* the evidence rather than adding to it, which is what carried every one of them through self-review.
 
 ## Writing is the instrument, when the claim can be wrong
 
@@ -1250,3 +1305,156 @@ event, leaving the input silently inert, and *sideways*, a sibling branch of an
 unrelated ternary that told every such run it had been triggered by a mention
 that did not exist.
 Three defects, one shape, one direction named.)
+
+## A rule's example is read as its scope, not as one instance of it
+
+The section above is a rule that named one *direction* and got read as
+covering every direction.
+This is the sibling failure, over a rule that named one *instance* and got
+read as bounded to that instance's incidental attribute --- a property the
+example happened to carry, which the rule's own mechanism never depended on.
+
+A rule stated as "a human's `CHANGES_REQUESTED` can be invisible to a
+comments-only scan" is really about two things that have nothing to do with
+being human: a **formal review** (an API surface separate from issue
+comments) whose finding lives in the **body or an inline comment** rather
+than as an unresolved thread.
+`CHANGES_REQUESTED` and "human" are the example's incidental attributes ---
+true of the case that prompted the rule, no part of why the blind spot
+exists.
+A bot's `COMMENTED` review with the same shape (a real finding, no open
+thread) is exactly the case the rule already covers, worded in a way that
+reads as excluding it.
+
+The tell is the same shape [`challenge-ambiguous-terminology`](challenge-ambiguous-terminology.md)
+names for a term whose meaning is unresolved, aimed at a rule instead of a
+word: read the rule's own justification, not its example, and ask which
+words in the example the justification actually depends on.
+Here the justification is "a finding can live outside the thread population
+entirely" --- nothing about *who* posted it or *what state* the review
+carries is load-bearing to that sentence, so neither belongs in the rule's
+effective scope even though both appear in its wording.
+
+- **Do:** before applying a rule illustrated by one example, name which of the
+  example's attributes the rule's own justification actually depends on, and
+  apply it to every case sharing those, not only to cases matching the
+  example verbatim.
+- **Do:** widen a rule's *wording* once an excluded case is found to fit its
+  justification, the same remedy the section above prescribes for a
+  direction --- don't just handle the one instance and leave the next reader
+  to re-derive the same gap.
+- **Don't:** read a rule narrower than its own reasoning because the example
+  that motivated it happened to carry a more specific attribute.
+
+(Morrison-Lab/ai-config#3084, 2026-09-03: a session had `CLAUDE.md`'s
+formal-review-checking section loaded in context --- worded around "a
+human's `CHANGES_REQUESTED`" --- while reading a Copilot review whose state
+was `COMMENTED`.
+The rule was not applied, on the reading that it named a human reviewer and
+a different state.
+Its own justification (a formal review's finding can live outside the
+thread population) covered the bot review exactly, and did not name either
+excluded attribute.
+The source rule is this repo's own [`CLAUDE.md`](../../CLAUDE.md), so the fix
+belongs here: filed as
+[`ai-config#3121`](https://github.com/Morrison-Lab/ai-config/issues/3121),
+with [`ucdavis/bcs#901`](https://github.com/ucdavis/bcs/issues/901) covering
+that repo's copy of the same wording.)
+
+## A story that fits the evidence is not a finding
+
+The section above governs a cause read off the wrong artifact.
+This one governs a cause read off the **right** artifact, where the reading is
+accurate, the story accounts for every observation, and the cause is still
+made up.
+
+Fitting is cheap.
+A small set of readings admits several stories that each explain all of them,
+so the story arriving first tends to be the one whose vocabulary was already
+in mind rather than the one the evidence selects.
+It then feels verified precisely because nothing in the evidence contradicts
+it --- which is the property every rival story shares.
+
+The check is not "does this explain what I saw" but "what observation would
+this predict that a rival would not".
+Run that experiment before naming a cause.
+When no such experiment is available or affordable, the honest report is that
+the cause is **not established**, listing the candidates, rather than the
+likeliest one dressed as a finding.
+Naming the likeliest is the near-miss here: it reads as a conclusion, it is
+usually hedged nowhere, and it closes the question for everyone downstream.
+
+- **Do:** run the experiment that discriminates between candidate causes
+  before naming one.
+- **Do:** report the cause as not established, with its candidates, when no
+  discriminating experiment is available.
+- **Don't:** treat a story that accounts for every observation as verified ---
+  that is the property that made it convincing, not evidence for it.
+- **Don't:** publish the likeliest candidate as the cause because a reader is
+  waiting for one.
+
+(Measured 2026-09-01.
+Three instrument readings on one corpus were published with a cause, then
+republished with a different cause once the first was ruled out --- first a
+vocabulary difference in the findings, then a stale checker version.
+A controlled re-run falsified both: each checker version returned identical
+verdicts on the same inputs.
+Both stories fit every reading, and the actual cause was never established ---
+which is what the report should have said in the first round.)
+
+## Your own most recent change is a cause claim too, and self-blame is what exempts it
+
+This is a **specialization of the section directly above**, not a fourth independent rule, and saying which one is the point.
+"A story that fits the evidence is not a finding" asks what observation a rival story would not predict.
+This section is that experiment, run against one specific candidate cause: your own last change.
+
+The candidate is naming **your own** diff as what broke the thing, when the only evidence is that the defect sits inside the code you just touched.
+Proximity is doing the work, exactly as it does when a cause is read off the artifact beside the one that failed.
+A function you reworked an hour ago is the most available explanation for any defect found in that function, and availability is not evidence.
+
+What earns it a section is the second mechanism, which the rules above do not carry: the claim comes out as an **admission**.
+"That is a regression of my own fix" reads as candour, so it draws credit rather than scrutiny, and nobody --- including you --- asks the question the **cause** claim-type at the top of this fragment prescribes.
+An external attribution invites pushback, so someone argues with it;
+a self-attribution invites none, so nobody does.
+
+**That is a claim about who checks it, not about whether it survives**, and the case below is why the distinction has to be drawn carefully: there an external reviewer caught the self-attribution, and the corpus entry you are reading exists because they did.
+So the review layer works, and the claim is not that a self-attribution reaches the record --- it is that no check runs at the moment of writing, which is the only moment a lone author has.
+Read the case as evidence for the author-time check rather than against it: the cost of skipping it was a round trip and a reviewer's attention, and on work nobody reviews it would have been the whole of the error-detection budget.
+
+That mechanism is stated twice already, in this fragment's **rationale** companion rather than in the fragment itself, which is worth knowing because the sections it belongs to do not carry it.
+[`metacognitive-monitoring.rationale.md`](metacognitive-monitoring.rationale.md) gives it for a self-declared deviation --- an agent that names its own departure reads as candid, and candour reads as diligence, so the disclosure discharges the suspicion it should create --- and again for a self-directed retraction, which reads as an admission against your own interest, "the last kind of sentence anyone thinks to verify".
+Its companion section here, "Calling your own note stale is a state claim about that note", argues from something else entirely: that staleness is a convenient explanation for a failure you have not diagnosed.
+So this is the third statement of the candour mechanism and the first inside the fragment proper, which is the gap it fills.
+Read across the three, the generalization is that a claim's **direction** decides whether it gets checked, independently of its type --- which is why each claim-type needs its own self-directed case rather than inheriting one.
+
+The cost that matters is not the reputational one.
+It is that a defect **older** than your change gets filed as introduced by it, so nobody looks for how long it has been shipping or what else the same root cause reaches, and a written record now says the bug's lifetime began at your commit.
+A wrong exculpation and a wrong inculpation are the same error with the same remedy;
+only the first one feels like a claim while you are making it.
+
+The check is one command, because the counterfactual is already in the repository.
+Run the code as it stood **before** your change against the same input.
+When the old version reproduces the defect, the change did not cause it;
+when it does not, it did.
+
+```bash
+git show <parent>:<path> > /tmp/old.py   # then exercise it directly
+```
+
+**That one-file form holds only while the file is self-contained.**
+Where the same commit also changed something the file imports, or something that imports it, the extracted copy either fails to import or --- worse --- imports the **new** sibling and runs as a hybrid that is neither the real before nor the real after, returning a confident verdict either way with nothing signalling the mixture.
+Check what else the commit touched before trusting it, and check out the whole tree instead when it touched anything adjacent:
+
+```bash
+git worktree add /tmp/before <parent>    # then exercise it there
+```
+
+That reading is what "the reviewer said it predated my fix and they are right" must rest on, rather than on the reviewer's authority --- a reviewer's causal claim is a cause claim under this same rule, and deferring to it is not checking it.
+Where the routes differ but the observable defect is identical, say so: pre-existing by a different mechanism is a third answer, and it was the true one in the case this section was written from.
+
+- **Do:** run the pre-change version against the failing input before writing that your change caused something.
+- **Do:** report "pre-existing, reached by a different route" when that is what the counterfactual shows.
+- **Don't:** treat an admission as exempt from the cause check --- candour is a property of the tone, not of the evidence.
+- **Don't:** accept a reviewer's attribution, in either direction, without the same counterfactual you would demand of your own.
+
+See [`metacognitive-monitoring.cases.md`](metacognitive-monitoring.cases.md), "A defect attributed to the fix that merely sits beside it".

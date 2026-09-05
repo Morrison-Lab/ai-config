@@ -82,8 +82,14 @@
 
   ```text
   `gh` is not installed or not on PATH.
-  This script requires the GitHub CLI; -R cannot substitute for it.
+  `-R` alone cannot substitute for it, but the GitHub CLI is not required: score a JSON payload instead. `build-pr-payload.py` assembles one from plain REST, and needs GITHUB_TOKEN or GH_TOKEN set:
+    python3 <scripts>/build-pr-payload.py OWNER/REPO N /tmp/pr.json
+    python3 <scripts>/check-pr-fully-clean.py N -R OWNER/REPO --from-json /tmp/pr.json
   ```
+
+  The two commands print as absolute paths derived from the script's own
+  location, so they are runnable as printed from whatever directory the
+  failing invocation used (ai-config#3113).
 
   It exits **2**, never 1 --- 1 is this script's "not clean" code, so a missing
   binary would otherwise read as a verdict rather than an environment failure.
@@ -412,8 +418,9 @@
   `gh issue view 1334` returns `{"number":1334,"state":"MERGED",...}` without complaint.
   Same key the timeline bullet above relies on.
   What it adds is that the plain `gh issue view` path answers for both kinds, and so distinguishes neither.)
-- **`gh pr checks` does NOT say which checks are REQUIRED, and the legacy protection endpoint 404s on ruleset-gated repos — so the lazy check confirms the wrong answer.**
-  `gh pr checks` reports check *state* only; required-ness is nowhere in its output.
+- **Plain `gh pr checks` does NOT say which checks are REQUIRED (`--required` does, and only within the current rollup), and the legacy protection endpoint 404s on ruleset-gated repos --- so the lazy check confirms the wrong answer.**
+  Plain `gh pr checks` reports check *state* only.
+  `gh pr checks --required` (present in `gh` 2.98.0, checked 2026-09-02) filters to the required ones among the checks in the current rollup, and neither form can show a required check that is absent from that rollup, which is the base-gained-a-check case.
   And `gh api repos/<o>/<r>/branches/<branch>/protection` returns `404 Branch not protected` on a repo that gates the branch with a **ruleset** rather than legacy branch protection, which reads as "nothing is required" and *confirms* the mistaken assumption.
   Query rulesets too, before any "ready to merge" or "that check doesn't gate us" claim:
   ```bash
@@ -461,6 +468,29 @@
   ```
   On `ucdavis/bcs` (2026-07-30) ruleset `19248641`, scoped to `~DEFAULT_BRANCH`, returns `{"review_on_push":true,"review_draft_pull_requests":true}` -- which is why draft PRs there get Copilot reviews at all.
   Check this before concluding that a Copilot review was requested by a person, or that its absence means nobody asked.
+
+  **A required-context STRING is derivable from the default branch's workflow files, and a PR's check-run names are not the place to read it.**
+  A caller job invoking a reusable workflow publishes `<caller job> / <inner job>`, where each half is a **job** display name -- its `name:` where one is set, its key otherwise -- and the caller *workflow*'s `name:` appears nowhere.
+  So `check: {uses: Morrison-Lab/gha/.github/workflows/spellcheck.yml@v2}` in a workflow whose `name:` is `Spellcheck` publishes `check / spellcheck`, not `Spellcheck`.
+  Both branches of that rule are locally measured on `ucdavis/rampp` (2026-09-03).
+  Run `33688762211` prints `check / spellcheck`, where neither job sets `name:`, so both halves are keys.
+  Run `33727364476` prints `Check-Changelog / Check Changelog Action`, where the left half is the **caller**'s job key in the repo's own `news.yaml` and the right half is the `name:` on `check-news.yml@v2`'s inner job -- whose key, also `Check-Changelog`, never appears.
+  The coincidence of those two names is why this example needs spelling out: read the caller's job key for the left half, always, however the called workflow happens to key its own job.
+  Read the definitions off the default branch by ref, never off a checkout and never off a PR's rollup:
+  ```bash
+  gh api "repos/<o>/<r>/contents/.github/workflows?ref=<default-branch>" --jq '.[].name'
+  gh api "repos/<o>/<r>/contents/.github/workflows/<file>?ref=<default-branch>" --jq .content | base64 -d
+  ```
+  A run can corroborate that those definitions compose as you read them, but **which** run is usable is the subtle half -- a `pull_request` run resolves the file from the head-into-base merge, so its base and its touched paths both matter.
+  [`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md)'s twelfth shape carries those conditions.
+  Do not reconstruct them from a `gh api .../jobs` line here, since a placeholder that names no branch is exactly what drops them.
+  - **Do:** read the workflow file at `?ref=<default-branch>` and compose the context string from its job names.
+  - **Don't:** read a required-context string off any pull request's check runs -- merged, recent, or green.
+  (ucdavis/rampp, 2026-09-03: bare `Spellcheck` and `Check Changelog Action` were added to ruleset `3889405` on the strength of check-run names read off merged PR #157.
+  Those names were accurate for `main` when #157 merged.
+  The move to called reusable workflows landed on `main` three hours later via #153, retiring them.
+  `main` now emits `check / spellcheck` and `Check-Changelog / Check Changelog Action`.
+  Such a context never turns red -- it sits as `Expected`, so there is no failing signal to find the mistake by.)
 
 - **GitHub PR Reviews REST API (`POST /repos/{owner}/{repo}/pulls/{number}/reviews`) Requirements & Fallbacks**:
   - `pull_number` MUST be an explicit integer in the URL path (e.g. `/pulls/412/reviews`), not `'current'` or branch names.
@@ -541,9 +571,70 @@
 
   That disappearance is **not** explained by the `review_on_push: true` rule above, and [`shared/workflow/pr-on-claim.md`](../shared/workflow/pr-on-claim.md)'s "blocked-request test has a false positive" section owns the argument and the deriving queries.
   The short version: `Morrison-Lab/ai-config` reproduces the identical 201-then-empty signature while carrying no `copilot_code_review` rule at either scope, so an empty pending list is evidence neither that the request was blocked nor that a review is coming.
-  Only the posted review **body** settles which of those happened.
+  Only the posted review **body** settles whether a review is actually coming.
+  The timeline event described next settles the strictly narrower question of whether the request was *accepted*, which those three surfaces also cannot answer --- so the two conclusions divide the question rather than competing for it.
 
-  **Both outcomes were genuinely observed on the same repo the same day, so do not flatten this into "it returns 201".**
+  **The issue timeline's `review_requested` event is a fourth surface, and it is the one that does discriminate whether the request landed.**
+  Measured 2026-09-02 on [Morrison-Lab/ai-config#3004](https://github.com/Morrison-Lab/ai-config/pull/3004).
+  The POST returned **200**, not 201, with `"requested_reviewers":[]` in its own response body.
+  A follow-up `GET` of the same endpoint stayed empty too.
+  Together those read as a silently failed request, and invited four repeated POSTs, each landing the same way.
+  The timeline carried a `review_requested` event the entire time.
+
+  **Read that event with `--paginate` and with its timestamp kept, or the check is unsound in two ways at once.**
+  This file already requires `--paginate` on this endpoint, in the `cross-referenced` bullet above.
+  Without it `gh api` returns only the first 30 events and silently drops later ones.
+  A busy PR's newest request is then exactly what goes missing.
+  Collapsing the logins --- `| unique` --- discards *when* each event happened.
+  A request from an earlier head then confirms forever, which is the opposite of what the check is for.
+  Take the newest event's timestamp and compare it against the push or POST you are asking about:
+
+  ```bash
+  set -o pipefail
+  gh api --paginate "repos/<owner>/<repo>/issues/<N>/timeline" \
+    | jq -s '[.[][] | select(.event == "review_requested")
+                    | select((.requested_reviewer.login // "") | startswith("Copilot") or startswith("copilot"))
+                    | .created_at] | max'
+  ```
+
+  Two details in that command are this file's own standing rules rather than taste, and skipping either produces a wrong answer quietly.
+  `--jq` cannot be combined with `--paginate` for an aggregate: it evaluates each page separately, so `max` returns one maximum *per page* rather than one across the run.
+  Pipe the raw pages into standalone `jq -s`, exactly as the comment-polling recipe above prescribes, and enable `pipefail` so a failed `gh api` is not masked by a successful `jq`.
+
+  Cross-checked against [#2979](https://github.com/Morrison-Lab/ai-config/pull/2979), a PR Copilot did go on to review: the same event is there, and that review is present.
+  Its login differs by surface, which matters to any jq that filters on one.
+  REST (`gh api .../pulls/<N>/reviews`) returns `copilot-pull-request-reviewer[bot]`.
+  GraphQL (`gh pr view <N> --json reviews`) returns `copilot-pull-request-reviewer`, with the suffix stripped.
+  Match on a prefix rather than on equality, or a filter written against one surface silently returns nothing on the other.
+
+  - **Do:** check the timeline's `review_requested` event before re-issuing a reviewer-request POST that read back empty.
+  - **Do:** treat the timeline event as confirmation the request landed, and the posted review body as the separate, later question of whether a review follows.
+  - **Don't:** re-POST a request because the pending-list or `reviewRequests` read came back empty --- both are already documented above as uninformative in either direction.
+  - **Don't:** read the timeline event as proof a review is coming;
+    it confirms the request, not the outcome.
+
+  **A #3010 instance bears on the "not blocked" half, not the "nor that a review is coming" half, and is weaker evidence than it first looks.**
+  An empty pending list followed by a landed review shows emptiness is not evidence the request was *blocked*.
+  It says nothing about the other direction, which only a zero-review outcome after an empty read could speak to.
+  On `Morrison-Lab/ai-config#3010` (2026-09-02) the session **reports** running the POST repeatedly and seeing `requested_reviewers` come back empty on the immediate read every time, and Copilot reviews did land on that PR anyway.
+  Weigh that empty-read observation as narration rather than measurement: the pending list is only observable at request time, so unlike the reviews themselves it cannot be re-derived afterwards, and the same PR is where the session's own POST count turned out not to match its timeline.
+  [`pr-on-claim.cases.md`](../shared/workflow/pr-on-claim.cases.md)'s "The blocking message prescribes a non-dischargeable shape" carries the derived figures;
+  read them there rather than restating them here, since #3010 is open and any copy drifts.
+
+  So this instance does not upgrade the claim.
+  What is measured on #3010 is that reviews arrived;
+  that they arrived *over an empty pending read* rests entirely on the session's own report, from the one session whose self-counting is known to have been wrong.
+  The `ucdavis/bcs` #648/#649/#650 record further down this file is the zero-review candidate for the other direction, and it is confounded too: [`challenge-the-assignment.cases.md`](../shared/workflow/challenge-the-assignment.cases.md) records `_argv_close`'s docstring in `hooks/no-unreviewed-pr.py` documenting HTTP 200 on this endpoint as what GitHub returns for an already merged or closed PR, adding nobody by design, and that confound was confirmed to apply to some of those four calls without being shown to explain all of them.
+  Both candidate directions are therefore unconfirmed, and the honest statement stays *unreliable*, not *uninformative*.
+
+  - **Do:** poll the review bodies on the head when you need to know whether a reviewer engaged.
+  - **Do:** read `review_requested` timeline events as a lower bound on requests that actually **added** a reviewer, never as a POST count.
+    Why a POST can add nobody is unsettled here --- the untested 422 reconciliation below is one account, a silent no-op another --- so take the bound from the events themselves and leave the mechanism open.
+  - **Don't:** treat an empty pending read as evidence the request failed, nor as evidence a review is coming;
+    that was already the rule and neither new data point changes it.
+  - **Don't:** cite either direction as settled --- the bcs status-code confound is open, and the #3010 empty reads are unverifiable after the fact.
+
+  **Both response codes --- the `422` and the `201` above, not the two directions just discussed --- were genuinely observed on the same repo the same day, so do not flatten this into "it returns 201".**
   One session ran the POST once and got `422`;
   another ran it three times, across all three login spellings, and got `201` every time.
   Neither session was lying, and the first one's real mistake was not the observation but the generalisation -- it turned a single failed attempt into a stated property of the repository, wrote that into a PR body as settled fact, and steered two later rounds with it.
@@ -555,14 +646,53 @@
   It stays untested on purpose: probing consumes the per-user quota that is usually the actual reason Copilot is absent, so the experiment damages the thing it would explain.
 
   The operational advice does not depend on resolving it.
-  Don't spend a call on this endpoint either way -- the ruleset already requests the review, and neither response tells you whether one is pending.
+  Don't spend a call on this endpoint either way while a `copilot-pull-request-reviewer` check run is queued or in progress on the head -- the ruleset already requested the review, and neither response tells you whether one is pending.
+  A completed run on an unchanged head is no veto: after a Rebut/Defer-only round with no push, `skills/ardi/SKILL.md` requires a fresh request, and this endpoint is how to make it.
+  A ready-for-review head with no such run about a minute after the push is the other case, measured per push in [`memories/copilot-reviews.md`](copilot-reviews.md).
 
-  **As of 2026-08-04, Copilot is quota-exhausted across Morrison-Lab and unavailable until September 2026, so do not request it at all until then.**
+  **As of 2026-08-04, Copilot is quota-exhausted across Morrison-Lab, so do not request it at all while the moratorium stands.**
+  Its live expiry is `MORATORIUM_END` in `hooks/no-unreviewed-pr.py`, extended to December 2026 on 2026-09-02.
   The user stated this directly on 2026-08-04, in the words "copilot is unavailable until september" and "stop trying to get copilot reviews".
   Until then, skip both the `requested_reviewers` POST for `copilot-pull-request-reviewer[bot]` and the `request_copilot_review` MCP tool: either only produces a `COMMENTED` review whose whole body is *"Copilot was unable to review this pull request because the user who requested the review has reached their quota limit."*, which wastes a round and is not a verdict.
   This is a time-bounded override of two standing instructions that otherwise say to request Copilot every round: `shared/workflow/pr-on-claim.md`'s "Request the external reviewer in the same stride" and `shared/workflow/review-verdict-pitfalls.md`'s fifth case ("Keep re-requesting each round anyway").
-  Until September 2026, rely on `claude-review` plus self-review, which is exactly the no-reachable-external-reviewer fallback that fifth case already describes.
-  Re-verify Copilot's quota and re-enable the per-round request after September 2026, per `shared/writing/timestamp-volatile-claims.md`.
+  Until `MORATORIUM_END`, rely on `claude-review` plus self-review, which is exactly the no-reachable-external-reviewer fallback that fifth case already describes.
+  **Measured 2026-09-01, then superseded the next day.**
+  Read the two as a sequence rather than a contradiction.
+  The quota did return, and Copilot code reviews resumed across Morrison-Lab in September 2026
+  with login `copilot-pull-request-reviewer` and formal verdict headers
+  (`### 🟢 Approval recommended` for clean signoff, `### 🟡 Changes recommended` for changes requested).
+  Review verification tools and mistake patterns (Pattern 40) require recognizing `copilot-pull-request-reviewer`
+  and its clean/not-clean verdict patterns so Copilot reviews are tracked as part of the automated review gate.
+
+  **On the 2026-09-01 (Pacific) sample, with Copilot reviewing again, the 201-then-empty `requested_reviewers` signature above still held, and the fix is to poll `reviews`, not `reviewRequests`.**
+  On the PRs below, `gh api repos/<owner>/<repo>/pulls/<N>/requested_reviewers -X POST -f 'reviewers[]=copilot-pull-request-reviewer[bot]'` returned HTTP 201 each time.
+  The section above records 422 and refusal as other outcomes.
+  `gh pr view --json reviewRequests` stayed empty each time.
+  On those same requests the review then landed (a few minutes later on [#2976](https://github.com/Morrison-Lab/ai-config/pull/2976)), visible under `gh pr view --json reviews` with author login `copilot-pull-request-reviewer`, which `startswith("copilot")` matches.
+  That is an observation of those PRs, not a guarantee: the empty request list stays inconclusive (see the 201-then-empty section above), and the posted review is the only evidence of arrival.
+  The inline comments of that review (`gh api repos/<owner>/<repo>/pulls/<N>/comments`) carry `user.login` `Copilot` instead, so a query over comments needs a case-insensitive test (`test("copilot"; "i")`) while a query over reviews does not.
+  On those PRs a re-request after a push was followed by a fresh review on the new head.
+  Count reviews per `commit.oid` to tell a new round from the old one.
+  Measured 2026-09-01 on [#2975](https://github.com/Morrison-Lab/ai-config/pull/2975) through [#2979](https://github.com/Morrison-Lab/ai-config/pull/2979) and [#2983](https://github.com/Morrison-Lab/ai-config/pull/2983).
+
+  - **Do:** poll `reviews` (count, login, and `commit.oid`) for the landed review rather than `reviewRequests`.
+  - **Do:** match the inline-comment author case-insensitively, since it is `Copilot` there and `copilot-pull-request-reviewer` on the review.
+  - **Don't:** read an empty `reviewRequests` as a failed request, nor as a review on its way --- it discriminates nothing, so read the check run and the posted review instead.
+  - **Don't:** read a review on an older `commit.oid` as the verdict on the head you just pushed.
+
+  **Two reviewers are two finding streams, and the checker's one-line verdict is not either of them.**
+  Measured 2026-09-02 on [#2979](https://github.com/Morrison-Lab/ai-config/pull/2979):
+  five Copilot rounds were read and answered while the Claude review repeated the same docstring finding five times unread,
+  because each poll read only the verdict line of `check-pr-fully-clean.py` and the Copilot inline comments.
+  The checker prints one or more blocker bullets per selected review (a review state such as `CHANGES_REQUESTED` and a body finding each get one).
+  For a structured review payload that bullet carries the first finding's file and message.
+  For free-text prose it names only the regex pattern that matched.
+  In neither case is it the full findings list.
+  Those bullets say which review still blocks.
+  The findings themselves are in that review's body, and each reviewer's set has to be read after every push.
+  - **Do:** after each push, read the checker's blocker bullets, then the Claude `### Findings` section and the Copilot review body and comments they point at.
+  - **Don't:** treat the verdict line, or one reviewer's round, as the whole of what is open on the head.
+
   **Re-measured 2026-08-06 with a wider denominator:** across `Morrison-Lab/ai-config`'s last 60 merged PRs, every Copilot review object carries a refusal body and **zero** are substantive (query in [`shared/workflow/pr-on-claim.md`](../shared/workflow/pr-on-claim.md), which also explains why the object count drifts between runs while the zero does not).
   Say *refusals* rather than *quota refusals* when reporting a count like this, because the body alone does not name a cause: the 2026-08-06 Actions incident listed "Copilot code review" among its affected components, so a refusal inside that window has two candidate explanations.
   `Morrison-Lab/ai-config#1223` owns that discrimination and carries the timestamp table --- read it rather than re-deriving.
@@ -584,7 +714,7 @@
   (Reproduced on Morrison-Lab/ai-config#1128, 2026-08-04.)
 
   **Superseded 2026-08-19 (ai-config#1709): the script now honors this override itself, and nothing needs unregistering.**
-  `hooks/no-unreviewed-pr.py` carries `MORATORIUM_END = 2026-09-01`, matching the September 2026 expiry above, and returns before scanning while that date is still ahead --- so the collision is gone on every installation shape and the guard re-arms itself on the day the override names, with nobody having to remember.
+  `hooks/no-unreviewed-pr.py` carries `MORATORIUM_END`, matching the expiry recorded above, and returns before scanning while that date is still ahead --- so the collision is gone on every installation shape and the guard re-arms itself on the day the override names, with nobody having to remember.
   Keep the two in step: extending the moratorium here means editing that constant in the same PR, or the memory and the hook start disagreeing again.
 
   The remedy this paragraph used to give --- unregister it from `~/.claude/settings.json`'s `Stop` hooks --- covered only ONE installation shape, and it is worth recording why rather than just deleting it.
@@ -600,7 +730,33 @@
   **Restated and widened 2026-08-19: the moratorium covers ALL REPOS, not just Morrison-Lab.**
   The user said "stop requesting copilot reviews until september", then, asked about scope, "ALL REPOS".
   So the paragraph above should be read with `ucdavis/bcs` and every other repo inside it, not only the Morrison-Lab org the 2026-08-04 measurement happened to cover.
-  The expiry is unchanged and deliberate: **September 2026**, after which re-verify the quota and re-enable the per-round request rather than letting the moratorium become permanent by default (`shared/writing/timestamp-volatile-claims.md`).
+  The expiry is deliberate rather than incidental: re-verify the quota at the end date and re-enable the per-round request, rather than letting the moratorium become permanent by default (`shared/writing/timestamp-volatile-claims.md`).
+
+  **Extended 2026-09-02 to December 2026, on the directive "stop using copilot reviews".**
+  The September expiry arrived and did exactly what it was designed to do: the guard re-armed on 2026-09-01, resumed demanding a Copilot request, and a session complied before the user stopped it.
+  Derived rather than recalled, by counting `review_requested` events for Copilot across that session's PRs: six PRs received requests (`#3004`, `#3007`, `#3016`, `#3036`, `#3044`, `#3076`), nine request events in total, and only the PR carrying this extension received none.
+  That is the mechanism working, not failing --- a date that re-arms is the whole reason the switch is a date and not an env flag --- but it does show the cost of a short window, since the re-arm lands mid-session with no announcement.
+  So the new window is three months rather than a fortnight, far enough from the day-to-day that its expiry is unlikely to surprise an active session.
+
+  `MORATORIUM_END` in [`hooks/no-unreviewed-pr.py`](../hooks/no-unreviewed-pr.py) is the live value and this paragraph is its prose pair;
+  the constant's own comment requires editing both together, and an extension that moves one is a silent divergence.
+
+  **Its test file derives every clock from that constant, and must keep doing so.**
+  Before this extension the tests pinned literal dates --- an `AFTER` of `2026-09-02`, and a boundary pair of `2026-08-31`/`2026-09-01`.
+  Moving the end date to December puts all three inside the new window, where `main()` returns at its first line.
+  Measured by reverting the literals and running them against the December constant: **92 passed, 88 failed**.
+  The split is the point rather than the totals.
+  Every case expecting a block fails loudly, because an inert guard blocks nothing;
+  every true-negative case passes vacuously, because "no block" is what it expected anyway.
+  So half the suite goes quiet while the other half screams --- loud enough to notice, and the passing half still means nothing.
+
+  An earlier draft of this paragraph claimed the whole file would pass vacuously, citing "179 cases".
+  That number came from a run with the fix already half-applied, generalized to the unfixed case without rerunning it, and labelled "measured".
+  It is recorded here rather than quietly replaced, because the correction is the same overclaim-from-one-observation this file's neighbours keep catching.
+
+  - **Do:** edit the constant and this paragraph in the same commit.
+  - **Do:** derive any date a test needs from `MORATORIUM_END`, never write one out.
+  - **Don't:** read a passing suite after an extension as evidence the guard still works --- check that the pinned clock still sits outside the window.
 
   The same session tried four `requested_reviewers` POSTs for `copilot-pull-request-reviewer[bot]` on `ucdavis/bcs` PRs #648, #649, and #650.
   Each was accepted with HTTP **200**, and each left zero Copilot reviews behind, the pending request absent from both `gh pr view --json reviewRequests` and the `GET .../requested_reviewers` endpoint.
@@ -620,13 +776,13 @@
   Say so in the PR or the recap when you defer on this ground, so the omission reads as a recorded deferral rather than as a missed step --- that is the whole reason to write it down, since silence and compliance look identical from outside.
   Unregistering the hook, per the paragraph above, remains the fix for the turn-by-turn nag while the moratorium is live.
 
-  - **Do:** skip the `requested_reviewers` POST and `request_copilot_review` on every repo until September 2026, and state the directive as the reason when a PR ships without a Copilot request.
+  - **Do:** skip the `requested_reviewers` POST and `request_copilot_review` on every repo while `MORATORIUM_END` is still ahead, and state the directive as the reason when a PR ships without a Copilot request.
   - **Do:** rely on `claude-review` plus self-review meanwhile, which is the same no-reachable-external-reviewer fallback the paragraph above already cites --- `shared/workflow/review-verdict-pitfalls.md`'s fifth case.
     Withheld-by-policy is not literally unreachable, so the fit is by analogy rather than by definition.
     Say which one applies when reporting a PR's review state.
   - **Don't:** read `hooks/no-unreviewed-pr.py`'s demand, or `shared/workflow/pr-on-claim.md`'s "request the external reviewer in the same stride", as overriding a standing user directive.
   - **Don't:** treat an accepted POST (200 or 201) as evidence the moratorium is over --- all four 2026-08-19 requests were accepted and none produced a review.
-  - **Don't:** let September 2026 pass without re-verifying.
+  - **Don't:** let `MORATORIUM_END` pass without re-verifying.
     The expiry is part of the rule, not a footnote to it.
 
   **Recurrence 2026-08-21 (Morrison-Lab/gha#571), and the new failure is what happened AFTER the request, not the request itself.**
@@ -747,12 +903,37 @@ and `gh pr merge` refuses it,
 so a queue of clean PRs merges strictly serially ---
 update one, wait out its CI and review re-run, merge,
 and every remaining PR is `BEHIND` again.
-Batch-updating the queue wastes the re-runs:
+Landing N simultaneously ready PRs thus costs O(N^2) review rounds and serial latency.
+Enabling a GitHub merge queue ([`shared/workflow/merge-queue.md`](../shared/workflow/merge-queue.md))
+eliminates this churn by building speculative merge trees on the forge side,
+reducing the verification cost to O(N).
+Batch-updating the queue without a merge queue wastes the re-runs:
 all but the next PR go stale before their turn.
 (Measured 2026-08-27 clearing the ai-config queue: five PRs,
 one update-plus-rerun cycle each.)
 
 - **Do:** update one PR at a time and merge it the moment it is green,
-  then start the next PR's update.
-- **Don't:** batch-update the whole queue --- every PR but the next one
+  then start the next PR's update (or use a merge queue where configured).
+- **Don't:** batch-update the whole queue without a merge queue --- every PR but the next one
   goes `BEHIND` again before its turn, and its re-run is wasted.
+
+## `gh pr merge` can land with no output surfaced at all
+
+Measured 2026-09-03 on `Morrison-Lab/ai-config` through the Claude Code Bash tool: `gh pr merge <N> --squash --delete-branch` came back with no stdout, no stderr, and no error surfaced, and the merge had in fact landed.
+
+One observation cannot separate `gh` printing nothing from the harness surfacing nothing, since the two are identical from here.
+So the durable claim is about the *reading* rather than about which layer swallowed the output, and it covers any forge command whose effect is separately checkable --- [`claude-code.md`](claude-code.md) already draws the sibling line for a bounded probe, that empty output is not evidence it did nothing.
+Settling the layer needs the same merge run outside the tool, which this measurement did not do.
+
+Empty output is therefore not a signal in either direction here, and the two readings it invites are both wrong and both expensive.
+Read as a failure, it prompts a retry, which then fails on the PR's already-merged state and reads as a second, different problem.
+Read as a success, it is right by luck rather than by evidence.
+
+One query settles it, and it is cheaper than either misreading:
+
+```bash
+gh pr view <N> --json state,mergedAt,mergeCommit
+```
+
+- **Do:** confirm a merge from a state query rather than from the merge command's own output.
+- **Don't:** read empty output from `gh pr merge` as failure, and don't retry on it.

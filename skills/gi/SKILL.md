@@ -38,9 +38,38 @@ gh issue list --state open --limit 20 --json number,title,labels,assignees,creat
 glab issue list --per-page=20 2>&1 | cat
 ```
 
-### 2. Triage / prioritize
+### 2. Triage, label, and prioritize
 
-Scan the issue list and rank by priority. Use these signals (in order):
+While surveying open issues to select the top candidate, inspect candidate
+issues and apply triage labels to any that are unlabeled or undertriaged.
+
+**Apply triage labels:**
+
+1. **Check repo taxonomy:** Use existing labels on the repository (check
+   `gh label list` / `glab label list` if unsure) rather than inventing new
+   ones.
+2. **Classify each candidate:**
+   - **Type:** `bug`, `enhancement`, `documentation`, `maintenance` / `refactor` /
+     `chore` (match repo conventions).
+   - **Priority:** `high-priority`, `low-priority`, `P0` / `P1` / `P2` if the repo
+     uses explicit priority labels.
+   - **Status:** `blocked`, `duplicate`, `invalid`, `wontfix` if applicable.
+3. **Add labels to inspected issues:**
+
+```bash
+# GitHub
+gh issue edit <N> --add-label "<label1>,<label2>"   # LABEL_ISSUE
+
+# GitLab
+glab issue update <N> --label "<label1>,<label2>"
+```
+
+`gh issue edit --add-label` is additive and preserves existing labels.
+
+**Rank by priority:**
+
+Scan the triaged issues and rank by priority.
+Use these signals (in order):
 
 | Signal | Weight |
 |--------|--------|
@@ -54,13 +83,6 @@ Scan the issue list and rank by priority. Use these signals (in order):
 | Issue comment says "Working on this" (and the claim is live --- under 2 h old) | **Skip** |
 | Open PR already exists for the issue | **Skip** |
 
-**Re-triage if helpful:** If labels are stale, missing, or inconsistent, briefly
-suggest re-labeling to the user before proceeding. Don't unilaterally relabel
-without asking — but do flag it:
-
-> "Issues #4 and #7 both look high-priority but neither is labeled. Want me to
-> label them before picking one, or just grab #4 (older, looks like a bug)?"
-
 ### 3. Select top issue automatically
 
 Pick the highest-priority issue automatically based on the triage signals in
@@ -69,8 +91,8 @@ State which issue was selected and why, then proceed directly to check
 in-flight status and implementation without pausing for user confirmation.
 
 Do not describe the issue as "in progress" or say that implementation has
-started until steps 4, 6, 7, and 8 have completed: the live claim, isolated
-branch/worktree, and draft PR are the observable start of work.
+started until steps 4, 6, 6b/7, and 8 have completed: the live claim, isolated
+worktree and branch, and draft PR are the observable start of work.
 Investigation or triage alone is preparatory work, not an active implementation.
 
 ### 4. Check the issue isn't already in-flight
@@ -112,26 +134,34 @@ An expired claim is taken over by posting your own claim comment, never silently
 
 ```bash
 # GitHub — list open PRs and scan for any whose title or branch references this issue:
-gh pr list --state open --json number,title,headRefName | cat   # LIST_PRS
+gh pr list --state open --json number,title,headRefName,author,assignees \
+  --jq '.[] | "#\(.number) \(.title) [\(.headRefName); \(.author.login); assignees: \([.assignees[].login] | join(","))]"'   # LIST_PRS
 # Authoritative — the issue's cross-referenced open PRs via the REST timeline API.
 # (gh issue view --json has no timelineItems field; in the timeline, source.type is
 #  always "issue", so a PR is one whose source.issue.pull_request is non-null. The
 #  state filter keeps only open PRs — merged/closed siblings aren't active competitors.
 #  --paginate walks every page so a cross-reference past the first 30 events isn't missed.)
 gh api --paginate repos/<owner>/<repo>/issues/<N>/timeline \
-  --jq '.[] | select(.event == "cross-referenced") | .source.issue | select(.pull_request != null) | select(.state == "open") | "#\(.number) \(.title)"' | cat   # ISSUE_LINKED_PRS
+  --jq '.[] | select(.event == "cross-referenced") | .source.issue | select(.pull_request != null) | select(.state == "open") | "#\(.number) \(.title) [\(.user.login); assignees: \([.assignees[].login] | join(","))]"' | cat   # ISSUE_LINKED_PRS
 ```
 
 If an open PR already exists for the issue:
 - **Don't open a competing PR.** The issue is already being worked.
 - Skip it and grab the next unblocked issue instead.
-- Or, if the existing PR is stalled/abandoned and you're taking it over,
+- Or, if the existing PR is stalled/abandoned and it passes
+  `memories/reviewing-prs.md`'s scope test (opened by or assigned to the
+  invoking user, explicitly requested, or authored by the GitHub Actions app;
+  the listing above prints the author and assignee logins), take it over:
   check it out (use the existing PR branch), claim the PR, and ARDI it
   rather than starting fresh.
+- A stalled PR that fails that test is not yours to take over: skip the
+  issue, leave the PR untouched, and report it so the user can assign or
+  name it.
 
-### 5. Check history and peers
+### 5. Check history, peers, and research DRW
 
 Before implementing, invoke the `check-history` skill to review merged MRs/PRs that touched the same area so you don't undo past progress.
+Perform a research step to check whether the functionality or helper already exists (DRW) in our own repos or upstream ecosystems before writing custom code, following [`prefer-upstream`](../prefer-upstream/SKILL.md) and [`dont-reinvent-wheel`](../../shared/principles/dont-reinvent-wheel.md).
 If the issue is a new feature or architectural change, also consider running `scout-peers` to see how other comparable projects solved it, ensuring we don't reinvent the wheel. (Do NOT run `opposition-research` / `oppo` here;
 `oppo` mines community demand to decide *what* to build and feeds the issue tracker, while `scout-peers` checks *how* others built it once you've already grabbed an issue).
 
@@ -149,7 +179,34 @@ glab issue note <N> --message "Claude Code CLI (local session) is working on thi
 _Posted by Claude Code (AI agent) --- not written by a human._"
 ```
 
+### 6b. Cut a dedicated worktree
+
+`AGENTS.md`'s "Worktree isolation" rule applies here and this skill did not
+say so, so a session following it verbatim ran its triage and its edits in
+the shared checkout, which was sitting on another work-stream's branch
+([#2061](https://github.com/Morrison-Lab/ai-config/issues/2061)).
+Every step from here on runs inside a worktree of its own:
+
+```bash
+git fetch origin main                                              # FETCH
+git worktree add ../<repo>-<slug> -b fix/<slug> origin/main         # CREATE_WORKTREE -- or feat/<slug>, docs/<slug>
+cd ../<repo>-<slug>
+```
+
+`git worktree add` does not change directory, two worktrees on one branch
+name can silently move the shared ref instead of erroring, and a repo script
+run from a worktree can still measure the main checkout ---
+[`memories/git-worktrees.md`](../../memories/git-worktrees.md) carries these
+and the other measured gotchas; the [`session-lock`](../session-lock/SKILL.md)
+skill wraps the same step with a collision check.
+Remove the worktree when the PR merges, per
+[`post-merge`](../post-merge/SKILL.md).
+
 ### 7. Create a branch
+
+Step 6b's `worktree add -b` already created the branch; this step is the
+fallback for a session that cannot create a worktree, such as a container with
+no writable directory beside the checkout:
 
 ```bash
 git fetch origin main                    # FETCH
@@ -199,6 +256,9 @@ tracker
 ### 9. Implement
 
 - Read the issue description carefully — understand "done" criteria
+- Research before writing code: verify that no standard library, upstream package,
+  or lab repo helper already provides what you are about to write (DRW).
+  If custom implementation is needed, record the search and why existing options were unfit
 - Make the changes (code, tests, docs as needed)
 - Run the repo's standard checks (lint, test, build) before committing
   Prefer the same commands CI runs.
@@ -283,6 +343,8 @@ dependency, needs design decision, upstream bug):
 ## Relationship to other skills
 
 - **`check-history`** — invoked in step 5 to avoid undoing past work
+- **`prefer-upstream`** --- search existing packages, standard libraries, and lab
+  repos before writing custom code to avoid reinventing the wheel
 - **`scout-peers`** --- suggested in step 5 to check how peers solved a problem so you don't reinvent the wheel (distinct from `oppo`, which finds *what* to build)
 - **`ardi`** — invoked in step 11 to drive the MR/PR to clean
 - **`claim-pr`** — the issue claim in step 6 follows the same pattern
@@ -299,10 +361,13 @@ dependency, needs design decision, upstream bug):
 
 - ❌ Grabbing an issue already assigned to someone else
 - ❌ Starting implementation without checking history
+- ❌ Hand-rolling custom code without researching existing packaged or shared solutions first (violating DRW)
 - ❌ Opening an MR without running the repo's standard checks first
 - ❌ Picking a huge issue that can't be completed in one session without
   discussing scope with the user first
 - ❌ Implementing without understanding "done" criteria from the issue
+- ❌ Skipping triage labeling on candidate issues — apply classification labels
+  to candidate issues inspected during triage so the backlog stays organized
 - ❌ Opening the PR only after implementing — open a draft PR up front (step 8)
   so the work is visible and a parallel session doesn't grab the same issue
 - ❌ Forgetting `Closes #N` in the MR/PR description

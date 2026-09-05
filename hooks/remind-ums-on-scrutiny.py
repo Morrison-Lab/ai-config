@@ -130,6 +130,7 @@ CORRECTION_EXTRA = re.compile(
         (?:wrong|incorrect|off)\b
     | ,\s*not\s+\d+\b
     | not\s+\d+\s+as\s+i\s+said\b
+    | \b(?:it|i|we)\s+filtered\s+[^\n.!?]+?\s+rather\s+than\b
     )""",
     re.I | re.X,
 )

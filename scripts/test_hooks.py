@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Run every hook's own test suite, and flag any hook that lacks one.
 
-The hooks in `hooks/` each can ship a `test-<name>.py` beside a `<name>.py`,
+The hooks in `hooks/` each can ship a `test-<name>.py` beside a `<name>.py`
+or `<name>.sh`,
 but those tests ran nowhere: `.pre-commit-config.yaml` and `validate.yml`
 invoke `scripts/test_*.py` by name and never reach into `hooks/`. So a guard
 could regress -- start blocking a message it should pass, stop catching the
@@ -11,8 +12,10 @@ the instruments that enforce the corpus's rules were themselves unverified.
 
 This runner does two things:
 
-  1. Runs each `hooks/test-*.py` against its subject `hooks/<name>.py` (the
-     convention every hook test already uses, taking the subject as argv[1]).
+  1. Runs each `hooks/test-*.py` against its subject `hooks/<name>.py` or
+     `hooks/<name>.sh` (the convention every hook test already uses, taking
+     the subject as argv[1]; a stem with both spellings is a FAIL, since
+     picking one silently would test the wrong file).
   2. Checks coverage in the OTHER direction -- enumerates every hook and
      confirms it has a test. A one-directional test->subject walk cannot see a
      hook that ships NO test at all, so "N/N suites passed" would read as full
@@ -21,7 +24,8 @@ This runner does two things:
 
 `KNOWN_UNTESTED` records the hooks that currently ship without a test as an
 explicit, reviewable debt; adding a NEW hook without a test fails this check.
-Tracked in ai-config#1080 -- write those tests, then empty the allowlist.
+ai-config#1080 wrote the last of those tests, so the allowlist is empty; it
+stays so a new untested hook is a failure, not a NOTE.
 
 A hung suite used to stall the whole sweep with no timeout and nothing on
 stdout (ai-config#2098, observed on Windows). Each suite now has a deadline;
@@ -42,9 +46,20 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HOOKS = os.path.join(ROOT, "hooks")
 
-# Per-suite deadline. Measured 2026-08-26 on a Linux cloud runner: the
-# slowest suite (test-no-clobbering-push: 32 scratch git repos plus 17
-# mutation rounds) finished in 178s. 900s is about 5x that, so a slow
+# Per-suite deadline. The slowest suite is test-no-clobbering-push, and its
+# population is what the number below is derived from, so re-state both
+# whenever the suite grows rather than leaving a stale count behind: 32 cases
+# plus 17 mutation rounds finished in 178s on a Linux cloud runner
+# (2026-08-26), and 64 cases plus 42 rounds finished in 159s on another one
+# (2026-09-04). The unit is a test CASE, not a scratch repository: every case
+# builds a working repo AND a bare origin, and several build a clone or a
+# worktree on top, so the repositories outnumber the cases at least two to
+# one. Reading the derived number as a repository count made a per-repo cost
+# look more than twice what it is (ai-config#2451).
+# Restating it is no longer left to whoever grows the suite:
+# `scripts/test_test_hooks.py` derives both counts and FAILs on a stale one,
+# because two reviews in a row found this comment stale anyway
+# (ai-config#2451). 900s is about 5x the slower reading, so a slow
 # Windows box has headroom past the 420s kill of the hang that never
 # produced output (ai-config#2098) while still FAILing an infinite
 # stall. Override with HOOK_TEST_SUITE_TIMEOUT.
@@ -69,10 +84,11 @@ DEFAULT_SUITE_TIMEOUT_S = 900
 # this runner targets.
 MAX_SUITE_TIMEOUT_S = 86400
 
-# Hooks that ship without a test today. An explicit, reviewable list -- not a
-# silent gap. A new hook is expected to bring its test; this list should only
-# ever shrink. See ai-config#1080.
-KNOWN_UNTESTED = {"inject-local-time.sh"}
+# Hooks that ship without a test: an explicit, reviewable allowlist rather
+# than a silent gap. Empty since ai-config#1080 wrote the last missing test;
+# the set stays so a new hook without a test fails this check, and an entry
+# added here must cite its tracking issue.
+KNOWN_UNTESTED: set = set()
 
 
 def suite_timeout_s():
@@ -166,7 +182,20 @@ def run_one_suite(test_path, subject, timeout):
     # and was caught in review: 36 of 46 suites spawn the subject as a
     # subprocess, and a SyntaxWarning injected into one of them (verified
     # empirically) still passed cleanly under the `-W`-only form.
-    env = dict(os.environ, PYTHONWARNINGS="error::SyntaxWarning")
+    #
+    # The second entry is keyed on the warning MESSAGE rather than a category
+    # (ai-config#3114): an invalid escape sequence is a DeprecationWarning on
+    # Python 3.11 and a SyntaxWarning on 3.12 and later, so the category-only
+    # form is vacuous on whichever interpreter is not the one it names.
+    # Measured 2026-09-03: `P = "a\s"` under `error::SyntaxWarning` alone
+    # exits 0 on 3.11 and 1 on 3.12, and the message-keyed entry makes both
+    # exit 1. Keying on the message rather than adding
+    # `error::DeprecationWarning` keeps every unrelated deprecation a warning.
+    env = dict(
+        os.environ,
+        PYTHONWARNINGS="error::SyntaxWarning,error:invalid escape sequence::",
+    )
+    env.pop("ANTIGRAVITY_AGENT", None)
     proc = subprocess.Popen(
         [sys.executable, test_path, subject],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
@@ -209,13 +238,24 @@ def run_suites(timeout=None):
     failures = 0
     tests = sorted(glob.glob(os.path.join(HOOKS, "test-*.py")))
     for test_path in tests:
-        subject = os.path.join(HOOKS, os.path.basename(test_path)[len("test-"):])
-        rel_test = os.path.relpath(test_path, ROOT)
-        rel_subj = os.path.relpath(subject, ROOT)
-        if not os.path.isfile(subject):
-            print(f"FAIL: {rel_test} has no subject at {rel_subj}")
+        # A subject may be a .py or a .sh hook (inject-local-time.sh, #1080);
+        # try the test's own extension first, then the shell spelling.
+        stem = os.path.basename(test_path)[len("test-"):-len(".py")]
+        candidates = [os.path.join(HOOKS, stem + ext) for ext in (".py", ".sh")]
+        present = [c for c in candidates if os.path.isfile(c)]
+        if len(present) > 1:
+            # Two subjects for one suite is ambiguous; picking one silently
+            # would test the wrong file with no signal (fail-fast).
+            print(f"FAIL: {os.path.relpath(test_path, ROOT)} has two subjects: "
+                  + ", ".join(os.path.relpath(c, ROOT) for c in present))
             failures += 1
             continue
+        if not present:
+            print(f"FAIL: {os.path.relpath(test_path, ROOT)} has no subject at "
+                  + " or ".join(os.path.relpath(c, ROOT) for c in candidates))
+            failures += 1
+            continue
+        subject = present[0]
         failures += run_one_suite(test_path, subject, timeout)
     return failures, len(tests)
 
@@ -231,7 +271,7 @@ def check_coverage():
         if has_test:
             tested += 1
         elif name in KNOWN_UNTESTED:
-            print(f"NOTE: {name} has no test (known debt, ai-config#1080)")
+            print(f"NOTE: {name} has no test (known debt; track it in an issue)")
         else:
             print(f"FAIL: hooks/{name} has no test ({test_for(name)}); "
                   "add one or add it to KNOWN_UNTESTED with a tracking issue")
@@ -241,6 +281,11 @@ def check_coverage():
     for name in sorted(KNOWN_UNTESTED):
         if os.path.isfile(os.path.join(HOOKS, test_for(name))):
             print(f"FAIL: {name} now has a test; drop it from KNOWN_UNTESTED")
+            failures += 1
+        elif name not in subs:
+            # A deleted or renamed hook left behind in the allowlist would
+            # otherwise pass both loops while inflating the known-debt count.
+            print(f"FAIL: {name} is in KNOWN_UNTESTED but is not a hook in hooks/; drop it")
             failures += 1
     return failures, tested, len(subs)
 

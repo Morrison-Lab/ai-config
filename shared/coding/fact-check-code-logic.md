@@ -332,6 +332,47 @@ retire all three.
 Tracked as
 [#1519](https://github.com/Morrison-Lab/ai-config/issues/1519).)
 
+### A sampling instrument's zero is a coverage statement unless the new arm's reach is reported
+
+When a verification tool or change-time test
+(such as a corpus-sampling parity diff or generator-based checker)
+reports "0 regressions" or "0 widened, 0 narrowed",
+confirm that the new code path or arm was actually **reached** during the run.
+
+Three distinct mechanisms produce a false zero from a sampling instrument:
+
+1. **Truncation before reaching the arm.**
+   A generator that yields new cases after a truncation limit
+   (such as an arm appended last in a generator subject to `--limit`)
+   is cut off before any new cases execute.
+2. **Strided sampling skipping the arm.**
+   A sampling harness that selects every k-th item from a generated stream
+   can skip a small, concentrated batch of newly added cases entirely.
+3. **Earlier deciding branches.**
+   An existing check that evaluates before the new mechanism
+   (such as a prose verdict line preceding a structured payload)
+   can resolve the case before control reaches the new branch.
+
+In all three cases,
+the resulting zero reports that the check did not run,
+not that the code is correct.
+
+- **Do:** report and assert the reach count
+  (e.g., "reached N times out of M")
+  for each arm of a generator or sampling instrument.
+- **Do:** evaluate new generator arms unconditionally
+  or append them after sampling limits and strides are applied,
+  so no generated cases are skipped.
+- **Don't:** read "0 differences" or "0 widened" as evidence of correctness
+  when the execution count for the new branch was zero.
+
+(Measured on PR [#2736](https://github.com/Morrison-Lab/ai-config/pull/2736):
+`scripts/check-verdict-scan-parity.py` reported 0 widened across multiple review rounds
+because the structured payload arm was placed at index 241,920 where `--limit` truncated it,
+skipped by strided sampling,
+and bypassed by prose verdict checks,
+hiding 1 accepted widening and 5 fail-closed narrowings.)
+
 ### Mutate the fix, not only the test
 
 The rule above says a regression test must be seen to fail.
@@ -428,6 +469,41 @@ A caller reading only the pass/fail bit sees no difference at all.
   rather than for a deletion.
 - **Don't:** trust an anchored pattern to cover the unanchored case;
   `^marker` and `marker` agree on every example that starts with the marker.
+
+### A subsumption proof over raw text must account for every transformation
+
+When deleting a structured extraction check or parser term on the grounds that
+it is "provably redundant" with a raw substring or regex match over the unparsed
+body,
+account for every transformation between raw text and parsed values.
+This extends the near-subsumption hazard in `### A misleading test label also licenses a DELETION`
+above from matching domains within one string to representations across decoding
+transformations.
+
+Decoders and parsers
+(such as `json.loads` resolving `\u0061` Unicode escapes,
+URL decoders resolving `%20`,
+HTML/XML entity unescaping,
+or case/whitespace normalizations)
+convert raw representations into values that do not appear byte-for-byte in the
+unparsed text.
+A structured equality check `payload.get("commit_sha") == head_sha`
+matches an escaped JSON string `"commit_sha": "\u0061bc1234..."`,
+while raw substring checks on `head_sha` in the unparsed body fail to find it.
+Deleting the structured check causes escaped or encoded payloads to fail closed.
+
+- **Do:** construct adversarial test fixtures with escapes, encodings,
+  and entity references before concluding a parsed-value check is subsumed
+  by raw text search.
+- **Do:** test decoded/escaped representations against the full verification
+  pipeline.
+- **Don't:** treat raw text and decoded structured values as interchangeable
+  in redundancy proofs.
+
+(Measured on PR [#2736](https://github.com/Morrison-Lab/ai-config/pull/2736):
+deleting a structured `commit_sha` check as "provably dead" made escaped JSON
+review payloads fail closed as "no review posted" because raw substring
+disjuncts could not see the escaped SHA.)
 
 ### A predicate a fix adds needs mutation in both directions, not just reversion
 
@@ -555,6 +631,59 @@ See
 "When a mutation survives, the first hypothesis is that the mutation
 was wrong" for the general form this instance is one of three of, all
 on the same PR.)
+
+### Three ways an assertion passes without ever seeing the value it names
+
+The vacuous modes above concern an assertion evaluated against an empty or self-satisfying collection.
+These three concern an assertion evaluated against a **non-empty** stream that is not the stream the test claims to be reading.
+Each looks like ordinary, specific coverage --- a named value,
+an anchored pattern, a real comparison ---
+and each passes against deliberately broken code.
+
+- **The harness merges the streams.**
+  A runner that captures stdout and stderr into one buffer lets any log line,
+  progress message,
+  or warning satisfy an anchored grep meant for the program's *output*.
+  The assertion is specific, the pattern is anchored,
+  and the value it matched was written by the logger.
+  Check what the harness captures before trusting any assertion over captured text,
+  and assert against the stream you mean by capturing them separately.
+- **Two values are emitted as one field.**
+  When a formatter concatenates two variables with no separator,
+  a test asserting on the combined field cannot distinguish them,
+  so a defect that swaps, drops,
+  or duplicates one of the two leaves the assertion intact.
+  Assert on the parsed fields, or on a separator the format guarantees ---
+  not on a substring of the joined line.
+- **A subsequence match cannot see an appended item.**
+  An `in_order`-style assertion checks that the named items appear in that relative order.
+  Extra content between them, and extra content after the last of them,
+  satisfies it by construction ---
+  so a test written to pin an output's shape is blind to anything the code appends.
+  Pair every ordering assertion with a length or exact-set assertion,
+  or the ordering check is a lower bound and nothing more.
+
+The general form: **name the stream, the field,
+and the completeness the assertion actually constrains**,
+and check that each is the one the test is about.
+All three survive the "does it read as coverage" glance precisely because the assertion names a real,
+specific value --- what is wrong is the haystack, not the needle.
+
+- **Do:** state, for each assertion, which stream it reads,
+  which field it isolates, and what it forbids the output from also containing.
+- **Do:** pair an ordering assertion with an exact-set or length assertion,
+  so it constrains more than a lower bound.
+- **Don't:** trust an assertion over captured text without checking whether the harness captured one stream or two.
+- **Don't:** read a specific, named,
+  anchored expected value as evidence the assertion is discriminating ---
+  specificity of the needle says nothing about the haystack.
+
+(Measured 2026-09-02 Pacific on [ai-config#3023](https://github.com/Morrison-Lab/ai-config/pull/3023), whose own body records "Nine adversarial rounds,
+34 findings", several rounds finding a real defect in the previous round's fix.
+The three shapes above account for three of the four occasions on that PR where a suite passed against deliberately broken code.
+The fourth --- asserting a value is PRESENT on the failure path without asserting it ABSENT on the success path ---
+is the positive-fixture-without-negative-control case that "A predicate a fix adds needs mutation in both directions" above already covers,
+and is recorded as a recurrence of that entry rather than written again here.)
 
 ## When the runtime is available, run the claim instead of reasoning about it
 
@@ -754,6 +883,40 @@ Confirming it is deliberately historical discharges the warning.
 The four comment lines directly above went untouched, so they still said 6, their stated 192G total was now wrong by more than a factor of three, and they still recorded the incident that had motivated the cap --- an unbounded array previously drained a node with an unkillable process stuck on network I/O.
 Only the directive line was ever read.
 An AI reviewer returned "Needs more work" on the contradiction.)
+
+## A comment asserting the state of ANOTHER artifact is a claim with an expiry across commits
+
+A comment asserting facts about *another* file, prompt format, or test expectation
+(such as "prompts render the payload 3 spaces in",
+"this field was removed as provably dead in helper X")
+is a cross-artifact claim.
+In a multi-commit PR where designs iterate across review rounds,
+modifying the referenced file immediately expires the comment in the other file.
+
+Because the comment is in a different file from the code change,
+single-file adjacent-comment linters (e.g. `hooks/flag-stale-adjacent-comment.py`,
+which checks a 10-line window in the modified file)
+cannot flag it,
+and the diff of the modifying commit does not contain it.
+Worse,
+a stale test comment pointing readers away from the test pinning a restored feature
+actively misleads reviewers.
+
+- **Do:** grep for cross-artifact references, format descriptions,
+  and justification comments across the repository when updating a shared data
+  format or reversing a prior round's deletion.
+- **Do:** audit explanatory comments in test files when restoring logic
+  that an earlier commit removed.
+- **Don't:** rely on 10-line adjacent-comment hooks to catch stale claims about
+  other files.
+
+(Measured on PR [#2736](https://github.com/Morrison-Lab/ai-config/pull/2736)
+commit `c725c449`:
+after restoring `commit_sha` in `scripts/check-pr-fully-clean.py`
+and making reviewer payloads flush-left,
+comments in `scripts/test_check_pr_fully_clean.py`
+and `scripts/lib/review_payload.py`
+still asserted the old, opposite states.)
 
 ## Matching values is not matching roles
 
@@ -1159,3 +1322,58 @@ The question is answerable by execution: run both over a corpus that includes ma
 (Measured 2026-08-28 on [ai-config#2539](https://github.com/Morrison-Lab/ai-config/pull/2539).
 The generalization was itself the fix for a prior fail-open, and it shipped with the four names checked and the boundary unexamined.
 It became the tenth certification fail-open of that PR, and the reviewer's reproducer was one line: a tag opener with no closing bracket anywhere in the block.)
+
+## Two literals for one concept drift apart inside a single session
+
+When two separate regexes, literals, or parsers match the same syntax or concept
+(such as harvesting a token at one site and scanning for trailing content
+after that token at another),
+modifying one site in response to a review finding causes them to drift apart.
+
+A relaxed matcher accepts an input that the second matcher rejects,
+causing unexpected `None` dereferences, missed checks, or silent inconsistencies.
+
+- **Do:** hoist duplicate literals or regexes for the same concept into a single
+  shared constant or helper, or assert their identity.
+- **Don't:** maintain two separate regex literals for the same concept across
+  multiple checks in the same file.
+
+(Measured on PR [#2736](https://github.com/Morrison-Lab/ai-config/pull/2736)
+commit `5dfd3883`:
+`parse_review_verdict` in `scripts/pre-push-review.py` used two separate regexes
+for `Reviewed-Commit:`;
+loosening one to accept bold and spaced formatting while replacing the other with
+a line scan caused `last_fp` to stay `None` on loosened inputs,
+raising an `AttributeError`.
+This is the single-constant counterpart to the sibling-audit rule in
+[What to check](#what-to-check) above
+("When one parser construct becomes tolerant of a condition, audit its siblings for the same condition"):
+where that rule prescribes sweeping distinct constructs that parse the same syntax class,
+this one prescribes eliminating duplicate literals for the exact same construct outright.)
+
+## Prose about your own tests and instruments overclaims by default, and it can be the dominant finding class
+
+Every section above treats one claim at a time --- a mutation that did not apply, a needle already present, a count asserted rather than derived.
+Across a long review it compounds into something worth naming on its own: a PR whose *code* was correct within a round or two can still take many more rounds to land, because nearly every remaining finding is a **claim about the code's own tests**, not a defect in the code.
+
+The claims that keep failing this way share a shape --- each is a sentence about the session's own instruments, and each is cheap to write and expensive to check, so the writer settles for plausible:
+
+- A "superset" relation between two mutations or two test arms, asserted rather than run.
+- A phrase attributed to a rendered or generated artifact ("the docstring says X", "the comment lands in paragraph Y") without rendering it and looking.
+- A coverage claim scoped with "the only arm that ..." when a neighboring arm was never checked against the same input.
+- An enumeration claimed exhaustive ("two cases: A and B") when a third case exists in the code (an `||`, an early return, an alternate branch) and was simply not looked for.
+- A count in prose ("four mutations were confirmed") that does not match the count of items actually named in the surrounding paragraph.
+
+None of these is a hard error to catch in isolation --- each reads as a small, plausible aside in a paragraph that is otherwise doing real work, which is exactly why they survive a first self-read and only surface once a reviewer tries to reproduce the specific claim.
+
+The remedy is the same one this file gives for code: run the thing before describing it.
+
+- **Do:** run the mutation and the ablation before asserting a superset or coverage relation between them.
+- **Do:** render the artifact (the docstring, the generated message, the diff) and grep or read it before saying a phrase appears in it.
+- **Do:** enumerate the actual branches in the code (grep for the operator, walk the `if`/`elif`/`else`) before writing "the only case" or "two cases".
+- **Do:** count the items you are about to name in a sentence, and match the stated count to that count.
+- **Don't:** treat a plausible-sounding claim about your own tests as needing no check merely because it is about testing infrastructure rather than about the feature --- it is exactly as checkable, and exactly as likely to be wrong.
+- **Don't:** read "the code is right" as "the PR is ready" while claims about the code's own verification remain unmeasured.
+
+(A session working in `Morrison-Lab/gha` recorded the incident that produced this section in its own local `prose-about-my-own-tests-overclaims.md` --- project-local Claude Code auto-memory, not a file committed to any repository, so there is no link to give here: roughly eleven adversarial review rounds on one PR, where the code was correct by round two and every one of the remaining rounds found a claim of exactly the shapes listed above.)
+

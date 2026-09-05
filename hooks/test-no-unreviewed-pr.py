@@ -19,9 +19,12 @@ import rather than by an environment variable.
 
 Run: python3 hooks/test-no-unreviewed-pr.py hooks/no-unreviewed-pr.py
 """
+import datetime
 import importlib.util
 import json
 import os
+import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -49,7 +52,32 @@ sys.exit(m.main())
 
 # One day after the moratorium ends, so the guard is live for the cases that
 # are about anything else.
-AFTER = "2026-09-02"
+#
+# DERIVED from the subject's own constant rather than written out. A literal
+# date here expires when `MORATORIUM_END` moves past it, putting every case
+# below back inside the moratorium, where the guard returns at the first line
+# of `main()`.
+#
+# Measured 2026-09-02, by reverting the literals and running them against the
+# December constant: 92 passed, 88 failed. NOT a silent whole-file vacuum ---
+# the split is what matters. Every case expecting a block FAILS loudly, since
+# an inert guard blocks nothing; every true-negative case PASSES vacuously,
+# for the wrong reason. So the hazard is half the suite going quiet while the
+# other half screams, which is noisy enough to notice but leaves the passing
+# half meaning nothing.
+#
+# An earlier version of this comment claimed the whole file would pass
+# vacuously, on an unrun inference from a partially-fixed run. Deriving the
+# date is the right fix either way; the reason it was needed is smaller and
+# differently shaped than that claim said.
+def _moratorium_end():
+    spec = importlib.util.spec_from_file_location("_subject_const", HOOK)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod.MORATORIUM_END
+
+
+AFTER = (_moratorium_end() + datetime.timedelta(days=1)).isoformat()
 
 
 def hook_argv(when=AFTER):
@@ -119,6 +147,34 @@ def create(tid, result=URL, err=False):
             res(tid, result, err)]
 
 
+# One push/no-push corpus for `_argv_push`, the sole authority both this
+# hook and no-push-without-self-review.py consult (ai-config#1935, #1920).
+PUSH_CORPUS = [
+    ("git push origin main", True),
+    ("git -C /tmp/wt push origin HEAD", True),
+    ("git push -o -n origin feature", True),
+    ("git push --receive-pack -d origin feature", True),
+    ("git push --push-option=-n origin x", True),
+    ("git push -on origin x", True),
+    ("git push -o ci.skip origin main", True),
+    ("git push -- origin -n", True),
+    # git reads the exclusions last-wins (measured on git 2.43.0: each of
+    # these moves the remote ref), so a later --no- form restores the push.
+    ("git push -n --no-dry-run origin main", True),
+    ("git push --dry-run --no-dry-run origin main", True),
+    ("git push --delete --no-delete origin main", True),
+    ("git push -d --no-delete origin main", True),
+    ("git push --no-dry-run -n origin main", False),
+    # After an ambiguous abbreviation git refuses the command outright, so
+    # the classification is immaterial; pinned so a change is deliberate.
+    ("git push --rec -n origin main", False),
+    ("git push --dry-run origin HEAD", False),
+    ("git push origin --delete old", False),
+    ("git push -qn origin x", False),
+    ("git push --dry origin x", False),
+    ("git push --del origin x", False),
+    ("gh pr comment 1 --body 'git push'", False),
+]
 CASES = []
 
 
@@ -353,7 +409,7 @@ case(create("c") + [
     res("q", '{"requested_reviewers":[{"login":"Copilot"}]}'),
     say("Requested a reviewer, successfully.")], False,
      "a sole successful api request discharges")
-# A request chained AHEAD of another command is AMBIGUOUS: is_error belongs to
+# A request chained AHEAD of another command is AMBIGUOUS: is_error is shared with
 # the trailing command, and no other signal recovers the request's own outcome
 # from the single combined result blob. The guard fails toward NOT discharging
 # (it keeps blocking -- the safe over-warn direction) rather than risk clearing
@@ -423,7 +479,7 @@ case(create("c") + [bash("gh pr ready 1038 -R o/r --undo", tid="d"),
                     say("Tried to undo ready; it failed.")], True,
      "a failed gh pr ready --undo keeps the ready PR tracked")
 # A draft transition chained AHEAD of a succeeding command has an is_error that
-# belongs to the LATER command, so the clear cannot trust it -- exactly the
+# is shared with the LATER command, so the clear cannot trust it -- exactly the
 # ordering hazard the reviewer-request discharge already guards against. Here
 # the `--undo` genuinely fails ("cannot revert to draft state") but `echo done`
 # succeeds (is_error=False) and the failure text carries no error-word/4xx, so
@@ -980,8 +1036,10 @@ case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
      "a FAILED structured draft does not cancel the push's arm")
 # The boundary the fix must NOT cross, and a deliberate decision rather than an
 # oversight: a transition chained AHEAD of the push shares ONE combined exit
-# status, which belongs to the LAST command, so the call cannot attribute an
-# outcome to the transition either way. The draft and terminal discharges in
+# status with the commands after it, and which one produced it is not
+# recoverable (the operators are discarded, and a failing transition
+# short-circuits a following `&&`), so the call cannot attribute an outcome to
+# the transition either way. The draft and terminal discharges in
 # this same call already withhold on exactly this input, so the arm withholds
 # too -- an ambiguous call changes nothing in either direction. The cost is
 # bounded: the PR stays live (that same ambiguity withheld its own pop), so the
@@ -1091,6 +1149,35 @@ case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
                     bash("git push origin --delete old-branch", tid="p"),
                     res("p", ""), say("Deleted a stale branch.")], False,
      "`git push --delete` removes a ref rather than advancing one")
+# The exclusion walks option VALUES (ai-config#1935): `-n` as the value of
+# `-o` is a push-option, not a dry run, and `-d` after `--receive-pack` is
+# that option's value -- both re-head the branch and re-arm. A clustered
+# `-qn` is a dry run; `-on` is `-o` with the value `n`; `--dry` is git's
+# accepted abbreviation of `--dry-run`.
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash("git push -o -n origin feature", tid="p"),
+                    res("p", ""), say("Pushed with a push-option.")], True,
+     "`-n` as the value of `-o` is not --dry-run: the push re-arms")
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash("git push --receive-pack -d origin feature", tid="p"),
+                    res("p", ""), say("Pushed via a custom receive-pack.")], True,
+     "`-d` as the value of --receive-pack is not --delete: the push re-arms")
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash("git push -qn origin feature", tid="p"),
+                    res("p", ""), say("Quiet dry run.")], False,
+     "a clustered `-qn` is a dry run and does not re-arm")
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash("git push -on origin feature", tid="p"),
+                    res("p", ""), say("Pushed with push-option n.")], True,
+     "`-on` is `-o` with the value `n`, a real push that re-arms")
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash("git push --dry origin feature", tid="p"),
+                    res("p", ""), say("Dry run, abbreviated.")], False,
+     "`--dry` is git's abbreviation of --dry-run and does not re-arm")
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash("git push -n --no-dry-run origin feature", tid="p"),
+                    res("p", ""), say("Pushed; the later --no-dry-run wins.")], True,
+     "a later --no-dry-run restores the push (git reads last-wins), so it re-arms")
 case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
                     bash("git -C /tmp/wt push origin HEAD", tid="p"),
                     res("p", ""), say("Pushed from a worktree.")], True,
@@ -1151,6 +1238,68 @@ def _push_wording():
 # and the guard re-fires forever, which is how a guard stops being read.
 MERGED = ('{"state":"MERGED","merged":true,'
           '"url":"https://github.com/o/r/pull/1038"}')
+# The same observation for a PR CLOSED without merging (ai-config#3086). A
+# closed PR is terminal for exactly the reason a merged one is -- the request
+# POST returns 200 and adds nobody -- so it must discharge identically.
+CLOSED = ('{"state":"CLOSED","merged":false,'
+          '"url":"https://github.com/o/r/pull/1038"}')
+# Field-selecting probes, which is where merged and closed had drifted apart:
+# `--json merged,mergedAt` discharged and `--json closed,closedAt` did not.
+MERGED_FIELDS = '{"merged":true,"mergedAt":"2026-09-01T00:00:00Z"}'
+CLOSED_FIELDS = '{"closed":true,"closedAt":"2026-09-03T06:25:00Z"}'
+# A closed-unmerged PR read through the MERGE-side fields alone. Says nothing
+# about closure, so it must NOT discharge. This pins the MERGE side only: it
+# contains neither `closed` nor `closedAt`, so it exercises neither alternative
+# ai-config#3086 added and constrains nothing about them.
+UNMERGED_FIELDS = '{"merged":false,"mergedAt":null}'
+# The negative control for the CLOSE side, which is the half the #3086 diff
+# widened: an OPEN PR read through the close-side fields. Without it a later
+# loosening of `"closed"\s*:\s*true` to `\w+`, or of the `closedAt` digit
+# anchor, would turn no case red (ai-config#3086 review).
+OPEN_CLOSE_FIELDS = '{"closed":false,"closedAt":null}'
+# A REST body: the raw `gh api`/MCP spellings are snake_case, and the same
+# facts in the same channel-independent shape must discharge.
+REST_CLOSED = ('{"number":1038,"state":"closed","merged":false,'
+               '"closed_at":"2026-09-03T06:25:00Z","merged_at":null}')
+# A body that merely CONTAINS a terminal-state literal without reporting one:
+# the diff of a PR that touches an API fixture or a JSON snapshot -- this very
+# file, for one. `pull_request_read` serves `get_diff` under the same tool name
+# as `get`, so a registration that ignores the method reads this as a status
+# report (ai-config#3086 review).
+DIFF_QUOTING_CLOSED = (
+    'diff --git a/hooks/fixtures.json b/hooks/fixtures.json '
+    '+  "state": "CLOSED", "merged": false')
+# A COMMENT thread, rendered as the plain text `gh pr view --comments` prints
+# and `--json comments --jq '.comments[].body'` projects. The terminal literal
+# belongs to the API response the comment QUOTES, not to the PR the comment
+# sits on -- and PRs in this corpus quote API responses constantly.
+COMMENT_QUOTING_CLOSED = (
+    'claude: the fixture reads {"number":7,'
+    '"closed_at":"2026-01-01T00:00:00Z"}\n')
+# The PR BODY, rendered the way `gh pr view <N>` prints it with no selection
+# at all: gh's non-TTY plain output is tab-separated headers, then `--`, then
+# the description verbatim. The header line reads `state:\tOPEN`, which
+# RX_TERMINAL_STATE cannot match in any case, so the only terminal literal such
+# a body can carry is one the DESCRIPTION quotes -- and PR descriptions in this
+# corpus quote API responses as freely as comments do (ai-config#3086 review).
+BODY_QUOTING_CLOSED = (
+    "title:\tSome PR\nstate:\tOPEN\nnumber:\t1038\n--\n"
+    'The fixture reads {"number":7,"closed_at":"2026-01-01T00:00:00Z"}\n')
+# The PR DESCRIPTION alone, as `gh api .../pulls/<N> --jq .body` projects it:
+# raw prose, with the quoted API response's quotes NOT escaped inside any
+# enclosing JSON string. That single escaping level is the whole difference
+# between a projection and the un-projected read (ai-config#3086 review).
+BODY_QUOTING_CLOSED_PROJECTED = (
+    'The fixture reads {"number":7,"closed_at":"2026-01-01T00:00:00Z"}\n')
+# The same description inside the FULL pull object of an OPEN PR, which is what
+# an un-projected `gh api .../pulls/<N>` returns. gh escapes the description's
+# own quotes once inside its JSON, and the transcript escapes them again, so
+# the literal is double-escaped and RX_TERMINAL_STATE cannot reach it -- which
+# is why the un-projected read stays a probe while a projection does not.
+REST_OPEN_BODY_QUOTING = (
+    '{"number":1038,"state":"open","merged":false,"closed_at":null,'
+    '"merged_at":null,"body":"The fixture reads '
+    '{\\"number\\":7,\\"closed_at\\":\\"2026-01-01T00:00:00Z\\"}"}')
 
 case(create("c") + [bash("gh pr merge 1038 --squash", tid="m"), res("m", "{}"),
                     say("Merged.")], False,
@@ -1169,6 +1318,53 @@ case(create("c") + [use("update_pull_request", tid="m", owner="o", repo="r",
 case(create("c") + [bash("gh pr view 1038 --json state,merged", tid="v"),
                     res("v", MERGED), say("Someone merged it.")], False,
      "observing a terminal state on a single-PR probe discharges")
+# Closed WITHOUT merging: the same terminal state, reached the other way
+# (ai-config#3086). Pinned alongside the merged cases so the equivalence is
+# asserted rather than incidental.
+case(create("c") + [bash("gh pr view 1038 --json state,merged", tid="v"),
+                    res("v", CLOSED), say("Closed it without merging.")],
+     False, "observing CLOSED on a single-PR probe discharges too")
+case(create("c") + [bash("gh pr view 1038 --json merged,mergedAt", tid="v"),
+                    res("v", MERGED_FIELDS), say("It merged.")], False,
+     "a probe selecting the merge FIELDS discharges")
+case(create("c") + [bash("gh pr view 1038 --json closed,closedAt", tid="v"),
+                    res("v", CLOSED_FIELDS), say("It closed.")], False,
+     "a probe selecting the close FIELDS discharges, exactly as the merge "
+     "fields do")
+# The REST close: neither a `gh pr` verb nor a structured tool, so before
+# ai-config#3086's review it reached no path at all and the guard stayed armed
+# on a PR the session had just closed. It clears as a PROBE -- the call names
+# one pull and its own result reports the new state.
+case(create("c") + [bash("gh api repos/o/r/pulls/1038 -X PATCH "
+                         "-f state=closed", tid="x"),
+                    res("x", REST_CLOSED), say("Closed it over REST.")],
+     False, "a REST close names one pull and its result reports CLOSED")
+case(create("c") + [bash('gh api "repos/o/r/pulls/1038"', tid="x"),
+                    res("x", REST_CLOSED), say("Read it over REST.")],
+     False, "a REST read of one pull is a probe too")
+# The MCP twin, which a remote/web session has instead of `gh` (ai-config#3086
+# review). Its body is the same snake_case REST shape.
+case(create("c") + [use("mcp__github__pull_request_read", tid="v", owner="o",
+                        repo="r", pullNumber=1038, method="get"),
+                    res("v", REST_CLOSED), say("Read it.")], False,
+     "the MCP single-PR read is a probe, so `gh` is not the only channel")
+# `curl`/`wget` are accepted alongside `gh api`, and the URL they carry has a
+# host in front of the path -- a shape no other case exercises, so an edit to
+# the anchoring would otherwise turn nothing red (ai-config#3086 review).
+case(create("c") + [bash("curl -s -H 'Accept: application/vnd.github+json' "
+                         "https://api.github.com/repos/o/r/pulls/1038",
+                         tid="x"),
+                    res("x", REST_CLOSED), say("Read it with curl.")], False,
+     "a curl read of one pull is a probe, host and all")
+# `--url` is the one request-carrying flag deliberately absent from
+# `_API_VALUE_FLAGS`, since its value IS the path. Nothing else exercises it,
+# so adding it to that set would otherwise turn no case red (ai-config#3086
+# review).
+case(create("c") + [bash("curl -s --url "
+                         "https://api.github.com/repos/o/r/pulls/1038",
+                         tid="x"),
+                    res("x", REST_CLOSED), say("Read it with --url.")], False,
+     "`--url` carries the request path, so its value stays a probe candidate")
 
 # ... and the fail-safe direction, which must survive all of the above.
 case(create("c") + [bash("gh pr merge 1038 --squash", tid="m"),
@@ -1180,6 +1376,176 @@ case(create("c") + [bash("gh pr merge 1038 --squash; echo done", tid="m"),
 case(create("c") + [bash("gh pr view 1038 --json state", tid="v"),
                     res("v", '{"state":"OPEN"}'), say("Still open.")], True,
      "a probe reporting OPEN does not discharge")
+case(create("c") + [bash("gh pr view 1038 --json merged,mergedAt", tid="v"),
+                    res("v", UNMERGED_FIELDS), say("Not merged.")], True,
+     "a probe reporting merged:false alone does not discharge -- it says "
+     "nothing about closure")
+case(create("c") + [bash("gh pr view 1038 --json closed,closedAt", tid="v"),
+                    res("v", OPEN_CLOSE_FIELDS), say("Still open.")], True,
+     "a probe reporting closed:false does not discharge -- the negative "
+     "control for the widened close-side alternatives")
+case(create("c") + [bash('gh api "repos/o/r/pulls/1038/requested_reviewers"',
+                         tid="x"), res("x", REST_CLOSED),
+                    say("Read the reviewers.")], True,
+     "a sub-resource path is not a single-PR probe, whatever its body says")
+case(create("c") + [use("mcp__github__pull_request_read", tid="v", owner="o",
+                        repo="r", pullNumber=1039, method="get"),
+                    res("v", REST_CLOSED), say("Read the other PR.")], True,
+     "an MCP read of a DIFFERENT PR does not discharge this one")
+case(create("c") + [use("mcp__github__pull_request_read", tid="v", owner="o",
+                        repo="r", pullNumber=1038, method="get_diff"),
+                    res("v", DIFF_QUOTING_CLOSED), say("Read the diff.")],
+     True,
+     "an MCP read of a PR's DIFF is not a status read, whatever the diff "
+     "quotes -- the twin of `gh pr diff`, which is not a probe either")
+# The SHELL twins of the `get_comments`/`get_reviews` methods that MCP arm
+# excludes. `gh pr view <N> --comments` and `--json comments` return arbitrary
+# comment text, and a comment quoting an API response -- which PRs in this
+# corpus do constantly -- carries a terminal-state literal that says nothing
+# about the PR the comment sits on. The `gh pr view` arm matched both until
+# _probe_selection was added, so such a comment discharged the obligation with
+# no reviewer requested and no close (ai-config#3086 review).
+case(create("c") + [bash("gh pr view 1038 --comments", tid="v"),
+                    res("v", COMMENT_QUOTING_CLOSED), say("Read the thread.")],
+     True,
+     "`--comments` is not a status read, whatever a comment quotes")
+# The selection-less form, which is the same hole reached by asking for
+# nothing rather than by asking for the wrong thing. A `gh pr view <N>` with no
+# `--json` prints the PR body, so it carries free text for the same reason
+# `--comments` does -- and it cannot discharge legitimately either, since its
+# plain `state:` header is not the JSON shape RX_TERMINAL_STATE matches. A
+# selection is therefore REQUIRED, which is also the form the block message
+# prescribes (ai-config#3086 review).
+case(create("c") + [bash("gh pr view 1038", tid="v"),
+                    res("v", BODY_QUOTING_CLOSED), say("Read it.")],
+     True,
+     "a selection-less `gh pr view` is not a status read -- its output "
+     "carries the PR body")
+# The same text reached through `--json comments`, with `--jq` unwrapping the
+# body to raw prose. The `--jq` is load-bearing: gh escapes a comment's inner
+# quotes once inside its own JSON, so the un-projected form does not match
+# RX_TERMINAL_STATE and would pass here for a reason that has nothing to do
+# with this rule (ai-config#3086 review).
+case(create("c") + [bash("gh pr view 1038 --json comments "
+                         "--jq '.comments[].body'", tid="v"),
+                    res("v", COMMENT_QUOTING_CLOSED), say("Read the thread.")],
+     True,
+     "`--json comments` is not a status read either, and `--jq` does not "
+     "launder it")
+# The near-miss a "names a state field" rule alone would admit: the selection
+# DOES name a state, and carries free text beside it. Pins the ALLOWLIST half
+# specifically -- dropping it, or admitting `comments` into the allowlist,
+# leaves this case green while the two above stay red (ai-config#3086 review).
+case(create("c") + [bash("gh pr view 1038 --json state,comments "
+                         "--jq '.comments[].body'", tid="v"),
+                    res("v", COMMENT_QUOTING_CLOSED), say("Read both.")],
+     True,
+     "a state field does not launder a free-text field selected beside it")
+# And the other half: allowlisted fields that name no state at all. The
+# decision belongs to the SELECTION rather than to the body, so the fixture
+# supplies a body this field list could not have produced -- with the allowlist
+# in place nothing realistic reaches this arm, which is why dropping the
+# state-field requirement would otherwise turn no case red.
+case(create("c") + [bash("gh pr view 1038 --json number", tid="v"),
+                    res("v", REST_CLOSED), say("Read the number.")], True,
+     "a selection naming no state field is not a status read")
+# The REST twin of the two cases above, on the arm that has no `--json` to
+# bound: `gh api .../pulls/<N>` fetches the whole pull object, so a `--jq` or
+# `--template` projection can print the PR's own DESCRIPTION as raw prose --
+# free text carrying whatever terminal literal it quotes, exactly the hole
+# `--comments` and the selection-less `gh pr view` are refused for. The
+# projection therefore costs the probe (ai-config#3086 review).
+case(create("c") + [bash("gh api repos/o/r/pulls/1038 --jq .body", tid="x"),
+                    res("x", BODY_QUOTING_CLOSED_PROJECTED),
+                    say("Read it.")], True,
+     "a `--jq` projection of the pull object is not a status read")
+case(create("c") + [bash("gh api repos/o/r/pulls/1038 -t '{{.body}}'",
+                         tid="x"),
+                    res("x", BODY_QUOTING_CLOSED_PROJECTED),
+                    say("Read it.")], True,
+     "a `--template` projection is not a status read either")
+# The further spellings the flag parser accepts. Without them the `=`-joined
+# and single-dash branches of `_api_projects` could each be dropped with
+# nothing red (ai-config#3086 review).
+case(create("c") + [bash("gh api repos/o/r/pulls/1038 --jq=.body", tid="x"),
+                    res("x", BODY_QUOTING_CLOSED_PROJECTED),
+                    say("Read it.")], True,
+     "an `=`-joined projection is not a status read")
+case(create("c") + [bash("gh api repos/o/r/pulls/1038 -q.body", tid="x"),
+                    res("x", BODY_QUOTING_CLOSED_PROJECTED),
+                    say("Read it.")], True,
+     "a shorthand projection with its value attached is not a status read")
+# The GROUPED shorthand, which pflag accepts too: `-iq .body` is `--include`
+# plus `--jq`, whose value is the next argument. An exact-token test admits it,
+# and admitting it discharges an OPEN PR on its own description -- the failure
+# the four cases above exist to close, reached through the one spelling they
+# did not cover (ai-config#3086 review).
+case(create("c") + [bash("gh api repos/o/r/pulls/1038 -iq .body", tid="x"),
+                    res("x", BODY_QUOTING_CLOSED_PROJECTED),
+                    say("Read it.")], True,
+     "a projection inside a grouped shorthand is not a status read")
+# The control for the widening in the other direction: a single-dash flag that
+# projects NOTHING still leaves a probe. Without it the shorthand branch could
+# refuse every single-dash token and turn no case red, which would disarm the
+# discharge this hook depends on (ai-config#3086 review).
+case(create("c") + [bash("gh api repos/o/r/pulls/1038 -i", tid="x"),
+                    res("x", REST_CLOSED), say("Read it with headers.")],
+     False, "a non-projecting shorthand leaves the REST read a probe")
+# The negative control for why the UN-projected read is still a probe: the same
+# description, inside the full pull object of an OPEN PR. It must not discharge
+# either -- and it does not, because the double escaping puts the literal out
+# of RX_TERMINAL_STATE's reach. Loosening that pattern's backslash allowance
+# would turn this case red and nothing else (ai-config#3086 review).
+case(create("c") + [bash("gh api repos/o/r/pulls/1038", tid="x"),
+                    res("x", REST_OPEN_BODY_QUOTING), say("Read it.")], True,
+     "an un-projected read of an OPEN pull does not discharge on the "
+     "description it embeds")
+# A call carrying NO method at all. The tool's schema marks `method` required,
+# so this is malformed rather than legitimate -- and the guard treats it as
+# not-a-probe, the direction that stays armed. Pinned because relaxing the
+# absent-method default to `get` would otherwise turn no case red
+# (ai-config#3086 review).
+case(create("c") + [use("mcp__github__pull_request_read", tid="v", owner="o",
+                        repo="r", pullNumber=1038),
+                    res("v", REST_CLOSED), say("Read it, method-less.")],
+     True,
+     "an MCP read with no method is not a probe, so a missing method leaves "
+     "the guard armed")
+case(create("c") + [bash("gh api repos/o/r/issues/9/comments "
+                         "-f 'body=status of repos/o/r/pulls/1038'", tid="x"),
+                    res("x", REST_CLOSED), say("Posted a comment.")], True,
+     "a pull path quoted in a PAYLOAD is not the request path, so a "
+     "comment-posting write is not a probe")
+# The REST spelling of `gh pr diff`: the SAME path as a status read, with the
+# representation selected by the `Accept:` header alone, so the body is diff
+# text. The shell twin of the MCP `get_diff` case above (ai-config#3086
+# review).
+case(create("c") + [bash("gh api repos/o/r/pulls/1038 "
+                         "-H 'Accept: application/vnd.github.diff'", tid="x"),
+                    res("x", DIFF_QUOTING_CLOSED), say("Read the diff.")],
+     True,
+     "a diff media type on the pull path is not a status read, whatever the "
+     "diff quotes")
+case(create("c") + [bash("curl -s -H 'Accept: application/vnd.github.diff' "
+                         "https://api.github.com/repos/o/r/pulls/1038",
+                         tid="x"),
+                    res("x", DIFF_QUOTING_CLOSED), say("Read the diff.")],
+     True,
+     "the curl spelling of that diff read is not a status read either")
+# The mirror image of the payload case above, on the REQUEST side: a
+# comment-posting POST whose body quotes the reviewers endpoint must not
+# discharge the obligation it names (ai-config#3086 review).
+case(create("c") + [bash("gh api repos/o/r/issues/9/comments -X POST "
+                         "-f 'body=asked at "
+                         "repos/o/r/pulls/1038/requested_reviewers'", tid="x"),
+                    res("x", '{"requested_reviewers":[{"login":"Copilot"}]}'),
+                    say("Posted a comment.")], True,
+     "the reviewers endpoint quoted in a PAYLOAD is not the request path, so "
+     "a comment-posting write requests nobody")
+case(create("c") + [bash("curl -s https://api.github.com/repos/o/r/pulls/1038"
+                         "/requested_reviewers", tid="x"),
+                    res("x", REST_CLOSED), say("Read the reviewers.")], True,
+     "the curl negative control: a sub-resource URL is not a single-PR probe")
 case(create("c") + [bash("gh pr list --state merged", tid="v"),
                     res("v", MERGED), say("Listed.")], True,
      "a repo-wide list naming no single PR is not a probe")
@@ -1236,7 +1602,7 @@ case(create("c") + [bash(LABEL_CMD, tid="x"),
                         err=True),
                     say("Tried to label it.")], True,
      "a FAILED label add does not exempt (the repo has no such label)")
-# Chained AHEAD of a succeeding command, the is_error belongs to that LATER
+# Chained AHEAD of a succeeding command, the is_error is shared with that LATER
 # command, so the outcome is unknowable. The body here deliberately carries no
 # error-word or 4xx shape ("unable to add" matches nothing in RX_FAILED), so
 # only the `last` check can withhold the exemption -- the same ordering hazard
@@ -1306,6 +1672,458 @@ case(create("c") + [bash("ALLOW_UNREVIEWED_REDACTION_PR=0 gh pr view 1038 "
                     res("x", '{"number":1038}'), say("Not asserted.")], True,
      "ALLOW_UNREVIEWED_REDACTION_PR=0 is not an assertion")
 
+# --- unnumbered / help commands forge no obligation (ai-config#3206) ---
+case([bash("gh pr create --help", tid="h"),
+      res("h", "Usage: gh pr create [flags]"),
+      say("Checked help.")], False,
+     "gh pr create --help forges no obligation")
+case([bash("gh pr create -h", tid="h"),
+      res("h", "Usage: gh pr create [flags]"),
+      say("Checked help.")], False,
+     "gh pr create -h forges no obligation")
+case([bash("gh pr ready --help", tid="h"),
+      res("h", "Usage: gh pr ready [flags]"),
+      say("Checked help.")], False,
+     "gh pr ready --help forges no obligation")
+case([bash("gh pr create --title x --body y", tid="c"),
+      res("c", "some output without url or number"),
+      say("Done.")], False,
+     "a gh pr create producing no number or URL does not track")
+case(create("c1") + [
+    bash(REQ_CMD, tid="q1"), res("q1", OK),
+    bash("gh pr merge 1038 --squash", tid="m1"), res("m1", "Merged"),
+    bash("gh pr create --help", tid="h"),
+    res("h", "Usage: gh pr create [flags]"),
+    say("Ran create --help after merge.")], False,
+     "gh pr create --help after merged PRs does not wedge session")
+case([bash("gh pr create --reviewer copilot-pull-request-reviewer", tid="c1"),
+      res("c1", FAIL, err=True),
+      bash("gh pr create --base main --title x --body y", tid="c2"),
+      res("c2", URL),
+      bash(REQ_CMD, tid="q"), res("q", OK),
+      say("Recovered from failed create with successful create and request.")],
+     False, "a later create with a number drops an earlier unnumbered obligation")
+case([bash("gh pr create --base main --title x --body y", tid="c1"), res("c1", URL),
+      bash(REQ_CMD, tid="q1"), res("q1", OK),
+      bash("gh pr create --reviewer copilot-pull-request-reviewer", tid="c2"),
+      res("c2", FAIL, err=True),
+      bash("gh pr merge 1038 --squash", tid="m"), res("m", "Merged"),
+      say("Merged PR 1038.")],
+     False, "an unnumbered obligation drops once the live set is empty across a merge")
+case([bash("gh pr create --base main --title x --body y", tid="c1"), res("c1", URL),
+      bash(REQ_CMD, tid="q1"), res("q1", OK),
+      bash("gh pr create --base main --title x2 --body y2", tid="c2"),
+      res("c2", "https://github.com/o/r/pull/1039\n"),
+      bash("gh pr create --reviewer copilot-pull-request-reviewer", tid="c3"),
+      res("c3", FAIL, err=True),
+      bash("gh pr merge 1038 --squash", tid="m"), res("m", "Merged"),
+      say("Merged PR 1038 while 1039 is still live.")],
+     True, "an unnumbered obligation is kept when another live PR remains after a merge")
+
+
+def stdout_of(events):
+    """The hook's raw stdout for a transcript.
+
+    One run-and-capture, shared by `block_of` and `reason_of`, so a later change
+    to the sentinel isolation or the invocation cannot leave the two disagreeing
+    about what they exercise (ai-config#3017 review).
+    """
+    fd, path = tempfile.mkstemp(suffix=".jsonl")
+    with os.fdopen(fd, "w") as fh:
+        for e in events:
+            fh.write(json.dumps(e) + "\n")
+    try:
+        return subprocess.run(
+            hook_argv(), input=json.dumps({"transcript_path": path}),
+            capture_output=True, text=True,
+            env=dict(os.environ, TMPDIR=tempfile.mkdtemp())).stdout
+    finally:
+        os.unlink(path)
+
+
+def reason_of(events):
+    """The block `reason` text for a transcript, or "" when it does not block.
+
+    `block_of` answers only whether the hook blocked; a wording assertion needs
+    the text itself.
+    """
+    out = stdout_of(events)
+    return json.loads(out).get("reason", "") if out.strip() else ""
+
+
+def two_requests_last_position(prefix):
+    """Transcript: two PRs opened, then ONE call POSTing reviewers for both.
+
+    Nothing follows the second POST, so it sits in the chain's LAST position
+    and is kept by `undischargeable_requests` because an earlier request took
+    `pending`'s slot. Two tests need exactly this shape and built it twice,
+    which let an edit to one copy leave the other silently exercising a
+    different case (adversarial review on ai-config#3071).
+
+    `prefix` distinguishes the tool_use ids, which must be unique per test.
+    """
+    return [
+        bash("gh pr create --base main --title x --body y", tid=prefix + "1"),
+        res(prefix + "1", URL),
+        bash("gh pr create --base main --title y --body z", tid=prefix + "2"),
+        res(prefix + "2", "https://github.com/o/r/pull/2222\n"),
+        bash(REQ_CMD_Q + " && "
+             'gh api "repos/o/r/pulls/2222/requested_reviewers" -X POST '
+             "-f 'reviewers[]=copilot-pull-request-reviewer[bot]'",
+             tid=prefix + "3"),
+        res(prefix + "3", OK), say("Requested both, nothing after.")]
+
+
+def _chained_request_wording():
+    """A request chained AHEAD of another command must be NAMED as such.
+
+    ai-config#3017, measured on ai-config#3010: eight successive POSTs each
+    returned 200 and three Copilot reviews landed, while every call chained the
+    hook's own prescribed verification after the request -- so `rlast` was
+    False every time, nothing discharged, and the block text named only failure
+    as the cause. From inside the turn the two are indistinguishable, so the
+    reader re-issues the same shape and the guard re-fires unchanged.
+
+    The negative half is the load-bearing one: a session that made NO request
+    must not be told a request is in the transcript.
+    """
+    chained = reason_of(create("c") + [
+        bash(REQ_CMD_Q + " && gh pr view 1038 --json reviews", tid="q"),
+        res("q", OK), say("Requested.")])
+    none_made = reason_of(create("c") + [say("Opened it.")])
+    # A `gh pr create --reviewer` chained ahead of another command resolves no
+    # number on either side, so the number-matched marking cannot reach it and
+    # it needs its own path (ai-config#3017 review). Without that path this arm is
+    # the pre-fix message, naming only failure as the cause.
+    chained_create = reason_of([
+        bash("gh pr create --base main --title x --body y --reviewer "
+             "copilot-pull-request-reviewer[bot] && gh pr view 1038 "
+             "--json reviews", tid="c"),
+        res("c", URL), say("Created with a reviewer.")])
+    # The needle must be unique to the new paragraph. "chained AHEAD" is NOT:
+    # the pre-existing label-exemption text already carries that exact phrase,
+    # so a needle keyed on it matches the no-request case too and the negative
+    # half passes vacuously (caught by running it).
+    # Several PRs can be outstanding with only one carrying a chained request,
+    # so the paragraph names the flagged number rather than saying "this PR"
+    # over a mixed set (ai-config#3017 review round 4). The mixed case is the
+    # one that discriminates: aggregating with any() passes every other arm.
+    mixed = reason_of([
+        bash("gh pr create --base main --title x --body y", tid="c1"),
+        res("c1", URL),
+        bash(REQ_CMD_Q + " && gh pr view 1038 --json reviews", tid="q"),
+        res("q", OK),
+        bash("gh pr create --base main --title y --body z", tid="c2"),
+        res("c2", "https://github.com/o/r/pull/2222\n"),
+        say("Opened a second, unrequested.")])
+    needle = "A reviewer request for #1038 appears in the transcript"
+    # A request chained ahead of a ready for a DIFFERENT PR must not mark
+    # this one: the direct marking is restricted to the create form, whose
+    # request resolves no number (ai-config#3017 review round 2).
+    # A push re-arms its obligation AFTER the marking loop runs, so a call
+    # chaining a push with a non-last request must still be marked
+    # (claude-review on ai-config#3024).
+    pushed_chain = reason_of(create("c") + [bash(REQ_CMD_Q, tid="q0"),
+                                            res("q0", OK),
+                                            say("Requested.")] + [
+        bash("git push origin HEAD && " + REQ_CMD_Q
+             + " && gh pr view 1038 --json reviews", tid="p"),
+        res("p", OK), say("Pushed and requested.")])
+    # Two number-less commands naming DIFFERENT repos must not mark either.
+    # The result must RESOLVE a number, or `flagged`'s own `and o["num"]`
+    # filter drops the obligation and the needle is absent either way -- the
+    # vacuous-needle shape this suite has hit before.
+    cross_repo = reason_of([
+        bash("gh pr edit -R o/repoA --add-reviewer "
+             "copilot-pull-request-reviewer[bot] && gh pr ready -R o/repoB",
+             tid="rr"),
+        res("rr", "https://github.com/o/repoB/pull/77\n"),
+        say("Different repos.")])
+    # A `&&` chain can short-circuit before the request runs, so the paragraph
+    # must not assert it executed or returned anything (Copilot on
+    # ai-config#3024). It is still named -- the transcript cannot tell the
+    # cases apart, which is the point -- but the wording stays agnostic.
+    short_circuit = reason_of(create("c") + [
+        bash("false && " + REQ_CMD_Q + " && gh pr view 1038", tid="sc"),
+        res("sc", "", True), say("Short-circuited.")])
+    # A chained request SUPERSEDED by a credited standalone one must not mark an
+    # obligation the later push re-armed: without the seq/tid ordering the
+    # end-of-scan sweep loses, the block would blame chaining for a moved head
+    # (adversarial review on ai-config#3024).
+    superseded = reason_of(create("c") + [
+        bash(REQ_CMD_Q + " && gh pr view 1038", tid="s1"), res("s1", OK),
+        bash(REQ_CMD_Q, tid="s2"), res("s2", OK),
+        bash("git push origin HEAD", tid="s3"), res("s3", ""),
+        say("Superseded, then pushed.")])
+    # A bare `gh pr ready` backfills its number from the RESULT, which arrives
+    # after the marking site runs, so only an end-of-scan sweep sees it
+    # (Copilot on ai-config#3024).
+    backfilled = reason_of([
+        bash("gh pr ready && " + REQ_CMD_Q + " && gh pr view 1038", tid="bf"),
+        res("bf", URL), say("Readied and requested.")])
+    # The same cross-repo overclaim on the NUMBER-MATCHED path, which the
+    # cross_repo arm above cannot reach -- it pins the direct marking only
+    # (adversarial review on ai-config#3024).
+    cross_repo_numbered = reason_of([
+        bash("gh pr ready 42 -R o/repoB", tid="b"),
+        res("b", "https://github.com/o/repoB/pull/42\n"),
+        bash('gh api "repos/o/repoA/pulls/42/requested_reviewers" -X POST '
+             "-f 'reviewers[]=copilot-pull-request-reviewer[bot]' "
+             "&& gh pr view 42", tid="n"),
+        res("n", OK), say("Requested against another repo.")])
+    # `gh pr ready <N>` names a PR that need not be this branch's, so a
+    # current-branch numberless add-reviewer chained ahead of it targets a
+    # DIFFERENT PR and must not mark <N> (Copilot on ai-config#3024).
+    ready_named = reason_of([
+        bash("gh pr edit --add-reviewer copilot-pull-request-reviewer[bot] "
+             "&& gh pr ready 1038", tid="r"),
+        res("r", OK), say("Readied a named PR.")])
+    # Two flagged PRs get the plural sentence, not a singular one over a list.
+    two = reason_of([
+        bash("gh pr create --base main --title x --body y --reviewer "
+             "copilot-pull-request-reviewer[bot] && gh pr view", tid="d1"),
+        res("d1", URL),
+        bash("gh pr create --base main --title y --body z --reviewer "
+             "copilot-pull-request-reviewer[bot] && gh pr view", tid="d2"),
+        res("d2", "https://github.com/o/r/pull/2222\n"),
+        say("Two creates, each chained.")])
+    # ONE call requesting reviewers for TWO PRs, then verifying. Pre-fix the
+    # marking read `request_ident`, which returns the FIRST match only, so
+    # #2222's obligation went unmarked and the block named #1038 alone --
+    # the reader then re-issued the same shape for the PR that was never
+    # mentioned (Copilot on ai-config#3024).
+    #
+    # It is the only MULTI-REQUEST arm whose chain ends in something other
+    # than a request, which is the shape Copilot reported. Many single-request
+    # arms end in a non-request (`chained`, `mixed`, `pushed_chain` and
+    # others); what is unique here is the combination. `two_last_position` also turns red
+    # under a plain first-match-only mutation, so this arm is not the sole
+    # detector of that one -- but a mutation that truncates to the first match
+    # only when the chain's last command is not a request is killed here and
+    # nowhere else (adversarial review on ai-config#3071, which measured it).
+    #
+    # Stated as a coverage fact rather than a kill-set relation, because the
+    # relation asserted here before was a superset claim, and it was false.
+    two_in_one = reason_of([
+        bash("gh pr create --base main --title x --body y", tid="t1"),
+        res("t1", URL),
+        bash("gh pr create --base main --title y --body z", tid="t2"),
+        res("t2", "https://github.com/o/r/pull/2222\n"),
+        bash(REQ_CMD_Q + " && "
+             'gh api "repos/o/r/pulls/2222/requested_reviewers" -X POST '
+             "-f 'reviewers[]=copilot-pull-request-reviewer[bot]' "
+             "&& gh pr view 1038 --json reviews", tid="t3"),
+        res("t3", OK), say("Requested both, then verified.")])
+    # The same two requests with NO trailing command, so the second sits in
+    # the LAST position. `pending` is keyed from `request_ident`, which returns
+    # #1038 with `last` False, so the discharge fires for neither -- and a
+    # `undischargeable_requests` that skipped the last position unconditionally left
+    # #2222 discharged by nothing and named by nothing, which is the very
+    # failure this fix is about (adversarial review on ai-config#3071).
+    #
+    # Distinct from `two_in_one`: there the trailing `gh pr view` puts both
+    # requests in non-last positions, so that arm cannot reach this boundary.
+    two_last_position = reason_of(two_requests_last_position("l"))
+    # A SOLE request in the last position that FAILED. It is not chained, so
+    # the block must not say it was -- the reader would go looking for an
+    # operator that is not there instead of at the 422. This is the branch
+    # that keeps `undischargeable_requests` from flagging every request outright, and
+    # it is observable only on failure: a successful sole request discharges,
+    # so its obligation never reaches the message at all.
+    sole_failed = reason_of(create("c") + [
+        bash(REQ_CMD, tid="f"), res("f", FAIL, err=True), say("Requested.")])
+    cross_pr = reason_of([
+        bash("gh api \"repos/o/r/pulls/42/requested_reviewers\" -X POST "
+             "-f 'reviewers[]=copilot-pull-request-reviewer[bot]' "
+             "&& gh pr ready 1038", tid="x"),
+        res("x", OK), say("Readied a different PR.")])
+    # The remedy sentence lives in the generic recovery paragraph, not in the
+    # chained one -- duplicating it there was dropped as redundant, so assert
+    # it where it actually is (adversarial review on ai-config#3024).
+    return (needle in chained and "only command in this call" in chained
+            and needle in chained_create
+            and none_made and needle not in none_made
+            and cross_pr and needle not in cross_pr
+            # Decisive over a mixed set: the SINGULAR branch must render, which
+            # it does only when `flagged` holds one number. Asserting the
+            # absence of a "#2222 appears" phrase decided nothing -- that
+            # phrase exists only when 2222 is flagged ALONE, a world the
+            # positive needle has already excluded (adversarial review).
+            and needle in mixed and "Reviewer requests for" not in mixed
+            and ready_named and needle not in ready_named
+            and "Reviewer requests for #1038, #2222 appear" in two
+            # Both numbers, from ONE call. The plural sentence renders only
+            # when `flagged` holds both, so the singular's absence is implied
+            # rather than asserted separately.
+            and "Reviewer requests for #1038, #2222 appear" in two_in_one
+            and "Reviewer requests for #1038, #2222 appear" in two_last_position
+            and sole_failed and needle not in sole_failed
+            and needle in pushed_chain
+            and cross_repo and "#77 appears in the transcript" not in cross_repo
+            and cross_repo_numbered
+            and "#42 appears in the transcript" not in cross_repo_numbered
+            and needle in backfilled
+            and superseded and needle not in superseded
+            # The needle is the ASSERTIVE old phrasing, not the substring the
+            # new hedged sentence still contains ("it may have returned 200
+            # with a review landing"). A needle matching both tests nothing.
+            and "The POST may well have returned 200" not in chained
+            and "short-circuited before it ran" in chained
+            # The intended fact stated directly. The former disjunction drew
+            # both operands from one string literal, so it held whether or not
+            # a short-circuited chain was flagged (adversarial review).
+            and needle in short_circuit)
+
+
+def _request_ordering_wording():
+    """The recovery text must tell the reader to run the request alone.
+
+    The message used to present the request and its verification together
+    under "in this same message", which is exactly the shape `request_ident`
+    refuses to credit -- so following the instruction reproduced the block.
+    """
+    text = reason_of(create("c") + [say("Opened it.")])
+    return all(t in text for t in ("only command in this call", "SEPARATE call",
+                                   "per-PR, not per-head",
+                                   "`sha` equals `head`"))
+
+
+def _review_query_null_safe():
+    """The prescribed review-check `jq` must survive a null review author.
+
+    A GitHub review author is nullable -- a deleted account reports
+    `"author": null` -- and `null | startswith(...)` is a hard `jq` error
+    rather than a false. So the unguarded filter aborts the WHOLE query
+    instead of skipping that one review, and the reader sees a jq usage error
+    where the hook promised them a way to confirm their review landed
+    (Copilot on ai-config#3024).
+
+    The guard is already in place; this pins it, because it survived a
+    mutation otherwise. Pinned two ways, since the lexical half alone would
+    pass on a filter that merely mentions the guard somewhere harmless. When
+    `jq` is on PATH the extracted filter is RUN against a fixture whose first
+    review has a null author and whose second is a real Copilot review: it
+    must not error, and must still find the Copilot one.
+    """
+    text = reason_of(create("c") + [say("Opened it.")])
+    match = re.search(r"--jq '(\{head:.*?\})'", text, re.S)
+    if not match:
+        return False
+    filt = match.group(1)
+    if "(.author.login // \"\")" not in filt:
+        return False
+
+    if not shutil.which("jq"):
+        # The lexical half above already fails without the guard, so an
+        # absent `jq` weakens this check rather than voiding it.
+        return True
+
+    fixture = json.dumps({
+        "headRefOid": "deadbeefcafe",
+        "reviews": [
+            {"author": None, "commit": {"oid": "1111111111"},
+             "submittedAt": "2026-01-01T00:00:00Z"},
+            {"author": {"login": "copilot-pull-request-reviewer"},
+             "commit": {"oid": "2222222222"},
+             "submittedAt": "2026-01-02T00:00:00Z"},
+        ],
+    })
+    proc = subprocess.run(["jq", filt], input=fixture, capture_output=True,
+                          text=True)
+    if proc.returncode != 0:
+        return False
+    try:
+        got = json.loads(proc.stdout)
+    except ValueError:
+        return False
+    return [c["sha"] for c in got.get("copilot", [])] == ["22222222"]
+
+
+def _no_attribution_overclaim():
+    """The block must not claim the exit status BELONGS to the later command.
+
+    It does not, in either direction. `false && <request> && gh pr view`
+    leaves the status with `false`; `<request> && gh pr view` where the
+    request fails leaves it with the request. The only sound claim is the
+    negative one -- the combined status cannot be attributed to the request
+    -- and the paragraph's own later hedge ("a `&&` chain may have
+    short-circuited before it ran at all") contradicted the unconditional
+    attribution it opened with (Copilot on ai-config#3024, round 4).
+
+    Checked over BOTH the chained paragraph and the always-rendered recovery
+    paragraph, since the overclaim appeared in three places and a needle over
+    only one of them would pass while the others still asserted it.
+    """
+    chained = reason_of(create("c") + [
+        bash(REQ_CMD_Q + " && gh pr view 1038 --json reviews", tid="q"),
+        res("q", OK), say("Requested.")])
+    two = reason_of([
+        bash("gh pr create --base main --title x --body y --reviewer "
+             "copilot-pull-request-reviewer[bot] && gh pr view", tid="d1"),
+        res("d1", URL),
+        bash("gh pr create --base main --title y --body z --reviewer "
+             "copilot-pull-request-reviewer[bot] && gh pr view", tid="d2"),
+        res("d2", "https://github.com/o/r/pull/2222\n"),
+        say("Two creates, each chained.")])
+    plain = reason_of(create("c") + [say("Opened it.")])
+    banned = "belongs to that later command"
+    # A second banned phrase, added when the chained paragraph stopped saying
+    # "chained AHEAD of another command": a LAST-position request kept because
+    # an earlier one took `pending`'s slot is followed by nothing, so that
+    # sentence was false of it (adversarial review on ai-config#3071). Checked
+    # over BOTH `two_last` and `one_last` below, which each reach the case.
+    # Scoped to the CHAINED PARAGRAPH, not the whole message. The phrase is
+    # correct prose in ONE other rendered paragraph -- the redaction
+    # label-add recovery line, which really is about a command chained ahead
+    # of another -- so a whole-message needle fails on that and tests nothing
+    # about this paragraph. Located by rendering the message and splitting it
+    # on blank lines, after an earlier version of this comment named two
+    # paragraphs that do not exist in the output at all (adversarial review on
+    # ai-config#3071, which also caught the sentence this one replaced: it
+    # called `two_last` the only fixture reaching the case, which `one_last`
+    # below contradicts).
+    #
+    # Applied to BOTH fixtures below. Each keeps a last-position request, and
+    # they differ in which sentence that renders: `two_last` flags two numbers
+    # and takes the plural branch, `one_last` flags one and takes the
+    # singular. Checking either alone leaves the other branch free to regress.
+    def _chained_para(text):
+        for para in text.split("\n\n"):
+            if "appear in the transcript and none was" in para \
+                    or "appears in the transcript and was not" in para:
+                return para
+        return ""
+    banned_ahead = "chained AHEAD of another command"
+    two_last = reason_of(two_requests_last_position("p"))
+    # `flagged` is a set of NUMBERS, so two requests for the SAME PR with the
+    # second in last position keep that request and render the SINGULAR
+    # sentence. Without this fixture only the plural branch carries the
+    # `banned_ahead` needle.
+    #
+    # The mutation it alone catches is the NARROW one: swapping just "shared a
+    # call with another command" back to "was chained AHEAD of another
+    # command" in the singular branch. A wholesale revert of that branch is
+    # caught anyway, by the `chained` conjunct below, which asserts the
+    # replacement wording positively -- so stating this as "reverting the
+    # singular branch" would overstate what the fixture pins (adversarial
+    # review on ai-config#3071, which measured both).
+    one_last = reason_of(create("c") + [
+        bash(REQ_CMD_Q + " && " + REQ_CMD_Q, tid="o1"),
+        res("o1", OK), say("Requested the same PR twice.")])
+    return (banned not in chained and banned not in two and banned not in plain
+            and _chained_para(two_last)
+            and banned_ahead not in _chained_para(two_last)
+            and _chained_para(one_last)
+            and banned_ahead not in _chained_para(one_last)
+            and "appears in the transcript and was not" in _chained_para(one_last)
+            # The unattributability must still be STATED, or dropping the
+            # sentence outright would satisfy both banned needles.
+            and "does not attribute that call's exit status to it" in chained
+            and "does not attribute any call's exit status to its own request" \
+                in two
+            and "cannot be attributed to it" in plain
+            and "shared a call with another command" in _chained_para(two_last))
+
 
 def _redaction_wording():
     """The block text must NAME the redaction deferral and both escapes.
@@ -1330,20 +2148,67 @@ def _redaction_wording():
         os.unlink(path)
 
 
+def _terminal_wording():
+    """The block text must NAME the closed/merged case as a legitimate defer.
+
+    ai-config#3086: the message enumerated exactly two deferrals -- a
+    deliberate draft, and a redacting diff -- so a session holding a PR closed
+    without merging found no correct action described, and the only sanctioned
+    moves were a false claim of draft status or a request that GitHub accepts
+    and discards. Enumerating carve-outs as though they were exhaustive is the
+    same defect point 3 of ai-config#1392 recorded for the draft-only text.
+
+    The cause wording is asserted too. A close CHAINED ahead of another command
+    is observed and deliberately not credited, so telling that reader the guard
+    "has not observed the transition" is the same misdiagnosis the `chained`
+    paragraph above already exists to prevent (ai-config#3086 review).
+    """
+    reason = reason_of(create("c") + [say("Opened it.")])
+    # "Two" would mean the draft and redaction pair survived unchanged.
+    return ("CLOSED" in reason and "Three legitimate reasons" in reason
+            and "Two legitimate reasons" not in reason
+            and "has not observed" not in reason
+            and "Either way" not in reason
+            and "does not credit as a status read" in reason
+            and "CREDITED" in reason)
+
+
+# Every `gh pr view <N>` line the block text prints. The message carries more
+# than one -- the head/reviews verification is a `gh pr view` too -- so the
+# terminal-state read is picked out by the thing it reads (`state`) rather than
+# by its position, which a reflow would move.
+RX_PRESCRIBED_READ = re.compile(r"^[ \t]*(gh pr view \"<N>\".*)$", re.M)
+
+
+def _terminal_remedy_runs():
+    """The command the message prescribes must be one the guard ACCEPTS.
+
+    This is the single point the whole exemption turns on: a session holding a
+    PR closed outside the transcript can only discharge by making the state
+    visible, and the message names exactly one way to do that. If `probe_ident`
+    does not recognise that command form, the obligation is undischargeable
+    again -- which is precisely the defect ai-config#3086 reports.
+
+    So the form is READ OUT OF THE BLOCK TEXT rather than restated here: a
+    reflow that chains a `| jq` after the read (making it non-last, so `plast`
+    is false), or an edit to `_verb_ident`'s flag handling, must turn this red
+    rather than leaving a green suite over a message nobody can act on
+    (ai-config#3086 review).
+    """
+    reason = reason_of(create("c") + [say("Opened it.")])
+    reads = [m.group(1) for m in RX_PRESCRIBED_READ.finditer(reason)
+             if "state" in m.group(1)]
+    if len(reads) != 1:
+        return False
+    cmd = reads[0].replace("<N>", "1038").replace("<owner>/<repo>", "o/r")
+    return not block_of(create("c") + [
+        bash(cmd, tid="v"), res("v", '{"state":"CLOSED","closed":true}'),
+        say("Read the state.")])
+
+
 def block_of(events):
-    fd, path = tempfile.mkstemp(suffix=".jsonl")
-    with os.fdopen(fd, "w") as fh:
-        for e in events:
-            fh.write(json.dumps(e) + "\n")
-    try:
-        out = subprocess.run(
-            hook_argv(), input=json.dumps({"transcript_path": path}),
-            capture_output=True, text=True,
-            env=dict(os.environ, TMPDIR=tempfile.mkdtemp()),
-        ).stdout
-        return '"decision": "block"' in out or '"decision":"block"' in out
-    finally:
-        os.unlink(path)
+    out = stdout_of(events)
+    return '"decision": "block"' in out or '"decision":"block"' in out
 
 
 def load_hook():
@@ -1385,6 +2250,15 @@ def obligations_of(events):
 
 def main():
     passes = failures = 0
+    hookmod = load_hook()
+    for cmd, want in PUSH_CORPUS:
+        got = hookmod._argv_push(cmd.split())
+        if got is want:
+            passes += 1
+            print(f"PASS: _argv_push({cmd!r}) is {want}")
+        else:
+            failures += 1
+            print(f"FAIL: _argv_push({cmd!r}) is {got}, want {want}")
     for events, expected, label in CASES:
         if expected == "ordering":
             obs = obligations_of(events)
@@ -1406,17 +2280,7 @@ def main():
 
     # Recovery commands must be copy-pasteable: an unquoted `<` is a shell
     # redirect, so a placeholder-bearing argument has to be quoted.
-    fd, path = tempfile.mkstemp(suffix=".jsonl")
-    with os.fdopen(fd, "w") as fh:
-        for e in create("c") + [say("Opened it.")]:
-            fh.write(json.dumps(e) + "\n")
-    out = subprocess.run(
-        hook_argv(), input=json.dumps({"transcript_path": path}),
-        capture_output=True, text=True,
-        env=dict(os.environ, TMPDIR=tempfile.mkdtemp()),
-    ).stdout
-    os.unlink(path)
-    reason = json.loads(out).get("reason", "") if out.strip() else ""
+    reason = reason_of(create("c") + [say("Opened it.")])
     bad = [ln for ln in reason.splitlines()
            if ln.strip().startswith("gh ") and "<" in ln
            and '"' not in ln and "'" not in ln]
@@ -1474,11 +2338,22 @@ def main():
     # transcript, two clocks: the ONLY difference between these two is the
     # date, which is what makes the second one evidence the first is silent
     # for the moratorium's sake and not because the fixture stopped arming.
+    #
+    # Both clocks are DERIVED from the subject's constant. Written out, they
+    # drift the moment the moratorium is extended: a literal "day before" and
+    # "end date" from an earlier window both fall INSIDE the new one, the
+    # guard is inert on both, and the pair stops testing the boundary it
+    # exists for. Measured 2026-09-02, when extending the window to December
+    # turned the literals 2026-08-31 and 2026-09-01 into two dates on the
+    # same side of the line.
+    _end = _moratorium_end()
+    _during = (_end - datetime.timedelta(days=1)).isoformat()
+    _on_end = _end.isoformat()
     armed = create("c") + [say("Opened it.")]
-    if blocks_at("2026-08-31", armed):
+    if blocks_at(_during, armed):
         print("FAIL: the guard still fires during the Copilot moratorium")
         failures += 1
-    elif not blocks_at("2026-09-01", armed):
+    elif not blocks_at(_on_end, armed):
         print("FAIL: the guard stays inert on the moratorium's end date")
         failures += 1
     else:
@@ -1488,9 +2363,9 @@ def main():
     hookmod = load_hook()
     import datetime as _dt
     bounds = (
-        hookmod.moratorium_active(_dt.date(2026, 8, 31)),
+        hookmod.moratorium_active(hookmod.MORATORIUM_END - _dt.timedelta(days=1)),
         not hookmod.moratorium_active(hookmod.MORATORIUM_END),
-        not hookmod.moratorium_active(_dt.date(2027, 1, 1)),
+        not hookmod.moratorium_active(hookmod.MORATORIUM_END + _dt.timedelta(days=31)),
     )
     if all(bounds):
         print("PASS: moratorium_active is half-open -- live ON the end date")
@@ -1516,6 +2391,55 @@ def main():
         passes += 1
     else:
         print("FAIL: the block text does not name the redaction deferral")
+        failures += 1
+
+    if _terminal_wording():
+        print("PASS: the block text names the closed/merged deferral")
+        passes += 1
+    else:
+        print("FAIL: the block text does not name the closed/merged deferral")
+        failures += 1
+
+    if _terminal_remedy_runs():
+        print("PASS: the status read the block text prescribes discharges")
+        passes += 1
+    else:
+        print("FAIL: the status read the block text prescribes does not "
+              "discharge")
+        failures += 1
+
+    if _chained_request_wording():
+        print("PASS: a chained request is named as chained, and a session "
+              "that made none is not")
+        passes += 1
+    else:
+        print("FAIL: the block text does not distinguish a chained request "
+              "from no request")
+        failures += 1
+
+    if _no_attribution_overclaim():
+        print("PASS: the block does not claim the exit status belongs "
+              "to the later command")
+        passes += 1
+    else:
+        print("FAIL: the block overclaims exit-status attribution")
+        failures += 1
+
+    if _review_query_null_safe():
+        print("PASS: the prescribed review query survives a null review "
+              "author")
+        passes += 1
+    else:
+        print("FAIL: the prescribed review query aborts on a null review "
+              "author")
+        failures += 1
+
+    if _request_ordering_wording():
+        print("PASS: the recovery text says to run the request alone and "
+              "verify separately")
+        passes += 1
+    else:
+        print("FAIL: the recovery text does not state the ordering rule")
         failures += 1
 
     if _push_wording():

@@ -84,3 +84,7 @@ unreachable.
 - **`tidy`** — the broader on-demand code audit (5 axes, one of which is
   "Simplify"); this skill is narrower and specifically about dead-code
   removal after a context change.
+- **`prune-dead-code`** (`pdc`) — the whole-repo audit counterpart for finding
+  and deleting provably unreferenced functions, files, configs, and stale docs
+  across the codebase, whereas this skill specifically sweeps unreachable paths
+  locally after a context-narrowing change.

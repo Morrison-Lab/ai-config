@@ -57,15 +57,20 @@ DRESSING = " \t\r\n*_`()[]\"'"
 
 
 def last_assistant_text(path):
+    if not path or not os.path.exists(path):
+        return ""
     last = ""
     try:
-        with open(path, errors="ignore") as fh:
+        with open(path, encoding="utf-8", errors="ignore") as fh:
             for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
                 try:
                     m = json.loads(line)
-                except Exception:
+                except (json.JSONDecodeError, ValueError):
                     continue
-                if m.get("type") == "assistant" or m.get("role") == "assistant":
+                if m.get("type") in {"assistant", "assistant_response"} or m.get("role") == "assistant":
                     blocks = (m.get("message") or {}).get("content") or m.get("content") or []
                     if isinstance(blocks, list):
                         txt = "".join(
@@ -100,13 +105,53 @@ def is_placeholder(text):
     return RX.fullmatch(stripped) is not None
 
 
+def extract_text_from_payload(payload):
+    """Extract last assistant text from payload transcript path or direct payload fields."""
+    tpath = (
+        payload.get("transcript_path")
+        or payload.get("transcriptPath")
+        or payload.get("transcript")
+        or payload.get("history_file")
+        or ""
+    )
+    if tpath:
+        text = last_assistant_text(tpath)
+        if text:
+            return text
+
+    # Fallback to direct payload fields if transcript is not provided or empty
+    for key in ("reply", "last_assistant_message", "message", "content", "text"):
+        val = payload.get(key)
+        if isinstance(val, str) and val.strip():
+            return val
+        if isinstance(val, dict):
+            content = val.get("content")
+            if isinstance(content, str) and content.strip():
+                return content
+            if isinstance(content, list):
+                txt = "".join(
+                    b.get("text", "") for b in content
+                    if isinstance(b, dict) and b.get("type") == "text"
+                )
+                if txt.strip():
+                    return txt
+        if isinstance(val, list):
+            txt = "".join(
+                b.get("text", "") for b in val
+                if isinstance(b, dict) and b.get("type") == "text"
+            )
+            if txt.strip():
+                return txt
+    return ""
+
+
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
     except Exception:
         return 0
 
-    text = last_assistant_text(payload.get("transcript_path") or "")
+    text = extract_text_from_payload(payload)
     if not text or not is_placeholder(text):
         return 0
 

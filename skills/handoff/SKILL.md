@@ -1,6 +1,6 @@
 ---
 name: handoff
-description: "Snapshot session state to memory."
+description: "Snapshot state to forge/memory."
 user-invocable: true
 allowed-tools:
   - Bash
@@ -12,8 +12,13 @@ allowed-tools:
 # handoff
 
 Capture everything the next session (or a context reset) needs to resume this
-work cleanly, then persist it as a **project memory** and — if a PR/MR is in
-play — a paused-state note on the thread.
+work cleanly, then **post it on the forge** --- GitHub, GitLab, or whichever
+tracker owns the work --- and keep a copy as a **project memory**.
+
+The forge post is the required half, and the memory file is the backup.
+A memory file is readable only by this account on this machine,
+so a teammate, a remote session, a CI run,
+and the user reading the forge cannot see a handoff that exists only there.
 
 This is the manual trigger for the standing "always leave handoff notes
 proactively when pausing" policy in `memories/preferences.md`: *always* leave
@@ -52,6 +57,9 @@ output paths), CI runs you're waiting on, archived/backup directories, and any
 
 ## Step 2 — Write (or update) the handoff memory
 
+This is the backup copy, and Step 3 posts the same content somewhere others can
+read it.
+
 Write to the project memory directory
 (`~/.claude/projects/<project-slug>/memory/`). Reuse an existing in-flight
 handoff file if one already covers this work (update it in place) rather than
@@ -72,16 +80,43 @@ Link related memories with `[[name]]` (e.g. any runtime-quirk memory the
 pick-up steps depend on). Then add a one-line pointer to `MEMORY.md` (or update
 the existing one).
 
-## Step 3 — Post a paused-state note on the active PR/MR
+## Step 3 --- Post the handoff on the relevant forge thread(s)
 
-If the work has an open PR/MR and you've **claimed** it (see `claim-pr`), post a
-short note so the `@claude` bot and other sessions don't push conflicting
-changes — especially when you have unpushed local commits or running jobs.
+Post the handoff every time, including when no PR/MR is in play.
+The forge is the one place a later session, a reviewer, and the user all
+already look, so it is where the pick-up state belongs.
+Route by what the work actually has:
+
+- **An open PR/MR you've claimed, still in scope** --- comment on it, in the
+  paused-claim form below; otherwise route the handoff to the issue.
+- **An issue and no PR/MR** --- comment on the issue.
+- **Neither** --- file an issue whose body is the handoff, per
+  [`issue-first`](../../shared/workflow/issue-first.md).
+- **State that outlives the thread** --- commit it to a file in the repo (a
+  runbook, a design note) and link that file from the comment.
+
+Combine these freely: a committed file for the long-lived detail, an issue for
+the open decisions, a PR comment for the paused claim.
+End every comment you post with the agent-disclosure marker, per
+[`disclose-agent-authorship`](../../shared/workflow/disclose-agent-authorship.md).
+On GitLab, `glab` mirrors each `gh` command below.
+[`AGENTS.md`](../../AGENTS.md)'s membership gate still governs the post: verify
+membership in that repository first, and where it is unverified, keep the
+memory file and ask the user before posting.
+
+If the work has an open PR/MR and you've **claimed** it (see `claim-pr`), the
+note also stops the `@claude` bot and other sessions pushing conflicting
+changes --- especially when you have unpushed local commits or running jobs.
+Post it only when that PR still passes `memories/reviewing-prs.md`'s scope
+test: a claim confers no scope, so if the PR has since fallen out of scope,
+skip the note, route the handoff to the issue instead, and report the PR to
+the user.
 
 ```bash
 gh pr comment <N> --body "⏸️ **Local session paused** (<local timestamp>) — still claimed.
 
-<2-4 bullets: in-flight jobs + IDs, unpushed local commits and why held, what runs next>
+<the Step 2 handoff content: where things stand, in-flight jobs + IDs, unpushed
+local commits and why held, open decisions, numbered pick-up steps>
 
 Please hold off on pushing to this branch in the meantime.
 
@@ -91,10 +126,24 @@ _Posted by Claude Code (AI agent) --- not written by a human._"   # COMMENT_PR
 If the work is genuinely *finished* (merged/closed, nothing outstanding), post a
 closing/unclaim note instead per `claim-pr` — don't leave a stale "paused" claim.
 
-## Step 4 — Confirm
+- **Do:** post the handoff to the forge thread that owns the work every time
+  you pause, and keep the memory file as the backup copy.
+- **Do:** route to the issue --- filing one when none exists --- when the work
+  has no open PR/MR to comment on.
+- **Do:** end each posted comment with the agent-disclosure marker.
+- **Don't:** treat a written memory file as a completed handoff; nobody but
+  this account on this machine can read it.
+- **Don't:** skip the post because there is no PR --- an issue thread, a
+  committed file, or a new issue is the route.
+- **Don't:** post to a repository whose membership is unverified --- hold the
+  handoff in memory and ask the user.
 
-Give the user a compact recap: what was snapshotted, where the memory lives, the
-PR note link, and the one-line pick-up summary. Include a local-time stamp.
+## Step 4 --- Confirm
+
+Give the user a compact recap: what was snapshotted, where the memory lives,
+links to every forge thread the handoff was posted on, and the one-line pick-up
+summary.
+Include a local-time stamp.
 
 ## Step 5 --- Retire a handoff once its state is resolved
 
@@ -134,8 +183,9 @@ Judge on the in-flight items.
 
 ### A handoff written as a repo-root file is a staging hazard
 
-The rest of this skill persists the snapshot as a **project memory**, which is
-outside the repo and cannot be committed by accident.
+Step 2 persists the snapshot as a **project memory**, which is outside the repo
+and cannot be committed by accident,
+and Step 3's committed-file route tracks the file deliberately.
 A handoff written instead as a repo-root `HANDOFF-*.md` is untracked **and**
 usually unignored, which is precisely the combination that lets a bare
 `git add -A` sweep it into a PR.
@@ -144,7 +194,7 @@ That is not hypothetical.
 It is the shape of `ucdavis/bcs`'s 2026-07-30 incident, where an
 untracked-and-unignored directory was staged that way and pushed a credential.
 
-So prefer the project-memory form.
+So prefer the project-memory form, or a file you track deliberately.
 Where a repo-root file already exists, either retire it under the rule above or
 add a `.gitignore` entry --- and read its contents before doing either, since a
 stale handoff can carry a rule the project has since **reversed**, which is
@@ -169,7 +219,7 @@ worse than one that is merely out of date.
 - `claim-pr` — owns the claim/unclaim lifecycle; `handoff` posts the *paused*
   note within an existing claim.
 - **`checkpoint`** — a lighter, deliberate mid-task snapshot for a session
-  that *isn't* ending: plan state, decisions, next actions, no branch/job/PR
+  that *isn't* ending: plan state, decisions, next actions, no branch/job/forge-post
   mechanics. Run `handoff` when actually stopping; `checkpoint` when just
   banking progress mid-task.
 - **`compress-session`** — distills the conversation into auto memory before

@@ -8,9 +8,13 @@ Tests:
 4. Review prose containing modifier variations like "No major changes requested".
 5. Robust handling of None author objects in review payloads.
 """
+import contextlib
 import importlib.util
+import io
 import json
+import os
 import re
+import shlex
 import time
 from unittest.mock import patch
 import sys
@@ -735,6 +739,14 @@ def main() -> int:
         "_reviewer_identity: a shared-login body with no first-line agent "
         "marker falls back to the login",
         checker._reviewer_identity(unmarked_ga, "github-actions") == "github-actions",
+    )
+    quoted_claude_multi_backtick = (
+        "A quote of ``**Claude finished**`` on the first line.\n\n"
+        "### Verdict\n\n**Ready for merge**"
+    )
+    check(
+        "_reviewer_identity: multi-backtick quoted agent marker falls back to login (#2525)",
+        checker._reviewer_identity(quoted_claude_multi_backtick, "github-actions") == "github-actions",
     )
     items_unmarked_after_claude = [
         items_cross_reviewer[0],
@@ -1852,6 +1864,90 @@ def main() -> int:
               "### Verdict\n**Ready for merge.** The previously blocking "
               "line-break failure is fixed and confirmed passing.\n", "")
           == "clean")
+    # ai-config#2957: "fixed and verified by <method>" is a fourth
+    # continuation, and a `;` clause after it is admitted only when benign.
+    # The clean case is the wai#187 round-4 verdict line verbatim.
+    _wai187_verdict = (
+        "### Verdict\n\n**Ready for merge** \u2014 both previously blocking "
+        "issues are fixed and verified by actually executing the spellcheck "
+        "script against the current checkout (clean exit, \"No spelling "
+        "errors found\"); the one new commit since the last round is a "
+        "small, accurate documentation correction.\n"
+    )
+    check("'fixed and verified by <method>; <benign clause>' reads as clean (#2957)",
+          checker.classify_verdict(_wai187_verdict, "") == "clean")
+    check("'fixed and verified by <method>' with no ';' clause reads as clean",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The previously blocking "
+              "failure is fixed and verified by re-running the suite.\n", "")
+          == "clean")
+    check("'fixed and verified by disabling the failing test' stays not-clean",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The previously blocking "
+              "failure is fixed and verified by disabling the failing test.\n", "")
+          == "not-clean")
+    check("a ';' clause that leaves a finding open stays not-clean",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The previously blocking "
+              "crash is fixed and verified by running the suite; the second "
+              "finding remains open.\n", "")
+          == "not-clean")
+    check("a ';' clause outside the whitelist stays not-clean (fails safe)",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The previously blocking "
+              "crash is fixed and verified by running the suite; nothing else "
+              "was checked.\n", "")
+          == "not-clean")
+    # The adversarial review of #2958 showed a blacklist failing open on
+    # ordinary finding vocabulary; the whitelist must refuse these.
+    for _clause in (
+        "a critical error in the login flow",
+        "a serious concern about the auth flow",
+        "a security vulnerability in login",
+        "a data race was spotted separately",
+        "still worth a look",
+    ):
+        check(f"a ';' clause naming an open finding stays not-clean: {_clause!r}",
+              checker.classify_verdict(
+                  "### Verdict\n**Ready for merge.** The previously blocking "
+                  "crash is fixed and verified by running the suite; "
+                  + _clause + ".\n", "")
+              == "not-clean")
+    # Round-2 adversarial review of #2958: a parenthesized aside inside the
+    # method phrase was consumed whole, so a forbidden word inside it was
+    # never seen. Both the bare "by" site and the verified continuation.
+    check("a finding inside parens after 'verified by' stays not-clean",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The previously blocking "
+              "crash is fixed and verified by running the suite (but a "
+              "critical bug remains).\n", "")
+          == "not-clean")
+    check("a finding inside parens after 'fixed by' stays not-clean",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The previously blocking "
+              "crash is fixed by a rebase (the test still fails).\n", "")
+          == "not-clean")
+    check("a harmless parenthesized aside after the method still reads as clean",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The previously blocking "
+              "crash is fixed and verified by running the suite (clean exit).\n", "")
+          == "clean")
+    check("an open-finding clause between the mention and the verb stays not-clean",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The previously blocking "
+              "crash which remains open is resolved.\n", "")
+          == "not-clean")
+    check("an open-finding aside between the mention and the verb stays not-clean",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The previously blocking "
+              "crash (still open) is resolved.\n", "")
+          == "not-clean")
+    check("a whitelisted 'no new issues introduced' ';' clause reads as clean",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The previously blocking "
+              "crash is fixed and verified by running the suite; no new "
+              "issues introduced.\n", "")
+          == "clean")
     check("a resolved prior verdict blocking issue is not an active finding",
           checker.classify_verdict(
               "### Verdict\n**Ready for merge.** The prior verdict's blocking "
@@ -1872,6 +1968,154 @@ def main() -> int:
               "### Verdict\n**Ready for merge.** The prior verdict's blocking "
               "issue is resolved. I found no new issues in this review.\n", "")
           == "clean")
+    for resolution_suffix, label in (
+        ("was resolved by the latest commit", "resolution explained by commit"),
+        ("was resolved by adding tests", "resolution explained by adding tests"),
+        ("was resolved in PR #123", "resolution explained by PR reference"),
+        ("was resolved via commit abc1234", "resolution explained by commit sha"),
+        ("was resolved with the changes in main.py", "resolution explained by filename changes"),
+        ("was resolved as requested", "resolution explained by adverbial as-requested"),
+        ("was resolved per review comments", "resolution explained by per-suggestion"),
+        ("was resolved by removing the deprecated function", "removing non-detector object"),
+        ("was resolved by disabling the deprecated feature flag", "disabling non-detector object"),
+        ("was resolved by muting a noisy third-party dependency log", "muting non-detector object"),
+        ("was resolved by weakening the coupling between the two modules", "weakening non-detector object"),
+        ("was resolved by bypassing the cache to always fetch fresh data", "bypassing non-detector object"),
+        ("was resolved", "bare resolved phrase"),
+        ("has already been fixed", "adverb already before fixed"),
+        ("has since been addressed", "adverb since before addressed"),
+    ):
+        check(
+            f"classify_verdict: prior blocking finding {label} stays clean (#2774)",
+            checker.classify_verdict(
+                f"### Verdict\n**Ready for merge.** The prior blocking finding {resolution_suffix}.\n",
+                "",
+            )
+            == "clean",
+        )
+        check(
+            f"_unresolved_finding_pattern: prior blocking finding {label} has no finding (#2774)",
+            checker._unresolved_finding_pattern(
+                f"### Verdict\n**Ready for merge.** The prior blocking finding {resolution_suffix}.\n"
+            )
+            is None,
+        )
+    check(
+        "classify_verdict: bare 'prior blocking finding was resolved' stays clean (#2774)",
+        checker.classify_verdict(
+            "### Verdict\n**Ready for merge.** Prior blocking finding was resolved.\n",
+            "",
+        )
+        == "clean",
+    )
+    check(
+        "classify_verdict: possessive finding's blocking issue is resolved stays clean (#2774)",
+        checker.classify_verdict(
+            "### Verdict\n**Ready for merge.** The prior finding's blocking issue is resolved.\n",
+            "",
+        )
+        == "clean",
+    )
+    check(
+        "classify_verdict: possessive issue's blocking problem is resolved stays clean (#2774)",
+        checker.classify_verdict(
+            "### Verdict\n**Ready for merge.** The prior issue's blocking problem is resolved.\n",
+            "",
+        )
+        == "clean",
+    )
+    for hedged_suffix in (
+        "was resolved by ignoring it entirely without actually fixing anything",
+        "was resolved by a partial patch that does not cover the edge case",
+        "was resolved without fixing the bug",
+        "was resolved except for the edge cases",
+        "was resolved by a patch that fails under load",
+        "was resolved by not doing anything",
+        "was resolved by skipping tests",
+        "was resolved by a patch that remains open",
+        "was resolved by code that is broken",
+        "was resolved by removing the test that caught it",
+        "was resolved by deleting the assertion",
+        "was resolved by muting the linter warning",
+        "was resolved by reverting the check that flagged it",
+        "was resolved by suppressing the error",
+        "was resolved by disabling the test",
+        "was resolved by commenting out the check",
+        "was resolved by weakening the assertion",
+        "was resolved by bypassing the check",
+        "was resolved by deleting tests",
+        "was resolved by removing tests",
+        "was resolved by disabling checks",
+        "was resolved by commenting out tests",
+        "was resolved by muting warnings",
+        "was resolved by suppressing errors",
+        "was resolved by disabling all checks",
+        "was resolved by deleting these tests",
+        "was resolved by deleting unit tests",
+        "was resolved by a patch that ignores tests",
+        "was resolved by code that skips the assertion",
+        "was resolved by silencing the test",
+    ):
+        check(
+            f"classify_verdict: hedged resolution '{hedged_suffix}' stays not-clean (#2774)",
+            checker.classify_verdict(
+                f"### Verdict\n**Ready for merge.** The prior blocking finding {hedged_suffix}.\n",
+                "",
+            )
+            == "not-clean",
+        )
+        check(
+            f"_unresolved_finding_pattern: hedged resolution '{hedged_suffix}' returns finding (#2774)",
+            checker._unresolved_finding_pattern(
+                f"### Verdict\n**Ready for merge.** The prior blocking finding {hedged_suffix}.\n"
+            )
+            is not None,
+        )
+
+    check(
+        "classify_verdict: '### Findings (non-blocking)' heading in clean review stays clean",
+        checker.classify_verdict(
+            "### Findings (non-blocking)\nNo new issues.\n\n### Verdict\n**Ready for merge.**\n",
+            "",
+        )
+        == "clean",
+    )
+    check(
+        "_unresolved_finding_pattern: '### Findings (non-blocking)' with no new issues produces no finding",
+        checker._unresolved_finding_pattern(
+            "### Findings (non-blocking)\nNo new issues.\n\n### Verdict\n**Ready for merge.**\n"
+        )
+        is None,
+    )
+    check(
+        "_unresolved_finding_pattern: '### Findings (non-blocking)' with real finding item blocks",
+        checker._unresolved_finding_pattern(
+            "### Findings (non-blocking)\n- **scripts/foo.py:42** SQL concatenation bug\n\n### Verdict\n**Ready for merge.**\n"
+        )
+        is not None,
+    )
+    check(
+        "_unresolved_finding_pattern: '### Nits' with non-blocking item stays not-clean",
+        checker._unresolved_finding_pattern(
+            "### Nits\nnon-blocking: rename variable x for clarity.\n\n### Verdict\n**Ready for merge.**\n"
+        )
+        is not None,
+    )
+    check(
+        "_unresolved_finding_pattern: '### Issues' with non-blocking item stays not-clean",
+        checker._unresolved_finding_pattern(
+            "### Issues\nnon-blocking: there is an off-by-one bug in the loop.\n\n### Verdict\n**Ready for merge.**\n"
+        )
+        is not None,
+    )
+    check(
+        "classify_verdict: 'Needs more work' with non-blocking trailer stays not-clean",
+        checker.classify_verdict(
+            "### Verdict\nNeeds more work: non-blocking issue, please rename variable x.\n",
+            "",
+        )
+        == "not-clean",
+    )
     check("unrelated unresolved wording in a later paragraph does not poison resolution",
           checker.classify_verdict(
               "### Verdict\n**Ready for merge.** The prior verdict's blocking "
@@ -2179,6 +2423,446 @@ def main() -> int:
           checker._unresolved_finding_pattern(
               "### Findings\n\nI traced everything and found no remaining bugs in the diff.\n")
           is not None)
+
+    # --- Issue #2781: exempt non-blocking or resolved findings headings ---
+    check("### Findings (non-blocking) is exempt from unresolved findings (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Findings (non-blocking)\n\n- [Nit] Variable could be renamed.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("### Findings (Non-blocking) with None resolves (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Findings (Non-blocking)\n\nNone.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("### Findings (non blocking) without hyphen resolves (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Findings (non blocking)\n\nNone.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("### Non-blocking Findings resolves (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Non-blocking Findings\n\nNone.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("### Findings: non-blocking resolves (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Findings: non-blocking\n\n- Suggestion: rename foo to bar\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("### Findings --- non-blocking resolves (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Findings \u2014 non-blocking\n\n- Minor formatting note.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    # ai-config#2945, a NEGATIVE result pinned as tests. A resolution log
+    # whose items read "**Previously: X.** Now fixed --- <explanation>" under a
+    # resolved Findings heading scores as open findings, because no lexical
+    # rule can tell "Now fixed; the pathspec is quoted" from "Now fixed; the
+    # query leaks memory on every call", and a same-comment CLEAN payload is
+    # the same author's verdict line in JSON, which fully-clean.md says loses
+    # to findings. Two attempts (a caveat blocklist, a payload gate) were
+    # withdrawn in #2950. The reviewer-side format that reads clean today is
+    # asserted below: resolved prior findings under a heading that is not a
+    # Findings heading, with `### Findings` reporting none.
+    prior_status_log = (
+        "### Findings \u2014 all three from the prior rounds are now resolved\n\n"
+        "1. **Previously: `LIST_PRS` omitted `assignees`.** Now fixed \u2014 "
+        "`skills/ardia/SKILL.md:25` includes `assignees` in the `--json` field list.\n"
+        "2. **Previously: duplicated scope bullet.** The old bullet has been fully removed "
+        "(confirmed via `grep`, zero hits).\n\n"
+        "### Verdict\n\nReady for merge\n"
+    )
+    check("a resolution log with free-prose explanations under a resolved Findings heading stays open by design (#2945)",
+          checker._unresolved_finding_pattern(prior_status_log) is not None)
+    check("the same log stays open even with a same-comment CLEAN payload: the payload is the author's own verdict, and findings win (#2945)",
+          checker._unresolved_finding_pattern(
+              prior_status_log
+              + "\n<!-- review-data:\n"
+              + '{"schema_version": "1.0", "reviewer": "claude", "verdict": "CLEAN", "findings": []}\n-->\n'
+          ) is not None)
+    check("the reviewer-side format resolves: prior findings under a non-Findings heading, Findings reporting none (#2945)",
+          checker._unresolved_finding_pattern(
+              "### Resolved since the last round\n\n"
+              "1. **Previously: `LIST_PRS` omitted `assignees`.** Now fixed \u2014 "
+              "`skills/ardia/SKILL.md:25` includes `assignees` in the `--json` field list.\n"
+              "2. **Previously: duplicated scope bullet.** The old bullet has been fully removed.\n\n"
+              "### Findings\n\nNone.\n\n### Verdict\n\nReady for merge\n"
+          ) is None)
+    check("a Previously: item whose resolution closes the line resolves under a resolved Findings heading (#2945)",
+          checker._unresolved_finding_pattern(
+              "### Findings \u2014 all resolved\n\n"
+              "1. **Previously: X.** Now fixed in abc1234.\n\n### Verdict\n\nReady for merge\n"
+          ) is None)
+    check("a closing-line Previously: item under a BARE Findings heading stays open: the heading admits the item test (#2945)",
+          checker._unresolved_finding_pattern(
+              "### Findings\n\n1. **Previously: X.** Now fixed in abc1234.\n\n### Verdict\n\nReady for merge\n"
+          ) is not None)
+    check("a Previously: item whose explanation names a new defect stays open (#2945)",
+          checker._unresolved_finding_pattern(
+              "### Findings \u2014 all resolved\n\n"
+              "1. **Previously: X.** Now fixed; the query now leaks memory on every call.\n\n"
+              "### Verdict\n\nReady for merge\n"
+          ) is not None)
+    check("### Findings from prior rounds --- now resolved resolves (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Findings from prior rounds \u2014 now resolved\n\n"
+              "- `foo()` crash was fixed in commit abc1234.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("### Findings from prior rounds -- now resolved resolves (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Findings from prior rounds -- now resolved\n\n"
+              "- Fixed in abc1234\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("### Findings from prior rounds - now resolved resolves (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Findings from prior rounds - now resolved\n\n"
+              "- Fixed in abc1234\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("### Findings from previous rounds --- now resolved resolves (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Findings from previous rounds \u2014 now resolved\n\n"
+              "- Resolved.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("### Findings (resolved) resolves (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- All items fixed.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("### Findings (addressed) resolves (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Findings (addressed)\n\n"
+              "- All feedback addressed.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("### Findings (now resolved) resolves (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Findings (now resolved)\n\n"
+              "- Item fixed.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("### Findings (all addressed) resolves (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Findings (all addressed)\n\n"
+              "- Items addressed.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("### Findings: resolved resolves (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Findings: resolved\n\n"
+              "- Resolved.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("### Resolved Findings resolves (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Resolved Findings\n\n"
+              "- Fixed.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("### Addressed Findings resolves (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Addressed Findings\n\n"
+              "- Fixed.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("### Actionable Findings (resolved) resolves (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Actionable Findings (resolved)\n\n"
+              "- Fixed in abc1234.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("### Detailed Findings (non-blocking) resolves (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Detailed Findings (non-blocking)\n\n"
+              "- Nit: style.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("full review with Findings (non-blocking) and structured CLEAN payload is clean (#2781)",
+          checker.classify_verdict(
+              "### Summary\nChecked all files.\n\n"
+              "### Findings (non-blocking)\n- Optional nit on naming.\n\n"
+              "### Verdict: Ready for merge\n\n"
+              "<!-- review-data: {\"schema_version\": \"1.0\", \"verdict\": \"CLEAN\", \"findings\": []} -->\n")
+          == "clean")
+    check("review with Findings (non-blocking) and structured CLEAN payload has no unresolved findings (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Summary\nChecked all files.\n\n"
+              "### Findings (non-blocking)\n- Optional nit on naming.\n\n"
+              "### Verdict: Ready for merge\n\n"
+              "<!-- review-data: {\"schema_version\": \"1.0\", \"verdict\": \"CLEAN\", \"findings\": []} -->\n")
+          is None)
+    check("Findings (blocking) still flags as an unresolved finding (#2781 control)",
+          checker._unresolved_finding_pattern(
+              "### Findings (blocking)\n\n1. Real crash bug.\n\n"
+              "### Verdict\nNeeds work\n")
+          is not None)
+    check("Findings (unresolved) still flags as an unresolved finding (#2781 control)",
+          checker._unresolved_finding_pattern(
+              "### Findings (unresolved)\n\n1. Real bug.\n\n"
+              "### Verdict\nNeeds work\n")
+          is not None)
+    check("Findings (not addressed) still flags as an unresolved finding (#2781 control)",
+          checker._unresolved_finding_pattern(
+              "### Findings (not addressed)\n\n1. Real bug.\n\n"
+              "### Verdict\nNeeds work\n")
+          is not None)
+    check("Findings (non-blocking) beside a real Actionable Findings heading still flags (#2781 control)",
+          checker._unresolved_finding_pattern(
+              "### Findings (non-blocking)\n- Nit: style.\n\n"
+              "### Actionable Findings\n1. Critical vulnerability.\n\n"
+              "### Verdict\nNeeds work\n")
+          is not None)
+    check("Findings (non-blocking) followed by **Critical** item is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (non-blocking)\n\n"
+              "- **[Critical]** scripts/auth.py:12 authentication bypass vulnerability!\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (non-blocking) followed by **[Defect]** item is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (non-blocking)\n\n"
+              "- **[Defect]** scripts/x.py:10 crashes on empty input.\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (non-blocking) followed by **Location:** item is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (non-blocking)\n\n"
+              "- **Location:** scripts/foo.py:10\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (resolved) followed by unresolved defect item is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- **[Defect]** scripts/x.py:10 is still failing and unresolved.\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings from prior rounds --- now resolved citing resolved defect item resolves (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Findings from prior rounds \u2014 now resolved\n\n"
+              "- **[Defect]** `foo()` crash was fixed in commit abc1234.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("Findings from prior rounds --- now resolved with still broken defect flags (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings from prior rounds \u2014 now resolved\n\n"
+              "- **[Defect]** `foo()` crash is still broken.\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (non-blocking) with 'must be fixed before merge' item is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (non-blocking)\n\n"
+              "- **Critical**: security flaw must be fixed before merge.\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (non-blocking) with 'needs to be addressed' item is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (non-blocking)\n\n"
+              "- **[Defect]**: memory leak needs to be addressed.\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (non-blocking) with 'will be fixed' item is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (non-blocking)\n\n"
+              "- **[Major]**: crash will be fixed in a later PR.\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (non-blocking) with 'to be resolved' item is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (non-blocking)\n\n"
+              "- **[Warning]**: missing validation to be resolved.\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (non-blocking) with 'should be fixed' item is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (non-blocking)\n\n"
+              "- **[Defect]**: race condition should be fixed.\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings from prior rounds --- now resolved with 'has been fixed' resolves (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Findings from prior rounds \u2014 now resolved\n\n"
+              "- **[Defect]** `foo()` crash has been fixed in commit abc1234.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("Findings from prior rounds --- now resolved with 'is now resolved' resolves (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Findings from prior rounds \u2014 now resolved\n\n"
+              "- **[Critical]** auth bypass is now resolved.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("Findings (non-blocking) with 'is being fixed in a follow-up PR' is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (non-blocking)\n\n"
+              "- **[Critical]** auth bypass is being fixed in a follow-up PR\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (non-blocking) with 'fixed only in happy path; error path still leaks' is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (non-blocking)\n\n"
+              "- **[Defect]** the leak is fixed only in the happy path; error path still leaks\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (resolved) with 'was fixed in abc1234 but was later reverted' is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- **[Defect]** was fixed in abc1234 but the fix was later reverted\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (non-blocking) with generic identifier 'fixed in some_function' is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (non-blocking)\n\n"
+              "- **[Major]** bug fixed in some_function\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (non-blocking) with untagged bullet describing bug is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (non-blocking)\n\n"
+              "- SQL injection in query builder\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (non-blocking) with untagged numbered item is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (non-blocking)\n\n"
+              "1. Crash occurs when payload is null.\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (resolved) with untagged unresolved bullet is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- Untagged finding still present.\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (non-blocking) with explicit Nit bullet resolves cleanly (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Findings (non-blocking)\n\n"
+              "- Nit: variable naming could be cleaner.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("Findings (non-blocking) with explicit Suggestion bullet resolves cleanly (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Findings (non-blocking)\n\n"
+              "- Suggestion: add type hints.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("Findings (resolved) with modal-perfect 'should have been fixed' is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- this should have been fixed already\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (resolved) with conditional 'would have been fixed had...' is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- this would have been fixed had the patch applied\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (resolved) with attribution 'the author says this is fixed' is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- the author says this is fixed\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (resolved) with contrasting clause 'was fixed, though...' is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- was fixed, though the underlying design flaw remains\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (resolved) with 'vulnerable PR was closed without a fix' is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- the vulnerable PR was closed without a fix; bug remains in main\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (resolved) with 'fix was removed during a later rebase' is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- the fix was removed during a later rebase, bug is back\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings -- not fully resolved yet heading is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings -- not fully resolved yet\n\n"
+              "- **[Critical]** crash was fixed in commit abc1234.\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (resolved) with 'it seems this is fixed' is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- it seems this is fixed\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (resolved) with 'it looks like this is fixed' is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- it looks like this is fixed\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (resolved) with 'this seems to have been fixed' is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- this seems to have been fixed\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (resolved) with 'I hope this is fixed' is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- I hope this is fixed\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (resolved) with 'in theory this is fixed' is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- in theory this is fixed\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (resolved) with 'in my opinion this is fixed' is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- in my opinion this is fixed\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (resolved) with 'in my view this is fixed' is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- in my view this is fixed\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (resolved) with 'as far as I know this is fixed' is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- as far as I know this is fixed\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (resolved) with 'to my knowledge this is fixed' is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- to my knowledge this is fixed\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (resolved) with 'It is fixed in commit abc1234' resolves (#2781 positive)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- It is fixed in commit abc1234.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("Findings (resolved) with 'We fixed this in commit abc1234' resolves (#2781 positive)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- We fixed this in commit abc1234.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("Findings (resolved) with 'The crash they reported is fixed in commit abc1234' resolves (#2781 positive)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- The crash they reported is fixed in commit abc1234.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
 
     # --- ai-config#2402: a structured non-bot clean supersedes that same
     # identity's earlier not-clean, and never counts toward quorum. ---------
@@ -2715,6 +3399,125 @@ def main() -> int:
               exit_code_of(lambda: checker.get_pr_info("445", TEST_REPO)) == 2)
         check("a missing gh exits 2 from check_ci_runs too",
               exit_code_of(lambda: checker.check_ci_runs("sha123", TEST_REPO)) == 2)
+
+    # Exiting 2 is only half of it: the message a stranded session reads must
+    # name the remedy, not only the dependency (ai-config#3113). Asserted on
+    # stderr rather than on the source text, so a message assembled correctly
+    # but never reached would still fail.
+    def stderr_of_missing_binary(argv):
+        buf = io.StringIO()
+        with patch.object(checker, "subprocess") as missing:
+            missing.run.side_effect = FileNotFoundError(
+                2, "No such file or directory", argv[0]
+            )
+            with contextlib.redirect_stderr(buf):
+                exit_code_of(lambda: checker.run_cmd(argv))
+        return buf.getvalue()
+
+    gh_message = stderr_of_missing_binary(["gh", "pr", "view", "445"])
+    check("a missing gh names build-pr-payload.py as the remedy",
+          "build-pr-payload.py" in gh_message)
+    check("a missing gh names --from-json, the flag that consumes the payload",
+          "--from-json" in gh_message)
+    check("a missing gh names the token build-pr-payload.py requires",
+          "GITHUB_TOKEN" in gh_message)
+
+    # The two substring checks above establish only that the message was
+    # reached and carries the strings. They cannot see a rename of the sibling
+    # script, of `--from-json`, or of the builder's positional order, each of
+    # which would leave the printed recipe pointing at nothing while the suite
+    # stayed green. The checks below are what actually pin the recipe to the
+    # artifacts it names: they take the commands back OFF the emitted message
+    # and run them through the real parsers (ai-config#3113).
+    def recipe_of(message):
+        return [
+            shlex.split(line.strip())
+            for line in message.splitlines()
+            if line.startswith("  python3 ")
+        ]
+
+    recipe = recipe_of(gh_message)
+    check("the message prints a two-command recipe", len(recipe) == 2)
+    builder_argv, scorer_argv = recipe[0], recipe[1]
+
+    # `N` is the recipe's placeholder for a PR number; the builder's parser
+    # types that positional as an int, so it has to be filled before parsing.
+    def filled(argv):
+        return ["445" if token == "N" else token for token in argv[2:]]
+
+    def parsed(parse_args, argv):
+        """Run *argv* through *parse_args*, answering None when it is rejected.
+
+        argparse answers a bad argv by printing usage and raising SystemExit,
+        which would tear down the whole suite at whichever rot this block is
+        meant to REPORT -- a renamed flag or a reordered positional. Catching
+        it turns that into one FAIL beside the others. stderr is swallowed for
+        the same reason: a usage block printed mid-run reads as a crash.
+        """
+        try:
+            with contextlib.redirect_stderr(io.StringIO()):
+                return parse_args(argv)
+        except SystemExit:
+            return None
+
+    builder_path = Path(builder_argv[1])
+    check("the script the recipe names exists at the path it prints",
+          builder_path.is_file())
+    check("the recipe invokes this very script for the scoring half",
+          Path(scorer_argv[1]) == Path(checker.__file__).resolve())
+
+    if builder_path.is_file():
+        builder_spec = importlib.util.spec_from_file_location(
+            "recipe_payload_builder", builder_path
+        )
+        builder = importlib.util.module_from_spec(builder_spec)
+        builder_spec.loader.exec_module(builder)
+        built = parsed(builder.parse_args, filled(builder_argv))
+        check("the recipe's positional order matches the builder's own parser",
+              built is not None
+              and (built.owner_repo, built.pr_number, built.out_file)
+              == ("OWNER/REPO", 445, "/tmp/pr.json"))
+
+        # The token sentence is a claim about the builder's behaviour, so it is
+        # checked against the builder rather than against the message alone.
+        with patch.dict(os.environ, {}, clear=True):
+            try:
+                builder._token()
+                token_required = False
+            except builder.PayloadBuildError:
+                token_required = True
+        check("the token precondition the message names is one the builder has",
+              token_required)
+
+    scored = parsed(checker.parse_args, filled(scorer_argv))
+    check("the recipe's scoring command parses, and feeds --from-json the "
+          "file the builder wrote",
+          scored is not None
+          and (scored.pr_number, scored.repo, scored.from_json)
+          == ("445", "OWNER/REPO", "/tmp/pr.json"))
+
+    # Both paths are interpolated into the recipe, so a checkout path
+    # containing a space has to survive a shell parser too.
+    spaced_file = "/tmp/ai-config recipe probe/check-pr-fully-clean.py"
+    with patch.object(checker, "__file__", spaced_file):
+        spaced_message = stderr_of_missing_binary(["gh", "pr", "view", "445"])
+    spaced_recipe = recipe_of(spaced_message)
+    spaced_here = Path(spaced_file).resolve()
+    check("a checkout path containing a space still prints a runnable recipe",
+          len(spaced_recipe) == 2
+          and spaced_recipe[0][1] == str(spaced_here.parent / "build-pr-payload.py")
+          and spaced_recipe[1][1] == str(spaced_here))
+
+    # The same `die` serves every command `run_cmd` is handed, and neither the
+    # payload recipe nor anything about the GitHub CLI answers a missing `git`
+    # -- so both are gated on the binary rather than emitted unconditionally.
+    other_message = stderr_of_missing_binary(["git", "rev-parse", "HEAD"])
+    check("a missing non-gh binary still reports which binary is absent",
+          "`git`" in other_message)
+    check("a missing non-gh binary is not offered the --from-json recipe",
+          "--from-json" not in other_message)
+    check("a missing non-gh binary is not told the GitHub CLI is the dependency",
+          "GitHub CLI" not in other_message)
 
     # Test 9: -R is parsed rather than silently ignored (#1391's repro)
     args = checker.parse_args(["445", "-R", "Morrison-Lab/gha"])
@@ -4000,7 +4803,25 @@ def main() -> int:
             checker.classify_verdict(clean_body) == "clean"
             and checker._unresolved_finding_pattern(clean_body) is None,
         )
-    # The paren-aside and character branches of the clause scan must stay
+    # Issue #2960: parenthesized asides in lead-in or method phrase that name
+    # in-progress work or defect investigations must not classify clean.
+    for label, aside_body in (
+        ("investigation in lead-in aside", "### Verdict\n**Ready for merge.** The prior blocking crash (root cause under investigation) is resolved."),
+        ("investigation in method aside", "### Verdict\n**Ready for merge.** The prior blocking finding is resolved by (patch applied, root cause still under investigation)."),
+        ("in-progress in method aside", "### Verdict\n**Ready for merge.** The prior blocking finding is resolved by (a fix is in progress)."),
+        ("critical error in method aside", "### Verdict\n**Ready for merge.** The prior blocking finding is resolved by (a critical error in the login flow)."),
+        ("no fix in aside", "### Verdict\n**Ready for merge.** The prior blocking finding is resolved by (no fix merged)."),
+        ("ignored in aside", "### Verdict\n**Ready for merge.** The prior blocking finding is resolved by (edge case ignored)."),
+        ("omitted in aside", "### Verdict\n**Ready for merge.** The prior blocking finding is resolved by (some inputs omitted)."),
+        ("skipped in aside", "### Verdict\n**Ready for merge.** The prior blocking finding is resolved by (validation skipped for now)."),
+        ("zero in aside", "### Verdict\n**Ready for merge.** The prior blocking finding is resolved by (zero test coverage)."),
+    ):
+        check(
+            f"{label} stays not-clean (#2960)",
+            checker.classify_verdict(aside_body) == "not-clean"
+            and checker._unresolved_finding_pattern(aside_body) is not None,
+        )
+
     # disjoint: an overlapping `(` was exponential backtracking (51s) on a
     # failing enumeration. Probed on _is_resolved_blocking_mention directly:
     # classify_verdict short-circuits on the leading "Needs more work"
@@ -4155,6 +4976,66 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     check("_unresolved_finding_pattern: clean structured review has no findings", checker._unresolved_finding_pattern(struct_clean) is None)
     check("_is_structured_review_body: structured review is recognized as structured body", checker._is_structured_review_body(struct_clean))
     check("_is_structured_review_body: casual mention of JSON without heading/fingerprint is NOT structured body", not checker._is_structured_review_body("Here is the JSON format:\n<!-- review-data: {\"verdict\":\"CLEAN\"} -->"))
+    check(
+        "_is_structured_review_body: single-line double-backtick span quoting report headings is NOT structured body (#2525)",
+        not checker._is_structured_review_body(
+            "Discussion of format:\n``## Verdict``\n``Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b``\nCasual prose."
+        ),
+    )
+    check(
+        "_is_structured_review_body: standard fenced block quoting report headings is NOT structured body (#2525)",
+        not checker._is_structured_review_body(
+            "Discussion of format:\n```\n## Verdict\nReviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\n```\nCasual prose."
+        ),
+    )
+    check(
+        "_is_structured_review_body: multi-line double-backtick span quoting report headings is NOT structured body (#2525)",
+        not checker._is_structured_review_body(
+            "Ready for merge -- this all looks good to me, thanks!\n\n"
+            "For reference, our report template looks like this:\n\n"
+            "`` \n"
+            "### Verdict\n"
+            "All clear\n"
+            "Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\n"
+            "``\n"
+        ),
+    )
+    check(
+        "_is_structured_review_body: stray unclosed backtick in prose does NOT hide genuine headings (#2525)",
+        checker._is_structured_review_body(
+            "Here is some commentary with a stray ` backtick.\nMore prose.\n\n## Verdict\n\nReviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\nClean"
+        ),
+    )
+    check(
+        "_is_structured_review_body: stray unclosed backtick without blank line does NOT hide genuine headings (#2525)",
+        checker._is_structured_review_body(
+            "Commentary with stray ` single backtick on line 1\n### Verdict\nClean\nReviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\nClosing ` on line 4"
+        ),
+    )
+    check(
+        "_is_structured_review_body: stray unclosed double-backtick in prose does NOT hide genuine headings (#2525)",
+        checker._is_structured_review_body(
+            "Here is some commentary with a stray `` double backtick.\nMore prose.\n\n## Verdict\n\nReviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\nClean"
+        ),
+    )
+    check(
+        "_is_structured_review_body: stray unclosed double-backtick without blank line does NOT hide genuine headings (#2525)",
+        checker._is_structured_review_body(
+            "Commentary with stray `` double backtick on line 1\n### Verdict\nClean\nReviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\nMore prose"
+        ),
+    )
+    check(
+        "_is_structured_review_body: stray unclosed double-backtick across fence does NOT hide genuine headings (#2525)",
+        checker._is_structured_review_body(
+            "Commentary with stray `` double backtick on line 1\n```python\ndef foo(): pass\n```\n### Verdict\nClean\nReviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\nClosing `` on line 6"
+        ),
+    )
+    check(
+        "_is_structured_review_body: fenced block preceding heading does NOT shift containment offsets (#2525)",
+        checker._is_structured_review_body(
+            "```\nthis is a seventy character fenced block that takes up some space in body\n```\nSome prose with ``two backtick span`` here.\n\n### Verdict\nClean\n\nReviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\n"
+        ),
+    )
 
     # Conflicting representations: prose says Needs work with findings, but JSON says CLEAN
     conflicting_body = """
@@ -4576,6 +5457,16 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     check(
         "_unresolved_finding_pattern on many small fenced blocks scales linearly (< 1s)",
         _uf_res is None and _uf_secs < 1.0,
+    )
+
+    _double_backtick_unit = "Some text with unclosed `` delimiter\n"
+    _double_backtick_body = _double_backtick_unit * 3000
+    _db_secs, _ = best_of_three(
+        checker._blank_fences_and_spans, _double_backtick_body
+    )
+    check(
+        "_blank_fences_and_spans on max-length body of double backticks scales linearly (< 1s)",
+        _db_secs < 1.0,
     )
 
     print(f"\n{passes} passed, {failures} failed")

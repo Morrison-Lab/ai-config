@@ -99,20 +99,23 @@
   Use temp files instead.
   See [`memories/zsh.md`](zsh.md), "A process substitution feeding a pipeline fails under zsh".
 
-## Skill command blocks — resolve the ai-config repo root with the per-skill symlink
-- To `cd` to the repo root from inside a skill, use the **per-skill** form
-  `git -C ~/.claude/skills/<this-skill> rev-parse --show-toplevel`, never the
-  bare-parent `git -C ~/.claude/skills rev-parse --show-toplevel`. `bootstrap.sh`
-  may symlink skills
+## Skill command blocks — resolve the ai-config repo root with the plugin root or per-skill fallback
+- To `cd` to the repo root from inside a skill, use
+  `${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/<this-skill> rev-parse --show-toplevel 2>/dev/null || pwd)}`,
+  which uses `$CLAUDE_PLUGIN_ROOT` under native plugin installs and falls back to
+  the per-skill symlink `git -C ~/.claude/skills/<this-skill> rev-parse --show-toplevel`
+  under legacy symlink setups, never the bare-parent `git -C ~/.claude/skills rev-parse --show-toplevel`.
+  `bootstrap.sh` may symlink skills
   *per-child* into a real `~/.claude/skills` directory, so the parent isn't a
   symlink into the repo and `git -C` there fails with "not a git repository".
-  The `@claude` reviewer enforces the per-skill form on new skills (it flagged
-  the bare-parent form on PR #71); `skill-builder` and `ums` already use it.
+  The `@claude` reviewer enforces the plugin/per-skill form on new skills;
+  `skill-builder` and `ums` already use it.
 - Issue #36 originally proposed the bare-parent `git -C ~/.claude/skills
   rev-parse --show-toplevel` — but that example is the unreliable one (it can
   error with "not a git repository", not a security risk). #36 was closed by
   PR #110, which standardized on the **per-skill** form for `record-learnings`
-  and `memorize`; PR #109 swept the last straggler #110 missed (`find-overlap`).
+  and `memorize`; PR #109 swept `find-overlap`, and #2530 ported all skills
+  to `${CLAUDE_PLUGIN_ROOT}` with per-skill fallback.
 - **Worktree caveat:** the resolved toplevel is the **MAIN** checkout, often on
   another session's branch — don't author files there. Work in your own
   worktree's `skills/<name>/` dir (full rationale in `skill-builder`'s Ship-it
@@ -798,6 +801,9 @@ than adding a version, so a workspace copy stayed frozen at whatever
 revision was first uploaded.
 Fixed in ai-config#769: an existing skill now gets a new version
 (`POST /v1/skills/{id}/versions`) on every run instead of being skipped.
+Refined in ai-config#2596 with content change detection (skipping unchanged skills
+without creating redundant API versions), deletion propagation (pruning managed skills
+removed from the repo), and a CI workflow (`upload-skills.yml`) to run on merge to `main`.
 The predicted shape of the drift, while the bug was live, was that the stale
 set was exactly the long-standing skills, while anything added since the
 last upload was still a working symlink -- worth knowing if diagnosing an
@@ -996,6 +1002,51 @@ the unquoted-delimiter case was written down nowhere.
 
 - **Do:** use a quoted heredoc delimiter (`<<'PY'`) whenever the body carries backticks or dollar signs, pass dynamic values in via a separately-exported environment variable or a placeholder substitution, and grep the emitted file for the expected spans afterwards.
 - **Don't:** choose an unquoted delimiter for the convenience of variable interpolation when the body carries markdown code spans --- each backtick span becomes a command substitution and vanishes silently on success.
+
+**Second occurrence, 2026-09-04, with the rule above loaded (ai-config#3230).**
+The payload this time was not a file but twenty-one forge bodies (one issue, ten PR bodies, ten claim comments).
+A Python script under `python3 - <<PY`, unquoted to interpolate one scratchpad path,
+filed issue ai-config#3219, opened PRs #3220 through #3229, and posted their claim comments.
+Every backtick span in those bodies ran as a shell command and was replaced by its empty output,
+so #3219 read `The branch records ... in and performs no such audit`,
+each code span deleted so that the two spaces flanking it met
+(the quote here shows one space, since the reflow script collapses a doubled one).
+All twenty-one were repaired by PATCH from a quoted-delimiter rerun,
+with the path passed as `export S=...` and read by `os.environ['S']`.
+
+Two things the first case did not draw out.
+The shell printed the substitution errors
+(`fix/3110-three-rounds-reflect: No such file or directory`, `check-links.py: command not found`)
+to stderr in the same tool result as the script's own output.
+The shell printed them at heredoc expansion, before Python started,
+but a foreground tool call returns only when the command ends,
+and this one command both composed and posted:
+issue #3219 was created at 21:16:48Z and the last claim comment at 21:17:12Z,
+so the lines were readable only once all twenty-one bodies were live.
+Those stderr lines are a detector usable before posting only when composing and posting are separate tool calls,
+or a dry run precedes the batch.
+The detector is one-sided:
+it fires only when a substituted command fails and prints;
+a backtick span or `$(...)` naming a command that succeeds quietly, and any `$VAR` expansion, are substituted and print nothing to stderr,
+so silence proves nothing and the read-back in the next sentence stays required.
+And a loop that posts to a forge should read one posted body back before posting the rest,
+since the first body is where the corruption shows.
+
+No guard was built at this occurrence, and that is a gap rather than a discharge:
+`shared/workflow/fixing-mistakes-is-top-priority.md` makes the prevention mechanism the next priority after the fix,
+and the condition is decidable,
+a `PreToolUse` regex over the Bash command for an unquoted delimiter with a backtick or dollar sign in the heredoc body,
+so `hooks/no-mistake-without-a-hook.py`'s one discharge (a mistake that cannot be mechanized) does not apply,
+and `shared/principles/deterministic-tools.md`'s third-occurrence bar is about repeated work, not a repeated mistake.
+Issue #3230's done-when asks only that a guard be considered, for a stderr-conditioned check;
+the `PreToolUse` regex above is the decidable half of that check, and building it is what closes the gap.
+
+- **Do:** compose the bodies in one tool call and post them in a second,
+  and treat `command not found` or `No such file or directory` on the first call's stderr as the payload probably having been substituted,
+  so the second call never runs.
+- **Do:** read one posted body back before a script posts the rest of its batch.
+- **Don't:** read those stderr lines as noise from an unrelated command and let the loop run on.
+- **Don't:** read an empty stderr as a clean payload, or post a whole batch and read the bodies afterwards.
 
 ## Tool result persistence & disk spillover threshold
 

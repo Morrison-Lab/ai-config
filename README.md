@@ -4,8 +4,7 @@ Portable AI agent config --- skills, memories, and commands
 synced across machines via git.
 Works with Claude Code, Codex, [Gemini CLI](https://github.com/google-gemini/gemini-cli), [Cursor](https://cursor.com), VS Code Copilot, and any agent that reads markdown instruction files.
 
-Claude Code and Cursor install this repo's skills natively as a plugin (see each harness's section below);
-Codex has no plugin mechanism yet ([#2352](https://github.com/Morrison-Lab/ai-config/issues/2352)).
+Claude Code, Codex, and Cursor install this repo's skills natively as plugins (see each harness's section below);
 `bootstrap.sh` handles what a plugin install can't: Gemini CLI / Antigravity config and per-machine dotfiles.
 
 ## Setup on a new machine
@@ -39,7 +38,7 @@ In a Claude Code or Cursor session with the plugin installed (see each harness's
 
 `ai-config` natively integrates with **Google Antigravity** (`agy` CLI, Antigravity IDE, and Antigravity 2.0) and **Gemini CLI**:
 
-- **Global Plugin**: `bootstrap.sh` writes `~/.gemini/config/plugins.json` and `skills.json`, registering this checkout's `plugins/ai-config` and `skills/` paths directly (no symlink).
+- **Global Plugin**: `bootstrap.sh` stages the plugin layout under `~/.gemini/config/plugins/ai-config` and writes `~/.gemini/config/plugins.json` and `skills.json` (registering the staged `plugins/ai-config` path and the checkout's `skills/` path directly).
 - **Workspace Plugin**: Opening this repository directly in Antigravity automatically discovers `.agents/skills.json` and `.agents/plugins.json` to load all skills, rules (`AGENTS.md`), and plugin features.
 
 ### opencode
@@ -76,7 +75,11 @@ strict `name`/`description` frontmatter. Each wrapper tells Codex to read the
 matching canonical skill from `skills/<name>/SKILL.md` and adapt Claude-only
 metadata or tools to the current Codex session.
 
-`bootstrap.sh` no longer places those wrappers on disk for Codex (see its header comment) --- Codex has no marketplace-plugin mechanism analogous to Claude Code's or Cursor's, so until a replacement lands ([#2352](https://github.com/Morrison-Lab/ai-config/issues/2352)), reach `codex-skills/` by symlinking or copying it into `${CODEX_HOME:-$HOME/.codex}/skills` by hand.
+Codex can load this repository as a plugin through [`.codex-plugin/plugin.json`](.codex-plugin/plugin.json).
+The plugin manifest explicitly routes hooks to `plugins/ai-config/codex-hooks.json`, avoiding Codex's default discovery of the Claude catalog at `hooks/hooks.json`.
+That Codex hook manifest routes the canonical catalog through `plugins/ai-config/codex-hook-adapter.py`.
+The first session opening a new or changed hook must review and trust it in Codex's hook browser before it runs.
+For a user-global install, register the plugin with Codex for skills and hooks.
 After adding or editing a canonical skill, regenerate the wrappers:
 
 ```sh
@@ -156,6 +159,28 @@ once Julia is present) and non-fatal — it only succeeds if the environment's
 network policy allowlists the Julia download hosts. See
 [`docs/julia-setup.md`](docs/julia-setup.md) for the allowlist and a
 build-time alternative.
+
+### Hooks in this repo's own web sessions (`skills/ai-config-hooks/`)
+
+The paragraph above covers skills and commands.
+Hooks are different: `hooks/hooks.json` reaches Claude Code only through the
+ai-config **plugin**, and a session that opens this checkout itself never
+installs that plugin, so every enforcement hook was inert in ai-config's own
+web sessions ([#2004](https://github.com/Morrison-Lab/ai-config/issues/2004)).
+
+[`skills/ai-config-hooks/`](skills/ai-config-hooks/README.md) closes that
+gap as a hooks-only **skills-directory plugin**: a folder under
+`.claude/skills/` (a symlink to `skills/`) that carries a
+`.claude-plugin/plugin.json` and loads in place as
+`ai-config-hooks@skills-dir`, with no marketplace and no install step.
+Its `hooks/hooks.json` is generated from the canonical catalog by
+`scripts/gen-hooks-plugin.py` (CI fails when the two drift), and each
+command runs through `run-hook.sh`, which stands down when an `ai-config@*`
+plugin is enabled under Claude Code's scope precedence (local, project, then
+user settings) so no hook fires twice on a machine that has the marketplace
+install.
+Verify it in a fresh web session by checking that the first prompt carries
+the `Current time -- local:` line `inject-local-time.sh` injects.
 
 ## Use these skills in another repo's web sessions (plugin marketplace)
 
@@ -259,6 +284,7 @@ Settings this repo's own tooling reads from the environment.
 | `AI_CONFIG_PR_REVIEWERS` | Comma-separated GitHub logins to request as reviewers on a PR the orchestrator opens. **Unset means no reviewer is requested**, which is deliberate: this repo is used by people other than its author, so there is no login that could be a correct default. Before this existed the value was hardcoded, and every request named a login that exists for nobody (ai-config#2627). |
 | `AI_CONFIG_DOTFILES_FORCE` | Install dotfiles on a machine that fails the environment gate --- see [`dotfiles/shiva/README.md`](dotfiles/shiva/README.md). |
 | `ALLOW_FORCE_PUSH` | Escape valve for `hooks/no-clobbering-push.py`, for a case the guard did not foresee. Using it means stating why. |
+| `ALLOW_COMMIT_AND_PUSH` | Escape valve for `hooks/no-commit-chained-to-push.py`, which otherwise refuses a `git commit` and a `git push` in one Bash call. Using it means saying why the call could not be split. |
 
 `scripts/check-reviewer-placeholders.py` gates the first of these: it fails
 CI when a person-shaped name is written into a value position --- an `owner:`
@@ -311,6 +337,39 @@ python3 scripts/check-context-closure.py --base ../consumer-repo --compare origi
 
 Measured on `ucdavis/bcs` at a three-day-old pin, the same 33 imports had grown **+62%**, arriving silently since a bump's gitlink diff is one line (ai-config#1028).
 
+### Lead-in counts (`scripts/check-leadin-counts.py`)
+
+Prose here introduces a list with a spelled-out count --- "Two lightweight checks keep the skill catalog well-formed:", "Three things the new observation adds" --- and then enumerates the items below it.
+A later edit that splits or merges one item leaves the count stale, and a reader who counts along stops at the stated number and never reaches the last item.
+Nothing else catches it: there is no broken link, the lines are well formed, and the prose reads fluently either way.
+
+```sh
+python3 scripts/check-leadin-counts.py                 # every tracked markdown file
+python3 scripts/check-leadin-counts.py memories/foo.md # just these files
+```
+
+Exit `0` every lead-in count matches, `1` at least one mismatch, `2` the scan examined no files (a check that examined nothing reports clean otherwise).
+
+Gated in `validate.yml`, over every tracked markdown file.
+The corpus reads clean at 0 findings;
+the checker prints the population it examined on every run.
+The one stale count the checker found on its first run --- `memories/claude-code-permissions.md` said two above three bullets --- is fixed in the same commit that gates it.
+
+False positives, rather than recall, are what bound the design: a checker that flagged every numeral would be switched off, taking the real cases with it.
+So it reads only spelled-out counts that open the last sentence above the enumeration, or sit behind at most two function words ("There are two ...").
+It reads that sentence only when it is its own one-line paragraph, so a count closing a multi-line paragraph is never examined.
+It skips a lead-in ending on a conditional subordinator, since "Two changes are independent if:" enumerates the conditions rather than the changes.
+And it discounts a bold-header run that overshoots the stated count by more than one, since body prose between such headers gives that shape no structural end.
+
+Those bounds are positional rather than semantic, so one shape stays a known false positive: a count that opens its sentence and then names a property of itself ("Two variables at once is hard:").
+No bound separates that from "Three answers are legitimate, and only the first is ...", which is a genuine lead-in of the same shape.
+The simplest alternative, a rule "keyed on the copula alone" that just requires `is`/`are`/`was`/`were` to appear somewhere in the sentence, suppresses the large majority of the lead-ins the shipped implementation accepts, most of them genuinely real, so it is not a workable substitute.
+No exact count is quoted: the total moves as prose lands, and three hand measurements while the checker was written gave three different totals, so derive it fresh rather than trusting a number.
+`scripts/test_check_leadin_counts.py` pins it as accepted rather than claiming coverage it does not have.
+
+- **Do:** run it over a file whose bulleted or bold-header sections you have just split or merged.
+- **Don't:** read a clean result as proof that every count in the file is right --- the bounds above trade recall for a quiet enough report to act on.
+
 ### Attributed quotes (`scripts/check-user-quote.py`)
 
 Shows every transcript record containing a phrase you are about to attribute to the user, with its provenance --- record shape, `origin.kind`, flags, `userType` --- so you can read them and judge.
@@ -361,28 +420,33 @@ The event mapping is [docs/cursor-hook-mapping.md](docs/cursor-hook-mapping.md).
 | `no-incomplete-check-enumeration.py` | `Stop` | blocks a reply declaring a PR clean when the only reading is `gh pr checks` or `statusCheckRollup` (short surfaces, not the complete instrument) |
 | `remind-ums-after-error.py` | `UserPromptSubmit` | reminds, never blocks, when an admitted error has no recorded learning after it |
 | `remind-ci-crosscheck-sim-verdict.py` | `UserPromptSubmit` | reminds, never blocks, when a verdict-shaped figure follows a LOCAL sim/transcript run with no CI-side read in between -- the same clip and seed have been measured reading FAIL locally and PASS on CI |
-| `no-mistake-without-a-hook.py` | `UserPromptSubmit, Stop` | blocks after an admitted, mechanizable mistake until hook work follows it |
+| `no-mistake-without-a-hook.py` | `UserPromptSubmit, Stop` | blocks after an admitted, mechanizable mistake, capped once per admitted phrase within a short transcript window (a re-admission of the same phrase well beyond that window blocks again) |
 | `remind-learn-from-review.py` | `UserPromptSubmit` | reminds, never blocks, when an accepted reviewer finding has no learning or mechanism after it |
 | `remind-ums-on-scrutiny.py` | `UserPromptSubmit` | reminds, never blocks, when a review of your work was read, or a questioned claim was then corrected, with no explicit UMS after it |
+| `remind-retry-before-declaring-blocked.py` | `UserPromptSubmit` | reminds, never blocks, when an auto-mode permission-classifier denial has no later re-attempt of the same command -- ai-config#2994 measured a byte-identical command succeeding after three denials (2026-09-02), so a denial is a sample rather than a wall; scoped to the classifier's own denial, never a user's rejection or a deterministic rule/hook refusal |
 | `flag-unassigned-worktree.py` | `PreToolUse` (Agent) | warns, never blocks, on a write-capable Agent launch with no `isolation` |
-| `no-unreviewed-pr.py` | `Stop` | blocks a reply ending a session after a PR was opened or readied with no reviewer requested, or after a push re-headed it with no reviewer requested since; deferred by draft status, or on a redaction PR by a `no-ai-review` label or an `ALLOW_UNREVIEWED_REDACTION_PR=1` assertion; wholly inert until its `MORATORIUM_END` (2026-09-01) while the standing directive forbids the Copilot request it would demand |
+| `no-fable-subagent.py` | `PreToolUse` (Agent, Task, Workflow) | denies an Agent launch that names Fable or that omits `model` while the session itself runs on Fable (inheriting is how the violation happens), unless `FABLE_SUBAGENT_OK=1` records the user's explicit grant for that launch; warns on a Workflow launch in a Fable session, whose `agent()` calls it cannot inspect -- user directive 2026-09-01 (ai-config#2927), after 8 of 10 launches in one session inherited Fable and the account hit its usage limit |
+| `no-unreviewed-pr.py` | `Stop` | blocks a reply ending a session after a PR was opened or readied with no reviewer requested, or after a push re-headed it with no reviewer requested since; deferred by draft status, by the PR having merged or closed once that transition is visible in the transcript (a terminal action, or a single-PR status read through `gh` or `pull_request_read`), or on a redaction PR by a `no-ai-review` label or an `ALLOW_UNREVIEWED_REDACTION_PR=1` assertion; wholly inert until its `MORATORIUM_END` (2026-12-01) while the standing directive forbids the Copilot request it would demand |
 | `no-unshipped-commit.py` | `Stop` | blocks a completion reply while the session's branch carries unpushed commits (derived from `git rev-list --count @{u}..HEAD`; a dropped commit no longer blocks) |
 | `no-report-unfixed-hook-test.py` | `Stop` | blocks a status-only reply after CI identifies a missing hook test, until that exact test is written |
 | `no-unmonitored-pr.py` | `Stop` | starts a detached two-minute `gh` poller when no model scheduler was used; blocks only when neither works |
 | `inject-pr-monitor-status.py` | `UserPromptSubmit` | injects changed state from a detached PR poller on the next prompt, and surfaces once a monitor whose last 3 polls all errored with the same text; local pollers cannot wake a terminated model session |
-| `ensure-open-pr-monitor.py` | `UserPromptSubmit` | ensures the agent-independent all-open-PR monitor service is running when an agent session begins |
-| `monitor-open-prs.py` | detached timer | reconciles every open PR authored by the authenticated user every two minutes, including PRs opened outside the current session |
+| `ensure-open-pr-monitor.py` | `UserPromptSubmit` | ensures the agent-independent all-open-PR monitor service (GitHub PRs and GitLab merge requests) is running when an agent session begins |
+| `monitor-open-prs.py` | detached timer | reconciles every open GitHub PR the authenticated user opened or is assigned to, plus every one the `github-actions` app opened under an owner that user works under, and every GitLab merge request they authored, every two minutes, including ones opened outside the current session; needs `gh` or `glab`, and polls whichever is installed |
 | `no-heavy-work-on-head-node.py` | `PreToolUse` (Bash) | blocks a heavy R/Quarto command run on a cluster's login node; inert off a cluster |
-| `remind-brief-premises.py` | `PreToolUse` (Agent, Task, SendMessage) | reminds, never blocks, when a brief asserts corpus state that nothing derived --- including a `SendMessage` follow-up to a running agent, where corrections and new premises land |
+| `remind-brief-premises.py` | `PreToolUse` (Agent, Task, SendMessage) | reminds, never blocks, when a brief asserts corpus state that nothing derived --- including a `SendMessage` follow-up to a running agent, where corrections and new premises land; also on the one PATHLESS count it can decide, an aggregate over `[FINDINGS_COUNT: N]` values already printed in the transcript that no command naming that token read back, and whose figure is not itself one of the printed values (ai-config#3117) |
 | `remind-both-sides-from-git.py` | `UserPromptSubmit` | reminds, never blocks, when a revision-qualified blob is compared against the working-tree copy of that path |
 | `remind-deserialize-before-binary-claim.py` | `UserPromptSubmit` | reminds, never blocks, when an escalation names a serialized artifact nobody deserialized |
 | `flag-unchained-branch-switch.py` | `PreToolUse` (Bash) | warns, never blocks, when a branch switch and a later mutating git command are not joined by `&&` |
 | `flag-cd-into-main-checkout.py` | `PreToolUse` (Bash) | warns, never blocks, when a worktree-rooted session `cd`s into the MAIN checkout of its own repository, where every edit and every check silently succeeds against another branch |
 | `flag-add-a-outside-pathspec.py` | `PreToolUse` (Bash) | warns, never blocks, when `git add -A`/`--all`/`.` sweeps in an untracked file its own exclusion pathspec does not cover |
-| `flag-reset-hard-uncommitted-work.py` | `PreToolUse` (Bash) | warns, never blocks, when `git reset --hard` is about to discard tracked, uncommitted changes |
+| `flag-reset-hard-uncommitted-work.py` | `PreToolUse` (Bash) | warns, never blocks, when `git reset --hard`, `git checkout <pathspec>`, or `git restore <pathspec>` is about to discard tracked, uncommitted changes. The two path forms revert the named paths to the INDEX, or to an explicit source when one is given (`<tree-ish> --` or `-s <ref>`, which this hook also matches), so any edit made since the last `git add` is destroyed silently at exit 0 -- the shape that bit a mutation-testing restore step twice in one session (ai-config#2524). Also warns, at whole-tree scope, on a FORCED `git checkout` that resolves to no pathspec (`-f`/`--force`, with or without a ref): forcing removes the refusal, and the ref-less `git checkout -f` reverts every tracked file to HEAD with no output at all. Silent on an UNFORCED branch switch (`git checkout <ref>`), which git refuses when it would clobber local changes and otherwise carries them across, and on `git restore --staged` without `--worktree`, which rewrites only the index. NOT covered, and destructive: `git switch -f`/`--discard-changes <ref>`, which discards tracked working-tree changes silently at exit 0 -- `git switch` is a fourth command this guard does not read |
 | `no-handrolled-verdict-parse.py` | `PreToolUse` (Bash) | blocks matching a verdict phrase against a PR's review comments when `check-pr-fully-clean.py` has not answered for that PR |
 | `warn-pr-create-without-dupe-check.py` | `PreToolUse` (Bash, mcp__github__.*) | warns when a command creates a PR or an issue and no earlier command in the session could have surfaced an existing one; issue discharge requires `--state all --search` (or `gh search issues` / MCP search_issues), not `--state open`; warns rather than blocks, since a duplicate is cheap to close and a blocked creation is not |
-| `no-unmeasured-clock-claim.py` | `Stop` | warns, never blocks, when a reply states a Pacific clock time and no clock read appears since the previous message |
+| `warn-unlabelled-agent-issue.py` | `PreToolUse` (Bash, mcp__github__.*) | warns when `gh issue create` / `glab issue create` / `mcp__github__issue_write` (`method: create`) files an issue with no `ai-authored` label; `disclose-agent-authorship.md` excludes an issue body from its marker line, so the labels are the only thing distinguishing an agent-filed issue from one the maintainer typed; warns rather than blocks, since the rule is scoped to repos we administrate and this hook cannot tell which repo is ours |
+| `warn-stale-review-diff-base.py` | `PreToolUse` (Bash, Agent, Task, SendMessage) | warns when a `git diff`/`log`/`merge-base` range names a bare local branch as its base; a base behind its remote widens the diff so the review runs on already-merged work, and one that is ahead of or diverged from its remote in commits the head branch also carries narrows it so part of the change is never reviewed at all; warns rather than blocks, since a local base is correct for an ordinary local comparison |
+| `flag-config-deletion-without-ref-check.py` | `Stop` | warns, never blocks, when a reply recommends deleting files under a configuration directory (`~/.claude`, `~/.config`, `~/.codex`, ...) and no earlier command read a manifest there to see what references them; staleness is a property of a file, safety-to-delete a property of the graph around it |
+| `no-unmeasured-clock-claim.py` | `Stop` | warns, never blocks, when a reply states a Pacific clock time and no clock read appears since the previous message; a read whose output is only captured into a variable does not count |
 | `no-unauthorized-merge.py` | `PreToolUse` (Bash, mcp__github__.*) | blocks a PR/MR merge command (`gh pr merge`, `glab mr merge`, `gh api .../merge`, or GitHub MCP merge tools) unless an explicit `ALLOW_MERGE=1` assertion or active /mwc accompanies it |
 | `no-whole-file-punct-replace.py` | `PreToolUse` (Bash) | blocks a whole-file glyph replace, which converts pre-existing glyphs on untouched lines and buries the real change in a mechanical diff |
 | `flag-cop-out-offer.py` | `Stop` | warns when a reply *closes* on an offer to do work (`say the word`, `want me to`, `unless you'd rather`), so the author answers whether the action was already authorized; warns rather than blocks because authorization is not lexically decidable and asking before a merge or force-push is correct, and is tail-anchored because the failure is a recap that closes on an offer |
@@ -390,7 +454,9 @@ The event mapping is [docs/cursor-hook-mapping.md](docs/cursor-hook-mapping.md).
 | `require-stopping-point.py` | `Stop` | blocks a final reply lacking an explicit clean or non-clean stopping-point declaration |
 | `flag-stale-adjacent-comment.py` | `PreToolUse` (Bash) | warns, never blocks, when a `git commit` changes a literal value while an unchanged comment within ten lines still asserts the old one |
 | `no-delete-branch-under-stacked-pr.py` | `PreToolUse` (Bash) | warns when `gh pr merge --delete-branch` or `gh pr close --delete-branch` would delete a branch that is an open PR's base. GitHub's documented behaviour is to retarget such a PR, but a measured case closed it instead, and a closed PR can be neither retargeted nor reopened while its base is gone. Silent when nothing is stacked, when the query fails or returns an unexpected shape, when `gh` is absent, when the command carries no `-R` or PR target, and on `--delete-branch=false` |
-| `no-clobbering-push.py` | `PreToolUse` (Bash) | refuses a bare `git push --force`/`-f`, whose remedy (`--force-with-lease --force-if-includes`) costs one word. Warns on every other push whose remote tip a live, read-only `git ls-remote` shows is not an ancestor of the ref being pushed (which is `HEAD` only when the refspec says so), and stays silent on a fast-forward |
+| `no-clobbering-push.py` | `PreToolUse` (Bash) | refuses a bare `git push --force`/`-f`, whose remedy (`--force-with-lease --force-if-includes`) costs one word. Warns on every other push whose remote tip a live, read-only `git ls-remote` shows is not an ancestor of the ref being pushed (which is `HEAD` only when the refspec says so, resolved in the directory the push runs in rather than the session's -- a `cd`, scoped to its subshell but not to a brace group, and declined where a compound statement's body, a short-circuited alternative, or a fork into a background job or a pipeline means the pushing shell never takes its effect, then the push's own `-C`, declined in turn when the shell would have had to expand it), names that directory and qualifies its remediation commands with `git -C` when it is not the call's own, declines the reading when the directory is indeterminate or `--git-dir`/`--work-tree`/`GIT_DIR=` redirected the repository, and stays silent on a fast-forward |
+| `no-commit-chained-to-push.py` | `PreToolUse` (Bash) | denies a Bash call that chains a `git commit` into a later `git push`. A PreToolUse deny rejects the whole invocation, so a guard refusing the push discards the commit too while its message speaks only about the push (ai-config#2992). Denies rather than warns because the refusal stops the chain reaching the sibling guards at all, and its remedy -- two Bash calls -- is always available. Clearable with `ALLOW_COMMIT_AND_PUSH=1`, either prefixing the commit or push or as the call's own leading assignment (a subshell or short-circuited one sets nothing and does not count). Matches over an argv split (`scripts/lib/shellcmd.py`), so a quoted commit message, a heredoc body and `git commit-tree` cannot trip it, while `timeout 60 git push`, `/usr/bin/git push` and `{ git commit; } && git push` all resolve -- the guard has to fire wherever its siblings would. There is no exemption for a `--dry-run` or `--delete` command: one was written and removed after a review measured `git commit ... && git push --force --delete` and `... --dry-run --no-dry-run --force` both going silent while `no-clobbering-push.py` denied them |
+| `no-underived-required-check.py` | `PreToolUse` (Bash) | warns, never blocks, when a `gh api` command sets required status checks on a repository or organization ruleset, or on classic branch protection. A context string is matched against a check-run name exactly, so one no workflow emits sits as `Expected` forever and blocks every merge, silently. Detects lexical shapes only, so its silence is never evidence that contexts were derived. Carries no discharge condition: every candidate (a run-jobs read, a branch-scoped `gh run list`, any transcript scan) was satisfiable by a pull request's own run or by typing the string |
 | `no-misattributed-quote.py` | `Stop` | blocks a reply attributing a quoted phrase to a corpus file that does not contain it, when that phrase is in the file's `.rationale.md`/`.cases.md` sibling; stays silent when the phrase is found nowhere else, since a bare "not found" is the invented-quote misread |
 | `warn-nonglobal-substitution.py` | `PreToolUse` (Bash) | warns, never blocks, on an in-place `perl -i`/`sed -i` substitution whose flags carry neither `g` nor a digit -- the shape that silently changes only the first occurrence, which bit mutation testing four times in one session |
 | `warn-dupe-check-chained-to-create.py` | `PreToolUse` (Bash) | warns, never blocks, when a tracker search and a create of the same object kind share one Bash call, so the check runs at the same instant as the action it gates and gates nothing. Detects one lexical shape only, which means its silence is evidence that two commands were not in one string and never that a dupe-check was consulted |
@@ -399,7 +465,9 @@ The event mapping is [docs/cursor-hook-mapping.md](docs/cursor-hook-mapping.md).
 | `flag-uncited-rebuttal.py` | `PreToolUse` (Bash) | warns, never blocks, when a PR/issue comment about to be posted disputes a finding whose most recently fetched citation named an external URL that no earlier `WebFetch`/`WebSearch` in the transcript touched -- ai-config#2070's wrong rebuttal, retracted two rounds later once the URL was finally fetched |
 | `require-agent-disclosure.py` | `PreToolUse` (Bash, mcp__github__.*) | warns, never blocks, on a `gh`/`glab` command or MCP call that posts a forge comment without the agent-disclosure marker -- such a comment carries the account holder's own login and reads as `type: User`, indistinguishable from one they typed. Three verdicts, not one: the marker is missing, the body is somewhere the check cannot read (`--body-file`, `--editor`, `$BODY`) so it says so rather than accusing, or the body discloses with the robot emoji, which `check-pr-fully-clean.py` matches as a review-body marker |
 | `flag-uncounted-comment-claims.py` | `PreToolUse` (Bash) | warns, never blocks, on a `gh pr comment`/`gh issue comment`/`gh api .../comments` body about to post an unverified count (`grep -c`/`wc -l`-shaped discharge) or a hand-typed enumerated list of hyphenated identifiers with no deriving command beside it in the body or elsewhere in the same Bash call -- `remind-brief-premises.py`'s cardinality/enumeration heuristic extended to forge-comment bodies, since that hook's own PATH clause is anchored to this corpus and a comment can be about any repo (ai-config#2377's sparta file-list incident) |
+| `flag-unmeasured-timestamp.py` | `PreToolUse` (Bash, mcp__github__.*, Write, Edit, NotebookEdit) | warns, never blocks, when a `gh pr comment`/`gh issue comment`/`gh pr review`/`gh api .../comments` body, or an MCP comment tool body, or a `Write`/`Edit`/Bash append to a session notebook (`session-*.md`) or memory file (`memory/*.md`), about to execute states a Pacific clock time (or `ish` suffix) and no clock read appears in the transcript since the current turn began, or the stamp runs ahead of the harness's injected reading (ai-config#2900, #2903, #2947) |
 | `warn-stale-issue-edit.py` | `PreToolUse` (Write, Edit, NotebookEdit) | warns, never blocks, when an issue-driven `Write`/`Edit` has no fresh VIEW_ISSUE and remote/default-branch check after the request that named the issue, or when the latest view shows the issue closed |
+| `warn-new-line-breaks-on-push.py` | `PreToolUse` (Bash) | warns, never blocks, before a `git push` carrying newly-added Markdown lines that violate semantic line breaks against the default base branch (e.g. `origin/main`), naming the file and line to fix before pushing |
 
 For agent-independent monitoring across all projects and sessions, install the
 user service after the hook files are installed:
@@ -408,8 +476,10 @@ user service after the hook files are installed:
 python3 scripts/install-pr-monitor.py
 ```
 
-The service polls every open PR authored by the authenticated GitHub user every
-two minutes. It does not depend on Claude, Codex, Gemini, or a project session
+The service polls every open GitHub PR and GitLab merge request authored by the
+authenticated user every two minutes, through whichever of `gh` and `glab` is
+installed.
+It does not depend on Claude, Codex, Gemini, or a project session
 remaining open. If a user systemd bus is unavailable, the installer starts the
 monitor immediately and installs an equivalent per-user cron `@reboot` entry.
 It copies the monitor to `~/.local/share/ai-config/hooks/`, so neither path
@@ -433,11 +503,22 @@ That is the worst possible defect for a guard, and nothing catches it: the
 hook runs, exits 0, and its tests pass if they only assert that *something* was
 printed.
 
-Warn-only hooks here emit `systemMessage` (the `PreToolUse` ones pair it with
-`hookSpecificOutput.additionalContext`); the four blocking `Stop` hooks pair
-`reason` with `decision`.
+Most warn-only hooks here emit `systemMessage`, and the `PreToolUse` ones pair
+it with `hookSpecificOutput.additionalContext`;
+the blocking `Stop` hooks pair `reason` with `decision`.
 The trap is that a blocking hook is the natural model to copy, and it uses
 `reason` correctly.
+"Most" rather than all, derived over `hooks/hooks.json` rather than recalled:
+every registered warn-only `Stop` hook emits `systemMessage`, and so does
+every registered warn-only `PreToolUse` hook but one (measured 2026-09-04).
+The exception is `warn-pr-create-without-dupe-check.py`, which emits
+`additionalContext` alone --- accepted by the `PreToolUse` rule below, since
+that channel is surfaced on its own.
+Stated as a property rather than as a tally, because a tally goes stale on
+any unrelated hook addition: `no-underived-required-check.py` and
+`flag-config-deletion-without-ref-check.py` landed on the same day and moved
+the counts from 19 warn-only `PreToolUse` hooks to 20 and from two warn-only
+`Stop` hooks to three.
 
 So when adding a warn-only hook:
 
@@ -450,8 +531,120 @@ So when adding a warn-only hook:
 
 `scripts/check-hook-output-shape.py` enforces this on every run: it verifies that
 warn-only hooks never emit `reason` alone, that warn-only `Stop` hooks emit
+`systemMessage`, that warn-only `PreToolUse` hooks emit `additionalContext` or
 `systemMessage`, and that their test suites inspect the payload shape rather than
 checking non-empty output.
+
+The `PreToolUse` half was added after `flag-cd-into-main-checkout.py` shipped
+printing its warning to stderr and exiting 0
+([#3068](https://github.com/Morrison-Lab/ai-config/issues/3068)).
+On exit 0 stderr reaches the `--debug` log alone, and `PreToolUse` plain stdout
+is not surfaced either, so the guard fired correctly and warned nobody.
+A hook with *neither* channel used to fall through both rules above: the
+`Stop` rule does not apply, and the test-side rule only inspects hooks that
+already emit one of the two.
+`UserPromptSubmit` is deliberately out of scope, since its plain stdout is
+added to the context.
+"Warn-only" here means the hook neither emits a blocking decision nor exits
+with status 2, matching the derivation in that issue:
+a `PreToolUse` hook that exits 2 denies the tool call and has its stderr fed
+back to Claude, so it already has a surfaced channel and the rule leaves it
+alone.
+The exemption is deliberately narrow, because writing a non-zero status
+somewhere does not show that a hook blocks.
+It reads status 2 alone, since every other non-zero status is a non-blocking
+error and the near-universal "bail out on an unreadable payload" branch would
+otherwise exempt almost every hook.
+It ignores a status raised inside an `except` handler, which reports that the
+hook itself broke rather than that it denied a tool call.
+And it reads literal statuses only, since `sys.exit(main())` passes a computed
+one.
+
+The `except`-handler narrowing keys on the handler and nothing wider, so an
+error-path `return 2` written outside one still reads as a block and exempts
+the hook.
+Measured against the shipped checker on 2026-09-04, `blocks_by_exit_2` returns
+`True` for `if not path.exists(): return 2` and `False` for the same statement
+inside an `except` clause.
+Exactly one registered hook writes a literal status 2, and it is
+`flag-stale-adjacent-comment.py` inside an `except OSError` clause,
+so the exit-2 route exempted no registered hook when this was measured
+(2026-09-04).
+A hook that emits a blocking `decision` is exempt through the other arm of
+the same condition, which this narrowing does not touch.
+
+- **Do:** give a warn-only `PreToolUse` hook
+  `hookSpecificOutput.additionalContext`, and confirm it by reading the
+  printed payload.
+- **Don't:** treat an error-path `return 1` as a blocking channel --- the
+  checker reads status 2 alone.
+
+A **`PreToolUse`** hook that emits **both** channels should gate its
+`systemMessage` on `ANTIGRAVITY_AGENT` being unset.
+The event decides this, and the adapter is where to read it off.
+`plugins/ai-config/claude-hook-adapter.py`'s `PreToolUse` branch prints
+`hookSpecificOutput.additionalContext` to stderr as `Warning from <hook>: ...`
+and separately prints every collected `systemMessage` as
+`claude-hook-adapter [allow]: ...`, so a `PreToolUse` payload carrying both
+prints the warning twice there.
+Its `Stop` branch instead collapses the two into one, taking the first channel
+present through
+`msg = hook_out.get("systemMessage") or hook_out.get("additionalContext") or nested_context`
+and appending a single entry, so a warn-only `Stop` hook carrying both
+surfaces its warning once and owes no gate.
+A hook emitting one channel alone is unaffected on either event.
+Driving the shipped adapter with a synthetic hook that emits both channels
+returns those two stderr lines for a `PreToolUse` payload and the single
+`{"systemMessage": ...}` object for a `Stop` payload (measured 2026-09-04).
+Nothing enforces the gate, and several registered `PreToolUse` hooks do not
+yet carry it.
+That census is derived over `hooks/hooks.json` rather than recalled ---
+registered scripts whose source names both channels and never *gates* on
+`ANTIGRAVITY_AGENT`.
+It keys on the channels rather than on the event, so a `Stop` hook can appear
+in its output without owing the gate;
+`flag-config-deletion-without-ref-check.py` is registered under `Stop` alone
+and is there for that reason.
+Read the membership off the query below rather than off this paragraph, and
+check each name's registered event before acting on it.
+No sentence here states the count, because a tally in prose goes stale on any
+unrelated hook addition, and this one went stale twice in two days
+(output pasted below the snippet, measured 2026-09-04):
+
+```python
+import json, pathlib
+d = json.load(open("hooks/hooks.json"))
+s = {h["script"] for e in d["hooks"].values() for g in e for h in g["hooks"]}
+print(sorted(x for x in s if (pathlib.Path("hooks") / x).is_file()
+             and all(k in (pathlib.Path("hooks") / x).read_text()
+                     for k in ("additionalContext", "systemMessage"))
+             and 'environ.get("ANTIGRAVITY_AGENT")' not in
+                 (pathlib.Path("hooks") / x).read_text()))
+# ['flag-add-a-outside-pathspec.py',
+#  'flag-config-deletion-without-ref-check.py', 'no-fable-subagent.py',
+#  'no-underived-required-check.py', 'warn-stale-review-diff-base.py']
+```
+
+The test is the gating **expression**, not the bare name, and the difference
+is not cosmetic.
+Keying on the name alone counts a hook that merely *mentions* the variable ---
+`warn-stale-review-diff-base.py`'s own docstring says it lacks the gate ---
+so the disclosure would delete that hook from the census disclosing it.
+That is what happened here: the name-keyed query printed two names under a
+paragraph naming three.
+
+- **Do:** gate a `PreToolUse` hook's `systemMessage` whenever the same payload
+  also carries `additionalContext`.
+- **Do:** key a census like this one on the expression that does the work, and
+  paste the output beside the query.
+- **Don't:** state the gate as repo-wide fact, or read the census off the
+  prose --- re-run the query and check each name's registered event, since
+  only its `PreToolUse` members warn twice under Antigravity.
+- **Don't:** gate a warn-only `Stop` hook --- the adapter's `Stop` branch
+  picks one channel through an `or` chain, so only a `PreToolUse` payload
+  carrying both warns twice.
+- **Don't:** key it on a bare identifier --- prose about the absence of a gate
+  reads as the gate itself.
 
 Every hook must ship a companion `test-<name>.py` beside it in the same change before pushing;
 `scripts/test_hooks.py` runs
@@ -462,10 +655,10 @@ Each suite has a 900-second deadline
 (override with `HOOK_TEST_SUITE_TIMEOUT`);
 a hung suite reports FAIL rather than stalling the sweep.
 The runner gates `validate` and pre-commit.
-One hook is untested today
-(`inject-local-time.sh`), carried in an explicit
-`KNOWN_UNTESTED` allowlist and tracked in
-[#1080](https://github.com/Morrison-Lab/ai-config/issues/1080).
+Every hook ships a test since
+[#1080](https://github.com/Morrison-Lab/ai-config/issues/1080) closed;
+the `KNOWN_UNTESTED` allowlist stays, empty, so a new hook without a test
+fails the runner rather than being noted.
 
 That runner compares hooks against their *tests*.
 `scripts/check-hook-catalog.py` compares them against their *bindings*:
@@ -488,6 +681,22 @@ so a closed activation issue cannot keep a hook silently inert
 When the issue cannot be fetched (offline, timeout, or rate limit), the
 check prints `SKIP` and does not fail --- that skip is the documented
 offline path, not a silent pass.
+It also fails a script bound twice for the same event and the same tool
+([#2535](https://github.com/Morrison-Lab/ai-config/issues/2535)),
+whenever some tool name `hooks.json` itself spells out fires both matchers:
+the row comparison folds a script's several matcher groups into one
+comma-joined string, so a hook bound once and a hook bound twice were
+indistinguishable there, while the harness runs every group whose matcher
+fires.
+Deciding that needs the harness's own matcher semantics, which
+[`memories/claude-code-hooks.md`](memories/claude-code-hooks.md) records:
+a plain name is compared by equality, an alternation by membership, and only
+anything else is an unanchored regex.
+It decides that over the tool names `hooks.json` itself spells out, so a pair of
+two regexes is beyond it only when no such name fires both;
+such a pair is printed as a `NOTE` and excluded from the compared count, though
+the run still exits 0, so a green catalog check does not by itself rule that
+pair out.
 
 The Claude Code plugin (`.claude-plugin/plugin.json`, `source: "./"`) is the supported path for the full catalog: its loader auto-discovers [`hooks/hooks.json`](hooks/hooks.json) at the plugin root and registers every hook it names, no separate step needed.
 
@@ -614,7 +823,9 @@ activated.")
 ## What's tracked
 
 - `skills/` --- reusable workflow skills (Claude Code and Cursor via plugin install, and Gemini/Antigravity via the `skills.json` registration `bootstrap.sh` writes against the checkout's own `skills/` path)
-- `codex-skills/` --- generated Codex wrappers (no install path yet --- [#2352](https://github.com/Morrison-Lab/ai-config/issues/2352))
+- `codex-skills/` --- generated Codex wrappers
+- `.codex-plugin/` --- Codex plugin manifest for generated wrappers
+- `plugins/ai-config/codex-hooks.json` --- Codex plugin hook registration that dispatches the canonical catalog
 - `cursor-rules/` --- user-global Cursor rules (shipped by the Cursor plugin's `rules` field, `~/.cursor/rules/`)
 - `.cursor/rules/` --- project Cursor rules for this repo as a workspace
 - `.cursor/hooks.json` --- Cursor-native project hooks (Cloud agents load these)
@@ -661,7 +872,10 @@ Conventions for fragments:
   lab manual's non-standard-character check passes when it includes them.
 
 A session working in this repo's own checkout resolves `@shared/...` imports against the repo root directly (as `CLAUDE.md` does for this very session).
-A **global** `~/.claude/CLAUDE.md` that imports these fragments needs `~/.claude/shared/` to exist, which `bootstrap.sh` no longer places there (see its header comment) --- until a replacement lands ([#2352](https://github.com/Morrison-Lab/ai-config/issues/2352)), symlink or copy `shared/` there by hand.
+A **global** `~/.claude/CLAUDE.md` that imports these fragments needs `~/.claude/shared/` to exist, which `bootstrap.sh` no longer places there (see its header comment) --- until a replacement lands ([#2352](https://github.com/Morrison-Lab/ai-config/issues/2352)), symlink `shared/` there by hand.
+Symlink rather than copy: a symlink tracks the checkout, while a copy goes stale with nothing to say so.
+When an ai-config plugin is enabled, `python3 scripts/doctor.py` follows that split: it reports a `~/.claude/shared` copy as a leftover and exempts a symlink that resolves into an ai-config checkout.
+It skips the sweep entirely otherwise, since a `~/.claude` copy may then be the machine's only install.
 The `@claude` CI bot reads `shared/` from the repo root.
 
 ### Vendored from wai (`shared/vendored/`)
@@ -699,7 +913,7 @@ These are either machine-specific, sensitive, or pure session state:
 - `cache/`, `shell-snapshots/`, `file-history/`, `ide/`, `telemetry/`,
   `backups/`, `downloads/`, `session-env/` — ephemera.
 - `plugins/` (in `~/.claude`) --- managed by Claude Code itself from marketplaces. (Note: The top-level `plugins/` directory in this repo contains Antigravity plugin manifests.
-  `bootstrap.sh` registers `~/.gemini/config/plugins.json` with this checkout's path, no symlink.)
+  `bootstrap.sh` stages `plugins/ai-config` into `~/.gemini/config/plugins/ai-config` and registers it in `~/.gemini/config/plugins.json`.)
 
 If a per-machine variation appears that's worth syncing (e.g., a global `CLAUDE.md`), add it as a top-level entry here and wire it into whichever install path (plugin manifest, or `bootstrap.sh` itself) needs to know about it.
 

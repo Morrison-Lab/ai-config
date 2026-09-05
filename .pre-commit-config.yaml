@@ -31,6 +31,18 @@ repos:
         language: python
         pass_filenames: false
         always_run: true
+      - id: check-ascii-punctuation
+        name: check ASCII punctuation in source (.py, .R)
+        entry: python scripts/check-ascii-punctuation.py
+        language: python
+        pass_filenames: false
+        always_run: true
+      - id: test-check-ascii-punctuation
+        name: check-ascii-punctuation tests
+        entry: python scripts/test_check_ascii_punctuation.py
+        language: python
+        pass_filenames: false
+        always_run: true
       - id: check-jules-review-workflow
         name: check Jules mention-dispatch wrap
         entry: python scripts/check-jules-review-workflow.py
@@ -77,6 +89,24 @@ repos:
       - id: hook-runner-tests
         name: hook-runner tests (scripts/test_hooks.py)
         entry: python scripts/test_test_hooks.py
+        language: python
+        pass_filenames: false
+        always_run: true
+      - id: gen-hooks-plugin-check
+        name: hooks-only skills-dir plugin in sync with hooks/hooks.json
+        entry: python scripts/gen-hooks-plugin.py --check
+        language: python
+        pass_filenames: false
+        always_run: true
+      - id: gen-hooks-plugin-tests
+        name: gen-hooks-plugin tests
+        entry: python scripts/test_gen_hooks_plugin.py
+        language: python
+        pass_filenames: false
+        always_run: true
+      - id: run-hook-tests
+        name: run-hook.sh tests
+        entry: python scripts/test_run_hook.py
         language: python
         pass_filenames: false
         always_run: true

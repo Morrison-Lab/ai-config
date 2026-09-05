@@ -2,6 +2,9 @@
 
 Quick-reference index of common failure patterns observed in agent sessions, with cross-references to their canonical enforcement rules and deep treatments.
 
+Pattern numbers are checked by `scripts/check-mistake-patterns.py` (run in `validate.yml`): each `## Pattern N:` heading is unique and the integers run 1..K in file order, with a lettered sub-pattern (`5b`, `34b`) filed directly under its base.
+When a new entry lands after `main` has appended one of its own, take the next number from the merged file rather than from the branch ([#2946](https://github.com/Morrison-Lab/ai-config/issues/2946)).
+
 ## Pattern 1: Assumption Over Verification
 - **Mistake**: Assume an action succeeded without verifying the result from tool output or repository state.
 - **Example**: Assuming `gh pr create` succeeded without checking URL / output or verifying the open PR exists.
@@ -175,22 +178,41 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
 - **Fix**: Verify every path, test suite name, and CI workflow against the target repository's tree before committing.
   Use absolute GitHub URLs for any cross-repository references to `ai-config` files.
 
-## Pattern 12: Arming Auto-Merge While Review Findings Are Still Open
+## Pattern 12: Arming Auto-Merge While Review Findings Are Still Open or at an Unreviewed Head After Sync
 - **Mistake**: Running `gh pr merge --auto` (or any deferred/auto merge) on a PR that still has open review findings or no verdict at head.
   Treating the arming as harmless because CI is red ignores that the robot fires later,
   the moment checks go green,
   with no re-check of review state.
-- **Example**: 2026-08-26 on `ai-config#2226`:
-  armed `--squash --auto` while round-1 findings were open and the reviewer was quota-skipping.
-  Hours later a push turned `validate` green,
-  auto-merge fired at 04:30Z,
-  and it merged over an explicit Needs-more-work verdict ---
-  requiring revert (#2268) plus reland-with-fixes (#2269).
+  A second route to the same failure is arming `--auto` immediately after a sync-only push
+  (e.g. merging `origin/main` in when a direct merge was refused due to an out-of-date branch):
+  reasoning about `--auto` as *scheduling a merge already verified* ignores that the sync-only push created a new HEAD commit ref
+  that silently invalidates the prior clean verdict.
+  The sync is content-free (no code change by the author),
+  which is why it does not feel like a new head needing a new review verdict,
+  but auto-merge fires the instant CI finishes,
+  before any reviewer can evaluate the new head.
+- **Example**:
+  - 2026-08-26 on `ai-config#2226`:
+    armed `--squash --auto` while round-1 findings were open and the reviewer was quota-skipping.
+    Hours later a push turned `validate` green,
+    auto-merge fired at 04:30Z,
+    and it merged over an explicit Needs-more-work verdict ---
+    requiring revert (#2268) plus reland-with-fixes (#2269).
+  - 2026-08-28 on `ai-config#2556` (Issue #2558):
+    verified fully clean at `2c1ae45d` (checker exit 0, verdict `Ready for merge` at that exact SHA, zero unresolved threads).
+    A direct merge was refused because `main` had moved (`the head branch is not up to date with the base branch`).
+    Merged `origin/main` in and pushed `54874be0`,
+    then armed `--auto` reasoning that the merge was already verified.
+    A clean review verdict for `54874be0` landed at 22:18:44Z and auto-merge fired at 22:20:29Z;
+    had auto-merge fired before the review posted,
+    it would have merged an unreviewed head.
 - **Canonical Rule**: [`fully-clean.md`](../shared/workflow/fully-clean.md).
-  See also [`check-before-pushing.md`](../shared/workflow/check-before-pushing.md):
+  See also [`check-before-pushing.md`](../shared/workflow/check-before-pushing.md)
+  and [`sync-with-main.md`](../shared/workflow/sync-with-main.md):
   the remote can act between your commands,
   and an armed automation is exactly such an action you scheduled against yourself.
 - **Fix**: Never arm `gh pr merge --auto` on a PR whose merge gate includes a posted review verdict, which is every PR here.
+  A sync-only push invalidates a clean verdict just as thoroughly as a code push.
   Auto-merge fires server-side the moment CI passes,
   so a review landing seconds later cannot block it,
   and no reactive disable can win that race.
@@ -198,7 +220,9 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
   it gates native approvals, not verdicts posted as comments.
   Merge synchronously instead,
   only after `scripts/check-pr-fully-clean.py <N>` exits clean ---
-  CI green and the all-clear verdict both verified at the shipping head.
+  CI green and the all-clear verdict both verified at the new shipping head.
+  Accept that a moving base may require repeating the sync and re-verification cycle,
+  rather than arming an automation that cannot re-check review state.
   If something is found already armed, disable it at once ---
   `gh pr merge <N> --repo <r> --disable-auto`,
   verified with `gh pr view <N> --repo <r> --json autoMergeRequest` ---
@@ -427,12 +451,12 @@ A clean automated review from every available provider evaluating the current HE
 - **Fix**: Run a bare `git push origin <branch>` with no `2>&1`, no pipe, and no trailing redirection in a guarded repo.
   Before assuming the review state itself is stale, read the guard's refusal for a resolution error naming a suspicious token (a bare digit, a stray file target).
 
-## Pattern 22: A Background-Dispatched Review Verdict Is Invisible to the Push Guard
-- **Mistake**: Dispatching the final adversarial-reviewer round with `run_in_background: true` (or resuming a completed reviewer via `SendMessage`) and then pushing on the strength of its clean report, when `hooks/no-push-without-self-review.py` only scans the FOREGROUND transcript for verdicts and never sees a report that arrived as a background task notification.
+## Pattern 22: A Background-Dispatched Review Verdict Is Invisible to Older Push Guard Revisions
+- **Mistake**: Dispatching the final adversarial-reviewer round with `run_in_background: true` (or resuming a completed reviewer via `SendMessage`) and then pushing on the strength of its clean report, when older revisions of `hooks/no-push-without-self-review.py` only scanned the foreground tool results and missed background task notifications / TaskOutput.
 - **Example**: 2026-08-27, ai-config#2483: a fresh "Ready for merge / Reviewed-Commit: 6d1e7ace..." report arrived via a task notification, and the very next push of that exact commit was refused with "The clean verdict is for commit 0825a859..." --- a stale earlier verdict --- forcing an `ALLOW_UNREVIEWED_PUSH` override for a genuinely reviewed head.
-- **Canonical Rule**: [`adversarial-self-review.md`](../shared/workflow/adversarial-self-review.md) (dispatch to a separate subagent) plus [`no-push-without-self-review.py`](../hooks/no-push-without-self-review.py)'s transcript scan.
-- **Fix**: Dispatch the round whose verdict you intend to push on in the FOREGROUND (`run_in_background: false`), not as a background task.
-  If a background or resumed verdict is the only one available, push with `ALLOW_UNREVIEWED_PUSH=1` and state the reason (verdict landed via background notification, guard cannot see it) rather than re-diagnosing a stale-verdict refusal as a review-state regression.
+- **Canonical Rule**: [`adversarial-self-review.md`](../shared/workflow/adversarial-self-review.md) (dispatch to a separate subagent) plus [`no-push-without-self-review.py`](../hooks/no-push-without-self-review.py)'s transcript and fallback scan.
+- **Fix**: The guard now credits valid reviews from foreground dispatches, fallback subagent dispatches (matching `FALLBACK_AGENT_NAME`), tracked `TaskOutput` results, and background task notifications (ai-config#2544).
+  Dispatching in the foreground (`run_in_background: false`) remains the primary recommendation.
 
 ## Pattern 23: Implementing From a Truncated Issue-Body Read
 - **Mistake**: Briefing an implementer (a subagent, or yourself) from a sliced issue body --- e.g. `gh issue view --jq '.body[0:2200]'` --- instead of the full body and its comments.
@@ -514,10 +538,10 @@ A clean automated review from every available provider evaluating the current HE
   No separate hook is needed.
   Pattern 25's proposed guard (ai-config#2590) already covers this axis once built.
 
-## Pattern 28: Trusting Both Sides' Test Suites After Uniting Two Regex Versions in a Merge Conflict
-- **Do**: When resolving a merge conflict by uniting two versions of a regex (or any validation mechanism) --- one side's structure extended with the other side's prefixes, verbs, or branches --- write adversarial tests against the **union** itself before trusting it: negated forms, failing (non-matching) inputs, and combinations that exercise one side's extensions inside the other side's structure.
+## Pattern 28: Trusting Both Sides' Test Suites After a Merge That United Two Independently Grown Versions of One File
+- **Do**: When merging two independently grown versions of a file (whether resolved through a merge conflict or merged cleanly by git's auto-merge heuristics) --- one side's structure extended or modified alongside the other side's changes --- write adversarial tests against the **union** itself before trusting it: negated forms, failing (non-matching) inputs, and combinations that exercise one side's extensions inside the other side's structure.
   Also check that alternation branches under a shared quantifier stay disjoint on their first character, so no starting position offers the engine more than one branch to try.
-- **Don't**: Read "both sides' full suites pass" as evidence the union is sound --- each suite covers only its own side's cases by construction, and the defects live in the cross terms neither side had any reason to test.
+- **Don't**: Read "both sides' full suites pass" or "git auto-merged with no conflict" as evidence the union is sound --- each suite covers only its own side's cases by construction, and defects live in the cross terms neither side had any reason to test.
 - **Example**: 2026-08-30, `Morrison-Lab/ai-config` PR [#2668](https://github.com/Morrison-Lab/ai-config/pull/2668): the PR and main's #2684 had both rewritten the same two regexes in `scripts/check-pr-fully-clean.py` (`RESOLVED_BLOCKING_SUFFIX` and `_is_resolved_blocking_mention`'s prefix).
   In the session driving that PR, the conflict was resolved as a union: main's tense-checked, sentence-scoped structure extended with the PR's prefixes (`earlier`, `round-\d+`), plural verbs (`are`/`were`), and a parenthesized-aside branch in the clause scan. (As of this entry's date the resolution lived in that session's working tree, not yet on the PR's pushed head --- verify the specifics against PR #2668 as merged before citing them as its content.)
   The union passed both sides' full suites (344 tests, as counted in that session's united suite) yet carried two defects, both found only by adversarial probes against the union: (1) a negation fail-open --- "None of the earlier blocking findings were resolved." was exempted as a resolved mention, so `classify_verdict` lost a not-clean verdict;
@@ -526,10 +550,14 @@ A clean automated review from every available provider evaluating the current HE
   fixed with a negator check (`none|no|not|never|neither|nothing`) on the prefix window before the past-state marker;
   (2) catastrophic backtracking (51 seconds measured) --- the new paren-aside branch `\([^()\n]{0,120}\)` overlapped the char-class branch `[^,:;.!?]` (both could consume `(`), so a failing enumeration input like `"(1) " * 24` was exponential;
   fixed by excluding `()` from the char class so the branches are disjoint --- a stray unmatched paren then fails the clause scan, which fails safe (the mention stays blocking).
-- **Canonical Rule**: [`batch-merge-and-resolve.md`](../shared/workflow/batch-merge-and-resolve.md)'s "Four silent failure modes arrive through a merge nothing flags" section establishes that defects arrive through cleanly-resolved merges;
-  this pattern is the sharper case where the conflict *was* seen and resolved, and the resolution itself is the new, untested code.
+
+  2026-08-31, `Morrison-Lab/ai-config` PR [#2736](https://github.com/Morrison-Lab/ai-config/pull/2736): merge `80398b90` auto-merged `scripts/check-pr-fully-clean.py` with **no conflict at all** (359 lines from `main`, 109 from the branch);
+  the only conflicted path in that merge was `memories/mistake-patterns.md` itself.
+  Yet the post-merge adversarial review of the cleanly merged files (`scripts/check-pr-fully-clean.py` and `scripts/pre-push-review.py`, commit `cea1a533`) returned twelve findings, five of them letting not-clean artifacts score clean across the newly combined review-matching, payload-extraction, and disclosure-footer mechanisms (admitting all comments with Claude Code disclosure footers as automated reviews, first-payload-wins admitting quoted prompt templates with clean verdicts, unmasked code spans/blocks, unclosed details tags, and stripped HTML comments ignoring NOT_CLEAN payloads).
+- **Canonical Rule**: [`batch-merge-and-resolve.md`](../shared/workflow/batch-merge-and-resolve.md)'s "Five silent failure modes arrive through a merge nothing flags" section establishes that defects arrive through cleanly-resolved merges and clean auto-merges;
+  this pattern covers both the case where the conflict *was* seen and resolved, and the clean auto-merge where no conflict was raised.
   [`fact-check-code-logic.md`](../shared/coding/fact-check-code-logic.md) covers verifying the implementation rather than trusting its green suite.
-- **Fix**: Treat a union resolution as new code with zero targeted coverage: derive probes from the cross product of the two sides' extensions (each new prefix with each new verb with each new branch), include negated and failing inputs, and time the regex on a pathological non-matching input before committing the resolution.
+- **Fix**: Treat a union resolution or clean auto-merge of independently grown logic as new code with zero targeted coverage: derive probes from the cross product of the two sides' extensions (each new prefix with each new verb with each new branch), include negated and failing inputs, and time the regex on a pathological non-matching input before committing.
 - **Algorithmatizable?**
   Partially.
   The first-character-disjointness check on alternation branches under a quantifier is mechanically decidable and would have caught the backtracking defect;
@@ -577,3 +605,393 @@ A clean automated review from every available provider evaluating the current HE
   Complete the delivery cycle: create the applicable tracking issue when issue-first workflow applies, commit the scoped changes, run local adversarial self-review to a clean verdict, push the branch, open or update its Pull Request, request AI review after the final push, and drive CI and review findings to a clean result."
 - **Fix**: Never terminate an implementation turn at uncommitted files or a local-only commit.
   Complete the full chain (commit -> self-review -> push -> PR -> review request) in that same turn.
+
+## Pattern 31: Self-Ambiguous Alternative Under Repetition Causing Catastrophic Backtracking
+- **Do**: When writing a repeated pattern `(A|B)*` or quantifier, verify that alternation branches are strictly disjoint and cannot match prefixes or subsets of each other.
+  Replace nested or self-ambiguous quantifiers (like `(={3,}|\s*)*` or duplicated whitespace inside a group with leading whitespace) with linear scans by construction (line scans, string slicing) that cannot backtrack.
+  Time the regex on pathological failing inputs (e.g. runs of 40-60+ characters followed by non-matching text).
+- **Don't**: Assume that because every branch consumes at least one character, catastrophic backtracking is impossible --- an alternative that is self-ambiguous (like `={3,}` under `*`, which partitions N `=` characters in exponentially many ways) or overlapping branches reintroduce exponential backtracking on non-matching inputs.
+- **Example**: 2026-08-31, `Morrison-Lab/ai-config` PR [#2736](https://github.com/Morrison-Lab/ai-config/pull/2736) (`scripts/pre-push-review.py`): In round 1, removing an empty `\s*` alternative from the fingerprint anchor's `*` quantifier was necessary and not sufficient;
+  round 2 revealed `={3,}` under an outer `*` still backtracked exponentially on the tool's own `"=" * 60` report separator followed by non-matching text (0.50s at 36, 4.01s at 42, 14.18s at 45).
+  Fixed by replacing the nested-quantifier regex with a linear line scan (0.36ms at 4000 `=`).
+- **Canonical Rule**: [`regex-backtracking-pitfalls.md`](../shared/coding/regex-backtracking-pitfalls.md) and [`fact-check-code-logic.md`](../shared/coding/fact-check-code-logic.md).
+- **Fix**: Replace repeated ambiguous quantifiers with linear scans
+  or enforce strict disjointness between alternatives under repetition;
+  measure execution time on long pathological inputs.
+- **Algorithmatizable?**
+  Yes --- static regex linters and timeout probes
+  ([ai-config#2768](https://github.com/Morrison-Lab/ai-config/issues/2768)).
+
+## Pattern 32: Treating a Sampling Instrument's Zero as a Result Without Verifying Arm Reach
+- **Do**: When using a corpus-sampling or generator-based instrument (such as `scripts/check-verdict-scan-parity.py`) to verify parity or absence of regressions, explicitly report and verify the **reach** of newly added arms or branches (e.g., confirming the new arm was actually executed and reached, and reporting the number of cases evaluated).
+  Place newly added arms where generators and limit/stride logic will not skip or truncate them.
+- **Don't**: Accept a sampling instrument reporting "0 widened, 0 narrowed" as evidence of correctness when the new arm was never reached (e.g. truncated by `--limit`, skipped by strided sampling, bypassed by an earlier deciding branch, or missing from the corpus entirely).
+- **Example**: 2026-08-31, `Morrison-Lab/ai-config` PR [#2736](https://github.com/Morrison-Lab/ai-config/pull/2736) (`scripts/check-verdict-scan-parity.py`): Across rounds 2, 3, and 4, the instrument repeatedly reported 0 widened / 0 narrowed as a coverage statement rather than a verification:
+  (1) round 2 yielded the payload arm last at index 241,920 where `--limit` truncated it before execution;
+  (2) yielding it first in round 2 was still lost because `--limit` used strided sampling selecting only 1 of 57 bodies;
+  (3) in round 3 (`cfdedd9c`), generated payload bodies carried a prose `## Verdict:` line that decided before `payload_is_clean` was ever reached (reached 0 of 32 times), fixed in that round by generating payload-only bodies;
+  (4) in round 4 (`3a7648a7`), the arm still reported 0/0 because `--limit`'s strided sample skipped the first-yielded payload bodies.
+  Fixed in round 5 (`fbf50a69`) by appending the arm after `--limit`, revealing 1 widening and 5 narrowings previously hidden.
+- **Canonical Rule**: [`fact-check-code-logic.md`](../shared/coding/fact-check-code-logic.md) ("A sampling instrument's zero is a coverage statement unless the new arm's reach is reported") and [`fail-fast.md`](../shared/principles/fail-fast.md).
+- **Fix**: Measure and report reach counts (e.g. "reached M of N times") on every arm of a sampling instrument, and ensure new arms are appended after sampling limits.
+- **Algorithmatizable?**
+  Yes --- test runners asserting non-zero generator arm execution counts
+  ([ai-config#2769](https://github.com/Morrison-Lab/ai-config/issues/2769)).
+
+## Pattern 33: Cross-Artifact Comment Staleness During Multi-Commit PRs
+- **Do**: When modifying an invariant, data format, layout, or implementation across commits in a PR, grep across the entire repository (including tests, documentation, helper scripts, and sister modules) for comments and docstrings that assert the state or layout of the modified artifact.
+- **Don't**: Rely on adjacent-comment linters (e.g. 10-line single-file windows) or memory of modified files to catch stale assertions about other artifacts;
+  comments asserting facts about *another* file expire when that other file changes.
+- **Example**: 2026-08-31, `Morrison-Lab/ai-config` PR [#2736](https://github.com/Morrison-Lab/ai-config/pull/2736): Round 5 (`fbf50a69`) restored the structured `commit_sha` term in `scripts/check-pr-fully-clean.py` and changed prompt/persona rendering from 3-space indentation to flush-left.
+  Round 6 (`c725c449`) found two stale cross-artifact comments left behind by round 5's changes: (1) `scripts/test_check_pr_fully_clean.py` still contained a comment claiming `commit_sha` "was REMOVED as provably dead", pointing readers away from the test pinning it;
+  (2) `scripts/lib/review_payload.py` still stated that prompts and personas render the payload 3 spaces in.
+  Neither was in the diff or within 10 lines of the changed code in their respective files.
+- **Canonical Rule**: [`fact-check-code-logic.md`](../shared/coding/fact-check-code-logic.md) ("A comment asserting the state of ANOTHER artifact is a claim with an expiry across commits").
+- **Fix**: Grep for tokens and cross-references
+  when changing a cross-module contract or layout;
+  audit test comments when reverting or restoring implementation logic.
+- **Algorithmatizable?**
+  Partially.
+  Cross-file comment scanning can detect file-name citations and literal quotes,
+  but semantic claims require reading.
+
+## Pattern 34: Claiming Subsumption Proofs Over Raw Text Without Accounting for Transformations
+- **Do**: When arguing that a structured extraction or parsing branch is redundant and subsumed by a raw text search (e.g. raw substring or regex match), verify whether any transformation (JSON escape decoding like `\u0061`, URL decoding, character set normalization, or whitespace normalization) occurs between the raw text and the parsed value.
+- **Don't**: Delete a parser disjunct or term as "provably dead" based on a raw-text subsumption proof that assumes the parsed value appears byte-for-byte in the unparsed body.
+- **Example**: 2026-08-31, `Morrison-Lab/ai-config` PR [#2736](https://github.com/Morrison-Lab/ai-config/pull/2736): In round 4 (`3a7648a7`), the structured `commit_sha` check in `scripts/check-pr-fully-clean.py` was deleted as "provably inert" under the belief that `payload.get("commit_sha") == head_sha` was subsumed by raw substring checks on `head_sha` in the body.
+  In round 5 (`fbf50a69`), this had to be restored: `json.loads` resolves Unicode escapes (e.g. `"commit_sha": "\u0061bc1234..."`), so a payload with escaped characters matches the parsed SHA while escaping the raw substring disjuncts.
+- **Canonical Rule**: [`fact-check-code-logic.md`](../shared/coding/fact-check-code-logic.md) ("A subsumption proof over raw text must account for every transformation before claiming a disjunct is dead").
+- **Fix**: Construct adversarial test fixtures with escaped, decoded, or transformed representations to test whether raw text matching and structured value matching can diverge before deleting extraction logic.
+
+## Pattern 34b: Unbounded Subset Overlap in Fuzzy Matching Defeating Negative Controls
+- **Do**: When implementing fuzzy or token-overlap matching to tolerate subtitles or minor variations, enforce length and density proportionality (e.g. bounded character/token length ratio or Jaccard similarity threshold) alongside token containment.
+- **Don't**: Accept full subset containment (`overlap_coef == 1.0`) of a short needle in a long haystack without bounding the relative lengths or densities;
+  a short 2-token title (e.g. "Causal Inference") is a 100% token subset of an arbitrarily long, unrelated review title (e.g. "A Review of Causal Inference Methods in Epidemiology and Public Health Policy"), defeating the tool's fabrication-detection purpose.
+- **Example**: 2026-08-31, `Morrison-Lab/ai-config` PR [#2797](https://github.com/Morrison-Lab/ai-config/pull/2797) (`scripts/check_doi_bib.py`): Round 1 implemented `fuzzy_match_title` with an `(overlap_coef == 1.0 and len(intersection) >= 1)` branch intended for subtitle variations.
+  Review identified that for short generic titles (2 tokens), this branch matched completely unrelated long review papers with a 1.0 score and classified fabricated citations as `MATCH`.
+  Fixed in round 2 by replacing the raw overlap with bounded Jaccard similarity and length proportionality (`jaccard >= 0.60 and len_ratio >= 0.60`), and adding negative control tests for short title containment.
+- **Canonical Rule**: [`fixtures-are-not-evidence.md`](../shared/workflow/fixtures-are-not-evidence.md) and [`fact-check-code-logic.md`](../shared/coding/fact-check-code-logic.md).
+- **Fix**: Require length ratio constraints and bounded Jaccard thresholds for fuzzy matching, and always test negative controls with short generic strings contained in long unrelated targets.
+- **Algorithmatizable?**
+  Yes --- unit test suites asserting negative control rejection of short subset inputs against long distractor strings.
+
+## Pattern 35: Fixing the Admitting Site But Not the Branching Site
+- **Do**: When handling a new condition, trigger, or input case, verify both the **admitting site** (the gate deciding whether the code runs) and the **branching site** (the logic deciding what the code does once it runs).
+  Find branching sites by searching for the conditions or variables they test *instead of* the new condition (e.g., variables that go empty, unset, or defaulted in the new case).
+  Test admitted cases by running the actual execution logic against realistic fixtures.
+- **Don't**: Stop after updating the admitting rule named in the issue or finding without auditing downstream branching logic;
+  a fix that admits a case into downstream code that doesn't handle it creates a false sense of completion while silently executing the wrong path.
+- **Example**: 2026-08-29 on `health-analytics-core/HACtions!47` (internal GitLab):
+  A reviewer noted tag pipelines were excluded from a CI job.
+  The fix added `- if: $CI_COMMIT_TAG` to the job's `rules:`, admitting tags.
+  However, the job's downstream script still evaluated `if [ "${CI_COMMIT_BRANCH:-}" = "${CI_DEFAULT_BRANCH:-}" ]` to determine whether to perform a whole-tree scan or a diff against `main`.
+  Because `CI_COMMIT_BRANCH` is empty on tag pipelines, tags took the diff branch against `main` (which tags have no branch relationship to) instead of the intended whole-tree scan.
+  CI was green because CI never ran a tag pipeline in that MR, giving a false appearance of completion until re-reviewed.
+- **Canonical Rule**: [`admitting-vs-branching-site.md`](../shared/principles/admitting-vs-branching-site.md) and [`fail-fast.md`](../shared/principles/fail-fast.md).
+- **Fix**: Identify all downstream branching points that depend on context variables,
+  update branching logic to handle the new case explicitly (e.g. `[ -n "$CI_COMMIT_TAG" ] || [ "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH" ]`),
+  and add execution tests against fixtures simulating the new input state.
+- **Algorithmatizable?**
+  Partially per-domain (e.g. static analyzers checking that CI jobs admitting `$CI_COMMIT_TAG` do not rely exclusively on `CI_COMMIT_BRANCH` in their scripts).
+  General case requires behavioural fixture tests.
+
+## Pattern 36: Approximating Shell Constructs via Regex Without Disambiguating Context-Dependent Operators
+- **Do**: When approximating shell grammar (such as heredocs, redirection, or variable expansions) in security-relevant hooks, identify and mask syntactic contexts where the operator has a completely different meaning (e.g., `<<` inside arithmetic expressions `$(( x << n ))` or `(( x << n ))` is bitwise left-shift, not a heredoc opener), parse balanced parentheses rather than naive regexes, and preserve unclosed constructs rather than dropping downstream commands.
+- **Don't**: Assume an operator character sequence (like `<<`) uniquely identifies a redirection across all shell contexts, or that non-matching delimiter lines will safely fail closed;
+  treating an operator as a heredoc opener causes subsequent command lines to be silently swallowed until an impossible delimiter matches, creating silent false negatives on gated commands.
+- **Example**: 2026-08-31 on `Morrison-Lab/ai-config` PR [#2817](https://github.com/Morrison-Lab/ai-config/pull/2817) (Issue #2588):
+  `strip_heredocs` matched `<<` as a heredoc opener without checking for arithmetic expansion `$(( ... ))` or `(( ... ))`.
+  In a multi-line script starting with `timeout=$(( base_timeout << retry_count ))`, the left-shift was misparsed as opening a heredoc with delimiter `retry_count`, silently swallowing subsequent lines including ungated `gh` commands.
+  Caught in review by Claude review bot on PR #2817.
+- **Canonical Rule**: [`fail-fast.md`](../shared/principles/fail-fast.md).
+- **Fix**: Mask arithmetic expansions with balanced parenthesis tracking (`mask_arithmetic`), fail-safe unclosed heredocs by restoring buffered lines, and verify delimiter termination syntax before entering heredoc-stripping state;
+  add regression test cases specifically covering arithmetic expressions preceding gated commands.
+- **Algorithmatizable?**
+  Yes;
+  unit test suites for shell-parsing hooks must include fixtures combining arithmetic expansions, subshells, pipelines, and heredocs.
+
+## Pattern 37: Discrepancy Between Synthesis Count and Underlying Source Inventory
+- **Do**: Distinguish between the total number of referenced items/files in a source catalog and the count of synthesized/distilled items in your derived document or taxonomy.
+  Ensure summaries, index entries, and cross-references match the exact count in the file they describe.
+- **Don't**: Cite the source catalog's full size (e.g., "29 patterns") as the count of items in a derived taxonomy that only enumerates a subset (e.g., 20 core patterns).
+- **Example**: 2026-08-31, `Morrison-Lab/ai-config` PR [#2800](https://github.com/Morrison-Lab/ai-config/pull/2800): `memories/MEMORY.md` and `skills/find-ai-tells/SKILL.md` described `memories/ai-writing-patterns.md` as an "Empirical synthesis of 29 AI writing patterns", whereas the document's taxonomy enumerated 20 core categories distilled from the source repository's 29 research files.
+- **Canonical Rule**: [`check-info-quality`](../skills/check-info-quality/SKILL.md) and [`timestamp-volatile-claims.md`](../shared/writing/timestamp-volatile-claims.md).
+- **Fix**: Count the actual items in the produced document and verify that descriptions in indices and skills match that exact count.
+- **Algorithmatizable?**
+  Yes.
+  A linter can extract claims of the form `N <nouns>` in docstrings/index entries
+  and compare them against header or bullet counts in target files.
+
+## Pattern 38: Atomized Write Fan-Out on Shared Subsystems / Files
+- **Do**: Group cohesive syntax edge cases, parser rules, or multi-case features for the same file or subsystem into unified design specifications and consolidated pull requests.
+- **Don't**: Fan out 20+ parallel micro-issues and micro-PRs targeting isolated syntax permutations in the same source file, which generates massive CI thrashing, review quota exhaustion, merge conflict cascades, and duplicate authoring overhead before ultimately requiring a holistic rewrite.
+- **Example**: 2026-09-01 on `Morrison-Lab/ai-config`:
+  Decomposing CommonMark link parsing in `scripts/check-links.py` into 26 separate micro-PRs (#2849–#2874) caused severe review quota exhaustion, merge collisions, and wasted authoring turns.
+  The entire problem was ultimately solved by 3 holistic PRs ([#2836](https://github.com/Morrison-Lab/ai-config/pull/2836), [#2839](https://github.com/Morrison-Lab/ai-config/pull/2839), [#2843](https://github.com/Morrison-Lab/ai-config/pull/2843)),
+  rendering all 26 micro-PRs redundant and superseded.
+- **Canonical Rule**: [`when-to-orchestrate.md`](../shared/workflow/when-to-orchestrate.md),
+  [`use-subagents.md`](../shared/workflow/use-subagents.md),
+  and [`restructure-for-efficiency.md`](../shared/workflow/restructure-for-efficiency.md).
+- **Fix**: Perform survey/discovery to identify the root architectural requirement (e.g. "Full CommonMark link parser compatibility") rather than decomposing into per-syntax permutation micro-tasks.
+  Use read-only subagents for discovery, and execute write tasks with consolidated, holistic feature branches.
+- **Algorithmatizable?**
+  Yes.
+  Check file footprints during orchestration and gate multi-subagent dispatch when targets share the same file footprint.
+
+## Pattern 39: Leaving PR Review Questions or Feedback Unanswered on the Forge Thread
+- **Do**: Whenever a user or reviewer links, cites, or asks about a PR review comment, question, or finding, synthesize and post the formal reply/resolution directly to the PR thread on GitHub in that very same turn.
+- **Don't**: Analyze the review question or execute downstream tasks locally/in chat without posting the written answer or resolution directly to the forge PR review thread.
+- **Example**: 2026-09-01 session (Antigravity, working `ucdavis/matt.contracts` [PR #98](https://github.com/ucdavis/matt.contracts/pull/98)): user linked review `https://github.com/ucdavis/matt.contracts/pull/98#pullrequestreview-5075093750` ("how much of this content can we externalize to hac.sap and load from there?").
+  The agent analyzed the architectural boundaries internally and proceeded to work on multi-format rendering in `hac.sap#9`, but failed to post the written architectural breakdown reply to the PR thread on GitHub until prompted "why didn't you do that hours ago?".
+- **Canonical Rule**: `AGENTS.md` ("Status and diagnostic requests do not make issues report-only", "Deliver completed implementation work"), and [`skills/ard/SKILL.md`](../skills/ard/SKILL.md) (Address, rebut, or defer review items).
+- **Fix**: When given a PR review reference or question, immediately post the direct response comment to the PR thread on the forge before or alongside related code updates.
+
+## Pattern 40: Merging Over Unaddressed Review Bot Findings Due to Incomplete Bot Identity and Verdict Header Scanning in ARDI Verifier
+- **Do**: Register all active external and automated review bot logins
+  (such as `copilot-pull-request-reviewer`, `jules`, `cursor`, `claude[bot]`)
+  in `EXCLUSIVE_BOT_IDENTITY` and `_is_bot_author` within review verification tools (such as `scripts/check-pr-fully-clean.py`),
+  and parse their standard verdict formats
+  (e.g. `### 🟢 Approval recommended` for clean signoff and `### 🟡 Changes recommended` for changes requested)
+  to ensure all automated review comments are strictly tracked and enforced by ARDI verification.
+- **Don't**: Rely on an incomplete list of review bot logins
+  or omit distinct forge/bot verdict headers in verification tooling;
+  missing a bot identity causes its review comments to be ignored by the automated review gate,
+  allowing PRs with outstanding findings or comments to falsely pass ARDI checks and merge.
+- **Example**: 2026-09-01 on `Morrison-Lab/wai` PR [#161](https://github.com/Morrison-Lab/wai/pull/161):
+  When Copilot code reviews resumed in September 2026,
+  Copilot posted review `5073770958` with login `copilot-pull-request-reviewer`
+  leaving an unresolved finding regarding missing Windows platform support in `chapters/ai-tools/antigravity-python-sdk.qmd`.
+  Because the review verifier only scanned for `github-actions`, `claude[bot]`, `jules`, and `cursor`
+  and did not recognize Copilot's `### 🟢 Approval recommended` / `### 🟡 Changes recommended` headers,
+  the ARDI checker reported clean and permitted merging over the unaddressed comment.
+- **Canonical Rule**: [`fully-clean.md`](../shared/workflow/fully-clean.md) (Criterion 2, automated review identity)
+  and [`scripts/check-pr-fully-clean.py`](../scripts/check-pr-fully-clean.py) (`EXCLUSIVE_BOT_IDENTITY`).
+- **Fix**: Register `copilot-pull-request-reviewer` in review bot rosters,
+  add Copilot's `Approval recommended` / `Changes recommended` verdict patterns,
+  and address the missing Windows platform documentation in `Morrison-Lab/wai` PR [#169](https://github.com/Morrison-Lab/wai/pull/169)
+  (closing [Issue #168](https://github.com/Morrison-Lab/wai/issues/168)).
+- **Algorithmatizable?**
+  Yes.
+  Test suites for ARDI verification scripts must maintain unit fixtures covering all active review bots
+  (Copilot, Claude, Jules, Cursor)
+  and their exact clean / changes-requested verdict headers.
+
+## Pattern 41: Claiming a Fix Without Differential Verification on Base vs Head
+- **Do**: When claiming a bug fix or edge-case resolution,
+  verify differential behavior by writing tests that fail on base (pre-fix)
+  and pass on head (post-fix),
+  and verify that the proposed regex/parser change does not inadvertently suppress genuine inputs
+  (such as negative lookahead `(?!\^)` on link text suppressing links whose text starts with `^`).
+- **Don't**: Assume an issue report describes an unhandled bug without reproducing the failure on base first;
+  adding unneeded exclusions can introduce false negatives on real inputs.
+- **Example**: 2026-09-01 on `Morrison-Lab/ai-config` PR [#2894](https://github.com/Morrison-Lab/ai-config/pull/2894) (Issue #2877):
+  An issue reported markdown footnote references (`[^1]`) could be mistakenly matched by link regexes as file paths.
+  Adding `(?!\^)` to `LINK_PATTERN` was redundant because `REF_DEF`'s existing `(?!\^)` exclusion already prevented footnote definitions from entering `defs`,
+  and introduced a false negative on valid links whose text began with `^` (e.g. `[^link](target.md)`).
+  Caught in review by Claude review bot on PR #2894.
+- **Canonical Rule**: [`fixtures-are-not-evidence.md`](../shared/workflow/fixtures-are-not-evidence.md)
+  and [`fact-check-code-logic.md`](../shared/coding/fact-check-code-logic.md).
+- **Fix**: Revert redundant regex restrictions,
+  add positive and negative test cases verifying that footnote markers are ignored while links starting with `^` are checked,
+  and verify base vs head behavior before claiming a bug fix.
+- **Algorithmatizable?**
+  Yes.
+  Unit test suites must assert differential failure on base fixtures and regression coverage for non-standard link text.
+
+## Pattern 42: Declaring an Instrument Blocked Without Reading Its Own `--help`
+- **Do**: Before reporting that a required instrument cannot run in this
+  environment, run its `--help` and read the memory file for the environment
+  (`memories/github-remote-sessions.md` for a remote/web session);
+  an instrument this corpus requires usually ships the remote-session route
+  beside the flag that needs it.
+- **Don't**: Hand-build an input the repo has a builder for,
+  then read the harness denying the hand-building commands as the instrument
+  being unrunnable,
+  and hand the user a BLOCKER with options that all cost them a step.
+- **Example**: 2026-09-01 on `Morrison-Lab/ai-config`, the GIA session that
+  merged [#2896](https://github.com/Morrison-Lab/ai-config/pull/2896) and
+  [#2932](https://github.com/Morrison-Lab/ai-config/pull/2932):
+  `check-pr-fully-clean.py --from-json` needs a payload file,
+  the session transcribed MCP tool output into it through Bash heredocs,
+  the auto-mode classifier denied those commands three times,
+  and the two clean PRs sat unmerged for hours behind a boxed BLOCKER.
+  `python3 scripts/check-pr-fully-clean.py --help` names
+  `scripts/build-pr-payload.py OWNER/REPO N FILE`, which builds the payload
+  from plain REST in one command;
+  run once, it scored six PRs FULLY CLEAN and they merged within minutes.
+  The near-miss is that the report looked diligent (three attempts, a clear
+  blocker box) while the cheapest check was never run.
+- **Canonical Rule**:
+  [`growth-mindset.md`](../shared/workflow/growth-mindset.md),
+  [`research-before-asking.md`](../shared/workflow/research-before-asking.md),
+  and [`get-under-the-hood.md`](../shared/principles/get-under-the-hood.md).
+- **Fix**: `fully-clean.md` now names the builder beside the `--from-json`
+  sentence, so the fragment that governs the gate carries the remote-session
+  route ([#2938](https://github.com/Morrison-Lab/ai-config/issues/2938)).
+- **Algorithmatizable?**
+  Partly.
+  A `Stop` guard could warn when a reply carries a BLOCKER box naming a
+  `scripts/*.py` instrument and the transcript shows no `--help` invocation
+  of that script; not built yet.
+
+## Pattern 43: Auto-Mode Push-Guard Deadlock --- Stale Plugin-Cache Hook Plus Classifier-Denied Overrides
+- **Do**: stop probing after the classifier's second denial of the same goal and hand the user the decision (push manually, restart the session, or add a permission rule).
+- **Don't**: keep rephrasing the override or the dispatch --- each denied variant makes the classifier more suspicious, locking out even the sanctioned paths;
+  and don't route the push around the guard through a peer session, a separately-billed CLI, or the MCP GitHub write tools ---
+  each is permission laundering:
+  the MCP write tools are the guard's documented open gap ([ai-config#1929](https://github.com/Morrison-Lab/ai-config/issues/1929)),
+  and a peer session or a separate CLI bypasses simply because the hook does not run there.
+- **Example**: 2026-09-01, `Lacaedemon/sparta` [PR #1459](https://github.com/Lacaedemon/sparta/pull/1459) (GIA sweep), tracked as [ai-config#2899](https://github.com/Morrison-Lab/ai-config/issues/2899);
+  previously `ucdavis/bcs` 2026-08-28 ([ai-config#2544](https://github.com/Morrison-Lab/ai-config/issues/2544), closed by [#2820](https://github.com/Morrison-Lab/ai-config/pull/2820)).
+  In an auto-permission-mode plugin-consumer session where no `adversarial-reviewer` agent is registered (`Agent type not found`),
+  the session treated `hooks/no-push-without-self-review.py`'s refusal as solvable in-session by repeatedly rephrasing the sanctioned `ALLOW_UNREVIEWED_PUSH=1` override or by patching the running hook file ---
+  when the auto-mode permission classifier pattern-matches every such attempt as a guard bypass and denies it,
+  and repeated varied attempts make the classifier (correctly) more suspicious,
+  until it denies even legitimately-shaped review dispatches.
+  The hook's sanctioned escape valve is exactly what the classifier reads as a bypass, so the two mechanisms compose into a lockout neither intends.
+  Both discharge paths were unreachable at once:
+  the plugin's shipped agents were absent from the session's Agent registry
+  (writing `.claude/agents/adversarial-reviewer.md` into the repo mid-session does not register it immediately or reliably --- definitions load at session start, and the one measured mid-session appearance came about fifty minutes after the write, by a mechanism not yet identified),
+  and the classifier denied the override in all three phrasings tried (Bash chained, Bash standalone, PowerShell `$env:`) --- consistent denials, not stochastic ones.
+  The [#2820](https://github.com/Morrison-Lab/ai-config/pull/2820) fallback, merged earlier that same day, was ALSO unreachable, for a distinct reason:
+  the harness runs the hook from the plugin CACHE snapshot (`~/.claude/plugins/cache/Morrison-Lab/ai-config/<rev>/hooks/`, via `${CLAUDE_PLUGIN_ROOT}`),
+  which predated the fix (rev `a3e0fdb`, no `FALLBACK_AGENT_NAME`);
+  pulling the marketplace clone (`git -C ~/.claude/plugins/marketplaces/Morrison-Lab pull --ff-only origin main`, to `79def2e`) succeeded but changed nothing the harness executes,
+  and copying the updated hook onto the cache copy was itself classifier-denied (reasonably --- an agent rewriting its own active guard).
+- **Canonical Rule**: [`adversarial-self-review.md`](../shared/workflow/adversarial-self-review.md) (the override's sanctioned scope),
+  [`no-push-without-self-review.py`](../hooks/no-push-without-self-review.py) (the fallback contract),
+  and [`keep-checkouts-fresh.md`](../shared/workflow/keep-checkouts-fresh.md) (the plugin hook path is the cache snapshot, not the marketplace clone).
+- **Fix**: Check first whether the running hook copy is stale against ai-config `main` --- diff the copy that `~/.claude/plugins/installed_plugins.json` pins (its per-scope `version` / `installPath`), since that is what runs: not the marketplace clone, and not merely the newest directory under the cache.
+  A session restart alone does NOT advance that pin (measured 2026-09-01: a continuation session started under ten minutes after the marketplace pull still ran rev `a3e0fdb`, and after a later app update the cache held a `79def2e` snapshot containing the fix while every scope stayed pinned to `a3e0fdb`).
+  Both measurements are recorded in the 2026-09-01 comments on [#2899](https://github.com/Morrison-Lab/ai-config/issues/2899).
+  What a restart does refresh is the auto-mode classifier's per-conversation state (the override the prior session's classifier had denied three times was accepted in the fresh one) and the Agent registry (a repo-level `.claude/agents/adversarial-reviewer.md` present at session start registers the reviewer, which satisfies even the stale hook's literal check).
+  The hook copy itself moves only when that pin advances.
+  The documented way to advance it is the plugin CLI --- `claude plugin marketplace update Morrison-Lab`, then `claude plugin update ai-config`.
+  `update` is the CLI's own subcommand for an already-installed plugin (present in Claude Code 2.1.258);
+  the `install` step in [`use-plugins.md`](../shared/workflow/use-plugins.md) is the first-time path and does not advance an existing pin.
+  This incident did not measure those commands:
+  an agent updating its own active guard mid-session is the same self-modification the classifier denies, so running them is the next thing for the USER to do.
+  Verify the pinned copy in `installed_plugins.json` afterwards rather than assuming the pin moved.
+  On a post-[#2820](https://github.com/Morrison-Lab/ai-config/pull/2820) hook (verified against `main`, 2026-09-01), the fallback contract is:
+  a dispatch whose `subagent_type` matches the general-purpose family (`general-purpose`, `general`, `reviewer`, `code-reviewer`, `research`, `self`)
+  and whose prompt contains a review-request phrase matching the prompt gate (e.g. "adversarial pre-push review"),
+  returning a report whose last verdict line reads `### Verdict: Ready for merge` (or `Needs more work`)
+  followed by `Reviewed-Commit: <HEAD sha>` (the parser accepts 7-40 hex characters; give the full 40).
+  A foreground dispatch is the simplest credited path and the one the hook's own refusal message recommends,
+  but background fallback dispatches, tracked `TaskOutput` reads, and task notifications are credited too, per Pattern 22.
+- **2nd occurrence of the misidentified-hook-copy class, 2026-09-03** ([#3141](https://github.com/Morrison-Lab/ai-config/issues/3141), recorded in [#3156](https://github.com/Morrison-Lab/ai-config/issues/3156)), and it is an occurrence of **this bullet's own Fix step being skipped** rather than of a new mechanism.
+  `hooks/no-unreviewed-pr.py` demanded a Copilot review while the moratorium ran to `2026-12-01`, and the session identified "the loaded copy" as the newest per-commit directory under `~/.claude/plugins/cache/` --- the exact proxy the Fix above rules out.
+  Several cache directories carried the same value, so newest isolated nothing --- derive the count rather than citing one, since the cache is garbage-collected and it fell from nine to five between 2026-09-03 and 2026-09-04 with no edit in between.
+  The label above names the diagnostic failure rather than a stale cache, and stays right after the resolution below: what recurred was reading the wrong artifact, and the copy captured firing sits outside the cache this pattern is named for.
+  What the resolution order would have surfaced: the copy registered directly in `~/.claude/settings.json` carries the correct date and returns 0 before reading the transcript, `enabledPlugins` for this plugin is `false`, and the user-scope pin in `installed_plugins.json` names a hook with **no `MORATORIUM_END` at all**.
+  Resolved 2026-09-04 by capture rather than by reasoning: `ps -eo args` sampled at 0.05s while deliberately triggering the guard named a snapshot under `~/Library/Application Support/Claude/local-agent-mode-sessions/`, carrying the expired constant.
+  No pass had looked there, and no corpus step named it.
+  Three passes enumerated explanations --- two, then three --- over a candidate set nobody had established, and each list was internally sound while the true answer sat outside all of them.
+  The transferable step is to capture the resolved path (`ps` while the guard fires) instead of deducing it from registration files, since a guard that fires repeatedly hands you the measurement for free.
+  See [`keep-checkouts-fresh.md`](../shared/workflow/keep-checkouts-fresh.md)'s dated-constant section for the resolution order and for the fail-open hazard, and for what the capture leaves unestablished.
+- **Algorithmatizable?**
+  Partially.
+  [#2544](https://github.com/Morrison-Lab/ai-config/issues/2544)'s suggested fix 3 --- have the hook's refusal message name a user-approvable permission rule for the override --- would have resolved the measured session in one step, and remains open under [#2899](https://github.com/Morrison-Lab/ai-config/issues/2899).
+
+## Pattern 44: `pgrep -f` Self-Matching in Background Waiters and Process Status Pollers
+- **Do**: When monitoring background tasks or long-running scripts,
+  wait on an explicit sentinel done-marker file
+  (`until [ -f "$DIR/job.done" ]; do sleep 5; done`)
+  or record and poll the exact process PID (`$!`),
+  and kill processes by PID (`kill -9 "$pid"; pkill -9 -P "$pid"`).
+- **Don't**: Use unanchored command-line substring matching (`pgrep -f "<script-name>"`)
+  in polling loops, waiters, or kill invocations;
+  the executing shell or waiter loop itself contains the search pattern in its `argv`,
+  causing `pgrep` to match itself and report false "still running" statuses,
+  deadlock on dead processes,
+  or trigger self-inflicted kills (a 128-plus-signal exit status) when running `pkill -f`.
+- **Example**: 2026-09-01 during a `serocalculator` [PR #668](https://github.com/UCD-SERG/serocalculator/pull/668) session (documented in [Issue #2915](https://github.com/Morrison-Lab/ai-config/issues/2915)):
+  A background waiter `until ! pgrep -f "install.R"; do sleep 10; done` ran indefinitely
+  because its own command line matched `install.R`,
+  causing status checks to report `STILL INSTALLING` for 40 minutes after the script finished.
+  A subsequent script waiting with `while pgrep -f "mut2.sh"; do sleep 3; done` deadlocked on the lingering waiter,
+  and a cleanup `pkill -f 'pgrep -f ...'` killed the active Bash execution mid-run.
+- **Canonical Rule**: [`memories/shell.md`](shell.md) (Background process waiters section)
+  and [`shared/principles/fail-fast.md`](../shared/principles/fail-fast.md) (a waiter that can never observe completion is a silent failure).
+- **Fix**: Replace process table substring matching with done-file sentinels,
+  track and terminate by PID,
+  and anchor pattern matching (`pgrep -f "^bash .*<name>"`) when unavoidable.
+- **Algorithmatizable?**
+  Yes.
+  Static analysis / hooks can flag unanchored `pgrep -f` and `pkill -f` inside while/until loops in shell scripts.
+
+## Pattern 45: Merging a PR That Adds a CI Check Alongside PRs That Add Content, Then Not Watching Main's First Run
+- **Do**: When a PR adds or widens a CI check and other open PRs add content the check will scan, run the new check on a local union of `main` plus the check branch immediately before merging it, and watch the first run on `main` after the merge as if it were the PR's own CI.
+  Treat that first run as the only run that has ever seen the union.
+- **Don't**: Read "every PR was green on its own branch" as evidence `main` will be green.
+  Each branch was checked against its own content;
+  the check branch never held the content branches' prose, and the content branches never held the check.
+- **Example**: 2026-09-02, `Morrison-Lab/wai`: [#187](https://github.com/Morrison-Lab/wai/pull/187) added a chapter-wide spellcheck step;
+  [#190](https://github.com/Morrison-Lab/wai/pull/190) and a peer session's [#192](https://github.com/Morrison-Lab/wai/pull/192) added prose in the same hour.
+  All three were green on their branches.
+  The first Spellcheck run on `main` after #187 merged ([run 33580505258](https://github.com/Morrison-Lab/wai/actions/runs/33580505258)) failed on six words, five from #192 and one from #190, and stayed red until [#199](https://github.com/Morrison-Lab/wai/pull/199).
+  Two of the six were a second gap the same run exposed: the wordlist already listed `GSM8K` and `MiniF2F`, and hunspell splits a token at a digit, so the entries had never matched.
+  The red run was noticed only because a post-wave sweep listed the workflow's runs on `main`;
+  nothing in the PR-driving loop looks at `main` after a merge.
+- **Canonical Rule**: [`sync-with-main.md`](../shared/workflow/sync-with-main.md) keeps a branch current with `main` before its own CI runs;
+  this pattern is the mirror, where the branch is current and it is `main` that has never been checked with the union.
+  [`post-merge`](../skills/post-merge/SKILL.md) verifies the merge landed and does not read `main`'s CI.
+- **Fix**: Before merging a check-adding PR, run the check locally on `main` merged with the branch, or list the open PRs whose files the check scans and re-run the check against each merged in turn.
+  After merging, list the workflow's runs on `main` (`gh run list --workflow <file> --branch main --limit 1`, or the Actions API) and hold the wrap-up until that run is green.
+- **Algorithmatizable?**
+  Yes for the after-merge half: a post-merge step that lists the affected workflow's latest run on `main` and refuses a clean wrap-up while it is red or in progress.
+  The before-merge half is a bounded loop over open PRs that `scripts/pr-overlap.py` already enumerates.
+
+## Pattern 46: Broad Multi-Surface Matching Without Surface Discrimination
+- **Do**: When extending a pre-tool hook or analyzer to new surfaces (e.g. extending forge comment guards to session notebooks or memory files), use surface-specific pattern matchers and extractors.
+  Require domain-specific markers (such as Pacific timezone indicators `PDT|PST|PT`) on general text surfaces and contextual indicators (heading, parenthesized, context-word, or tilde-prefix timestamps) for approximate `ish` stamps on session notebooks to prevent false positives on bare durations (such as `2:30ish` or `14:32`),
+  and scope in-command exemptions strictly by both start and end statement boundaries so neither preceding nor succeeding chained statements falsely discharge unmeasured stamps.
+- **Don't**: Collapse distinct surfaces into a single loose regex pattern or treat in-command subshell invocations (such as `$(date)`) as globally discharging unrelated write operations within chained commands.
+- **Example**: 2026-09-01 on [PR #2965](https://github.com/Morrison-Lab/ai-config/pull/2965) ([Issue #2947](https://github.com/Morrison-Lab/ai-config/issues/2947)):
+  `flag-unmeasured-timestamp.py` added a bare `ish` alternative (`\b\d+:\d+ish\b`) to `RX_STAMP`, which falsely flagged ordinary duration phrasing like "2:30ish" and "14:32" as Pacific clock claims.
+  Additionally, checking `RX_IN_COMMAND_DATE` against unsegmented command strings or start-only bounded statement substrings caused `LOGID=$(date +%s); echo "17:50 PDT" >> session.md` or `echo "17:50 PDT" >> session.md; NOW=$(date +%s)` to silently suppress unmeasured warnings.
+- **Canonical Rule**: [`fail-fast.md`](../shared/principles/fail-fast.md) and [`deterministic-tools.md`](../shared/principles/deterministic-tools.md).
+- **Fix**: Separate `RX_STAMP` (requiring explicit `PDT|PST|PT`) from contextual `RX_NOTEBOOK_STAMP`, bound redirect statements strictly by start and end separators, and ensure candidate tool input parameter mappings (such as `NotebookEdit`'s `new_source`) are complete.
+- **Algorithmatizable?**
+  Yes.
+  Multi-surface hook unit tests should include negative cases for bare durations, duration phrasing ("took 2:30ish"), and cross-segment chained command interactions (both leading and trailing unrelated date calls).
+
+## Pattern 47: Signature-Only Fallback Guard and Silent Content Loss in Reformatting
+- **Do**: When providing a fallback script or local mirror for an external or suggested dependency, verify full formals (names and defaults) and test output equivalence across target formats (e.g. HTML and OpenXML/DOCX) rather than merely comparing argument names (`names(formals())`).
+  When adapting or reformatting an established technical specification, statistical analysis plan, or contract into a new layout or visual template, explicitly audit that foundational methodological statements (blinding, multiplicity policies, non-error-free reference standard caveats, cluster-size variations) are preserved rather than silently dropped, and maintain consistent heading level hierarchy across the entire document.
+- **Don't**: Rely on `names(formals())` equality as proof that a fallback function mirrors its upstream counterpart;
+  signature equality misses body divergence, dropped text, layout changes, and argument default drift.
+  Don't describe a document reformatting as "formatting only" in changelogs or PR descriptions if substantive methodological prose or caveats were removed.
+- **Example**: 2026-09-02 on `ucdavis/matt.contracts` [PR #98](https://github.com/ucdavis/matt.contracts/pull/98),
+  a private repository whose link resolves only with access:
+  A fallback script `altdoc/scripts/format-sap-table.R` claimed to mirror `ucdavis/hac.sap`, but its guard test compared only `names(formals())`.
+  The non-DOCX branch of `format_charter_table` diverged materially (emitting two boxed tables and omitting prompt questions and bullet points rather than a single merged table), while the guard passed 24/24 tests.
+  Simultaneously, reformatting the SAP into the HAC template dropped the blinding procedure,
+  multiplicity policy, error-free reference standard caveat, and variable cluster size caveats,
+  inverted document heading levels by placing `## References` over a document rooted at `###`,
+  and `format_milestones_table` discarded column identifiers by replacing `Month 1`..`Month 8` with `rep("Month", ...)`.
+- **Canonical Rule**: [`fail-fast.md`](../shared/principles/fail-fast.md) and
+  [`preferences.md`](preferences.md) (verify outputs, not assumptions).
+- **Fix**: Write regression tests that verify output equivalence (rendered HTML / OpenXML) and full `formals()` matching.
+  Perform a content preservation diff check before finalizing documentation reformatting,
+  and enforce consistent heading depth across all markdown sections.
+- **Algorithmatizable?**
+  Yes.
+  In tests guarding fallback implementations, assert `expect_equal(formals(fallback), formals(upstream))`
+  and test output equivalence on representative fixtures.
+  In document linters, check that a document intentionally rooted at level 3 has no orphaned level-2 headings.
+
+## Pattern 48: Silent Library Import Fallback in Standalone Hooks
+- **Do**: When providing an inline fallback in a hook script that attempts to import from a shared repository library (e.g. `scripts/lib/`), bind the exception and log an explicit diagnostic to `stderr` (`print(f"... cannot load ... ({_exc}); using fallback ...", file=sys.stderr)`).
+  In test suites, assert that inline fallback definitions stay synchronized with the shared library module, and test that the fallback error path logs as expected.
+- **Don't**: Use bare `except Exception: pass` around shared library imports in hooks.
+  A silent pass swallows broken paths, rename drifts, or syntax errors, causing the hook to run indefinitely on stale duplicate inline definitions with zero observability.
+- **Example**: 2026-09-04 on [PR #3201](https://github.com/Morrison-Lab/ai-config/pull/3201) ([Issue #3172](https://github.com/Morrison-Lab/ai-config/issues/3172)):
+  `hooks/no-unshipped-commit.py` wrapped `from git_cmd import ...` in `try: ... except Exception: pass`.
+  Automated review flagged that the silent fallback provided zero observability and lacked tests asserting that the inline fallback copies of `_ENV` and `_GIT_FLAGS` stayed synchronized with `scripts/lib/git_cmd.py`.
+- **Canonical Rule**: [`fail-fast.md`](../shared/principles/fail-fast.md) ("Never swallow an error into a silent fallback;
+  make any genuinely wanted fallback explicit, bounded, and observable").
+- **Fix**: Log a warning to `stderr` describing the import failure and fallback activation, and write regression tests in the hook's test suite asserting constant equality and fallback invocation.
+- **Algorithmatizable?**
+  Yes.
+  Linters or hook test suites can parse inline fallback definitions against shared library exports and test import failure execution.

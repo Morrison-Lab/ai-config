@@ -232,8 +232,9 @@ RX_GH_SEARCH_ISSUES = re.compile(
 # `--state all`/`--state=all` is a command gh itself rejects and the search
 # never ran). Any explicit value disqualifies the all-state-by-omission
 # reading, which is what actually satisfies `gh search issues`.
+# Long-form --state lookbehind: see RX_GH_SEARCH_FLAG (ai-config#2427, #2481).
 RX_GH_SEARCH_STATE_FLAG = re.compile(
-    r"--state\b(?:=|\s+)['\"]?\S+",
+    r"(?<![A-Za-z0-9-])--state\b(?:=|\s+)['\"]?\S+",
     re.IGNORECASE,
 )
 
@@ -259,8 +260,11 @@ RX_OPEN_CLOSED_QUALIFIER = re.compile(
 # conservative about: an issue closed last week is invisible to the
 # open-only search gh actually ran (caught in review on #2324, verified by
 # direct execution of the reproducer above).
+# The lookbehind on long-form --state (mirroring the -s branch and
+# RX_GH_SEARCH_FLAG) stops the flag matching as a substring of a longer
+# unquoted token, e.g. `--label needs--state open` (ai-config#2427, #2481).
 RX_GH_STATE_FLAG = re.compile(
-    r"(?:--state(?:=|\s+)|(?<![A-Za-z0-9-])-s(?:=|\s+))(\S+)"
+    r"(?:(?<![A-Za-z0-9-])--state(?:=|\s+)|(?<![A-Za-z0-9-])-s(?:=|\s+))(\S+)"
 )
 # The lookbehind on the long-form --search (mirroring the -S branch's)
 # stops the flag matching as a substring of a longer unquoted token,
@@ -289,8 +293,9 @@ RX_SEARCH_VALUE = re.compile(
 # above: `--all --all=false` parses to false, not true, and a plain
 # containment check for `--all\b(?!=false)` matches the FIRST occurrence
 # and never sees the second one override it.
+# Long-form --all lookbehind: see RX_GH_SEARCH_FLAG (ai-config#2427, #2481).
 RX_GLAB_ALL_FLAG = re.compile(
-    r"(?:--all|(?<![A-Za-z0-9-])-A)\b(?:=(\S+))?"
+    r"(?:(?<![A-Za-z0-9-])--all|(?<![A-Za-z0-9-])-A)\b(?:=(\S+))?"
 )
 # Long-form --search lookbehind: see RX_GH_SEARCH_FLAG (ai-config#2427).
 RX_GLAB_SEARCH_FLAG = re.compile(r"(?<![A-Za-z0-9-])--search\b")
@@ -712,12 +717,34 @@ def _emit(note):
     }))
 
 
-def main():
+def _read_payload() -> tuple[dict, bool]:
+    """Parse payload from sys.argv (--dry-run / --simulate) or sys.stdin."""
+    args = sys.argv[1:]
+    is_dry_run = "--dry-run" in args or "--simulate" in args
+    if is_dry_run:
+        positional = [a for a in args if not a.startswith("-")]
+        if positional:
+            raw_cmd = positional[0].strip()
+            if raw_cmd.startswith("{") and raw_cmd.endswith("}"):
+                try:
+                    return json.loads(raw_cmd), True
+                except Exception:
+                    pass
+            return {"tool_name": "Bash", "tool_input": {"command": raw_cmd}}, True
+
     try:
         payload = json.load(sys.stdin)
-    except Exception as exc:  # fail open, but say so
-        print("warn-pr-create-without-dupe-check: unreadable hook input "
-              f"({exc})", file=sys.stderr)
+        return (payload if isinstance(payload, dict) else {}), is_dry_run
+    except Exception as exc:
+        print(f"warn-pr-create-without-dupe-check: unreadable hook input ({exc})",
+
+              file=sys.stderr)
+        return {}, is_dry_run
+
+
+def main():
+    payload, is_dry_run = _read_payload()
+    if not payload:
         return 0
 
     if not isinstance(payload, dict):

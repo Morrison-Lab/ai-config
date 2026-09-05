@@ -43,6 +43,16 @@ and about **mechanism**
 (whether a cache is ever read),
 in exactly the same shape.
 
+**The boundary in the other direction is worth naming, because this fragment is where a reader lands first and the rule they need may be elsewhere.**
+Every shape here begins with a substitution: you read A and the claim is about B.
+The neighbouring failure has no substitution in it at all --- the artifact is the right one, it is read correctly, and the sentence after the reading answers a question that artifact does not address.
+Nothing in this fragment fires on that, because there is no wrong object to name.
+[`metacognitive-monitoring`](metacognitive-monitoring.md)'s "A sound measurement does not license the claim standing next to it" is the rule for it.
+So when a check of yours came back clean and the claim still feels under-supported, ask which of the two is happening: whether you read the wrong thing, or read the right thing and then took a step.
+
+- **Do:** send a claim to that section instead of this one when the artifact is the correct one and the doubt is about the step taken from it.
+- **Don't:** read a shape here failing to match as evidence the claim is supported --- these shapes cover substitutions only.
+
 ## The four shapes
 
 Recognizable in advance, which is the point of enumerating them:
@@ -191,6 +201,74 @@ When a brief, an issue body, or a review finding asserts what a repository says,
 
 See [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md), "A stale branch read that produced two issues and a config edit".
 
+## A comparison's base is an artifact too, and it moves the scope in both directions
+
+Every shape above concerns an artifact you **read**.
+A diff is an artifact you **derive**, from two refs, and attention goes to the one you are interested in --- the branch under review.
+The other ref is the base, and nothing about naming it feels like making a claim.
+
+`git diff main...pr-98` reads as "the PR's changes".
+It is not.
+It is the changes since whatever commit your **local** `main` shares with `pr-98`, and a local branch is a cached copy of a remote branch, which is shape 1 exactly.
+The three-dot form is what conceals it: a merge-base is a real computation over real history, so the range feels self-correcting, and the sensation of having used the careful form stands in for having checked the ref the careful form is computed from.
+A merge-base is only ever as fresh as the ref you fed it.
+
+**The error runs in both directions, and the quieter one is the worse.**
+A base **behind** its remote moves the merge-base earlier, so the diff gets bigger.
+The extra content is commits that already merged --- other people's work, already reviewed, already landed --- and a review run on it produces findings against code the author of this PR never wrote, spending the author's time and the reviewer's credibility at once.
+A base carrying local commits the remote lacks --- **ahead** of it, or diverged from it --- where the head branch also carries those commits, moves the merge-base *later*, so the diff gets smaller.
+That is the dangerous one.
+An over-wide diff produces findings the author will dispute, so it announces itself within a round;
+an under-wide one silently omits part of the change and comes back clean, and a clean verdict is the one nobody questions.
+
+**Nothing in the output announces either direction.**
+A 53-file diff and a 14-file diff are equally plausible artifacts.
+Every finding derived from the wrong scope is individually well-formed, correctly quoted, and about a real line of real code.
+So the usual detector --- a finding that looks wrong --- never fires, because none of them do.
+
+A dispatched reviewer cannot catch it either, and [`challenge-the-assignment`](challenge-the-assignment.md) says why in the mirror: a brief must not assert what the author cannot query about the *recipient's* environment.
+This is the inversion of that.
+The brief asserts something about the author's **own** environment, which the author could have queried in one command and did not, and which the recipient cannot query at all.
+
+**The falsifying question in "The test" above disposes of it, and its answer is that the diff cannot testify about itself.**
+Ask what would have to be true for the base to be wrong, and whether the diff in hand could show it.
+It could not.
+The forge could, and it is one call:
+
+```bash
+git -C <repo> fetch -q <remote>
+BASE=$(git -C <repo> merge-base <remote>/<default-branch> <pr-ref>)
+git -C <repo> diff --shortstat "$BASE" <pr-ref>
+gh pr view <N> --json changedFiles,additions,deletions
+```
+
+The two readings must agree.
+A mismatch means one of the two refs is wrong, and the base is only the first place to look: the local copy of the *head* goes stale the same way, so a PR that has received commits since you fetched it disagrees with a perfectly correct base.
+Re-fetch the head before concluding anything about the base. (Rename detection is a smaller third cause, since `diff.renames` is on by default and the forge counts renames its own way.)
+This section is about attributing a discrepancy to the wrong artifact, so a single diagnosis for a symptom with several causes is the failure it describes rather than a shortcut past it.
+Resolve the default branch from the repo rather than assuming `main`, and note the remote is not always `origin` --- a dual-forge repo has the PR's forge under a second remote name, and the fetch has to name that one.
+
+The `fetch` is the load-bearing half, for the reason the working-directory section already gives: a remote-tracking ref is itself a cached copy, current only to the last fetch.
+A fetch at session start does not cover a review dispatched an hour later, which is [`check-before-pushing`](check-before-pushing.md)'s point about a reading of a moment that has passed, moved from the push to the dispatch.
+
+Report the base you resolved.
+A review brief, or a review comment, that states the merge-base SHA and the file and insertion counts alongside its findings is one a reader can check;
+one that says "the PR's diff" is not.
+
+- **Do:** resolve a review diff's base from a remote-tracking ref, after fetching that remote, and state the merge-base SHA and the file and insertion counts beside it.
+- **Do:** cross-check the derived counts against the forge's own (`gh pr view --json changedFiles,additions,deletions`) before dispatching, and treat any mismatch as a wrong base rather than as noise.
+- **Don't:** pass a bare local branch name as a diff's base, in your own command or in a brief you hand a subagent.
+- **Don't:** read the three-dot form as self-correcting --- it computes a merge-base from refs you supplied, and cannot know one of them is behind.
+- **Don't:** wait for an implausible finding to reveal it;
+  over-wide scope produces findings that are all individually sound.
+
+`hooks/warn-stale-review-diff-base.py` is the instrument, per [`algorithmatize-checks`](algorithmatize-checks.md).
+The rule it enforces is not "was the local ref fresh", which no hook can know, but "name a remote-tracking ref", which is lexical.
+It warns and never blocks, because a bare local base is entirely correct for an ordinary local comparison and the hook cannot tell those apart.
+It has no fetch-based discharge on purpose: [`keep-checkouts-fresh`](keep-checkouts-fresh.md) mandates a fetch at session start, so keying on one would silence the hook in exactly the sessions that follow the corpus.
+
+See [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md), "A stale local base that nearly quadrupled a review diff's file count".
+
 ## A summary is another shape, and the auto-loaded copy is the one you read
 
 [`fact-check-prose`](../writing/fact-check-prose.md)'s "any condensation
@@ -233,6 +311,34 @@ currently uninstrumented.
 
 See [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md),
 "A summary read as its source, in the session that fixed the summary".
+
+**The same substitution runs over your own transcript,
+and there it corrupts a measurement rather than a citation.**
+The section above concerns a summary of a corpus *file*.
+A context-window summary of the *conversation* is the other copy that is already in front of you,
+and the reply it condenses is not.
+
+That matters most when the text is being used as a **specimen** rather than as a source.
+Designing a matcher --- a hook's regex, a grep, a classifier's word list ---
+against the summary's rendering of a reply is validating it against paraphrase.
+The summary's wording is written to be representative, so it matches readily,
+and the measurement comes back clean;
+the real reply's wording is what the matcher will actually meet in production,
+and it need not match at all.
+Nothing distinguishes the two outcomes,
+because both are "the pattern fired on the text I tested it against".
+
+Measured 2026-09-02/03 while drafting the `no-unverified-approval-claim` Stop hook on `Morrison-Lab/ai-config` (branch `hook/no-unverified-approval-claim`,
+unpushed at the time of writing, so there is no PR to cite):
+the matcher was designed and validated against a context-window summary of the session's own reply.
+The summary's phrasing matched and the reply's phrasing did not,
+so the design read as validated by its own measurement while not firing on the one case that motivated it.
+
+- **Do:** pull the verbatim text out of the raw transcript when a matcher is being fitted to it,
+  per [`get-under-the-hood`](../principles/get-under-the-hood.md)'s raw-log practice.
+- **Do:** treat "the pattern matched my test string" as a claim about the test string until you can say where that string came from.
+- **Don't:** fit a matcher to a summary of the thing it must match ---
+  a paraphrase is the one specimen guaranteed to be cooperative.
 
 ## A drift claim is relational, so one read cannot settle it
 
@@ -658,3 +764,343 @@ Running it against the shipped design reports 0, which any reader can re-run.
 The 3,924 / 108 / 270 / non-zero off-axis figures for the four rejected designs were recorded on that branch before #2515 was **squash-merged** as `07847b9`, so they are not reproducible from `main` --- which is the artifact a reader has.
 They are not lost, though, and the difference matters: GitHub retains `refs/pull/<N>/head`, so `git fetch origin 'refs/pull/2515/head:refs/remotes/pr/2515'` restores the branch and all four designs (`c7ff646`, `4f9d3fc`, `68a14b9`, `a3251bf`) with it.
 Name that route whenever you mark a figure unreproducible, since "unreachable" and "not on the default branch" are different claims and only the second is true here --- the first was asserted in this very section and refuted by one `git ls-remote`.)
+
+**A ninth: a LOSSY CONVERSION of a document, standing in for the document.**
+
+The shapes above substitute an artifact that is stale, partial, or adjacent.
+This one substitutes an artifact that is current and complete for its own purpose, and **lossy by design**.
+A conversion drops what its target format cannot carry,
+so its omissions are the reason the tool is useful rather than a defect in it.
+
+The tell is that the derived view answers the question you asked and cannot answer the question you meant.
+`pandoc -t markdown` on a `.docx` reports the text a reader sees.
+Asked whether a link is present, it can report nothing about a URL stored as a Word HYPERLINK field code,
+and **more than one thing decides whether it does**.
+All three arms below were measured on pandoc 3.1.3 under `--track-changes=accept`.
+A `fldChar` HYPERLINK field in ordinary body text whose `instrText` sits in a single run
+converts to a markdown link with its URL intact.
+Splitting that same `instrText` across two runs, at the space before the quoted URL,
+still emits a link and empties its target: `[anchor]()`.
+The identical single-run field nested inside a `<w:ins>` tracked insertion drops the link entirely,
+leaving bare text.
+So `<w:ins>` is **sufficient** to lose the URL without being the determinant,
+since the split-run arm loses it with no `<w:ins>` anywhere in the document.
+The split-run arm is not a corner case either:
+Word and Zotero routinely split `instrText` across runs,
+which is the premise of [`memories/office-open-xml.md`](../../memories/office-open-xml.md)'s sibling entry
+and the reason its `merge_runs.py` exists at all.
+Say "single-run" rather than "contiguous", which this entry reached for first and which decides nothing:
+a field split across *paragraphs*, its `instrText` still in one run, converts with the URL intact.
+The negative control is what identifies each mechanism.
+Without it the omission reads as "pandoc does not carry field-code links at all",
+which is false and was written down that way once before the control was run.
+A listing of `word/_rels/document.xml.rels` is no better:
+it enumerates one of the two ways Word stores a hyperlink and is silent about the other.
+Two independent readings then agree, and the agreement is a property of what both drop.
+
+So before concluding a document does not contain something,
+search the **stored form**: grep the source XML, the raw bytes, the file the application actually writes.
+The converted view is evidence about what a reader sees, which is a different claim.
+
+- **Do:** name which representation a negative is about --- rendered text, or stored source --- before reporting it.
+- **Do:** grep the stored form (`word/document.xml`, the raw file) when the claim is that something is absent.
+- **Do:** run a negative control on the conversion before naming a mechanism for what it dropped;
+  an omission with no control behind it is a guess wearing a measurement.
+- **Don't:** promote one mechanism to *the* determinant once a control has shown it sufficient;
+  sufficient and necessary are different findings, and only a further arm separates them.
+- **Don't:** read two derived views agreeing as corroboration when both drop the same class of content;
+  that is [`grep-is-not-coverage`](grep-is-not-coverage.md)'s guaranteed-either-way null in a new surface.
+- **Don't:** treat "lossy" as "stale" --- refetching a conversion returns the same omissions.
+
+(Measured 2026-09-01 while adding tracked changes and comments to three `.docx` files for a journal resubmission.
+A manuscript's Shiny-app link was absent from the rels listing and absent from pandoc's markdown output,
+and the conclusion that it had been deleted was written into a draft review finding.
+It was present as a `fldChar` HYPERLINK field code, found by grepping `word/document.xml` for the URL.
+In that manuscript the field carries exactly one `instrText` element and *is* wrapped in `<w:ins>`,
+so the tracked insertion really is the operative cause there;
+the split-run mechanism generalizes the entry rather than retracting its case.
+The manuscript is private, but the pandoc behaviour needs no manuscript:
+build a minimal `.docx` carrying the same HYPERLINK field three times ---
+once in plain body text with its `instrText` in a single run,
+once in plain body text with that `instrText` split across two runs at the space before the quoted URL,
+and once single-run but wrapped in `<w:ins>` --- then convert with `--track-changes=accept`.
+The three arms emit the URL, an empty target, and bare text respectively.
+Read a `w:ins` grep over `word/document.xml` carefully when building the split arm:
+`w:instrText` contains the substring `w:ins`, so a plain `grep -c` reports a match in a document that has none.
+[`memories/office-open-xml.md`](../../memories/office-open-xml.md) carries the docx-specific mechanics,
+including the two-pandoc-diff verification for a redlined document.)
+
+**A tenth: a diff's changed lines, standing in for the file they changed.**
+
+The shapes above substitute one file, run, or environment for another.
+This one keeps the right file and reads only the fraction of it a diff highlighted.
+A diff marks what changed;
+it says nothing about what the surrounding text, including context the same diff adds, now means.
+Grepping the diff for a keyword returns exactly the lines matching that keyword and nothing about the lines around them --- and those surrounding lines are the file's meaning as often as not, because a change is scoped by its neighbours.
+
+The tell is a conclusion drawn from **removed or added lines alone**, when the same diff's own added context sits one hunk away and narrows what the removal actually licenses.
+
+Case: `Morrison-Lab/gha#811` deleted three lines from `examples/quarto-publish.yml` --- `concurrency:` / `group: gh-pages` / `cancel-in-progress: false` --- with no replacement.
+Reading that removal through `gh pr diff | grep` for `concurrency`/`group` lines supports one conclusion: the PR tells consumers to delete the block outright.
+The same diff, earlier in the same file, adds a six-line NOTE the grep pattern never matched: "Do NOT declare a top-level `concurrency:` block naming `gh-pages`" in the caller workflow.
+That sentence is scoped to the group's *name*, not to the presence of a block.
+A caller-level group with a different name --- `website-publish-${{ github.ref }}`, the literal name `gha#667` gave a different workflow's group in the same repo, or `quarto-publish-${{ github.ref }}`, the name the consumer PR that motivated this fix later merged --- names something else and is not what the note forbids.
+The removal and the addition are two edits inside one diff, and only reading the file whole, rather than the diff's hunks in isolation, shows that the second scopes the first.
+
+**This survives the quote-the-passage check, which is what makes it worth recording rather than dismissing as ordinary carelessness.**
+[`quotable-findings`](quotable-findings.md) requires a finding to quote the exact passage it is about, on the theory that a quotable finding is a checked one.
+Quoting the three removed lines satisfies that rule to the letter: the passage exists, the quote is exact, the mechanical filter passes clean.
+What the filter cannot check is whether the *file*, read whole, means what the quoted fragment suggests once its own neighbouring lines are included.
+The check that would have caught this reads "open the file the passage lives in," not "quote the passage" --- a stricter requirement than [`quotable-findings`](quotable-findings.md) states, and this is the shape that shows the gap between them.
+
+**Before writing a retraction, check whether the head moved.**
+A wrong claim about a file can be wrong for two different reasons, and they produce different retractions.
+The commit could have changed since the claim was written, in which case the honest statement is "this changed" and no misreading occurred.
+Or the commit could be exactly the one that was read, in which case the honest statement is "I misread it" --- and conflating the two either lets a real misreading hide behind an invented edit, or accuses a PR of moving when it did not.
+Settle it before writing either sentence: fetch the specific commit SHA the claim was written against (`gh api repos/<owner>/<repo>/contents/<path>?ref=<sha>`) and confirm it is unchanged, rather than assuming from the PR's current state.
+In the case above, the branch head had in fact already moved by the time of both flagged comments --- a separate commit (`e34e03d5`) landed less than a minute before the first of them, fixing an unrelated review round --- but a direct compare (`gh api repos/<owner>/<repo>/compare/<cited-sha>...<later-sha>`) shows that commit never touched `examples/quarto-publish.yml`.
+So the file the claim was about was genuinely unchanged, and the retraction's "I misread it" holds;
+but the retraction described the cited commit as the one its comments were written against without checking the branch's own commit history, which shows a different commit was already the head by then.
+A retraction is a claim like any other, and this one needed the same check.
+
+- **Do:** read the file a diff's hunk lives in, not only the hunk, before concluding what a removal licenses or forbids.
+- **Do:** treat added context in the *same* diff as evidence about scope, even when it sits in a different hunk than the lines a grep matched.
+- **Do:** fetch the exact commit a wrong claim was written against before deciding whether to retract it as "I misread" or "this changed."
+- **Don't:** treat a clean pass of [`quotable-findings`](quotable-findings.md)'s quote-the-passage check as evidence the file was read;
+  it only proves the passage exists.
+- **Don't:** infer a rule's scope from the lines a diff removed when the same diff also adds prose stating the scope.
+
+(Measured 2026-09-02 on [`Morrison-Lab/gha#811`](https://github.com/Morrison-Lab/gha/pull/811).
+Two comments on the PR, both derived from `gh pr diff | grep`-ing the changed `concurrency`/`group`/`cancel-in-progress` lines, argued that the deletion was the wrong fix and that a rename (as `gha#667` had already used elsewhere in the same repo) should have been kept instead;
+a later comment restated the same position once a consumer PR merged its own renamed group, phrasing it as the stub telling consumers to delete the block while the consumer had shipped a rename.
+The stub's own added NOTE at the cited commit (`856b8702`) read "Do NOT declare a top-level `concurrency:` block naming `gh-pages`," which scopes the prohibition to the group's name and forbids nothing about a renamed group.
+Verified with `gh api "repos/Morrison-Lab/gha/contents/examples/quarto-publish.yml?ref=856b8702" --jq '.content' | base64 -d`.
+The claim was retracted in the PR thread;
+the retraction described `856b8702` as the commit its comments were written against, which a separate check against `gh api repos/Morrison-Lab/gha/pulls/811/commits` and `.../compare/856b8702...e34e03d5` did not confirm, though the file itself was confirmed unchanged.)
+
+**An eleventh: an issue's OPEN state,
+standing in for the behaviour it describes.**
+
+The seventh shape above substitutes a *future* state for the present one.
+This one substitutes a **stale past** one,
+and it arrives with a citation attached,
+which is what makes it the more persuasive of the two.
+An open issue is a durable, linkable,
+timestamped artifact that describes a defect precisely.
+Everything about it reads as evidence.
+What it actually records is that nobody has closed it,
+and closing is a bookkeeping act performed by a person,
+so the gap between "the defect exists" and "the issue is open" is exactly the set of fixes that landed without their issue being closed ---
+which in a fast-moving repo is a large set.
+
+The asymmetry runs against you.
+A closed issue over-claims in the safe direction: you go and check.
+An open issue under-claims in the dangerous one:
+it confirms the belief you already had, from a source you can cite,
+so nothing prompts the read.
+
+The falsifying question from "The test" above disposes of it in one step:
+*could this issue be open while the behaviour it describes is fixed?*
+It always could.
+So the issue can never settle the question, and only the code can.
+
+- **Do:** read the code (or run the test) before asserting current behaviour,
+  and cite the file and line rather than the issue.
+- **Do:** cite the issue for the *history* --- that this was once broken,
+  and is tracked --- which is the claim it can actually support.
+- **Do:** check whether the fix landed and the issue simply was not closed,
+  and close it (or say so) when it did.
+- **Don't:** treat an open issue as a live measurement;
+  its state is bookkeeping, not behaviour.
+
+(Measured 2026-09-02, and re-checked 2026-09-03.
+`hooks/flag-background-review-dispatch.py` ---
+authored at commit `9009e787a` on the local `ai-config` branch `hook/flag-background-review`,
+which `git ls-remote --heads origin hook/flag-background-review` confirms is unpushed,
+so neither the commit nor the file is reachable from any clone but the author's ---
+carried a docstring asserting that [`no-push-without-self-review.py`](../../hooks/no-push-without-self-review.py) does not register verdicts arriving via background task notifications,
+citing [ai-config#2483](https://github.com/Morrison-Lab/ai-config/issues/2483), which was ---
+and as of 2026-09-03 still is --- open.
+The fix had landed on 2026-09-01 in [#2820](https://github.com/Morrison-Lab/ai-config/pull/2820) (`0d78e04c`),
+whose `is_task_notification` branch sits at `hooks/no-push-without-self-review.py:1400-1417` and is covered by a passing test.
+`git log -L 1400,1417:hooks/no-push-without-self-review.py` names that commit in one command;
+no such command was run, because an open issue looked like the answer.
+The docstring was still uncorrected on that branch as this was written.)
+
+**A twelfth: a pull request's check-run names, standing in for the branch's own workflow definitions.**
+
+The seventh and eleventh shapes above are both substitutions across time, and the eleventh is unaware too, so what is new here is that **the artifact offers nothing to date**.
+The seventh reads a future state for the present one knowingly, because the future state is the one being worked toward.
+The eleventh reads a stale past one from a citable artifact: an issue carries a number and a timestamp, so its staleness is checkable by anyone who thinks to check, and what defeats it is that nothing prompts the read.
+A check-run **name** carries neither.
+`Spellcheck` is the same ten characters whenever it was produced, so there is no field to inspect and no version to compare --- the thing you would have to date is not in what you read.
+A pull request's check runs are current, complete, and correct.
+What they describe is the workflow definitions **in force when each run executed** --- resolved from the pushed commit for a `push` run, and from the head-into-base merge for a `pull_request` one.
+Neither of those is the default branch as of now, and the name carries no trace of which moment or which resolution produced it.
+
+The tell is a claim of the form "this repository emits X", derived from observing X somewhere.
+A check run is produced by a workflow file, and a workflow file is versioned like any other, so a rename, a job restructuring, or a migration from inline jobs to a called reusable workflow changes every context string the repository publishes from that moment on.
+A check run therefore records the definitions **in force when that run executed**, and its name carries no trace of when that was.
+
+Two facts about a run decide which definitions it used, and a check-run name shows neither.
+**When** it executed, and **which ref** it resolved the workflow file from.
+For a `push` run that ref is the pushed commit;
+for a `pull_request` run it is the merge of the head into the base, so a head that edits the workflow file overrides the base's copy while a head that does not simply gets whatever the base carries at that moment.
+That second case is worth stating plainly, because the intuitive rule --- an old head publishes old names --- is false: an untouched workflow file follows the base, so a pull request opened long before a migration publishes the *new* names on its next run.
+
+The staleness that does bite is therefore temporal rather than positional.
+A name observed at time T is a fact about time T, and any later merge to the default branch retires it without touching the pull request you read.
+Merged-ness is what conceals that.
+A merged pull request feels like it *became* the branch, and in the ordinary case it did;
+what it did not become is the branch as of any later moment, and nothing about a merged status says which moment you are reading.
+
+The consequence for a required status check is unusually expensive, because it fails in the direction nothing reports.
+A required context naming a check that no workflow emits does not error, does not turn red, and does not appear in any run.
+It sits as `Expected`, and the only diagnosis is noticing that a check listed as required never appears at all.
+How far that spreads is a question about runs rather than about settings.
+An open pull request keeps whatever check runs it already has, so one that last ran before the workflow change still shows the old names and still looks satisfied.
+Its next **push** re-resolves the workflow file through the current base and publishes the new names, after which the required context is unreportable on that pull request.
+A *re-run* does not do this: GitHub re-runs reuse the original event's `GITHUB_SHA` and `GITHUB_REF`, so re-running a pre-change run republishes the old names and looks like evidence that nothing changed.
+So the requirement is retired one pull request at a time, as each one is next pushed to, and nothing about that transition is announced.
+Date the check runs you are reading before describing the blast radius;
+a rollup showing a required context green may be showing a week-old run.
+
+The authoritative artifact is the default branch's own workflow definitions, confirmed against a run **of that branch**:
+
+```bash
+gh api "repos/<o>/<r>/contents/.github/workflows?ref=<default-branch>" --jq '.[].name'
+gh api "repos/<o>/<r>/contents/.github/workflows/<file>?ref=<default-branch>" --jq .content | base64 -d
+gh api "repos/<o>/<r>/actions/runs/<run-id-on-that-branch>/jobs" --jq '.jobs[].name'
+```
+
+Read the definition rather than only the run, because a run answers only for the workflows that happened to trigger on that push.
+A caller job `check:` invoking `uses: <org>/gha/.github/workflows/spellcheck.yml@v2`, in a workflow whose own `name:` is `Spellcheck`, publishes `check / spellcheck`.
+The workflow-level `name:` does not appear at all.
+What appears on each side of the slash is a **job** display name --- the caller job's, then the called workflow's inner job's --- and a job's display name is its `name:` where one is set and its key otherwise.
+So the string is derivable from the file, and reading it off any observed check run is derivable from the wrong file.
+
+This is also [`run-ums-proactively`](run-ums-proactively.md)'s false-*state*-claim case in its purest form.
+No belief about reusable workflows was ever held and then corrected;
+the wrong thing was simply looked up, so the reusable lesson is the query rather than the value.
+
+One clause on the corroborating run, because the obvious reading of it is unsatisfiable.
+The workflow definition on the default branch is the authority;
+the run is corroboration that the definition composes the string you think it does.
+A workflow triggered only by `pull_request` produces no run at all on an ordinary push to the default branch, so for that class the corroborating run is usually a pull-request run.
+The exception is worth taking when it exists: a pull request opened *from* the default branch into some other base carries that branch's copy of the file on its head side, so its run reads what you want unless the base has diverged on that same file.
+Failing that, a pull-request run resolved the workflow file from the merge of its head into its base, so it corroborates the **default branch's** copy only when two things hold together.
+Its base is the default branch --- `gh pr view <N> --json baseRefName` --- since a stacked pull request or one targeting a release branch resolves the file from that other base instead, and would corroborate a different branch's copy while looking identical.
+And its head does not touch that one file --- `gh pr diff <N> --name-only`, matching the single path rather than the `.github/workflows/` directory, since a head editing some other workflow is irrelevant.
+The first condition is the one that goes unstated, and omitting it reinstates this shape's own substitution by way of its remedy.
+Prefer a recent run, since an older one may predate the definition you just read.
+
+- **Do:** derive a required-context string from the default branch's workflow definitions, and use a run only to corroborate how those definitions compose.
+- **Do:** date every check-run observation by the commit its run executed, and say what has landed on the default branch since.
+- **Don't:** accept a pull-request run as corroboration without reading its `baseRefName` --- a head that leaves the workflow file alone is necessary and not sufficient.
+- **Don't:** read check names off a pull request, however recent, and generalize them to the repository.
+- **Don't:** treat a pull request having merged as evidence its check names still describe the branch --- they described it at one instant, and a later merge can retire them without touching that pull request at all.
+
+See [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md), "A merged pull request's check names written into a live ruleset".
+
+## A PR's `MERGED` status is another shape, and it is not corroboration of content
+
+The sections above each name a claim about a PR that outlives the moment it was true.
+This one is the claim made *at* the merge itself: that a PR reading `MERGED` is evidence your reviewed, verdict-clean diff reached the default branch.
+
+It is not, for an ordinary reason that has nothing to do with the merge going wrong.
+A PR branch can be merged while carrying a stale head --- another session, an `@claude` auto-sync, a rebase gone half-finished --- so the commit that lands on `main` is not the commit whose review you read.
+Nothing about the merge fails: CI is green, the merge commit exists, GitHub reports success, and the PR page shows `MERGED` exactly as it would for a clean landing.
+The status is real; it answers "did a merge happen", not "did my content land".
+Confusing the two is the same substitution [`The four shapes`](#the-four-shapes) names elsewhere: the adjacent artifact (the PR's own state field) stands in for the one the claim is actually about (the tree at `origin/<default-branch>`).
+
+The detector is cheap and belongs right after every merge you drive, not only when something looks wrong:
+
+```bash
+git merge-base --is-ancestor <your-last-pushed-sha> origin/<default-branch> && echo ok
+git grep -c '<distinctive symbol from your diff>' origin/<default-branch> -- <path>
+```
+
+The ancestry check answers whether your commit is even in the merged history at all;
+the content grep answers the sharper question, since a squash merge can be an ancestor-check false negative (the SHA changes on squash) while still needing the grep to confirm the actual lines survived.
+Pick a symbol distinctive enough that a match means your specific change, not a coincidentally similar one nearby.
+
+Recovery is not "push the stale branch again."
+A branch that has drifted this far shows the merged base's *own* subsequent work as deletions when diffed against it, so reusing it re-proposes reverting content that was never yours to touch.
+Cut a fresh branch off the current default branch and re-apply just the lost pieces instead.
+
+- **Do:** after driving a PR to merge, grep `origin/<default-branch>` for a distinctive symbol from your diff and confirm your last pushed SHA is an ancestor of it.
+- **Do:** cut a fresh branch off the current default branch to recover lost content, rather than reusing a branch that has drifted behind it.
+- **Don't:** read `MERGED` as proof your content landed --- it is proof *a* merge happened, which is a claim about the PR's state field, not about the tree.
+- **Don't:** diff a long-stale branch against the current default branch and treat what it shows as your own missing work --- some of it is the default branch's newer content read backwards.
+
+(Measured 2026-09-04 on `Morrison-Lab/ai-config#3024`: the PR showed `MERGED`, but at another session's head commit rather than the one this session had pushed and had reviewed clean.
+Three pieces of reviewed work were silently lost --- an enumeration, two corrected docstrings, and a test arm --- with nothing red anywhere.
+Recovery was `Morrison-Lab/ai-config#3179`, cut fresh off `main` rather than off the stale branch, whose own diff against `main` showed `main`'s newer work as deletions.)
+
+## Existence of a mechanism is not reachability of it
+
+[`The four shapes`](#the-four-shapes) above names a counterpart that is **missing** ---
+a cache `save` with no `restore`, a marketplace entry with no install.
+This shape is the one where the counterpart is present, correct, and never reached.
+The clearing branch is in the source, it does exactly what it should,
+and the normal path never produces the input it reads ---
+so the mechanism is real and the behaviour it promises is unavailable.
+
+It is more convincing than the missing-counterpart case,
+because finding the code that would have prevented a false positive feels like having explained the false positive.
+Reading it produces a genuine and correct conclusion --- this guard clears on a terminal state ---
+and that conclusion is about the source rather than about the run.
+Existence and reachability are different claims,
+and confirming the first is exactly what checking the second would feel like.
+
+[`The test`](#the-test) above supplies the question, so ask it of reachability rather than of existence:
+what would have to be true for this mechanism never to fire,
+and does the normal path produce the input it matches on?
+Trace the input backwards to whatever emits it.
+Where the emitter is a command, read that command's actual output
+rather than assuming it carries the fields the matcher wants.
+
+- **Do:** name the producer of a mechanism's input, and read what that producer actually emits, before saying the mechanism works.
+- **Do:** treat "the clearing branch exists" as an answer about the source and an open question about the run.
+- **Don't:** close an incident on the strength of having found the code that should have prevented it.
+- **Don't:** read a matcher's field list as evidence those fields ever arrive --- a matcher is a claim about its input, not a supply of one.
+
+(Measured 2026-09-03, and the record is the rule applied to itself three times.
+A `Stop` hook demanded a per-HEAD reviewer request on an already-merged pull request.
+The hook was read, a terminal-state matcher was found in it,
+and the incident was written off as the guard behaving correctly given what it could see ---
+a claim about the source presented as a claim about the run.
+The first retraction asserted a *cause*:
+that `gh pr merge`'s own success output carries none of that matcher's fields,
+so merging without a later `--json state` probe would leave an obligation that can never discharge.
+Adversarial review refuted that from the source of `hooks/no-unreviewed-pr.py`,
+finding a second clearing branch --- `close_ident` ---
+that discharges a merge structurally, from the command's argv and exit status,
+with the terminal-state matcher reserved for a merge performed OUTSIDE the session.
+The second retraction adopted that reading, and was wrong in the identical way,
+because it too was reasoned from the code rather than run against the artifact.
+Running the hook's own `close_ident` on the command the session actually issued settles it:
+
+```python
+close_ident("ALLOW_MERGE=1 gh pr merge 3101 -R Morrison-Lab/ai-config "
+            "--squash --delete-branch 2>&1 | tail -3")
+# -> (False, None, None, False)
+```
+
+Two independent defeats, either sufficient alone.
+The environment-variable prefix makes the first token of the parsed argv something other than `gh`,
+so the structural recogniser rejects the command outright;
+and the merge is not the last simple command in the pipeline,
+which the call site treats as ambiguous rather than as a discharge.
+The idealized command with neither feature returns a clear,
+which is the value both retractions were reasoning about.
+So both clearing branches were reachable in principle and the run reached neither ---
+one defeated by the command's shape, the other never fed its input.
+[#3152](https://github.com/Morrison-Lab/ai-config/issues/3152) was filed on the first mistaken premise;
+the correction is posted on its thread.
+The lesson survives three wrong causes intact, and is sharper for them:
+reading a matcher tells you what it would accept, and reading a recogniser tells you what it would recognize.
+Neither tells you which branch this run took.
+Only running the reader against the exact artifact does, and
+[`mistake-patterns`](../../memories/mistake-patterns.md) Pattern 17 names that move ---
+which is worth stating twice, because it was cited in the same change that failed to perform it.)

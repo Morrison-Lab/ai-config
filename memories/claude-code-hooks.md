@@ -1,6 +1,7 @@
 # Claude Code hooks: manifest, registration, and install failures
 
 How this repo's hooks reach a machine and how that goes wrong --- the native `hooks/hooks.json` schema, the split between `install-hooks.py` (which binds) and a manual copy (which places, the plugin loader serving its hooks from the plugin root instead), and the two routes to a registered hook whose script is absent, one of which takes the whole `Bash` tool down.
+For the complete catalog of active hooks and rules for proactively complying with each hook, see [`hooks.md`](hooks.md).
 `check-install.py`, this file's original placement instrument, was removed along with the symlink install it verified.
 [ai-config#2352](https://github.com/Morrison-Lab/ai-config/issues/2352) tracks a replacement, so read every reference to it below as historical.
 
@@ -247,13 +248,75 @@ Re-running the python part alone under `ALLOW_WHOLE_FILE_PUNCT=1` edited the fil
 Caught by `remote: error: GH013: Repository rule violations found for refs/heads/main`, not by anything local.
 Tracked as ai-config#1609.)
 
-## Hook matchers use JavaScript regular expressions, NOT shell globs
+## A hook matcher has three branches, and only the third is a regex
 
-Hook matchers in `hooks/hooks.json` containing characters outside `[A-Za-z0-9_\- ,|]` are evaluated as JavaScript regexes (`RegExp.prototype.test()`).
+Measured 2026-09-04 by extracting the matcher functions from the standalone native `claude` binary this container runs, version 2.1.260 per `claude --version`,
+and re-running them under `node` against a table of tool names.
+Re-verify on a harness bump rather than treating this as permanent,
+and read the build actually in use rather than whichever copy of the package happens to be on disk:
+the `@anthropic-ai/claude-code` npm package installed beside that binary was still 2.1.42, and its `cli.js` carries a narrower fast path than the binary applies.
 
-- **Correct syntax:** Use `"mcp__github__.*"` (JavaScript regex syntax) to match all tools from the `mcp__github__` MCP server prefix.
-- **Incorrect syntax:** Do not use `"mcp__github__*"` (shell glob syntax), which evaluates as regex matching `mcp__github` followed by 0 or more `_` characters.
-- **Catalog validator:** `scripts/check-hook-catalog.py` parses compound matcher entries (e.g. `PreToolUse (Bash, mcp__github__.*)`) using `ROW` regex matcher class `[A-Za-z0-9_.*, -]` and aggregates multiple matcher groups for the same script and event.
+```js
+// `wide` is fur.has(hook_event_name); `A` is the query, `q` the matcher.
+function names(q, wide) {
+  if (!(wide ? /^[a-zA-Z0-9_|, -]+$/ : /^[a-zA-Z0-9_|]+$/).test(q)) return;
+  return q.split(wide ? /[|,]/ : "|").map((y) => y.trim()).filter(Boolean)
+          .flatMap((y) => aliasForms(y));
+}
+if (!q || q === "*") return true;
+const parts = names(q, wide);
+if (parts !== undefined)
+  return parts.includes(A) || aliases(A).some((v) => parts.includes(v));
+// The regex is also tried against the alias and reverse-alias forms of `A`.
+try { return new RegExp(q).test(A) } catch { return false }
+```
+
+`A` is the match query (`tool_name` for `PreToolUse`), `q` is the group's `matcher`, and `aliases` yields the alias forms of the tool name.
+Every branch is tried against alias forms, not only the fast path: `names` expands the matcher's own parts through `aliasForms`, and the regex branch tests the alias and reverse-alias forms of `A` as well as `A` itself.
+So:
+
+| matcher | evaluated as | fires on a `NotebookEdit` call? |
+|---|---|---|
+| absent, empty, or `*` | fires on every call | fires |
+| a plain name, e.g. `Edit` | **exact string equality** | does **not** fire |
+| an alternation, e.g. `Write\|Edit`, or `Write, Edit` where `wide` is set | exact membership of the trimmed parts | does **not** fire; `NotebookEdit` is not one of the parts |
+| anything else, e.g. `mcp__github__.*` | an **unanchored** JavaScript regex | does **not** fire; that regex does not match `NotebookEdit` |
+
+Only the catch-all fires here, and that is the whole trap:
+`Edit` would fire on a `NotebookEdit` call if it reached the regex branch,
+and a plain name never reaches it.
+
+Two consequences that were previously open questions (ai-config#2535).
+A plain name is not a substring test, so binding one script to `Write`, `Edit`, and `NotebookEdit` as three groups is three disjoint bindings rather than a triple invocation on a `NotebookEdit` call.
+And an alternation is usable rather than silently inert, so those three groups could be written as one.
+This repo keeps them apart anyway, per the Don't below.
+
+The `wide` flag is `fur.has(hook_event_name)`, and `PreToolUse` is a member of `fur`, so every matcher this repo binds takes the wide arm.
+There the fast-path class is `[A-Za-z0-9_|, -]` and the separator is `[|,]`, so `"Write, Edit"` is an alternation firing on `Write` and on `Edit`.
+Off those events the class is `[A-Za-z0-9_|]` and the separator is `|` alone, so the same matcher falls through to the **regex** branch and matches only the literal text `Write, Edit`;
+that narrow reading is what the 2.1.42 `cli.js` applies on every event.
+
+The harness runs **every** group whose matcher fires, so one script named in two firing groups runs twice on one call.
+That is wasteful for a warn-only hook and is not benign for a blocking one.
+
+- **Do:** use `"mcp__github__.*"` (JavaScript regex) to match a whole MCP server's tools.
+- **Do:** read an alternation, `"Write|Edit|NotebookEdit"`, as one group that fires rather than one that is silently inert
+  (the table above escapes that pipe only because a bare `|` would end a markdown cell).
+- **Do:** run `python3 scripts/check-hook-catalog.py`, which reimplements the three branches and fails a script bound twice for the same event and tool
+  whenever some tool name `hooks.json` itself spells out fires both matchers;
+  a pair of two regexes no such name settles prints a `NOTE` and does not fail, so a green run does not by itself rule that pair out.
+- **Do:** name the package and version a matcher reading came from, rather than attributing it to "Claude Code vN" and leaving which install it was to inference.
+- **Do:** keep the comma-joined form to the README catalog's notation for several groups, so pasting one into `hooks.json` cannot silently add a second firing group.
+- **Don't:** read a version off a package directory and report it as the harness version --- run `claude --version` for that one.
+- **Don't:** use `"mcp__github__*"` (shell glob), which is a regex matching `mcp__github` followed by zero or more `_`.
+- **Don't:** expect a plain name to match a longer tool name --- it is compared by equality.
+- **Don't:** bind a comma-joined matcher such as `"Bash, Edit"` expecting it to be inert;
+  on `PreToolUse` it fires on `Bash` and on `Edit` exactly like `"Bash|Edit"` does.
+- **Don't:** collapse a script's per-tool groups into one alternation on the strength of that being permitted.
+  One group per tool is this repo's convention, and `hooks/test-remind-brief-premises.py` asserts a per-tool matcher set,
+  `set(_matchers) >= {"Agent", "Task", "SendMessage"}`, which a single alternation group would fail.
+
+**Catalog validator:** `scripts/check-hook-catalog.py` parses compound matcher entries (e.g. `PreToolUse (Bash, mcp__github__.*)`) using `ROW` regex matcher class `[A-Za-z0-9_.*, -]`, plus a backslash-escaped pipe for an alternation cell, and aggregates multiple matcher groups for the same script and event.
 
 ## Complete hook lifecycle catalog (27 events)
 
@@ -324,6 +387,58 @@ When a hook emits a multi-paragraph message with blank lines (`\n\n`), each blan
 To keep warnings legible and avoid visual clutter:
 - Format warn-only `Stop` hook `systemMessage` strings as a concise, single-line actionable reminder.
 - Avoid internal double newlines (`\n\n`) in `systemMessage` payloads emitted by `Stop` guards.
+
+## Stop hook payload schemas and remote session tolerance
+
+`Stop` hook scripts receive a JSON payload on stdin that varies across harnesses and runtime environments:
+- **Transcript path key variants**: `transcript_path` (standard Claude Code CLI snake_case), `transcriptPath` (camelCase in some harnesses), `transcript`, or `history_file`.
+  Scripts that inspect the transcript must check all four keys rather than assuming snake_case alone.
+- **Direct message fields**: In contexts where the transcript file is omitted or piped directly, payloads may supply `reply`, `last_assistant_message`, `message`, `content`, or `text`.
+- **Remote / web session boundary**: In remote/web cloud sessions (such as `claude.ai/code`), plugin `Stop` hooks may not be dispatched by the cloud container across turn completions or context summarizations (ai-config#2943).
+  Do not treat local `Stop` hook enforcement as an active safety net in remote web sessions --- follow instruction rules like "Always produce a reply" directly in model reasoning.
+
+## A non-blocking hook must write `additionalContext` on stdout, not stderr
+
+A hook that exits 0 and prints its warning to stderr is a no-op.
+Per Anthropic's
+[hooks reference](https://code.claude.com/docs/en/hooks), for exit code 0
+stderr goes to the debug log only (`--debug`), and is shown to neither Claude
+nor the user; and for `PreToolUse`, plain stdout is not surfaced either.
+The documented non-blocking channel is JSON on stdout carrying
+`hookSpecificOutput.additionalContext`.
+
+The failure is silent in both directions at once.
+The hook runs, the harness reports nothing wrong, and the transcript looks
+exactly as it would if the condition had never fired --- so the mechanism can
+sit in the corpus for as long as nobody happens to trigger it deliberately.
+
+Verified in this repo, 2026-09-01: every hook whose warning has actually
+surfaced in a live session emits `additionalContext`, and their
+`file=sys.stderr` lines are internal error reporting rather than the warning
+itself.
+`Stop` hooks are the exception --- they deliver by exiting non-zero, which is
+why a `Stop` hook written this way does surface and reads as proof the pattern
+works.
+
+- **Do:** print `{"hookSpecificOutput": {"additionalContext": "..."}}` on
+  stdout for any advisory hook that exits 0.
+- **Do:** trigger the condition deliberately once and confirm the text reaches
+  the session, rather than confirming the hook ran.
+- **Don't:** write an advisory message to stderr on a zero exit --- it reaches
+  the debug log and nothing else.
+- **Don't:** generalize a `Stop` hook's delivery to `PreToolUse`; the two use
+  different channels.
+
+(Tracked as
+[Morrison-Lab/ai-config#3068](https://github.com/Morrison-Lab/ai-config/issues/3068).
+Found while a `PreToolUse` hook was a no-op three separate ways across three
+review rounds --- the wrong mechanism, then a matcher that refused relative
+paths when every real invocation in that corpus is relative or bare, then this
+output channel.
+See
+[`incidents-dont-repeal-decisions`](../shared/workflow/incidents-dont-repeal-decisions.md)
+for the surrounding lesson: a mechanism built on a false diagnosis is worse
+than none, because it closes the question while doing nothing.)
 
 ## An invoked skill's body arrives as user-role transcript text and can arm an issue-scanning hook on an unrelated repo
 

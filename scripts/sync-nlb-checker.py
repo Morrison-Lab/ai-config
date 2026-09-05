@@ -9,6 +9,7 @@ Run this after bumping the action pin. Do not hand-edit the vendored copy.
 """
 from __future__ import annotations
 
+import argparse
 import importlib.util
 import subprocess
 import sys
@@ -29,33 +30,64 @@ RAW_URL = (
 
 
 def _fetch(sha: str) -> bytes:
-    """Return the checker bytes at `sha`, preferring `gh api` then raw HTTPS."""
-    proc = subprocess.run(
-        [
-            "gh",
-            "api",
-            f"repos/Morrison-Lab/gha/contents/check-new-line-breaks/"
-            f"check-new-line-breaks.py?ref={sha}",
-            "-H",
-            "Accept: application/vnd.github.raw",
-        ],
-        capture_output=True,
-    )
-    if proc.returncode == 0 and proc.stdout:
-        return proc.stdout
+    """Return the checker bytes at `sha`, preferring `gh api` then raw HTTPS.
+
+    A missing `gh` binary is one more way the first route can fail, not a
+    reason to stop: `subprocess.run` raises `FileNotFoundError` (an
+    `OSError`) rather than returning a non-zero exit, so it is caught here
+    and the HTTPS route runs as it does for any other `gh` failure
+    (ai-config#2338). The reason is kept so the combined error names both
+    routes when HTTPS fails too.
+    """
+    try:
+        proc = subprocess.run(
+            [
+                "gh",
+                "api",
+                f"repos/Morrison-Lab/gha/contents/check-new-line-breaks/"
+                f"check-new-line-breaks.py?ref={sha}",
+                "-H",
+                "Accept: application/vnd.github.raw",
+            ],
+            capture_output=True,
+        )
+    except OSError as exc:
+        gh_err = str(exc)
+    else:
+        if proc.returncode == 0 and proc.stdout:
+            return proc.stdout
+        gh_err = proc.stderr.decode("utf-8", errors="replace").strip() or str(proc.returncode)
     url = RAW_URL.format(sha=sha)
     try:
         with urllib.request.urlopen(url) as resp:
             return resp.read()
     except OSError as exc:
-        gh_err = proc.stderr.decode("utf-8", errors="replace").strip()
         raise SystemExit(
-            f"failed to fetch NLB checker at {sha}: gh: {gh_err or proc.returncode}; "
-            f"HTTPS: {exc}"
+            f"failed to fetch NLB checker at {sha}: gh: {gh_err}; HTTPS: {exc}"
         ) from exc
 
 
-def main() -> int:
+def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    """Consume the command line so `--help` prints usage instead of syncing.
+
+    The sync fetches over the network and rewrites two tracked files, so a
+    reader who runs `--help` to learn the usage must not trigger it: before a
+    pin bump that is a surprise write, and over local edits to the vendored
+    copy it is a silent overwrite (ai-config#3095). The parser defines no
+    arguments beyond argparse's own `-h`/`--help`, and `parse_args` (not
+    `parse_known_args`) is what rejects an unrecognized one, so an unknown
+    argument exits 2 rather than being ignored.
+    """
+    parser = argparse.ArgumentParser(
+        prog=Path(__file__).name,
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    _parse_args(argv)
     sha = nlb_gate.parse_ci_nlb_sha()
     body = _fetch(sha)
     if b"classify_line" not in body or b"has_late_semicolon" not in body:

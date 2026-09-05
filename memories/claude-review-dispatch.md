@@ -418,3 +418,167 @@ alone does not.)
   one `workflow_dispatch`.
   (Measured 2026-08-24, ai-config#2074: two rounds burned to this before the
   clean single-dispatch re-review landed the verdict.)
+
+## Review artifact uploads vs forge comment payloads
+
+### Do AI reviews upload Actions artifacts?
+
+Yes, but as an **internal pipeline transport**, not as the consumer-facing review interface.
+
+In `Morrison-Lab/gha` (`.github/workflows/claude-code-review.yml`),
+the model review job (`claude-review`) and posting job (`post-review`)
+are split for least-privilege security (gha#580):
+1. **Model job (`claude-review`)**:
+   Runs Claude Code to generate the review under minimal permissions
+   (`contents: read`, no PR write access).
+   Before completing, it invokes the composite action
+   `Morrison-Lab/gha/.github/actions/pack-review-payload`,
+   which packages `payload.json` (metadata including `schema_version`,
+   `pr_number`, `repo`, `head_sha`, `total_cost_usd`, `resolve_outcome`,
+   `failure_kind`, `denials`, and `denied_tools`),
+   `review.txt` (the raw model review prose),
+   and optional `denied_tools.txt`.
+   This directory is uploaded as a GitHub Actions workflow artifact named
+   `claude-review-payload-${RUN_ID}-${RUN_ATTEMPT}` with a 14-day retention.
+2. **Posting job (`post-review`)**:
+   Runs with elevated privileges (`pull-requests: write`, `issues: write`),
+   downloads `claude-review-payload-${RUN_ID}-${RUN_ATTEMPT}` via
+   `actions/download-artifact`, parses `payload.json` and `review.txt`,
+   and posts the review to the GitHub PR timeline.
+   The comment contains the human-readable Markdown review,
+   the reviewed commit SHA, the run URL link,
+   and the machine-readable payload
+   (`<!-- review-data: {"schema_version": "1.1", "verdict": "CLEAN", ...} -->`).
+   That review-data comment payload is schema `1.1`, which is a different
+   field from `payload.json`'s own `schema_version` (`1`, set by
+   `pack-review-payload.sh`).
+   gha's reviewer prompt has required `1.1`,
+   with `detailed_assessment` and `holistic_assessment`, since
+   [gha#800](https://github.com/Morrison-Lab/gha/pull/800)
+   (measured 2026-09-02).
+   `ai-config`'s own emitters still write `1.0`, which nothing reads.
+
+### Why ai-config agents inspect PR comment payloads instead of Actions artifacts
+
+`ai-config` verification tooling (such as `scripts/check-pr-fully-clean.py`
+and pre-push hooks) inspects the structured `<!-- review-data: ... -->` payload
+embedded directly in PR issue comments and formal reviews via
+`scripts/lib/review_payload.py`, rather than downloading Actions zip artifacts:
+
+1. **Durability vs expiration**:
+   GitHub Actions workflow artifacts expire after 14 days and are purged when
+   workflow runs are deleted.
+   PR timeline comments and reviews are permanent, durable records on the forge.
+2. **Universal protocol across review sources**:
+   Review verdicts originate from multiple modalities:
+   automated GitHub Actions `@claude` runs (`claude-code-review.yml`),
+   in-session subagent self-reviews (`adversarial-reviewer`),
+   local pre-push CLI passes (`scripts/pre-push-review.py`),
+   GitHub Copilot reviews, and human reviews.
+   Only GHA workflows generate Actions artifacts.
+   Embedding the JSON payload inside an HTML comment (`<!-- review-data: ... -->`)
+   provides a single, uniform representation that `scripts/lib/review_payload.py`
+   parses identically across all local, CI, and external review sources.
+3. **Remote session accessibility & latency**:
+   In remote/web sessions without the `gh` CLI, agents gather PR metadata via
+   MCP tools (`pull_request_read`) into a JSON payload for
+   `python3 scripts/check-pr-fully-clean.py --from-json <file>`
+   ([`shared/workflow/fully-clean.md`](../shared/workflow/fully-clean.md)).
+   Reading PR comments is a single GraphQL/REST query.
+   Downloading GHA zip artifacts would require run discovery, binary archive
+   downloads, zip extraction, and disk cleanup.
+4. **Auditability and transparency**:
+   The PR comment is what human maintainers, collaborators, and other agents see.
+   Placing the structured payload in an HTML comment makes it invisible in
+   rendered Markdown while keeping it co-located with the human text.
+5. **Deterministic parsing & safety**:
+   `scripts/lib/review_payload.py` (`extract_structured_review`) safely parses
+   the payload with code-fence, inline-span, and indented-block masking,
+   verdict normalization, and contradiction checks (e.g., rejecting `CLEAN`
+   verdicts that list unresolved findings).
+
+## A CI review quota outage does not reach this session's own budget
+
+When `claude-code-review` posts the mid-run 429 skip (gha#520 --- "You've hit
+your session limit, resets HH:MM (UTC)"), the natural inference is that the
+account is limited and therefore every Claude call is, including the
+adversarial-reviewer subagent that
+[`self-review-fallback`](../shared/workflow/self-review-fallback.md)
+prescribes as the substitute.
+
+That inference is wrong, and acting on it stalls a sweep for the length of the
+outage at exactly the moment the fallback is needed.
+The workflow authenticates with its own configured credential; a Claude Code
+session runs on its own budget.
+They are separate pools.
+
+Measured 2026-09-02 on `Morrison-Lab/ai-config`: while the workflow was
+refusing every new review round with a session limit, a one-word `haiku`
+subagent probe returned normally.
+The figure is the probe's own reported `duration_ms` of 3179, so it is
+checkable rather than an impression of speed --- which matters here,
+because "it felt fast" would not distinguish a working budget from a
+fast refusal.
+The fallback was available throughout.
+
+Probe rather than reason about it, since the probe costs one cheap call and
+the inference costs the whole outage:
+
+```
+Agent(model="haiku", prompt="Reply with exactly the word: ALIVE. Do not use any tools.")
+```
+
+Two further consequences of the outage itself, which decide what may still
+proceed:
+
+- **A verdict already posted is not retracted.**
+  A PR carrying a clean verdict on a head that has not moved since is still
+  fully clean at head, so merges of already-verified PRs proceed normally.
+  Re-verify the head with `git ls-remote` rather than assuming it held.
+- **Only NEW rounds are skipped**, and `require-review` grays rather than
+  reddens on that path, so a skipped round is not a red check to chase.
+
+**An `in_progress` `claude-review` is not evidence the quota has recovered.**
+The skip is a MID-RUN 429, so the run really does start: `preempt-previous`
+and `gather-context` succeed, `claude-review` reports `in_progress`, and the
+429 arrives after that.
+Reading the in-progress state as recovery is therefore reading the shape of
+the failure as its absence.
+Measured 2026-09-02: a round that reached `in_progress` posted the identical
+skip notice about a minute later.
+Only a posted verdict settles it, which is why the re-trigger after a reset
+should be verified by getting one rather than by the clock.
+
+- **Do:** probe with a trivial subagent call before concluding a quota outage
+  reaches this session.
+- **Do:** keep merging PRs whose clean verdict predates the outage and whose
+  head has not moved.
+- **Don't:** infer from a CI review skip that self-review is unavailable too.
+- **Don't:** treat a grayed `require-review` from a quota skip as a failure to
+  diagnose.
+
+## The reviewer's sandbox is not the CI container: a check that fails there can pass in CI
+
+A review run that installs a tool in its own sandbox and re-runs a repo check
+is testing the sandbox, not the workflow.
+Measured 2026-09-01 on Morrison-Lab/wai#187: the `@claude` review installed
+R plus `spelling`/`hunspell` in its sandbox, ran the PR's new chapter
+spellcheck, and reported ten misspelled words (`config`, `JSON`, `macOS`,
+`repo`, ...) as a blocking CI failure, while the Spellcheck job on the same
+head had already run the same script in `rocker/verse:latest` and printed
+`No spelling errors found.`
+The two containers resolved different `en_US` dictionaries.
+
+The job log is the authority for "does this check pass in CI"; a sandbox
+reproduction is evidence about the sandbox.
+Adding the ten words to the wordlist anyway was cheap and made the check
+robust across dictionaries, which is the right disposition when the fix is
+harmless, but the finding's premise still needed correcting in the ARD
+table so the next round did not re-derive it.
+
+- **Do:** read the workflow job's log for the step in question before
+  accepting a reviewer's "this fails in CI" claim, and cite the log in the
+  ARD disposition.
+- **Don't:** treat a reviewer sandbox's failure as a reproduction of the CI
+  run, or push a fix for it without saying which container it reproduces
+  in.

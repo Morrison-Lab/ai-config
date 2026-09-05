@@ -57,6 +57,9 @@ misfires is worse than a missing one" -- no `permissionDecision`, ever.
       one PATHSPEC (see "Ref-vs-path disambiguation" below) and, for
       `restore`, is not `--staged` without `--worktree` (that combination
       only rewrites the index, never the working tree)
+  M3'' for `git checkout` carrying `-f`/`--force` and NO pathspec: the whole
+      tracked working tree is in scope, the same as `reset --hard` (see
+      "Forced switches" below)
   M4  `git status --porcelain`, scoped to the whole tree for `reset --hard`
       or to the resolved pathspecs for `checkout`/`restore`, reports at
       least one entry that is NOT untracked (`??`) -- i.e. at least one
@@ -66,11 +69,12 @@ misfires is worse than a missing one" -- no `permissionDecision`, ever.
 ## Ref-vs-path disambiguation
 
 `git checkout <arg>` is ambiguous on its face: `<arg>` may be a ref (branch,
-tag, SHA, `HEAD`, `-` for "previous branch") -- a safe switch, since git
-itself refuses one that would clobber local changes -- or a pathspec, which
-this hook exists to catch. Mirroring git's own tie-break (a name that is
-both a ref and a path resolves as the REF) is the reliable way to tell them
-apart, so each bare positional argument is tested with
+tag, SHA, `HEAD`, `-` for "previous branch") -- an UNFORCED switch, which git
+refuses when it would clobber local changes and otherwise carries them
+across -- or a pathspec, which this hook exists to catch. Mirroring git's
+own tie-break (a name that is both a ref and a path resolves as the REF) is
+the reliable way to tell them apart, so each bare positional argument is
+tested with
 `git rev-parse --quiet --verify <arg>^{commit}`; only an argument that
 demonstrably does NOT resolve as a commit-ish counts as a pathspec.
 A `--` separator sidesteps the question entirely -- everything after it is
@@ -78,6 +82,23 @@ unambiguously a pathspec, per `git checkout`'s own syntax (`git checkout
 [<ref>] [--] <pathspec>...`). `git restore`'s positional operands are always
 pathspecs (its ref comes from `-s`/`--source`, never positionally), so no
 resolution is needed there.
+
+## Forced switches
+
+`-f`/`--force` removes the refusal that makes an unforced switch safe, and
+nothing else about the command announces it. Measured 2026-09-04 on git
+2.43.0, over a tree carrying ` M f.txt` and ` M g.txt`: `git checkout other`
+left both edits in place, while `git checkout -f other`,
+`git checkout --force -b feature`, and `git checkout -f` with no operand at
+all each exited 0 with both edits gone. A forced `checkout` that resolves
+to no pathspec is scoped to the whole tracked tree, exactly like
+`reset --hard`.
+
+`git switch -f`/`--discard-changes` does the same thing and is NOT matched:
+`switch` is a fourth command this hook does not read at all, and reading it
+would widen the guard past the three it was built for. That gap is named in
+the catalogs. (`git switch -f` with no branch operand is a fatal error, so
+the gap is the ref-carrying form only.)
 
 Untracked files are deliberately out of scope for all three commands: none
 of `reset --hard`, `checkout <path>`, or `restore <path>` can discard a file
@@ -87,7 +108,10 @@ scratch file sitting in the tree is not itself at risk.
 The flag lists below are a best-effort read of `git checkout`/`git
 restore`'s documented options, not an exhaustive reimplementation of git's
 argument parser. An unrecognized `-`-prefixed token is skipped rather than
-risking a false pathspec read from its value.
+risking a false pathspec read from its value -- and when that token is a
+short cluster ENDING in a value-taking short option (`-qb`, not `-bfixup`),
+the value is a SEPARATE next token, which is skipped along with it, rather
+than being left to fall through and get misread as a pathspec itself.
 
 Fails OPEN on any parse trouble, on `git status`/`git rev-parse` failing or
 timing out, and outside a git repository.
@@ -102,6 +126,7 @@ import sys
 RX_HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1.*?\n[ \t]*\2\b", re.S)
 
 ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+SHORT_CLUSTER = re.compile(r"-[A-Za-z]+")
 LEAD_WORDS = {"then", "do", "else", "!", "time", "sudo", "command", "exec",
               "nohup", "env"}
 
@@ -152,22 +177,63 @@ CHECKOUT_RESTORE_BOOL_FLAGS = {
 # Flags that consume the NEXT token as a value (checked, per subcommand).
 CHECKOUT_VALUE_FLAGS = {"-b", "-B", "--orphan"}
 RESTORE_VALUE_FLAGS = {"-s", "--source"}
+CHECKOUT_VALUE_SHORTS = "bBt"
+RESTORE_VALUE_SHORTS = "s"
+
+
+def _cluster_forces(tok, value_shorts):
+    """Whether short cluster `tok` carries `-f`. A value-taking short option
+    swallows the rest of the cluster as its value, so only an `f` before the
+    first such letter is `--force` rather than part of that option's value."""
+    if not SHORT_CLUSTER.fullmatch(tok):
+        return False
+    cluster = tok[1:]
+    stop = next((i for i, c in enumerate(cluster) if c in value_shorts),
+                len(cluster))
+    return "f" in cluster[:stop]
+
+
+def _cluster_value_consumes_next(tok, value_shorts):
+    """Whether short cluster `tok` ends in a value-taking short option with
+    NO value attached in the same token -- e.g. `-b` in `-qb`, but not the
+    `b` in `-bfixup`, where `fixup` is already `-b`'s attached value. When it
+    does, that option's value is a SEPARATE next token (`git checkout -qb
+    mybranch`), and the caller must skip that token too, or it falls through
+    and gets misread as a positional pathspec."""
+    if not SHORT_CLUSTER.fullmatch(tok):
+        return False
+    cluster = tok[1:]
+    idx = next((i for i, c in enumerate(cluster) if c in value_shorts), None)
+    return idx is not None and idx == len(cluster) - 1
 
 
 def _checkout_restore_targets(subcommand, args):
     """Positional targets of a `checkout`/`restore` invocation's ARGS (the
     tokens after `git checkout`/`git restore`).
 
-    Returns (pre, post, saw_sep, staged_no_worktree). `pre` is every
-    non-flag token before a `--` separator (or all of them, if none);
+    Returns (pre, post, saw_sep, staged_no_worktree, saw_force). `pre` is
+    every non-flag token before a `--` separator (or all of them, if none);
     `post` is every token after one. `staged_no_worktree` (restore only) is
     whether `--staged` appeared without `--worktree` -- that combination
     only rewrites the index, so it carries no risk to the working tree.
+    `saw_force` is whether `--force`, or a short cluster whose `f` precedes
+    the first value-taking short option in it, if any, appeared before any `--`.
+
+    A short cluster that ENDS in a value-taking short option (`-b`/`-B`/`-t`
+    for `checkout`, `-s` for `restore`) with nothing attached after it in the
+    same token takes the NEXT token as that option's value, exactly as the
+    bare flag would (`-b` in `CHECKOUT_VALUE_FLAGS`) -- so that next token is
+    skipped too, whether or not the cluster also carries `-f` (`-fb branch`,
+    `-qb branch`). A value-taking short that is NOT last in the cluster has
+    its value already attached in the same token (`-bfixup`) and consumes no
+    further token.
     """
     value_flags = (CHECKOUT_VALUE_FLAGS if subcommand == "checkout"
                    else RESTORE_VALUE_FLAGS)
+    value_shorts = (CHECKOUT_VALUE_SHORTS if subcommand == "checkout"
+                    else RESTORE_VALUE_SHORTS)
     pre, post = [], []
-    saw_sep = saw_staged = saw_worktree = False
+    saw_sep = saw_staged = saw_worktree = saw_force = False
     i = 0
     while i < len(args):
         tok = args[i]
@@ -187,6 +253,13 @@ def _checkout_restore_targets(subcommand, args):
             saw_worktree = True
             i += 1
             continue
+        if tok == "--force" or _cluster_forces(tok, value_shorts):
+            saw_force = True
+            # A cluster like `-fb` or `-fB` still ends in a value-taking
+            # short (`b`/`B`), whose value is the NEXT token -- skip that
+            # too, or it falls through and gets misread as a pathspec.
+            i += 2 if _cluster_value_consumes_next(tok, value_shorts) else 1
+            continue
         if tok in CHECKOUT_RESTORE_BOOL_FLAGS:
             i += 1
             continue
@@ -194,13 +267,16 @@ def _checkout_restore_targets(subcommand, args):
             i += 2
             continue
         if tok.startswith("-") and tok != "-":
-            i += 1  # an unrecognized flag -- see the module docstring
+            # An unrecognized flag -- see the module docstring. A short
+            # cluster ending in a value-taking short (`-qb`) still takes the
+            # NEXT token as that option's value; skip it too.
+            i += 2 if _cluster_value_consumes_next(tok, value_shorts) else 1
             continue
         pre.append(tok)
         i += 1
     staged_no_worktree = (subcommand == "restore" and saw_staged
                            and not saw_worktree)
-    return pre, post, saw_sep, staged_no_worktree
+    return pre, post, saw_sep, staged_no_worktree, saw_force
 
 
 def _resolves_as_ref(arg):
@@ -228,9 +304,10 @@ def _looks_like_path(arg):
 def offending(command):
     """The matched destructive-discard invocation in `command`, or None.
 
-    Returns (kind, segment, paths). `kind` is "reset-hard" (paths is None
-    -- the whole tracked tree is in scope) or "checkout"/"restore" (paths
-    is the resolved pathspec list that invocation would revert).
+    Returns (kind, segment, paths). `kind` is "reset-hard" or
+    "checkout-force" (paths is None -- the whole tracked tree is in scope)
+    or "checkout"/"restore" (paths is the resolved pathspec list that
+    invocation would revert).
     """
     cmds = _simple_commands(command)
     if cmds is None:
@@ -250,8 +327,8 @@ def offending(command):
             return "reset-hard", " ".join(argv), None
         if sub not in ("checkout", "restore"):
             continue
-        pre, post, saw_sep, staged_no_worktree = _checkout_restore_targets(
-            sub, rest[2:])
+        (pre, post, saw_sep, staged_no_worktree,
+         saw_force) = _checkout_restore_targets(sub, rest[2:])
         if staged_no_worktree:
             continue
         if sub == "restore":
@@ -267,6 +344,8 @@ def offending(command):
         else:
             paths = pre if _looks_like_path(pre[0]) else pre[1:]
         if not paths:
+            if sub == "checkout" and saw_force:
+                return "checkout-force", " ".join(argv), None
             continue
         return sub, " ".join(argv), paths
     return None
@@ -322,6 +401,24 @@ NOTE_RESET_HARD = (
     "throwaway `git worktree add --detach` instead."
 )
 
+NOTE_FORCED_SWITCH = (
+    "This forced `git checkout` will discard {count} tracked file(s) with "
+    "uncommitted changes -- staged or unstaged -- that have nothing "
+    "necessarily to do with why this is being run:\n\n"
+    "  command:  {segment}\n"
+    "  would be discarded:\n{files}\n\n"
+    "`-f`/`--force` removes the refusal that makes a plain `git checkout "
+    "<ref>` safe: an unforced switch either refuses or carries local "
+    "changes across, while a forced one resets every tracked file to the "
+    "target and reports only `Switched to branch ...` at exit 0. With no "
+    "ref at all (`git checkout -f`), the whole tracked tree is reverted to "
+    "HEAD with no output whatsoever.\n\n"
+    "If these changes are not meant to be discarded, commit or "
+    "`git stash -u` them first.\n\n"
+    "`git switch -f` / `--discard-changes` does the same thing and this "
+    "hook does not read `git switch` at all -- check that form by hand."
+)
+
 NOTE_PATH_DISCARD = (
     "This `git {subcommand}` will discard {count} tracked file(s) with "
     "uncommitted changes -- staged or unstaged -- that have nothing "
@@ -339,20 +436,46 @@ NOTE_PATH_DISCARD = (
 )
 
 
-def main() -> int:
+def _read_payload() -> tuple[dict, bool]:
+    """Parse payload from sys.argv (--dry-run / --simulate) or sys.stdin."""
+    args = sys.argv[1:]
+    is_dry_run = "--dry-run" in args or "--simulate" in args
+    if is_dry_run:
+        positional = [a for a in args if not a.startswith("-")]
+        if positional:
+            raw_cmd = positional[0].strip()
+            if raw_cmd.startswith("{") and raw_cmd.endswith("}"):
+                try:
+                    return json.loads(raw_cmd), True
+                except Exception:
+                    pass
+            return {"tool_name": "Bash", "tool_input": {"command": raw_cmd}}, True
+
     try:
         payload = json.load(sys.stdin)
-    except Exception as exc:  # fail open, but say so
-        print(f"flag-reset-hard-uncommitted-work: unreadable hook input "
-              f"({exc})", file=sys.stderr)
+        return (payload if isinstance(payload, dict) else {}), is_dry_run
+    except Exception as exc:
+        print(f"flag-reset-hard-uncommitted-work: unreadable hook input ({exc})",
+
+              file=sys.stderr)
+        return {}, is_dry_run
+
+
+def main() -> int:
+    payload, is_dry_run = _read_payload()
+    if not payload:
         return 0
 
     if payload.get("tool_name") not in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
+        if is_dry_run:
+            print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
         return 0
 
     inp = payload.get("tool_input") or {}
     command = inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or inp.get("script")
     if not isinstance(command, str) or not command.strip():
+        if is_dry_run:
+            print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
         return 0
 
     try:
@@ -363,10 +486,16 @@ def main() -> int:
         return 0
 
     if match is None:
+        if is_dry_run:
+            print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
         return 0
     kind, segment, paths = match
 
-    changed = _tracked_changes(paths)
+    sim_dirty = os.environ.get("SIMULATE_DIRTY")
+    if sim_dirty is not None:
+        changed = [f.strip() for f in sim_dirty.split(",") if f.strip()]
+    else:
+        changed = _tracked_changes(paths)
     if not changed:
         return 0  # None (git unreachable) or empty (clean tree) -- fail open
 
@@ -379,6 +508,11 @@ def main() -> int:
         note = NOTE_RESET_HARD.format(
             count=len(changed), segment=segment, files=files)
         summary = (f"`git reset --hard` will discard {len(changed)} "
+                   "tracked file(s) with uncommitted changes.")
+    elif kind == "checkout-force":
+        note = NOTE_FORCED_SWITCH.format(
+            count=len(changed), segment=segment, files=files)
+        summary = (f"Forced `git checkout` will discard {len(changed)} "
                    "tracked file(s) with uncommitted changes.")
     else:
         note = NOTE_PATH_DISCARD.format(

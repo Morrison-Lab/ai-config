@@ -65,13 +65,32 @@ which keeps the R-toolchain and R-package material that applies anywhere.
   yet** (e.g. R 4.6.1 in mid-2026), `install.packages()` from P3M silently falls
   back to **source**, and heavy pkgs (DT → sass, etc.) fail or time out — so a
   full HTML `quarto render` (needs knitr/DT/rmarkdown) isn't feasible locally.
-  Two mitigations: (1) replicate just the **build-breaking check in base R**
-  (e.g. a Quarto page's `stop()`-on-missing-data guard) — base R needs no
-  install; (2) `quarto install tinytex` **does** work, so validate the LaTeX/PDF
-  paths locally with lualatex (`quarto render <f>.qmd --to pdf`) even when the
-  HTML render is blocked. Let CI do the authoritative HTML render. (macros#71:
-  DT/knitr uninstallable, but a base-R interpretation-completeness check + a
-  lualatex PDF render of the new macros validated the change before push.)
+  Two mitigations:
+  (1) replicate just the **build-breaking check in base R**
+  (e.g. a Quarto page's `stop()`-on-missing-data guard) --- base R needs no install;
+  (2) `quarto install tinytex` usually works
+  (measured working on macros#71, and failing silently on 2026-09-01 --- see the next bullet),
+  so validate the LaTeX/PDF paths locally with lualatex (`quarto render <f>.qmd --to pdf`)
+  even when the HTML render is blocked.
+  Let CI do the authoritative HTML render.
+  (macros#71: DT/knitr uninstallable,
+  but a base-R interpretation-completeness check + a lualatex PDF render of the new macros
+  validated the change before push.)
+  **That installer can also fail while exiting 0.**
+  Measured 2026-09-01 in a remote Claude Code container:
+  `quarto install tinytex --no-prompt` printed
+  `ERROR: Unable to determine latest release for rstudio/tinytex-releases / 403 - Forbidden`
+  (the unauthenticated GitHub-releases lookup, the same signature `quarto-sites.md` records for shared runners)
+  and still returned exit 0, leaving no TeX at all,
+  so a `| tail` on its output read as success.
+  Verify with `quarto check` (`Tex: (not detected)`) rather than the exit status.
+  The fallback that worked, about three minutes:
+  `apt-get install -y --no-install-recommends texlive-luatex texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended lmodern`,
+  then `texlive-fonts-extra` as well,
+  because Quarto's callout preamble needs `fontawesome5.sty`, which the first set does not carry
+  (the render dies with `File 'fontawesome5.sty' not found`).
+  - **Do:** read `quarto check` after installing TinyTeX in a container.
+  - **Don't:** trust `quarto install tinytex`'s exit code, or a tailed log.
   **Before accepting "uninstallable," try `install.packages()` straight from a
   source CRAN mirror** (`options(repos = c(CRAN = "https://cloud.r-project.org"));
   install.packages(c("knitr", "rmarkdown", "DT"))`, no P3M) — it builds sass/DT
@@ -536,3 +555,19 @@ which keeps the R-toolchain and R-package material that applies anywhere.
   search (not `installed.packages(lib.loc=<one dir>)`, which misses base/recommended
   packages and anything already installed in a different lib on the path and
   falsely reports them as missing).
+
+## The remote container has no GNU `time`; use the shell keyword
+
+`/usr/bin/time` is absent in the Claude Code remote container
+(measured 2026-09-01: `/usr/bin/time -v python3 ...` failed with
+`No such file or directory`, and a compound command that started with it
+ran nothing else, so the "timing" run produced an empty log that read like
+a script failure).
+Bash's `time` keyword works: `{ time cmd > log 2>&1 ; } 2>&1` prints
+`real`/`user`/`sys` for the braced command.
+`python3 -m cProfile -s cumtime script.py` is the profiler when the
+question is *where* the time goes rather than how much.
+
+- **Do:** time a command with the `time` keyword, or profile with `cProfile`.
+- **Don't:** reach for `/usr/bin/time -v` in this container, or read its
+  empty log as the timed command having failed.

@@ -6,7 +6,7 @@ review/comment/thread mechanics, and the specific failure modes each
 tool has shown in practice.
 Split out of `github.md` pre-emptively at 1199 lines, just under
 `scripts/check-memory-file-size.py`'s gate --- that check fires strictly
-above 1200 lines, so the file never actually tripped it.
+above 1250 lines (enforced with `--strict` in CI per ai-config#2970), so the file never actually tripped it.
 See ai-config#694 for the precedent.
 
 - In remote/web sessions the authenticated GitHub identity **can be** the repo
@@ -137,6 +137,11 @@ See ai-config#694 for the precedent.
   `review / gather-context` reading `in_progress` at `16:39:08Z` seconds later.
   That second check is the load-bearing one, since a 204 is an acknowledgement
   and says nothing about whether a job ran.
+  **Every `inputs` value must be a JSON string, even when the workflow declares that input `type: number`.**
+  `inputs: {"pr_number": 179}` (a JSON number) failed with `Invalid value for input 'pr_number'`; `inputs: {"pr_number": "179"}` (the same value as a string) queued the run.
+  This is the `workflow_dispatch` REST API's own contract -- GitHub Actions inputs are always strings on the wire regardless of the declared `type`, which only affects the web-UI form control -- so the tool is not misbehaving, and the fix is to stringify every input value, not just the ones already quoted in an example.
+  **Do:** pass every `actions_run_trigger` input as a string (`"179"`), including a value the workflow declares numeric.
+  **Don't:** pass a bare JSON number for a `type: number` input and expect the declared type to be honored.
   **Do not generalize it to the rerun family.**
   `rerun_failed_jobs`, `rerun_workflow_run`, and `cancel_workflow_run` were not
   exercised in that session, so the bullet above stands unrefuted for them; what
@@ -290,57 +295,7 @@ See ai-config#694 for the precedent.
   unified diff — equivalent to `gh pr diff`) · `get_status` · `get_files` ·
   `get_commits` · `get_review_comments` · `get_reviews` · `get_comments` ·
   `get_check_runs`.
-- **`mcp__github__request_copilot_review` is a real, separate tool** (not a
-  `pull_request_read` method) -- requests a Copilot code review on a PR,
-  equivalent to `gh api .../requested_reviewers -X POST -f
-  "reviewers[]=copilot-pull-request-reviewer[bot]"`. Verified directly
-  against `github/github-mcp-server`'s own source
-  (`pkg/github/copilot.go`'s `RequestCopilotReview`), registered in the
-  **default** toolset (`pkg/github/tools.go`), not behind an opt-in flag --
-  don't assume a tool is a hallucination just because it's absent from this
-  file, which is a running collection of quirks encountered, not an
-  exhaustive registry.
-- **`request_copilot_review` returns success even when Copilot's quota is
-  exhausted -- the refusal arrives later, as a posted review.**
-  The tool reports no error and no output whether or not Copilot will
-  actually review; what comes back minutes later is a `COMMENTED` review
-  whose entire body is *"Copilot was unable to review this pull request
-  because the user who requested the review has reached their quota
-  limit"*.
-  So a clean return is **not** evidence the quota is back, and neither is
-  the absence of an error --- only the posted review body settles it.
-  Two further specifics:
-  - The quota is **per requesting user**, not per repo or per PR, so every
-    request from the same account keeps refusing until it resets, however
-    many different PRs it's spread across.
-  - **Latency is a weak tell, and an untested one.**
-    Every refusal came back within roughly a minute of the request.
-    A later request was still pending when last checked about ten minutes
-    in, which is the only reason to suspect a long-pending request may be
-    a real review rather than a slow refusal -- but its outcome was never
-    observed, because the PR merged first.
-    So treat a long wait as weak grounds for holding off on re-requesting,
-    not as evidence a review is coming, and read the posted review either
-    way.
-  Copilot and the `@claude` reviewer fail **independently**: Copilot can be
-  quota-dead while `claude-review` posts genuine verdicts at the same head,
-  so a Copilot refusal is never a reason to stop checking the other one.
-  (`ucdavis/rampp#111`, 2026-07-24/25: three refusals across two heads while
-  `claude-review` reviewed both normally, and Copilot itself had worked on
-  the same PR two days earlier.)
-- **A branch ruleset can block Copilot from pushing a fix while leaving my
-  own push to the same branch unaffected.**
-  When Copilot reports it prepared a change but could not apply it ---
-  e.g. *"Cannot update this protected ref"* --- don't infer the branch is
-  write-protected for this session too: try the push.
-  The corollary matters more for review triage: a Copilot-identified issue
-  still sitting unfixed may be unfixed because its push was rejected,
-  **not** because the fix was wrong, disputed, or deliberately dropped.
-  Re-check such a finding on its own merits rather than reading "Copilot
-  left it alone" as a signal it was already settled.
-  (`ucdavis/rampp#111`: Copilot had prepared the `DESCRIPTION` version bump
-  that `version-check` was failing on and was rejected with that error; the
-  identical fix pushed fine from this session as `0c72d81`.)
+- GitHub Copilot reviews (`request_copilot_review`, quota refusals, timing guarantees, suppressed comments, branch-ruleset blocks): split out topically to [`copilot-reviews.md`](copilot-reviews.md) (ai-config#2969).
 - **`get_status` can return "pending / 0 checks" even after CI has finished.**
   Use `get_check_runs` for the real job conclusions (`success`, `failure`,
   `skipped`) --- but see the bullet below: it is the more reliable of the two,
@@ -729,9 +684,57 @@ See ai-config#694 for the precedent.
   (ai-config#373: `mergeable_state: unstable` right after a push was CI still
   running, not a conflict signal.)
 - **`gh pr merge` can return "Head branch is out of date" even after syncing; verify with SHAs before looping, and re-establish fully-clean before retrying.** When this error repeats, first read the PR's actual base branch (`gh pr view <N> --json baseRefName -q .baseRefName`) — do **not** assume `main`; stacked and release PRs target a different base — then fetch and merge that base into the branch. Merging the base creates a new head SHA, which invalidates the CI/review "fully clean" snapshot that authorized the original merge attempt (a repo that doesn't make every workflow/review a required branch-protection check can otherwise merge an unreviewed/untested new head) — re-run the `fully-clean.md` check against the new SHA before retrying the merge, not just the merge command itself. If it still fails, don't compare against `origin` blindly: for a cross-fork PR, `origin` is the *base* repo, not necessarily where the head branch lives, so `git ls-remote origin refs/heads/<branch>` can silently read a missing ref or an unrelated same-named branch in the base repo. Get the actual head repo and ref from the PR API first (`gh pr view <N> --json headRepositoryOwner,headRepository,headRefName`), query *that* repo's ref (`gh api repos/<head-owner>/<head-repo>/git/refs/heads/<head-ref> --jq .object.sha` — verified this endpoint works), and compare it against the PR API's own `.head.sha` (`gh api repos/<o>/<r>/pulls/<N> --jq .head.sha`); the PR object can lag the branch ref briefly, so **wait** until the two SHAs agree rather than retrying. If branch protection still blocks the merge, only use `gh pr merge --admin` when the user has **separately and explicitly** authorized the bypass itself — ordinary merge authorization does **not** cover it (see `preferences.md`) — otherwise stop and surface it as a blocker.
-- Webhook PR-activity events cover comments/reviews/CI *failures* but NOT CI
-  *success*, new pushes, or merge-conflict transitions — don't rely on events
-  alone to know a PR went green or merged; re-check explicitly.
+- Webhook PR-activity events cover comments/reviews/CI *failures* but NOT
+  new pushes or merge-conflict transitions --- don't rely on events alone to
+  know a PR merged; re-check explicitly.
+  **CI success is now partly covered, contrary to what this bullet used to
+  say in full: a `check_suite.completed` event is delivered when no
+  third-party check suite on a head is still running or failed.**
+  Measured 2026-09-01 in a Claude Code remote session on
+  `UCD-SERG/serodynamics`, where nine arrived across six PRs.
+  Its own body states the limits, and they matter:
+  cancelled suites, suites with no runs, the GitHub App's own suites
+  and legacy commit statuses are **not** covered.
+  So it is a prompt to verify, not a green light --- a PR can carry a
+  still-running `review / claude-review` (an App suite)
+  while this event says CI is done.
+  Read the check runs before calling anything clean.
+- **A `check_suite.completed` event can name a superseded head, and its
+  wording invites you to act on it anyway.**
+  The event body says "If you were waiting on CI, continue with the next
+  step", which reads as an all-clear for the PR rather than for one commit.
+  Three of the nine measured above named a head that a later push had
+  already replaced, written here as superseded-head -> replacement:
+  on #311, `8c6c1be` -> `fb8c7ac`;
+  on #298, `cb327d7` -> `65fd9fc`, and then `65fd9fc` -> `e76c564`.
+  Each arrived one to five minutes after the superseding push,
+  and every one was on a PR that had just been pushed to ---
+  the old head's suite simply finishes after the new head exists.
+  So the risk concentrates exactly where an iterating session lives,
+  rather than being spread evenly across events.
+  Read those counts as a lower bound on an ongoing pattern
+  rather than a fixed tally:
+  a fourth arrived later the same session on
+  `Morrison-Lab/ai-config#2907` (`2450dd3` -> `30e83de`),
+  by the same mechanism,
+  which is what establishes that this is not repo-specific.
+  This is the same staleness the failure-event bullet below describes,
+  in the direction that is easier to act on wrongly:
+  a stale *failure* costs a wasted investigation,
+  while a stale *success* can license declaring a head green
+  whose CI never ran.
+  Compare `head_sha` against the PR's live `.head.sha`
+  before treating any such event as progress.
+  The earliest measurement of this shape predates this bullet and lives in
+  [`fully-clean.cases.md`](../shared/workflow/fully-clean.cases.md),
+  "A `check_suite.completed` wake at a superseded head"
+  (`ucdavis/bcs#732`, 2026-08-23), which this bullet was written without
+  having found; read the two together.
+  This stays a memory rather than a hook despite clearing
+  [`deterministic-tools`](../shared/principles/deterministic-tools.md)'s
+  third-occurrence bar:
+  deciding it needs a live API read of the PR's current head,
+  which is not a condition a transcript-scanning hook can evaluate.
 - **A CI-failure webhook event's `HeadSHA` can be stale — compare it against
   the PR's actual current head before investigating.** Pushing a fix-up commit
   right after a bad one (e.g. correcting an encoding mistake seconds later)
@@ -980,6 +983,78 @@ See ai-config#694 for the precedent.
   - **Don't:** read the `422` as a property of the MCP client --- it is the
     author-equals-reviewer collision, and it does not arise when the two
     logins differ.
+
+- **Recurrence of the raw-REST no-review trap, with the rule loaded, and
+  what the recurrence added (2026-09-04).**
+  [`github-remote-sessions.md`](github-remote-sessions.md)'s "Two
+  consequences follow" bullet already records, from the day before, that a
+  PR created by `POST /pulls` sends `pull_request.opened` as the bot, gets
+  no automatic review, shows a green run with every `review /` job
+  skipped, and that a bot comment's `author_association` is `CONTRIBUTOR`;
+  [`claude-bot-workflows.md`](claude-bot-workflows.md)'s "A bot-sender push
+  never triggers the ai-config review workflow" bullet carries the same
+  run-green-jobs-skipped shape.
+  Ten PRs (ai-config#3220 through #3229) were opened by `POST /pulls`
+  anyway, for the convenience of a loop, and the claim comments posted the
+  same way.
+  Three things those entries do not say.
+
+  Each workflow declines on its own `if:`.
+  `jules-review.yml` requires `github.event.issue.pull_request`, an
+  `@jules` mention, and an `author_association` of OWNER, MEMBER, or
+  COLLABORATOR;
+  its ten runs on the bot's claim comments failed the association alone,
+  and eleven more on the bot's issue comments (ten link-backs and one
+  wave summary) failed the pull-request and mention conjuncts as well.
+  `antigravity-review.yml` accepts a `workflow_dispatch` outright and
+  otherwise requires the same pull-request and association conjuncts plus
+  an `@agy` or `@antigravity` mention, so on the mention it skipped under
+  every sender, the user's included.
+  `jules-review.yml` declares only `issue_comment`, so it has no dispatch
+  route and needed the re-posted mention where `claude-review.yml` and
+  `antigravity-review.yml` could be dispatched.
+  Read the `on:` and the `if:` before naming the gate.
+
+  The MCP tools write where the raw route fails for two different
+  reasons: GitHub refuses the raw `POST .../dispatches` outright (the
+  App token lacks `actions: write`), while a raw mention comment is
+  accepted and then ignored by the association gate.
+  `mcp__github__actions_run_trigger` with `inputs.pr_number`
+  queued `claude-review.yml` for nine PRs under `d-morrison` in one batch
+  (eight verdicts; #3220's run was cancelled by the push that followed
+  it), and `mcp__github__add_issue_comment` re-posted the mention so Jules
+  started on all ten within a minute.
+  The MCP writes carried `d-morrison` in this container on 2026-09-04;
+  re-derive that per the entry above rather than carrying it.
+  `github-remote-sessions.md`'s "Don't reach for `workflow_dispatch` or an
+  `@claude review` comment" bullet covers the raw-API route and points
+  here for the MCP route.
+
+  Where a dispatched run's check-runs land depends on the `ref` the
+  dispatch passed, not on its being a dispatch.
+  The nine runs above were dispatched on `main` with the PR named only by
+  `inputs.pr_number`, so their check-runs attached to `main`'s tip and
+  the PR heads kept the bot-sender run's `skipped` rows;
+  a run dispatched on the PR's own branch as `ref` (#3239, run
+  33925727681, 2026-09-04) attached its check-runs to that PR head.
+  #3228 merged with the head's `require-clean-verdict` reading `skipped`
+  while the dispatch run's copy had failed on `verdict: unrecognized`
+  (ai-config#3233).
+  For a review dispatched on another ref, read that run's jobs, not the
+  head's check-runs.
+
+  - **Do:** open PRs and post reviewer mentions through the client whose
+    writes carry the user's login.
+  - **Do:** dispatch on the PR's branch as `ref`, and read the dispatch
+    run's jobs when a review was dispatched on any other ref.
+  - **Do:** read each review workflow's `on:` and `if:` before naming
+    why it skipped.
+  - **Don't:** attribute a skip to the sender's association alone, or
+    assume every review workflow has a dispatch route.
+  - **Don't:** open PRs by raw REST for the convenience of a loop; the
+    entry from the day before already said what that costs.
+  - **Don't:** read a head check-run row after a dispatch as that
+    dispatch's verdict gate.
 
 - **The REST-backed reads can 404 while the GraphQL-backed ones succeed in the
   same container, against the same PR --- so a review verdict can be

@@ -32,8 +32,11 @@ PR #555 looked caused, because its conflict was on
 `19ab811d`, confirmed with `git log --diff-filter=D`.
 Without attribution the sweep prescribes claiming and resolving all 20.
 The branch behind #511 was a CRAN release branch this session did not own, so
-the response was an explanatory comment naming the rename and where the content
-went, not a push.
+the response at the time was an explanatory comment naming the rename and where
+the content went, not a push.
+That comment is superseded: #511 was Copilot-authored and assigned to others,
+so under `memories/reviewing-prs.md`'s scope test it gets no comment either,
+and the current response is a report to the user.
 `git show --name-status "$merge"` was the first command reached for and printed
 no file list at all --- both merges here are two-parent merges, which is the
 case that behaves this way; re-measured against this corpus's own merge
@@ -80,14 +83,18 @@ spent.
 
 The enforcement half was measured on #1226's own first push, which failed
 `validate` at **step 12, "Run memory-file-size check tests"** --- not at the
-later step named "Check for oversized memory files (advisory)", which runs
-`scripts/check-memory-file-size.py` with no `--strict` and exits 0 by design.
-What gates is `scripts/test_check_memory_file_size.py:127-132`, whose comment
-reads "The real corpus must stay under the shipped default, or the check ships
-red", calling `cmfs.oversized_files("memories", cmfs.DEFAULT_MAX_LINES)` and
-exiting 1 on any finding.
-So the cap is hard and is enforced from the check's test suite rather than from
-the check.
+later step then named "Check for oversized memory files (advisory)", which on
+that date ran `scripts/check-memory-file-size.py` with no `--strict` and
+exited 0 by design.
+What gated was the assertion in `scripts/test_check_memory_file_size.py` whose
+comment reads "The real corpus must stay under the shipped default, or the
+check ships red", calling `cmfs.oversized_files` over the tracked memory files
+and exiting 1 on any finding.
+So the cap was hard that day and was enforced from the check's test suite
+rather than from the check.
+That step has since gained `--strict` and lost "(advisory)" from its name
+(ai-config#2970 / #2973, 2026-09-01), so the cap is now enforced from both the
+CI step and the test suite.
 Two sibling files were already at the gate when this was found:
 `memories/git.md` at 1199, and `memories/claude-bot-workflows.md` at 1199 after
 the trim #1226 made to fit, with `memories/debugging.md` at 1169 --- tracked

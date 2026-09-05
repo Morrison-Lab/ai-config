@@ -1,0 +1,65 @@
+# Upload skills to the Anthropic Skills API on push to main or manual dispatch.
+# Uses upload_skills.sh with change detection and state caching.
+name: Upload Skills
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "skills/**"
+      - "upload_skills.sh"
+      - ".github/workflows/upload-skills.yml"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Force upload all skills regardless of cache"
+        required: false
+        type: boolean
+        default: false
+      prune:
+        description: "Prune deleted managed skills from workspace"
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  upload:
+    name: Upload Skills
+    runs-on: ubuntu-latest
+    if: github.repository == 'Morrison-Lab/ai-config'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 1
+
+      - name: Restore skill upload state cache
+        uses: actions/cache/restore@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0
+        with:
+          path: .skill_state.json
+          key: skill-upload-state-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            skill-upload-state-${{ runner.os }}-
+
+      - name: Run upload_skills.sh
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_WORKSPACE_API_KEY || secrets.ANTHROPIC_API_KEY }}
+          FORCE: ${{ inputs.force && '1' || '0' }}
+          PRUNE: ${{ github.event_name == 'workflow_dispatch' && inputs.prune == false && '0' || '1' }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "ANTHROPIC_API_KEY secret not configured; skipping upload"
+            exit 0
+          fi
+          ./upload_skills.sh
+
+      - name: Save skill upload state cache
+        if: always()
+        uses: actions/cache/save@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0
+        with:
+          path: .skill_state.json
+          key: skill-upload-state-${{ runner.os }}-${{ github.run_id }}

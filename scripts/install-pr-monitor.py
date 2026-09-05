@@ -2,12 +2,13 @@
 """Install and start ai-config's agent-independent PR monitor service.
 
 The daemon must survive contexts with a minimal PATH (cron, systemd user
-units), so `gh` and `python3` are resolved absolutely at install time and
-the interactive PATH is persisted for the daemon: into the cron line and a
-systemd drop-in. The checked-in unit stays machine-generic.
+units), so `python3` is resolved absolutely at install time, `gh` or `glab`
+(at least one; the daemon polls whichever it finds) is confirmed present,
+and the interactive PATH is persisted for the daemon: into the cron line
+and a systemd drop-in. The checked-in unit stays machine-generic.
 
 On Windows the poll persists as a Task Scheduler job every five minutes;
-the task inherits the user environment, so the hook's runtime `gh`
+the task inherits the user environment, so the hook's runtime `gh`/`glab`
 resolution sees the interactive PATH. The task runs while you are logged
 on: sleep and logout pause it, which is acceptable for a secondary
 backstop host (#2082).
@@ -28,6 +29,9 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+from scripts.lib.ai_cli import find_executable
+
 UNIT = "ai-config-pr-monitor.service"
 SOURCE = ROOT / "systemd" / UNIT
 TARGET = Path.home() / ".config" / "systemd" / "user" / UNIT
@@ -47,13 +51,21 @@ STALE_POLLS = 5
 
 
 def resolve_dependencies():
-    python3 = shutil.which("python3")
+    python3 = find_executable("python3", fallback_to_dirs=False, use_cache=False)
     if python3 is None and IS_NT:
         # Windows rarely ships a python3.exe alias; run the daemon under
         # whatever interpreter is executing this installer.
         python3 = sys.executable
-    gh = shutil.which("gh")
-    missing = [name for name, path in (("python3", python3), ("gh", gh)) if not path]
+    # The monitor polls through whichever of gh (GitHub) and glab (GitLab)
+    # is installed -- the same rule as its own require_cli() -- so one of
+    # the two is enough, and neither is a refusal.
+    gh = find_executable("gh", fallback_to_dirs=False, use_cache=False)
+    glab = find_executable("glab", fallback_to_dirs=False, use_cache=False)
+    missing = []
+    if not python3:
+        missing.append("python3")
+    if not gh and not glab:
+        missing.append("gh or glab")
     if missing:
         sys.exit("FATAL: cannot resolve " + ", ".join(missing) + " on PATH; "
                  "refusing to install a monitor that can only error every poll")

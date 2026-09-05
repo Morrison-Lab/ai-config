@@ -1,6 +1,6 @@
 ---
 name: adv
-description: "Get an adversarial review from another model available on this machine."
+description: "Adversarial review from another local model."
 user-invocable: true
 allowed-tools:
   - Bash
@@ -9,7 +9,7 @@ allowed-tools:
 
 # adv (Adversarial Review)
 
-Runs a local adversarial AI code review on outgoing branch commits using an alternate model/engine available on this machine.
+Runs a detailed and holistic local adversarial AI code review on outgoing branch commits using an alternate model/engine available on this machine (evaluating architecture, conventions, safety, tests, and diff impacts rather than perfunctory surface checks).
 
 ## When this fires
 
@@ -29,7 +29,7 @@ GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
 if [ -n "$PRE_PUSH_REVIEW_LOCAL_DEV" ] && [ -n "$GIT_ROOT" ] && [ -f "$GIT_ROOT/scripts/pre-push-review.py" ]; then
   REVIEW_SCRIPT="$GIT_ROOT/scripts/pre-push-review.py"
 else
-  TRUSTED_DIR=$(python3 -c "import os, sys; candidates = ['~/.claude/skills/pre-push-review', '~/.gemini/skills/pre-push-review', '~/.cursor/skills/pre-push-review', '~/.codex/skills/pre-push-review', '~/.gemini/config/plugins/ai-config/skills/pre-push-review']; p = next((os.path.realpath(os.path.expanduser(f)) for f in candidates if os.path.exists(os.path.expanduser(f))), None); sys.exit('Error: Trusted pre-push-review skill not found') if not p else print(os.path.abspath(os.path.join(p, '..', '..')))")
+  TRUSTED_DIR=$(python3 -c "import os, sys; candidates = [os.environ.get('CLAUDE_PLUGIN_ROOT', ''), '~/.claude/skills/pre-push-review', '~/.gemini/skills/pre-push-review', '~/.cursor/skills/pre-push-review', '~/.codex/skills/pre-push-review', '~/.gemini/config/plugins/ai-config/skills/pre-push-review']; p = next((os.path.realpath(os.path.expanduser(f)) for f in candidates if f and os.path.exists(os.path.expanduser(f))), None); sys.exit('Error: Trusted pre-push-review skill not found') if not p else print(os.path.abspath(p if os.path.isdir(os.path.join(p, 'scripts')) else os.path.join(p, '..', '..')))")
   TMP_WORKTREE=$(mktemp -d)
   trap 'rm -rf "$TMP_WORKTREE"' EXIT
   git -C "$TRUSTED_DIR" archive origin/main | tar -x -C "$TMP_WORKTREE" 2>/dev/null || { echo "Error: Failed to extract trusted origin/main review script. Set PRE_PUSH_REVIEW_LOCAL_DEV=1 to use local branch."; exit 1; }
@@ -53,7 +53,7 @@ python3 "$REVIEW_SCRIPT" --engine codex
 ## How it works
 
 1. Computes the local outgoing diff against `origin/main` (or PR base).
-2. Dispatches the review to the selected alternate model/engine using plan/read-only mode.
+2. Dispatches the review to the selected alternate model/engine using plan/read-only mode to independently conduct both a detailed implementation defect audit and a holistic change assessment.
 3. Parses and validates the structured review findings.
 4. Exits with a nonzero code on blocking findings (unless `--allow-findings` is specified).
 

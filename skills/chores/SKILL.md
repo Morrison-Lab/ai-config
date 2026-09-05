@@ -29,16 +29,27 @@ for the user's call before merging.
 
 ## What counts as a chore PR
 
-A PR is in scope if **any** of these hold:
+A PR is in scope when **either** of these holds:
 
-- Author is a bot: `app/dependabot`, `dependabot[bot]`, `app/renovate`,
-  `renovate[bot]`.
-- Title is a conventional-commit chore: starts with `chore(` (e.g.
-  `chore(actions):`, `chore(submodule):`, `chore(deps):`).
-- Labels include `dependencies`.
+- Its author is one of the dependency bots this skill exists for, matched in
+  the exact login form the source returns: `app/dependabot`,
+  `dependabot[bot]`, `app/renovate`, `renovate[bot]`.
+  An explicit `chores` call names that population, which is what admits those
+  two bots and no other author.
+- It looks like a chore --- the title starts with `chore(` (e.g.
+  `chore(actions):`, `chore(submodule):`, `chore(deps):`), or the labels
+  include `dependencies` --- **and** it passes `memories/reviewing-prs.md`'s
+  scope test for the invoking user: authored by the GitHub Actions app
+  (`github-actions`, which opens `chore(submodule):` bumps) or by the invoking
+  user or one of their aliases, assigned to one of them, or one the user
+  explicitly asked this run to work on (a mention such as "do not touch"
+  followed by a number is not a request).
 
-Human-authored feature PRs are **out of scope** — those go through `ardia` /
-`gia` (review-to-clean), not this skill.
+Human-authored feature PRs are **out of scope** --- those go through `ardia` /
+`gia` (review-to-clean), not this skill --- and so is a chore-titled or
+`dependencies`-labelled PR whose author is another lab member or another bot,
+unless the invoking user is assigned to it or explicitly asked this run to
+work on it.
 
 ## Procedure
 
@@ -57,13 +68,57 @@ This skill is GitHub-first (`gh`). For a GitLab repo, the same shape applies via
 
 ### 1. List the open chore PRs
 
+Set the three scope inputs first, the way `REPO` is set above.
+`PR_SCOPE_ALIASES` is the comma-separated list of other logins
+`memories/reviewing-prs.md` names as the same person as the resolved user
+(leave it unset when that file lists none for them), and `PR_SCOPE_REQUESTED`
+is the comma-separated list of PR numbers the user explicitly asked this run
+to work on, never a number merely mentioned or excluded
+(leave it unset when there are none).
+`PR_SCOPE_EXCLUDED` is the comma-separated list of PR numbers the user told
+this run not to touch ("chores, but do not touch" followed by a number); it
+is a veto checked before every positive arm, bot authors included, so an
+excluded dependency-bot PR is neither listed nor merged.
+With all three unset the filter keeps only the resolved login's own PRs, the
+assigned ones, and the bots', which is the fail-closed default.
+
 ```bash
+set -eo pipefail   # a failed command, or a failed gh pr list in the pipeline below, stops here
+ME=$(gh api user --jq .login 2>/dev/null) || ME=""   # WHO_AM_I
+if [ -z "$ME" ]; then
+  # Fail closed, and say so: with no identity the author and assignee arms
+  # stay unevaluated (aliases included), so only bot-authored and explicitly
+  # requested PRs pass.
+  PR_SCOPE_ALIASES=""
+  echo "::warning::identity lookup failed; author/assignee arms unevaluated (report this)" >&2
+fi
+# e.g. PR_SCOPE_ALIASES=other-login      # from memories/reviewing-prs.md
+# e.g. PR_SCOPE_REQUESTED=123,456       # PRs the user asked this run to work on
+# e.g. PR_SCOPE_EXCLUDED=789            # PRs the user told this run not to touch
+IDS=$(jq -cn --arg me "$ME" --arg al "${PR_SCOPE_ALIASES:-}" \
+  '[$me] + ($al | split(",") | map(select(length > 0))) | map(select(length > 0)) | unique')
+REQ=$(jq -cn --arg r "${PR_SCOPE_REQUESTED:-}" \
+  '$r | split(",") | map(select(length > 0) | tonumber)')
+EXC=$(jq -cn --arg x "${PR_SCOPE_EXCLUDED:-}" \
+  '$x | split(",") | map(select(length > 0) | tonumber)')
 gh pr list --repo "$REPO" --state open --limit 200 \
-  --json number,title,author,labels,mergeable \
-  --jq '.[] | select(
-          (.author.login | test("dependabot|renovate"))
-          or (.title | startswith("chore("))
-          or ([.labels[].name] | index("dependencies"))
+  --json number,title,author,assignees,labels,mergeable \
+  | jq -r --argjson ids "$IDS" --argjson req "$REQ" --argjson exc "$EXC" '.[] | select(
+          ((.number as $n | $exc | index($n)) == null)
+          and (
+          (.author.login | test("^(app/(dependabot|renovate)|(dependabot|renovate)\\[bot\\])$"))
+          or (
+            (
+              (.author.login | test("^(app/github-actions|github-actions\\[bot\\]|github-actions)$"))
+              or ((.author.login as $a | $ids | index($a)) != null)
+              or any(.assignees[].login; . as $x | ($ids | index($x)) != null)
+              or ((.number as $n | $req | index($n)) != null)
+            ) and (
+              (.title | startswith("chore("))
+              or (([.labels[].name] | index("dependencies")) != null)
+            )
+          )
+          )
         ) | "\(.number)\t\(.mergeable)\t\(.title)"'   # LIST_PRS
 ```
 
@@ -72,7 +127,29 @@ would otherwise be silently truncated.
 
 If there are none, say so and stop.
 
+That listing is a snapshot.
+Assignment, the title, and the labels can all change while the sweep runs,
+so re-fetch every input the predicate reads (author, assignees, title,
+labels) and reapply the same predicate, the `PR_SCOPE_EXCLUDED` veto
+included, immediately before each write action in steps 2-5 (closing a bump
+PR, a `@dependabot` comment, a merge), and drop and report a PR that no longer
+passes.
+
 ### 2. Classify each PR by bump size
+
+Record the head, the base, and the title before classifying (GitHub only: the pins and the gate they feed have no GitLab form until [#3021](https://github.com/Morrison-Lab/ai-config/issues/3021)),
+since the classification, every read in step 3, and the merge in step 4 are claims about one SHA on one target under one title,
+and Dependabot can replace the head or retitle the PR between any two of them:
+
+```bash
+PINNED=$(gh pr view "$N" --repo "$REPO" --json headRefOid -q .headRefOid)   # VIEW_PR
+BASE=$(gh pr view "$N" --repo "$REPO" --json baseRefName -q .baseRefName)   # VIEW_PR; a retarget at the same tip must not pass
+TITLE=$(gh pr view "$N" --repo "$REPO" --json title -q .title)   # VIEW_PR; the classification below reads this title
+```
+
+Shell variables do not survive between tool calls, so print the three values and substitute the literals into every later command, rather than expecting `$PINNED` to expand later.
+If the head, the base name, or the title changes before the merge lands, start again from here, classification included.
+A retitle moves neither SHA and can turn a patch-looking bump into a major one.
 
 Parse the version pair out of the title (`... from X to Y`) and compare the
 leading number:
@@ -84,8 +161,10 @@ leading number:
   don't respect patch semantics either — don't wave these through as safe.
 - **major** — leading number increases (`4 → 7`, `2 → 3`, `1 → 2`) → **review**.
 - **submodule** (`chore(submodule):`) — no semver; it tracks a moving branch by
-  design. Treat a green submodule bump as **safe** (auto-advancing the pointer
+  design.
+  Treat a green submodule bump as **safe** (auto-advancing the pointer
   is the whole point), unless the diff is unexpectedly large.
+  If the repository has migrated to a native plugin for the vendored tool (e.g. `ai-config` as a plugin), close the bump PR and remove the redundant submodule instead per [`remove-redundant-plugin-submodules.md`](../../shared/workflow/remove-redundant-plugin-submodules.md).
 
 When the title has no parseable version (some Renovate digests), fall back to
 the PR body's update table or treat it as **review**.
@@ -118,33 +197,40 @@ Dashboard) — `@dependabot` comment commands do nothing on Renovate PRs.
 
 ### 4. Safe bumps (patch / minor / submodule + green) → merge
 
-Merge directly. Dependabot deletes its own branch on merge.
+First read whether the base requires a merge queue (the rules probe in `fully-clean`'s stop bullet).
+On a base that requires a merge queue, stop and report the bump as blocked: the queue form of the gate is [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030) and is out of scope until it lands.
+Otherwise run the base-currency check from [`fully-clean`](../../shared/workflow/fully-clean.md)'s stale-base rule (the Do bullets beginning "for a direct merge"), since a green head can still break the base when the base gained a check after the head's CI ran.
+That check's one-liner prints the tested base tip.
+Record the printed literal as `TIP` the same way.
+Immediately before the merge command, require the live head to equal `$PINNED`, the live base name to equal `$BASE`, the live title to equal `$TITLE`, and the live base tip to equal `$TIP`, and restart from the currency check if the tip moved or from step 2 if anything else did.
+A regenerated head that already contains the base would otherwise pass a currency check with CI never read for it.
+When that check finds the base stale, the bot-bump recovery is to update the branch pinned to `$PINNED`,
+wait until `headRefOid` differs from `$PINNED`, with a deadline of a few minutes (expiry is a failed update: stop and report it rather than restarting),
+and then start again from the top of step 2: re-record `$PINNED` and `$BASE`, re-classify the bump, and rerun the CI and conflict checks against the new pin (review stays skipped on bot PRs).
+The first different SHA is not necessarily the update's result, since Dependabot or another writer can replace the head in the same window, so re-classification is what keeps the merge pinned to a head this skill has actually judged.
+`gh api -X PUT "repos/$REPO/pulls/$N/update-branch" -f expected_head_sha="$PINNED"` merges the base in, pinned to the head whose CI was read.
+A `422` whose message names an expected-head mismatch (match on the substring `expected head sha`, since the live text carries a curly apostrophe and a trailing period that this ASCII rendering cannot show) means the bot or another writer already replaced that head, so re-read before touching it.
+Any other `422` is a failed update: stop and read the message.
+`@dependabot rebase` rewrites the head onto the base branch and also clears a conflict.
+It too replaces the head, so it is followed by the same bounded wait and restart from step 2, never by a direct merge on the old `$PINNED`.
+With the pin current and the checks green, merge directly.
+Dependabot deletes its own branch on merge.
 
 ```bash
-gh pr merge "$N" --repo "$REPO" --squash   # MERGE_PR
+gh pr merge "$N" --repo "$REPO" --squash --match-head-commit "$PINNED"   # MERGE_PR; $PINNED is the headRefOid recorded above
 ```
+
 
 Pick a merge method the repo actually allows — `--squash` errors when squash
 merges are disabled; swap in `--merge` or `--rebase` to match the repo's
 settings.
 
-If checks are still running and you want it to land once they pass:
+Do not arm `gh pr merge --auto` and do not hand the merge to `@dependabot squash and merge`.
+Auto-merge stays enabled across later pushes and fires on required checks alone, so the classified head can be replaced and different content merge without this skill's scope and bump-risk checks rerunning.
+Wait for the checks and merge synchronously with the pin instead.
 
-```bash
-gh pr merge "$N" --repo "$REPO" --squash --auto   # MERGE_PR — needs auto-merge enabled; swap --squash for --merge/--rebase if squash is disabled
-```
-
-For **Dependabot** you can also hand the merge back to the bot — it waits for
-CI, merges, and deletes its branch (handy when the branch needs a rebase
-first):
-
-```bash
-gh pr comment "$N" --repo "$REPO" --body "@dependabot squash and merge"   # COMMENT_PR — Dependabot only
-```
-
-`@dependabot ...` comment commands do nothing on **Renovate** PRs — for those,
-use `gh pr merge` (or tick the merge checkbox in Renovate's Dependency
-Dashboard).
+`@dependabot ...` comment commands do nothing on **Renovate** PRs.
+Merge those with the same pinned `gh pr merge`, not with the merge checkbox in Renovate's Dependency Dashboard, which hands the merge to Renovate without the pin.
 
 Batch the safe ones — merge them all in one pass, then report.
 
@@ -221,5 +307,7 @@ bump is sitting unflagged.
 - ❌ Force-merging a PR with `pending` or `fail` checks.
 - ❌ Reporting "chores done" while a flagged major bump is still open with no
   decision recorded.
-- ❌ Treating human feature PRs as chores (or vice-versa) — scope by author /
-  `chore(` title / `dependencies` label.
+- ❌ Treating human feature PRs as chores (or vice-versa) --- a dependency
+  bot's PR is a chore by author; any other PR needs the `chore(` title or
+  `dependencies` label **and** an in-scope author or assignee, never the
+  title or label alone.

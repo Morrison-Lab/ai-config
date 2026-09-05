@@ -41,8 +41,14 @@ read it before running this skill; the steps below are the short version.
 2. **Grep for candidates** using the two patterns in
    [`informal-definitions.md`](../../shared/writing/informal-definitions.md#the-detection-heuristic) ---
    a bolded term followed by defining language (`\eqdef`, "is the", "="),
-   and a naming sentence ending "is:"/"are:" immediately before a display
-   equation. Run both; each catches phrasing the other misses.
+   and a naming sentence ending "is:"/"are:" immediately before a display equation.
+   Run both; each catches phrasing the other misses:
+   ```bash
+   # Pattern 1: bolded term followed by defining language
+   rg -n '\*\*[A-Za-z][a-zA-Z .-]{2,60}\*\*[^.]*(\\eqdef|is (defined|the)\b|=)' <file>
+   # Pattern 2: naming sentence ending with is: or are: before display math
+   rg -n '\bis:\s*$|\bare:\s*$' <file>
+   ```
 3. **For each hit, find its enclosing div** (search backward for the
    nearest `:::{#...}` opener, forward for its matching closer). It's a
    candidate if it sits in no formal-definition div at all, or if it sits

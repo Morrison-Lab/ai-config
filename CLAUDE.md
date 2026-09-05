@@ -23,7 +23,7 @@ passes. See README.md, "Shared content".
 @shared/workflow/run-ums-proactively.md
 
 Don't wait for `/clear`, a wrap-up step, or a merge to run `ums` (Update Memories and Skills) --- run it the moment a learning shows up: a corrected mistake, a new preference, a tool quirk, a workflow gap.
-The fragment above walks through the specific moments this gets skipped even by someone trying to follow the rule --- an offer to run it standing in for running it, a new instruction preempting an owed pass, a recommendation to `/clear` or start fresh while a pass is still owed, a PR-count worry used to justify deferring it, a corrected belief or a corrected false state-claim that never gets banked because nothing merged, reading a review and treating ARD work as the pass, and answering a questioned claim ("are you sure about that?") with the corrected fact so nothing looks like an admission --- and gives the fix for each: run the pass now, delegate it as pre-authorized sidecar work, and report it in the past tense rather than announcing an intention.
+The fragment above walks through the specific moments this gets skipped even by someone trying to follow the rule --- an offer to run it standing in for running it, a new instruction preempting an owed pass, a recommendation to `/clear` or start fresh while a pass is still owed, a PR-count worry used to justify deferring it, a corrected belief or a corrected false state-claim that never gets banked because nothing merged, reading a review and treating ARD work as the pass, answering a questioned claim ("are you sure about that?") with the corrected fact so nothing looks like an admission, and a pause that ends the turn with the pass still owed, waiting on CI, a review round, or an answer from the user --- and gives the fix for each: run the pass now, delegate it as pre-authorized sidecar work, and report it in the past tense rather than announcing an intention.
 
 ## Record both the pattern and the anti-pattern
 
@@ -191,12 +191,11 @@ Local and on-device models are prohibited because they can crash the user's
 computer.
 When hosted quota is unavailable, report the blocker or use
 deterministic checks instead of starting a local inference runtime.
-`agy` (Google Antigravity)'s **API** route was permanently retired for
-dispatched work (user directive, 2026-08-20, ai-config#1776).
-Only that route is out --- the `agy --print` CLI and the interactive
-subscription/extension are unaffected and not at quota.
-`memories/delegation.md` carries the rule, the usage-window semantics
-across `opencode`, `codex`, and `agy`, and the prepaid-balance details.
+`agy` (Google Antigravity)'s **API** route was retired for dispatched work on 2026-08-20 (ai-config#1776), and a 2026-09-01 retest (`workflow_dispatch` run 33557587761) still failed, now with `request failed (code 403): Spend cap breached` rather than the original 429.
+The `agy --print` CLI is a separate path and was never affected --- it is confirmed working on Windows as of 2026-09-02 via a fresh install from the official `antigravity-cli` GitHub release (user directives that day: "start using agy as a subagent where feasible", "use agy cli for it").
+Route dispatchable subagent work to the `agy` CLI accordingly.
+The interactive subscription/extension was never affected and was never at quota.
+`memories/delegation.md` carries the rule, the usage-window semantics across `opencode`, `codex`, and `agy`, the prepaid-balance details, and the Windows install/mechanics writeup.
 Ground the recommendation in `assess-model-fit`/`select-model` rather than a guess.
 
 **Compaction.**
@@ -277,6 +276,38 @@ If the suffix isn't PDT/PST, fall back to plain `date` when the machine's system
 Otherwise use PowerShell: `[System.TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTime]::UtcNow, 'Pacific Standard Time')`.
 Note the output format differs from the bash command — it's a raw `DateTime` with no timezone-abbreviation field, so format it yourself if you need the `PDT`/`PST` suffix or a compact form.
 
+**The same drift also hits a clock time typed into a forge comment --- an issue or PR comment, and a claim comment especially, since sessions habitually stamp their claims with a start time.**
+A claim comment, a "working on this" status update, or a session-notebook heading is a dated claim exactly like the file edit above, so it needs the same fresh reading, not a reuse of whatever the last real reading said.
+The near-miss is inferring the current time from how much work has happened since that last reading --- counting elapsed tool calls, or a rough sense of "it's been a while" --- rather than running the clock command again.
+That inference feels safe because the earlier reading really was measured, but the clock keeps moving while a tool-call count does not track it, so the two drift apart the same way an unrefreshed chat timestamp does, and the drift compounds across several comments posted in sequence from the same stale reading.
+(Measured 2026-09-01: one real reading at 12:02 PDT was followed by claim comments on wai#81, wai#96, and wai#95 stamped "12:15 PT", "12:40 PT", and "12:58 PT" and by notebook headings "12:25", "12:55", "13:20", all extrapolated from elapsed tool calls.
+The next real reading, taken when a PR head commit's timestamp was needed, came back 12:21 PDT --- up to an hour behind the invented stamps.
+The brief that dispatched this entry itself asserted that `claim-pr` inserts the timestamp, which the skill's templates do not do.
+The review caught it, and it is the same class of unmeasured claim.)
+
+**Run the clock so its value lands in the transcript, not only in a file.**
+A command of the shape `t=$(TZ=America/Los_Angeles date "+%H:%M %Z")` followed by a heredoc writing `$t` into a notebook does read the clock, and you still never see the reading --- so the next stamp you type comes from a sense of elapsed work exactly as if no command had run.
+A reading you cannot quote is not a reading, however honestly it was measured.
+
+- **Do:** run the clock command again immediately before typing a time into a forge comment, exactly as before a chat recap or a file edit.
+- **Do:** print the reading --- run the clock command on its own, so the value comes back in a tool result you can read and quote.
+- **Don't:** infer a clock time from the number of tool calls or actions taken since the last real reading.
+- **Do:** derive a time written into a file from a `date` read in the *same* command that writes it, so a heredoc heading cannot be typed from memory.
+- **Don't:** treat a reading captured into a shell variable whose only destination is that file as a measurement for a chat or comment claim ---
+  the session never observes it, so print it as well (`echo "$now"`) when the same reading will be quoted.
+
+See [`CLAUDE.cases.md`](CLAUDE.cases.md), "A notebook heading typed from the last reading, with the rule loaded".
+
+Two hooks are this rule's mechanism, one per surface.
+`hooks/no-unmeasured-clock-claim.py` reads the reply at `Stop`.
+`hooks/flag-unmeasured-timestamp.py` reads a comment body at `PreToolUse`,
+on the `gh` comment and review commands
+and on the `mcp__github__` comment tools that `hooks/require-agent-disclosure.py` covers.
+Each warns, never blocks, when the text states a Pacific clock time
+and no clock read appears in the transcript since the turn began,
+naming the stamp and the command to run before restating it
+(ai-config#2903, filed on the same day the rule above was written and broken again).
+
 ## State the actual time when reporting a scheduled check-in
 
 When telling the user I've scheduled a wakeup or check-in (`ScheduleWakeup`, or an equivalent poll-later mechanism), state the clock time it fires at, not just the relative delay or a bare "I scheduled a check-in."
@@ -285,7 +316,7 @@ The tool result already returns a clock time (e.g. "Next wakeup scheduled for 08
 
 ## Bare keyword directives
 
-Two families of slash skill read as directives when I write them **without** the leading slash: the **queue commands** that amend the task list, and the **judgment grants** that hand a decision back to you.
+Three families of slash skill read as directives when I write them **without** the leading slash: the **queue commands** that amend the task list, the **judgment grants** that hand a decision back to you, and the **orchestration commands** that cap a run already in flight.
 
 ### Queue commands
 
@@ -303,6 +334,15 @@ Read a bare "do as you think best" as `daytb`, not as `away` -- the session-wide
 `dmmhyh` ("don't make me hold your hand") is a correction rather than a proactive grant: it fires when I'm asking for more guidance than the moment calls for.
 It resolves the pending item like `daytb`, raises the decide-vs-ask threshold for the rest of the session like `away`'s judgment-call test, and -- unlike either -- writes the correction down as a memory entry so it doesn't have to be re-taught next session.
 See [`dmmhyh`](skills/dmmhyh/SKILL.md).
+
+### Orchestration commands
+
+`fw` ("finish the current wave but don't start a new one", longhand `finish-wave`) caps an orchestration run at the wave already in flight.
+It bounds *issue grabs* only, so the review rounds, fixes, and the owed UMS pass that finish the wave's PRs all run under it.
+See [`finish-wave`](skills/finish-wave/SKILL.md).
+
+- **Do:** read a bare "finish the current wave" as `fw`, hold every new grab, and drive the wave's open PRs to a terminal state.
+- **Don't:** read it as "open no more PRs" --- a UMS PR or a follow-up issue is not a grab from the backlog.
 
 ## Link PRs in tables
 
@@ -572,12 +612,25 @@ gh api repos/<owner>/<repo>/issues/<N>/comments --paginate \
 
 `memories/gh-cli.md` carries the full statement, including the placeholder-wording trap when polling a run still in flight.
 
-**Also check formal GitHub reviews, not just issue-style comments — a human's `CHANGES_REQUESTED` can be invisible to a comments-only scan.** A review submitted via GitHub's review UI (as opposed to a plain PR comment) shows up in `gh pr view N --json reviews`, and its top-level `body` is frequently **empty** — the actual finding lives entirely in a per-line inline comment, which only appears via `gh api repos/<owner>/<repo>/pulls/N/comments` (a different endpoint from issue comments). Checking `--json comments` alone can miss the review's existence entirely. Before declaring a PR ready, also run:
+**Also check formal GitHub reviews, not just issue-style comments --- a review's findings can sit where a comments-only scan never looks, whoever posted it and whatever state it carries.**
+A review submitted via GitHub's review UI (as opposed to a plain PR comment) shows up in `gh pr view N --json reviews`, and its top-level `body` is frequently **empty** --- the actual finding lives entirely in a per-line inline comment, which only appears via `gh api repos/<owner>/<repo>/pulls/N/comments` (a different endpoint from issue comments).
+The mirror case is a finding in the top-level `body` itself, plainly or inside a collapsed `<details>` suppression block: neither shape produces a comment object, so `pulls/N/comments` and a thread query both return nothing over it.
+[`fully-clean`](shared/workflow/fully-clean.md) carries the matcher for the collapsed block, and what fails that bar is the finding rather than the state.
+So a bot's `COMMENTED` review carrying a finding fails that bar exactly as a human's `CHANGES_REQUESTED` does.
+Checking `--json comments` alone can miss the review's existence entirely.
+Before declaring a PR ready, also run:
 ```
+gh pr view N --json reviews --jq '.reviews[] | [.state, .author.login, .submittedAt, ((.body // "") | split("\n") | map(select(length > 0)) | .[0] // "(empty body)")] | @tsv'
 gh pr view N --json reviews --jq '.reviews[] | select(.state == "CHANGES_REQUESTED") | "\(.author.login) \(.submittedAt)"'
 gh api repos/<owner>/<repo>/pulls/N/comments --jq '.[] | "\(.path):\(.line // .original_line // "?") \(.user.login) \(.body)"'
 ```
 A `CHANGES_REQUESTED` state is blocking regardless of whether an automated re-review later says "Ready for merge" — that bot verdict doesn't clear a human's own review state, which only the human (or an explicit dismissal) can resolve.
+The unfiltered listing comes first: the state filter answers only whether a review *state* blocks the merge button, which the forge lets `CHANGES_REQUESTED` alone do.
+
+- **Do:** read every formal review's state and body, whoever posted it, and treat a finding in a review body --- a collapsed suppression block included --- as blocking.
+- **Don't:** pass over a review because its author is a bot or its state is `COMMENTED`, nor read that state as blocking on its own.
+
+See [`CLAUDE.cases.md`](CLAUDE.cases.md), "A bot's `COMMENTED` review is the same blind spot".
 
 (A specific case of the standing **never assume; always verify** rule in `memories/preferences.md` — confirm the verdict with a fresh query, don't recall it.)
 
@@ -595,6 +648,8 @@ One to three sentences is enough.
 The trailing marker is required, per the section above: this comment paraphrases the user in the user's own voice under the user's own login, which is the shape most easily read as their own writing.
 Don't quote verbatim — paraphrase so it reads naturally in the PR thread.
 Skip trivial acknowledgments or conversational exchanges with nothing to act on.
+Post it only on a PR that passes `memories/reviewing-prs.md`'s scope test.
+Feedback about an out-of-scope PR, such as a request not to touch it, stays in chat and the session notebook rather than on that PR.
 
 This makes context visible to future @claude sessions, other reviewers, and contributors who only see the PR thread.
 
@@ -697,6 +752,13 @@ This one is the other direction: when a server would help, install and register 
 Covers reading `claude mcp list` for transport rather than name (a plugin's remote server can shadow the local one you meant), 400-versus-401 on an uninterpolated credential, supplying tokens by launch wrapper instead of storing them, opt-in toolsets whose selection *replaces* the default, and verifying by a real call rather than by the tool listing.
 Its last section generalizes past MCP: when a standing rule names a mechanism this session doesn't have, look for the local equivalent instead of silently degrading to a worse fallback.
 
+## Search for and install plugins proactively
+
+[shared/workflow/use-plugins.md](shared/workflow/use-plugins.md)
+
+Proactively discover, evaluate, and install plugins across Claude Code (`claude plugin marketplace list`, `claude plugin marketplace update`, `claude plugin install`), Antigravity (`.agents/plugins.json`, `~/.gemini/config/plugins.json`), Codex (`codex plugin marketplace add`, `codex plugin add`), and Cursor when a task would benefit from specialized domain tooling or workflow automation.
+Covers marketplace verification, permission review, avoiding redundant submodules, and testing live tool activation.
+
 ## File an issue before starting a new task
 
 @shared/workflow/issue-first.md
@@ -715,6 +777,16 @@ The companion to issue-first above: that rule settles *whether* something is tra
 Actionable work is an issue.
 An open-ended policy question whose deliverable is a decision, and which has a real do-nothing option, is a discussion --- in an answerable category (`Q&A`) so the resolution can be marked as the answer.
 Its second half is the general principle: best practice outranks repo precedent when choosing venue or method, and "the board is unused, so nobody would find it there" is circular reasoning that can never permit anyone to start using it.
+
+## Triage the backlog weekly; closing as not-planned is licensed
+
+[shared/workflow/triage-backlog.md](shared/workflow/triage-backlog.md)
+
+The counterweight to the filing rules around it.
+Every open issue ends the weekly pass carrying one of `P1`, `P2`, `P3`, or closed, and a bare aphorism, a filing-mechanism test, or a duplicate may be closed as not-planned on the pass's own judgment.
+A new symptom of a tracked defect family is a comment on that family's issue, not a new issue.
+`scripts/triage-backlog.py` is the instrument and the `triage` skill runs it.
+(Measured 2026-09-03: 15 to 410 open issues in six weeks with 14 not-planned closes in the repo's history, ai-config#3134.)
 
 ## If you see something, say something — file an issue for every noticed mistake
 
@@ -821,6 +893,7 @@ Stop watching only when the PR merges or closes, or I tell you to back off.
 Do not start ARDI, do not push fixes, and do not merge.
 Leave the findings and stop unless asked to iterate.
 A later request to iterate is a driving request.
+The review you post still carries both representations, per `AGENTS.md`'s own review-only rule.
 
 (UCD-SERG/shigella#31, 2026-08-25.)
 
@@ -901,7 +974,7 @@ The key points, restated here because a bare pointer is invisible to a consumer 
   Attribution is a second axis, and it runs before the claim: intersect the merge's own deleted and renamed paths (`git diff --name-status -M "$merge^1" "$merge" | grep -E '^(D|R)'`) with each conflict, and report conflicts caused alongside conflicts found.
   `git show --name-status <merge>` cannot supply that set for a **true** (two-parent) merge --- it prints no file list at all there, and grepping its header for `^[ADMR]` returns three phantom paths.
   It does diff a squash merge normally, so whether it works depends on how the repo merges rather than on the commit in front of you.
-  A conflict you caused on a branch you do not own is an explanatory comment, not a push.
+  A conflict you caused on a PR that fails `memories/reviewing-prs.md`'s scope test is a report to the user, not a comment or a push.
 - **Independent per-PR checking cannot see pair collisions.**
   Every PR can be clean against `main` while two of them conflict with each other.
   Only a pairwise `git merge-tree` between PR heads finds that.
@@ -940,6 +1013,28 @@ Nothing parallelizable should ever sit "queued" --- writing "queued", "next up",
 Sidecar delegation (independent investigation, verification, a disjoint slice, an owed UMS pass, a routed `cai`) is pre-authorized and never worth asking about; keep only the blocking critical-path edit local.
 Research and reading are dispatchable too, sized by how much comprehension the result needs rather than by how small the fetch looks --- the fragment above covers why that category of work is easy to route wrong without anything in the artifact showing it.
 
+## Never launch a subagent on Fable without explicit, specific permission
+
+An `Agent` call that omits `model` inherits the conductor's model.
+In a Fable session that makes the cheapest thing to type the most expensive thing to run, and nothing reports the substitution: the call reads as "default", the transcript records `claude-fable-5-1`, and the account hits its usage limit.
+Measured 2026-09-01: 10 launches in one session, 8 of them inherited Fable (six adversarial reviews, two sidecars), and only the two that set `model: sonnet` did not.
+
+The rule is the user's, verbatim: never spawn a subagent on Fable without their explicit, specific permission.
+"Specific" means for that launch, not a standing yes for the session.
+`hooks/no-fable-subagent.py` is the mechanism: it denies an `Agent` launch that names Fable, or that omits `model` while the session's own model is Fable, and warns on a `Workflow` launch in a Fable session, whose `agent()` calls it cannot inspect.
+`FABLE_SUBAGENT_OK=1` on the one approved command is how a grant is recorded.
+Exporting it for a session is the violation wearing an environment variable.
+The persona files under `.claude/agents/` and `.opencode/agents/` deliberately carry no `model:` (per `skills/agent-builder/SKILL.md`, the tier is pinned at the call site so one persona serves every tier), which is exactly why the call site has to name it: every `Agent()`, `Task`, or `Workflow` `agent()` invocation passes `model`, and the hook denies the Claude Code launch that does not.
+
+- **Do:** pass `model` on every `Agent` call, `sonnet` or `haiku` for bounded or mechanical work, and ask before naming Fable.
+- **Do:** set `FABLE_SUBAGENT_OK=1` only on the single command the user approved, after they approved it.
+- **Don't:** omit `model` and let the launch inherit, which in a Fable session is a Fable launch nobody chose.
+- **Don't:** treat a `daytb`, `away`, or `mwc` grant as covering the model tier; none of them does.
+
+(Directive from the user, 2026-09-01: "have you been spawning subagents using fable?
+don't ever do that without my explicit specific permission".
+Tracked as ai-config#2927.)
+
 ## Derive a set of work items; never hand over an enumeration of it
 
 The section above governs *whether* to dispatch.
@@ -953,6 +1048,14 @@ Every agent does its job correctly on the list it was given, so the items that a
 `scripts/pr-sweep.py` is the deterministic half for open PRs, and reports what it examined rather than only what it found.
 
 [`shared/workflow/derive-dont-enumerate.md`](shared/workflow/derive-dont-enumerate.md)
+
+## Help your subagents improve over time
+
+[`shared/workflow/improve-your-subagents.md`](shared/workflow/improve-your-subagents.md)
+
+The brief, the memory a dispatched agent can read, and the loop that feeds findings back to it are the orchestrator's, so the agent's mistake rate is too.
+`AGENTS.md` carries the rule;
+the fragment carries the mechanisms (a per-agent mistake ledger prepended to every brief, a loop change after every fix round, rounds-to-clean as the measure, promotion into skills and hooks).
 
 ## Subagent worktrees are assigned, and an incident never silently repeals a decision
 
@@ -1194,11 +1297,9 @@ When adding a coding or review rule, place it under the principle it serves.
 
 [shared/principles/README.md](shared/principles/README.md)
 
-## Don't reinvent the wheel (DRW) — in dev and in review
+## Don't reinvent the wheel (DRW) --- in dev and in review
 
-Before implementing a new function or feature, check that it hasn't already been done — in one of our own repos, or in a trustworthy external source we could depend on instead (base R, r-lib, tidyverse, a well-maintained CRAN package).
-Prefer forking and/or contributing to an existing external source over re-building the functionality from scratch.
-Apply this in review too: a hand-rolled equivalent of functionality that already exists is a review finding, the same weight as any other standing review check.
+Universal DRW policy is in `AGENTS.md` ("Research existing solutions before implementing (DRW)").
 
 [shared/principles/dont-reinvent-wheel.md](shared/principles/dont-reinvent-wheel.md)
 
@@ -1220,12 +1321,47 @@ The fragment carries the rest: taking the inventory from gha's README table rath
 
 [shared/principles/dont-incur-technical-debt.md](shared/principles/dont-incur-technical-debt.md)
 
+## Dead code is technical debt
+
+[shared/principles/dead-code-is-tech-debt.md](shared/principles/dead-code-is-tech-debt.md)
+
 ## Fail fast — no silent failures
 
 Detect bad state early and stop with a clear error rather than proceeding on it; never swallow an error into a silent fallback (a bare `except:`, a `tryCatch` returning `NULL`, a shell `|| true`), and make any genuinely wanted fallback explicit, bounded, and observable.
 Apply this in review too: error handling that hides failure is a review finding, the same weight as any other standing review check.
 
 [`shared/principles/fail-fast.md`](shared/principles/fail-fast.md)
+
+## Specific beats general
+
+When two instructions, policies, configurations, or design rules apply to the same decision, the narrower, more specific rule takes precedence over the broader, general one.
+Explicit human user instructions in a specific session override general repository defaults, narrow subsystem and file configs override repository-wide policies, and targeted types and condition handlers beat generic catch-alls in code.
+
+[`shared/principles/specific-beats-general.md`](shared/principles/specific-beats-general.md)
+
+## Think outside the box --- distinguish real from artificial limitations
+
+Do not make unnecessary assumptions about structural limitations;
+consider which limitations are real (hard architectural, mathematical, security, or physical bounds)
+and which are artificial (inherited conventions, unexamined defaults, or local scoping traps).
+When a task or design becomes awkward or overly complex, test the assumed constraints empirically
+and reframe or dissolve problems rather than building intricate workarounds inside an unnecessary box.
+
+[`shared/principles/think-outside-the-box.md`](shared/principles/think-outside-the-box.md)
+
+## Don't take anyone's word for it --- independent verification and constructive pushback
+
+Never accept factual assertions, technical recommendations, or stated preferences blindly.
+Everyone makes mistakes --- humans, AI models, peer agents, and experts alike.
+Always investigate assertions independently via deterministic queries, source inspection, or clarifying questions, and push back constructively whenever you suspect an error or unsound reasoning.
+
+[`shared/principles/dont-take-my-word-for-it.md`](shared/principles/dont-take-my-word-for-it.md)
+
+## Get under the hood --- inspect source code and raw output
+
+When trying to understand what a process is doing, diagnose an unexpected failure, or determine the behavior of a tool, library, or harness, find and inspect the actual source code, raw logs, job output, and live execution paths rather than treating the component as an opaque black box.
+
+[`shared/principles/get-under-the-hood.md`](shared/principles/get-under-the-hood.md)
 
 ## Coding: KISS is the umbrella principle
 
@@ -1340,6 +1476,11 @@ same weight as the other modularity checks above.
 
 <!-- Not yet shared with the lab manual; edit shared/coding/decompose-to-functions.md, not here. -->
 [shared/coding/decompose-to-functions.md](shared/coding/decompose-to-functions.md)
+
+## Coding: avoid catastrophic backtracking in regular expressions
+
+<!-- Not yet shared with the lab manual; edit shared/coding/regex-backtracking-pitfalls.md, not here. -->
+[`shared/coding/regex-backtracking-pitfalls.md`](shared/coding/regex-backtracking-pitfalls.md)
 
 ## Writing style: plain, direct prose
 
@@ -1461,9 +1602,15 @@ math, apply this in addition to the fact-check above.
 
 Applies wherever `code-review`/`ard`/`ardi` already reviews a prose diff, alongside the fact-check and ambiguous-terminology checks above.
 
+`python3 scripts/check-bare-fragment-mentions.py` is the instrument for this corpus's own version of the miss: a fragment linked once and then named as plain prose further down the same file.
+Advisory, always exits 0, and wired into `validate.yml` as a non-gating step.
+
+- **Do:** run it over a prose diff that names a fragment more than once.
+- **Don't:** link a fragment on its first mention and then repeat the basename bare further down.
+
 ## Remove forward-pointing phrases from prose, not just crossref divs
 
-The section above covers formal Quarto crossref-div ordering for term/result definitions specifically.
+The section above covers this repo's own linked-once-then-bare miss, and formal Quarto crossref-div ordering for term/result definitions.
 The same problem shows up more broadly as plain-text signposting — "as discussed below", "in the following section", "we'll cover this later" — pointing at content the reader hasn't reached yet, in any prose (not just documents with crossref divs).
 
 [shared/writing/forward-references.md](shared/writing/forward-references.md)
@@ -1699,8 +1846,23 @@ must itself contain a backslash escape.
   on this platform, measured 2026-08-22, it does not.
 - **Don't:** carry the claim to another platform without re-measuring; it did
   not reproduce in a Linux CI runner.
+  It also did not reproduce in a Linux remote Claude Code container on
+  2026-09-01: the same reproducer left both backslashes of `a\\nb` intact
+  under `repr()`.
 - **Don't:** trust a green suite after writing a regex through a heredoc; read
   the emitted line back.
+
+**Knowing this rule does not stop you tripping it, so add a check rather than trusting recall.**
+Measured 2026-09-01: this section was loaded and had just been read
+when a heredoc'd Python edit wrote `'\\n\\n'` into a file,
+which arrived as the literal text `\n` and corrupted the script it was patching.
+`ast.parse` caught it immediately, and the fix was the `chr(92)` placeholder this entry prescribes.
+So the remedy works; what fails is noticing that the moment has arrived,
+because nothing about typing an escape sequence announces itself as the trigger.
+Run a parse or round-trip check after any heredoc'd edit that writes escape sequences.
+
+- **Do:** parse-check (or read back) a file a heredoc just wrote with escapes in it.
+- **Don't:** treat having read this section as the check --- it was, and the collapse happened anyway.
 
 (Measured 2026-08-22; tracked as
 [ai-config#1923](https://github.com/Morrison-Lab/ai-config/issues/1923).
@@ -1725,6 +1887,8 @@ recurred immediately in a `jq` filter reading a PR review body.)
   A peer may have further commits planned, so merging one that just went clean can destroy work it was about to push --- and that is exactly the case where the peer's PR unblocks yours and the temptation is strongest.
   Start the clock at the clean verdict on the current head, which a push resets, rather than at the PR's `updatedAt`, which any comment bumps.
   The threshold is an inference, so confirm it: message the owning session directly when `ListAgents` reaches it, and otherwise post a comment saying you intend to merge and wait a further five minutes for a hold-off.
+  The path applies only to a peer PR that passes `memories/reviewing-prs.md`'s scope test (a peer session under your own login satisfies the author arm).
+  Another lab member's PR that fails the test gets neither the comment nor the merge.
   [`mwc`](skills/mwc/SKILL.md)'s "Another session's PR" section carries the derivation and the pattern/anti-pattern pair (ai-config#2460).
 
 **One standing exception: PRs targeting `Morrison-Lab/ai-config` carry a standing `mwc` grant**, with no per-session re-issue and no `enable-mwc` step --- `hooks/no-unauthorized-merge.py` reads the merge's target repo off the command.

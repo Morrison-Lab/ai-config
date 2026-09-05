@@ -19,16 +19,18 @@ or a path relative to a stable directory like `~/.gemini/config/plugins/...`.
 (Empirical finding verified on macOS 2026-08-29: Antigravity expands `~` when launching the command).
 For example, `ai-config` uses
 `~/.gemini/config/plugins/ai-config/claude-hook-adapter.py`
-backed by a symlink created in `bootstrap.sh`.
+backed by a staging directory created in `bootstrap.sh`.
 
 ### Lifecycle events & payload mapping
 - **`PreToolUse`**: Passed `{"toolCall": {"name": "<tool_name>", "args": { ... }}}`.
   Returns `{"decision": "allow" | "deny" | "ask", "reason": "..."}`.
   - In Antigravity's `hooks.json`, `PreToolUse` handlers are **grouped** under `{ "matcher": "...", "hooks": [ ... ] }`.
-  - The plugin's `PreToolUse` list carries **two** groups rather than one, deliberately: a `"run_command"` group (literal matcher, unchanged since before this split) carrying `enforce-mwc-review-gate.py` and `claude-hook-adapter.py`, and a second group matched on the regex alternation `"invoke_subagent|send_message|define_subagent|mcp__github__.*"` carrying only `claude-hook-adapter.py`.
-    Whether Antigravity treats `matcher` as a regex at all is unverified (2026-08-26), so the split is a de-risking measure: if that assumption is wrong, only the second group's coverage (the newer tool names) fails to fire, and the pre-existing `run_command` merge-control gate --- matched literally, so it does not depend on regex support --- is unaffected.
-  - The second group's `mcp__github__.*` alternative assumes Antigravity names MCP tool calls with Claude Code's `mcp__<server>__<tool>` convention.
-    That is unverified (2026-08-26): the confirmed Antigravity `toolCall.name` values are only `run_command`, `invoke_subagent`, `send_message`, and `define_subagent`, so if the real MCP names differ, the `mcp__github__.*` branch silently never fires --- re-verify against a live install before relying on it as a gate.
+  - The plugin's `PreToolUse` list carries discrete single-tool matcher groups for each tool name (`run_command`, `invoke_subagent`, `send_message`, `define_subagent`, `call_mcp_tool`, `write_to_file`, `replace_file_content`, and wildcard `mcp__github__.*`), rather than combining them into a regex alternation.
+    Whether Antigravity treats `matcher` as a regex alternation with pipes is unverified (2026-08-26), so discrete matcher blocks de-risk completely against silent fail-open if Antigravity's engine uses literal string matching.
+    `run_command` carries both `enforce-mwc-review-gate.py` and `claude-hook-adapter.py`; the other groups carry `claude-hook-adapter.py`.
+  - `call_mcp_tool` maps `ServerName` and `ToolName` to Claude Code's `mcp__{ServerName}__{ToolName}` convention (e.g. `ServerName: "github"`, `ToolName: "merge_pull_request"` -> `mcp__github__merge_pull_request`), unpacking `Arguments` into `tool_input` (tool schema verified live in Antigravity session 2026-09-04).
+  - `write_to_file` maps to `Write` (`file_path: TargetFile`, `content: CodeContent`) (tool schema verified live in Antigravity session 2026-09-04).
+  - `replace_file_content` maps to `Edit` (`file_path: TargetFile`, `old_string: TargetContent`, `new_string: ReplacementContent`) (tool schema verified live in Antigravity session 2026-09-04).
   - `run_command` maps to Claude Code's `Bash` tool (`{"command": args.get("CommandLine")}`).
   - `invoke_subagent` passes an array `{"Subagents": [{"TypeName": "...", "Workspace": "...", "Prompt": "..."}]}`.
     A bridge adapter evaluates all subagents in the list against `Agent` PreToolUse hooks.
@@ -105,14 +107,12 @@ Three layers had to fail together, and each is worth checking separately when au
 - IDE sessions: `~/.gemini/antigravity/conversations/*.db`; CLI sessions: `~/.gemini/antigravity-cli/conversations/*.db`, with prompts in `~/.gemini/antigravity-cli/history.jsonl`.
   `strings <db> | grep <needle>` recovers commands and hook decisions without a sqlite client;
   mtimes bracket the session window.
-- Two path layers decide which hook code agy actually runs, and they moved in opposite directions overnight 2026-08-29/30 PT (symlink swapped for a copy 2026-08-29 22:56 PT;
-  ai-config#2664 merged 2026-08-30 00:34 PT).
-  `~/.gemini/config/plugins.json` registers the plugin by absolute path into the **live ai-config checkout** (`.../Documents/GitHub/ai-config/plugins/ai-config`), so `hooks.json` itself is read from whatever branch that checkout is parked on.
-  But since ai-config#2664, `hooks.json`'s `command` entries invoke the scripts via `~/.gemini/config/plugins/ai-config/...` --- and on this machine that path is a **static copy** (the previous symlink into the checkout was renamed to `ai-config.backup-<epoch>`), while `bootstrap.sh` creates it as a symlink on a fresh install.
-  So a gate or adapter fix merged to main reaches agy only when that copy is refreshed (or the symlink restored);
-  diff the copy against the checkout before trusting that a fix is live.
-
-(Measured 2026-08-30 while diagnosing ai-config#2676.)
+- Two path layers decide which hook code agy actually runs:
+  `~/.gemini/config/plugins.json` registers the plugin in a **staging runtime directory** (`~/.gemini/config/plugins/ai-config`),
+  where `hooks.json` and `plugin.json` are copied so Antigravity runtime rewrites do not dirty the git checkout.
+  Executable scripts and repository directories (`hooks/`, `scripts/`, `skills/`, `shared/`) are symlinked from the checkout into the staging directory,
+  so adapter and gate updates take effect live while canonical source remains pristine.
+  (Updated 2026-08-31 for Issue #2673).
 
 ## Reactive wakeup vs background task polling
 
@@ -120,3 +120,25 @@ Three layers had to fail together, and each is worth checking separately when au
 - Do not poll `manage_task(Action='status')` or run repetitive checks in a loop while waiting for a long-running background command or test suite to finish.
 - After launching an asynchronous task or schedule timer, end the tool turn and let the reactive system wakeup resume execution when the process exits or the timer expires.
   (Observed in live Antigravity sessions 2026-08-30.)
+
+## Python SDK (`antigravity-sdk-python`) vs declarative plugins and CLI
+
+The [`google-antigravity/antigravity-sdk-python`](https://github.com/google-antigravity/antigravity-sdk-python) library is the programmatic Python SDK for building, orchestrating, and embedding Antigravity agents (evaluated 2026-08-31).
+
+- **Declarative plugin & skill boundary:**
+  Antigravity IDE, Desktop 2.0, and `agy` discover skills and hooks declaratively via `plugins/ai-config/plugin.json`, `hooks.json`, and markdown skills.
+  The Python SDK is designed for embedding an agent inside a custom Python application or test process, not for authoring plugin configurations or ambient agent behavior.
+- **Review dispatcher parity (`pre-push-review.py`):**
+  Single-turn local code review uses `agy --print` (alongside `claude`, `codex`, `cursor`, `opencode`) to tap into the user's active local CLI subscription login without extra Python runtime dependencies or API key management.
+- **Future adoption trigger:**
+  Evaluate adopting `antigravity-sdk-python` if building Python-native automated agent benchmarking suites, synthetic skill evaluation harnesses, or headless CI pipelines that require typed step streams and programmatic tool registration.
+
+## Asynchronous subagent dispatch and pre-push self-review (`invoke_subagent`)
+
+- In Antigravity / Gemini CLI, `invoke_subagent` dispatches subagents asynchronously in the background, returning `{conversationId, ...}` immediately.
+- The subagent's completed report arrives as an incoming reactive message from the subagent's conversation ID, rather than as the synchronous tool step result of `invoke_subagent`.
+- Consequently, client-side pre-tool hooks (such as `no-push-without-self-review.py`) that parse the direct tool-result output of the subagent tool call will not find the verdict embedded in the initial dispatch step result.
+- Once the asynchronous subagent has finished and returned its verified clean review report and fingerprint, use the authorized prefix `ALLOW_UNREVIEWED_PUSH=1` for the `git push` invocation (the guard's `AGENT_TOOLS` set intentionally rejects `Bash`/`run_command` outputs to prevent unauthenticated reviews).
+  (Observed in live Antigravity sessions 2026-09-01.)
+
+

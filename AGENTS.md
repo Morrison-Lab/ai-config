@@ -36,6 +36,13 @@ Drafting locally while approval is pending is allowed.
 Membership or approval does not override
 a stricter repository contribution or AI-agent policy.
 
+The user grants standing authorization, across sessions and workspaces, for
+non-force `git push` operations to `ucdavis/rampp` and
+`Morrison-Lab/ai-config` after positive membership verification.
+This authorization covers pushes only;
+it does not authorize force pushes, merges,
+or any other outward repository communication.
+
 Do not infer membership from a public repository, prior contributions, a fork,
 organization membership, technical write access, available credentials,
 collaborator access elsewhere, or the ability to post.
@@ -95,6 +102,34 @@ no reliable timer.
 A verified clean stopping point needs no timer because no work remains to resume.
 Do not substitute a promise to return for a mechanism that will actually fire.
 
+## Prefer optionality over removing functionality
+
+Never remove existing functionality entirely when you can add optionality instead.
+When changing default behavior, fixing an issue, or refactoring a workflow,
+do not delete an existing capability or code path outright if it served a legitimate purpose.
+Instead, make the improved behavior the default
+and preserve the legacy or alternative behavior behind an explicit, documented opt-in parameter,
+environment variable, or configuration toggle.
+See [`shared/principles/prefer-optionality-over-removal.md`](shared/principles/prefer-optionality-over-removal.md).
+
+## Research existing solutions before implementing (DRW)
+
+Before writing custom code or hand-rolling functions and helpers,
+always perform a research step to verify DRW (don't reinvent the wheel)
+and check for existing libraries, functions, or package solutions.
+Search in our own repos (`Morrison-Lab/gha`, lab packages), standard libraries,
+and trustworthy upstream ecosystems (base R, tidyverse / r-lib, PyPI, npm).
+Prefer reusing, depending on, forking, or contributing to an existing
+implementation over building a new one from scratch.
+Record what was searched and what was found.
+See [`shared/principles/dont-reinvent-wheel.md`](shared/principles/dont-reinvent-wheel.md)
+and [`prefer-upstream`](skills/prefer-upstream/SKILL.md).
+
+- **Do:** search our own repos and trustworthy upstream ecosystems for an existing solution before writing custom code.
+- **Do:** note the search terms and candidate packages/functions in the PR description or code comments when choosing to implement custom code.
+- **Don't:** hand-roll a utility or function without performing a DRW research check first.
+- **Don't:** cite a self-imposed constraint (such as a minimal environment chosen by the current change) as justification to avoid using an upstream package.
+
 ## Interpret instructions broadly and maximize safe progress
 
 Unless the user narrows a request, take the broad reading that advances its
@@ -132,6 +167,50 @@ The full rule, including the Do/Don't pair, is
 [`shared/workflow/run-ums-proactively.md`](shared/workflow/run-ums-proactively.md).
 Questioning alone does not owe a pass: the check has to show the claim
 was wrong.
+
+## Run UMS before every pause
+
+Before ending a turn to wait on anything --- CI, a review round,
+a subagent, or an answer from the user --- run `ums` first.
+A wait's length is not knowable when it begins, so the learnings sit in
+conversation state for however long it runs, and a pause is the likeliest
+point for compaction or a session nobody resumes.
+"Resume every non-clean pause" above obliges a wake mechanism at this same
+moment; this obliges the pass alongside it.
+The pass is owed by accumulated learnings rather than by the number of waits,
+so a monitoring loop and a run of separately posed questions each get it at
+the first pause and again only once new learnings accumulate.
+The full rule, including the rationale and the other pairs, is
+[`shared/workflow/run-ums-proactively.md`](shared/workflow/run-ums-proactively.md).
+
+- **Do:** run the pass before the pause, not once the wait turns out to be long, whenever learnings have accumulated since the last pass.
+- **Do:** run it at the first pause, whether the waits that follow are a monitoring loop's re-arms or a run of separately posed questions.
+- **Don't:** re-run it at a second consecutive pause that has learned nothing since the first.
+- **Don't:** defer the pass to when the wait ends --- the resumption may land in another session or never come.
+
+## Help your subagents improve over time
+
+An orchestrator owns the three things that set a dispatched agent's
+mistake rate: its brief, the memory it can read, and the loop that feeds
+findings back to it.
+Correcting each output as it arrives leaves that rate unchanged.
+Keep a per-agent mistake ledger in a committed memory file read from the
+default branch (never in the PR branch the agent is working), prepend it
+to every brief, change the brief or the loop after every fix round,
+measure rounds-to-clean, and promote what holds into the delegation
+skill and hooks.
+The full rule, including the Do/Don't pairs, is
+[`shared/workflow/improve-your-subagents.md`](shared/workflow/improve-your-subagents.md).
+
+## Treat user profanity and frustration as urgent defect signals
+
+Profanity, exasperation, or intense frustration from the user is a high-priority signal that a mistake, regression, broken assumption, or workflow failure occurred.
+Treat it as an immediate, top-priority defect alert:
+diagnose what failed,
+acknowledge the concrete mistake directly without defensive boilerplate, tone policing, or canned apologies,
+execute the repair immediately in that very turn,
+and run `ums` to learn from the defect and prevent recurrence mechanically.
+See [`shared/workflow/user-profanity-signal.md`](shared/workflow/user-profanity-signal.md).
 
 ## Status and diagnostic requests do not make issues report-only
 
@@ -175,7 +254,8 @@ The decision stays the human's.
 Two boundaries.
 Efficiency never outranks correctness, so no saving is bought with a skipped verification or a shortened review.
 And restructure in its own issue or PR, not inside whatever task happened to notice it.
-See `shared/workflow/restructure-for-efficiency.md`.
+See [`shared/workflow/restructure-for-efficiency.md`](shared/workflow/restructure-for-efficiency.md)
+and [`shared/workflow/merge-queue.md`](shared/workflow/merge-queue.md).
 
 ## Keep ai-config and repo checkouts fresh
 
@@ -184,9 +264,20 @@ In every session --- at session start, and again periodically during long sessio
 1. **The ai-config checkout.** Check that the local `ai-config` clone is on `main` and run `git pull --ff-only`.
 2. **The consumer install.**
    Claude Code and Cursor read this repo's skills as a native plugin, not a symlink install --- confirm the plugin is enabled and up to date instead of checking for symlinks.
-   Ensure `bootstrap.sh` has run so the Gemini/Antigravity registration files (`skills.json` and `plugins.json`, which point at this checkout's own `skills/` and `plugins/ai-config` paths) stay current.
+   Ensure `bootstrap.sh` has run so the Gemini/Antigravity registration files (`skills.json` and `plugins.json`, which point at this checkout's `skills/` and staged `plugins/ai-config` paths) stay current.
 3. **Working repo checkouts.** Keep `main` updated (`git fetch origin`, `git pull --ff-only`).
 
+## Remove redundant submodules when using native plugins
+
+When a repository configures ai-config (or any other tool) as a native plugin
+(via Claude Code, Cursor, Antigravity, or CI workflows), remove any redundant
+git submodule for that same tool (such as `.ai-config`).
+Native plugins provide direct integration, making redundant submodules
+unnecessary and prone to drift.
+De-initialize and remove the submodule, clean `.gitmodules`, remove legacy
+symlinks (such as `.claude/skills -> ../.ai-config/skills`), and update CI
+checkout settings.
+See [`shared/workflow/remove-redundant-plugin-submodules.md`](shared/workflow/remove-redundant-plugin-submodules.md).
 
 ## Verify changes before pushing
 
@@ -327,12 +418,16 @@ Check any replacement marker against that script's `REVIEW_BODY_MARKERS` and `RE
 
 Scope: comment bodies, on every surface --- claims, releases, status notes, review replies, self-reviews, issue comments filed on the user's behalf.
 Not commit messages, not titles, not issue bodies, not PR bodies, each of which has its own attribution convention.
+An issue body's convention is a pair of **labels** rather than a marker line: every issue an agent files into a repo we administrate carries `ai-authored` and `model:<model-id>`, set in the command that creates it.
+See [`shared/workflow/label-agent-filed-issues.md`](shared/workflow/label-agent-filed-issues.md) for the `gh`, `glab`, and MCP forms and for normalizing the model id.
 Two exemptions.
 A comment another machine parses as a command (`@dependabot rebase`), where the test is the audience rather than the length.
 And a comment posted under a genuine bot token, where the forge already reports `type: Bot` and the marker adds nothing.
 
 - **Do:** append the marker to every agent-posted comment, including ones whose prose already identifies the session.
+- **Do:** label an agent-filed issue `ai-authored` and `model:<model-id>` in the creating command, since the marker line does not go in an issue body.
 - **Don't:** use the robot emoji in the marker, and don't read "the account holder knows an agent is running" as making the disclosure unnecessary --- the reader is whoever finds the thread later.
+- **Don't:** put the marker in an issue body in place of those labels, or file an unlabelled issue on the grounds that the body carries no marker.
 
 ## File formatting & links
 
@@ -345,7 +440,10 @@ And a comment posted under a genuine bot token, where the forge already reports 
   always format them as clickable markdown hyperlinks to their forge URLs
   (e.g. `[PR #123](https://github.com/<owner>/<repo>/pull/123)`),
   never as bare unlinked text (such as `#123`),
-  except for forge issue-closing syntax (such as `Closes #123`).
+  except for forge issue-closing syntax (such as `Closes #123`)
+  and for the illustrative tokens the Don't bullet below covers.
+- **Do:** link every pull request or issue you cite as a source, whether or not the reader can open its repository.
+- **Don't:** link a `#NNN` or `owner/repo#NNN` a passage is displaying rather than citing --- a linter's truncation example, a spell-check false positive --- because the link destroys what the passage demonstrates.
 - Preserve semantic line breaks (SemBr) and formatting conventions when editing markdown docs.
 
 ## Deliver completed implementation work
@@ -354,6 +452,14 @@ When asked to implement, edit, or write up a change on a feature branch, do not 
 Complete the delivery cycle: create the applicable tracking issue when issue-first workflow applies, commit the scoped changes, run local adversarial self-review to a clean verdict, push the branch, open or update its Pull Request, request AI review after the final push, and drive CI and review findings to a clean result.
 This does not grant merge authority.
 The strict merge policy below still applies.
+
+## Never dispatch a worker on Fable without explicit, specific permission
+
+A dispatched worker (a subagent, a workflow `agent()` call, a delegated CLI run) that names no model inherits the conductor's, so in a Fable session omitting the parameter is a Fable launch nobody chose.
+The user's rule: no worker runs on Fable without their explicit permission for that specific dispatch.
+Name the model on every dispatch, a cheaper tier for bounded or mechanical work, and ask before naming Fable.
+On Claude Code, `hooks/no-fable-subagent.py` denies the launch that violates this.
+Other harnesses carry the rule as instruction (ai-config#2927).
 
 ## Every self-review is an adversarial review by a separate subagent
 
@@ -500,6 +606,41 @@ This grants no merge authority: the strict merge policy below still applies.
   (`gh issue reopen <issue-number>`) per
   [`revert-merge.md`](shared/workflow/revert-merge.md).
 
+## Only work PRs opened by the user, assigned to the user, explicitly requested by the user, or authored by the Actions app
+
+Before pushing to, editing, commenting on, reviewing, resolving threads on,
+dispatching a paid review of, or merging any PR, resolve the invoking user
+and read the PR's author and assignees.
+Proceed only when the author or one of the assignees is that user (or an
+alias `memories/reviewing-prs.md` lists for that same user), the user
+explicitly asked for work on that PR by name (or, through an explicit
+`chores` call, on the Dependabot/Renovate population), or the author is the
+GitHub Actions app (`github-actions`).
+A mention such as "do not touch" followed by a PR number is not a request, a
+claim comment confers no scope, and a sweep skill's "every open PR" means
+every PR that passes this test.
+An explicit exclusion ("do not touch" followed by a PR number) is a veto: it
+removes that PR before any positive arm is evaluated, the user's own PRs and
+the Actions app's included, and every sweep carries the exclusion list into
+each recheck and each delegated scan.
+A review-only run that CI or a skill invocation dispatched naming the target
+PR (an `@claude review`, a `claude-code-review.yml` run) is that explicit
+request, whoever authored the PR; it reviews and stops there.
+Every review you post carries both representations of its verdict, whoever
+asked for it and whether or not anything dispatched it: the human-readable
+Markdown report, and the machine-readable `review-data` JSON payload, per
+[`shared/workflow/adversarial-self-review.md`](shared/workflow/adversarial-self-review.md)'s
+"Structured review data" section.
+The payload requirement is easiest to miss exactly here, since no persona was
+dispatched and no push follows
+([ai-config#3006](https://github.com/Morrison-Lab/ai-config/issues/3006)).
+An out-of-scope PR is reported to the user and left untouched.
+When no identity operation is available, fail closed the way `ardia` does:
+leave the author and assignee arms unevaluated, act only on PRs the user
+explicitly asked for or the Actions app authored, and say so in the report.
+`memories/reviewing-prs.md` carries the full rule and its provenance;
+`skills/ardia/SKILL.md` step 1 is the reference implementation.
+
 ## Always arm a persistent PR loop
 
 This applies in any repo, not only Morrison-Lab ones.
@@ -514,12 +655,18 @@ Another harness: its own scheduler or timer.
 A question like "are you monitoring that PR?" is a status check, not a reason to stay idle.
 Start the loop if it is not already running, then answer.
 
+After every push to a PR/MR, actively poll the forge until the current head's CI/pipeline and review reach a terminal state.
+Use `gh` for GitHub and `glab` for GitLab when those CLIs are available;
+query the PR/MR, current-head checks or pipeline, and review comments or notes rather than assuming an event-triggered reviewer completed.
+Re-arm the poll while work remains.
+
 Baking a self-merge directive into the loop/wakeup prompt is allowed only under a standing merge-when-confident (`mwc`) session grant.
 A one-off "merge this PR" instruction authorizes merging the current head once.
 It never licenses a later wake to self-merge a different head.
 
 - **Do:** arm a persistent loop in the same turn you open, push to, or take over a PR, and skip starting a second one if a loop is already running.
-- **Don't:** treat a subscription or a one-shot poll as watching, or refuse to start a loop because the latest message only asked about status.
+- **Do:** after every push, actively query the current head's CI/pipeline and review state with `gh` or `glab` until that round is terminal.
+- **Don't:** treat a subscription or a one-shot poll as watching, treat event-triggered automation as evidence of completion, or refuse to start a loop because the latest message only asked about status.
 
 ## Request review and drive every started PR to clean
 

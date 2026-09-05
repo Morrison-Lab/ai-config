@@ -38,6 +38,7 @@ import argparse
 import json
 import re
 import bisect
+import shlex
 import subprocess
 import sys
 import unicodedata
@@ -45,7 +46,11 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
-from fences import CODE_SPAN_RE, find_fence_spans  # noqa: E402
+from fences import (  # noqa: E402
+    CODE_SPAN_RE,
+    find_fence_spans,
+    strip_code_spans,
+)
 from payload_fetcher import PayloadError, PayloadFetcher  # noqa: E402
 from review_payload import (  # noqa: E402
     extract_structured_review,
@@ -113,10 +118,47 @@ def run_cmd(cmd: List[str]) -> str:
         # guard fail-fast.md describes -- the guard's presence reads as the
         # hazard being handled everywhere. See Morrison-Lab/ai-config#1330 for
         # the standing dependency on `gh` itself, which this does not remove.
-        die(
-            f"`{cmd[0]}` is not installed or not on PATH.\n"
-            "This script requires the GitHub CLI; -R cannot substitute for it."
-        )
+        message = f"`{cmd[0]}` is not installed or not on PATH."
+        if cmd[0] == "gh":
+            # fail-fast.md asks a failure to name its own remedy, and the line
+            # above names only the dependency. What this used to say next --
+            # "This script requires the GitHub CLI; -R cannot substitute for
+            # it." -- read as a closed door: it ruled out the one alternative
+            # it mentioned and stopped. It was also false, because the remedy
+            # ships in this same directory (`build-pr-payload.py`,
+            # ai-config#2908) and needs no CLI. That remedy was reachable only
+            # from `fully-clean.md` or that script's `--help`, both of which
+            # require already suspecting it exists -- so a stranded session
+            # hand-built the payload instead (ai-config#2938) or skipped the
+            # check. The error message is the one surface such a session is
+            # guaranteed to read (ai-config#3113).
+            #
+            # Two details the recipe cannot omit and stay executable. The
+            # paths are derived from `__file__` rather than written relative
+            # to the repo root, because this script is routinely invoked by
+            # absolute path from an unrelated cwd, where
+            # `scripts/build-pr-payload.py` resolves to nothing. And the token
+            # is named because `build-pr-payload.py`'s `_token()` dies without
+            # GITHUB_TOKEN or GH_TOKEN, so a recipe that omitted it would send
+            # the reader into a second dead end.
+            #
+            # Gated on `gh` because this `die` serves every command run_cmd is
+            # handed, and neither `--from-json` nor anything about the GitHub
+            # CLI answers a missing `git`.
+            here = Path(__file__).resolve()
+            message += (
+                "\n`-R` alone cannot substitute for it, but the GitHub CLI is"
+                " not required: score a JSON payload instead."
+                " `build-pr-payload.py` assembles one from plain REST, and"
+                " needs GITHUB_TOKEN or GH_TOKEN set:\n"
+                f"  python3 {shlex.quote(str(here.parent / 'build-pr-payload.py'))}"
+                " OWNER/REPO N /tmp/pr.json\n"
+                f"  python3 {shlex.quote(str(here))}"
+                " N -R OWNER/REPO --from-json /tmp/pr.json"
+            )
+        else:
+            message += "\nInstall it, or put it on PATH, and re-run."
+        die(message)
     if res.returncode != 0:
         # `stderr` is exposed to the same reader-thread decode failure as
         # `stdout`, so it can be None here even though the exit code arrived.
@@ -343,7 +385,7 @@ def _reviewer_identity(body: str, author: str = "") -> str:
     The first line, not the first paragraph: semantic line breaks often put
     the header and the next sentence in one paragraph, and a quote of
     ``**Claude finished**`` on line 2 must not inherit Claude's identity.
-    Cited finding vocabulary is blanked first so a code span still does not
+    Code spans and cited finding vocabulary are blanked first so a code span does not
     match.
 
     Residual: a shared-login review whose first or last non-empty line has no known
@@ -358,10 +400,9 @@ def _reviewer_identity(body: str, author: str = "") -> str:
     exclusive = EXCLUSIVE_BOT_IDENTITY.get(login.lower())
     if exclusive:
         return exclusive
-    scan = strip_cited_finding_vocab(body or "")
-    lines = [ln.strip() for ln in scan.splitlines() if ln.strip()]
-    first_line = lines[0] if lines else ""
-    last_line = lines[-1] if lines else ""
+    lines = [ln.strip() for ln in (body or "").splitlines() if ln.strip()]
+    first_line = strip_cited_finding_vocab(strip_code_spans(lines[0])) if lines else ""
+    last_line = strip_cited_finding_vocab(strip_code_spans(lines[-1])) if lines else ""
     agent = _detect_review_agent(first_line) or _detect_review_agent(last_line)
     if agent:
         return agent
@@ -422,6 +463,38 @@ def _detect_review_agent(body: str) -> Optional[str]:
             best_pos = pos
             best_name = name
     return best_name
+
+
+ARD_DISPOSITION_PHRASE = "ard review disposition summary"
+
+
+def is_ard_disposition_summary(body: str) -> bool:
+    """Is this an ARD round's own disposition summary?
+
+    An ARD round posts a disposition summary (`skills/ard/SKILL.md` requires
+    the summary; the heading matched here is this checker's own convention,
+    written nowhere else in the corpus). A driving session's round-up quotes
+    the verdict it is disposing of, so without this skip it reads as a
+    standing verdict on the session's own PR. `check_review_comments` applies
+    it before it reaches `is_non_review_notice`.
+
+    A bare substring test over the whole lowercased body, deliberately
+    unlike `is_non_review_notice`: there is no heading, position, or
+    review-agent precedence guard, so a review that merely QUOTES the phrase
+    is skipped too.
+
+    Extracted from `check_review_comments`, where it was inlined, so that
+    `check-review-body.py` can call it instead of duplicating the phrase. A
+    duplicated literal drifts silently the moment either side changes, and
+    the AST guard written to detect that drift was narrowed across three
+    review rounds and still had escapes.
+
+    What the extraction closes is the literal-drift problem, and only that.
+    Whether the CALL still sits ahead of admission is a property of
+    `check_review_comments`, not of this function, and is covered by a
+    behavioural test rather than by anything here.
+    """
+    return ARD_DISPOSITION_PHRASE in body.lower()
 
 
 def is_non_review_notice(body: str) -> bool:
@@ -590,8 +663,8 @@ _CURLY_QUOTE_SPAN = re.compile("\u201c[^\u201d\\n]*\u201d")
 _MAX_MASKED_LINE = 4096
 
 
-def _citation_mask(text: str) -> bytearray:
-    """Mark every offset lying inside a closed code span of 2+ backticks.
+def _citation_mask(text: str, min_backticks: int = 2) -> bytearray:
+    """Mark every offset lying inside a closed code span of min_backticks+ backticks.
 
     The INTERSECTION of a per-line scan and a whole-body scan, which is
     strictly safer than either alone because each over-reaches where the other
@@ -626,7 +699,7 @@ def _citation_mask(text: str) -> bytearray:
             oversized.append((offset, offset + len(line)))
         else:
             for match in CODE_SPAN_RE.finditer(line):
-                if len(match.group(1)) >= 2:
+                if len(match.group(1)) >= min_backticks:
                     begin, finish = match.span()
                     per_line[offset + begin:offset + finish] = (
                         b"\x01" * (finish - begin)
@@ -645,7 +718,7 @@ def _citation_mask(text: str) -> bytearray:
 
     whole = bytearray(len(text))
     for match in CODE_SPAN_RE.finditer(scannable):
-        if len(match.group(1)) >= 2:
+        if len(match.group(1)) >= min_backticks:
             begin, finish = match.span()
             whole[begin:finish] = b"\x01" * (finish - begin)
 
@@ -1163,20 +1236,109 @@ _BARE_REJECTION = (
 # tense-checked ("is/are/was/were ... fixed", "has/have been fixed", "no
 # longer applies") so a live directive like "must be fixed before merge"
 # never reads as already resolved.
+# The method phrase after a resolution verb ("fixed by re-running the
+# suite", "resolved via a rebase") and after the verified continuation
+# below ("fixed and verified by executing the script"). One definition, so
+# the forbidden-token lookahead that keeps "fixed by disabling the test"
+# not-clean guards both sites identically (ai-config#2957).
+# The tokens that keep a "fixed by ..." method phrase from vouching for a
+# suppressed check or a still-open finding. Applied per character of the
+# phrase AND per character inside a parenthesized aside: the aside used to
+# be consumed atomically, so "(but a critical bug remains)" after the
+# method was never inspected (round-2 adversarial review of #2958).
+_RESOLUTION_FORBIDDEN_LOOKAHEAD = (
+    r"(?!\b(?:and|but|while|although|however|yet|though|"
+    r"not|never|neither|nor|no|none|nothing|without|"
+    r"hardly|barely|scarcely|zero|"
+    r"partially?|incomplete(?:ly)?|ignor(?:e|ed|ing|es)?|omit(?:s|ted|ting)?|skip(?:s|ped|ping)?|"
+    r"except|unresolved|unfixed|unaddressed|open|reproduce[s]?|broken|failing|fails?|"
+    r"(?:suppress|disabl|mut|weaken|bypass|silenc|remov|delet|revert)(?:e|ed|ing)?\s+(?:(?:the|an?|all|these|those|that|our|any)\s+)?(?:[a-z0-9_-]+\s+)?(?:tests?|checks?|assertions?|warnings?|linters?|guards?|lints?|detectors?|errors?)|"
+    r"comment(?:ed|ing)?\s+out\s+(?:(?:the|an?|all|these|those|that|our|any)\s+)?(?:[a-z0-9_-]+\s+)?(?:tests?|checks?|assertions?|warnings?|linters?|guards?|lints?|detectors?|errors?))\b)"
+)
+
+# Parenthesized asides inside the lead-in or method phrase are checked against
+# a stricter lookahead per character: finite verbs, progress indicators,
+# open-work phrasing, and defect words are forbidden (in addition to everything
+# in _RESOLUTION_FORBIDDEN_LOOKAHEAD) so an aside like "(root cause under
+# investigation)" or "(a fix is in progress)" cannot masquerade as a benign
+# clarification (ai-config#2960).
+_ASIDE_FORBIDDEN_LOOKAHEAD = (
+    r"(?!\b(?:"
+    r"and|but|while|although|however|yet|though|"
+    r"not|never|neither|nor|no|none|nothing|without|"
+    r"hardly|barely|scarcely|zero|"
+    r"partially?|incomplete(?:ly)?|ignor(?:e|ed|ing|es)?|omit(?:s|ted|ting)?|skip(?:s|ped|ping)?|"
+    r"except|unresolved|unfixed|unaddressed|open|reproduce[s]?|broken|failing|fails?|failed|"
+    r"is|are|was|were|will|would|could|should|can|has|have|had|be|being|been|remains?|persists?|"
+    r"investigat\w*|progress|pend\w*|wip|tbd|todo|"
+    r"need\w*|requir\w*|follow[- ]?up|still|problem\w*|"
+    r"defects?|bugs?|errors?|crashes?|leaks?|faults?|flaws?|regressions?|"
+    r"because|since|if|unless|when|where|"
+    r"(?:suppress|disabl|mut|weaken|bypass|silenc|remov|delet|revert)(?:e|ed|ing)?\s+(?:(?:the|an?|all|these|those|that|our|any)\s+)?(?:[a-z0-9_-]+\s+)?(?:tests?|checks?|assertions?|warnings?|linters?|guards?|lints?|detectors?|errors?)|"
+    r"comment(?:ed|ing)?\s+out\s+(?:(?:the|an?|all|these|those|that|our|any)\s+)?(?:[a-z0-9_-]+\s+)?(?:tests?|checks?|assertions?|warnings?|linters?|guards?|lints?|detectors?|errors?)"
+    r")\b)"
+)
+
+_RESOLUTION_METHOD_PHRASE = (
+    r"(?:\s+(?:by|in|via|with|through|as|per|on|against)\b"
+    r"(?:" + _RESOLUTION_FORBIDDEN_LOOKAHEAD
+    + r"(?:\((?:" + _ASIDE_FORBIDDEN_LOOKAHEAD + r"[^()\n]){0,120}\)"
+    r"|[^;:,.!?()]|\.(?!\s|$))){1,180})?"
+)
+
+# "are fixed and verified by <method>" is how a reviewer says the fix was
+# checked rather than merely made. The method phrase reuses the guarded
+# body above, so the continuation admits no more than the bare form does.
+_RESOLUTION_VERIFIED_CONTINUATION = (
+    r"\s+and\s+(?:re-?)?(?:verified|confirmed|validated|checked)\b"
+    + _RESOLUTION_METHOD_PHRASE
+)
+
+# A `;`-joined clause after a resolved mention. Admitted by WHITELIST: the
+# clause must be one of a few enumerated shapes that carry no finding by
+# construction -- a "no new issues" statement, or the reviewer's habitual
+# note that the round's only commit is a small documentation correction.
+# A blacklist of finding vocabulary was tried first and failed open on the
+# adversarial review of ai-config#2958 ("; a critical error in the login
+# flow" read as clean), which is the dangerous direction by this file's
+# policy: a bounded word list can never enumerate every way to name an
+# open finding, while a whitelist admits only what it names.
+_BENIGN_TRAILING_CLAUSE = re.compile(
+    r"^\s*(?:"
+    r"(?:I\s+found\s+|there\s+(?:are|were)\s+|with\s+)?no\s+new\s+(?:issues?|findings?)"
+    r"(?:\s+(?:introduced|found|added|identified))?"
+    r"(?:\s+in\s+(?:this|the)\s+(?:round|review|pass|diff))?"
+    r"|nothing\s+else\s+to\s+report"
+    r"|the\s+(?:one|only|single|sole)\s+new\s+commit"
+    r"(?:\s+since\s+(?:the\s+)?(?:last|previous|prior)\s+round)?"
+    r"\s+is\s+an?\s+(?:(?:small|minor|trivial|cosmetic|accurate|correct|harmless|simple),?\s+){0,3}"
+    r"(?:documentation|doc|docs|comment|wording|typo|formatting|whitespace)"
+    r"\s+(?:correction|fix|change|update|tweak)s?"
+    r")\s*[.!?]?\s*$",
+    re.IGNORECASE,
+)
+
 RESOLVED_BLOCKING_SUFFIX = re.compile(
-    r"^(?:(?!\b(?:and|but|while|although|however)\b)"
-    r"(?:\([^()\n]{0,120}\)|[^,:;.!?()])){0,120}\b(?:"
-    r"(?:is|are|was|were)\s+(?:now\s+)?"
+    # The lead-in between the blocking mention and the resolution verb gets
+    # the same forbidden-token guard as the method phrase, inside parens
+    # too: "crash which remains open is resolved" and "crash (still open)
+    # is resolved" both read as resolved before it (ai-config#2958). The
+    # shared lookahead also carries the conjunction stop (and, but, while,
+    # although, however) the lead-in used to assert on its own.
+    r"^(?:" + _RESOLUTION_FORBIDDEN_LOOKAHEAD
+    + r"(?:\((?:" + _ASIDE_FORBIDDEN_LOOKAHEAD + r"[^()\n]){0,120}\)"
+    r"|[^,:;.!?()])){0,120}\b(?:"
+    r"(?:is|are|was|were)\s+(?:(?:now|since|already|also|fully|completely|satisfactorily|properly|cleanly|successfully)\s+)?"
     r"(?:fixed|resolved|addressed|closed|removed|corrected)"
-    r"|ha(?:s|ve)\s+(?:since\s+)?been\s+"
+    r"|ha(?:s|ve)\s+(?:(?:since|already|also)\s+)?been\s+(?:(?:now|fully|completely|satisfactorily|properly|cleanly|successfully)\s+)?"
     r"(?:fixed|resolved|addressed|closed|removed|corrected)"
     r"|no\s+longer\s+applies"
     r")\b"
-    r"(?:\s+(?:by|in|via)\s+this\s+round(?:['\u2019]s)?\s+"
-    r"(?:diff|push|commit|changes?|fixes?))?"
-    r"(?:"
+    + _RESOLUTION_METHOD_PHRASE
+    + r"(?:"
     r"\s+and\s+(?:confirmed\s+)?passing"
-    r"|,?\s+and\s+(?:(?![.!?])[\s\S]){1,180}\b"
+    + "|" + _RESOLUTION_VERIFIED_CONTINUATION
+    + r"|,?\s+and\s+(?:(?![.!?])[\s\S]){1,180}\b"
     r"(?:is|are|was|were)\s+(?:also\s+)?"
     r"(?:fixed|resolved|addressed|closed|removed|corrected)"
     r"|,?\s+with\s+no\s+new\s+(?:issues?|findings?)"
@@ -1307,8 +1469,7 @@ _NEGATOR_RE = re.compile(
 
 _PAST_STATE_RE = re.compile(
     r"(?:\bpreviously"
-    r"|\bprior(?:\s+(?:round|verdict)(?:['\u2019]s)?"
-    r"|\s+(?:finding|issue)s?)?"
+    r"|\bprior(?:\s+(?:round|verdict|finding|issue)s?(?:['\u2019]s?)?)?"
     r"|\bearlier"
     r"|\bround-\d+(?:['\u2019]s)?"
     r")(?:[-\s]+|\s+\*{1,2}|\s+(?:the\s+)?)$",
@@ -1329,9 +1490,21 @@ def _has_resolution_suffix(scan: str, match: re.Match) -> bool:
     if paragraph is None:
         return False
     following = paragraph.group(0)[sentence.end():]
+    if AFFIRMATIVE_RESOLUTION_FOLLOWUP.fullmatch(following) is None:
+        return False
+    text = sentence.group(0)
+    if RESOLVED_BLOCKING_SUFFIX.fullmatch(text) is not None:
+        return True
+    # A `;`-joined clause is inside the sentence, so it defeats the `$`
+    # anchor even when it carries nothing. Retry on the head alone and
+    # require the tail to be one of the whitelisted benign shapes
+    # (ai-config#2957).
+    head, sep, tail = text.partition(";")
+    if not sep:
+        return False
     return (
-        RESOLVED_BLOCKING_SUFFIX.fullmatch(sentence.group(0)) is not None
-        and AFFIRMATIVE_RESOLUTION_FOLLOWUP.fullmatch(following) is not None
+        RESOLVED_BLOCKING_SUFFIX.fullmatch(head) is not None
+        and _BENIGN_TRAILING_CLAUSE.fullmatch(tail) is not None
     )
 
 
@@ -1404,6 +1577,206 @@ def _is_resolved_blocking_mention(
 # compare against this exact string, so a drifted copy would silently
 # disable the ai-config#2370 exemption.
 _FINDINGS_HEADING_PATTERN = r"#+\s*(Actionable\s+|Detailed\s+)?Findings"
+
+_EXEMPT_FINDINGS_HEADING_NON_BLOCKING = re.compile(
+    r"(?i)^[ \t]*#{1,6}[ \t]*.*?"
+    r"(?:"
+    r"\bfindings\b.*?\bnon[- ]blocking\b"
+    r"|"
+    r"\bnon[- ]blocking\s+(?:actionable\s+|detailed\s+)?findings\b"
+    r")"
+)
+_EXEMPT_FINDINGS_HEADING_RESOLVED = re.compile(
+    r"(?i)^[ \t]*#{1,6}[ \t]*.*?"
+    r"(?:"
+    r"\b(?:resolved|addressed)\s+(?:actionable\s+|detailed\s+)?findings\b"
+    r"|"
+    r"\bfindings\b.*?(?:[\(\[\{:\-\u2013\u2014\s]|\b(?:from|prior|previous|earlier|rounds?|now|all|already|previously))\s*"
+    r"(?:from\s+(?:prior|previous|earlier)\s+rounds?\s*[\-\u2013\u2014:]?\s*)?"
+    r"(?:now\s+|all\s+|already\s+|previously\s+)?"
+    r"(?:resolved|addressed)\b"
+    r")"
+)
+_FINDINGS_HEADING_NOT_EXEMPT = re.compile(
+    r"(?i)\b(?:"
+    r"unresolved|unaddressed|unfixed"
+    r"|partially\s+(?:resolved|addressed|fixed|closed|cleared)"
+    r"|partly\s+(?:resolved|addressed|fixed|closed|cleared)"
+    r"|not\s+(?:fully\s+|completely\s+|entirely\s+|quite\s+|yet\s+)?(?:resolved|addressed|fixed|closed|cleared)"
+    r"|never\s+(?:resolved|addressed|fixed|closed|cleared)"
+    r"|hardly\s+(?:resolved|addressed|fixed|closed|cleared)"
+    r"|scarcely\s+(?:resolved|addressed|fixed|closed|cleared)"
+    r"|without\s+(?:a\s+)?fix"
+    r"|yet\s+to\s+be\s+(?:resolved|addressed|fixed)"
+    r"|to\s+be\s+(?:resolved|addressed|fixed)"
+    r"|still\s+(?:unresolved|open|unaddressed|broken)"
+    r")\b"
+    r"|(?<!non-)(?<!non\s)\bblocking\b"
+)
+_LINE_RESOLUTION_WORDS = re.compile(
+    r"(?i)\b(?:"
+    r"(?:is|are|was|were|have|has)\s+(?:now\s+|also\s+|already\s+|since\s+|been\s+)*"
+    r"(?:fixed|resolved|addressed|closed|removed|corrected|cleared)"
+    r"(?:\s+(?:in|by|via)\s+(?:commit\s+[a-f0-9]+|[a-f0-9]{7,40}|PR\s+#?\d+|#\d+|this\s+round(?:['\u2019]s)?\s+(?:diff|push|commit|changes?|fixes?)))?"
+    r"|no\s+longer\s+applies"
+    r"|(?:now|already|previously|all)\s+(?:fixed|resolved|addressed|cleared|closed)"
+    r"|(?:item|items|feedback|issues?|findings?|bugs?|everything|both|all)\s+(?:now\s+|also\s+|already\s+|since\s+)?(?:fixed|resolved|addressed|closed|cleared)"
+    r"|(?:fixed|resolved|addressed|cleared|closed)\s+(?:(?:this|it|that|the\s+(?:bug|issue|finding|defect|crash|problem|leak))\s+)?(?:in|by|via)\s+(?:commit\s+[a-f0-9]+|[a-f0-9]{7,40}|PR\s+#?\d+|#\d+|this\s+round(?:['\u2019]s)?\s+(?:diff|push|commit|changes?|fixes?))"
+    r")\b"
+    r"|^[ \t]*(?:[-*+]|\d+[.)])?[ \t]*(?:\*\*)?\[?(?:resolved|fixed|addressed|closed|cleared)\b\]?"
+)
+_LINE_UNRESOLVED_WORDS = re.compile(
+    r"(?i)\b(?:"
+    r"unresolved|unaddressed|partially\s+(?:resolved|addressed|fixed)"
+    r"|still\s+(?:unresolved|broken|present|failing|reproducible|open|leaks?|crashes?|fails?|in\s+main|remains)"
+    r"|not\s+(?:resolved|addressed|fixed|closed|cleared|fully|completely|yet)"
+    r"|(?:is|are|was|were|currently)\s+being\s+(?:fixed|resolved|addressed|closed|corrected|cleared)"
+    r"|(?:must|needs?\s+to|should|ought\s+to|has\s+to|remains?\s+to|will|would|could|might|may|supposed\s+to|yet\s+to)\s+(?:have\s+been\s+|be\s+)?(?:fixed|resolved|addressed|closed|corrected|cleared)"
+    r"|(?:fixed|resolved|addressed)\s+only\s+(?:in|for|on|partially)"
+    r"|only\s+(?:fixed|resolved|addressed)\s+(?:in|for|on|partially)"
+    r"|(?:later\s+|was\s+|since\s+)?reverted"
+    r"|(?:in|for|via)\s+(?:a\s+)?(?:follow-?up|later|future|next|subsequent|separate)\s+(?:pr|commit|branch|release|issue|round)"
+    r"|remains?\b|is\s+back\b|comes\s+back\b|persists?\b"
+    r"|without\s+(?:a\s+)?fix\b"
+    r")\b"
+    r"|(?<!non-)(?<!non\s)\bblocking\b"
+)
+_PREFIX_DISQUALIFY_RE = re.compile(
+    r"(?i)\b(?:"
+    r"should|would|could|might|may|must|ought\s+to|needs?\s+to|supposed\s+to|yet\s+to"
+    r"|claims?|claiming|claimed|says?|saying|said|believes?|believed|thinks?|thought"
+    r"|assumes?|assumed|purports?|purported|alleges?|alleged|supposedly|allegedly"
+    r"|apparently|seemingly|presumably|unconfirmed|unverified|reportedly"
+    r"|if|unless|whether|had|though|although"
+    r"|seems?(?:\s+to(?:\s+have(?:\s+been)?)?)?|looks?\s+(?:like|to\s+be)"
+    r"|hopes?|hoping|hoped|hopefully"
+    r"|in\s+theory|theoretically|hypothetically|ostensibly|tentatively"
+    r"|maybe|perhaps|possibly|probably|likely|unclear|unsure|suspects?"
+    r"|appears?(?:\s+to(?:\s+be)?)?"
+    r"|in\s+(?:my|our|your|their|his|her)\s+(?:opinion|view|judgment|judgement|assessment|estimation|belief|impression|experience)"
+    r"|to\s+(?:my|our|your|their|his|her)\s+(?:knowledge|understanding|recollection|mind)"
+    r"|as\s+far\s+as\s+(?:i|we|you|they|he|she)\s+(?:know|understand|recall|remember|can\s+tell)"
+    r"|according\s+to"
+    r"|from\s+(?:my|our|what\s+i|what\s+we)"
+    r")\b"
+)
+_PREFIX_NON_RESOLUTION_SUBJECT = re.compile(
+    r"(?i)\b(?:fix|fixes|patch|patches|pr|pull\s+request|branch|workaround|revert)\b"
+)
+_AFFIRMATIVE_RESOLUTION_SUFFIX = re.compile(
+    r"^(?:"
+    r"\s*(?:in|by|via)\s+(?:commit\s+[a-f0-9]+|[a-f0-9]{7,40}|PR\s+#?\d+|#\d+|this\s+round(?:['\u2019]s)?\s+(?:diff|push|commit|changes?|fixes?))"
+    r")?"
+    r"(?:"
+    r"\s*(?:and|,?\s*and)\s+(?:confirmed\s+|now\s+)?(?:passing|clean|verified|resolved|tested|closed|cleared)"
+    r")?"
+    r"(?:"
+    r"\s*,?\s*with\s+no\s+new\s+(?:issues?|findings?)(?:\s+(?:introduced|found|added|identified))?"
+    r")?"
+    r"[.,!?:;\s\)\"'\`]*$",
+    re.IGNORECASE,
+)
+
+# A line that reads as a finding ITEM. Severity/class tags and Location
+# markers are the explicit forms; a bare list item in any CommonMark form
+# (`-`, `*`, `+`, `1.`, `1)`) vetoes too, because an untagged finding
+# ("1. `foo()` crashes on empty input") is still a finding, and swallowing
+# it is the dangerous direction.
+_SECTION_FINDING_ITEM = re.compile(
+    r"(?im)"
+    r"^[ \t]*(?:\*\*)?\[?"
+    r"(?:Defect|Factual\s+Error|Edge\s+Case|Convention|Nit|Non-blocking|"
+    r"Suggestion|Note|Question|Warning|Blocking|Critical|Major|Minor|P[0-4])\b\]?"
+    r"|^[ \t]*(?:\d+[.)]|[-*+])\s+\S"
+    r"|\*\*Location:\*\*"
+    r"|^[ \t]*>\s*\S"
+    r"|^[ \t]*\*\*(?!\s*$)"
+)
+_ITEM_NON_BLOCKING_TAG = re.compile(
+    r"(?i)^[ \t]*(?:[-*+]|\d+[.)])?[ \t]*(?:\*\*)?\[?"
+    r"(?:Nit|Non-blocking|Suggestion|Note|Question|Minor|Optional|Low)\b\]?"
+    r"|^[ \t]*(?:[-*+]|\d+[.)])[ \t]*(?:Nit|Suggestion|Note|Question|Optional|Minor|Low)(?::|\b)"
+)
+
+
+def _item_is_resolved(line: str) -> bool:
+    if _LINE_UNRESOLVED_WORDS.search(line):
+        return False
+    res_match = _LINE_RESOLUTION_WORDS.search(line)
+    if not res_match:
+        return False
+    before_res = line[:res_match.start()]
+    if _NEGATOR_RE.search(before_res):
+        return False
+    if _PREFIX_DISQUALIFY_RE.search(before_res):
+        return False
+    matched_verb = res_match.group(0).lower()
+    if any(w in matched_verb for w in ("removed", "closed")):
+        if _PREFIX_NON_RESOLUTION_SUBJECT.search(before_res):
+            return False
+    after_res = line[res_match.end():]
+    if not _AFFIRMATIVE_RESOLUTION_SUFFIX.match(after_res):
+        return False
+    return True
+
+
+def _section_has_unresolved_blocking_items(
+    section: str, is_non_blocking_heading: bool = False
+) -> bool:
+    """True when the section contains unresolved severity-tagged, untagged, or blocking items."""
+    for line in section.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if _LINE_UNRESOLVED_WORDS.search(line):
+            return True
+        if _SECTION_FINDING_ITEM.search(line):
+            if _item_is_resolved(line):
+                continue
+            if is_non_blocking_heading and _ITEM_NON_BLOCKING_TAG.search(line):
+                continue
+            return True
+    return False
+
+
+def _is_exempt_findings_heading(
+    scan_body: str, match_start: int, match_end: int
+) -> bool:
+    """True when a Findings heading indicates non-blocking or resolved findings,
+    AND the section body underneath it contains no unresolved severity-tagged, untagged, or blocking items.
+
+    Exempts headings like '### Findings (non-blocking)', '### Findings (resolved)',
+    '### Findings from prior rounds --- now resolved', '### Findings (addressed)', etc.
+    Does not exempt headings with unaddressed/unresolved or blocking signals, or
+    sections containing unresolved blocking/severity-tagged/untagged items.
+    """
+    line_start = scan_body.rfind("\n", 0, match_start) + 1
+    line_end = scan_body.find("\n", match_end)
+    if line_end == -1:
+        line_end = len(scan_body)
+    heading_line = scan_body[line_start:line_end]
+
+    if not re.match(r"^[ \t]*#{1,6}\s", heading_line):
+        return False
+
+    if _FINDINGS_HEADING_NOT_EXEMPT.search(heading_line):
+        return False
+    is_non_blocking = bool(_EXEMPT_FINDINGS_HEADING_NON_BLOCKING.search(heading_line))
+    is_resolved = bool(_EXEMPT_FINDINGS_HEADING_RESOLVED.search(heading_line))
+    if not (is_non_blocking or is_resolved):
+        return False
+
+    section_start = line_end + 1
+    next_heading = re.search(r"(?m)^#{1,6}\s", scan_body[section_start:])
+    section = (
+        scan_body[section_start:section_start + next_heading.start()]
+        if next_heading
+        else scan_body[section_start:]
+    )
+    if _section_has_unresolved_blocking_items(section, is_non_blocking_heading=is_non_blocking):
+        return False
+
+    return True
 
 VERDICT_NOT_CLEAN_PATTERNS = [
     # Intervening words allowed, because the adjacent forms are not the only
@@ -1553,8 +1926,8 @@ FINDING_HEADING_PATTERNS = {
 # cover qualifiers attached to an already-marked phrase, which is a far smaller
 # job than parsing arbitrary prose.
 BARE_CLEAN_MARKED = re.compile(
-    r"(?:^|\n)[ \t]*(?:[#>*_+-]+[ \t]*)*"
-    r"(?:verdict[ \t]*[:.\-]*[ \t]*)?(?:[#>*_]+[ \t]*)*$",
+    r"(?:^|\n)[ \t]*[#>*_+\t -]*"
+    r"(?:verdict[ \t]*[:.\-]*[ \t]*)?[#>*_\t -]*$",
     re.IGNORECASE,
 )
 CLEAN_NEGATION_PREFIX = re.compile(
@@ -1680,10 +2053,11 @@ def classify_verdict(body: str, state: str = "") -> str:
             if NOT_CLEAN_NEGATION_PREFIX.search(prefix):
                 if not _is_negated_resolution(scan, match):
                     continue
-            if pat == _BARE_REJECTION and _is_resolved_blocking_mention(
-                scan, match, cited
-            ):
-                continue
+            if pat == _BARE_REJECTION:
+                if _is_resolved_blocking_mention(scan, match, cited):
+                    continue
+                if _is_exempt_findings_heading(scan, match.start(), match.end()):
+                    continue
             if pat == r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b":
                 suffix = scan[match.end():match.end() + 60]
                 if NOT_CLEAN_NEGATION_SUFFIX.search(suffix):
@@ -1740,20 +2114,16 @@ def classify_verdict(body: str, state: str = "") -> str:
     return ""
 
 
-# A line that reads as a finding ITEM. Severity/class tags and Location
-# markers are the explicit forms; a bare list item in any CommonMark form
-# (`-`, `*`, `+`, `1.`, `1)`) vetoes too, because an untagged finding
-# ("1. `foo()` crashes on empty input") is still a finding, and swallowing
-# it is the dangerous direction.
-_SECTION_FINDING_ITEM = re.compile(
-    r"(?im)"
-    r"^[ \t]*(?:\*\*)?\[?"
-    r"(?:Defect|Factual\s+Error|Edge\s+Case|Convention|Nit|Non-blocking|"
-    r"Suggestion|Note|Question|Warning|Blocking|Critical|Major|Minor|P[0-4])\b\]?"
-    r"|^[ \t]*(?:\d+[.)]|[-*+])\s+\S"
-    r"|\*\*Location:\*\*"
-    r"|^[ \t]*>\s*\S"
-    r"|^[ \t]*\*\*(?!\s*$)"
+
+
+
+_FINDINGS_TRAILER_SUFFIX = re.compile(
+    r"^\s*(?:"
+    r"[*_:.\-]*\s*(?:none\b(?!\s+of\b)|n/a\b|none\s+identified\b|none\s+remaining\b)"
+    r"|"
+    r"[:.\-(]*\s*(?:non-blocking\b|nothing\b|0\b|no\s+(?:\w+\s+){0,3}(?:findings|issues|bugs|violations|blockers)|no\s+new\b)"
+    r")",
+    re.IGNORECASE,
 )
 
 
@@ -1766,7 +2136,7 @@ def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:
     heading, not the section body, so scanning starts on the following line
     (ai-config#2459). The section runs from there to the next heading or end
     of body. The FIRST non-empty line must match the
-    NOT_CLEAN_NEGATION_SUFFIX allowlist -- the same trigger the old 60-char
+    _FINDINGS_TRAILER_SUFFIX allowlist -- the same trigger the old 60-char
     suffix shortcut keyed on, made line-anchored -- and everything after it
     must clear the item veto.
 
@@ -1814,7 +2184,7 @@ def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:
     lines = lead + [ln for ln in section.splitlines() if ln.strip()]
     if not lines:
         return False
-    if not NOT_CLEAN_NEGATION_SUFFIX.search(lines[0]):
+    if not _FINDINGS_TRAILER_SUFFIX.search(lines[0]):
         return False
     return not _SECTION_FINDING_ITEM.search("\n".join(lines[1:]))
 
@@ -1860,10 +2230,11 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
             if NOT_CLEAN_NEGATION_PREFIX.search(prefix):
                 if not _is_negated_resolution(scan_body, match):
                     continue
-            if pat == _BARE_REJECTION and _is_resolved_blocking_mention(
-                scan_body, match, cited
-            ):
-                continue
+            if pat == _BARE_REJECTION:
+                if _is_resolved_blocking_mention(scan_body, match, cited):
+                    continue
+                if _is_exempt_findings_heading(scan_body, match.start(), match.end()):
+                    continue
             if pat == _FINDINGS_HEADING_PATTERN:
                 # The section-resolution check REPLACES the 60-char suffix
                 # shortcut for this heading: the shortcut read "No new
@@ -1872,9 +2243,13 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
                 # #2370's review of this very fix). The replacement keeps
                 # the shortcut's first-line trigger and adds the item veto
                 # over the rest of the section.
+                if _is_exempt_findings_heading(scan_body, match.start(), match.end()):
+                    continue
                 if _findings_section_resolves_empty(scan_body, match.end()):
                     continue
             elif pat in FINDING_HEADING_PATTERNS:
+                if _is_exempt_findings_heading(scan_body, match.start(), match.end()):
+                    continue
                 suffix = scan_body[match.end():match.end() + 60]
                 if NOT_CLEAN_NEGATION_SUFFIX.search(suffix):
                     continue
@@ -2102,6 +2477,72 @@ def check_latest_verdict(
 _REVIEW_STRUCTURE_HEADING = re.compile(
     r"(?im)^#{1,6}\s*(?:(?:Review\s+)?Summary|(?:Critical\s+|Actionable\s+)?Findings|Verdict)\b"
 )
+_MULTI_BACKTICK_SPAN_RE = re.compile(
+    r"(?<!`)(`{2,})(?!`)(?:[^\n\r]|\r?\n(?![ \t]*\r?\n))*?(?<!`)\1(?!`)"
+)
+
+
+def _blank_fences_and_spans(body: str) -> str:
+    """Blank fenced code blocks and code spans to spaces, preserving length."""
+    fenced_lines, _, _ = find_fence_spans(body, swallow_unclosed=True)
+
+    lines = body.split("\n")
+    mask = bytearray(len(body))
+    line_offset = 0
+    unclaimed_lines = []
+
+    for idx, line in enumerate(lines):
+        if idx in fenced_lines:
+            unclaimed_lines.append("")
+        else:
+            line_span_mask = bytearray(len(line))
+            for m in CODE_SPAN_RE.finditer(line):
+                b, e = m.span()
+                line_span_mask[b:e] = b"\x01" * (e - b)
+                mask[line_offset + b : line_offset + e] = b"\x01" * (e - b)
+            unclaimed_lines.append(
+                "".join(" " if m else c for c, m in zip(line, line_span_mask))
+            )
+        line_offset += len(line) + 1
+
+    unclaimed_body = "\n".join(unclaimed_lines)
+
+    line_offsets = []
+    curr = 0
+    for line in lines:
+        line_offsets.append(curr)
+        curr += len(line) + 1
+
+    unclaimed_line_offsets = []
+    curr_un = 0
+    for un_line in unclaimed_lines:
+        unclaimed_line_offsets.append(curr_un)
+        curr_un += len(un_line) + 1
+
+    for m in _MULTI_BACKTICK_SPAN_RE.finditer(unclaimed_body):
+        b_un, e_un = m.span()
+        start_line = bisect.bisect_right(unclaimed_line_offsets, b_un) - 1
+        start_col = b_un - unclaimed_line_offsets[start_line]
+        end_line = (
+            bisect.bisect_right(unclaimed_line_offsets, max(0, e_un - 1)) - 1
+        )
+        end_col = e_un - unclaimed_line_offsets[end_line]
+
+        if not any(l in fenced_lines for l in range(start_line, end_line + 1)):
+            b_orig = line_offsets[start_line] + start_col
+            e_orig = line_offsets[end_line] + end_col
+            mask[b_orig:e_orig] = b"\x01" * (e_orig - b_orig)
+
+    out = []
+    line_offset = 0
+    for idx, line in enumerate(lines):
+        if idx in fenced_lines:
+            out.append(" " * len(line))
+        else:
+            line_mask = mask[line_offset : line_offset + len(line)]
+            out.append("".join(" " if m else c for c, m in zip(line, line_mask)))
+        line_offset += len(line) + 1
+    return "\n".join(out)
 
 
 def _is_structured_review_body(body: str) -> bool:
@@ -2110,13 +2551,16 @@ def _is_structured_review_body(body: str) -> bool:
     Requires both a report heading (Summary / Findings / Verdict families)
     and a Reviewed-Commit fingerprint line, tested over the CITED-VOCAB
     STRIPPED body so a casual comment quoting a prior report inside a
-    fence cannot smuggle the structure in (#1202's convention). The two
+    fence or code span cannot smuggle the structure in (#1202/#2525). The two
     together are what a pre-push-review or adversarial-self-review report
     always carries and conversational prose does not, which is what keeps
     #1798's false-CLEAN direction closed while #2402's supersession path
     opens.
     """
-    scan = strip_cited_finding_vocab(body)
+    if not body:
+        return False
+    blanked = _blank_fences_and_spans(body)
+    scan = strip_cited_finding_vocab(blanked)
     if not _REVIEW_STRUCTURE_HEADING.search(scan):
         return False
     return bool(re.search(
@@ -2175,10 +2619,9 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
     all_items = []
     for c in comments:
         body = c.get("body", "")
-        body_lower = body.lower()
         author_login = (c.get("author") or {}).get("login", "")
 
-        if "ard review disposition summary" in body_lower:
+        if is_ard_disposition_summary(body):
             continue
 
         # A workflow status notice is not a review, whoever posted it.
@@ -2414,7 +2857,11 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         help="Score a payload gathered by the agent instead of shelling out to "
              "`gh`. Use this in remote/web sessions, where the CLI does not "
              "exist (ai-config#2441). shared/workflow/fully-clean.md lists the "
-             "payload keys and the MCP calls that fill them.",
+             "payload keys and the MCP calls that fill them. When a remote "
+             "session's GraphQL surface is pinned to a fixed operation set "
+             "but plain REST is reachable (ai-config#2908), build FILE with "
+             "`python3 scripts/build-pr-payload.py OWNER/REPO N FILE` instead "
+             "of hand-transcribing MCP tool output.",
     )
     parser.add_argument(
         "-R", "--repo", default="", metavar="OWNER/REPO",

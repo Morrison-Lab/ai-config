@@ -149,10 +149,16 @@ and the default branch for each issue:
 >    scan merged/closed PRs that touched the same area so you don't undo past work or reintroduce a fixed bug (`gh pr list --state all --search "<keywords>"`).
 >    If a past PR already solved this,
 >    stop and report that instead of re-doing it.
-> 3. **Branch from current `<default-branch>`**:
+> 3. **Research before writing code (DRW check)** --- before hand-rolling any custom code,
+>    helpers, or utilities, do a research step to verify DRW (don't reinvent the wheel)
+>    and check for existing libraries, functions, or package solutions (in our own repos
+>    or upstream ecosystems like r-lib/tidyverse, PyPI, npm).
+>    Follow `prefer-upstream`.
+>    If custom implementation is required, note what was searched in the PR.
+> 4. **Branch from current `<default-branch>`**:
 >    `git fetch origin <default-branch> -q && git checkout -b <slug> origin/<default-branch>`.
 >    Use a descriptive `<slug>`.
-> 4. **Open the draft PR now** — before implementing,
+> 5. **Open the draft PR now** --- before implementing,
 >    so this worktree's work is visible to the other parallel workers and no one double-grabs the issue (see [`pr-on-claim`](../../shared/workflow/pr-on-claim.md)).
 >    Give the branch a diff with an empty commit, push,
 >    and open a **draft** PR into `<default-branch>` referencing `Closes #<N>`:
@@ -160,16 +166,16 @@ and the default branch for each issue:
 >    then `git push -u origin HEAD` (retry with backoff on a network error),
 >    then `gh pr create --draft …` (or `mcp__github__create_pull_request` with `draft: true`).
 >    A draft doesn't trigger the review bot on an empty diff.
-> 5. **Implement** the change.
+> 6. **Implement** the change.
 >    Keep the diff focused on this issue only — do **not** touch files another issue owns.
 >    Follow the repo's conventions (its `CLAUDE.md` / lab manual).
 >    Run the repo's pre-commit checks (render / lint / spell / tests) and fix what they flag.
-> 6. **Commit and push** the implementation onto the draft PR with a clear
+> 7. **Commit and push** the implementation onto the draft PR with a clear
 >    message referencing the issue (`Closes #<N>` so the PR auto-closes it),
->    then **mark the PR ready for review** — `gh pr ready <N>` (or
+>    then **mark the PR ready for review** --- `gh pr ready <N>` (or
 >    `mcp__github__update_pull_request` with `draft: false`). Marking it ready
 >    is what kicks off review.
-> 7. **ARDI to clean** — drive the PR to a clean review verdict: read the
+> 8. **ARDI to clean** --- drive the PR to a clean review verdict: read the
 >    LATEST review, Address every finding / Rebut what's wrong / Defer
 >    out-of-scope items to a tracked issue, push, re-request review, repeat
 >    until zero findings and CI is green. Don't stop at "review-clean, needs
@@ -241,7 +247,9 @@ signal is present; otherwise propose with a cost estimate first.
 - **`gi`** / **`grab-issue`** — the per-issue flow each subagent runs (claim →
   history → open draft PR → implement → mark ready → ARDI). GIP restates it
   inline because subagents start fresh.
-- **`pr-on-claim`** — the rule behind each subagent's step 4: open the draft PR
+- **`prefer-upstream`** --- search existing packages, standard libraries, and lab
+  repos before writing custom code to avoid reinventing the wheel
+- **`pr-on-claim`** --- the rule behind each subagent's step 5: open the draft PR
   up front so parallel workers see the in-flight issue before implementing.
 - **`gia`** — clears the whole queue (clean open PRs, then work issues); compose
   GIP into its issue phase when that phase's issues are independent.
@@ -263,6 +271,7 @@ signal is present; otherwise propose with a cost estimate first.
   Run them serially (gii) instead.
 - ❌ Fanning out a stacked issue whose base is another unmerged in-batch branch.
   It belongs in the serial remainder.
+- ❌ Hand-rolling custom code without researching existing libraries or lab packages first (violating DRW).
 - ❌ Skipping `isolation: "worktree"` — parallel subagents in one checkout
   clobber each other's edits and branches.
 - ❌ Skipping the independence gate and parallelizing the whole backlog

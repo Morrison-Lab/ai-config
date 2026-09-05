@@ -13,7 +13,7 @@ allowed-tools:
 # mma
 
 Repo-wide fan-out of [`sync-pr-branch`](../sync-pr-branch/SKILL.md): instead
-of resyncing one branch, resync **every currently-open PR** in the repo
+of resyncing one branch, resync **every currently-open PR** in the repo that passes `memories/reviewing-prs.md`'s scope test
 against `main` (and each PR's own remote), so a burst of merges into `main`
 doesn't leave the rest of the queue stale and conflict-prone.
 
@@ -35,7 +35,13 @@ fix for free.
 ## The procedure
 
 1. **List every open PR in the repo** (`mcp__github__list_pull_requests` /
-   `gh pr list`). Note each PR's number and `headRefName`.
+   `gh pr list --json number,headRefName,author,assignees`).
+   Note each PR's number, `headRefName`, `author`, and `assignees`.
+   Filter the list by `memories/reviewing-prs.md`'s scope test first, as
+   `ardia` step 1 does (opened by or assigned to the invoking user,
+   explicitly requested by name, or authored by the GitHub Actions app (`github-actions`)), and report the PRs
+   dropped: a resync pushes a merge commit, which that memory forbids on any
+   other PR.
 
 2. **Check whether main is actually ahead** before touching anything:
    ```bash

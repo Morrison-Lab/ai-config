@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# check-one-function-per-file: allow-multiple
 """
 Flag newly-added Markdown lines that pack more than one sentence/clause onto
 a single source line -- a diff-scoped check for semantic line breaks (one
@@ -9,6 +10,18 @@ Design notes:
   base SHA) are checked, so a corpus that has already accumulated long lines
   (commonly because markdownlint's MD013 is disabled for exactly this
   reason) never gets reflagged on every unrelated edit.
+- **Working-tree-aware scope.** When a *tracked* file the globs match (and
+  ``NLB_PATHS_IGNORE`` does not cover) carries a staged or unstaged change,
+  the diff is taken against the working tree instead of ``HEAD``, so a line
+  added but not yet committed is examined too -- the check is meant to be
+  run by hand before a commit, and a clean verdict over zero examined lines
+  used to be indistinguishable from a genuine pass (see ``NLB_SCOPE``
+  below). Inside CI the tree is always clean, so this has no effect there:
+  scope stays committed-only. A brand new *untracked* file never widens
+  scope on its own -- plain ``git diff`` cannot show untracked content, so
+  letting one flip scope would promise an examination that never happens --
+  and is instead named in an explicit warning; stage it (``git add``) to be
+  examined for real.
 - **No base_ref to diff against, or the diff can't be computed** (e.g. an
   unset base-ref on a push run, or a shallow clone missing the base commit):
   the check is *skipped* with a warning. There is no whole-tree fallback,
@@ -22,6 +35,10 @@ Design notes:
   rule 5 (the SHOULD: break after an independent clause) applies too, and is
   opt-*out* via ``NLB_CLAUSE_BREAKS=false`` -- see ``has_late_semicolon``
   for why that slice is semicolons only, and why it is gated on line length.
+- **The search space is reported.** Every run prints how many added lines
+  and files it examined, and under which scope, so a run that examined zero
+  lines prints something visibly different from a run that examined
+  everything and found nothing.
 
 Configuration (all via environment variables, set by the composite action):
   NLB_BASE_REF      Git ref/SHA to diff against. Empty => skip the check.
@@ -34,12 +51,25 @@ Configuration (all via environment variables, set by the composite action):
                     Minimum *visible* line length before the clause check
                     applies, inclusive (default: 80); markup is stripped
                     first. Ignored when NLB_CLAUSE_BREAKS is false.
+  NLB_SCOPE         "auto" (default) => scope from the working tree when a
+                    *tracked* file it matches carries a change, else from
+                    HEAD; "worktree" => always scope from the working tree;
+                    "committed" => always scope from HEAD only, even when
+                    the tree is dirty. Line *content* is always read from
+                    the working tree regardless of this setting, so forcing
+                    "committed" on a dirty tree can desync line numbers --
+                    it is meant for reproducing CI's own behavior on a
+                    clean tree, not for selectively ignoring uncommitted
+                    changes elsewhere. An untracked new file never widens
+                    scope on its own (plain `git diff` cannot show it) and
+                    is instead named in a warning.
 """
 
 import os
 import re
 import subprocess
 import sys
+from collections import Counter
 from pathlib import Path
 from typing import List, NamedTuple, Optional, Set, Tuple
 
@@ -243,11 +273,11 @@ def has_late_semicolon(text: str, min_length: int = _DEFAULT_CLAUSE_MIN_LENGTH) 
 
     - A **comma** is overwhelmingly a list separator, an appositive, or an
       introductory phrase -- rule 6's MAY at most. Measured over
-      d-morrison/ai-config's tracked Markdown (22,820 prose lines, already
+      Morrison-Lab/ai-config's tracked Markdown (22,820 prose lines, already
       conformant), keying on any mid-line ``, ; : --`` flags 50.5% of those
       lines, against 6.1% for the semicolon alone, and 0.7% once the length
       gate below applies. These are a re-measurement taken against the shipped
-      code; d-morrison/gha#336 records the original pass, whose figures differ
+      code; Morrison-Lab/gha#336 records the original pass, whose figures differ
       because the corpus grew and because the stripping above was widened
       after it was written.
     - A **colon** usually introduces a list or an example, which rule 7
@@ -319,7 +349,7 @@ def prose_line_numbers(text: str) -> Set[int]:
     """1-indexed lines eligible for a sentence-count check.
 
     Excludes frontmatter, fenced code, tables, headings, and horizontal
-    rules, and HTML comments. (Ported from d-morrison/ai-config's
+    rules, and HTML comments. (Ported from Morrison-Lab/ai-config's
     semantic-line-breaks.py, which also excludes ai-config's own
     ``@shared/foo.md``-style include directives -- not carried over here,
     since that convention has no equivalent in this repo's own consumers.)
@@ -457,31 +487,178 @@ def _ignored(rel: str, ignores: List["re.Pattern[str]"]) -> bool:
 _HUNK_RE = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")
 
 
-def _added_line_numbers(base_ref: str, pathspecs: List[str]) -> Optional[dict]:
-    """Return {file: {new-file line numbers added}} vs the merge-base of
-    base_ref and HEAD, or None if the diff could not be computed."""
-    diff = _run_git(["diff", "--unified=0", "--no-color", f"{base_ref}...HEAD", "--", *pathspecs])
+def _status_path(line: str) -> str:
+    """Extract the (post-rename) path from one ``git status --porcelain`` line.
+
+    The format is ``XY PATH`` or, for a rename/copy, ``XY PATH -> PATH2``, in
+    which case the new path is what matters here. This does not undo git's
+    C-style quoting of an exotic filename (a literal quote, backslash, or
+    non-ASCII byte); the rest of this module already makes that same
+    simplifying assumption when it slices diff header lines.
+    """
+    rest = line[3:]
+    if " -> " in rest:
+        rest = rest.split(" -> ", 1)[1]
+    return rest.strip().strip('"')
+
+
+def _has_uncommitted_changes(
+    pathspecs: List[str], ignores: List["re.Pattern[str]"]
+) -> bool:
+    """True when the working tree or index carries a **tracked** change to a
+    file the given pathspecs match and ``ignores`` does not cover.
+
+    ``git status --porcelain -uno`` reports staged and unstaged
+    modifications to tracked files, which is what "auto" scope needs to
+    decide whether to widen the diff. Untracked files are deliberately
+    excluded (``-uno``): plain ``git diff`` cannot show untracked content,
+    so an untracked file alone must never flip scope to "worktree" -- that
+    would promise an examination that then silently does not happen. See
+    ``_untracked_matches`` for the warning that covers that gap instead.
+    ``ignores`` is applied here too, so an uncommitted edit confined to an
+    ignored file does not widen scope for everything else. A status call
+    that fails (e.g. not a git repo) is read as "nothing to widen for", the
+    same conservative default ``_run_git`` callers elsewhere use.
+    """
+    out = _run_git(["status", "--porcelain", "-uno", "--", *pathspecs])
+    if not out:
+        return False
+    for line in out.splitlines():
+        if not line:
+            continue
+        if not _ignored(_status_path(line), ignores):
+            return True
+    return False
+
+
+def _untracked_matches(
+    pathspecs: List[str], ignores: List["re.Pattern[str]"]
+) -> List[str]:
+    """Untracked files that match ``pathspecs`` and are not covered by
+    ``ignores`` -- the set a warning names, since plain ``git diff`` cannot
+    show their content even under worktree scope (see
+    ``_has_uncommitted_changes``).
+    """
+    out = _run_git(["status", "--porcelain", "-uall", "--", *pathspecs])
+    if not out:
+        return []
+    matches = []
+    for line in out.splitlines():
+        if not line.startswith("??"):
+            continue
+        rel = _status_path(line)
+        if not _ignored(rel, ignores):
+            matches.append(rel)
+    return sorted(matches)
+
+
+def _merge_base(base_ref: str) -> Optional[str]:
+    """The merge base of ``base_ref`` and HEAD, computed explicitly.
+
+    ``git diff A...B`` already resolves to this internally, but both scopes
+    below need the same commit, so it is computed once here rather than
+    left to two different diff invocations to each resolve on their own --
+    which is also what keeps a stale ``base_ref`` from widening the diff:
+    the merge base, not ``base_ref`` itself, is what gets diffed against.
+    Empty or whitespace-only output (in addition to an outright failure) is
+    treated as "could not resolve", since a blank ref satisfies none of the
+    diff commands below.
+    """
+    out = _run_git(["merge-base", base_ref, "HEAD"])
+    if out is None:
+        return None
+    out = out.strip()
+    return out or None
+
+
+def _added_line_numbers(
+    base_ref: str, pathspecs: List[str], scope: str = "committed"
+) -> Optional[Tuple[dict, "Counter[str]"]]:
+    """Return ({file: {new-file line numbers added}}, deleted-line multiset)
+    vs the merge-base of base_ref and HEAD, or None if the diff could not be
+    computed.
+
+    ``scope`` is ``"committed"`` (diff the merge base against ``HEAD`` --
+    CI's own behavior) or ``"worktree"`` (diff the merge base against the
+    working tree and index, so an added-but-uncommitted line is examined
+    too, the default when the tree carries a change). Either way the merge
+    base of ``base_ref`` and ``HEAD`` is resolved once via ``_merge_base``,
+    so both scopes share the same anchor and a stale ``base_ref`` cannot
+    widen the diff.
+
+    Only the *scope of what counts as added* changes between the two --
+    line *content* is always read afterward from the current working tree
+    (see ``find_violations``), never from ``HEAD``. That is harmless for
+    ``"committed"`` on a clean tree (the two agree), but forcing
+    ``"committed"`` on a dirty tree -- via an explicit ``NLB_SCOPE=committed``
+    override -- reintroduces the desync this scope machinery exists to fix:
+    a line number computed against ``HEAD`` can point at different content
+    in the now-edited working tree. The override is meant for reproducing
+    exactly what CI would see, which presumes a clean tree; it is not a way
+    to selectively ignore uncommitted changes while other uncommitted edits
+    are present.
+
+    The deleted-contents set feeds the moved-content exemption (gha#684): an
+    added line whose exact text was also deleted somewhere in the same diff is
+    relocated content rather than new writing. Collecting it here costs no
+    extra git call, and keying the exemption on the diff's own deletions --
+    rather than on membership anywhere in the base tree -- is what stops a
+    genuinely new line that happens to duplicate untouched base content from
+    being silently exempted. It is a multiset, not a set: N deletions of a
+    text exempt at most N additions of it, so one deletion cannot launder
+    unlimited duplicates (gha#700 round 2).
+    """
+    merge_base = _merge_base(base_ref)
+    if merge_base is None:
+        return None
+    if scope == "worktree":
+        # A single ref with no `--cached`/second ref compares that commit
+        # directly to the working tree, folding staged and unstaged changes
+        # into one diff -- exactly the population an uncommitted local run
+        # needs. A brand-new untracked file still will not appear here:
+        # plain `git diff` never shows untracked content (see the module
+        # docstring's disclosed limitation).
+        diff_args = ["diff", "--unified=0", "--no-color", merge_base, "--", *pathspecs]
+    else:
+        diff_args = ["diff", "--unified=0", "--no-color", f"{merge_base}..HEAD", "--", *pathspecs]
+    diff = _run_git(diff_args)
     if diff is None:
         return None
     result: dict = {}
+    deleted: "Counter[str]" = Counter()
     cur_path: Optional[str] = None
     new_lineno = 0
+    # Header lines (`--- a/f`, `+++ b/f`) appear only between a `diff` line
+    # and that file's first `@@` hunk header, so header-vs-body is decided by
+    # position, never by sniffing the line's own prefix: inside a hunk,
+    # `--- x` is a deleted line whose content starts with `--`, and `+++ x`
+    # an added line whose content starts with `++` (gha#700 round 2).
+    in_hunk = False
     for raw in diff.splitlines():
-        if raw.startswith("+++ "):
+        if raw.startswith("diff "):
+            in_hunk = False
+            continue
+        if not in_hunk and raw.startswith("+++ "):
             target = raw[4:]
             cur_path = None if target == "/dev/null" else target[2:]
             if cur_path is not None:
                 result.setdefault(cur_path, set())
             continue
         if raw.startswith("@@"):
+            in_hunk = True
             m = _HUNK_RE.match(raw)
             new_lineno = int(m.group(1)) if m else 0
             continue
-        if raw.startswith("+") and not raw.startswith("+++"):
+        if not in_hunk:
+            continue
+        if raw.startswith("-"):
+            deleted[raw[1:]] += 1
+            continue
+        if raw.startswith("+"):
             if cur_path is not None:
                 result[cur_path].add(new_lineno)
             new_lineno += 1
-    return result
+    return result, deleted
 
 
 class Violation(NamedTuple):
@@ -509,6 +686,7 @@ def find_violations(
     ignores: List["re.Pattern[str]"],
     clause_breaks: bool = _DEFAULT_CLAUSE_BREAKS,
     clause_min_length: int = _DEFAULT_CLAUSE_MIN_LENGTH,
+    scope_mode: str = "auto",
 ) -> Tuple[List[Violation], bool]:
     """Return (violations, skipped). violations is empty and skipped is True
     whenever there's no diff to check against -- either base_ref was never
@@ -517,14 +695,38 @@ def find_violations(
     check-phi, there is no whole-tree fallback: this check's entire purpose
     is to avoid ever reflagging a corpus's pre-existing long lines, so a
     whole-tree scan here would defeat the point, not just be less precise.
+
+    ``scope_mode`` is ``"auto"`` (widen to the working tree when it carries
+    changes to a matched file, else committed-only), ``"worktree"``
+    (always widen), or ``"committed"`` (never widen, even when the tree is
+    dirty -- CI's own behavior, forced).
     """
     if not base_ref:
         return [], True
-    scope = _added_line_numbers(base_ref, globs)
-    if scope is None:
+    if scope_mode == "worktree":
+        scope_kind = "worktree"
+    elif scope_mode == "committed":
+        scope_kind = "committed"
+    else:
+        scope_kind = "worktree" if _has_uncommitted_changes(globs, ignores) else "committed"
+    scoped = _added_line_numbers(base_ref, globs, scope_kind)
+    if scoped is None:
         return [], True
+    scope, deleted_contents = scoped
+    print(f"Checking for missing semantic line breaks (lines added since {base_ref[:12]})\n")
+
+    untracked = _untracked_matches(globs, ignores)
+    if untracked:
+        print(
+            f"::warning::{len(untracked)} untracked file(s) match the glob "
+            "but are not examined (git diff cannot see untracked content; "
+            "run `git add` to include them): " + ", ".join(untracked)
+        )
 
     violations: List[Violation] = []
+    exempted_moves = 0
+    examined_lines = 0
+    examined_files = 0
     for rel_path in sorted(scope):
         if _ignored(rel_path, ignores):
             continue
@@ -538,15 +740,49 @@ def find_violations(
         lines = text.split("\n")
         prose = prose_line_numbers(text)
         target_lines = scope[rel_path] & prose
+        # Only count a file toward the reported search space when it
+        # actually contributed an examined line -- a file whose added
+        # lines are all non-prose (a heading, a table row) would otherwise
+        # print "0 added line(s) across 1 file(s)", which reads like the
+        # zero-examined bug this whole feature exists to make visible.
+        if target_lines:
+            examined_files += 1
+            examined_lines += len(target_lines)
 
         for line_no in sorted(target_lines):
             if line_no < 1 or line_no > len(lines):
                 continue
-            content = line_content(lines[line_no - 1])
+            raw = lines[line_no - 1]
+            content = line_content(raw)
             reason = classify_line(content, clause_breaks, clause_min_length)
             if reason is not None:
                 preview = content if len(content) <= 80 else content[:77] + "..."
+                # Moved-content exemption (gha#684): an added line whose
+                # exact text was also deleted somewhere in this same diff is
+                # relocated rather than new, so it keeps whatever
+                # grandfathering it had. Keyed on the diff's own deletions,
+                # never on mere membership in the base tree, so a new line
+                # that happens to duplicate untouched base content still
+                # flags. The pairing is diff-wide rather than per file-pair,
+                # and that is an accepted tradeoff: a deletion in one file
+                # exempting an identical addition in another is exactly what
+                # a split looks like, and even in the coincidental case the
+                # corpus's count of violating lines does not increase.
+                if deleted_contents[raw] > 0:
+                    deleted_contents[raw] -= 1
+                    exempted_moves += 1
+                    continue
                 violations.append(Violation(rel_path, line_no, preview, reason))
+    scope_label = "committed" if scope_kind == "committed" else "working tree"
+    print(
+        f"Examined {examined_lines} added line(s) across {examined_files} "
+        f"file(s) (scope: {scope_label})."
+    )
+    if exempted_moves:
+        print(
+            f"Note: {exempted_moves} added line(s) also appear among this "
+            "diff's deleted lines (moved, not new) and were not reported."
+        )
     return violations, False
 
 
@@ -594,6 +830,27 @@ def _env_int(name: str, default: int) -> int:
     return value
 
 
+_SCOPE_CHOICES = ("auto", "worktree", "committed")
+
+
+def _env_choice(name: str, default: str, choices: Tuple[str, ...]) -> str:
+    """Read a string env var restricted to ``choices`` (case-insensitive).
+
+    Falls back to ``default`` when unset, empty, or not a recognized choice,
+    warning in the last case the same way ``_env_flag``/``_env_int`` do.
+    """
+    raw = os.environ.get(name, "").strip().lower()
+    if not raw:
+        return default
+    if raw not in choices:
+        print(
+            f"::warning::{name}={raw!r} is not one of {choices}; "
+            f"using default ({default!r})."
+        )
+        return default
+    return raw
+
+
 def main() -> int:
     base_ref = os.environ.get("NLB_BASE_REF", "").strip()
     globs = os.environ.get("NLB_GLOBS", "*.md").split() or ["*.md"]
@@ -601,9 +858,10 @@ def main() -> int:
     fail = _env_flag("NLB_FAIL", default=_DEFAULT_FAIL)
     clause_breaks = _env_flag("NLB_CLAUSE_BREAKS", _DEFAULT_CLAUSE_BREAKS)
     clause_min_length = _env_int("NLB_CLAUSE_MIN_LENGTH", _DEFAULT_CLAUSE_MIN_LENGTH)
+    scope_mode = _env_choice("NLB_SCOPE", "auto", _SCOPE_CHOICES)
 
     violations, skipped = find_violations(
-        base_ref, globs, ignore, clause_breaks, clause_min_length
+        base_ref, globs, ignore, clause_breaks, clause_min_length, scope_mode
     )
 
     if skipped:
@@ -614,8 +872,6 @@ def main() -> int:
             f"reflag pre-existing long lines)."
         )
         return 0
-
-    print(f"Checking for missing semantic line breaks (lines added since {base_ref[:12]})\n")
 
     if not violations:
         print("No lines missing semantic breaks.")

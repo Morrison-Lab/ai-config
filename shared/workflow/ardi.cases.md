@@ -298,9 +298,9 @@ would have confirmed the wrong version just as readily.)
 
 (Morrison-Lab/ai-config#1067, 2026-08-02: a UMS pass took `memories/git.md`
 from 1172 to 1315 lines.
-`scripts/check-memory-file-size.py` exits 0 and its `validate.yml` step is
-labelled advisory, both genuinely so, and the threshold was therefore reported
-as non-blocking on #1007.
+`scripts/check-memory-file-size.py` exits 0 without `--strict`, and its
+`validate.yml` step was then labelled advisory, both genuinely so, and the
+threshold was therefore reported as non-blocking on #1007.
 `scripts/test_check_memory_file_size.py` asserts this repo's own `memories/`
 are under the default and hard-fails, turning `validate` red on the next push.
 The claim had to be retracted on #1007 as well as fixed in the PR.)
@@ -897,3 +897,69 @@ The duration was computed from the job's start and end timestamps after the merg
 Nothing about the green check prompted it, and without it a false causal claim would have stood on a merged PR and in an issue thread.
 The merge itself was correct to perform under [`sync-with-main`](sync-with-main.md) and stays;
 only the causal claim was wrong.)
+
+## A mutation test whose reverted run never reached its assertion
+
+(`UCD-SERG/serocalculator#668`, 2026-09-01: a regression test guarded a fix
+to a save/restore pair for the RNG kind.
+Mutation-testing the guard --- revert the fix, re-run, expect the test to
+fail --- was run against `pkgload::load_all()` rather than an installed
+build.
+The test spun up a `parallel::parLapplyLB()` cluster, whose PSOCK workers
+`require()` the package by name and cannot see a `load_all()` session's
+environment, so both the fixed and the reverted run **errored** before
+reaching the guard's assertion at all.
+`testthat`'s summary read `FAILED: 0` in both runs, which a glance reads as
+"the guard doesn't discriminate" when the true story is "neither run tested
+anything".
+Installing the package for real (`R CMD INSTALL .`) before re-running the
+mutation surfaced the difference the test was written to catch: `FAILED: 0`
+with the fix in place, a real assertion failure with it reverted.
+
+The tell, worth generalizing past this one platform quirk: any regression
+test reaching a code path that behaves differently under a development
+loader than under an installed package --- a parallel cluster, `system.file()`
+resolution, anything that spawns a second process --- can silently fail to
+execute under the loader without failing loudly, and a mutation count taken
+under that loader proves nothing either way.
+`memories/r-quarto.md`'s "`pkgload::load_all()` cannot serve a PSOCK cluster"
+section carries the mechanism.)
+
+## Prose staled by its own fixes, round after round
+
+(`Morrison-Lab/gha#811`, 2026-09-02.
+Six adversarial pre-push review rounds ran on it.
+The final commit `0262c1c6` names the recurring class as "the class this branch
+has spent five rounds on -- a comment describing code inaccurately".
+That is wider than this record's subject, which is the part of it staled by the
+branch's own fixes, and the commit messages do not separate the two --- so the
+record argues from one worked instance rather than from a count.
+
+`gha`'s `CLAUDE.md` is not merely a contributor guide.
+It runs to several thousand lines recording, per capability, which composite
+does what, which exit code means what, which default each of two YAML files
+declares, and which mutation kills which test case.
+Almost any behavioural fix therefore falsifies a sentence in it, and a later
+reader who finds code and prose disagreeing has good reason to take the prose.
+
+The sharpest instance: a group-acceptance rule was changed, to close an earlier
+finding, from "an integer is accepted, a bool is refused" to "every non-string
+is refused".
+`CLAUDE.md` went on saying an integer "round-trips and is accepted", and went
+on prescribing that bool be tested before int --- an ordering the new rule makes
+meaningless.
+Both sentences had been accurate when written, and the change that falsified
+them was in a different file --- `audit_example_concurrency.py` --- so nothing
+in the *code* diff put either sentence in front of the author.
+`CLAUDE.md` was not untouched, though, which is the sharper version: `385d4f43`
+edited it in the same commit, and that edit's nearest hunk runs to line 2884
+while the
+first of the two stale sentences sits at 2887 --- three lines below the hunk's
+last context line, six below its last changed line.
+So the file was open and the region was on screen, and the round still pushed.
+Proximity is not the remedy; a grep for the replaced value is.
+
+What makes it recur rather than merely happen is that each round's fix creates
+the next round's stale sentence, which is what
+[`ardi`](ardi.md)'s grep bullet now says explicitly: the grep is owed after
+every round's fix, not once when the PR's headline defect is closed.)

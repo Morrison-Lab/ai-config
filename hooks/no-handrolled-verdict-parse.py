@@ -399,7 +399,6 @@ def checked_prs(path):
                     output_text = str(b.get("content") or b.get("output") or "")
                     is_failure = (
                         "is not installed or not on PATH" in output_text or
-                        "This script requires the GitHub CLI" in output_text or
                         "usage: check-pr-fully-clean.py" in output_text or
                         "Cannot resolve the repository" in output_text or
                         "is not in OWNER/REPO form" in output_text or
@@ -417,25 +416,60 @@ def checked_prs(path):
     return ran, valid_prs
 
 
-def main() -> int:
+def _read_payload() -> tuple[dict, bool]:
+    """Parse payload from sys.argv (--dry-run / --simulate) or sys.stdin."""
+    args = sys.argv[1:]
+    is_dry_run = "--dry-run" in args or "--simulate" in args
+    if is_dry_run:
+        positional = [a for a in args if not a.startswith("-")]
+        if positional:
+            raw_cmd = positional[0].strip()
+            if raw_cmd.startswith("{") and raw_cmd.endswith("}"):
+                try:
+                    return json.loads(raw_cmd), True
+                except Exception:
+                    pass
+            return {"tool_name": "Bash", "tool_input": {"command": raw_cmd}}, True
+
     try:
         payload = json.load(sys.stdin)
+        return (payload if isinstance(payload, dict) else {}), is_dry_run
+    except Exception as exc:
+        print(f"no-handrolled-verdict-parse: unreadable hook input ({exc})",
+
+              file=sys.stderr)
+        return {}, is_dry_run
+
+
+def main() -> int:
+    payload, is_dry_run = _read_payload()
+    if not payload:
+        return 0
+    try:
         if (payload.get("tool_name") or "") not in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
             return 0
         inp = payload.get("tool_input") or {}
         cmd = inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or inp.get("script") or ""
         if not cmd:
+            if is_dry_run:
+                print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
             return 0
 
         # 5: explicit override.
         if OVERRIDE.search(cmd):
+            if is_dry_run:
+                print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
             return 0
         # 1 + 2: a verdict phrase in a matching position.
         phrase = phrase_in_matcher_position(cmd)
         if not phrase:
+            if is_dry_run:
+                print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
             return 0
         # 3: the data is review-derived.
         if not is_review_derived(cmd):
+            if is_dry_run:
+                print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
             return 0
         # 4: the instrument has not already answered for this PR.
         ran, checked = checked_prs(payload.get("transcript_path") or "")

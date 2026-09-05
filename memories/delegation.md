@@ -7,17 +7,13 @@ this section is self-contained.
 ## Delegate heavy work to another CLI first --- codex, agy, opencode, and openrouter
 
 > [!IMPORTANT]
-> **`agy` (Google Antigravity)'s API-dispatch route is permanently out of
-> service** (user directive, 2026-08-20; scope corrected 2026-08-23),
-> confirmed via a dispatched run's `429: prepayment credits depleted`.
-> Route no API-dispatched subagent work to it.
-> **The API and the CLI are two separate paths: the API is out of commission,
-> but the agy CLI is available** (user clarification, 2026-08-25),
-> so headless `agy --print` invocations
-> --- including adversarial review dispatch ---
-> remain usable.
-> The interactive subscription/extension is unaffected and not at quota ---
-> don't extrapolate this into "uninstall the extension".
+> **`agy` (Google Antigravity) is confirmed usable as a dispatchable subagent, effective 2026-09-02** (user directives that day: "start using agy as a subagent where feasible", "use agy cli for it").
+> The 2026-08-20 API-dispatch outage (`429: prepayment credits depleted`, user directive that day, scope corrected 2026-08-23) stays on record as history --- it explains why an earlier version of this banner said "out of service" --- but it never described the CLI, which the 2026-08-25 clarification already carved out as a separate, unaffected path.
+> **A fresh Windows install on 2026-09-02, from the official `google-antigravity/antigravity-cli` GitHub release, confirms the CLI works end to end**: `agy --version` reports 1.1.24, `agy models` lists a real roster, and a headless smoke test returned the expected output in about 5 seconds.
+> This file's "agy on Windows" section carries the install steps;
+> `memories/preferences.md` points here for the same writeup rather than duplicating it.
+> Route dispatchable subagent work to the `agy` CLI accordingly, per this section's cost order --- after `opencode`'s free tier on cost, alongside `codex` on capability.
+> The interactive subscription/extension was never affected and was never at quota.
 > Tracked as ai-config#1776.
 
 For heavy, parallelizable **read / draft / verify** work ---
@@ -233,6 +229,110 @@ reaffirmed 2026-07-06 ("always use codex first
 and widened 2026-08-15 ("in addition to codex, we have agy quota to use;
 try using both of those as subagents before exhausting claude quota").
 
+## agy on Windows
+
+Measured 2026-09-02 on the user's Windows 11 machine.
+This is a fresh, from-scratch install, distinct from the 1.1.13 install this file's mechanics sections above already document --- re-run these steps rather than assuming an existing install matches.
+
+**Install from the official GitHub release, not from an IDE bundle.**
+
+```bash
+gh release download 1.1.24 -R google-antigravity/antigravity-cli \
+  -p agy_cli_windows_x64.zip
+# unzip, then copy the extracted antigravity.exe to ~/.local/bin/agy.exe
+```
+
+It authenticated with no extra step, reusing the Antigravity IDE's own login.
+`agy --version` reports `1.1.24`.
+
+**`agy models` lists a real roster**, unquoted here since a model roster is exactly the kind of fact a vendor changes without notice --- run the command rather than trusting a pasted list.
+As of 2026-09-02 it included `gemini-3.8-flash-{high,medium,low}`, `gemini-3.7-flash-{high,medium,low}`, `gemini-3.6-flash-{high,medium,low}`, `gemini-3.1-pro-{high,low}`, `claude-sonnet-4-6`, `claude-opus-4-6-thinking`, and `gpt-oss-120b-medium`.
+
+**A headless smoke test confirms the print path works end to end:**
+
+```bash
+agy --print "Reply with only the word BANANA." \
+  --model gemini-3.8-flash-medium --output-format text </dev/null
+```
+
+Returned `BANANA` in about 5 seconds.
+The existing "`agy --print` CONSUMES THE NEXT TOKEN" rule above still applies --- keep the prompt immediately after `--print`.
+
+**Headless mode cannot satisfy a tool's permission prompt, and it fails with a named cause rather than hanging.**
+A tool needing a permission it hasn't been granted (`read_file` is the one observed) makes the run print `jetski: no output produced --- a tool required the "read_file" permission that headless mode cannot prompt for` and produce nothing.
+The available escapes are `--mode plan` (read-only), `--mode accept-edits`, `--dangerously-skip-permissions`, or an allow-rule under `permissions.allow` in `settings.json` --- but this file's own auto-mode classifier section already found `--dangerously-skip-permissions` and `--mode accept-edits` denied by Claude Code's permission classifier, so those two may not be reachable from an orchestrated dispatch even where they solve the headless problem.
+**Which of these actually works for a read-only review dispatch is unmeasured as of 2026-09-02** --- probe it and update this section with a result before relying on any one of them, rather than assuming `--mode plan` is the safe default merely because it sounds read-only.
+
+**A `language_server.exe agentapi` fallback exists for when no CLI is installed but the Antigravity IDE is already open.**
+This is not a CLI dispatch at all --- it talks to the IDE's own running language server:
+
+```bash
+# --model accepts one of: flash, flash_lite, pro
+language_server.exe agentapi new-conversation --model=flash "<prompt>"
+```
+
+with environment variables read from the running IDE process: `ANTIGRAVITY_LS_ADDRESS=127.0.0.1:<higher of the two LISTENING ports of language_server.exe>`, `ANTIGRAVITY_CSRF_TOKEN=<the --csrf_token value from that process's own command line>`, and `ANTIGRAVITY_PROJECT_ID=<the workspace path>`.
+The reply lands as a `PLANNER_RESPONSE` step in `~/.gemini/antigravity/brain/<conversationId>/.system_generated/logs/transcript.jsonl`, not on stdout, so a caller has to poll or tail that file rather than capturing a return value.
+This route did real tool work and two edit-only doc fixes on 2026-09-02, so it is a working fallback, not merely a documented one --- but it depends on the IDE process already running, which the direct CLI install above does not.
+
+- **Do:** install from the official `antigravity-cli` GitHub release when setting up `agy` fresh on Windows, and confirm with `agy --version` and `agy models` before trusting the install.
+- **Do:** read `agy models`' own output for the current roster rather than reusing a pasted list, since a vendor roster is exactly the kind of claim this corpus times.
+- **Do:** reach for the `agentapi` fallback only when the IDE is already open --- it reads the IDE's own ports and token, so it cannot start a fresh Antigravity session on its own.
+- **Don't:** treat any of `--mode plan`, `--mode accept-edits`, `--dangerously-skip-permissions`, or a `permissions.allow` rule as the settled fix for a headless permission denial until one has actually been tried and reported --- this section names the options, not a verdict.
+- **Don't:** expect the `agentapi` transcript file to update instantly;
+  it is a log a background process appends to, not a synchronous response.
+
+## agy as a cheap adversarial-review lane on macOS
+
+Measured 2026-09-02 with `agy` 1.1.22 at `~/.local/bin/agy`,
+across nine review rounds on two PRs,
+[ai-config#3061](https://github.com/Morrison-Lab/ai-config/pull/3061) and [gha#826](https://github.com/Morrison-Lab/gha/pull/826).
+Each round was one command,
+`agy --print "$(cat prompt.txt)" --output-format text </dev/null`,
+with the unified diff pasted into the prompt file.
+Headless `agy` cannot read repo files on its own,
+so the diff has to be supplied inline rather than pointed at.
+Each round returned in roughly one to three minutes,
+at no Claude quota cost.
+
+**`agy` caught real defects a Sonnet `adversarial-reviewer` round had missed:**
+an untracked-file false clean in a git-scope change,
+a count that did not add up,
+and an inaccurate quoted cross-reference.
+[`when-to-orchestrate`](../shared/workflow/when-to-orchestrate.md) argues
+that a judgment-heavy verify stage belongs with a model in a different family;
+these misses are a second data point for that argument.
+The misses were exactly the kind a same-family reviewer inherits along with the finder's blind spots.
+
+**`agy` also produced many stylistic objections stricter than this corpus's own norm,**
+which the dispatcher has to rebut rather than apply.
+Any `, and` clause written on one physical line read as a semantic-line-break violation,
+though the corpus's own gate does not flag a comma-joined line with no mid-line semicolon,
+per [`semantic-line-breaks`](../shared/writing/semantic-line-breaks.md).
+Any sentential `which` read as an antecedent defect,
+whether or not the antecedent was ambiguous.
+
+**Headless `agy` cannot write a file on macOS without a permission allow-rule.**
+Two probes, both 2026-09-02, both with `--mode accept-edits --output-format text </dev/null`, both exit 0, both writing nothing:
+a plain "create probe.txt" brief printed
+`jetski: no output produced --- a tool required the "command" permission that headless mode cannot prompt for, so it was auto-denied. Add an allow-rule under permissions.allow in settings.json (e.g. command(<target>)).`,
+and a brief forbidding shell use and asking for the native file tool printed
+`jetski: no output produced --- a tool required the "write_file" permission that headless mode cannot prompt for, so it was auto-denied. Add an allow-rule under permissions.allow in settings.json (e.g. write_file(<target>)).`.
+The settings file is `~/.gemini/antigravity-cli/settings.json`,
+which on this machine held only narrow `command(...)` rules from interactive use.
+The "agy on Windows" section above left open which escape clears a headless permission denial for a read-only review dispatch.
+These probes settle a different question, a file write rather than a review:
+`--mode accept-edits` alone reaches neither a shell-routed nor a native file write on macOS.
+
+- **Do:** dispatch `agy --print` for review-only passes on a pasted diff, on macOS as on Windows.
+- **Do:** state the corpus's actual norms in the brief
+  (the clause-join convention, when `which` is fine),
+  and check each `agy` style finding against the written convention before applying that finding.
+- **Do:** keep implementation work on a subagent that can write
+  until an `agy` allow-rule for `write_file` is measured to work.
+- **Don't:** apply an `agy` style finding as though it were a corpus rule without that check.
+- **Don't:** hand headless `agy` a task that requires reading, running, or writing anything in the repo.
+
 ## A measured lane comparison: codex, opencode, agy, and Sonnet reviewers, one real task each
 
 Measured 2026-08-27/28 PT across a 13-merge GIA sweep on Morrison-Lab/ai-config, comparing four lanes on real work rather than a benchmark.
@@ -335,6 +435,63 @@ I don't care if they run on this computer or in the cloud."
   a failed cheap attempt plus a retry costs more than starting at the
   right tier once.
 
+## Never dispatch a subagent on Fable without explicit, specific permission
+
+The rule, its guard (`hooks/no-fable-subagent.py`), and the
+`FABLE_SUBAGENT_OK=1` grant mechanism live in `CLAUDE.md`'s section of the
+same rule ([#2927](https://github.com/Morrison-Lab/ai-config/issues/2927));
+read them there rather than here.
+This entry adds the one inferred step the rule does not spell out,
+and keeps the case records behind it.
+
+- **Do (inferred):** before dispatching an agent from a definition file under
+  `.claude/agents/`, read its frontmatter for `model:`;
+  if the line is absent, pass one on the call.
+  `adversarial-reviewer` is one such definition, and `CLAUDE.md`'s pre-push
+  rule dispatches it by name, so this is the common path onto Fable.
+- **Don't (inferred):** read the conductor's `/model` setting as saying
+  anything about what a worker may run on;
+  a session switched to Fable mid-way turns every model-less dispatch after
+  the switch into a Fable launch with nothing in the call recording it.
+
+Three sessions produced case records on 2026-09-01, and they are three
+events, not three tellings of one.
+
+**The directive.**
+The session that received it is the one `CLAUDE.md` and the hook's docstring
+measure:
+10 `Agent` launches, 8 of them inheriting `claude-fable-5-1`
+(six adversarial reviews, two sidecars),
+until the account hit its usage limit.
+
+**A near miss** (session `01CEJjpA4tREQecY1yJzae2U`).
+Four dispatches ran.
+Three passed `model: "sonnet"`.
+One --- `adversarial-reviewer`, whose definition carries no `model:` ---
+passed nothing and inherited Opus 5, because the session was on Opus 5 at
+12:47 PDT.
+At 13:12 PDT the user switched the session to Fable with `/model`.
+The same dispatch issued after that switch would have run on Fable with an
+identical call, and no artifact would have recorded the difference.
+Asked "have you been spawning subagents using fable?", the session checked
+every dispatch's parameters and the reviewer definition's frontmatter and
+answered no;
+the answer was one timestamp away from yes.
+
+**A breach** (session `01VJ5YLpnoipBafisrTZkCCt`, the `gia /mwc /daytb` sweep
+driving [#2896](https://github.com/Morrison-Lab/ai-config/pull/2896) and
+issue [#1935](https://github.com/Morrison-Lab/ai-config/issues/1935)).
+It dispatched `adversarial-reviewer` for every pre-push self-review round
+--- eleven rounds on
+[#2896](https://github.com/Morrison-Lab/ai-config/pull/2896) and two on
+[#1935](https://github.com/Morrison-Lab/ai-config/issues/1935) ---
+with no `model` parameter on any call,
+on a session that was on `claude-fable-5-1` throughout,
+so all thirteen inherited Fable.
+Nothing in any call recorded it;
+what made the inheritance visible was the last dispatch dying with
+`rate_limit ... model sent to the API: claude-fable-5-1`.
+
 ## opencode free tier: a full authoring task, validated mechanically
 
 Measured 2026-08-28 on opencode CLI 1.18.15 (macOS),
@@ -361,13 +518,50 @@ under dot-prefixed directories,
 recovering only because the brief carried literal paths --- see that
 skill's step 2 ("Prepare the prompt").
 
-- **Do:** treat free-tier delegation of authoring work as feasible
-  when the acceptance test is mechanical ---
-  it is the deterministic validation step, not the model's own
-  confidence, that makes trusting the result safe.
+The routing rule this measurement licenses lives in
+[`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md)'s
+"The one measured exception: authoring work a mechanical test can
+accept" section, which summarizes the measurement in one sentence and
+cites this section for the rest.
+A later measurement belongs in this file,
+and a change to the routing rule belongs in that section.
+
 - **Do:** read this as one data point for one model id on one task,
   not as a general claim about hosted-free-tier authoring capability.
-- **Don't:** delegate authoring work to a free-tier model with no
-  deterministic way to check the result ---
-  this success was confirmed by four independent test suites,
-  not by inspecting the diff.
+- **Do:** credit the deterministic validation step --- four
+  independent test suites passing --- when recording why a delegated
+  result was trusted.
+- **Don't:** generalize this measurement to another free-tier model id
+  or another task shape --- neither was measured here.
+- **Don't:** credit the model's own confidence for the result;
+  what made trusting it safe was the acceptance test passing.
+
+## Conversation-inheriting subagent dispatch vs. clean-context dispatch for UMS and CAI
+
+When delegating UMS (`update-memories-and-skills`) or CAI (`config-ai`) as subagents,
+harnesses support either **conversation-inheriting dispatch** (inheriting the full conversation transcript and tool history)
+or **clean-context dispatch** (starting a fresh conversation with a standalone prompt brief).
+The canonical trade-off analysis, context-budget rationale, and Do/Don't directives live in [`use-subagents`](../shared/workflow/use-subagents.md).
+
+### Concrete invocation mechanics across harnesses
+
+- **Claude Code programmatic subagents:**
+  Pass `subagent_type: "fork"` to the `Agent` tool to clone the current session's conversation history into the worker.
+  Do not confuse this with skill frontmatter `context: fork` (which runs a skill in isolated context *without* conversation history, as in `skill-audit` and `find-overlap`).
+- **Claude Code interactive sessions:**
+  Use `/subtask` to fork the active conversation interactively into a subagent with full history.
+- **Antigravity:**
+  Pass `TypeName: "self"` to `invoke_subagent` to inherit the parent agent's tools, system prompt, and model configuration (with `Workspace: "inherit"` to share the underlying working directory).
+  Subagents start with a clean conversation context;
+  supply conversation history by passing the path to `transcript.jsonl` under `<appDataDir>/brain/<conversation-id>/.system_generated/logs/` in the prompt.
+- **Gemini CLI, OpenAI Codex, and headless CLIs without runtime forking:**
+  Subagents start with a clean context window by default (e.g. `@subagent_name` in Gemini CLI);
+  provide the path to the on-disk conversation log or a focused milestone summary in the prompt brief.
+
+- **Do:** use conversation-inheriting dispatch (`subagent_type: "fork"` in Claude Code) or pass the transcript log path (`transcript.jsonl`) for reflective UMS sweeps and emergent CAI workflows per [`use-subagents`](../shared/workflow/use-subagents.md).
+- **Do:** clearly distinguish the `Agent` tool's conversation-inheriting `subagent_type: "fork"` from skill frontmatter `context: fork` (which isolates and omits conversation history).
+- **Don't:** duplicate the full trade-off rationale across multiple files ---
+  keep the normative guidance in [`use-subagents`](../shared/workflow/use-subagents.md).
+
+
+

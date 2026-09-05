@@ -245,8 +245,29 @@ The heading moves across PRs:
 PR #660 emitted `Comments suppressed due to low confidence (3)`,
 while PRs #1029 and #1031 emitted `Suppressed comments (4)`.
 A literal match for either phrase can return a false zero.
-Matching case-insensitively on `suppressed` strictly inside `<summary>` headings prevents false positives against overview prose
-(such as review 4837572117 whose summary table mentioned "suppressed Copilot findings" in uncollapsed text).
+Matching case-insensitively on `suppressed` in a `<summary>` element or in an ATX heading inside a collapsed `<details>` region catches ai-config#3084 review `5098574802`,
+whose block is a `### Suppressed comments (1)` heading nested under `<summary>Review details</summary>` that a `<summary>`-only match returns zero against (measured 2026-09-03).
+Prefer the heading anchor over the region, and keep the region as a fallback.
+The corpus has two measured false-positive controls, and each belongs to a PR the citation has to name --- a review id does not carry its PR number, and an earlier version of this record cited `4837572117` without one.
+They do not partition one per wider matcher form, as the superseded wording had it: an occurrence inside a `<details>` region is by definition an occurrence in the body, so region-wide's hits are a subset of body-wide's, and body-wide carries both controls while region-wide carries one.
+The body-wide-only control is ai-config#1038 review `4837572117`, whose "suppressed Copilot findings" sits in the uncollapsed overview sentence "Aligns ARDI-family guidance on deadlocks, sweep scheduling, and suppressed Copilot findings" --- not in its summary table, whose four rows contain no occurrence of the word (re-read 2026-09-04 from `get_reviews`).
+Both the heading anchor and the region-wide form exclude it.
+The other control, which both wider forms flag, is ai-config#1036 review `4837539268`, whose only occurrences of the word sit inside a collapsed `<details>` region headed `<summary>Show a summary per file</summary>`, in table rows reading "Detects suppressed Copilot findings." and "Updates suppressed-comment detection.", while the body carries no suppression block at all (measured 2026-09-04 from `get_reviews`).
+Only the heading anchor excludes it.
+`5098574802` also wraps its own `Pull request overview` and `File summaries` prose in collapsed `<details>` regions (measured 2026-09-03), so a collapsed region is no longer a proxy for "not ordinary overview prose".
+Enumerating Copilot review bodies from the `reviews` endpoint on 2026-09-04 --- 137 bodies across 39 PRs, from ai-config PRs 1000 through 1100 and 3060 through 3130 plus ai-config#660, ai-config#2913 and ai-config#2976 --- body-wide hit 80, region-wide 79 and the heading anchor 78, a `<summary>`-only match returned zero against 50 of those 78, and the only body the region-wide form flagged and the heading anchor did not is the `4837539268` control.
+Region-scoping is therefore the weaker anchor on measurement, not only in principle.
+The superseded claim that no body in the measured set turns it into a false positive was an artifact of deriving that set from a repo-wide prose grep, which enumerates the PRs this corpus happens to mention rather than the population of Copilot review bodies.
+
+[ai-config#3170](https://github.com/Morrison-Lab/ai-config/issues/3170) asks `scripts/check-pr-fully-clean.py` to implement this check, quoting [`fully-clean.md`](fully-clean.md)'s pre-change wording,
+so its Ask prescribes matching strictly inside `<summary>` --- the form measured to return zero against `5098574802`.
+The correction has to reach the issue as well as this file.
+Whoever implements #3170 opens the issue and reads its Ask, not `fully-clean.cases.md`, and the issue carried no comment recording the counter-example when this was written (2026-09-04, 00:50 PDT).
+
+- **Do:** implement the heading anchor above when closing that issue.
+- **Do:** post the counter-example on that issue --- review `5098574802`'s `### Suppressed comments (1)` nested under `<summary>Review details</summary>`, measured 2026-09-03 --- and link the comment from here, so the two records point at each other.
+- **Don't:** build the `<summary>`-only matcher its Ask names.
+- **Don't:** read this in-repo note as having corrected the Ask --- it does not sit on the surface the implementer reads.
 
 ## A review comment's header SHA can be stale
 
@@ -1143,7 +1164,10 @@ The second wake named the live head, and still arrived inside that window.
 
 What the wake's body says about its own scope is not reproduced here, because it lives only in that session's transcript and no later reader can check it.
 What is checkable is the pair of fields above: the event's `head_sha`, and a check-runs read on the PR's actual head.
-Compare the first, then run the second.)
+Compare the first, then run the second.
+The success-direction framing, the exclusions the event body itself declares, and later occurrences across two further repositories are in
+[`memories/github-mcp-tools.md`](../../memories/github-mcp-tools.md),
+"A `check_suite.completed` event can name a superseded head".)
 
 ## A poller exited on an empty check list
 
@@ -1356,3 +1380,63 @@ That distinguished "the retry hangs" from "the reviewer is broken", and confirme
 The cited SHA matched nothing on hand, which reads exactly like a fabricated citation.
 The round had two commits: the fix (`004266a`) and a `Merge origin/main` on top of it (`2624610`), and the reviewer had named the commit that actually carried the fix --- arguably the more useful citation of the two.
 `git cat-file -t 004266a` resolving, and `git show -s` placing it in the branch's own history, settled it in one command.)
+
+## Auto-merge armed after a sync-only push, having verified the previous head (#2556)
+
+(`Morrison-Lab/ai-config#2556`, 2026-08-28 / Issue #2558: PR was verified fully clean at `2c1ae45d` --- checker exit 0, verdict `Ready for merge` at that exact SHA, zero unresolved threads.
+A direct merge was refused because `main` had moved (`the head branch is not up to date with the base branch`).
+The author merged `origin/main` in and pushed `54874be0`, then armed `gh pr merge --auto`, reasoning about it as *scheduling a merge already verified* rather than authorizing an unreviewed head.
+The sync was content-free (no author changes), so it did not feel like a new head needing a new verdict.
+However, pushing created a new HEAD commit ref that silently invalidated the prior clean verdict.
+Auto-merge fires server-side as soon as CI passes, with no check of whether a review verdict has posted for the new HEAD.
+A clean verdict for `54874be0` posted at 22:18:44Z and auto-merge fired at 22:20:29Z.
+Had the auto-merge beaten the review, it would have merged a head no reviewer had seen.)
+
+## The review JSON's `commit_sha` named the synthetic merge commit
+
+(`Morrison-Lab/ai-config#2907` and `UCD-SERG/serodynamics#298`, 2026-09-01,
+one session, two triggers.
+On #2907, auto-reviewed on push, the review's JSON block said
+`commit_sha: da51b7b1...` while its `Reviewed commit:` trailer said
+`ce350638...`, and `ce350638` was the branch tip.
+The JSON's SHA was resolved rather than assumed:
+
+```bash
+git fetch origin da51b7b141726693d4b2c5919108fc35867d9f32
+git log -1 --format='%P%n%s' da51b7b141726693d4b2c5919108fc35867d9f32
+#=> 10d438f43729722411448ee1cb09b4423c8f3cbb ce350638245ff07dbb1cd350010fa52ec4a89d55
+#=> Merge ce350638245ff07dbb1cd350010fa52ec4a89d55 into 10d438f43729722411448ee1cb09b4423c8f3cbb
+```
+
+Two parents, the second being the tip: the synthetic merge commit at
+`refs/pull/2907/merge`, which `actions/checkout` produces by default on a
+`pull_request` event.
+So the verdict genuinely covered `ce350638`, and a script comparing the JSON
+field against `head.sha` would have called it stale.
+
+On #298, dispatched by a `/review` comment through `workflow_dispatch`,
+which checks out the PR head explicitly, the JSON and the trailer agreed on
+`6b101d8a`.
+The difference tracks the trigger, not the repository.
+
+The PR recording this, `Morrison-Lab/ai-config#2911`, reproduced the shape
+on itself and added one datum: its review's JSON gave only a seven-character
+`a1081f5`, which `git fetch origin a1081f5` could not resolve, while the
+trailer's `4059bf08` was the tip.
+Whether `a1081f5` was the merge ref is therefore unconfirmed, and is recorded
+as such; the trailer settled it either way.)
+
+## A clean round that names a prior finding reads as not clean
+
+(Morrison-Lab/ai-config#2906 and wai#174, 2026-09-01.
+A round with `"verdict": "CLEAN"` and an empty findings array still failed
+`check-pr-fully-clean.py`, because its prose said "the prior blocking
+finding" in one case and carried a `### Findings (non-blocking)` heading in
+the other.
+That is the classifier working as designed: the prose scan runs before
+`payload_is_clean`, and prose wins the contradiction (#2736).
+The driver-side remedy is not to argue with the instrument or to hand-read
+the round as clean.
+Push the next code change, or the round's own follow-up, so a fresh round is
+worded cleanly, and let the instrument read that one.
+Only a round with no such phrase and no such heading exits 0.)

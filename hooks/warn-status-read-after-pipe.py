@@ -839,12 +839,34 @@ def find_misread(command):
     return None
 
 
-def main():
+def _read_payload() -> tuple[dict, bool]:
+    """Parse payload from sys.argv (--dry-run / --simulate) or sys.stdin."""
+    args = sys.argv[1:]
+    is_dry_run = "--dry-run" in args or "--simulate" in args
+    if is_dry_run:
+        positional = [a for a in args if not a.startswith("-")]
+        if positional:
+            raw_cmd = positional[0].strip()
+            if raw_cmd.startswith("{") and raw_cmd.endswith("}"):
+                try:
+                    return json.loads(raw_cmd), True
+                except Exception:
+                    pass
+            return {"tool_name": "Bash", "tool_input": {"command": raw_cmd}}, True
+
     try:
         payload = json.load(sys.stdin)
-    except Exception as exc:  # fail open, but say so
+        return (payload if isinstance(payload, dict) else {}), is_dry_run
+    except Exception as exc:
         print(f"warn-status-read-after-pipe: unreadable hook input ({exc})",
+
               file=sys.stderr)
+        return {}, is_dry_run
+
+
+def main():
+    payload, is_dry_run = _read_payload()
+    if not payload:
         return 0
 
     if not isinstance(payload, dict):
@@ -853,6 +875,8 @@ def main():
         return 0
 
     if payload.get("tool_name") not in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
+        if is_dry_run:
+            print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
         return 0
 
     tool_input = payload.get("tool_input")
@@ -863,6 +887,8 @@ def main():
                or tool_input.get("CommandLine")
                or "")
     if not isinstance(command, str) or not command.strip():
+        if is_dry_run:
+            print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
         return 0
 
     try:
@@ -873,6 +899,8 @@ def main():
         return 0
 
     if hit is None:
+        if is_dry_run:
+            print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
         return 0
 
     pipeline, read = hit

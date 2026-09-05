@@ -127,7 +127,18 @@ ADVERSARIAL_AGENT_NAME = re.compile(
     r"\A\s*(?:[\w.-]+[:/])?adversarial[-_ ]?reviewer\s*\Z", re.I
 )
 
-AGENT_TOOLS = {"agent", "task", "invoke_subagent"}
+# When no dedicated `adversarial-reviewer` persona is registered in the
+# environment (e.g. built-in subagents or automated sessions), allow
+# fallback subagents whose prompt requests adversarial review.
+FALLBACK_AGENT_NAME = re.compile(
+    r"\A\s*(?:[\w.-]+[:/])?(?:general[-_ ]?purpose|general|reviewer|code[-_ ]?reviewer|research|self)\s*\Z", re.I
+)
+
+REVIEW_PROMPT_RE = re.compile(
+    r"\b(?:adversarial[-_ ]?(?:self[-_ ]?)?review|pre[-_ ]?push[-_ ]?review|self[-_ ]?review)\b", re.I
+)
+
+AGENT_TOOLS = {"agent", "task", "invoke_subagent", "taskoutput", "task_output", "manage_task"}
 
 OVERRIDE_ENV = re.compile(r"\AALLOW_UNREVIEWED_PUSH=1\Z")
 
@@ -138,13 +149,15 @@ OVERRIDE_ENV = re.compile(r"\AALLOW_UNREVIEWED_PUSH=1\Z")
 # a PreToolUse deny is not user-overridable.
 DEGRADED_OVERRIDE = re.compile(r"(?:^|[;&|`(\s])ALLOW_UNREVIEWED_PUSH=1\s")
 
-# Options of `git push` that consume the following token, so a value is never
-# mistaken for a refspec.
-PUSH_OPTS_WITH_VALUE = {"--repo", "--receive-pack", "--exec", "-o", "--push-option",
-                        "--recurse-submodules"}
+# Options after which no single reviewed commit can describe the push.
+# `--branches` is git's own documented alias of `--all` (`git push -h`), so it
+# ships every branch while looking like an ordinary unknown option.
+PUSH_OPTS_INDETERMINATE = {"--all", "--branches", "--mirror", "--tags",
+                           "--follow-tags"}
 
-# Short options that take a value, for the clustered form (`-qo ci.skip`).
-SHORT_OPTS_WITH_VALUE = "o"
+# `--recurse-submodules` in these modes pushes commits in ANOTHER repository,
+# which no fingerprint naming a commit in this one can describe.
+SUBMODULE_PUSH_MODES = {"on-demand", "only"}
 
 # The config forms of PUSH_OPTS_INDETERMINATE. Each entry is (key, the flag it
 # mirrors, a predicate on the configured value). `{remote}` is filled from the
@@ -164,83 +177,6 @@ CONFIG_LIKE_INDETERMINATE_FLAGS = (
 )
 
 
-# Options after which no single reviewed commit can describe the push.
-# `--branches` is git's own documented alias of `--all` (`git push -h`), so it
-# ships every branch while looking like an ordinary unknown option.
-PUSH_OPTS_INDETERMINATE = {"--all", "--branches", "--mirror", "--tags",
-                           "--follow-tags"}
-
-# git's parse-options accepts any UNAMBIGUOUS abbreviation of a long option, so
-# every table below has to be matched through a resolver rather than by string
-# equality. An earlier revision hardened only `--repo` and left the rest exact,
-# which was a fix to one site rather than to the class. Measured on git 2.43.0,
-# with no `remote.<name>.push` configured so only the indeterminate table could
-# refuse them:
-#
-#   git push --all up   -> refused        git push --al up   -> ALLOWED
-#   git push --mirror up-> refused        git push --mir up  -> ALLOWED
-#   git push --tags up  -> refused        git push --ta up   -> ALLOWED
-#
-# and, defeating the value-aware parsing the walk below depends on:
-#
-#   git push -o --repo=other   -> refused
-#   git push --pu --repo=other -> ALLOWED   (`--pu` IS `--push-option`)
-#
-# `--al` ships every ref. So an unresolved abbreviation is not a cosmetic gap.
-# Deliberately partial: it carries the options whose resolution CHANGES a
-# verdict, plus enough neighbours to make ambiguity match git's. `--ipv4` and
-# `--ipv6` are absent, which is safe only because they take no value -- an
-# unknown option is passed through, and a valueless one parses identically
-# either way. A future value-taking option added in a namespace this set does
-# not cover would diverge silently, so add it here when one appears.
-PUSH_LONG_OPTS = frozenset({
-    "--all", "--atomic", "--branches", "--delete", "--dry-run", "--exec",
-    "--follow-tags", "--force", "--force-if-includes", "--force-with-lease",
-    "--mirror", "--no-verify", "--porcelain", "--progress", "--prune",
-    "--push-option", "--quiet", "--receive-pack", "--recurse-submodules",
-    "--repo", "--set-upstream", "--signed", "--tags", "--thin", "--verbose",
-    "--verify",
-})
-
-# Ambiguity is the reason this returns a sentinel rather than just resolving.
-# `--re` matches --receive-pack and --recurse-submodules and git REFUSES it, so
-# the guard must not silently pick one; AMBIGUOUS makes the caller bail to
-# indeterminate, which is the fail-closed direction.
-AMBIGUOUS = object()
-
-
-def resolve_long_opt(head: str):
-    """`head` resolved to the option git would read it as.
-
-    Returns the full option name, AMBIGUOUS when several match (git refuses
-    those outright), or `head` unchanged when nothing matches -- an option this
-    table does not know, left to be handled as it was before.
-
-    `--no-<x>` is resolved against `<x>` and returned in its `--no-` form, since
-    git accepts abbreviations there too (`--no-rep` is `--no-repo`).
-    """
-    if head in PUSH_LONG_OPTS:
-        return head
-    # No `--no-verify` special case is needed here: it is in PUSH_LONG_OPTS,
-    # so the exact-match return above has already fired for it.
-    negated = head.startswith("--no-")
-    stem = "--" + head[len("--no-"):] if negated else head
-    if stem in PUSH_LONG_OPTS:
-        return head
-    matches = {o for o in PUSH_LONG_OPTS if o.startswith(stem) and stem != "--"}
-    if len(matches) > 1:
-        return AMBIGUOUS
-    if not matches:
-        return head
-    full = matches.pop()
-    return "--no-" + full[2:] if negated else full
-
-
-# `--recurse-submodules` in these modes pushes commits in ANOTHER repository,
-# which no fingerprint naming a commit in this one can describe.
-SUBMODULE_PUSH_MODES = {"on-demand", "only"}
-
-
 # --- push detection, borrowed rather than re-derived ------------------------
 #
 # `no-unreviewed-pr.py`'s detector is shell-parsed rather than regex-matched, so
@@ -248,9 +184,11 @@ SUBMODULE_PUSH_MODES = {"on-demand", "only"}
 # the two push forms that re-head nothing, and is already tested there. A second
 # hand-rolled detector would be a DRW finding and would diverge silently
 # (ai-config#1920) -- an earlier revision of this file wrote one as a "fallback"
-# and it did diverge, on all three of those points. So there is no fallback: if
-# the sibling cannot be loaded this guard says so and denies, rather than
-# quietly grading pushes with a worse parser.
+# and it did diverge, on all three of those points. So there is no fallback
+# parser: if the sibling cannot be loaded this guard never grades pushes with
+# a worse one. It applies only the narrow degraded-mode heuristic in main()
+# to decide whether to report the broken installation and deny a command
+# whose text looks like a push (ai-config#2981).
 
 def _load_sibling():
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "no-unreviewed-pr.py")
@@ -270,6 +208,19 @@ except Exception as exc:  # covered by orphan_cases() in
                           # copy of this file in a directory without the sibling
     _SIBLING = None
     _SIBLING_ERROR = str(exc)
+
+# The walk over git's push-option grammar, its tables, and the abbreviation
+# resolver live in the sibling and are bound here rather than declared twice
+# (ai-config#1935, #1920): the sibling decides whether a command is a push at
+# all, and that decision reads values and abbreviations exactly as this
+# file's refspec walk must, so one walk keeps the two halves of the decision
+# from disagreeing about how git's CLI works. With no sibling the names stay
+# unbound: every path that consults them sits behind the deny that a missing
+# sibling triggers.
+if _SIBLING is not None:
+    walk_push_options = _SIBLING.walk_push_options
+    resolve_long_opt = _SIBLING.resolve_long_opt
+    AMBIGUOUS_OPTION = _SIBLING.AMBIGUOUS_OPTION
 
 
 def _load_review_payload():
@@ -518,6 +469,78 @@ def _blank_shell_redirections(command: str) -> str:
     return "".join(chars)
 
 
+def _resolve_cd_target(rest: list[str], cur_dir: str | None) -> str | None:
+    """Resolve the directory after a `cd`, `pushd`, or `popd` command relative to `cur_dir`.
+
+    Returns the new effective directory, or None if cleared / indeterminate.
+    """
+    cmd_name = rest[0]
+    if cmd_name == "popd":
+        # `popd -n` suppresses the directory change, leaving cur_dir untouched.
+        if any(tok.startswith("-") and "n" in tok and tok != "-" for tok in rest[1:]):
+            return cur_dir
+        # Without a full dirstack simulation across commands, popd without -n clears the hint.
+        return None
+
+    # For `cd` and `pushd`: parse flags and positional directory target.
+    i = 1
+    target = None
+    suppress_chdir = False
+    while i < len(rest):
+        tok = rest[i]
+        if tok == "--":
+            # End of options; next token (if present) is the target directory.
+            if i + 1 < len(rest):
+                target = rest[i + 1]
+            break
+        if tok == "-":
+            # `cd -` switches to OLDPWD, which is indeterminate without shell state.
+            return None
+        if tok.startswith("+") or (tok.startswith("-") and tok[1:].isdigit()):
+            # `pushd +N` or `pushd -N` rotates the directory stack.
+            return None
+        if tok.startswith("-"):
+            # Flags like -P, -L, -e, -@ for cd, or -n for pushd
+            if cmd_name == "pushd" and "n" in tok:
+                suppress_chdir = True
+            i += 1
+            continue
+        target = tok
+        break
+
+    if cmd_name == "pushd" and suppress_chdir:
+        # `pushd -n <dir>` rotates/modifies stack without changing current working directory.
+        return cur_dir
+
+    if target is None:
+        # Bare `cd` or `cd -P` with no directory defaults to $HOME (~).
+        # For pushd with no args, it swaps top 2 stack entries (indeterminate -> None).
+        if cmd_name == "pushd":
+            return None
+        target = "~"
+
+    # Expand ~ and ~/path
+    if target == "~" or target.startswith("~/"):
+        target = os.path.expanduser(target)
+    elif target.startswith("$HOME/") or target == "$HOME" or target.startswith("${HOME}/") or target == "${HOME}":
+        home = os.path.expanduser("~")
+        if target in ("$HOME", "${HOME}"):
+            target = home
+        elif target.startswith("$HOME/"):
+            target = os.path.join(home, target[len("$HOME/"):])
+        elif target.startswith("${HOME}/"):
+            target = os.path.join(home, target[len("${HOME}/"):])
+    elif "$" in target or "`" in target:
+        # Unexpanded shell variables/substitutions cannot be resolved statically.
+        return None
+
+    if os.path.isabs(target):
+        return os.path.normpath(target)
+    if cur_dir is not None:
+        return os.path.normpath(os.path.join(cur_dir, target))
+    return os.path.normpath(target)
+
+
 def _hints_by_position(command: str) -> list[str | None]:
     """One directory hint per push, in order, or [] when structure is unclear.
 
@@ -544,9 +567,7 @@ def _hints_by_position(command: str) -> list[str | None]:
         # so it is reachable by ordinary use rather than only adversarially.
         _, rest = _strip_env(argv)
         if rest and rest[0] in ("cd", "pushd", "popd"):
-            arg = rest[1] if len(rest) > 1 else None
-            stack[depth] = arg if (arg and not arg.startswith("-")
-                                   and rest[0] != "popd") else None
+            stack[depth] = _resolve_cd_target(rest, stack[depth])
             continue
         if rest and _SIBLING and _SIBLING._argv_push(rest):
             hints.append(stack[depth])
@@ -627,9 +648,10 @@ def _posixize_windows_paths(command: str) -> str:
 def iter_pushes(command: str):
     """Yield (env, argv, directory) for each `git push` simple command.
 
-    `directory` is the push's own `-C`, else the directory a `cd`/`pushd` put it
-    in (subshell scoping respected), else None -- meaning the hook's own cwd.
-    Both were previously read off the FIRST git command in the chain, so
+    `directory` is the push's own absolute `-C`, else the push's relative `-C`
+    resolved within the directory a `cd`/`pushd` put it in (subshell scoping
+    respected), else the `cd`/`pushd` directory, else None -- meaning the hook's
+    own cwd. Both were previously read off the FIRST git command in the chain, so
     `git -C a status && git -C b push` graded the wrong repository.
 
     The sibling stays authoritative on WHETHER a command is a push. The
@@ -709,7 +731,17 @@ def iter_pushes(command: str):
     if len(hints) != len(pushes):
         hints = [None] * len(pushes)
     for (env, rest, directory), hint in zip(pushes, hints):
-        yield env, rest, (directory or hint)
+        effective_dir = directory
+        if effective_dir is REDIRECTED:
+            yield env, rest, REDIRECTED
+            continue
+        if effective_dir is None:
+            effective_dir = hint
+        elif hint is not None and not os.path.isabs(effective_dir):
+            # When -C is relative and an in-command cd/pushd established a working
+            # directory, git applies -C relative to that directory.
+            effective_dir = os.path.normpath(os.path.join(hint, effective_dir))
+        yield env, rest, effective_dir
 
 
 def has_allow_override(env: list[str]) -> bool:
@@ -775,7 +807,9 @@ def _parse_push(argv: list[str]) -> tuple[list[str], str | None] | None:
     which is why every long option is put through `resolve_long_opt` first. An
     earlier revision skipped that and `--pu --repo=X` walked straight back into
     the same hole, `--pu` being `--push-option`. `--no-repo` clears the value,
-    as it does for git, and the last occurrence wins.
+    as it does for git, and the last occurrence wins. The tokens come from the
+    sibling's `walk_push_options`, the one walk both hooks read git's push
+    grammar through (ai-config#1935).
     """
     try:
         idx = argv.index("push")
@@ -783,56 +817,22 @@ def _parse_push(argv: list[str]) -> tuple[list[str], str | None] | None:
         return None
     positionals: list[str] = []
     repo: str | None = None
-    i = idx + 1
-    end_of_options = False
-    while i < len(argv):
-        tok = argv[i]
-        if not end_of_options and tok == "--":
-            # `--` ends the options, so every later token is a positional even
-            # when it starts with a dash. `refs/heads/-dash` is a valid ref
-            # name that `git check-ref-format` accepts and `git push -- origin
-            # -dash` really ships, so reading `-dash` as an unknown option left
-            # the refspec list empty and graded the command as a bare push
-            # against HEAD -- authorizing an unreviewed branch under a verdict
-            # naming the current one.
-            end_of_options = True
-            i += 1
+    for kind, head, value in walk_push_options(argv[idx + 1:]):
+        if kind == "positional":
+            positionals.append(head)
             continue
-        if not end_of_options and tok.startswith("-") and tok != "-":
-            head, _, value = tok.partition("=")
-            if head.startswith("--"):
-                head = resolve_long_opt(head)
-                if head is AMBIGUOUS:
-                    return None
-            if head in PUSH_OPTS_INDETERMINATE:
-                return None
-            if head == "--recurse-submodules" and value in SUBMODULE_PUSH_MODES:
-                return None
-            if head == "--no-repo":
-                repo = None
-                i += 1
-                continue
-            if head == "--repo" and _:
-                repo = value
-                i += 1
-                continue
-            if head in PUSH_OPTS_WITH_VALUE and not _:
-                if head == "--recurse-submodules" and i + 1 < len(argv) \
-                        and argv[i + 1] in SUBMODULE_PUSH_MODES:
-                    return None
-                if head == "--repo" and i + 1 < len(argv):
-                    repo = argv[i + 1]
-                i += 2
-                continue
-            # A clustered short form (`-qo ci.skip`) takes its value from the
-            # next token when the cluster ends in a value-taking letter.
-            if not tok.startswith("--") and tok[-1] in SHORT_OPTS_WITH_VALUE:
-                i += 2
-                continue
-            i += 1
+        if kind == "short":
             continue
-        positionals.append(tok)
-        i += 1
+        if head is AMBIGUOUS_OPTION:
+            return None
+        if head in PUSH_OPTS_INDETERMINATE:
+            return None
+        if head == "--recurse-submodules" and value in SUBMODULE_PUSH_MODES:
+            return None
+        if head == "--no-repo":
+            repo = None
+        elif head == "--repo":
+            repo = value
     return positionals, repo
 
 
@@ -1258,14 +1258,45 @@ def parse_report(text: str) -> tuple[str | None, str | None]:
     return verdict, (sha.group(1).lower() if sha else None)
 
 
+
+
+def _is_reviewer_record(record: dict) -> bool:
+    """True if this transcript record is attributed to the adversarial reviewer."""
+    candidates: list[str] = []
+    for k in ("attributionAgent", "agent_type", "subagent_type", "subagentType",
+              "TypeName", "Role", "agent", "name", "persona"):
+        val = record.get(k)
+        if isinstance(val, str) and val:
+            candidates.append(val)
+        elif isinstance(val, dict):
+            for sub_k in ("name", "TypeName", "Role", "type"):
+                sub_val = val.get(sub_k)
+                if isinstance(sub_val, str) and sub_val:
+                    candidates.append(sub_val)
+    msg = record.get("message")
+    if isinstance(msg, dict):
+        for k in ("attributionAgent", "agent_type", "subagent_type", "subagentType",
+                  "TypeName", "Role", "agent", "name", "persona", "role"):
+            val = msg.get(k)
+            if isinstance(val, str) and val and val.lower() not in (
+                "user", "assistant", "system", "tool", "model", "planner"
+            ):
+                candidates.append(val)
+    return any(ADVERSARIAL_AGENT_NAME.match(c) for c in candidates)
+
+
 def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bool]:
     """(verdict, reviewed_commit, saw_reviewer_call) from the transcript.
 
-    Only the reviewer's own call results are consulted, and an errored result is
-    skipped -- a failed or interrupted reviewer states no verdict, and
-    `fail-fast` forbids letting that look identical to a clean one.
+    Only the reviewer's own call results and attributed subagent reports are
+    consulted, and an errored result on the dispatch itself is skipped -- a failed
+    or interrupted reviewer states no verdict, and `fail-fast` forbids letting that
+    look identical to a clean one. Transient tool call errors during a subagent's
+    exploration (e.g. bash command syntax retry) do not invalidate an otherwise
+    clean final review verdict.
     """
     reviewer_call_ids: set[str] = set()
+    reviewer_task_ids: set[str] = set()
     saw_reviewer_call = False
     verdict: str | None = None
     reviewed_commit: str | None = None
@@ -1282,37 +1313,108 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
             if not isinstance(record, dict):
                 continue
 
+            is_assistant = (
+                record.get("source") == "MODEL"
+                or record.get("type") == "assistant"
+                or (isinstance(record.get("message"), dict) and record["message"].get("role") == "assistant")
+            )
+
+            record_is_reviewer = _is_reviewer_record(record)
+            if record_is_reviewer:
+                saw_reviewer_call = True
+                content_text = _result_text(
+                    record.get("message") if isinstance(record.get("message"), dict) else record
+                )
+                if content_text:
+                    found, sha = parse_report(content_text)
+                    if found:
+                        verdict, reviewed_commit = found, sha
+
             for b in _iter_blocks(record):
                 b_type = b.get("type")
 
                 if b_type == "tool_use":
-                    if (b.get("name") or "").lower() not in AGENT_TOOLS:
-                        continue
+                    tool_name = (b.get("name") or "").lower()
+                    call_id = b.get("id")
                     inp = b.get("input") or {}
-                    sub_types = []
-                    for k in ("subagent_type", "subagentType", "agent_type", "TypeName", "name", "Role"):
-                        if inp.get(k):
-                            sub_types.append(str(inp.get(k)))
-                    if isinstance(inp.get("Subagents"), list):
-                        for sa in inp["Subagents"]:
-                            if isinstance(sa, dict):
-                                for k in ("TypeName", "Role", "name"):
-                                    if sa.get(k):
-                                        sub_types.append(str(sa.get(k)))
-                    if any(ADVERSARIAL_AGENT_NAME.match(st) for st in sub_types):
-                        saw_reviewer_call = True
-                        call_id = b.get("id")
-                        if isinstance(call_id, str) and call_id:
-                            reviewer_call_ids.add(call_id)
+
+                    if tool_name in AGENT_TOOLS:
+                        sub_types = []
+                        for k in ("subagent_type", "subagentType", "agent_type", "TypeName", "name", "Role"):
+                            if inp.get(k):
+                                sub_types.append(str(inp.get(k)))
+                        if isinstance(inp.get("Subagents"), list):
+                            for sa in inp["Subagents"]:
+                                if isinstance(sa, dict):
+                                    for k in ("TypeName", "Role", "name"):
+                                        if sa.get(k):
+                                            sub_types.append(str(sa.get(k)))
+
+                        prompt = str(inp.get("prompt") or inp.get("Prompt") or inp.get("instruction") or inp.get("description") or "")
+
+                        is_adversarial = any(ADVERSARIAL_AGENT_NAME.match(st) for st in sub_types)
+                        is_fallback = bool(
+                            sub_types
+                            and any(FALLBACK_AGENT_NAME.match(st) for st in sub_types)
+                            and REVIEW_PROMPT_RE.search(prompt)
+                        )
+
+                        if is_adversarial or is_fallback:
+                            saw_reviewer_call = True
+                            if isinstance(call_id, str) and call_id:
+                                reviewer_call_ids.add(call_id)
+                        elif tool_name in ("taskoutput", "task_output", "manage_task"):
+                            task_id = str(inp.get("task_id") or inp.get("TaskId") or inp.get("id") or "")
+                            if task_id and task_id in reviewer_task_ids:
+                                if isinstance(call_id, str) and call_id:
+                                    reviewer_call_ids.add(call_id)
+                    elif tool_name == "send_message" and record_is_reviewer:
+                        msg_text = str(inp.get("Message") or inp.get("message") or "")
+                        if msg_text:
+                            found, sha = parse_report(msg_text)
+                            if found:
+                                verdict, reviewed_commit = found, sha
 
                 elif b_type == "tool_result":
-                    if b.get("tool_use_id") not in reviewer_call_ids:
-                        continue
-                    if b.get("is_error"):
-                        continue
-                    found, sha = parse_report(_result_text(b))
-                    if found:
-                        verdict, reviewed_commit = found, sha
+                    call_id = b.get("tool_use_id")
+                    if call_id in reviewer_call_ids:
+                        # Check if this result launched a background task with an ID
+                        res_text = _result_text(b)
+                        try:
+                            res_data = json.loads(res_text)
+                            if isinstance(res_data, dict):
+                                tid = res_data.get("task_id") or res_data.get("conversationId") or res_data.get("id")
+                                if tid:
+                                    reviewer_task_ids.add(str(tid))
+                        except Exception:
+                            tid_match = re.search(r"\b(?:task[-_ ]?id|conversationId)[:=]\s*[`\"']?([\w-]+)", res_text, re.I)
+                            if tid_match:
+                                reviewer_task_ids.add(tid_match.group(1))
+
+                        if not b.get("is_error"):
+                            found, sha = parse_report(res_text)
+                            if found:
+                                saw_reviewer_call = True
+                                verdict, reviewed_commit = found, sha
+
+                # Genuine task notifications from tracked background reviewer dispatches
+                origin = record.get("origin")
+                is_task_notification = (
+                    isinstance(origin, dict)
+                    and origin.get("kind") in ("task-notification", "task_notification")
+                )
+                if is_task_notification and not is_assistant and not b.get("is_error"):
+                    origin_task_id = str(origin.get("taskId") or origin.get("task_id") or "")
+                    sender_id = str(record.get("sender") or "")
+                    if (
+                        (origin_task_id and origin_task_id in reviewer_task_ids)
+                        or (sender_id and sender_id in reviewer_task_ids)
+                    ):
+                        text = str(b.get("text") or b.get("content") or "")
+                        found, sha = parse_report(text)
+                        if found:
+                            saw_reviewer_call = True
+                            verdict, reviewed_commit = found, sha
 
     return verdict, reviewed_commit, saw_reviewer_call
 
@@ -1320,13 +1422,18 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
 def verify_review(transcript_path: str, directory: str | None,
                   argv: list[str], env: list[str]) -> tuple[bool, str]:
     """(is_clean, reason) -- is there a clean verdict for what this push ships?"""
-    if not transcript_path or not os.path.exists(transcript_path):
-        return False, "No transcript available to verify the adversarial self-review."
+    saw_reviewer_call = False
+    verdict: str | None = None
+    reviewed_commit: str | None = None
 
-    try:
-        verdict, reviewed_commit, saw_reviewer_call = read_latest_review(transcript_path)
-    except Exception as e:
-        return False, f"Failed reading transcript: {e}"
+    if transcript_path and os.path.exists(transcript_path):
+        try:
+            verdict, reviewed_commit, saw_reviewer_call = read_latest_review(transcript_path)
+        except Exception as e:
+            return False, f"Failed reading transcript: {e}"
+
+    if not transcript_path and not saw_reviewer_call:
+        return False, "No transcript available to verify the adversarial self-review."
 
     if not saw_reviewer_call:
         return False, (
@@ -1352,9 +1459,11 @@ def verify_review(transcript_path: str, directory: str | None,
     if not reviewed_commit:
         return False, (
             "The clean verdict does not say which commit it read.\n"
-            "The reviewer must end its report with `Reviewed-Commit: <sha>`, after the "
-            "verdict; without it nothing ties the verdict to what this push would ship, "
-            "and a report cut short before its fingerprint is not a verdict."
+            "The reviewer must state `Reviewed-Commit: <full sha>` on its own line "
+            "immediately after the verdict; the JSON payload may follow it, and "
+            "nothing else should. Without the line nothing ties the verdict to what "
+            "this push would ship, and a report cut short before its fingerprint is "
+            "not a verdict."
         )
 
     try:
@@ -1390,15 +1499,17 @@ def verify_review(transcript_path: str, directory: str | None,
 DENY_TAIL = (
     "\n\nStanding rule: every self-review is an adversarial review by a separate "
     "subagent. Dispatch `adversarial-reviewer` in the foreground against your "
-    "committed diff, address or rebut every finding, and let its report state the "
-    "commit it read.\n\n"
-    "Only that subagent's own result counts -- this message does not, and neither "
-    "does reading a file that quotes a verdict.\n\n"
+    "committed diff (or dispatch a fallback reviewer subagent such as `general-purpose` "
+    "or `self` with an adversarial review prompt when the persona is unregistered), "
+    "address or rebut every finding, and let its report state the commit it read.\n\n"
+    "Only that reviewer's own result or report counts -- this message does not, "
+    "and neither does reading a file that quotes a verdict.\n\n"
     "Override by prefixing the push itself with `ALLOW_UNREVIEWED_PUSH=1` when no "
     "verdict can exist for the guard to check: an initial empty PR branch (per "
-    "pr-on-claim), a review delivered by a separate CLI rather than a subagent, a "
-    "session where the reviewer agent is unregistered or loaded from a stale "
-    "definition, or an emergency. Say in your reply that you used it and why."
+    "pr-on-claim), an auto-mode session where no subagent tool exists, "
+    "or an emergency. In auto mode, if the permission classifier denies the env "
+    "prefix, request a Bash permission rule. "
+    "Say in your reply that you used the override and why."
 )
 
 
@@ -1414,15 +1525,46 @@ def deny(reason: str) -> None:
     }))
 
 
-def main() -> int:
+def _read_payload() -> tuple[dict, bool]:
+    """Parse payload from sys.argv (--dry-run / --simulate) or sys.stdin."""
+    args = sys.argv[1:]
+    is_dry_run = "--dry-run" in args or "--simulate" in args
+    if is_dry_run:
+        positional = [a for a in args if not a.startswith("-")]
+        if positional:
+            raw_cmd = positional[0].strip()
+            if raw_cmd.startswith("{") and raw_cmd.endswith("}"):
+                try:
+                    return json.loads(raw_cmd), True
+                except Exception:
+                    pass
+            return {"tool_name": "Bash", "tool_input": {"command": raw_cmd}}, True
+
     try:
         payload = json.load(sys.stdin)
+        return (payload if isinstance(payload, dict) else {}), is_dry_run
+    except Exception as exc:
+        print(f"no-push-without-self-review: unreadable hook input ({exc})",
+
+              file=sys.stderr)
+        return {}, is_dry_run
+
+
+def main() -> int:
+    payload, is_dry_run = _read_payload()
+    if not payload:
+        return 0
+    try:
         if (payload.get("tool_name") or "") not in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
+            if is_dry_run:
+                print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
             return 0
 
         inp = payload.get("tool_input") or {}
         cmd = inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or inp.get("script") or ""
         if not cmd:
+            if is_dry_run:
+                print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
             return 0
 
         if _SIBLING is None:

@@ -29,14 +29,14 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/ensure-open-pr-monitor.py\"",
             "timeout": 10,
             "script": "ensure-open-pr-monitor.py",
-            "why": "Ensures one detached timer continuously reconciles every open PR authored by the authenticated user, including PRs opened outside this session."
+            "why": "Ensures one detached timer continuously reconciles every open GitHub PR and GitLab merge request authored by the authenticated user, including ones opened outside this session."
           },
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/inject-pr-monitor-status.py\"",
             "timeout": 10,
             "script": "inject-pr-monitor-status.py",
-            "why": "Surfaces changed state from no-unmonitored-pr.py's detached timer on the next prompt. The fallback observes a PR while the session is absent but cannot wake a terminated model."
+            "why": "Surfaces changed state from the detached pollers on the next prompt: the per-PR watchers no-unmonitored-pr.py starts (GitHub only) and the all-open-PR monitor, which also polls GitLab merge requests. A poller observes while the session is absent but cannot wake a terminated model."
           },
           {
             "type": "command",
@@ -115,6 +115,33 @@
               "correction also matches ADMISSION; that overlap is deliberate.",
               "Critical feedback that is not lexically decidable stays a",
               "written rule, not a matcher.",
+              "",
+              "Activation follows this file's uniform model (see the top-level",
+              "_comment and README): the plugin loads it on enable, and",
+              "install-hooks.py --fix registers it for a non-plugin install."
+            ]
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/remind-retry-before-declaring-blocked.py\"",
+            "timeout": 10,
+            "script": "remind-retry-before-declaring-blocked.py",
+            "why": "ai-config#2994, measured 2026-09-02: an `ALLOW_UNREVIEWED_PUSH=1 git push`, and the attempt to grant it a permission rule, were denied by the auto-mode permission classifier three times over; the session reported the path as permanently closed -- to the user, in a memory entry, and on this repo's own tracker -- and the byte-identical command then succeeded, with no settings change and no permission rule added. (#2994 is not self-consistent about how many of those three denials were the push itself rather than the `update-config` edit that followed it, so every claim here is worded to hold under both readings; #3008 tracks settling it.) Injects, never blocks, when a classifier denial has no later re-attempt of the same command.",
+            "_note_not_a_stop_hook": [
+              "UserPromptSubmit, inject-only, for the same reason as the",
+              "reminders above: reporting a denial is RIGHT to send. The",
+              "classifier's own message says to stop and explain when a",
+              "capability is essential, and a user waiting on a stalled task",
+              "needs to hear it. What is premature is the PERMANENCE, not the",
+              "report, so this can only ADD context and never suppresses,",
+              "delays, or alters a message.",
+              "",
+              "Scoped to the classifier's own denial and nothing else. A",
+              "user's own rejection is a decision to respect rather than a",
+              "sample to re-draw, and a deterministic permission-rule or hook",
+              "refusal returns the same answer by construction. All four",
+              "denial shapes were measured from real transcripts; the hook's",
+              "docstring carries the counts.",
               "",
               "Activation follows this file's uniform model (see the top-level",
               "_comment and README): the plugin loads it on enable, and",
@@ -278,7 +305,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-reset-hard-uncommitted-work.py\"",
             "timeout": 10,
             "script": "flag-reset-hard-uncommitted-work.py",
-            "why": "On 2026-08-09, in the same session as the git-add incident above, a `git reset --hard <ref>` run to drop a throwaway probe commit also discarded UNRELATED uncommitted edits to .Rbuildignore and NEWS.md sitting in the same working tree -- both had to be redone. `reset --hard` resetting the entire working tree (not just the commit being undone) is exactly its documented behaviour; the mistake was reaching for it in a tree with unrelated live edits, for an experiment that never needed to touch that tree. Warns rather than blocks: discarding a commit is frequently exactly the point, and this hook cannot tell 'this dirty state is unrelated' from 'this dirty state is what I meant to discard'.",
+            "why": "On 2026-08-09, in the same session as the git-add incident above, a `git reset --hard <ref>` run to drop a throwaway probe commit also discarded UNRELATED uncommitted edits to .Rbuildignore and NEWS.md sitting in the same working tree -- both had to be redone. `reset --hard` resetting the entire working tree (not just the commit being undone) is exactly its documented behaviour; the mistake was reaching for it in a tree with unrelated live edits, for an experiment that never needed to touch that tree. Warns rather than blocks: discarding a commit is frequently exactly the point, and this hook cannot tell 'this dirty state is unrelated' from 'this dirty state is what I meant to discard'. Extended in ai-config#2560 to `git checkout <pathspec>` and `git restore <pathspec>`: those forms revert the named paths to the INDEX rather than to the pre-edit tree, so an edit made since the last `git add` is discarded silently at exit 0. A plain branch switch (`git checkout <ref>`) stays out of scope because git refuses one that would clobber local changes and otherwise carries them across, and `git restore --staged` without `--worktree` stays out of scope because it rewrites only the index. The FORCED `git checkout` forms discard tracked working-tree changes too, and ai-config#2524 closed that gap rather than justifying it. Measured 2026-09-04 on git 2.43.0: `git checkout -f other` over a modified tracked file printed only 'Switched to branch' and exited 0 with the edit gone, `git checkout --force -b feature` did the same, and `git checkout -f` with no operand at all reverted every tracked file to HEAD with no output whatsoever -- so a forced checkout that resolves to no pathspec is now scoped to the whole tracked tree, exactly like `reset --hard`. That needed no new command parsing: `git checkout` was already read and `-f` was already a known flag. `git switch -f` / `--discard-changes` stays uncovered, and that one IS a scope decision: `switch` is a fourth command this guard does not read at all, and reading it would widen the guard past the three it was built for. The catalogs name that remaining gap.",
             "_note_reads_live_git_status": [
               "Also reads live `git status`, same reasoning as the sibling",
               "hook above: whether uncommitted tracked-file changes exist is",
@@ -307,6 +334,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-unlabelled-agent-issue.py\"",
+            "timeout": 10,
+            "script": "warn-unlabelled-agent-issue.py",
+            "why": "shared/workflow/issue-first.md, 'Label an agent-filed issue with its authorship and its model'. disclose-agent-authorship.md scopes its marker line to comment BODIES and excludes an issue body, so an agent-filed issue is the one artifact that discloses nothing -- it goes out under the account holder's login as type: User. The labels close that, and the rule is consulted at read time while the omission happens at composition time. WARNS, never blocks: an unlabelled issue is fixed by one `gh issue edit --add-label` while a blocked create loses the act that makes work visible (report-mistakes-proactively.md, 'filing is not gated on approval'), the rule is scoped to repos we administrate and this hook cannot tell which repo is ours (sup files upstream with neither label), and a repo whose labels cannot be created still gets the issue. Anchored on a command position with heredoc bodies stripped, for the reason warn-pr-create-without-dupe-check.py records: this corpus quotes `gh issue create` constantly. Fails open. Tracked as #3111."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-stale-adjacent-comment.py\"",
             "timeout": 15,
             "script": "flag-stale-adjacent-comment.py",
@@ -332,6 +366,13 @@
             "timeout": 20,
             "script": "warn-nonglobal-substitution.py",
             "why": "shared/workflow/algorithmatize-checks.md. A non-global `s///` changes only the FIRST occurrence, which may not be the one meant. It bites hardest in mutation testing: a mutation that silently failed to apply reads as a surviving mutation, or worse a verified one, because the test stays green from nothing having changed. Measured four times in one session on 2026-08-21, twice where the substitution rewrote a neighbouring comment instead of the code. WARNS, never blocks: it fires only when perl/sed is the segment's leading command AND carries a genuine in-place flag, and scans script text only, never filenames. Tracked as #1900."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-commit-chained-to-push.py\"",
+            "timeout": 10,
+            "script": "no-commit-chained-to-push.py",
+            "why": "shared/workflow/check-before-pushing.md, plus ai-config#2992, which is a REPORT rather than a measurement -- its author states they verified the mechanism from the hook registration and did not reproduce the lost commit. A PreToolUse deny rejects the WHOLE Bash invocation, so a call that chains `git commit` into `git push` loses the commit when any guard refuses the push -- and no-push-without-self-review.py and no-clobbering-push.py are both registered PreToolUse on Bash. Their refusal names only the push, so it reads as \"the push was blocked\" while the change is still an uncommitted working-tree edit. Reported 2026-09-02, caught only because an adversarial reviewer checked whether HEAD had moved. Note that on a HEREDOC commit neither sibling currently sees a push at all (they carry the #2993 splitter defect this hook's library fixes), so for that shape today nothing would be lost -- a reason to fix #2993, not to exempt the shape, and the deny message is worded so it never asserts a sibling would have refused a particular call. DENIES rather than warns, unlike its warn-dupe-check-chained-to-create.py sibling of the same shape: an advisory additionalContext is attached while the call proceeds, so a sibling's deny in the same pass still discards the commit, and whether the author is even TOLD depends on unverified harness behaviour (does a non-denying hook's context survive a sibling's deny -- see the hook docstring for the ten-minute experiment that settles it). The refusal does not depend on that answer: it stops the chain reaching the siblings at all. The refusal is always satisfiable (issue the same two commands as two calls) and clearable with an `ALLOW_COMMIT_AND_PUSH=1` env-assignment prefix. Matches over an argv split (scripts/lib/shellcmd.py) rather than the raw string, so a quoted commit message, a heredoc body, and `git commit-tree`/`git commit-graph` cannot trip it. Requires commit BEFORE push: push-then-commit loses nothing. No exemption for a --dry-run or --delete command: one was written on review advice and removed when a second review measured `git push --force --delete` and `--dry-run --no-dry-run --force` going silent here while no-clobbering-push.py denied both -- a refused dry-run costs one tool call, a missed force-delete costs the commit. Fails open. Tracked as #2992; the shared splitter's heredoc defect and the eight unmigrated copies are #2993 (eight, not seven: derive the set from `grep -rlF '_SHELL_OPS = set(\"();|&\")' hooks/`, since remind-ci-crosscheck-sim-verdict.py spells its copy without the leading underscore)."
           },
           {
             "type": "command",
@@ -440,6 +481,51 @@
             "timeout": 10,
             "script": "flag-uncounted-comment-claims.py",
             "why": "ai-config#2377's sparta file-list incident (2026-08-26): a forge comment posted an enumerated file list recalled from memory rather than derived, and it was wrong. Warns, never blocks, when a `gh pr comment`/`gh issue comment`/`gh api .../comments` body about to post asserts an unverified count (no `grep -c`/`wc -l`-shaped discharge nearby) or a hand-typed enumerated list of hyphenated identifiers with no deriving command beside it in the body or elsewhere in the same Bash call -- `remind-brief-premises.py`'s cardinality/enumeration heuristic extended past Agent/Task/SendMessage briefs to forge-comment bodies, since that hook's own PATH clause is anchored to this corpus and a comment can be about any repo."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-unmeasured-timestamp.py\"",
+            "timeout": 10,
+            "script": "flag-unmeasured-timestamp.py",
+            "why": "CLAUDE.md 'Timestamp recaps in local time', forge-comment surface (ai-config#2900, #2903; measured 2026-09-01: claim comments stamped 12:15/12:40/12:58 PT off one 12:02 PDT reading, the next real reading 12:21 PDT). Warns, never blocks, when a `gh pr comment`/`gh issue comment`/`gh pr review`/`gh api .../comments` body about to post states a Pacific clock time (the Stop sibling's `RX_CLAIM` shape: HH:MM, optional seconds, optional AM/PM, then PDT, PST, or PT) and no clock read appears in the transcript since the current turn began -- or, when the harness's injected reading is in this turn, the stamp runs ahead of its value. The chat-recap half is `no-unmeasured-clock-claim.py` at Stop, whose `scan()`, `RX_CLAIM`, and context exemptions this hook imports so the two agree on what a turn, a clock read, and a stamp are; a comment body never reaches a Stop hook, which is the gap this fills. A post whose body the hook cannot read (a `--body-file` written by a heredoc in the same call, `--body-file -`) gets a cannot-read note rather than silence, after require-agent-disclosure.py's third verdict. Warns because a quoted or relayed time (a CI timestamp, a reviewer's own stamp) is legitimate and not distinguishable by the body alone."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-new-line-breaks-on-push.py\"",
+            "timeout": 15,
+            "script": "warn-new-line-breaks-on-push.py",
+            "why": "memories/mistake-patterns.md Pattern 25, ai-config#2590 (2026-08-29): warns, never blocks, before a `git push` carrying newly-added Markdown lines that violate semantic line breaks against the default base branch (e.g. origin/main)."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-stale-review-diff-base.py\"",
+            "timeout": 10,
+            "script": "warn-stale-review-diff-base.py",
+            "why": "verify-the-right-artifact 'A comparison's base is an artifact too' -- a bare local branch as a diff's base widens the range when it is behind, and narrows it when it is ahead of or diverged from its remote in commits the head branch also carries, so a review runs on already-merged work or silently skips part of the change; this names the base and the remote-tracking form.",
+            "_note_warn_only": [
+              "Reminder only: emits hookSpecificOutput.additionalContext and never a",
+              "decision. The hook cannot tell a review diff from an ordinary local",
+              "comparison, and a bare local base is correct for plenty of those, so a",
+              "block would refuse correct commands on a heuristic.",
+              "No fetch-based discharge on purpose: keep-checkouts-fresh mandates a",
+              "session-start fetch, so keying on one would silence this in exactly the",
+              "sessions that follow the corpus.",
+              "The Agent|Task|SendMessage matcher is there because the measured failure",
+              "was a brief handed to a subagent, which cannot check a premise about the",
+              "author's own environment."
+            ],
+            "_note_deliberate_under_approximation": [
+              "The Bash matcher requires the git invocation to sit at a command",
+              "position, so a range merely quoted inside another command's argument",
+              "is inert -- including one inside a backtick code span, or after the",
+              "words `then` or `do` used in ordinary English.",
+              "That deliberately UNDER-approximates: a real backtick substitution,",
+              "`bash -c \"...\"`, and any wrapper word outside",
+              "sudo/env/time/nohup/xargs/command are missed. A missed reminder costs a",
+              "review round; one fired on quoted prose trains everyone to ignore it.",
+              "Agent|Task|SendMessage briefs are prose with no command structure, so",
+              "they use an unanchored pattern instead."
+            ]
           }
         ]
       },
@@ -468,6 +554,57 @@
               "Activation follows this file's uniform model (see the top-level",
               "_comment and README): the plugin loads it on enable, and",
               "install-hooks.py --fix registers it for a non-plugin install."
+            ]
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-fable-subagent.py\"",
+            "timeout": 10,
+            "script": "no-fable-subagent.py",
+            "why": "Denies an Agent launch that names Fable, or that omits `model` in a session whose own model is Fable (the inherit path is how the violation happens), unless FABLE_SUBAGENT_OK=1 records the user's explicit grant for that launch; warns on a Workflow launch in a Fable session, whose agent() calls it cannot inspect. User directive 2026-09-01, ai-config#2927: 8 of 10 launches in one session inherited Fable and the account hit its usage limit.",
+            "_note_blocks": [
+              "Emits `permissionDecision: deny` only for the two Fable cases above;",
+              "every other Agent launch is untouched, and an unreadable transcript",
+              "adds a note rather than a denial, so a missing file never stops work.",
+              "Never emits `allow`."
+            ]
+          }
+        ]
+      },
+      {
+        "matcher": "Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-fable-subagent.py\"",
+            "timeout": 10,
+            "script": "no-fable-subagent.py",
+            "why": "Denies an Agent launch that names Fable, or that omits `model` in a session whose own model is Fable (the inherit path is how the violation happens), unless FABLE_SUBAGENT_OK=1 records the user's explicit grant for that launch; warns on a Workflow launch in a Fable session, whose agent() calls it cannot inspect. User directive 2026-09-01, ai-config#2927: 8 of 10 launches in one session inherited Fable and the account hit its usage limit.",
+            "_note_blocks": [
+              "Emits `permissionDecision: deny` only for the two Fable cases above;",
+              "every other Agent launch is untouched, and an unreadable transcript",
+              "adds a note rather than a denial, so a missing file never stops work.",
+              "Never emits `allow`."
+            ]
+          }
+        ]
+      },
+      {
+        "matcher": "Workflow",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-fable-subagent.py\"",
+            "timeout": 10,
+            "script": "no-fable-subagent.py",
+            "why": "Warns on a Workflow launch in a Fable session: its agent() calls inherit the session model unless each sets `model`, and the hook cannot inspect the script, so it names the risk and leaves the decision visible (ai-config#2927).",
+            "_note_warns_never_blocks": [
+              "On the Workflow matcher this script only ever adds context; the deny path is reachable from the Agent matcher alone."
             ]
           }
         ]
@@ -527,10 +664,24 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-unlabelled-agent-issue.py\"",
+            "timeout": 10,
+            "script": "warn-unlabelled-agent-issue.py",
+            "why": "shared/workflow/issue-first.md, 'Label an agent-filed issue with its authorship and its model'. disclose-agent-authorship.md scopes its marker line to comment BODIES and excludes an issue body, so an agent-filed issue is the one artifact that discloses nothing -- it goes out under the account holder's login as type: User. The labels close that, and the rule is consulted at read time while the omission happens at composition time. WARNS, never blocks: an unlabelled issue is fixed by one `gh issue edit --add-label` while a blocked create loses the act that makes work visible (report-mistakes-proactively.md, 'filing is not gated on approval'), the rule is scoped to repos we administrate and this hook cannot tell which repo is ours (sup files upstream with neither label), and a repo whose labels cannot be created still gets the issue. Anchored on a command position with heredoc bodies stripped, for the reason warn-pr-create-without-dupe-check.py records: this corpus quotes `gh issue create` constantly. Fails open. Tracked as #3111."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/require-agent-disclosure.py\"",
             "timeout": 10,
             "script": "require-agent-disclosure.py",
             "why": "The MCP half of the Bash entry above. A remote/web session has no `gh` on PATH, so mcp__github__add_issue_comment and its siblings are the ONLY way it posts a comment -- and hooks.json matches by tool name, so the Bash entry never sees them. Same script, same warn-only behaviour; it reads tool_input.body directly rather than parsing a command line, and stays silent when no string body is present (some pull_request_review_write methods submit without one)."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-unmeasured-timestamp.py\"",
+            "timeout": 10,
+            "script": "flag-unmeasured-timestamp.py",
+            "why": "The MCP half of the Bash entry above, following require-agent-disclosure.py's precedent. The #2900 claim comments went out through mcp__github__add_issue_comment from a remote session with no `gh` on PATH, and hooks.json matches by tool name, so the Bash entry never sees them. Same script, same warn-only behaviour; it reads tool_input.body directly for every tool in require-agent-disclosure.py's MCP_POST_TOOLS (imported, so the two guards cover the same set) and stays silent when no string body is present."
           }
         ]
       },
@@ -576,6 +727,13 @@
               "so the matcher is a prefilter rather than the only gate: the Cursor",
               "names StrReplace/EditNotebook are handled there, not here."
             ]
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-unmeasured-timestamp.py\"",
+            "timeout": 10,
+            "script": "flag-unmeasured-timestamp.py",
+            "why": "CLAUDE.md 'Timestamp recaps in local time', session notebook / memory file edit surface (ai-config#2900, #2947). Warns when writing to session notebooks or memory files stating a Pacific clock time without a date reading in the turn."
           }
         ]
       },
@@ -588,6 +746,13 @@
             "timeout": 10,
             "script": "warn-stale-issue-edit.py",
             "why": "skills/check-history/SKILL.md invokes its issue/PR checks at read time, and the omission is broken at the first Write/Edit, which leaves no artifact for review or tests to catch. Warns, never blocks."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-unmeasured-timestamp.py\"",
+            "timeout": 10,
+            "script": "flag-unmeasured-timestamp.py",
+            "why": "CLAUDE.md 'Timestamp recaps in local time', session notebook / memory file edit surface (ai-config#2900, #2947). Warns when editing session notebooks or memory files stating a Pacific clock time without a date reading in the turn."
           }
         ]
       },
@@ -600,6 +765,13 @@
             "timeout": 10,
             "script": "warn-stale-issue-edit.py",
             "why": "skills/check-history/SKILL.md invokes its issue/PR checks at read time, and the omission is broken at the first Write/Edit, which leaves no artifact for review or tests to catch. Warns, never blocks."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-unmeasured-timestamp.py\"",
+            "timeout": 10,
+            "script": "flag-unmeasured-timestamp.py",
+            "why": "CLAUDE.md 'Timestamp recaps in local time', session notebook / memory file edit surface (ai-config#2900, #2947). Warns when editing session notebooks or memory files stating a Pacific clock time without a date reading in the turn."
           }
         ]
       },
@@ -612,6 +784,57 @@
             "timeout": 10,
             "script": "flag-cd-into-main-checkout.py",
             "why": "Warns when a worktree-rooted session cd's into the MAIN checkout of its own repo -- a real path on a different branch, where every edit and every check silently succeeds against somebody else's tree."
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-stale-review-diff-base.py\"",
+            "timeout": 10,
+            "script": "warn-stale-review-diff-base.py",
+            "why": "verify-the-right-artifact 'A comparison's base is an artifact too' -- a bare local branch as a diff's base widens the range when it is behind, and narrows it when it is ahead of or diverged from its remote in commits the head branch also carries, so a review runs on already-merged work or silently skips part of the change; this names the base and the remote-tracking form.",
+            "_note_see_bash_entry": "Design notes live on this hook's Bash entry, per this file's precedent (require-agent-disclosure.py, warn-stale-issue-edit.py). Repeating them per matcher guarantees sibling divergence on the next correction."
+          }
+        ]
+      },
+      {
+        "matcher": "Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-stale-review-diff-base.py\"",
+            "timeout": 10,
+            "script": "warn-stale-review-diff-base.py",
+            "why": "verify-the-right-artifact 'A comparison's base is an artifact too' -- a bare local branch as a diff's base widens the range when it is behind, and narrows it when it is ahead of or diverged from its remote in commits the head branch also carries, so a review runs on already-merged work or silently skips part of the change; this names the base and the remote-tracking form.",
+            "_note_see_bash_entry": "Design notes live on this hook's Bash entry, per this file's precedent (require-agent-disclosure.py, warn-stale-issue-edit.py). Repeating them per matcher guarantees sibling divergence on the next correction."
+          }
+        ]
+      },
+      {
+        "matcher": "SendMessage",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-stale-review-diff-base.py\"",
+            "timeout": 10,
+            "script": "warn-stale-review-diff-base.py",
+            "why": "verify-the-right-artifact 'A comparison's base is an artifact too' -- a bare local branch as a diff's base widens the range when it is behind, and narrows it when it is ahead of or diverged from its remote in commits the head branch also carries, so a review runs on already-merged work or silently skips part of the change; this names the base and the remote-tracking form.",
+            "_note_see_bash_entry": "Design notes live on this hook's Bash entry, per this file's precedent (require-agent-disclosure.py, warn-stale-issue-edit.py). Repeating them per matcher guarantees sibling divergence on the next correction."
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-underived-required-check.py\"",
+            "timeout": 10,
+            "script": "no-underived-required-check.py",
+            "why": "Warns when a `gh api` command sets required status checks on a repository or organization ruleset, or on classic branch protection. A context string is matched against a check-run name exactly, so one no workflow emits sits as `Expected` forever and blocks every merge, silently. Detects lexical shapes only -- a write assembled across variables, or reached through a wrapper it does not know, is silent -- so its silence is never evidence that contexts were derived. Carries no discharge condition by design: every candidate was satisfiable by a pull request's own run, or by typing the string."
           }
         ]
       }
@@ -659,7 +882,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unreviewed-pr.py\"",
             "timeout": 10,
             "script": "no-unreviewed-pr.py",
-            "why": "CLAUDE.md 'Open a PR for every pushed feature branch' + skills/ardi 'always request another review' -- opening a PR auto-triggers the repo's own review workflow but does NOT summon Copilot, and that auto-triggered half is what disguises the missing one. claude-review has failed on every attempted review this session (ai-config#897, which calls the cause an unconfirmed leading hypothesis); whatever the cause, an unrequested PR gets no review at all while it is down. A reviewer request is per-HEAD, so a push re-arms the obligation: without that the guard is armed once and permanently discharged by the first request, and every later round carries a review of a commit that is no longer the PR's head (ai-config#1282). A REDACTION PR is exempt, because there the reviewer's input IS the secret -- the removed side of every hunk carries it (ucdavis/bcs#610) -- so the exemption is asserted by a `no-ai-review` label or an `ALLOW_UNREVIEWED_REDACTION_PR=1` prefix rather than paid for by leaking (ai-config#1392). A standing directive forbids the Copilot request on all repos until September 2026, which leaves this guard no satisfiable demand at all, so it returns before scanning until its `MORATORIUM_END` date -- a date rather than a flag, so it re-arms itself when the quota returns, and in the script rather than in a settings registration, which a plugin install has nothing to remove from (ai-config#1709)."
+            "why": "CLAUDE.md 'Open a PR for every pushed feature branch' + skills/ardi 'always request another review' -- opening a PR auto-triggers the repo's own review workflow but does NOT summon Copilot, and that auto-triggered half is what disguises the missing one. claude-review has failed on every attempted review this session (ai-config#897, which calls the cause an unconfirmed leading hypothesis); whatever the cause, an unrequested PR gets no review at all while it is down. A reviewer request is per-HEAD, so a push re-arms the obligation: without that the guard is armed once and permanently discharged by the first request, and every later round carries a review of a commit that is no longer the PR's head (ai-config#1282). A REDACTION PR is exempt, because there the reviewer's input IS the secret -- the removed side of every hunk carries it (ucdavis/bcs#610) -- so the exemption is asserted by a `no-ai-review` label or an `ALLOW_UNREVIEWED_REDACTION_PR=1` prefix rather than paid for by leaking (ai-config#1392). A standing directive forbids the Copilot request on all repos until the `MORATORIUM_END` date in the script, which leaves this guard no satisfiable demand at all, so it returns before scanning until its `MORATORIUM_END` date -- a date rather than a flag, so it re-arms itself when the quota returns, and in the script rather than in a settings registration, which a plugin install has nothing to remove from (ai-config#1709)."
           },
           {
             "type": "command",
@@ -687,14 +910,14 @@
             "command": "AI_CONFIG_STOP=1 python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-mistake-without-a-hook.py\"",
             "timeout": 10,
             "script": "no-mistake-without-a-hook.py",
-            "why": "Turns an admitted, mechanizable mistake into an immediate stop condition until hook work follows it."
+            "why": "Turns an admitted, mechanizable mistake into an immediate stop condition, capped once per admitted phrase within a short transcript window so a re-explanation of the same admission does not re-block; the same phrase re-admitted well beyond that window blocks again."
           },
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unmeasured-clock-claim.py\"",
             "timeout": 10,
             "script": "no-unmeasured-clock-claim.py",
-            "why": "CLAUDE.md 'Timestamp recaps in local time' -- warns when a reply states a Pacific clock time and no clock read appears since the previous message, so an extrapolated time is not reported as measured."
+            "why": "CLAUDE.md 'Timestamp recaps in local time' -- warns when a reply states a Pacific clock time and no clock read appears since the previous message, so an extrapolated time is not reported as measured. A read whose output is only ever captured (`t=$(TZ=... date ...)` writing into a file) does not discharge it: the value never reaches the transcript, so the session could not have quoted it (ai-config#2991)."
           },
           {
             "type": "command",
@@ -723,6 +946,13 @@
             "timeout": 10,
             "script": "require-stopping-point.py",
             "why": "A stopping-point declaration is an explicit standing preference, not a best-effort recap; blocks an otherwise final reply that omits it."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-config-deletion-without-ref-check.py\"",
+            "timeout": 10,
+            "script": "flag-config-deletion-without-ref-check.py",
+            "why": "ai-config#3096 -- a reply recommended `find \"$HOME/.claude/hooks\" -name '*.py' -delete` over what was the LIVE guard set (settings.json registered 46 of those files by explicit path). A content diff had been run, so the removal felt sanctioned; the question never asked was what POINTS AT the files. Warns rather than blocks: the condition cannot tell an orphan from a registered file without reading the config, and the point is to prompt that read."
           }
         ]
       }

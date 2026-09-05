@@ -7,7 +7,8 @@ run `python3 scripts/sync-codex-skill-wrappers.py` to regenerate this page and
 the links in `codex-skills/`.
 
 The canonical skills under `skills/` are written for Claude Code and name
-concrete tools — mostly `gh`/`git` commands. This registry maps each canonical
+concrete tools --- mostly `gh`/`git` commands.
+This registry maps each canonical
 operation to the equivalent GitHub MCP tool so any model can run a skill.
 
 > [!IMPORTANT]
@@ -33,11 +34,14 @@ operation to the equivalent GitHub MCP tool so any model can run a skill.
 
 ## How each model resolves an operation
 
-- **Claude Code** — GitHub MCP tool in remote/web sessions; the CLI command locally.
-- **Codex** — GitHub MCP tool if the session has it; otherwise the CLI command.
-- **VS Code Copilot** — GitHub MCP tool.
-- **Gemini CLI** — GitHub MCP tool if configured in MCP settings; otherwise the CLI command.
-- **Generic shell / CLI** — The CLI command (fallback for any agent that just runs a shell).
+- **Claude Code** --- GitHub MCP tool in remote/web sessions;
+  the CLI command locally.
+- **Codex** --- GitHub MCP tool if the session has it;
+  otherwise the CLI command.
+- **VS Code Copilot** --- GitHub MCP tool.
+- **Gemini CLI** --- GitHub MCP tool if configured in MCP settings;
+  otherwise the CLI command.
+- **Generic shell / CLI** --- The CLI command (fallback for any agent that just runs a shell).
 
 ## Operations
 
@@ -45,6 +49,7 @@ operation to the equivalent GitHub MCP tool so any model can run a skill.
 | --- | --- | --- | --- |
 | `VIEW_PR` | Read a pull request's details and metadata. | `gh pr view "<N>"` | `mcp__github__pull_request_read (method=get)` |
 | `LIST_PRS` | List pull requests. | `gh pr list` | `mcp__github__list_pull_requests` |
+| `WHO_AM_I` | Resolve the invoking user's login, for the PR-scope filter in `memories/reviewing-prs.md`. | `gh api user --jq .login` | `mcp__github__get_me` |
 | `SEARCH_PRS` | Search pull requests by keyword / query string. | `gh pr list --search "<query>"` | `mcp__github__search_pull_requests` |
 | `DIFF_PR` | Read a pull request's diff. | `gh pr diff "<N>"` | `mcp__github__pull_request_read (method=get_diff)` |
 | `PR_CHECKS` | Read a pull request's CI check / status results. | `gh pr checks "<N>"` | `mcp__github__pull_request_read (method=get_check_runs)` |
@@ -54,8 +59,9 @@ operation to the equivalent GitHub MCP tool so any model can run a skill.
 | `REQUEST_COPILOT_REVIEW` | Request a GitHub Copilot code review on a pull request. | `gh api "repos/<owner>/<repo>/pulls/<N>/requested_reviewers" -X POST -f "reviewers[]=copilot-pull-request-reviewer[bot]"` | `mcp__github__request_copilot_review` |
 | `CREATE_PR` | Open a new pull request. | `gh pr create` | `mcp__github__create_pull_request` |
 | `EDIT_PR` | Edit a pull request (reviewers, labels, base, etc.). | `gh pr edit "<N>"` | `mcp__github__update_pull_request` |
-| `MERGE_PR` | Merge a pull request. | `gh pr merge "<N>"` | `mcp__github__merge_pull_request` |
+| `MERGE_PR` | Merge a pull request directly, pinned to the head the clean gate evaluated; a base that requires a merge queue is out of scope until [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030) lands. | `gh pr merge "<N>" -R "<owner>/<repo>" --match-head-commit "<sha>"` | `mcp__github__merge_pull_request (expectedHeadSha="<sha>")` |
 | `MARK_PR_READY` | Flip a draft pull request to ready for review. | `gh pr ready "<N>"` | `mcp__github__update_pull_request (draft=false)` |
+| `UPDATE_PR_BRANCH` | Merge the base branch into a pull request's head branch, pinned to the head that was checked. | `gh api -X PUT "repos/<owner>/<repo>/pulls/<N>/update-branch" -f expected_head_sha="<sha>"` | `mcp__github__update_pull_request_branch (expectedHeadSha="<sha>")` |
 | `REOPEN_PR` | Reopen a closed pull request. | `gh pr reopen "<N>"` | `mcp__github__update_pull_request (state=open)` |
 | `COMMENT_PR` | Post a top-level comment on a pull request. **The body ends with the agent-disclosure marker** --- see [`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md). | `gh pr comment "<N>" --body "..."` | `mcp__github__add_issue_comment` |
 | `REPLY_REVIEW_COMMENT` | Reply to an inline pull-request review comment. The path carries the PR number; the id-only route (`PATCH .../pulls/comments/<id>`) EDITS that comment instead. **The body ends with the agent-disclosure marker** --- see [`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md). | `gh api -X POST "repos/<owner>/<repo>/pulls/<N>/comments/<id>/replies" -F "body=@<file>"` | `mcp__github__add_reply_to_pull_request_comment` |
@@ -69,7 +75,7 @@ operation to the equivalent GitHub MCP tool so any model can run a skill.
 | `SEARCH_ISSUES` | Search issues by keyword / query string. | `gh issue list --search "<query>"` | `mcp__github__search_issues` |
 | `READ_ISSUE_COMMENTS` | Read an issue's comments. | `gh issue view "<N>" --comments` | `mcp__github__issue_read (method=get_comments)` |
 | `ISSUE_LINKED_PRS` | List the pull requests cross-referenced from an issue's timeline (i.e. PRs that link or close it). | `gh api --paginate "repos/<owner>/<repo>/issues/<N>/timeline"` | (no GitHub MCP tool; approximate with SEARCH_PRS) |
-| `CREATE_ISSUE` | Open a new issue. | `gh issue create` | `mcp__github__issue_write (method=create)` |
+| `CREATE_ISSUE` | Open a new issue. **An agent-filed issue carries the `ai-authored` and `model:<model-id>` labels** --- see [`issue-first`](shared/workflow/issue-first.md) and [`label-agent-filed-issues`](shared/workflow/label-agent-filed-issues.md). The MCP path accepts `labels` on `method=create`, and silently creates an unknown label name rather than rejecting it. | `gh issue create` | `mcp__github__issue_write (method=create)` |
 | `COMMENT_ISSUE` | Post a comment on an issue. **The body ends with the agent-disclosure marker** --- see [`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md). | `gh issue comment "<N>" --body "..."` | `mcp__github__add_issue_comment` |
 | `CLOSE_ISSUE` | Close an issue with a reason. | `gh issue close "<N>" --reason "..."` | `mcp__github__issue_write (method=update, state=closed, state_reason=...)` |
 | `REOPEN_ISSUE` | Reopen a closed issue. **The body ends with the agent-disclosure marker** --- see [`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md). | `gh issue reopen "<N>" --comment "..."` | `mcp__github__issue_write (method=update, state=open)` |
@@ -86,10 +92,11 @@ operation to the equivalent GitHub MCP tool so any model can run a skill.
 | `FETCH` | Fetch refs from the remote. | `git fetch origin "<branch>"` | (use git; no GitHub MCP equivalent) |
 | `MERGE_BRANCH` | Merge a branch into the current one. | `git merge "origin/<branch>"` | (use git; no GitHub MCP equivalent) |
 | `CREATE_BRANCH` | Create a new branch (e.g. off the default branch). | `git switch -c "<branch>" "origin/<base>"` | `mcp__github__create_branch` |
+| `CREATE_WORKTREE` | Create a dedicated worktree on a new branch off the default branch, so parallel sessions never share a checkout (AGENTS.md "Worktree isolation"). | `git worktree add "../<repo>-<slug>" -b "<branch>" "origin/<base>"` | (use git; no GitHub MCP equivalent) |
 | `DELETE_REF` | Delete a remote branch or tag ref. | `git push origin --delete "<branch>" (or git push origin ":refs/tags/<tag>")` | (no GitHub MCP tool; use gh api -X DELETE "repos/<owner>/<repo>/git/refs/heads/<branch>") |
 | `READ_FILE` | Read a file's contents from the repo. | `gh api "repos/<owner>/<repo>/contents/<path>"` | `mcp__github__get_file_contents` |
 | `LIST_COMMITS` | List a branch's commits (pass the branch or ref as sha, e.g. sha=gh-pages to see which build a Pages branch currently serves). | `git log "<branch>" (or gh api "repos/<owner>/<repo>/commits" -f "sha=<branch>")` | `mcp__github__list_commits` |
-| `WRITE_FILE` | Create or update file(s) on a branch in a single commit. | `git add "<path>" && git commit -m "..." && git push` | `mcp__github__create_or_update_file (one file) / mcp__github__push_files (multiple)` |
+| `WRITE_FILE` | Create or update file(s) on a branch. The MCP tools do it in one call; the CLI path is two Bash calls, never one --- stage and commit here, then run the PUSH operation separately; hooks/no-commit-chained-to-push.py refuses the chained form. | `git add "<path>" && git commit -m "..."` | `mcp__github__create_or_update_file (one file) / mcp__github__push_files (multiple)` |
 | `LIST_SECRETS` | List a repo's Actions secrets. The value is never readable, so this can confirm a secret exists and when it last changed, never what it is or whether it works. Use the REST endpoint when created_at is needed: `gh secret list --json` offers name, numSelectedRepos, selectedReposURL, updatedAt, and visibility (gh 2.96.0), so updatedAt is available from the CLI but created_at is not. `--paginate` needs the `--jq '.secrets[]'` projection: the endpoint returns an object rather than an array, so a bare `--paginate` concatenates one object per page and the result is not valid JSON. | `gh api "repos/<owner>/<repo>/actions/secrets" --paginate --jq '.secrets[]'` | (no GitHub MCP tool; use gh api) |
 | `SET_SECRET` | Set an Actions secret. Omit --body so the value is read from stdin, keeping it out of argv (visible in ps) and shell history. Exiting 0 means the value was stored, not that it is valid. | `gh secret set "<name>" --repo "<owner>/<repo>"` | (no GitHub MCP tool; use gh) |
 | `RUN_WORKFLOW` | Dispatch a workflow_dispatch workflow run on a ref. Pass --ref explicitly; omitting it dispatches against the default branch, which is rarely what a PR-scoped dispatch wants. The MCP tool's `ref` is required for the same reason. | `gh workflow run "<workflow>.yml" --repo "<owner>/<repo>" --ref "<branch>" --field "<key>=<value>"` | `mcp__github__actions_run_trigger (method=run_workflow)` |

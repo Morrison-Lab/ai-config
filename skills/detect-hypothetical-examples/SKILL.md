@@ -44,7 +44,11 @@ read it before running this skill; the steps below are the short version.
    [`hypothetical-examples.md`](../../shared/writing/hypothetical-examples.md#the-detection-heuristic) ---
    the "hypothetical"/"suppose a"/"consider a hypothetical"/"if N% of"
    signal phrases, plus suspiciously round proportions (`0.1`, `0.3`,
-   `20%`) sitting inside an example or definition div.
+   `20%`) sitting inside an example or definition div:
+   ```bash
+   rg -n '\b(hypothetical|[Ss]uppose a\b|[Ss]uppose the\b|[Ss]uppose only\b|[Ii]n a population where\b|[Cc]onsider a hypothetical|[Ii]f \d+% of\b)' <file>
+   rg -n '\b\d+%|\b0\.[1-9]0?\b' <file>
+   ```
 3. **Check for a real dataset already in scope** — a `read.csv`/
    `read_csv`/`glm(...)`-style loading chunk earlier in the same document,
    or a project-level running-example dataset convention. No real dataset

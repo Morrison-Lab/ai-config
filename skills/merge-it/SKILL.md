@@ -33,6 +33,8 @@ standing yes (see `preferences.md`).
 
 - Resolve which PR is meant (the one from the current session; if ambiguous,
   ask which number).
+- Then record that PR's `headRefOid` and `baseRefName` before the readiness check, so its result is tied to one head and one target,
+  and require both live values to equal them immediately before every direct merge, on the initially current path as much as after a recovery.
 - Confirm it is **fully clean** before merging (the ARDI terminal state — see
   `shared/workflow/fully-clean.md`): every CI workflow and check run — not
   just required ones — is green **and completed** (never still queued or in
@@ -62,6 +64,34 @@ standing yes (see `preferences.md`).
 
 ### 2. Merge
 
+- Before the merge command, run the base-currency check that `fully-clean.md` states in its stale-base rule
+  (the Do bullets beginning "for a direct merge"), by merge mode.
+  In a local session, fetch the PR's configured base and `refs/pull/<N>/head` from the `-R` repository
+  and confirm the merge-base is the base tip.
+  In a remote session without `git`, read `gh api "repos/<owner>/<repo>/compare/<base-encoded>...<head-sha>"` (the base name encoded as one path segment, `jq -rn --arg b "<base>" '$b|@uri'`)
+  and require `behind_by` of 0, recording `base_commit.sha` as `<pinned-tip>` for the pre-merge recheck of the same endpoint, which requires `behind_by` of 0 again and `base_commit.sha` equal to that pin.
+  Where neither is available, do not merge until [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) supplies the tool.
+  On a base that requires a merge queue, stop and report: the queue form of this gate is [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030) and is out of scope until it lands.
+  It is a manual step until [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) wires it into `check-pr-fully-clean.py`,
+  and on a repository that does not require an up-to-date branch GitHub would otherwise permit the stale merge, which is why the manual check stays required there.
+  When it fails on a direct merge, update the branch pinned to the recorded head.
+  Locally: `gh api -X PUT "repos/<owner>/<repo>/pulls/<N>/update-branch" -f expected_head_sha="<pinned-sha>"`.
+  Remotely: `update_pull_request_branch` with `expectedHeadSha`.
+  A `422` whose message names an expected-head mismatch is the another-writer signal, so settle ownership rather than retrying unpinned.
+  Match on the substring `expected head sha`, since the live text carries a curly apostrophe and a trailing period that this ASCII rendering cannot show.
+  Any other `422` is a failed update to stop on.
+  Then wait until `headRefOid` changes (the update answers `202 Accepted` before the merge lands), with a deadline of a few minutes, treating expiry as a failed update to stop on and report,
+  record that SHA,
+  rerun the base-currency check on it,
+  and then rerun the whole clean gate pinned to it.
+  Immediately before the merge command, check that the live head is still that SHA, that `baseRefName` is unchanged, and that the live base tip still equals the `<pinned-tip>` the currency check printed (recorded before the gate reran, since a shell variable does not survive into a later tool call),
+  and repeat the cycle if any moved during the gate (a concurrent push can pass a currency-only recheck while the gate covered the earlier head).
+  Then pass the pin to the merge itself, `--match-head-commit "<pinned-sha>"` (or `expectedHeadSha` on the MCP merge tool), so a push after the read is refused rather than merged.
+  That closes the head side only.
+  The base can still advance between the read and the merge, and where that must not happen the repository needs a merge queue or an up-to-date-branch requirement with every clean-gate check required, per `fully-clean.md`.
+  A repeat names the moving ref, not the remedy.
+  When the base moved twice it outruns the gate: merge under strict up-to-date protection instead (or through a merge queue once [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030) lands), per `fully-clean.md`.
+  When the head moved, another writer is on the branch: settle ownership per `claim-pr` before rerunning, since no queue or protection setting stabilizes a head someone else pushes to.
 - Default to **squash** for a feature branch with many small iteration commits
   (and/or a merge-of-main commit) — it gives `main` one clean commit. Use a
   plain merge commit only if the user asks or the repo clearly prefers it; don't
@@ -70,16 +100,12 @@ standing yes (see `preferences.md`).
   gone stale across the review loop — pass `commit_title` / `commit_message`
   rather than letting GitHub paste the outdated description. Keep `Closes #N` in
   the message so the linked issue auto-closes.
-- If `gh pr merge` fails with `Head branch is out of date`, first read the
-  PR's actual base branch (`gh pr view <N> --json baseRefName -q .baseRefName`
-  — do **not** assume `main`; stacked and release PRs target a different base),
-  sync that base into the PR branch, and retry once. **Syncing the base
-  creates a new head SHA, which invalidates the CI/review "fully clean"
-  snapshot that authorized the original merge attempt** — re-run the ARDI
-  "fully clean" check (`fully-clean.md`) against the new SHA before retrying
-  the merge, don't just retry the merge command itself; a repo that doesn't
-  make every workflow/review a required branch-protection check can
-  otherwise merge an unreviewed/untested new head. If the merge still fails,
+- If `gh pr merge` fails with `Head branch is out of date`, the base advanced after the pre-merge read: go back through the stale-base recovery above (the pinned update, the bounded wait, the currency check, and the whole clean gate on the new head) rather than syncing by hand.
+  The pinned update resolves the PR's configured base itself (stacked and release PRs target a branch other than `main`, and the endpoint reads that from the PR), and the pin refuses to update over a concurrent push, which a hand merge would not.
+  The update creates a new head SHA, so the clean verdict that authorized the first attempt no longer applies,
+  and a repository that does not make every workflow and review a required check would otherwise merge an unreviewed head,
+  which is why that cycle reruns the whole gate before its own pinned merge attempt.
+  If the merge still fails,
   don't compare against `origin` blindly — for a cross-fork PR, `origin` is
   the *base* repo, not necessarily where the head branch lives, so
   `git ls-remote origin refs/heads/<branch>` can silently read a missing ref
@@ -97,9 +123,9 @@ standing yes (see `preferences.md`).
 
 ```bash
 # MERGE_PR — remote/web (GitHub MCP):
-#   mcp__github__merge_pull_request  merge_method=squash  commit_title=…  commit_message=…
-# local:
-gh pr merge <N> -R <owner>/<repo> --squash --subject "<title>" --body "<accurate summary; Closes #N>"
+#   mcp__github__merge_pull_request  merge_method=squash  expectedHeadSha=<pinned-sha>  commit_title=…  commit_message=…
+# local (the pin is the headRefOid recorded before the readiness check):
+gh pr merge "<N>" -R "<owner>/<repo>" --squash --match-head-commit "<pinned-sha>" --subject "<title>" --body "<accurate summary; Closes #N>"
 ```
 
 **The `-R` is load-bearing, not tidiness --- a bare `gh pr merge <N>` refuses even from inside the repo it would merge into.**
@@ -122,7 +148,9 @@ for that repo.
 ### 3. Verify the merge landed — never assume
 
 Confirm `merged == true` (the merge tool's result) and re-check the PR state and
-that the linked issue auto-closed. If the merge didn't land (conflict, branch
+that the linked issue auto-closed.
+A base that requires a merge queue never reaches this step from an agent path: [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030) carries the queue form (enrollment is asynchronous and needs its own state machine), and until it lands the procedure stops before the merge command there.
+If the merge didn't land (conflict, branch
 protection, not mergeable), **stop and report** — don't tidy or run UMS.
 
 ### 4. Chain into `post-merge` — automatically
@@ -130,7 +158,8 @@ protection, not mergeable), **stop and report** — don't tidy or run UMS.
 Run the `post-merge` skill (invoke it by name) for the rest: tidy the local
 branch (checkout `main`, pull, `git branch -d`, remove any worktree), confirm
 deferred items are tracked, and **run UMS** to bank what the PR's review
-lifecycle taught. Do this without a separate prompt — opening the UMS follow-up
+lifecycle taught.
+Do this without a separate prompt --- opening the UMS follow-up
 branch + PR is a standing yes (`preferences.md`).
 
 ## Relationship to other skills

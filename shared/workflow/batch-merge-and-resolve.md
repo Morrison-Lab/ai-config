@@ -647,8 +647,8 @@ predicate runs on both sides.
 
 ## The recovery has a silent failure mode of its own, and no merge produces it
 
-The five modes above arrive *through* a merge git resolved on its own, and the
-batch pass below re-checks them per merge for that reason.
+The modes above arrive *through* a merge nothing flags, and the batch pass
+below re-checks them per merge for that reason.
 This one is not a sixth member of that set, and must not be looked for the same
 way: the merge behaved, and the damage is in what you typed next.
 Its trigger is a **hand-written recovery**, so check for it after any resolution

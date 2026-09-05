@@ -333,9 +333,8 @@ message --- was written into the PR body under the heading
 "Open items (not fixed, quota stop)" and carried forward unfixed.
 No local adversarial round that followed raised it.
 The forge review did, in each of the three rounds before the fix, and it was
-fixed in
-`1b20884a1` --- pre-squash, so fetch `refs/pull/3180/head` before running
-`git show` on it --- before the PR merged.
+fixed in `1b20884a1` --- pre-squash, so fetch `refs/pull/3180/head` before
+running `git show` on it --- before the PR merged.
 So this record is not an instance of a disclosed item reaching `main`: it is an
 instance of one surviving every round that was not the forge reviewer's, and
 being caught by something outside the disclosure's reach.

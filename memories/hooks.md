@@ -138,9 +138,9 @@ Blocking hooks prevent the turn from ending until the missing artifact or requir
 ## 4.5 A warn-only hook that fires and is ignored is not automatically a hook that should block
 
 The checklist below covers building a hook.
-This covers the question that arrives afterwards, when a warn-only guard fires
-on the same mistake several times in one session and the mistake happens
-anyway: does the recurrence license escalating it to a block?
+This section covers the question that arrives afterwards, when a warn-only
+guard fires on the same mistake several times in one session and the mistake
+happens anyway: does the recurrence license escalating it to a block?
 
 **Usually not, and recurrence alone never settles it.**
 [`deterministic-tools`](../shared/principles/deterministic-tools.md)'s

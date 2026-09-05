@@ -577,9 +577,7 @@ that check fails, only alongside the PR number, per the section below.
 
 **A pre-squash SHA is unreachable, not absent, and the difference decides the
 remedy.**
-`refs/pull/<N>/head` survives the squash and the branch deletion: measured on
-#3060, `git ls-remote origin refs/pull/3060/head` still returns `f90682991`
-long after that PR merged and its branch was removed.
+`refs/pull/<N>/head` survives the squash and the branch deletion.
 What a squash removes is *ancestry*: nothing under `refs/heads/*` reaches those
 objects, and the default fetch refspec is `+refs/heads/*:refs/remotes/origin/*`,
 so a fresh clone never downloads them and `git show <sha>` fails there with an
@@ -587,12 +585,8 @@ unknown-revision error.
 
 **Settle reachability against the remote, never against your own ref set.**
 `git for-each-ref --contains` is the wrong probe here, and wrong in the
-direction that reassures: it scans every local ref, so a pre-squash SHA still
-held by the branch you are standing on comes back reachable.
-Measured in a worktree of this repo, `git for-each-ref --contains 16544c50`
-returns the local branch, while
-`git merge-base --is-ancestor 16544c50 origin/main` exits 1 --- which is the
-answer a reader in a fresh clone will get.
+direction that reassures: it scans every local ref, so a pre-squash SHA any
+local ref still holds comes back reachable.
 
 ```bash
 git merge-base --is-ancestor <sha> origin/<default>   # 0 = a fresh clone reaches it
@@ -627,8 +621,7 @@ anyway.
 - **Do:** settle reachability with `git merge-base --is-ancestor <sha>
   origin/<default>`, whose answer is the one a fresh clone gets.
 - **Don't:** settle it with `git for-each-ref --contains`, which scans your own
-  refs and reports a SHA reachable on the strength of the branch you are
-  standing on.
+  refs and so answers a different question than a fresh clone would.
 - **Don't:** write a bare pre-squash SHA into durable guidance --- it resolves
   in your checkout and errors in a fresh clone, and the error looks like a
   typo.
@@ -636,9 +629,8 @@ anyway.
   `refs/pull/<N>/head` does not reach it, and no ref does.
 
 (Morrison-Lab/ai-config#3180, 2026-09-04, which broke this rule in two of its
-own passages --- `fully-clean.md` and
-`check-pr-fully-clean.py` both cited `16544c50` and `7e1294b0`, pre-squash
-heads of #3167, caught in `7a797d3f8`.
+own passages --- `fully-clean.md` and `check-pr-fully-clean.py` both cited
+`16544c50` and `7e1294b0`, pre-squash heads of #3167, caught in `7a797d3f8`.
 A pre-existing instance is open as
 [#3275](https://github.com/Morrison-Lab/ai-config/issues/3275).
 [`grep-is-not-coverage`](../shared/workflow/grep-is-not-coverage.md) carries

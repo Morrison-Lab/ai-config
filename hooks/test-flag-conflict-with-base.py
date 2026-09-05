@@ -21,6 +21,7 @@ gets each one wrong silently:
 Run: python3 hooks/test-flag-conflict-with-base.py hooks/flag-conflict-with-base.py
 """
 import json
+import importlib.util
 import os
 import shutil
 import subprocess
@@ -237,6 +238,75 @@ NON_COMMAND_PAYLOADS = [
 ]
 
 
+# `push_remote` is hand-written argument parsing, and the scenario cases above
+# can only reach it through a real repository, which is far too heavy to cover
+# an option grammar. These drive it directly. Every entry is a command git
+# itself accepts, paired with the remote git would target.
+#
+# Two shapes here are regressions, both found by review rather than by this
+# suite: `-fo ci.skip` (a value-taking short option inside a CLUSTER) and
+# `--recurse-submodules on-demand` (a REQUIRED-argument long option, which
+# takes the space form even though the manual shows only `=`). Their mirror
+# is `--force-with-lease origin main`, whose argument is OPTIONAL and so does
+# NOT consume the next token -- listing it alongside the others resolved the
+# remote as `main`.
+PUSH_REMOTE_CASES = [
+    (["git", "push", "upstream", "main"], "upstream", "plain positional remote"),
+    (["git", "push", "origin", "main"], "origin", "the ordinary case"),
+    (["git", "push", "--repo", "upstream"], "upstream", "--repo separated"),
+    (["git", "push", "--repo=upstream"], "upstream", "--repo inline"),
+    (["git", "push", "-f", "upstream", "main"], "upstream", "a valueless short flag"),
+    (["git", "push", "-o", "ci.skip", "upstream", "main"], "upstream",
+     "-o takes the next token"),
+    (["git", "push", "-oci.skip", "upstream", "main"], "upstream",
+     "-o takes the rest of its own token"),
+    (["git", "push", "-fo", "ci.skip", "upstream", "main"], "upstream",
+     "-o ENDING a cluster still takes the next token"),
+    (["git", "push", "--push-option=x", "upstream", "main"], "upstream",
+     "the inline form of a value option"),
+    (["git", "push", "--receive-pack", "/p/rp", "upstream", "main"], "upstream",
+     "a separated long value option"),
+    (["git", "push", "--recurse-submodules", "on-demand", "upstream", "main"],
+     "upstream", "a REQUIRED-argument option takes the space form"),
+    (["git", "push", "--recurse-submodules=on-demand", "upstream", "main"],
+     "upstream", "and its inline form"),
+    (["git", "push", "--force-with-lease", "origin", "main"], "origin",
+     "an OPTIONAL-argument option does NOT take the next token"),
+    (["git", "push", "--force-with-lease=origin/main", "origin", "main"], "origin",
+     "nor its inline form"),
+    (["git", "push", "--signed", "origin", "main"], "origin",
+     "--signed's argument is optional too"),
+    (["git", "push", "--all", "origin"], "origin", "a mode flag before the remote"),
+    (["git", "push", "--dry-run", "upstream", "main"], "upstream",
+     "--dry-run takes no value"),
+    (["git", "push", "origin", "--delete", "branchname"], "origin",
+     "a flag AFTER the remote"),
+]
+
+
+def _load_hook_module():
+    """Import the hook under test by path, for the direct-call cases."""
+    spec = importlib.util.spec_from_file_location("_fcwb_under_test", HOOK)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_push_remote():
+    module = _load_hook_module()
+    wrong = 0
+    print("push_remote (direct calls):")
+    for argv, want, desc in PUSH_REMOTE_CASES:
+        got = module.push_remote(argv, os.getcwd())
+        ok = got == want
+        wrong += not ok
+        label = "ok   " if ok else "WRONG"
+        print(f"  {label} {' '.join(argv[1:]):<52} -> {got:<10} {desc}")
+    print(f"\n{len(PUSH_REMOTE_CASES) - wrong}/{len(PUSH_REMOTE_CASES)} "
+          "push_remote cases correct\n")
+    return wrong
+
+
 def test_main():
     wrong = 0
     print("should WARN:")
@@ -393,8 +463,9 @@ def test_mutations():
 
 
 if __name__ == "__main__":
+    w0 = test_push_remote()
     w1 = test_main()
     w2 = test_mutations()
     for d in TEMP_DIRS:
         shutil.rmtree(d, ignore_errors=True)
-    sys.exit(1 if (w1 or w2) else 0)
+    sys.exit(1 if (w0 or w1 or w2) else 0)

@@ -183,7 +183,18 @@ def _git_root(directory):
 # `git push` options that consume the NEXT token, so that token is a value
 # rather than the positional remote. `--repo` is handled separately because
 # its value IS the remote.
-_PUSH_VALUE_OPTS = {"-o", "--push-option", "--receive-pack", "--exec"}
+# Long options whose value is a SEPARATE token. git's parse-options accepts
+# the space form for any option with a REQUIRED argument, even where the
+# manual shows only `--opt=<value>`; an option with an OPTIONAL argument
+# (`--force-with-lease`, `--force-if-includes`, `--signed`) takes `=` alone
+# and must stay out of this set, or it swallows the remote.
+_PUSH_VALUE_OPTS = {
+    "--push-option", "--receive-pack", "--exec", "--recurse-submodules",
+}
+
+# Short options whose value is a separate token when the letter ends a
+# cluster. `-o` is git push's only one.
+_SHORT_VALUE_OPTS = "o"
 
 
 def push_remote(argv, cwd):
@@ -204,12 +215,19 @@ def push_remote(argv, cwd):
     this walks past the leading `git`, any pre-command git options, and `push`
     itself before reading positionals.
 
-    `_PUSH_VALUE_OPTS` lists ONLY options whose value is a separate token.
-    `--force-with-lease`, `--force-if-includes`, `--signed` and
-    `--recurse-submodules` take a value in their `=` form alone, so listing
-    them would eat the following token -- which is the remote. Measured while
-    writing this: with `--force-with-lease` listed,
-    `git push --force-with-lease origin feat/x` resolved to `feat/x`.
+    Two argument-grammar details decide this, and getting either wrong makes
+    the guard resolve a remote that does not exist and then skip in silence.
+
+    An option with a REQUIRED argument accepts the space form even where the
+    manual shows only `--opt=<value>`, so `--recurse-submodules on-demand`
+    consumes its value. An option with an OPTIONAL argument does not:
+    measured on git 2.50.1, `git push --force-with-lease origin feat/x`
+    targets `origin`, so listing `--force-with-lease` here made this resolve
+    `feat/x`.
+
+    A short option may also arrive in a CLUSTER. `-fo ci.skip` is `-f -o
+    ci.skip`, so an exact-token test against `-o` misses it and reads
+    `ci.skip` as the remote.
     """
     tokens = list(argv)
     while tokens and tokens[0] != "push":
@@ -237,6 +255,22 @@ def push_remote(argv, cwd):
             continue
         if tok in _PUSH_VALUE_OPTS:
             skip = True
+            continue
+        if tok.startswith("--"):
+            continue
+        if tok.startswith("-") and len(tok) > 1:
+            # A short-option CLUSTER. git accepts `-fo ci.skip` exactly as
+            # `-f -o ci.skip`, so an exact-token test against `-o` misses it
+            # and then reads `ci.skip` as the remote -- which resolves to no
+            # base and makes the guard skip in silence. Walk the letters: a
+            # value-taking one consumes the REST of the cluster when more
+            # follows it, and the NEXT token when it ends the cluster.
+            letters = tok[1:]
+            for i, ch in enumerate(letters):
+                if ch in _SHORT_VALUE_OPTS:
+                    if i == len(letters) - 1:
+                        skip = True
+                    break
             continue
         if tok.startswith("-"):
             continue

@@ -149,15 +149,6 @@ Two measured shapes, from 2026-09-02 and the small hours of 2026-09-03 Pacific:
   committed 2026-09-02 at 23:41 PDT, under an hour before these attempts.
   The clause was skipped five times in favour of the command example printed below it.
 
-**A third occurrence, 2026-09-05, of the second shape above.**
-Same hook, same last-simple-command condition, three refusals, and a request written as `gh api ... >/tmp/rr.txt 2>&1; echo rc=$?; head -c 400 /tmp/rr.txt` --- redirected away and followed by two more commands.
-Two of the three responses went to the forge instead of to the source: they checked whether a *review existed*, found one at the right commit, and concluded the guard was wrong about the world.
-Run bare, the identical request cleared it on the first try.
-
-It is the paragraph below that this occurrence bears on: the mechanism had been read, written into this corpus, and merged earlier the same day, and it was violated on the next call anyway.
-What the occurrence adds is which wrong move comes first.
-Going to the forge answers a question about the world when the refusal is a claim about the record --- and it always finds something, so it always feels like progress, which is why it took two responses rather than one.
-
 **Diagnosing a guard and changing the habit are separate acts**,
 which is the sharper half and the one no amount of reading prevents.
 In the second case above the mechanism was read,

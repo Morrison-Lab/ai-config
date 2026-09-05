@@ -271,7 +271,8 @@ intent.**
 **A defect NAMED in the PR body is not thereby disposed of --- the body is
 not one of ARD's three dispositions and leaves nothing behind that outlives
 the PR.**
-Those rules govern a body whose problem is drift.
+The rules above about a body going stale govern a body whose problem is
+drift.
 This one governs a body that is accurate: it states a real, open defect, in
 the author's own voice, under a heading like "Open items".
 Nothing about it is wrong, which is exactly the problem.

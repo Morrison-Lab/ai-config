@@ -81,6 +81,23 @@ FIRES = [
     ("chained push after a heredoc whose body ends in a real backslash",
      "cat <<'EOF'\nsome body line" + chr(92) + chr(10)
      + "EOF\n&& git push"),
+    # A literal `<<` inside an ORDINARY quoted string (a commit message
+    # quoting a retry count, a shift-left operator, a diff marker) is not a
+    # heredoc. Detecting heredocs before applying any quote awareness read
+    # it as a genuine, unterminated tag and masked everything after it to
+    # the end of the string -- silently swallowing the real chained `git
+    # push` that follows, on exactly the commit-then-push shape this hook
+    # exists to catch (measured 2026-09-05 review, third pass).
+    ("chained push after a commit message containing a literal << (double-quoted)",
+     'git commit -m "see << 3 retries" -q\ngit push'),
+    ("chained push after a commit message containing a literal << (single-quoted)",
+     "echo 'retry << 3 times'\ngit push"),
+    # A real heredoc following ordinary quoted text that itself contains
+    # `<<` -- the fake match inside the quote must be skipped so the REAL
+    # heredoc's body still gets masked, and the genuine push chained after
+    # it (via the newline following the terminator) still fires.
+    ("chained push after a real heredoc, with a quoted << earlier on the line",
+     'echo "a << b" && cat <<EOF\nbody\nEOF\ngit push'),
 ]
 
 QUIET = [
@@ -109,6 +126,8 @@ QUIET = [
     # inside it matched (measured 2026-09-05 review, second pass).
     ("git push inside the SECOND of two heredocs sharing one intro line",
      "cat <<'A' <<'B'\nbodyA\nA\ngit push origin main\nB"),
+    ("a literal << inside a quoted string, with no real heredoc or push",
+     'git commit -m "see << 3 retries" -q'),
 ]
 
 

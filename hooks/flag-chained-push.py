@@ -117,6 +117,55 @@ GIT_PUSH_RE = re.compile(r"\bgit\s+(?:-C\s+\S+\s+)?push\b")
 REDIRECT_RE = re.compile(r"&>{1,2}|\d*>{1,2}&?\d*")
 
 
+def _quoted_ranges(command: str) -> list[tuple[int, int]]:
+    """`(start, end)` ranges (exclusive, quote characters included) covering
+    every single- or double-quoted span in `command`.
+
+    Used to keep `_mask_heredocs` from treating a literal `<<` inside an
+    ordinary quoted string as a real heredoc introducer -- a commit message
+    quoting a diff marker or a shift-left operator (`git commit -m "see <<
+    3 retries"`) is not a heredoc, and `_mask_heredocs` used to run before
+    any quote awareness existed, so it found the fabricated tag, found no
+    real terminator for it, and masked everything to the end of the string
+    -- silently swallowing a real chained `git push` after it (measured
+    2026-09-05 review, third pass). Escaping rules match the quote-masking
+    pass in `_mask`: a double-quoted backslash escapes the next character,
+    a single-quoted one does not.
+    """
+    ranges = []
+    i, n = 0, len(command)
+    while i < n:
+        ch = command[i]
+        if ch in "'\"":
+            quote = ch
+            start = i
+            i += 1
+            while i < n and command[i] != quote:
+                if quote == '"' and command[i] == "\\" and i + 1 < n:
+                    i += 2
+                    continue
+                i += 1
+            if i < n:
+                i += 1  # consume the closing quote
+            ranges.append((start, i))
+        else:
+            i += 1
+    return ranges
+
+
+def _next_heredoc_start(command: str, pos: int, quoted: list[tuple[int, int]]):
+    """The next `HEREDOC_START` match at or after `pos` whose `<<` does NOT
+    fall inside one of `quoted`'s ranges, or `None`."""
+    while True:
+        m = HEREDOC_START.search(command, pos)
+        if not m:
+            return None
+        if any(s <= m.start() < e for s, e in quoted):
+            pos = m.end()
+            continue
+        return m
+
+
 def _mask_heredocs(command: str) -> str:
     """`command` with each heredoc BODY (and its terminator line) replaced by
     `x`, same length. The introducing line -- `<<TAG`, and everything on that
@@ -148,11 +197,20 @@ def _mask_heredocs(command: str) -> str:
     2026-09-05 review, second pass). All tags sharing one intro line are
     therefore collected up front, and their bodies are masked in order
     before the outer loop resumes.
+
+    Every search below goes through `_next_heredoc_start`, which skips a
+    `<<` that falls inside an ordinary quoted string -- `HEREDOC_START` has
+    no quoting awareness of its own, so a commit message like
+    `git commit -m "see << 3 retries"` was read as a genuine (and
+    unterminated) heredoc, and masking ran to the end of the string,
+    swallowing a real chained `git push` after it (measured 2026-09-05
+    review, third pass).
     """
+    quoted = _quoted_ranges(command)
     out = list(command)
     pos, n = 0, len(command)
     while True:
-        m = HEREDOC_START.search(command, pos)
+        m = _next_heredoc_start(command, pos, quoted)
         if not m:
             break
         line_end = command.find("\n", m.end())
@@ -162,7 +220,7 @@ def _mask_heredocs(command: str) -> str:
         tags = [m]
         search_from = m.end()
         while True:
-            nxt = HEREDOC_START.search(command, search_from)
+            nxt = _next_heredoc_start(command, search_from, quoted)
             if nxt is None or nxt.start() >= line_end:
                 break
             tags.append(nxt)

@@ -727,6 +727,14 @@ The gap is any other brief that asks something to act as an adversarial reviewer
 (ai-config#2444, 2026-08-27: filed on the lag diagnosis, which running `read_latest_review`/`parse_report` directly against the session transcript then refuted --- it returned the older `needs_work` verdict from a mid-session dispatch rather than a stale read of a same-turn one.
 The issue's body was rewritten afterwards to lead with the corrected diagnosis and keep the lag theory behind a marked `<details>` block, so read it as the corrected account rather than the filed one.)
 
+**A verdict line that is absent altogether falls into the same trap, not a different one.**
+Measured 2026-09-04: a dispatched reviewer returned a full report ending "No findings." plus a `review-data` JSON block reading `"verdict": "CLEAN"`, with no `### Verdict:` line anywhere in the report.
+`read_latest_review` found nothing to parse from this dispatch and kept the **previous** round's `needs_work`, so the guard refused the push reporting a blocking verdict over a review that had found nothing.
+The fix is the same one this section already gives: state the required line explicitly in the brief, as a literal `### Verdict: Ready for merge` outside any code fence or HTML comment, and require the `review-data` payload to agree with it --- the two representations disagreeing (a `### Verdict: Ready for merge` line paired with a `review-data` payload naming findings) is itself a defect in the report, per this file's "Structured review data" section below.
+
+- **Do:** treat a report with no verdict line at all as the identical failure to a heading-separated one --- both leave the guard holding a stale prior verdict.
+- **Don't:** assume a report that "sounds clean" (ends in "No findings.", carries a clean JSON payload) discharges the guard without the literal verdict line the parser requires.
+
 **A separate, real constraint: the guard tracks one global latest verdict, not one per branch.**
 `read_latest_review` scans the whole transcript and keeps overwriting a single `(verdict, reviewed_commit)` pair with whatever it parses next, with no branch scoping at all.
 Reviewing branch A (clean, commit `X`) and then branch B (clean, commit `Y`) leaves `Y` as the global "latest" pair;

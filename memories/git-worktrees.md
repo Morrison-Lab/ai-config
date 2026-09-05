@@ -1158,25 +1158,23 @@ The prior instance in [`CLAUDE.cases.md`](../CLAUDE.cases.md) records the same
 unassigned-isolation slip with no harmful consequence available; this is the
 consequence.)
 
-## A read-only `cd` into a peer's worktree, or a REFUSED checkout, still arms `no-unshipped-commit.py`
+## A read-only `cd` into a peer's worktree, or a REFUSED checkout, can arm `no-unshipped-commit.py`
 
-Sibling to the section above, same family (a repo scan drawing a conclusion from context that is not the session's own), different mechanism: `no-unshipped-commit.py` (unpushed commits, not uncommitted diffs) fires from inspecting a separate PEER worktree, not from working inside the primary one.
-
-It scopes its `Stop` check to worktrees "active in this session" (`cwd`, touched paths, touched branches;
-`no-unshipped-commit.py:468-489`).
-The scoping is correct; what counts as "active" is not.
-A read-only visit and a git-refused command both register as activity.
+Sibling to the section above, same family (a repo scan drawing a conclusion from context that is not the session's own), different mechanism: `no-unshipped-commit.py` (unpushed commits, not uncommitted diffs) fired from inspecting a separate PEER worktree, not from working inside the primary one.
 
 Measured 2026-09-04 on `ucdavis/hac.sap`: a session `cd`'d into a peer's worktree only to inspect it, exactly what [`CLAUDE.md`](../CLAUDE.md)'s "Subagent worktrees are assigned" section requires, and separately ran a `git checkout -B` that git refused (`fatal: ... already used by worktree`).
-Both left a mark: the `cd` populated `extract_touched_paths`'s targets, and the refused checkout still added the branch to `touched_branches`, since `BRANCH_CMD` matches command text, not exit status.
 The hook then blocked `Stop`, reporting four of a live peer's unpushed commits (one a breaking `fix!:`) as this session's to push.
 
-Filed as [ai-config#3272](https://github.com/Morrison-Lab/ai-config/issues/3272) (open;
-do not re-file, its own follow-up comment already corrects the cause to this mechanism).
-Until it lands:
+Filed as [ai-config#3272](https://github.com/Morrison-Lab/ai-config/issues/3272) (open; do not re-file).
+Its own follow-up comment names the mechanism as it stood at filing time: a read-only visit and a failed checkout both registered as "touched."
+**Do not cite that comment's function or variable names as current** --- `no-unshipped-commit.py` has since accumulated several unrelated attribution fixes per its own docstrings (ai-config#2422, #2737, #3236), so a name correct at filing time can already be stale;
+re-derive from the live source before quoting internals, which is this entry's own near-miss on the first draft (an adversarial review caught fabricated names and a stale line range copied from the issue rather than re-checked against the code).
+A re-read of the current `scan_transcript` found that a call containing only a `cd`/`checkout` with no `git commit` in it no longer contributes to the tracked branches or paths at all (the function's own docstring: "Visiting is not committing," ai-config#2422), so the plain read-only-`cd` trigger may already be closed.
+Whether a *refused* checkout inside the same call as a real commit still registers (the command is read as text, with no exit-status check visible in that read) was not re-verified here.
 
-- **Do:** inspect a peer worktree with `git -C <path>` reads (`status`, `log`, `rev-parse`), never a bare `cd`.
-- **Do:** expect a refused `checkout`/`switch`/`branch` to still register as touched.
-- **Don't:** trust a failed command left no trace; `touched_branches` does not check exit status.
+Until the issue resolves, or its current state is re-checked:
+
+- **Do:** inspect a peer worktree with `git -C <path>` reads (`status`, `log`, `rev-parse`), never a bare `cd`, as a general precaution regardless of this hook's current state.
+- **Do:** re-read the hook's live source, not this entry or the issue comment, before asserting whether the bug still reproduces.
 - **Don't:** comply with "push the branch" when the flagged worktree belongs to a peer confirmed live;
-  publishing another session's unreviewed, possibly mid-amend commits is unsafe regardless of the trigger.
+  publishing another session's unreviewed, possibly mid-amend commits is unsafe regardless of the trigger or whether the hook's report is accurate.

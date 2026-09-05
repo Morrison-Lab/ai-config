@@ -367,16 +367,21 @@ an "all four sites" claim false under its own context;
 and "exactly two" where the query returns three.
 
 The mechanism: writing a comment reads as explaining, not asserting, so the claim-checking reflex `metacognitive-monitoring.md` names for State and Scope claims does not fire on it by default.
-`flag-uncounted-comment-claims.py` and `flag-uncited-rebuttal.py` gate only outgoing `gh`/`glab` comment bodies, and `fact-check-prose.md` explicitly excludes code comments, so a false claim written into shipped code is invisible to every existing guard.
+`fact-check-prose.md`'s "Applies to your own PR descriptions and comments too" section already requires fact-checking a self-authored code comment, but its worked example and stated test are about a **design-choice** claim: does the code actually implement what the comment says it does.
+None of the eight failures above are that shape;
+they are checkable facts about the *repo itself* (a grep's scope, an issue's coverage, a call site's consumers, a count), asserted in review-round prose (a PR reply, an ARD explanation) rather than a justification for code just written, so whether that existing rule was meant to reach this shape too is worth re-deriving rather than assuming from its own worked example.
+`flag-uncounted-comment-claims.py` and `flag-uncited-rebuttal.py` gate only outgoing `gh`/`glab` comment bodies (confirmed against both hooks' source), so a false repo-state claim written straight into a code comment is invisible to either.
 
-- **Do:** before any PR reply, ARD explanation, or code comment asserts a checkable repo fact (a grep result, an issue's scope, a call site's consumers, a count), run the query and cite what it returned.
+- **Do:** before any PR reply, ARD explanation, or code comment asserts a checkable repo fact (a grep result, an issue's scope, a call site's consumers, a count), run the query and cite what it returned, the same discipline `fact-check-prose.md` already applies to a design-choice claim.
 - **Do:** name a drafted comment's claim type (state, scope, count) before posting or committing it.
 - **Don't:** let expository framing ("to verify X", "the only consumer is Z") substitute for having verified X or enumerated every consumer of Z.
 - **Don't:** treat correct mechanics as proof the accompanying prose is correct;
   here it wasn't, five times running.
+- **Don't:** cite another file's internal names, line numbers, or mechanism details without re-deriving them from the live source first;
+  this entry's own first draft fabricated hook internals from a stale issue comment, caught only by adversarial review (see `git-worktrees.md`'s companion entry).
 
 See [ai-config#3150](https://github.com/Morrison-Lab/ai-config/issues/3150) (open hook-level fix for `gh`/`glab` comment bodies;
-it does not reach comments written into shipped code, which is this gap).
+it does not reach comments written into shipped code).
 
 ## Python regex features must fit the oldest runtime that will run the script
 
@@ -1086,8 +1091,7 @@ space/tab, and require the count to be `>= 3`.
 
 (Both surfaced on Morrison-Lab/gha#403, 2026-08-03, in the same
 `strip-non-invoking-markup.sh`.
-Sibling embedding trap: a bare `---` at column 0 inside a YAML `run: |` block is
-a document separator that truncates the generated script.)
+Sibling embedding trap: a bare `---` at column 0 inside a YAML `run: |` block is a document separator that truncates the generated script.)
 
 ## awk brace handling differs by implementation, in both directions
 

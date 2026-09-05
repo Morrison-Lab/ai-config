@@ -729,9 +729,9 @@ Two of the three cost their own fix commit afterwards --- `e89ee1e9d` for the
 docstring and `b7e4b8d32` for the `hooks.json` note.
 The README row cost none: `git log 9ccf8dbc3..refs/pull/3180/head -- README.md`
 is empty, so it was corrected inside the merge itself.
-`65b538bd6` is on `main`; `ca9d31bbe`, `e89ee1e9d` and `b7e4b8d32` are
-pre-squash and reachable only from `refs/pull/3180/head`, so fetch that ref
-before running `git show` on them.)
+`65b538bd6` is on `main`; `9ccf8dbc3`, `ca9d31bbe`, `e89ee1e9d` and
+`b7e4b8d32` are pre-squash and reachable only from `refs/pull/3180/head`, so
+fetch that ref before running `git show` or `git log` on them.)
 
 ## The batch pass
 

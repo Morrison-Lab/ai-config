@@ -383,7 +383,7 @@ Reading the test is not a substitute.
 A vacuous test usually looks targeted,
 because it was written from the same mental model that produced the fix.
 
-Eight distinct mechanisms can make a test pass against the reverted fix:
+Nine distinct mechanisms can make a test pass against the reverted fix:
 
 - **Wrong entry point.**
   The test calls a helper directly,
@@ -426,12 +426,47 @@ Eight distinct mechanisms can make a test pass against the reverted fix:
   It is likeliest when the defect is input-shaped,
   since the payload has to be malformed to reach the bug,
   and malformed is what the layer above rejects it for.
+- **Mirrored misunderstanding.**
+  The expectation was never checked against an authority outside the diff ---
+  it was read off the implementation itself,
+  or off the same false belief that produced the implementation,
+  so the test and the code agree with each other and disagree with the tool.
+  It differs from **Wrong expectation** in where the wrongness comes from:
+  that entry's expectation contradicts the specification however it was arrived at,
+  while this one's expectation was never derived from the specification at all.
+  It differs from **Coincident fixture** too:
+  there the fixture's *values* happen to make two paths agree;
+  here the *belief* behind the assertion is shared with the belief behind the bug,
+  on any fixture.
+  That is what makes it survive an ordinary review pass:
+  reading the test against the code confirms agreement,
+  and agreement is what a check for "does the test match the intent" is looking for ---
+  the two lines are consistent with each other and both wrong.
+  It also defeats the mutation remedy this section is about to give,
+  which is why it needs calling out separately:
+  mutating the fix assumes a correct fix already exists to mutate away from,
+  and here the wrong behaviour IS the only behaviour in place when the test is written,
+  so there is nothing yet to revert.
+  The test was measured against a manual, not mutated, to be caught.
+  Reproduced on Morrison-Lab/ai-config#3175: a parser resolved `git push`'s
+  target remote by checking `--repo` before the positional argument, and its
+  test asserted `git push --repo upstream feat/estimand` targets `upstream`.
+  `man git-push` states the opposite under `--repo=<repository>`: "This
+  option is equivalent to the `<repository>` argument.
+  If both are specified, the command-line argument takes precedence."
+  Fixing the parser to match the manual broke the test, which is how the
+  shared inversion surfaced --- not a mutation run, since no correct
+  implementation existed yet for one to revert.
 
 Those are test bugs,
 not merely weak tests.
-A suite with all eight can still be green,
+A suite with all nine can still be green,
 and coverage can still report the lines as exercised.
-Only the mutation answers whether the assertion depends on the fix.
+The mutation remedy below answers whether the assertion depends on the fix
+for eight of the nine;
+**Mirrored misunderstanding** needs the fixture's expected value checked
+against a source outside the diff instead, since there is no correct fix yet
+to mutate away from.
 
 - **Do:** mutate the exact fix and watch the new test fail before trusting it.
 - **Do:** route the fixture through the real entry point
@@ -450,6 +485,12 @@ Only the mutation answers whether the assertion depends on the fix.
 - **Don't:** read a representative fixture as a discriminating one ---
   representativeness is a claim about typical inputs,
   and a guard needs an input the two candidate behaviours disagree on.
+- **Do:** for an expected value about a third-party tool's own behaviour,
+  derive it from that tool's documentation or a fresh measurement,
+  never from what the implementation under test already returns.
+- **Don't:** trust agreement between a test and its implementation as evidence either is right ---
+  when both were written from the same mental model,
+  agreement is exactly what a **Mirrored misunderstanding** produces.
 
 See [`fact-check-code-logic.cases.md`](fact-check-code-logic.cases.md),
 "Mutate the fix, not only the test --- a fixture ordered like the table".

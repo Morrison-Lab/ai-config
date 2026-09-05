@@ -327,7 +327,8 @@ consuming the `m`, so `-Cm`/`-cm`/`-tm`/`-Sm`/`-um` were misread as carrying a
 message --- was written into the PR body under the heading
 "Open items (not fixed, quota stop)" and carried forward unfixed.
 No adversarial round that followed raised it; the forge review did, and it was
-fixed in `1b20884a1`, the second-to-last commit on the branch.
+fixed in `1b20884a1`, the second-to-last commit on the branch --- pre-squash,
+so fetch `refs/pull/3180/head` before running `git show` on it.
 The body itself supplies two author-side reasons alongside the disclosure ---
 the round had stopped on quota, and the item is graded there as costing "one
 spurious warning" --- so this record shows the *outcome* the rule is about and

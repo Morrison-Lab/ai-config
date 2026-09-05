@@ -595,7 +595,8 @@ answer a reader in a fresh clone will get.
 
 ```bash
 git merge-base --is-ancestor <sha> origin/<default>   # 0 = a fresh clone reaches it
-git ls-remote origin "refs/pull/<N>/head"             # non-empty = the forge still has it
+git ls-remote origin "refs/pull/<N>/head"             # non-empty = the REF exists; says
+                                                      # nothing about your <sha>
 git fetch origin "refs/pull/<N>/head" && git show <sha>
 ```
 

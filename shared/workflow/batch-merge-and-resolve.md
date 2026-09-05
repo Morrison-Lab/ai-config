@@ -719,7 +719,10 @@ old commit: a docstring saying the patterns were COPIED where the file now
 imports them, a `hooks.json` `_note_fails_silent` describing a live
 catastrophic stall that `#3172` had already fixed, and a README parking row.
 Each cost its own review round --- `e89ee1e9d`, `b7e4b8d32` and the
-registration restore respectively.)
+registration restore respectively.
+`65b538bd6` is on `main`; `ca9d31bbe`, `e89ee1e9d` and `b7e4b8d32` are
+pre-squash and reachable only from `refs/pull/3180/head`, so fetch that ref
+before running `git show` on them.)
 
 ## The batch pass
 

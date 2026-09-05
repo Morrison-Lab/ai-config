@@ -221,14 +221,15 @@ Confirm which physical branch is "ours" before you reach for `--ours` /
   asked to resolve.
 - ❌ Force-pushing a half-resolved merge/rebase.
 - ❌ Restoring a whole file from a pre-merge commit
-  (`git show <old>:<path> > <path>`) to recover one entry — that reverts every
+  (`git show <old>:<path> > <path>`) to recover one entry --- that reverts every
   other change the file has taken, including everything the merge just brought
-  in. Take the baseline from the index rather than from an old commit: once
-  the path is resolved, `git show :<path>` is stage 0, the merged content git
-  already computed. While the path is *still conflicted* there is no stage 0
-  and that command fails --- use `:1:`/`:2:`/`:3:` (above) to rebuild the
-  resolution, then swap the one hunk you came for. See
+  in. Rebuild the resolution from the conflict stages (`:1:`/`:2:`/`:3:`, above)
+  and swap in only the hunk you came for. Note that `git show :<path>` is not a
+  safe baseline here: while the path is conflicted it has no stage 0 and the
+  command fails, and once you have staged a resolution stage 0 holds *your*
+  content --- so if the bad restore is what you staged, that is what comes back.
+  See
   [`batch-merge-and-resolve`](../../shared/workflow/batch-merge-and-resolve.md)'s
   "The recovery has a silent failure mode of its own, and no merge produces
-  it" --- which is why the batch pass's per-merge re-check never surfaces this
+  it", which is why the batch pass's per-merge re-check never surfaces this
   one.

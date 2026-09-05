@@ -665,22 +665,24 @@ When it is, build; when it is not, say what survives and name the loss.
 
 (Morrison-Lab/ai-config#3180, 2026-09-04.
 One case-record paragraph in this file was rewritten five times ---
-`186577c62`, `85101fe1c`, `626209e68`, `7a797d3f8`, `bd8b1bfcc` --- each
-refuted by the history rather than by argument, and each on a clause the
-previous rewrite had not touched: a misattributed PR, an amend chain that
-cannot span two separately-merged PRs, evidence citing commits reachable from
-zero refs, an overstated reason for a rule that was itself correct, and finally
-a conjunction that could never hold.
-`85101fe1c`'s message names the move that ended it --- "the record now says
-what it can verify and names the rest as unrecoverable".
-The fifth, `bd8b1bfcc`, is 6 insertions against 7 deletions: a shorter
+`186577c62`, `85101fe1c`, `626209e68`, `7a797d3f8`, `bd8b1bfcc`, all pre-squash
+on that PR, so fetch `refs/pull/3180/head` before running `git show` on them.
+Read the five messages rather than a summary of them: each states its own
+finding, and no shorter list maps cleanly onto the five, which is itself the
+section's point.
+Two things about the series are derivable and worth stating.
+Every refutation came from the history rather than from argument --- a
+misattributed PR, a chain that cannot span two separately-merged PRs, evidence
+citing commits reachable from zero refs, an overstated reason for a rule that
+was itself correct, a conjunction that could never hold.
+And the convergent move was named *before* it was performed: `85101fe1c`, the
+second of the five, already says "the record now says what it can verify and
+names the rest as unrecoverable", and three further refutations followed it.
+Naming the remedy is not applying it, and the three rewrites after that one are
+the evidence for this section rather than an exception to it.
+`bd8b1bfcc`, the fifth, is 6 insertions against 7 deletions --- a shorter
 replacement rather than a pure deletion, which is the usual shape of the
-convergent version --- it still says something, just less than the record
-could not support.
-Every one of those SHAs is pre-squash, so fetch `refs/pull/3180/head` before
-running `git show` on them, per
-[`git`](../../memories/git.md)'s "Citing evidence that lives in a PR's own
-superseded commits".)
+convergent version.)
 
 ## A definition can resolve, render, and still say nothing
 

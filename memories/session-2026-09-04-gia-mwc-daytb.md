@@ -946,3 +946,19 @@ Still open from wave 3: #3248 (opus fixer running), #3254 (opus fixer running), 
 - Wave 3 is terminal: all ten PRs (#3248 to #3257) merged.
   The UMS pass for the wave merged as #3263.
   Remaining: this notebook's part-5 PR.
+
+## 17:27 PDT --- notebook part-5 PR #3264 opened
+
+- PR #3264 (`docs/session-notebook-2026-09-04-part5`, 79c29ee6, Refs #3203) opened via MCP, claimed with @jules review, Copilot requested, subscribed.
+  This entry and any later ones ride in a follow-up push before merge.
+- Open PRs this session: #3264 only.
+  Snapshots left unpushed: wt-2458, wt-2981, wt-3001 (findings recorded on their issues).
+
+## 17:30 PDT --- PR #3264 Ready; closing entry
+
+- Claude review Ready at 79c29ee6 with no findings; Jules reviewing.
+  This push carries the two entries written after the PR opened;
+  merge on the re-review under the standing ai-config grant.
+- Session state at close: every PR this session opened is merged except PR #3264;
+  the check-in trigger trig_01MAw3sdVeap2xTTAap7eAhA fires 18:20 PDT and is the last one to arm unless PR #3264 is still open then.
+  No new issues grabbed, per the user's directive.

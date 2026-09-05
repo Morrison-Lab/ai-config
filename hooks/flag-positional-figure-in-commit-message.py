@@ -258,6 +258,13 @@ def _read_file(path, cwd):
 
 RX_SHORT_CLUSTER = re.compile(r"-[A-Za-z]+$")
 
+# Short flags of `git commit` that consume a value. The first of these in a
+# cluster takes the rest of the token, so only the ones carrying a MESSAGE
+# (`m`, `F`) can yield one. Verified against real git rather than the manual:
+# `-Cm x`, `-cm x`, `-tm x`, `-Sm x` and `-um x` each fail in a way showing
+# the leading letter ate the `m`, while `-am` and `-sm` commit normally.
+VALUE_TAKING_SHORT_FLAGS = frozenset("CcFmtSu")
+
 
 def short_flag_value(tok):
     """(letter, attached_value_or_None) for a short flag carrying a message.
@@ -268,11 +275,20 @@ def short_flag_value(tok):
     invocations there is, so that miss is a large silent blind spot rather
     than an edge case.
 
-    The scan walks the cluster and stops at the first value-taking letter
-    (`m` or `F`), which is how git itself reads it: anything after that
-    letter in the same token is the attached value, so `-ams` is `-a -m s`
-    and `-ma` is `-m a` -- neither takes the NEXT token. A value-taking
-    letter in final position takes the next token instead.
+    The scan walks the cluster and stops at the first value-taking letter,
+    which is how git itself reads it: anything after that letter in the same
+    token is the attached value, so `-ams` is `-a -m s` and `-ma` is `-m a`
+    -- neither takes the NEXT token. A value-taking letter in final position
+    takes the next token instead.
+
+    `m` and `F` are not the only value-taking letters, and treating them as
+    such is a false-positive source rather than a missed case. `git commit`
+    also takes a value for `-C`, `-c`, `-t`, `-S` and `-u`, so in `-Cm` the
+    `C` consumes the `m` and there is no message in the token at all.
+    Measured against real git: `-Cm x` gives "could not lookup commit 'm'",
+    `-cm x` the same, `-tm x` treats `x` as a pathspec, `-Sm x` likewise,
+    and `-um x` gives "Invalid untracked files mode 'm'" -- while `-am` and
+    `-sm` do carry a message, because `a` and `s` take no value.
 
     Returns None for a token that is not a short-flag cluster (`--message`,
     a path, a `--` terminator) or carries no value-taking letter (`-v`).
@@ -288,8 +304,13 @@ def short_flag_value(tok):
     if not RX_SHORT_CLUSTER.match(tok):
         return None
     for i, ch in enumerate(tok[1:], start=1):
-        if ch in ("m", "F"):
-            return ch, (tok[i + 1:] or None)
+        if ch in VALUE_TAKING_SHORT_FLAGS:
+            # The first value-taking letter consumes the rest of the token.
+            # Only `m` and `F` carry a message; the others swallow it, so
+            # there is nothing in this token to warn about.
+            if ch in ("m", "F"):
+                return ch, (tok[i + 1:] or None)
+            return None
     return None
 
 

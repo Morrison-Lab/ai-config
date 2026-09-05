@@ -146,6 +146,22 @@ CASES = [
      False, "-ams is `-a -m s`: m is not last, so the next token is not the message"),
     (bash('git commit -av'),
      False, "a cluster with no value-taking letter stays silent"),
+    # A value-taking letter BEFORE m eats the m, so the token carries no
+    # message at all. Each of these was measured against real git: -Cm and
+    # -cm give "could not lookup commit 'm'", -tm and -Sm make the next token
+    # a pathspec, and -um gives "Invalid untracked files mode 'm'".
+    (bash('git commit -Cm "the note 13 lines above"'),
+     False, "-Cm is `-C m`: C eats the m, so there is no message here"),
+    (bash('git commit -cm "the note 13 lines above"'),
+     False, "-cm is `-c m`: c eats the m"),
+    (bash('git commit -tm "the note 13 lines above"'),
+     False, "-tm is `-t m`: t eats the m"),
+    (bash('git commit -Sm "the note 13 lines above"'),
+     False, "-Sm is `-S m`: S takes an optional attached keyid"),
+    (bash('git commit -um "the note 13 lines above"'),
+     False, "-um is `-u m`: u takes an optional attached mode"),
+    (bash('git commit -sm "the note 13 lines above"'),
+     True, "-sm still fires: s takes no value, so m is the message flag"),
     (bash('git commit -am'),
      False, "a dangling cluster with no value fails silent"),
     (bash('git commit --message="the note 13 lines above"'),

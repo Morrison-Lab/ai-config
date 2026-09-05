@@ -350,13 +350,20 @@ Measured 2026-09-05, on a session that had spent hours in the same sitting
 finding and fixing exactly this defect in other people's work --- an
 imaginary hook (Morrison-Lab/ai-config#3189), a citation naming a file that
 did not carry the claim (#3269), a fabricated quotation attributed to a
-hook's docstring (#3293).
+hook's docstring, caught and fixed within the same PR's own history rather
+than by a later pass (#3293's own follow-up commit, "quote the hook's real
+words, not a paraphrase of them").
 Writing a code comment to justify why a permission guard must fail closed
 under ambiguity, the same session asserted that a specific file
 (`docs/opencode-hook-mapping.md`) "carries verdict-shaped example strings" as
 supporting evidence that the failure mode arises with nobody attacking.
-It does not: `grep -ic "verdict\|reviewed-commit"` on that file returns 0 in
-every revision.
+It did not: at the revision the comment was written against (commit
+`30c32d5e6`, the only one that existed at the time), `grep -ic
+"verdict\|reviewed-commit"` on that file returned 0.
+(A later commit on the same still-open PR, `d7c92f9dd`, added a line
+matching that pattern --- itself a reminder that a state claim about a live
+branch is accurate for the revision measured and no later one, per
+[`timestamp-volatile-claims`](../writing/timestamp-volatile-claims.md).)
 The argument itself was sound and needed no such example --- any subagent
 output rendering an example of the guard's own report format reaches the same
 state --- so the fabricated citation was not load-bearing, only decorative,

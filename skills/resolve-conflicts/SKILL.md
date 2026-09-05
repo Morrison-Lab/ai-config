@@ -226,9 +226,10 @@ Confirm which physical branch is "ours" before you reach for `--ours` /
   in.
   Rebuild the resolution from the conflict stages (`:1:`/`:2:`/`:3:`, above)
   and swap in only the hunk you came for.
-  Note that `git show :<path>` is not a safe baseline here: while the path is conflicted it has no stage 0 and the
-  command fails, and once you have staged a resolution stage 0 holds *your*
-  content --- so if the bad restore is what you staged, that is what comes back.
+  Note that `git show :<path>` is not a safe baseline here.
+  While the path is conflicted it has no stage 0 and the command fails, and
+  once you have staged a resolution stage 0 holds *your* content --- so if the
+  bad restore is what you staged, that is what comes back.
   See
   [`batch-merge-and-resolve`](../../shared/workflow/batch-merge-and-resolve.md)'s
   "The recovery has a silent failure mode of its own, and no merge produces

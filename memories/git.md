@@ -588,9 +588,16 @@ unknown-revision error.
 question about your own ref set rather than about a fresh clone: it scans
 every local ref, so a pre-squash SHA any local ref still holds comes back
 reachable.
-On a SHA the local object store does not have --- the fresh-clone case --- it
-does not report unreachable at all: measured on git 2.50.1, it exits 129 with
-`error: no such commit <sha>`, which reads like a mistyped SHA.
+Its two answers, both measured on git 2.50.1, differ by whether the object is
+in the local store.
+Present but on no local ref's ancestry --- the ordinary state after a
+squash-merge and branch deletion --- it exits 0 with zero bytes of output,
+which reads as "no ref reaches this" even when `refs/pull/<N>/head` carries it
+on the remote.
+That reading is the one [#3275](https://github.com/Morrison-Lab/ai-config/issues/3275)
+made.
+Absent, the fresh-clone case, it does not report unreachable at all: it exits
+129 with `error: no such commit <sha>`, which reads like a mistyped SHA.
 
 ```bash
 git merge-base --is-ancestor <sha> origin/<default>   # 0 = a fresh clone reaches it

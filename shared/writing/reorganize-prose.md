@@ -308,11 +308,27 @@ sweeps above.
 - **Don't:** reword a self-reference broken by a merge instead of reordering
   --- rewording edits prose neither branch actually wrote.
 
-(`Morrison-Lab/ai-config#3173`, 2026-09-04: an adversarial review caught an
-opening back-reference that stopped describing what sat immediately above it
-once an append-collision resolution interposed an unrelated section between
-the two.
-The fix was to reorder the two sections rather than reword either one.)
+(Measured 2026-09-05 while syncing
+[`Morrison-Lab/ai-config#3173`](https://github.com/Morrison-Lab/ai-config/pull/3173)
+with `main`.
+The collision was in `shared/coding/avoid-hardcoding-external-data.md`, which
+that PR does touch: the branch appended "A suite's pass count is a liability
+twice over when written as an expectation" at the same point `main` had
+appended "A figure with no source of truth cannot be pinned into
+reproducibility".
+Keeping both put `main`'s section first, which stranded the branch section's
+opening line --- "The sections above govern a claim about a block the same
+file carries --- a count of its items, or a generalization over them" ---
+since the section now directly above it was about neither.
+An adversarial review caught it, and the fix was to swap the two rather than
+reword either.
+
+The event is not visible in that PR's title or its squashed subject, because
+it happened inside the sync merge rather than in the work the PR set out to
+do.
+That is the general case for this failure and the reason to name the file and
+both headings here: a merge-arrival defect leaves no artifact a bare PR
+number would lead a reader to.)
 
 ## Relationship to other rules
 

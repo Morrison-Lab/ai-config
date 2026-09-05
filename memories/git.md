@@ -618,9 +618,92 @@ c10ed45                  fix: exclude artifact outputs from provenance (#449)  <
 So the safe default is to cite what survives **every** strategy: the PR or
 issue number, a permalink to the file at a merged commit, or the CI job URL.
 Reach for a branch SHA only when the merge has already happened and you have
-checked that specific commit with `git merge-base --is-ancestor`.
+checked that specific commit with `git merge-base --is-ancestor` --- or, when
+that check fails, only alongside the PR number, per the section below.
 
-That is not a hypothetical.
+**A pre-squash SHA is unreachable, not absent, and the difference decides the
+remedy.**
+`refs/pull/<N>/head` survives the squash and the branch deletion.
+What a squash removes is *ancestry*: nothing under `refs/heads/*` reaches those
+objects, and the default fetch refspec is `+refs/heads/*:refs/remotes/origin/*`,
+so a fresh clone never downloads them and `git show <sha>` fails there with an
+unknown-revision error.
+
+**Settle reachability against the remote, never against your own ref set.**
+`git for-each-ref --contains` is the wrong probe here, because it answers a
+question about your own ref set rather than about a fresh clone: it scans
+every local ref, so a pre-squash SHA any local ref still holds comes back
+reachable.
+Its two answers, both measured on git 2.50.1, differ by whether the object is
+in the local store.
+Present but on no local ref's ancestry --- the ordinary state after a
+squash-merge and branch deletion --- it exits 0 with zero bytes of output,
+which reads as "no ref reaches this" even when `refs/pull/<N>/head` carries it
+on the remote.
+That reading is the one [#3275](https://github.com/Morrison-Lab/ai-config/issues/3275)
+made.
+Absent, the fresh-clone case, it does not report unreachable at all: it exits
+129 with `error: no such commit <sha>`, which reads like a mistyped SHA.
+
+```bash
+git merge-base --is-ancestor <sha> origin/<default>   # 0 = a fresh clone reaches it
+git ls-remote origin "refs/pull/<N>/head"             # non-empty = the REF exists; says
+                                                      # nothing about your <sha>
+git fetch origin "refs/pull/<N>/head" && git show <sha>
+```
+
+`--is-ancestor` needs the object present locally to answer at all, so run it
+after the fetch when the SHA does not resolve yet.
+
+So a pre-squash SHA *is* citable, provided you say where to fetch it from.
+Name the PR beside the SHA and the reader has the ref; give the bare SHA and
+they get an error that reads like a typo.
+
+**What `refs/pull/<N>/head` cannot recover is anything off the final head's
+ancestry.**
+That ref points at the PR's final head, so it reaches that head and its
+ancestors and nothing else.
+Anything a force-push removed from that line --- a message that was amended, a
+commit dropped or reordered in a rebase, an intermediate squashed away --- is
+on no ancestry at all, so no ref reaches it and no fetch brings it down.
+There the honest record says so, rather than citing a SHA and leaving the
+reader to discover there is nothing to fetch.
+`shared/writing/fact-check-prose.md`'s "When each rewrite is refuted on a NEW
+clause" section is what that costs when the record tries to reconstruct it
+anyway.
+
+- **Do:** cite the squash commit on the default branch when one exists.
+- **Do:** name the PR number beside any pre-squash SHA, so the reader knows to
+  fetch `refs/pull/<N>/head` first.
+- **Do:** settle reachability with `git merge-base --is-ancestor <sha>
+  origin/<default>`, whose answer is the one a fresh clone gets.
+- **Don't:** settle it with `git for-each-ref --contains`, which scans your own
+  refs and so answers a different question than a fresh clone would.
+- **Don't:** write a bare pre-squash SHA into durable guidance --- it resolves
+  in your checkout and errors in a fresh clone, and the error looks like a
+  typo.
+- **Don't:** cite a SHA that a force-push took off the final head's ancestry;
+  `refs/pull/<N>/head` does not reach it, and no ref does.
+
+(Morrison-Lab/ai-config#3180, 2026-09-04, which broke this rule in two of its
+own passages --- `fully-clean.md` and `check-pr-fully-clean.py` both cited
+`16544c50` and `7e1294b0`, pre-squash heads of #3167, caught in `7a797d3f8`,
+which is itself pre-squash on #3180 --- so the two SHAs and the commit that
+caught them are fetched from different refs.
+A pre-existing instance is open as
+[#3275](https://github.com/Morrison-Lab/ai-config/issues/3275), whose
+conclusion stands and whose stated reasoning does not: it argues from a
+`for-each-ref` reading that the object survives only in one checkout, which is
+the misconception this section corrects.
+[`grep-is-not-coverage`](../shared/workflow/grep-is-not-coverage.md) carries
+the measured recipe on a different PR: `git ls-remote origin
+refs/pull/3060/head` returns `f9068299`, the default refspec is
+`+refs/heads/*:refs/remotes/origin/*` in the measuring clone so that ref is
+not brought down, and the record anchors instead on commits that
+`git merge-base --is-ancestor ... origin/main` accepts.)
+
+That a repository's merge strategy is chosen per pull request, and so cannot
+be read off the last one, is not a hypothetical.
 This entry originally cited `082f369` as a still-reachable example, on the
 strength of #453 having merged as a merge commit --- and #456 then
 squash-merged, so `git merge-base --is-ancestor 082f369 origin/main` returns

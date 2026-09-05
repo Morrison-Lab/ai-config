@@ -645,6 +645,94 @@ predicate runs on both sides.
 - **Don't:** read two green PRs as evidence their merge is green, or reach for a
   merge order to fix a breach that both orders reach.
 
+## The recovery has a silent failure mode of its own, and no merge produces it
+
+The modes above arrive *through* a merge nothing flags, and the batch pass
+below re-checks them per merge for that reason.
+This one is not a sixth member of that set, and must not be looked for the same
+way: the merge behaved, and the damage is in what you typed next.
+Its trigger is a **hand-written recovery**, so check for it after any resolution
+you performed by copying content in, whether or not a merge was involved.
+
+The shape is `git show <old-commit>:<path> > <path>` --- reaching back to a
+commit where the file was in the state you want, and taking the whole file.
+It is attractive precisely when a resolution has gone wrong and a known-good
+copy exists, and it reads as a targeted fix because the *reason* for it is
+targeted: one registration entry, one row in a table, one flag.
+
+What it actually performs is a whole-file revert to that commit.
+Every other change the file has taken since --- including everything the merge
+you are in the middle of just brought in from the base --- is discarded, and
+nothing reports it.
+There is no conflict, because the write happens after the merge; there is no
+red check, because a registration file that lost an entry is still valid; and
+the deletion is invisible to any added-line-scoped check, which is the same
+blindness the instrument lesson above names.
+
+**Edit the file you have, rather than replacing it.**
+The content you want to keep is already in the working copy; what you need is
+one hunk from somewhere else, so apply that hunk and change nothing else.
+Where a merge is in progress the index carries the material to rebuild from ---
+`:1:`/`:2:`/`:3:` for base, ours and theirs while a path is conflicted, and
+`git show :<path>` for a path git already resolved.
+Note that `git show :<path>` reads stage 0, which holds *your* staged content
+once you have staged anything, so it is a record of what you did rather than of
+what git computed.
+
+**A wholesale restore also reinstates every claim the file made at the old
+commit**, and those claims are stale by construction, since something about
+the file changed in between or you would not be restoring it.
+They are worse than an ordinary stale sentence: each was true when written, so
+it survives a reader checking whether it *reads* wrong, and only re-deriving
+it against the current file shows otherwise.
+
+- **Do:** take the recovery baseline from the current working copy, or from
+  the conflict stages (`:1:`/`:2:`/`:3:`) while the path is still conflicted,
+  and apply the one hunk you need on top of it.
+- **Do:** diff the restored file against the pre-restore working copy, not only
+  against the old commit, so what the restore *removed* is visible.
+- **Do:** run that diff after every hand-written recovery, since the batch
+  pass's per-merge re-check does not reach this one.
+- **Do:** re-derive every claim inside a restored region --- a docstring, a
+  `_note_*` field, a README row --- against the file as it now stands.
+- **Don't:** reach for `git show :<path>` without checking which state the path
+  is in --- it fails while the path is conflicted, and once you have staged
+  anything it returns what *you* staged, which is the bad restore itself if
+  that is what you staged.
+- **Don't:** write `git show <old>:<path> > <path>`; it is a whole-file revert
+  wearing the clothes of a targeted fix.
+- **Don't:** read an absent conflict or a green check as evidence a restore
+  cost nothing --- both are blind to a silently dropped entry.
+
+[`sync-with-main`](sync-with-main.md)'s "The same silent reversion happens one
+line at a time" owns the version of this that *git* performs, and prescribes
+the pre-merge-tip-to-merge diff that sees it.
+Note also that [`check-purpose-before-reusing`](check-purpose-before-reusing.md)
+prescribes `git show <old-ref>:<old-path>` for a genuinely different purpose ---
+recovering content whose *home* moved --- so the same command is right there
+and wrong here; what separates them is whether the destination has changed
+since.
+
+(Morrison-Lab/ai-config#3180, 2026-09-04.
+Restoring a hook's registration copied `README.md` and both `hooks.json`
+files back from a pre-parking commit.
+`hooks/hooks.json` had gained another session's `warn-unlabelled-agent-issue`
+registration in the interval --- `65b538bd6` merged 2026-09-04 14:37 PT,
+against the parking line at `ca9d31bbe`, 2026-09-03 20:48 PT --- so the
+restore would have deregistered a hook this branch had nothing to do with.
+Recovered from the merge index.
+The same restore left three stale claims that had each been correct at the
+old commit: a docstring saying the patterns were COPIED where the file now
+imports them, a `hooks.json` `_note_fails_silent` describing a live
+catastrophic stall that `#3172` had already fixed, and a README parking row.
+Two of the three cost their own fix commit afterwards --- `e89ee1e9d` for the
+docstring and `b7e4b8d32` for the `hooks.json` note.
+The README row cost none: `git log 9ccf8dbc3..refs/pull/3180/head -- README.md`
+is empty, so it was corrected inside the merge itself.
+`65b538bd6` is on `main`; `9ccf8dbc3`, `ca9d31bbe`, `e89ee1e9d` and
+`b7e4b8d32` are pre-squash and reachable only from `refs/pull/3180/head`, so
+fetch that ref before running `git show` or `git log` on them.)
+
 ## The batch pass
 
 1. **Measure the two intervals** above, once, and say which is larger.

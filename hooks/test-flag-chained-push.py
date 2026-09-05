@@ -108,6 +108,15 @@ FIRES = [
      "echo " + chr(92) + '" && git push'),
     ("chained push after an escaped single-quote outside any real quoting",
      "echo " + chr(92) + "' && git push"),
+    # A backslash-escaped `;` is `find -exec`'s own argument terminator, not
+    # a shell separator -- the shell leaves it alone. With no masking here,
+    # the raw `;` still split the segment for OPS, and a genuinely chained
+    # `git push` sitting AFTER the whole find invocation (joined by a real
+    # `&&`) was indistinguishable from one that merely happened to follow an
+    # escaped `;` inside it (Copilot review finding on this hook's own PR,
+    # 2026-09-05).
+    ("chained push after a whole find -exec ... \\; invocation",
+     "find . -exec rm {} " + chr(92) + "; && git push"),
 ]
 
 QUIET = [
@@ -138,6 +147,17 @@ QUIET = [
      "cat <<'A' <<'B'\nbodyA\nA\ngit push origin main\nB"),
     ("a literal << inside a quoted string, with no real heredoc or push",
      'git commit -m "see << 3 retries" -q'),
+    # `echo hi \; git push` is ONE command to the shell -- `echo` prints
+    # "hi ; git push" as one line, and nothing is chained at all. Before
+    # `_mask_escaped_ops`, the raw (unmasked) `;` split this into two
+    # segments, and "git push" landed in the second one with a preceding
+    # `;` that was never a real separator -- a false positive on exactly
+    # the shape Copilot's review flagged (find/xargs's `\;` argument
+    # terminator), reduced to its simplest form.
+    ("git push as a literal argument after an escaped ; (not chained)",
+     "echo hi " + chr(92) + "; git push"),
+    ("git push as an argument to find -exec, chained via && around it",
+     "foo && find . -exec git push " + chr(92) + "; -o -true"),
 ]
 
 

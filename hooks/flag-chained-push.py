@@ -108,7 +108,27 @@ OPS = re.compile(r"\|\||&&|[;|\n]")
 # (`git --git-dir=... push`, several stacked global options) is left unmatched
 # rather than chased -- a miss there costs nothing a refusal would not already
 # surface on its own.
+#
+# ANCHORED at the segment's own leading command (via `LEAD_RE` in
+# `evaluate`), not searched for anywhere in the segment. A segment is
+# already one simple command by construction of `_segments`, so "git push"
+# appearing later in it is necessarily an ARGUMENT to that command, not a
+# second one -- `find . -exec git push {} \;` passes the two words "git"
+# and "push" to `find` as `-exec` arguments, and a `.search()` over the
+# whole segment could not tell that from a genuine invocation (Copilot
+# review finding on this hook's own PR, 2026-09-05).
 GIT_PUSH_RE = re.compile(r"\bgit\s+(?:-C\s+\S+\s+)?push\b")
+
+# Skipped before `GIT_PUSH_RE` is anchored: leading whitespace, any number
+# of env assignments (`VAR=val `), and the handful of lead words that still
+# leave "git push" as the command actually run. Deliberately smaller than
+# `no-clobbering-push.py`'s `LEAD_WORDS` -- this hook only needs enough to
+# avoid a false negative on the common cases, not a full simple-command
+# grammar.
+LEAD_RE = re.compile(
+    r"^\s*(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
+    r"(?:(?:sudo|exec|env|command|time|nohup)\s+)*"
+)
 
 # A redirection suffix: plain or doubled `>`, its fd-duplication form
 # (`2>&1`, `>&2`), or the bash `&>`/`&>>` shorthand. This is the shape that
@@ -294,14 +314,25 @@ def _mask(command: str) -> str:
     correctly on the next line, and one INSIDE a masked body is moot -- that
     span is already all `x` by the time continuation-joining runs.
 
-    Quotes are masked last, via the same `_quote_spans` scanner
+    Quotes are masked next, via the same `_quote_spans` scanner
     `_quoted_ranges` uses, so a quote appearing only inside a heredoc body
     never enters the quote scan and an escaped quote outside any real
     quoting is never mistaken for one (see `_quote_spans`'s docstring).
+
+    A backslash-escaped OPERATOR character (`;`, `&`, `|`, `>`) is masked
+    last, and only outside quotes -- by this point everything inside a
+    quote is already `x`, so this pass needs no quote-awareness of its own.
+    `find . -exec rm {} \\;` escapes that `;` precisely so the SHELL leaves
+    it alone (it is `find`'s own argument terminator, not a command
+    separator); with no masking here, the raw `;` still split the command
+    for `OPS`, and a `git push` sitting inside such a `find -exec` clause
+    could then be misattributed as chained after a genuine operator sitting
+    nearby (Copilot review finding on this hook's own PR, 2026-09-05).
     """
     command = _mask_heredocs(command)
     command = CONTINUATION_RE.sub(lambda m: " " * len(m.group(0)), command)
-    return _mask_quotes(command)
+    command = _mask_quotes(command)
+    return _mask_escaped_ops(command)
 
 
 def _mask_quotes(command: str) -> str:
@@ -314,6 +345,36 @@ def _mask_quotes(command: str) -> str:
         interior_end = end - 1 if closed else end
         for i in range(start + 1, interior_end):
             out[i] = "x"
+    return "".join(out)
+
+
+# The operator characters `OPS`/`REDIRECT_RE` care about, other than the
+# newline (already handled by `CONTINUATION_RE` before this runs).
+ESCAPABLE_OPS = set(";&|>")
+
+
+def _mask_escaped_ops(command: str) -> str:
+    """`command` with a backslash immediately followed by one of
+    `ESCAPABLE_OPS` replaced by `xx`, same length.
+
+    Runs LAST, after quote masking, so a `\\;` that happened to sit inside a
+    quoted string is already `x` by the time this scans -- no quote
+    awareness is needed here. A backslash escaping an ORDINARY character
+    (`\\p`, a POSIX no-op) is left untouched: masking every escaped
+    character rather than only the operator-relevant ones would erase a
+    `git push` written as `\\push`, trading one false negative for another;
+    the operator characters are the only ones `OPS`/`REDIRECT_RE` can
+    misread.
+    """
+    out = list(command)
+    i, n = 0, len(command)
+    while i < n - 1:
+        if command[i] == "\\" and command[i + 1] in ESCAPABLE_OPS:
+            out[i] = "x"
+            out[i + 1] = "x"
+            i += 2
+            continue
+        i += 1
     return "".join(out)
 
 
@@ -361,7 +422,8 @@ def evaluate(command: str) -> str | None:
     """Warning text for the first chained/suffixed `git push` found, else
     `None`."""
     for preceding, text, masked_text, following in _segments(command):
-        match = GIT_PUSH_RE.search(masked_text)
+        lead_end = LEAD_RE.match(masked_text).end()
+        match = GIT_PUSH_RE.match(masked_text, lead_end)
         if not match:
             continue
 

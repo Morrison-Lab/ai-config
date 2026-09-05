@@ -296,7 +296,7 @@ MUTATIONS = {
           "        if False:\n            continue")],
         {"S2"},
     ),
-    "M4 skip contained": (
+    "M4b skip contained": (
         "the ancestor skip is a performance short-circuit, not a "
         "correctness guard: merge-tree cannot report a conflict when "
         "HEAD is an ancestor of the base, so nothing flips",

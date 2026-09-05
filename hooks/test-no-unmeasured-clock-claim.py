@@ -38,6 +38,181 @@ CHAINED_DATE = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "input": {
         "command": "git log -1 && TZ=America/Los_Angeles date '+%H:%M %Z'"}}]}}
 
+# ai-config#2991's incident shape, verbatim: the reading goes into a variable
+# and from there into a notebook heading, so it never reaches the transcript.
+CAPTURED_DATE = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_cap", "input": {
+        "command": "t=$(TZ=America/Los_Angeles date \"+%H:%M %Z\"); "
+                   "cat >> notebook.md <<EOF\n## $t --- checkpoint\nEOF"}}]}}
+# The same capture, with the value echoed as well -- printing it makes it
+# quotable, which is all this guard asks for.
+CAPTURED_ECHOED = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_echo", "input": {
+        "command": "t=$(TZ=America/Los_Angeles date \"+%H:%M %Z\"); "
+                   "echo \"$t\"; cat >> notebook.md <<EOF\n## $t\nEOF"}}]}}
+# A capture alongside a second read that does print.
+CAPTURED_AND_PRINTED = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_both", "input": {
+        "command": "stamp=$(date +%s); "
+                   "TZ=America/Los_Angeles date '+%H:%M %Z'"}}]}}
+# The captured value echoed into a file rather than to the transcript.
+CAPTURED_ECHO_APPEND = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_appd", "input": {
+        "command": "t=$(TZ=America/Los_Angeles date \"+%H:%M %Z\"); "
+                   "echo \"## $t\" >> notebook.md"}}]}}
+CAPTURED_PRINTF_APPEND = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_prtf", "input": {
+        "command": "t=$(TZ=America/Los_Angeles date \"+%H:%M %Z\"); "
+                   "printf '%s' \"$t\" >> notebook.md"}}]}}
+# An operator inside the substitution, so the split must not treat it as a
+# command boundary.
+CAPTURED_SUBSHELL_OP = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_subop", "input": {
+        "command": "t=$(cd /tmp && TZ=America/Los_Angeles date \"+%H:%M %Z\"); "
+                   "echo \"## $t\" >> notebook.md"}}]}}
+# The echo sits in a brace group whose redirection is outside the group.
+CAPTURED_BRACE_GROUP = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_brace", "input": {
+        "command": "t=$(TZ=America/Los_Angeles date \"+%H:%M %Z\"); "
+                   "{ echo \"## $t\"; } >> notebook.md"}}]}}
+# A format string carrying a literal parenthesis, which is what a paren-
+# excluding character class cannot span: the assignment goes unrecognized, its
+# text stays in the segment, and the read then reads as printed -- discharging
+# the guard on the very shape it exists to catch.
+CAPTURED_PAREN_FORMAT = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_paren", "input": {
+        "command": "t=$(TZ=America/Los_Angeles date \"+%H:%M (%Z)\"); "
+                   "cat >> notebook.md <<EOF\n## $t --- checkpoint\nEOF"}}]}}
+# The same parenthesized format string, with the value echoed. Walking the
+# substitution must still recover the NAME, or the echo no longer matches the
+# captured variable and the guard fires on a reading that did reach stdout.
+CAPTURED_PAREN_ECHOED = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_pecho", "input": {
+        "command": "t=$(TZ=America/Los_Angeles date \"+%H:%M (%Z)\"); "
+                   "echo \"$t\""}}]}}
+# A parenthesis inside a QUOTED span within the substitution, unbalanced on its
+# own. Counting depth without honouring quotes never returns to zero here, so
+# the assignment reads as unterminated and is skipped -- which is the same
+# discharge the character class produced, by a different route.
+CAPTURED_QUOTED_PAREN = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_qpar", "input": {
+        "command": "t=$(TZ=America/Los_Angeles date \"+%H:%M %Z\" "
+                   "| sed 's/(//'); echo \"## $t\" >> notebook.md"}}]}}
+# An explicitly numbered stdout redirect. Descriptor 1 is stdout, so `1>>`
+# sends the reading to a file exactly as a bare `>>` does.
+REDIRECTED_FD1_DATE = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_fd1", "input": {
+        "command": "TZ=America/Los_Angeles date \"+%H:%M %Z\" 1>>notebook.md"}}]}}
+# Only descriptors 2 through 9 are excluded: stderr going to a file leaves
+# stdout on the transcript.
+STDERR_REDIRECTED_DATE = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_fd2", "input": {
+        "command": "TZ=America/Los_Angeles date \"+%H:%M %Z\" 2>/dev/null"}}]}}
+# The combined redirect sends stdout and stderr to the file together. The `&`
+# sits BEFORE the operator, unlike the `>&2` duplication it must not be
+# confused with, so a lookbehind excluding `&` reads this as a print.
+COMBINED_REDIRECTED_DATE = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_amp", "input": {
+        "command": "TZ=America/Los_Angeles date \"+%H:%M %Z\" &>notebook.md"}}]}}
+COMBINED_APPEND_DATE = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_ampa", "input": {
+        "command": "TZ=America/Los_Angeles date \"+%H:%M %Z\" &>>notebook.md"}}]}}
+# A descriptor duplication after the operator is still not a file redirect.
+DUPLICATED_FD_DATE = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_dup", "input": {
+        "command": "TZ=America/Los_Angeles date \"+%H:%M %Z\" 2>&1"}}]}}
+# A pipe character INSIDE the echoed string is text, not a pipe: the echo is
+# unredirected and prints the captured value. The weekday format keeps the
+# tool-result fallback from discharging on an HH:MM it would otherwise find,
+# so only the print classification can discharge these.
+QUOTED_PIPE_ECHOED = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_qpipe", "input": {
+        "command": "t=$(TZ=America/Los_Angeles date \"+%A\"); "
+                   "echo \"a|b today is $t\""}}]}}
+QUOTED_SEMI_ECHOED = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_qsemi", "input": {
+        "command": "t=$(TZ=America/Los_Angeles date \"+%A\"); "
+                   "echo \"steps done; today is $t\""}}]}}
+QUOTED_AMP_ECHOED = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_qamp", "input": {
+        "command": "t=$(TZ=America/Los_Angeles date \"+%A\"); "
+                   "echo \"a&b today is $t\""}}]}}
+# A REAL pipe between the echo and the variable: the echo feeds grep, and the
+# variable is grep's pattern, so the value never prints.
+PIPED_PAST_VAR = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_rpipe", "input": {
+        "command": "t=$(TZ=America/Los_Angeles date \"+%H:%M %Z\"); "
+                   "echo done | grep -c $t"}}]}}
+# An arrow inside the quoted format string is text: the read prints to the
+# transcript, and its `>` is not a redirect.
+QUOTED_ARROW_PRINTED = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_arrow", "input": {
+        "command": "TZ=America/Los_Angeles date \"+%H:%M %Z -> checkpoint\""}}]}}
+QUOTED_ARROW_SINGLE = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_arrow1", "input": {
+        "command": "TZ=America/Los_Angeles date '+%H:%M %Z -> checkpoint'"}}]}}
+# A redirect inside a brace group is a real redirect, and must stay one.
+GROUPED_REDIRECT = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_grp", "input": {
+        "command": "{ TZ=America/Los_Angeles date \"+%H:%M %Z\" >> notebook.md; }"}}]}}
+# A read substituted into the argument of a command that does not reprint it:
+# the comment body carries the time, the tool result is a URL, and nothing
+# reached the transcript.
+GH_COMMENT_INLINE = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_ghc", "input": {
+        "command": "gh pr comment 123 --body \"Status as of "
+                   "$(TZ=America/Los_Angeles date \"+%H:%M %Z\"): still working\""}}]}}
+CURL_INLINE = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_curl", "input": {
+        "command": "curl -sX POST -d \"t=$(TZ=America/Los_Angeles date +%A)\" "
+                   "https://example.com/log"}}]}}
+# The same swallow through a heredoc body fed to a non-reprinting command.
+HEREDOC_TO_GH = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_ghh", "input": {
+        "command": "gh pr comment 123 --body-file - <<EOF\n"
+                   "As of $(TZ=America/Los_Angeles date \"+%H:%M %Z\")\nEOF"}}]}}
+# A reprinting head behind an env assignment still prints the substitution.
+ENV_ECHO_INLINE = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_envecho", "input": {
+        "command": "LC_ALL=C echo \"as of $(TZ=America/Los_Angeles date \"+%H:%M %Z\")\""}}]}}
+# An env value carrying a quoted space still leaves the echo as the head.
+QUOTED_ENV_ECHO_INLINE = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_qenv", "input": {
+        "command": "LC_ALL=\"en US\" echo \"as of "
+                   "$(TZ=America/Los_Angeles date \"+%H:%M %Z\")\""}}]}}
+# An unquoted substitution with a space inside an env value is one value.
+SUBST_ENV_ECHO_INLINE = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_senv", "input": {
+        "command": "FOO=$(bar=1 baz) echo \"as of "
+                   "$(TZ=America/Los_Angeles date \"+%H:%M %Z\")\""}}]}}
+# `NAME=$(` inside a quoted argument is not an assignment: the read prints as
+# part of the echoed string, and the transcript carries it.
+QUOTED_HEAD_PRINTED = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_qhead", "input": {
+        "command": "echo \"stamp=$(TZ=America/Los_Angeles date +%H:%M) "
+                   "checkpoint\""}}]}}
+# The same heading, with no intermediate variable.
+HEREDOC_DATE = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_here", "input": {
+        "command": "cat >> notebook.md <<EOF\n"
+                   "## $(TZ=America/Los_Angeles date \"+%H:%M %Z\") --- checkpoint\nEOF"}}]}}
+# A read whose own stdout is redirected into a file.
+REDIRECTED_DATE = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_redir", "input": {
+        "command": "TZ=America/Los_Angeles date \"+%H:%M %Z\" >> notebook.md"}}]}}
+# A heredoc that prints, because nothing redirects it.
+HEREDOC_PRINTED = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_hprt", "input": {
+        "command": "cat <<EOF\n"
+                   "## $(TZ=America/Los_Angeles date \"+%H:%M %Z\")\nEOF"}}]}}
+
+
+def result(tool_use_id, content):
+    """The output of a tool call, as a transcript records it."""
+    return {"type": "user", "message": {"content": [
+        {"type": "tool_result", "tool_use_id": tool_use_id,
+         "content": content}]}}
+
 # The harness's own injected reading, which arrives as a bare-string user turn.
 HOOK_CLOCK = {"type": "user", "content":
               "UserPromptSubmit hook success: Current time -- local: "
@@ -275,6 +450,143 @@ CASES = [
     ([{"type": "assistant", "content": "The current local time is: 2026-08-21T18:55:51-07:00 according to my check."},
       say("Recap: as of 23:59 PDT")], True,
      "#2661: assistant message containing ISO time string does not discharge guard for unmeasured claim"),
+
+    # --- ai-config#2991: a reading captured into a variable and never printed
+    #     The four recaps of 2026-09-02 each sat in a turn that really did run
+    #     `date` -- into a `$(...)` whose value went straight to a file. The
+    #     session never saw the value, so the stated time was still typed from
+    #     a sense of elapsed work, and the guard stayed silent.
+    ([CAPTURED_DATE, result("call_cap", ""), say("Recap: 01:07 PDT")], True,
+     "#2991: a date captured into a variable, with no output in its result, "
+     "does not discharge"),
+    ([CAPTURED_DATE, say("Recap: 01:07 PDT")], True,
+     "#2991: a capture whose output never appears in the transcript is not a "
+     "reading either"),
+    ([CAPTURED_DATE, result("call_cap", "00:59 PDT"), say("Recap: 00:59 PDT")],
+     False,
+     "#2991: the same capture discharges once its output does reach the "
+     "transcript"),
+    ([CAPTURED_DATE,
+      result("call_cap", [{"type": "text", "text": "Wed Sep 3 00:59:12 PDT 2026"}]),
+      say("Recap: 00:59 PDT")], False,
+     "#2991: a result carrying its text in blocks is read the same way"),
+    ([CAPTURED_DATE, result("call_cap", 42), say("Recap: 00:59 PDT")], False,
+     "#2991: a result whose content cannot be read fails open"),
+    ([CAPTURED_ECHOED, say("Recap: 00:59 PDT")], False,
+     "#2991: echoing the captured value prints it, so the read discharges"),
+    ([CAPTURED_AND_PRINTED, say("Recap: 00:59 PDT")], False,
+     "#2991: a second read in the same command does print, so it discharges"),
+    ([CAPTURED_DATE, result("call_other", "00:59 PDT"),
+      say("Recap: 00:59 PDT")], True,
+     "#2991: another call's output is not this read's output"),
+    ([CAPTURED_ECHO_APPEND, result("call_appd", ""), say("Recap: 01:07 PDT")],
+     True,
+     "#2991: an echo of the captured value into a file is not a print"),
+    ([CAPTURED_PRINTF_APPEND, result("call_prtf", ""), say("Recap: 01:07 PDT")],
+     True,
+     "#2991: printf into a file is not a print either"),
+    ([CAPTURED_SUBSHELL_OP, result("call_subop", ""),
+      say("Recap: 01:07 PDT")], True,
+     "#2991: an operator inside the substitution is not a command boundary"),
+    ([CAPTURED_BRACE_GROUP, result("call_brace", ""),
+      say("Recap: 01:07 PDT")], True,
+     "#2991: a brace group's redirection covers the echo inside it"),
+    ([HEREDOC_DATE, result("call_here", ""), say("Recap: 01:07 PDT")], True,
+     "#2991: a read inside a redirected heredoc body never reaches the "
+     "transcript"),
+    ([REDIRECTED_DATE, result("call_redir", ""), say("Recap: 01:07 PDT")], True,
+     "#2991: a read whose own stdout goes to a file is not a reading"),
+    ([HEREDOC_PRINTED, say("Recap: 01:07 PDT")], False,
+     "#2991: an unredirected heredoc puts the read on stdout, so it "
+     "discharges"),
+
+    # --- review round 1 on #2991: the substitution and the redirect were each
+    #     matched by a character class that excluded the very characters the
+    #     real commands carry, so both shapes discharged the guard silently.
+    ([CAPTURED_PAREN_FORMAT, result("call_paren", ""),
+      say("Recap: 01:07 PDT")], True,
+     "#2991: a parenthesis in the format string does not end the "
+     "substitution -- the capture is still a capture"),
+    ([CAPTURED_PAREN_ECHOED, say("Recap: 00:59 PDT")], False,
+     "#2991: walking that substitution still recovers the variable, so "
+     "echoing it discharges"),
+    ([CAPTURED_QUOTED_PAREN, result("call_qpar", ""),
+      say("Recap: 01:07 PDT")], True,
+     "#2991: a parenthesis inside a quoted span does not change the "
+     "substitution's depth"),
+    ([REDIRECTED_FD1_DATE, result("call_fd1", ""),
+      say("Recap: 01:07 PDT")], True,
+     "#2991: `1>>` is a stdout redirect, so the reading went to the file "
+     "rather than the transcript"),
+    ([STDERR_REDIRECTED_DATE, say("Recap: 00:59 PDT")], False,
+     "#2991: `2>` is not a stdout redirect -- the reading still prints"),
+
+    # --- review round 2 on #2991: the lookbehind that excluded `>&2` by its
+    #     `&` also excluded `&>`, the combined redirect, which sends stdout to
+    #     the file; and a capture head matched inside a quoted argument.
+    ([COMBINED_REDIRECTED_DATE, result("call_amp", ""),
+      say("Recap: 01:07 PDT")], True,
+     "#2991: `&>` sends stdout to the file, so the reading never printed"),
+    ([COMBINED_APPEND_DATE, result("call_ampa", ""),
+      say("Recap: 01:07 PDT")], True,
+     "#2991: `&>>` is the append form of the same combined redirect"),
+    ([DUPLICATED_FD_DATE, say("Recap: 00:59 PDT")], False,
+     "#2991: `2>&1` duplicates a descriptor and redirects nothing to a file"),
+    ([QUOTED_HEAD_PRINTED, say("Recap: 00:59 PDT")], False,
+     "#2991: `NAME=$(` inside a quoted argument is not a capture -- the "
+     "echo prints the reading"),
+
+    # --- review round 3 on #2991: the echoed-variable search excluded `;`,
+    #     `&`, `|` from its span, which are text inside a quoted argument.
+    ([QUOTED_PIPE_ECHOED, say("Recap: 00:59 PDT")], False,
+     "#2991: a `|` inside the echoed string is text, so the echo prints "
+     "the captured value"),
+    ([QUOTED_SEMI_ECHOED, say("Recap: 00:59 PDT")], False,
+     "#2991: a `;` inside the echoed string is text too"),
+    ([QUOTED_AMP_ECHOED, say("Recap: 00:59 PDT")], False,
+     "#2991: and a `&` inside the echoed string"),
+    ([PIPED_PAST_VAR, result("call_rpipe", "0"), say("Recap: 01:07 PDT")],
+     True,
+     "#2991: a real pipe between the echo and the variable hands the echo "
+     "to grep, so the value never prints and the guard still fires"),
+
+    # --- review round 4 on #2991: the redirect search ran over the raw
+    #     segment, so a `>` inside a quoted format string read as a redirect.
+    ([QUOTED_ARROW_PRINTED, say("Recap: 00:59 PDT")], False,
+     "#2991: a `>` inside the double-quoted format string is text, and the "
+     "read prints"),
+    ([QUOTED_ARROW_SINGLE, say("Recap: 00:59 PDT")], False,
+     "#2991: the same inside single quotes"),
+    ([GROUPED_REDIRECT, result("call_grp", ""), say("Recap: 01:07 PDT")],
+     True,
+     "#2991: a redirect inside a brace group is still a redirect, so the "
+     "reading went to the file"),
+
+    # --- review round 5 on #2991: a read substituted into the argument of a
+    #     command that does not reprint it was classed as printing.
+    ([GH_COMMENT_INLINE,
+      result("call_ghc", "https://github.com/o/r/pull/123#issuecomment-1"),
+      say("Recap: 01:07 PDT")], True,
+     "#2991: a read inside `gh pr comment --body \"$(date ...)\"` never "
+     "reaches the transcript; the tool result is a URL"),
+    ([CURL_INLINE, result("call_curl", "ok"), say("Recap: 01:07 PDT")], True,
+     "#2991: the same through `curl -d`"),
+    ([HEREDOC_TO_GH,
+      result("call_ghh", "https://github.com/o/r/pull/123#issuecomment-2"),
+      say("Recap: 01:07 PDT")], True,
+     "#2991: a heredoc body fed to a non-reprinting command is swallowed too"),
+    ([ENV_ECHO_INLINE, say("Recap: 00:59 PDT")], False,
+     "#2991: an echo behind an env assignment reprints the substitution, so "
+     "the read discharges"),
+
+    # --- review round 6 on #2991: the head regex matched the env value with
+    #     `\S*`, so a quoted value carrying a space hid the echo.
+    ([QUOTED_ENV_ECHO_INLINE, say("Recap: 00:59 PDT")], False,
+     "#2991: a quoted env value with a space still leaves the echo as the "
+     "head, so the read discharges"),
+    ([SUBST_ENV_ECHO_INLINE, say("Recap: 00:59 PDT")], False,
+     "#2991: an unquoted substitution with a space in an env value is one "
+     "value, and the echo after it is still the head"),
 ]
 
 

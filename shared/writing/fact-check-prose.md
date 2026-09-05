@@ -455,6 +455,45 @@ is usually the step where the abstraction went wrong.
 - **Don't:** exempt a bullet you have just rewritten to satisfy a review
   finding, since that rewrite is an edit to the rule like any other.
 
+## Check every sentence against the hedges the passage states elsewhere
+
+The checks above take a sentence and ask whether it is true of the world.
+This one takes a sentence and asks whether it is true of the **document**: a passage that marks something unestablished, withdraws a cause, or narrows a claim to one measured case has thereby constrained every other sentence in scope, and a sentence written against the un-narrowed version reads perfectly well on its own.
+
+The cost is that it goes wrong in the direction nothing complains about.
+An internally contradictory passage renders, parses, and reads fluently, and the reader takes away whichever half they met first --- usually the confident one, since a hedge is the half written to be unobtrusive.
+
+**A phrase sweep cannot be relied on to find these.**
+A sentence that breaks a hedge re-asserts the withdrawn claim in *different words*, which is why it was not caught when the hedge was written: it shares no vocabulary with the sentence it contradicts, so a grep for the hedge's terms returns the hedge and nothing else.
+This is [`grep-is-not-coverage`](../workflow/grep-is-not-coverage.md)'s point applied to a document's own internal consistency --- the search is over strings and the property is over propositions.
+
+**It is not "a later edit forgot an earlier hedge", so a diff-ordering heuristic misses it too.**
+One measured instance had the hedge and the contradicting assertion added in the **same commit**, in two different files.
+Hedging one statement of a claim and asserting another is a single act when the two live apart, because writing the careful version discharges the sense of having been careful.
+That is the same mechanism [`metacognitive-monitoring`](../workflow/metacognitive-monitoring.md)'s "A hedge you attach for one audience is owed to the other, and writing it once is the tell" describes, across a different span: there the two statements go to different **audiences**, here they sit in different **files of one change**, which is why a same-commit break does not feel like an inconsistency to write.
+
+**The test:** enumerate what the passage and its siblings mark unestablished, hedged, or withdrawn --- as a list, before reading anything else --- then ask of every other sentence whether it would still be true if one of those hedges resolved the other way.
+Enumerating first is what makes it work, since a sentence read in isolation supplies its own missing context and reads as fine.
+Derive the list from the text rather than from what you remember writing.
+A reviewer applying this to one prose PR derived **eight** hedged points where the author's own list had four --- which is the argument for deriving it, and says nothing on its own about which of the eight the breaks sat under.
+
+Run it across the sibling files a change touches, not only within one file.
+A hedge stated in the file that argues for it constrains the file that cites it, and the citing file is where the unhedged restatement lands.
+
+(Measured 2026-09-03/04 while preparing ai-config [#3267](https://github.com/Morrison-Lab/ai-config/pull/3267).
+The rounds were **local `adversarial-reviewer` dispatches before each push**, so the PR's own review activity shows two verdict-bearing rounds rather than nine;
+the count is recorded in prose in that PR's `no-ai-review` comment ("It also went through nine adversarial-reviewer rounds locally"), which is the citation for it.
+Nine consecutive such rounds each returned exactly one finding of this shape.
+The eight-versus-four figure in the paragraph above comes from the same series, whose per-round detail that comment does not carry --- so read that figure as unciteable even though the round count beside it is not.
+That per-round count is itself the argument for enumerating the hedges up front rather than re-reading for consistency: re-reading surfaced one break per pass, so the rounds converged only as fast as a reviewer happened to notice, while an enumeration bounds the set to check in one pass.
+Tracked as [#3271](https://github.com/Morrison-Lab/ai-config/issues/3271).)
+
+- **Do:** list the passage's hedged and withdrawn points explicitly before checking any other sentence against them.
+- **Do:** derive that list from the text, and expect it to be longer than the one you would have written from memory.
+- **Do:** extend the check to sibling files the same change touches, since the citing file is where an unhedged restatement lands.
+- **Don't:** grep for the hedge's wording and call the passage consistent --- a break restates the claim in words the hedge never used.
+- **Don't:** assume a break implies a later edit, and so skip a passage nothing has touched since --- one measured instance had the hedge and the break written in the same commit, which retires the ordering heuristic without supporting any claim about how often that happens.
+
 ## Check that a stated trigger actually fired
 
 A justification for why a file was split, a check was added, or a workflow was
@@ -958,6 +997,51 @@ the figures were load-bearing for nothing,
 the paragraph's content was "split at the clause boundary",
 and the honest form carries no numbers at all.
 Tracked as [#3158](https://github.com/Morrison-Lab/ai-config/issues/3158).)
+
+## A tool's behaviour quoted in a commit message is written after the measurement, not before
+
+The section above covers a figure in a commit message.
+This covers a quotation: the error text a tool printed, the exit status it returned,
+or the behaviour a reviewer ascribed to it,
+written into the body as the reason for the change.
+The inherited-claims bullet near the top of this file governs restating such a claim in a doc or a comment,
+and "A block presented as program output is a claim, so capture it rather than composing it" above governs a block composed from memory in a doc;
+this governs the commit body, where the sentence is inherited from a reviewer's paraphrase and the draft usually precedes the measurement.
+
+A commit message is usually drafted before the commit,
+and often before the measurement the message describes has been read,
+because the change was made to answer a reviewer's finding
+and the finding already says what the tool does.
+So the body inherits the reviewer's phrasing of the tool's behaviour,
+and the phrasing is checked against nothing:
+the reviewer paraphrased, the author copied, and the tool's own output never entered the text.
+For the reason the section above gives (rewriting destroys the copy a later reader would check),
+the correction goes on the PR and into the squash body rather than into an amend,
+and the wrong quotation stays in the history.
+The same `address-every-comment` bullet the section above cites recommends the amend for a wrong figure;
+under squash merge the intermediate body never reaches `main`,
+so the squash body is the copy that rule is about, and the two agree.
+
+- **Do:** run the command, read its output and status on screen, and only then write the sentence that quotes them.
+- **Do:** when the change answers a reviewer's description of a tool's behaviour,
+  treat that description as a claim to measure before it becomes the commit's own.
+- **Don't:** write a tool's error text or exit status into a commit body from a reviewer's wording
+  or from the result you expect.
+- **Don't:** draft the body before the gate chain runs and leave it untouched after the chain prints something else.
+
+(Morrison-Lab/ai-config#3154, 2026-09-03, three times in one evening on grep alone.
+`75829fad`'s body said a `-zz` subject "exits 2 with \"invalid option\"";
+on GNU grep 3.11 `-zz` is the valid `-z` flag twice, so grep took the first path as its pattern and searched the current directory instead,
+exiting on whether that accidental pattern matched; `-Q` is the case that exits 2.
+`a51a170f`'s body quoted the error for a `[` subject as "Unmatched [", the reviewer's wording, where the tool prints "Invalid regular expression".
+The prose line that same commit added, and the prepared squash body, said a bare `(` motivates `-F`;
+`(` is a literal in grep's default BRE mode, and of the four characters the two versions of that prose line name (`[`, `(`, `.`, `*`) only `[` errors, which `27bb9588` corrected.
+The `(` case was caught by an adversarial verdict that ran the command;
+the other two surfaced while re-measuring for the next round's PR comment,
+and each correction went onto the PR and into the squash body rather than into an amend.
+The same day's fourth case was not grep:
+`e698c456`'s body called three commits "not fetchable" from a short-SHA fetch on a shallow clone,
+retracted in `709bc612`'s body on the same PR.)
 
 ## An elapsed-time claim is a computation, not a memory
 

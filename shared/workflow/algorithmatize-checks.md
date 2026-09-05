@@ -287,6 +287,80 @@ Ask it of the character rather than of the input, since the input you would have
 (Measured on [ai-config#1968](https://github.com/Morrison-Lab/ai-config/pull/1968), merged 2026-08-22.
 `(?<![\w/-])` entered `hooks/no-empty-promise.py` in [#1724](https://github.com/Morrison-Lab/ai-config/pull/1724) and stood unchanged on `main` until #1968 replaced it, so for that whole interval a dispatch prompt saying `/ums` did not discharge a promise.)
 
+### A lookaround excludes what sits on its own side of the anchor, not what the excluded form "contains"
+
+The section above asks what *else* an excluded character means.
+This asks something cheaper and prior: whether the character is reachable from
+where the clause sits at all.
+A lookbehind reads left of the match and a lookahead reads right of it, so a
+form whose distinguishing character follows the operator cannot be excluded by
+a lookbehind.
+The clause does not fail visibly either --- it silently excludes some other
+operator that carries the same character on the left.
+
+The worked example is a stdout-redirect matcher:
+
+```python
+RX_STDOUT_REDIRECT = r"(?<![2-9&<>])>>?\s*([^\s;&|]+)(?![&>])"
+```
+
+`&` went into the lookbehind to exclude `>&2`.
+The `&` of `>&2` sits *after* the `>`, where only the lookahead can see it, and
+the lookahead already refused it.
+What the lookbehind actually excluded was `&>` and `&>>`, the combined
+stdout-and-stderr redirect, which is a redirect to a file and needed the
+opposite verdict.
+
+Both directions stay invisible at once.
+The intended exclusion still holds, because a different clause is doing it, and
+the accidental exclusion removes a form nobody wrote a case for.
+
+- **Do:** for each character in a lookaround, name the operator it is meant to
+  exclude and check which side of the anchor that character sits on.
+- **Do:** test the operator you meant to exclude *and* every operator that
+  shares the character.
+- **Don't:** add a character to a lookbehind because the form to exclude
+  "contains" it --- containment says nothing about position.
+
+(Measured 2026-09-04 on
+[ai-config#3251](https://github.com/Morrison-Lab/ai-config/pull/3251):
+a `date ... &>>notebook.md` write read as a print rather than a file write and
+so discharged the guard it should have tripped.)
+
+### A reviewer's proposed widening of a class can overshoot the bug it fixes
+
+The sections above govern the exclusion clause you wrote.
+This governs the widening someone else proposes for it, which arrives with a
+reason attached and so escapes the same enumeration.
+The reason is almost always a claim about an *earlier stage* --- the splitter
+already removed the operators, the stripper already removed the quotes, so the
+class need not defend against them.
+That claim is about a pattern you did not write and are not looking at, and it
+is one command to open.
+
+The reported bug was real: `RX_PRINTED_VAR`'s `[^;&|\n]*` refused a `|` sitting
+inside a quoted `echo` argument.
+The proposed fix was `[^\n]*`, reasoning that the segment splitter had already
+removed every real operator.
+Reading the splitter refutes it.
+It splits on `;`, `&&`, and `||` only, so a single `|` --- as in
+`echo done | grep -c $t` --- is still a live pipe inside the segment, and the
+widened class would have swallowed it and discharged the guard.
+
+The fix that held blanked operator characters inside quoted spans and kept the
+class, so the quoted form passes without readmitting the operator.
+
+- **Do:** read the earlier stage's own pattern before accepting that it removed
+  what a proposed widening assumes it removed.
+- **Do:** test the operator the class was protecting against alongside the
+  quoted form the widening is for; a widening is right only if both pass.
+- **Don't:** accept "the splitter already handled it" as a premise --- it names
+  a regex, and reading it settles the question.
+
+(Measured 2026-09-04 on
+[ai-config#3251](https://github.com/Morrison-Lab/ai-config/pull/3251),
+review round 3.)
+
 ### An attribution claim in a guide-for-future-edits comment is settled by mutation, not by re-reading it
 
 "Test the instrument against the incident that prompted it, verbatim"'s closing **Don't** governs a comment claiming *what* a matcher matches.
@@ -553,7 +627,7 @@ picking the script whose name matches the property.
   that measures it.
 
 (Measured 2026-08-19 on ai-config.
-`scripts/check-memory-file-size.py` exits `0` while printing that
+`scripts/check-memory-file-size.py` exited `0` while printing that
 `memories/github-actions.md` was over its 1200-line threshold, so the crossing
 was reported here as advisory and pushed.
 `validate` went red on both parallel runs: `scripts/test_check_memory_file_size.py`
@@ -926,6 +1000,26 @@ A grep sees all three, so it does not matter that only the last is ever printed.
 (Measured 2026-09-02 while adding a hook test for [ai-config#3017](https://github.com/Morrison-Lab/ai-config/issues/3017).
 The needle was the phrase `chained AHEAD`, and `git show origin/main:hooks/no-unreviewed-pr.py | grep -n 'chained AHEAD'` returns 6 hits the fix never touches: three docstrings (lines 356, 418, 672), two inline comments (1522, 1550), and the label-exemption message (1917).
 So the assertion passed against the unfixed script, and the pre-fix control that was supposed to fail did not.)
+
+**A live guard's own substring needle has the identical failure mode, and it fires on the message that discharges it rather than only on a test fixture.**
+
+The section above is about a test's needle matching the fixture's own pre-existing text.
+The same collision reaches a shipped `Stop`/`PreToolUse` hook whenever its trigger phrase is one the corpus has to be able to *discuss*: a guard keyed on a cleanliness phrase fires on the very message that **retracts** an earlier, unsupported use of that phrase, because the retraction has to name the phrase to withdraw it.
+The guard is technically correct that the string appears --- it is wrong that the string's *appearance* still means what the guard was built to catch, because the sentence containing it is doing the opposite job: undoing the claim rather than making it.
+
+`no-placeholder-reply.py`'s whole-message anchoring, already named above, is the general answer: match the **whole** stripped message rather than a substring, specifically because this corpus quotes its own banned strings constantly.
+The same fix generalizes past that one hook.
+
+- **Do:** anchor a guard's needle on the whole message (or an unambiguous structural position within it), not a bare substring, whenever the corpus must be able to discuss the phrase it flags.
+- **Do:** exempt a sentence carrying a first-person negation of the claim ("I never ran ...", "I said X --- I never verified it") from a substring match, when whole-message anchoring is not available.
+- **Don't:** ship a guard whose needle is a bare substring of the phrase its own remedy has to use --- the remedy then trips the guard it exists to satisfy.
+- **Don't:** assume a guard is safe because its test fixtures don't happen to include a retraction of the guard's own vocabulary;
+  write that fixture deliberately.
+
+(Measured 2026-09-02: `hooks/no-incomplete-check-enumeration.py` blocked a message asserting two PRs were "clean by every instrument" on nothing but `gh pr checks` --- correctly, that is the exact short surface the guard exists to catch.
+The **next** message retracted it ("I said #3010 and #3029 were 'clean by every instrument' at merge.
+I never ran `check-pr-fully-clean.py` on either.") and the same guard, on the same phrase, blocked that retraction too --- twice, across two consecutive turns.
+Tracked as [ai-config#3053](https://github.com/Morrison-Lab/ai-config/issues/3053).)
 
 **A tenth outcome: the property under test is enforced at more than
 one independent site, and mutating one leaves the others standing
@@ -1371,6 +1465,54 @@ Both halves are strings a session can type, and neither names a workflow definit
 The issue is open and no hook file exists on `main`, so this section is the argument that its discharge should be dropped rather than a description of a shipped file;
 a comment recording that argument was posted on the issue on 2026-09-03.)
 
+## Your own command's shape is part of a transcript-read discharge condition
+
+The section above is the guard author's side of a discharge: does the matcher separate the obligation from prose that merely quotes it?
+This is the **subject's** side.
+[`pr-on-claim`](pr-on-claim.md) already states it for one hook --- run the `requested_reviewers` POST as the sole or last command, and pipe it nowhere --- and what follows generalizes that from one hook to every transcript-read guard, because the reason it holds there has nothing to do with that hook.
+
+A guard that reads the transcript sees the text of your command and the text of its output.
+It cannot see the effect the command had.
+So an ordinary formatting choice can destroy the evidence while the action itself succeeds perfectly, and the two outcomes are indistinguishable from where you are sitting: the thing you wanted happened, and the guard fired anyway.
+The reliable tell is that the first conclusion is always *the guard is broken*, because the action visibly worked.
+
+Two shapes, measured in one session, and they break different things:
+
+- `gh pr view --json state` narrowed with `--jq` to pretty-print flattened `"state":"MERGED"` into `state=MERGED`, so the hook's terminal-state discharge regex, written against the JSON, could not match.
+  What the guard reads is the output's **spelling**, and reshaping it is what destroys the record.
+- A `requested_reviewers` POST written as `... ; echo rc=$?` and as `... | head` moved out of last-command position, so its exit status could no longer be attributed to it.
+  What that guard needs there is the **position**, which is what makes the status attributable.
+
+The distinction decides the remedy, and getting it wrong forbids the right shape.
+`pr-on-claim` recommends narrowing that POST's response "with a flag on the POST itself rather than a downstream pipe".
+That is safe, and the reason is worth stating rather than assuming: the same hook does read the request's body --- a `"status":4xx` shape marks a failed request --- but a genuinely failed `gh api` also exits non-zero, so a projection cannot manufacture a false success by itself.
+The `gh pr view` above had no such second signal *for the fact in question*.
+Exit status distinguishes a failed read from a successful one and cannot distinguish MERGED from OPEN, so the terminal state has exactly one reader --- a regex written against the JSON spelling, which `--jq` rewrote.
+
+So ask what the guard reads, and expect the answer to name more than one thing.
+`no-unreviewed-pr.py` consults the output's text, the command's position, and its exit status, all three in one discharge, which is why "the position is what matters here" is not a licence to reshape the body.
+
+What the two shapes share is the moment.
+`--jq`, a trailing `echo`, and a pipe are each applied for readability, while composing the command, with no thought of the guard --- and each is applied to the very thing that was going to serve as the record.
+So the rule is about *which* commands get formatted rather than about formatting in general: a command that carries discharge evidence gets run bare, alone, and unchained, and the tidying goes on a separate follow-up call.
+
+**The mirror is a check reading a different artifact, and that failure has nothing to do with the subject's command.**
+The same session ran a CI-gate checker against the committed head while the fix sat uncommitted in the working tree.
+The checker was right, and the first conclusion was again that it was broken.
+That is [`verify-the-right-artifact`](verify-the-right-artifact.md)'s working-directory shape pointed the other way: there a stale checkout stands in for the authoritative revision, and here the authoritative revision stands in for the uncommitted change.
+That fragment covers only the first direction today ([#3130](https://github.com/Morrison-Lab/ai-config/issues/3130)), so this is adjacent to it rather than owned by it --- and it is still not this section's subject, since no command shape is involved.
+It is named here only because it wears the same disguise: an action that visibly worked, and a check that says it did not.
+Committing costs one command and settles it.
+
+- **Do:** run a discharge-relevant command alone and unchained, so the transcript carries its result verbatim.
+- **Do:** ask what the guard reads --- the output's text, the command's position, its exit status --- and expect more than one of those to matter at once.
+- **Do:** tidy or reshape that output in a separate call afterwards, when you want it readable.
+- **Do:** ask whether a disagreeing check is reading the artifact you changed, before diagnosing the check.
+- **Don't:** reshape the output of a command whose *text* is the evidence --- `--jq`, a downstream pipe, a formatting flag --- or chain anything after a command whose *position* is.
+- **Don't:** read those as alternatives;
+  a single guard can consult all three at once, so establishing that position matters says nothing about whether the body is inert.
+- **Don't:** conclude a guard is defective from the fact that the underlying action worked --- the guard measures the record, not the effect.
+
 ## Measure CPU time, not wall clock, when the assertion is about work done
 
 A performance regression test asserts something about the *code*.
@@ -1428,10 +1570,46 @@ Where it does not enter both measurements with the same magnitude, the ratio amp
 - **Don't:** assume min-of-N filters two measurements equally when one is much longer than the other.
 - **Don't:** read a ratio's stability on an idle machine as evidence that it is load-independent.
 
+### The same ratio compresses when the nuisance cost lands in the denominator
+
+The section above measures load pushing a growth ratio *up*, and that is one of two directions it can move.
+A ratio is large over small, so a nuisance cost that lands mostly in the **denominator** compresses it instead, and a genuinely quadratic scan then reads as sub-quadratic.
+
+Measured 2026-09-03: the negative control in `hooks/test-no-unauthorized-merge.py`, a deliberately quadratic scan whose growth then had to clear an 8x bound, read 14.5-15.3x over five runs on an idle container and 7.3x on a loaded GitHub runner, going red on a PR whose whole diff was two `memories/*.md` files ([#3098](https://github.com/Morrison-Lab/ai-config/issues/3098)).
+Nothing about the code differed between the two readings.
+
+The direction inverts what the failure looks like, which is why it is worth naming separately.
+An inflated ratio reports a regression that is not there, and reads as a finding about the code.
+A compressed one reports that the control cannot discriminate, and reads as a broken control --- so the instrument accuses itself, and the tempting repair is to loosen a bound that was working.
+
+Two repairs are on offer, and which one fits turns on whether the distortion is additive or multiplicative.
+That is measurable rather than assumable, so measure it --- and measure it under the load the distortion appears under, since an idle reading of the same quantity looks like the same number and answers a different question.
+Here it could not be: the fixed cost timeable off the runner is 0.62ms of a 6.2ms baseline, for the loop plus one zero-length scan call, which bounds the *interpreter's* share and says nothing about the runner's, since scheduler latency and a cold cache are load-dependent by construction.
+So the distortion's shape stayed a hypothesis, and the repair was chosen for surviving either shape rather than for ruling one out.
+Widening the input-size gap does that, because the quadratic term outruns the bound: at a size step of `s` the reading is `s ** 2` and the halfway bound is `s ** 1.5`, so the margin is `sqrt(s)` --- 1.9x at a 4x step against 3.6-3.7x at a 16x step, measured.
+
+**Widening the gap while leaving the bound fixed is the trap**, and it hides well because the number in the bound never changes, so nothing looks edited.
+A bound of 8.0 is the halfway line for a 4x step and sits *exactly on* the 8x a genuinely linear scan grows at an 8x step, so widening that far leaves it no margin against the shape it exists to reject.
+Measured, a linear scan read 7.55-8.09x at an 8x step on one container and 7.83-8.11x on another, crossing 8.0 in 1 run of 12 and in 3 of 12.
+At the 16x step the control actually runs at, a linear scan read 15.7-16.0x and cleared 8.0 in all six runs, so a widened control against the old bound would pass for either shape --- the one thing a control exists to rule out.
+Recompute the bound at whatever step it is read against, and pin the separation with a positive control of the opposite shape rather than arguing it.
+
+The 0.62ms, 3.6-3.7x and 7.55-8.09x figures here were read on one 4-core Linux container at load average ~2.5, through `time.process_time`, as the minimum of three baseline runs over the minimum of two target runs;
+the 7.83-8.11x and 15.7-16.0x figures came from a second 4-core container at load average ~4.1 under the same protocol, and the 14.5-15.3x readings from a quieter one at load average ~0.5.
+A timing figure is a claim about a machine, so re-measure rather than porting these.
+
+- **Do:** ask which term a nuisance cost lands in, since load can push a ratio either way.
+- **Do:** measure a fixed cost under the load it appears under before subtracting it, since an idle reading bounds the interpreter's share and not the runner's.
+- **Do:** prefer the repair that survives both shapes of distortion when you cannot measure which shape you have.
+- **Do:** recompute a bound at the size step it is read against, and pin the separation with a control of the opposite shape.
+- **Don't:** read a control's "I cannot discriminate" as evidence about the code it controls.
+- **Don't:** widen a ratio's input-size gap while leaving a bound that was derived for the old gap.
+- **Don't:** rest a causal classification on a measurement taken where the cause cannot appear.
+
 ## A slow wall-clock reading is a claim about the machine before it is a finding about the code
 
-The two sections above govern a timing **bound written into a test** --- which clock it uses, and whether a ratio cancels the noise it is meant to cancel.
-Neither reaches the reading you take **once**, by hand, in the middle of diagnosing something, and then report as a defect.
+The three sections above govern a timing **bound written into a test** --- which clock it uses, and whether a ratio cancels the noise it is meant to cancel or is instead inflated or compressed by it.
+None of them reaches the reading you take **once**, by hand, in the middle of diagnosing something, and then report as a defect.
 No assertion is being authored there and no threshold is being chosen, so nothing about the moment resembles the situation those sections describe.
 
 **The reading is self-authenticating in a way a wrong value is not**, and that is the whole of the trap.
@@ -1509,7 +1687,7 @@ rather than a decaying average over a window you did not choose.
 A reading you cannot reproduce is not a measurement of the code, and a spread that
 spans an order of magnitude names its own cause.
 
-**A timing assertion written as a regression guard is the same exposure, and the two sections above answer it** --- they are about exactly this, a busy machine inflating a wall-clock reading.
+**A timing assertion written as a regression guard is the same exposure, and the sections above answer it** --- they are about exactly this, a busy machine distorting a timed reading in either direction.
 What those sections do not separate, and what a session that has just learned its own machine was loaded most needs, is **which question the assertion asks**.
 
 A **regression bound** asks whether the code got slower.

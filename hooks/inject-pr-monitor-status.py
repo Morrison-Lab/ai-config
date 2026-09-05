@@ -3,7 +3,9 @@
 
 Two writers share the state directory: the per-PR watchers spawned by
 `no-unmonitored-pr.py` (GitHub only), and `monitor-open-prs.py`, which
-polls every open GitHub PR and GitLab merge request the user authored.
+polls every open GitHub PR in the user's scope --- opened by them,
+assigned to them, or opened by the `github-actions` app --- and every
+GitLab merge request they authored.
 
 A monitor that tracks a consecutive-error streak (today only
 `monitor-open-prs.py` writes `error_streak`) is surfaced too once its last

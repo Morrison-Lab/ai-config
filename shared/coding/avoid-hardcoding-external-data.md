@@ -196,6 +196,45 @@ Every number in the table had been re-derived by command before publishing;
 the sentence generalizing about it had not been checked against it at all, because it carried no number to re-derive.
 Fixed in `b02e3ff`.)
 
+### A figure with no source of truth cannot be pinned into reproducibility
+
+The count section above splits on whether a *source can be named*, and gives
+the pointer to a figure that has one and a deletion to a figure that does not.
+A third move looks like a source and is not.
+When a figure was produced by instrumentation written for the occasion --- a
+throwaway script, a hand-driven import of the functions under review --- the
+number has no owner at all, so pinning it to a commit records only where it was
+typed.
+The pin fixes the corpus and leaves the *method* free, and the method is what
+the disagreement is about.
+
+The near-miss is that a commit pin reads as exactly the mechanical
+re-derivation the section above asks for.
+It names an artifact, it is checkable, and a reader can open it, so the figure
+arrives dressed as reproducible while nothing about it reproduces.
+
+The same pair of right answers applies.
+Drop the number and state the trade-off qualitatively, which is usually what a
+reader needed from it.
+Or ship the instrument --- a `--list` flag on the checker, a counting mode ---
+and quote its invocation, which turns the figure back into a pointer.
+
+- **Do:** quote a corpus figure only where the checker itself can print it, and
+  quote the invocation beside it.
+- **Do:** state the point qualitatively when no instrument prints the number.
+- **Don't:** pin a hand-measured figure to a commit and read the pin as
+  reproducibility.
+
+(Measured 2026-09-04 on
+[ai-config#3249](https://github.com/Morrison-Lab/ai-config/pull/3249).
+The design prose for `scripts/check-leadin-counts.py` quoted "88 accepted
+lead-ins, 70 suppressed by a copula-only rule".
+Review round 1 measured 89; round 2 measured 89 again and found a stale
+"20 of 88"; the fix pinned 88/70 to commit `7927fc44`; round 3 then measured
+78/63 **at that very commit**, by driving the shipped functions directly.
+Three parties, three totals, one commit.
+What ended it was dropping the number for "the large majority".)
+
 ### A suite's pass count is a liability twice over when written as an expectation
 
 The sections above govern a claim about a block the same file carries --- a count of its items, or a generalization over them.

@@ -135,14 +135,25 @@ import shlex
 import sys
 import tempfile
 
-# `no-unshipped-commit.py`'s own idioms, so the two guards agree on what a
-# `git commit` invocation looks like.
-_ENV = r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
-_GIT_FLAGS = r"(?:-(?:C\s*\S+|c\s*\S+|[a-zA-Z0-9_-]+(?:=\S*)?)\s+|--[a-zA-Z0-9_-]+(?:=\S*)?\s+)*"
-COMMIT = re.compile(
-    r"(?:^|[;&|\n])\s*" + _ENV + r"git\s+" + _GIT_FLAGS + r"commit(?![\w-])",
-    re.MULTILINE,
-)
+# Imported rather than copied. This hook originally carried its own transcript
+# of `no-unshipped-commit.py`'s patterns, and inherited the catastrophic
+# backtracking they had at the time (ai-config#3172): the `-C\s*\S+` arm and
+# the generic short-flag arm could each match `-Cx`, and that ambiguity under a
+# `*` cost 8.3s at 18 flag-shaped tokens -- in a PreToolUse guard, which runs
+# before every Bash call. #3172's fix made the arms disjoint and moved them to
+# `scripts/lib/git_cmd.py`, so importing is what keeps this hook from
+# re-acquiring a defect that has already been fixed once.
+try:
+    _LIB = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+        "scripts", "lib")
+    if _LIB not in sys.path:
+        sys.path.insert(0, _LIB)
+    from git_cmd import COMMIT  # type: ignore[no-redef]
+except Exception as _exc:  # fail loudly rather than matching nothing
+    print(f"flag-positional-figure-in-commit-message: cannot load "
+          f"scripts/lib/git_cmd.py ({_exc})", file=sys.stderr)
+    raise
 
 # The measured pattern. BOTH gaps are `\s+` rather than a literal space,
 # because the corpus wraps in both places: `38a0738cc` breaks between the

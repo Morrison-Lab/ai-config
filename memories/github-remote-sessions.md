@@ -91,13 +91,14 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
   Do not rely on local `Stop` hook enforcement to prevent placeholder turns when running in remote/web cloud sessions --- adhere to `CLAUDE.md`'s "Always produce a reply" rule directly in every turn.
 - **This session's GitHub identity varies BY OPERATION, and which routes exist follows from that rather than from any single probe.**
   The credential is proxy-substituted (the literal value begins `prox`), and it does not resolve to one actor.
-  Measured 2026-09-02 in a remote session scoped to `Morrison-Lab/ai-config`:
+  Measured 2026-09-02 in a remote session scoped to `Morrison-Lab/ai-config`, except the row that carries its own date:
 
   | operation | identity observed | how it was read |
   |---|---|---|
   | `GET /user` | `d-morrison` (User) | the response body; header says `allows_permissionless_access=true` |
   | REST write (post a PR comment) | `claude[bot]` (Bot), `author_association: CONTRIBUTOR` | fetched the created comment and read its `user` |
   | `git push` | `d-morrison` (User) | the Actions `actor` on every push-triggered run |
+  | MCP write (`mcp__github__*`, 2026-09-04) | `d-morrison` (User) | the created comment's `user`, and the dispatched run's `actor` |
 
   So a `GET /user` probe answers nothing about what a write will look like, which is the trap:
   it reports the friendly answer, and the write then lands under a different actor.
@@ -116,5 +117,6 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
   `POST /actions/workflows/<file>/dispatches` is refused outright with `403 Resource not accessible by integration` --- "integration" is GitHub's word for an App, and the App's installation token carries `issues: write` and `pull_requests: write` but not `actions: write`.
   Deleting a remote branch is refused by the proxy itself (`Write access to this GitHub API path is not permitted through this proxy`), so a merged branch is tidied locally and left on the remote.
   Merging is not similarly blocked, and the absence of `gh` does not excuse the pre-merge head pin: plain REST takes it as `sha`, per [`fully-clean`](../shared/workflow/fully-clean.md)'s merge-pin bullet, which carries the exact call and the branch-tidying caveat above.
-  - **Do:** re-trigger a review by pushing with `git`, which is the one write here that carries a User identity.
-  - **Don't:** reach for `workflow_dispatch` or an `@claude review` comment as the fallback --- in this session both are closed, for the two distinct reasons above.
+  - **Do:** re-trigger a review by pushing with `git`, or by the MCP client's dispatch or mention, the writes here that carry a User identity.
+  - **Don't:** reach for `workflow_dispatch` or an `@claude review` comment as the fallback through the raw API --- in this session both are closed, for the two distinct reasons above;
+    the MCP client dispatches where GitHub refuses the raw call and mentions where the gate ignores the raw comment, per [`github-mcp-tools.md`](github-mcp-tools.md)'s recurrence bullet.

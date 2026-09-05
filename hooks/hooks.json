@@ -305,7 +305,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-reset-hard-uncommitted-work.py\"",
             "timeout": 10,
             "script": "flag-reset-hard-uncommitted-work.py",
-            "why": "On 2026-08-09, in the same session as the git-add incident above, a `git reset --hard <ref>` run to drop a throwaway probe commit also discarded UNRELATED uncommitted edits to .Rbuildignore and NEWS.md sitting in the same working tree -- both had to be redone. `reset --hard` resetting the entire working tree (not just the commit being undone) is exactly its documented behaviour; the mistake was reaching for it in a tree with unrelated live edits, for an experiment that never needed to touch that tree. Warns rather than blocks: discarding a commit is frequently exactly the point, and this hook cannot tell 'this dirty state is unrelated' from 'this dirty state is what I meant to discard'.",
+            "why": "On 2026-08-09, in the same session as the git-add incident above, a `git reset --hard <ref>` run to drop a throwaway probe commit also discarded UNRELATED uncommitted edits to .Rbuildignore and NEWS.md sitting in the same working tree -- both had to be redone. `reset --hard` resetting the entire working tree (not just the commit being undone) is exactly its documented behaviour; the mistake was reaching for it in a tree with unrelated live edits, for an experiment that never needed to touch that tree. Warns rather than blocks: discarding a commit is frequently exactly the point, and this hook cannot tell 'this dirty state is unrelated' from 'this dirty state is what I meant to discard'. Extended in ai-config#2560 to `git checkout <pathspec>` and `git restore <pathspec>`: those forms revert the named paths to the INDEX rather than to the pre-edit tree, so an edit made since the last `git add` is discarded silently at exit 0. A plain branch switch (`git checkout <ref>`) stays out of scope because git refuses one that would clobber local changes and otherwise carries them across, and `git restore --staged` without `--worktree` stays out of scope because it rewrites only the index. The FORCED `git checkout` forms discard tracked working-tree changes too, and ai-config#2524 closed that gap rather than justifying it. Measured 2026-09-04 on git 2.43.0: `git checkout -f other` over a modified tracked file printed only 'Switched to branch' and exited 0 with the edit gone, `git checkout --force -b feature` did the same, and `git checkout -f` with no operand at all reverted every tracked file to HEAD with no output whatsoever -- so a forced checkout that resolves to no pathspec is now scoped to the whole tracked tree, exactly like `reset --hard`. That needed no new command parsing: `git checkout` was already read and `-f` was already a known flag. `git switch -f` / `--discard-changes` stays uncovered, and that one IS a scope decision: `switch` is a fourth command this guard does not read at all, and reading it would widen the guard past the three it was built for. The catalogs name that remaining gap.",
             "_note_reads_live_git_status": [
               "Also reads live `git status`, same reasoning as the sibling",
               "hook above: whether uncommitted tracked-file changes exist is",
@@ -331,6 +331,13 @@
             "timeout": 10,
             "script": "warn-pr-create-without-dupe-check.py",
             "why": "pr-on-claim.md makes an issue's cross-referenced open PRs the authoritative in-flight signal; issue-first.md and report-mistakes-proactively.md require the same search before gh issue create. Both rules are consulted at read time while the omission happens at composition time. PR half measured on Morrison-Lab/wai 2026-08-19/20: five branches fixed the same CI failure across five hours, two reaching duplicate PRs (#77, #78). Issue half measured on Morrison-Lab/ai-config 2026-08: one cp1252 decode crash had four open issues (#1984, #2040, #2048, #2049) before #2086 closed them. Issue discharge requires --state all --search (or gh search issues / MCP search_issues), not --state open, per check-open-prs-before-duplicating.md. Warns rather than blocks -- a duplicate is cheap to close and a blocked creation is expensive, since creating the PR or filing the issue is the act that makes work visible. Anchored on a command position with heredoc bodies stripped. Fails open. Tracked as #1748 (PR) and #2088 (issue)."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-unlabelled-agent-issue.py\"",
+            "timeout": 10,
+            "script": "warn-unlabelled-agent-issue.py",
+            "why": "shared/workflow/issue-first.md, 'Label an agent-filed issue with its authorship and its model'. disclose-agent-authorship.md scopes its marker line to comment BODIES and excludes an issue body, so an agent-filed issue is the one artifact that discloses nothing -- it goes out under the account holder's login as type: User. The labels close that, and the rule is consulted at read time while the omission happens at composition time. WARNS, never blocks: an unlabelled issue is fixed by one `gh issue edit --add-label` while a blocked create loses the act that makes work visible (report-mistakes-proactively.md, 'filing is not gated on approval'), the rule is scoped to repos we administrate and this hook cannot tell which repo is ours (sup files upstream with neither label), and a repo whose labels cannot be created still gets the issue. Anchored on a command position with heredoc bodies stripped, for the reason warn-pr-create-without-dupe-check.py records: this corpus quotes `gh issue create` constantly. Fails open. Tracked as #3111."
           },
           {
             "type": "command",
@@ -519,6 +526,53 @@
               "Agent|Task|SendMessage briefs are prose with no command structure, so",
               "they use an unanchored pattern instead."
             ]
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-positional-figure-in-commit-message.py\"",
+            "timeout": 10,
+            "script": "flag-positional-figure-in-commit-message.py",
+            "why": "shared/writing/timestamp-volatile-claims.md, commit-message surface. Warns, never blocks, when a `git commit` message about to be written states a POSITIONAL figure about text -- \"13 lines above\", \"39 lines below\", \"77 lines earlier\", \"~130 lines later\". A commit message is permanent history, so such a figure is asserted once and re-derived by nobody: true when typed, false as soon as anything above it changes, and never contradicted by a failing check. Measured on this repository's own history (2026-09-03, roughly 2400 commits): 14 occurrences across 13 commit messages, every one decoration locating a passage, with no legitimate code-move description among them -- e.g. 4e1dea144, 593d25ccf, fcb4ee10d, f2f706fa1, 60edf4c1e. The warning says to DELETE the number rather than correct it, since naming the target beats counting to it and a recounted figure is a fresher instance of the same defect.",
+            "_note_scope_is_deliberately_narrow": [
+              "A bare dimensional count with no positional word is NOT matched.",
+              "Measured over the same roughly 2400 commits, `\\d+ (characters|chars|words)`",
+              "alone matches 53, overwhelmingly legitimate measured facts -- a",
+              "skill-listing context budget, GitHub's 65536-character comment cap, a",
+              "line length against the style guide. (3 of the 53 also carry a",
+              "positional figure, so they fire on that arm anyway.) Warning on the",
+              "rest is the noise that costs a warn-only hook its credibility, so a",
+              "dimensional figure fires only alongside above/below/earlier/later.",
+              "Diffstats (`3 files changed`), version numbers, issue and PR numbers,",
+              "SHAs, dates and clock times are all out of scope for the same reason.",
+              "",
+              "A `\\d+-to-\\d+ range` arm was written and then DROPPED after measuring",
+              "it. Its only match in the whole history was 0709c1a28's \"The 60-to-80",
+              "range is human guidance\", which states what a style guide asks,",
+              "locates no passage, and loses its meaning if the number is deleted --",
+              "a misfire, not a hit. Zero measured true positives against one",
+              "measured false positive is a losing trade for a guard whose only",
+              "capital is that a fire means something. Two tests pin that this shape",
+              "must stay silent.",
+              "",
+              "`commit(?![\\w-])`, not `commit\\b`, per no-unshipped-commit.py: a word",
+              "boundary sits happily between `commit` and `-`, so `\\b` matches",
+              "`git commit-tree` and `git commit-graph write`, neither of which",
+              "writes a commit message at all."
+            ],
+            "_note_fails_silent": [
+              "Every parse failure -- unbalanced quotes, an unreadable or stdin `-F`",
+              "target, an unrecognised payload shape -- returns with no output. A",
+              "commit is the worst thing for a hook to break, and a missed warning",
+              "costs one stale figure in one commit message. An unreadable `-F` also",
+              "abandons the whole segment rather than judging the `-m` fraction it",
+              "can see, so the warning never asserts more than it observed.",
+              "",
+              "One case is NOT covered by that guarantee, and is not a parse failure:",
+              "the `_GIT_FLAGS` regex copied from no-unshipped-commit.py backtracks",
+              "catastrophically on a command line carrying many flag-shaped tokens, so",
+              "such a command stalls this hook until its 10s timeout rather than",
+              "returning silently. Tracked as ai-config#3172, which covers both copies."
+            ]
           }
         ]
       },
@@ -654,6 +708,13 @@
             "timeout": 10,
             "script": "warn-pr-create-without-dupe-check.py",
             "why": "Dual-registered with the Bash entry, following no-unauthorized-merge.py's precedent. tool-mappings.md maps CREATE_PR to mcp__github__create_pull_request and CREATE_ISSUE to mcp__github__issue_write (method=create) (legacy mcp__github__create_issue still matched), and CLAUDE.md mandates that substitute in remote sessions -- so registering only under Bash let a remote session discharge the guard via MCP reads while never being able to trip it via MCP creation."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-unlabelled-agent-issue.py\"",
+            "timeout": 10,
+            "script": "warn-unlabelled-agent-issue.py",
+            "why": "shared/workflow/issue-first.md, 'Label an agent-filed issue with its authorship and its model'. disclose-agent-authorship.md scopes its marker line to comment BODIES and excludes an issue body, so an agent-filed issue is the one artifact that discloses nothing -- it goes out under the account holder's login as type: User. The labels close that, and the rule is consulted at read time while the omission happens at composition time. WARNS, never blocks: an unlabelled issue is fixed by one `gh issue edit --add-label` while a blocked create loses the act that makes work visible (report-mistakes-proactively.md, 'filing is not gated on approval'), the rule is scoped to repos we administrate and this hook cannot tell which repo is ours (sup files upstream with neither label), and a repo whose labels cannot be created still gets the issue. Anchored on a command position with heredoc bodies stripped, for the reason warn-pr-create-without-dupe-check.py records: this corpus quotes `gh issue create` constantly. Fails open. Tracked as #3111."
           },
           {
             "type": "command",
@@ -896,14 +957,14 @@
             "command": "AI_CONFIG_STOP=1 python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-mistake-without-a-hook.py\"",
             "timeout": 10,
             "script": "no-mistake-without-a-hook.py",
-            "why": "Turns an admitted, mechanizable mistake into an immediate stop condition until hook work follows it."
+            "why": "Turns an admitted, mechanizable mistake into an immediate stop condition, capped once per admitted phrase within a short transcript window so a re-explanation of the same admission does not re-block; the same phrase re-admitted well beyond that window blocks again."
           },
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unmeasured-clock-claim.py\"",
             "timeout": 10,
             "script": "no-unmeasured-clock-claim.py",
-            "why": "CLAUDE.md 'Timestamp recaps in local time' -- warns when a reply states a Pacific clock time and no clock read appears since the previous message, so an extrapolated time is not reported as measured."
+            "why": "CLAUDE.md 'Timestamp recaps in local time' -- warns when a reply states a Pacific clock time and no clock read appears since the previous message, so an extrapolated time is not reported as measured. A read whose output is only ever captured (`t=$(TZ=... date ...)` writing into a file) does not discharge it: the value never reaches the transcript, so the session could not have quoted it (ai-config#2991)."
           },
           {
             "type": "command",

@@ -93,7 +93,8 @@ def readme(rows, heading="## Enforcement hooks (`hooks/`)"):
     return "\n".join(body) + "\n"
 
 
-def make_repo(tmpdir, entries, rows, heading=None, allowlisted=None):
+def make_repo(tmpdir, entries, rows, heading=None, allowlisted=None,
+              hooks_text=None):
     root = Path(tmpdir)
     (root / "scripts").mkdir()
     (root / "hooks").mkdir()
@@ -107,8 +108,12 @@ def make_repo(tmpdir, entries, rows, heading=None, allowlisted=None):
         script_text = re.sub(r"KNOWN_UNREGISTERED = \{[^}]*\}", replacement, script_text)
     (root / "scripts" / "check-hook-catalog.py").write_text(
         script_text, encoding="utf-8")
+    # `hooks_json` keys groups by (event, matcher), so it cannot express two
+    # groups carrying the SAME matcher -- which is one shape of double
+    # binding. `hooks_text` writes the manifest verbatim for those cases.
     (root / "hooks" / "hooks.json").write_text(
-        hooks_json(entries), encoding="utf-8")
+        hooks_text if hooks_text is not None else hooks_json(entries),
+        encoding="utf-8")
     kwargs = {"heading": heading} if heading else {}
     (root / "README.md").write_text(readme(rows, **kwargs), encoding="utf-8")
     return root
@@ -139,9 +144,9 @@ ALLOW_ROWS = [(s, "PreToolUse", "Bash", f"**not registered ([#{issue}](u))** ---
 
 
 def case(name, entries, rows, want_fail, needle=None, heading=None,
-         allowlisted=None, issue_states="unfetchable"):
+         allowlisted=None, issue_states="unfetchable", hooks_text=None):
     with tempfile.TemporaryDirectory() as td:
-        root = make_repo(td, entries, rows, heading, allowlisted)
+        root = make_repo(td, entries, rows, heading, allowlisted, hooks_text)
         rc, out = run(root, issue_states=issue_states)
     ok = (rc != 0) if want_fail else (rc == 0)
     if ok and needle:
@@ -180,6 +185,183 @@ case("matcher mismatch fails",
      [("a.py", "PreToolUse", "Bash")],
      [("a.py", "PreToolUse", "Agent", "blocks x")] + ALLOW_ROWS,
      want_fail=True, needle="hooks.json binds PreToolUse (Bash)")
+
+# --- matcher semantics, measured against the harness (ai-config#2535) -----
+# These lock the finding that settles #2535: a plain-name matcher is compared
+# by EXACT STRING EQUALITY, not as an unanchored regex, and an alternation is
+# exact membership rather than dead. Extracted from the standalone native
+# `claude` binary (2.1.260 per `claude --version`) and re-run under node,
+# 2026-09-04. If a harness bump changes this, these fail rather than the
+# double-binding check quietly reporting the wrong answer.
+check("a plain-name matcher does not match a longer tool name",
+      _catalog.matcher_matches("NotebookEdit", "Edit", "PreToolUse") is False)
+check("a plain-name matcher matches its own tool",
+      _catalog.matcher_matches("Edit", "Edit", "PreToolUse") is True)
+check("an alternation matcher matches each named tool",
+      all(_catalog.matcher_matches(t, "Write|Edit|NotebookEdit", "PreToolUse")
+          for t in ("Write", "Edit", "NotebookEdit")))
+check("an alternation matcher matches nothing else",
+      _catalog.matcher_matches("Bash", "Write|Edit|NotebookEdit",
+                               "PreToolUse") is False)
+check("a non-plain matcher is an unanchored regex",
+      _catalog.matcher_matches("NotebookEdit", "Edit.*", "PreToolUse") is True
+      and _catalog.matcher_matches("mcp__github__issue_write",
+                                   "mcp__github__.*", "PreToolUse") is True)
+check("an empty or star matcher fires on every tool",
+      _catalog.matcher_matches("Bash", "", "PreToolUse") is True
+      and _catalog.matcher_matches("Bash", "*", "PreToolUse") is True)
+check("a comma-joined matcher is an alternation on a wide-class event",
+      _catalog.matcher_names("Write, Edit", "PreToolUse")
+      == frozenset({"Write", "Edit"}))
+check("and fires on each tool it names there",
+      _catalog.matcher_matches("Edit", "Bash, Edit", "PreToolUse") is True
+      and _catalog.matcher_matches("Write", "Bash, Edit",
+                                   "PreToolUse") is False)
+check("a fast-path matcher naming nothing fires on nothing",
+      _catalog.matcher_matches("Bash", "|", "PreToolUse") is False)
+check("off a wide-class event a comma-joined matcher is a regex instead",
+      _catalog.matcher_names("Write, Edit", "Stop") == frozenset()
+      and _catalog.matcher_matches("Edit", "Bash, Edit", "Stop") is False)
+check("an alternation matcher names each of its tools literally",
+      _catalog.matcher_names("Write|Edit", "PreToolUse")
+      == frozenset({"Write", "Edit"}))
+
+# --- double binding (ai-config#2535) --------------------------------------
+# `registered` folds a script's matcher groups into one comma-joined string,
+# so a hook bound once and a hook bound twice compare equal to the same README
+# row. Each case below is a binding the old catalog reported as clean.
+case("three disjoint plain matchers are not a double binding",
+     [("a.py", "PreToolUse", "Write"), ("a.py", "PreToolUse", "Edit"),
+      ("a.py", "PreToolUse", "NotebookEdit")],
+     [("a.py", "PreToolUse", "Write, Edit, NotebookEdit", "warns")]
+     + ALLOW_ROWS,
+     want_fail=False)
+
+case("a regex matcher overlapping a plain one is a double binding",
+     [("a.py", "PreToolUse", "Edit"), ("a.py", "PreToolUse", "Edit.*")],
+     [("a.py", "PreToolUse", "Edit, Edit.*", "warns")] + ALLOW_ROWS,
+     want_fail=True, needle="runs twice on one call")
+
+# A catch-all overlaps the OTHER matcher exactly, so the message has to name
+# that matcher's extent rather than claiming "every tool" of a narrow one. The
+# failure is real either way; what is asserted here is that it is not
+# overstated.
+case("a catch-all group beside a named group is a double binding",
+     [("a.py", "PreToolUse", ""), ("a.py", "PreToolUse", "Bash")],
+     [("a.py", "PreToolUse", "Bash", "warns")] + ALLOW_ROWS,
+     want_fail=True, needle="which both fire on Bash")
+
+case("a catch-all beside a regex group names the regex, not every tool",
+     [("a.py", "PreToolUse", ""),
+      ("a.py", "PreToolUse", "mcp__github__.*")],
+     [("a.py", "PreToolUse", "mcp__github__.*", "warns")] + ALLOW_ROWS,
+     want_fail=True,
+     needle="which both fire on every tool 'mcp__github__.*' fires on")
+
+# Two catch-alls really do overlap on everything, so the unqualified wording
+# survives for the one pair it is true of.
+case("two catch-all groups do fire on every tool",
+     [("a.py", "PreToolUse", ""), ("a.py", "PreToolUse", "*")],
+     [("a.py", "PreToolUse", "*", "warns")] + ALLOW_ROWS,
+     want_fail=True, needle="which both fire on every tool;")
+
+# --- pairs this check cannot decide (ai-config#2535) -----------------------
+# The vocabulary is built from tool names hooks.json spells out, and a regex
+# matcher spells out none -- so two DIFFERENT regexes are skipped rather than
+# compared. `mcp__github__.*` and `mcp__.*` share every `mcp__github__` tool
+# and this check sees none of them. Counting such a pair as compared would
+# report a skip as a clean comparison, which is exactly the vacuous-zero shape
+# the examined count exists to prevent.
+case("two different regex matchers are reported as undecidable, not clean",
+     [("a.py", "PreToolUse", "mcp__github__.*"),
+      ("a.py", "PreToolUse", "mcp__.*")],
+     [("a.py", "PreToolUse", "mcp__github__.*, mcp__.*", "warns")]
+     + ALLOW_ROWS,
+     want_fail=False, needle="both are regexes, so no tool name")
+
+case("an undecidable pair is counted apart from the compared ones",
+     [("a.py", "PreToolUse", "mcp__github__.*"),
+      ("a.py", "PreToolUse", "mcp__.*")],
+     [("a.py", "PreToolUse", "mcp__github__.*, mcp__.*", "warns")]
+     + ALLOW_ROWS,
+     want_fail=False,
+     needle="0 matcher pair(s) compared for a double binding, 1 undecidable")
+
+# The vocabulary settles some regex-regex pairs, so the undecidable
+# classification has to be the FALLBACK rather than the gate: `Edit.*` and
+# `Note.*` both fire on `NotebookEdit`, which a sibling binding spells out.
+# Asking `undecidable_pair` first printed the NOTE and exited 0 over a real
+# double binding -- a skip reported as a clean comparison, the same shape the
+# undecidable count exists to prevent, running in the other direction.
+case("two regexes a vocabulary name settles are a double binding, not a NOTE",
+     [("a.py", "PreToolUse", "Edit.*"), ("a.py", "PreToolUse", "Note.*"),
+      ("b.py", "PreToolUse", "NotebookEdit")],
+     [("a.py", "PreToolUse", "Edit.*, Note.*", "warns"),
+      ("b.py", "PreToolUse", "NotebookEdit", "warns")] + ALLOW_ROWS,
+     want_fail=True, needle="which both fire on NotebookEdit")
+
+case("a settled regex pair counts as compared, not as undecidable",
+     [("a.py", "PreToolUse", "Edit.*"), ("a.py", "PreToolUse", "Note.*"),
+      ("b.py", "PreToolUse", "NotebookEdit")],
+     [("a.py", "PreToolUse", "Edit.*, Note.*", "warns"),
+      ("b.py", "PreToolUse", "NotebookEdit", "warns")] + ALLOW_ROWS,
+     want_fail=True,
+     needle="1 matcher pair(s) compared for a double binding, 0 undecidable")
+
+# The classifier itself, so each arm is pinned rather than inferred from the
+# two fixtures above.
+check("two different regexes name no tool, so nothing settles them alone",
+      _catalog.undecidable_pair("mcp__github__.*", "mcp__.*",
+                                "PreToolUse") is True)
+check("but a vocabulary name can still settle two different regexes",
+      _catalog.overlapping_tools("Edit.*", "Note.*", {"NotebookEdit"},
+                                 "PreToolUse") == ["NotebookEdit"])
+check("a regex paired with a plain name is decidable",
+      _catalog.undecidable_pair("mcp__.*", "Bash", "PreToolUse") is False)
+check("two identical regexes are decidable",
+      _catalog.undecidable_pair("mcp__.*", "mcp__.*", "PreToolUse") is False)
+check("a catch-all is decidable against anything",
+      _catalog.undecidable_pair("", "mcp__.*", "PreToolUse") is False)
+
+# Two groups carrying the identical matcher -- the shape `hooks_json` cannot
+# build, and the one a reader is likeliest to create by appending a group
+# instead of extending one.
+_dup = json.dumps({"hooks": {"PreToolUse": [
+    {"matcher": "Bash", "hooks": [{"type": "command", "script": "a.py"}]},
+    {"matcher": "Bash", "hooks": [{"type": "command", "script": "a.py"}]},
+]}}, indent=2)
+case("the same matcher in two groups is a double binding",
+     [], [("a.py", "PreToolUse", "Bash, Bash", "warns")] + ALLOW_ROWS,
+     want_fail=True, needle="which both fire on Bash", hooks_text=_dup)
+
+# A comma-joined matcher beside a group naming one of its tools is a real
+# double binding on PreToolUse, since the harness splits on `[|,]` there.
+case("a comma-joined matcher overlapping a plain one is a double binding",
+     [("a.py", "PreToolUse", "Bash, Edit"), ("a.py", "PreToolUse", "Edit")],
+     [("a.py", "PreToolUse", "Bash, Edit, Edit", "warns")] + ALLOW_ROWS,
+     want_fail=True, needle="which both fire on Edit")
+
+case("a double binding on different events is not one",
+     [("a.py", "PreToolUse", "Bash"), ("a.py", "Stop", "")],
+     [("a.py", "PreToolUse, Stop", "Bash", "warns")] + ALLOW_ROWS,
+     want_fail=False)
+
+# --- alternation matchers in the README cell ------------------------------
+# The harness accepts `A|B|C` as one group, so the catalog has to be able to
+# say so. A markdown cell carries the pipe escaped.
+case("an escaped alternation row matches an alternation binding",
+     [("a.py", "PreToolUse", "Write|Edit|NotebookEdit")],
+     [("a.py", "PreToolUse", r"Write\|Edit\|NotebookEdit", "warns")]
+     + ALLOW_ROWS,
+     want_fail=False)
+
+# A second, well-formed row keeps the table non-empty, so this case reaches
+# the set comparison rather than short-circuiting on "parsed 0 hook rows".
+case("a bare pipe in the matcher cell does not parse as a row",
+     [("a.py", "PreToolUse", "Write|Edit"), ("b.py", "Stop", "")],
+     [("a.py", "PreToolUse", "Write|Edit", "warns"),
+      ("b.py", "Stop", "", "blocks y")] + ALLOW_ROWS,
+     want_fail=True, needle="a.py is registered")
 
 # --- allowlist hygiene, mirroring KNOWN_UNTESTED's reverse check ----------
 # Always exercised by injecting a test allowlist, ensuring these checks run

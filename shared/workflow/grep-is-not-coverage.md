@@ -157,9 +157,10 @@ Deciding where a learning belongs is a real step ---
 [`ums`](../../skills/ums/SKILL.md) step 2 routes each item either to ai-config
 or to the owning repo's own agent docs --- and once an item is routed to a repo
 we own, every later instruction reads as relative to *that* repo.
-Step 3's "grep the whole `memories/` directory" then means the destination's
-`memories/`, so the dupe check runs to completion, finds nothing, and never
-looked at ai-config at all.
+Step 3 read "the whole `memories/` directory" at `3935bfff`,
+and that wording meant the destination's,
+so the dupe check ran to completion, found nothing,
+and never looked at ai-config at all.
 
 The asymmetry is why this needs naming separately from the null-result case.
 A repo-local memory in some other repo is precisely the place nobody thinks to
@@ -194,9 +195,69 @@ The verification half of the same incident --- attempting the base form of a
 command and generalizing to a flag never passed --- is recorded separately in
 Morrison-Lab/ai-config#1174.)
 
+### The same failure has a same-repo sibling: the wrong directory
+
+The section above routes between repos;
+the same miss happens inside one repo
+when the dupe check is scoped to a directory
+that does not hold the file already owning the idea being recorded.
+
+- **Do:** grep [`skill-builder`](../../skills/skill-builder/SKILL.md) step 0's path list,
+  not only the directory the destination sits in.
+- **Don't:** read "the whole `memories/` directory", step 3's wording at `3935bfff`, as thorough;
+  the word doing the damage was `memories/`, not "whole".
+
+(Recorded 2026-09-03 on [ai-config#3060](https://github.com/Morrison-Lab/ai-config/pull/3060),
+where a markdownlint entry was added to `memories/markdownlint.md`
+while `shared/writing/semantic-line-breaks.md` already covered the same rule in three regions
+(a bare `#NNNN` at column 1 parses as an ATX heading, markdownlint's MD018),
+at `3935bfff` (`origin/main` before #3060 merged) and unchanged at `2156b439` (its squash merge):
+`git grep -n MD018 3935bfff -- shared/writing/semantic-line-breaks.md`
+and the same query at `2156b439`
+return the same five lines ---
+274, 288, 295, 861 and 995 ---
+of which the first three sit inside one bold-lead block with its own `Do`/`Don't` pair.
+What step 3's own directory-wide grep would have done is checkable:
+`git grep -il "issue reference" 3935bfff -- memories/` returns three files ---
+`memories/github.md`, `memories/preferences.md` and `memories/r-quarto.md` ---
+and the owner is not among them,
+because the owner is `shared/writing/semantic-line-breaks.md`,
+which a search of `memories/` cannot reach.
+What the [`skill-builder`](../../skills/skill-builder/SKILL.md) step 0 query
+would have done is checkable too:
+`git grep -il "issue reference" 3935bfff -- skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md`
+returns eight files at that ref ---
+`hooks/test-no-unauthorized-merge.py`,
+`hooks/warn-stale-issue-edit.py`,
+`memories/github.md`,
+`memories/preferences.md`,
+`memories/r-quarto.md`,
+`shared/workflow/address-every-comment.md`,
+`shared/writing/semantic-line-breaks.md`
+and `skills/promote-memory/SKILL.md` ---
+with the owner among them.
+The same `memories/` query returns four at `2156b439`:
+the three above plus `memories/markdownlint.md`, the file the entry was added to,
+where the entry is a cross-link to the owner rather than a restatement ---
+so the count rose by one either way,
+and a hit count cannot tell an owner from a pointer.
+Every commit on #3060's branch is still reachable on `origin` from `refs/pull/3060/head`
+(`git ls-remote origin refs/pull/3060/head` returns one line whose SHA begins `f9068299`,
+and after `git fetch --depth=200 origin refs/pull/3060/head`, `git rev-list --count 3935bfff..FETCH_HEAD` returns 33).
+The default refspec does not bring `refs/pull/3060/head` down
+(`git config --get-all remote.origin.fetch` returns `+refs/heads/*:refs/remotes/origin/*` in the measuring clone),
+and a shallow clone walks only to its fetch depth,
+so this record anchors on `main` commits, which a full fetch of `main` brings down
+(`git merge-base --is-ancestor 3935bfff origin/main` and the same for `2156b439` both exit 0).
+Note also why the wrong-corpus section's `Do` could not have caught it.
+It reads "grep the ai-config corpus as well as the destination repo's docs,
+whenever step 2 routes an item anywhere other than ai-config",
+and this item was routed to ai-config, so its trigger did not fire.)
+
 ## Searching only the rendered output is the same error one layer down
 
-The wrong-corpus section above governs searching the wrong **repo**.
+The wrong-corpus section above governs searching the wrong **repo**,
+and its subsection the wrong **directory** within one.
 This one governs searching the wrong **layer within the right repo**:
 a sweep whose file filter reaches the generated artifact and not the generator that produces it.
 
@@ -254,7 +315,8 @@ and the next regeneration would have restored the exact shape the same PR's own 
 
 ## An unmerged PR is part of the corpus a citation can be corroborated against, and no default-branch search reaches it
 
-The wrong-corpus section above governs searching the wrong **repo**.
+The wrong-corpus section above governs searching the wrong **repo**,
+and its subsection the wrong **directory** within one.
 This one governs searching the wrong **branch state within the right repo**: a citation to content that ships only in an open PR, checked by grepping the default branch.
 
 The null result here is not merely inconclusive --- it is guaranteed whether or not the cited content is genuine.

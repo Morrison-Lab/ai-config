@@ -18,17 +18,49 @@ In every session --- at session start, and again periodically during long sessio
    A leftover `~/.claude/skills` from a pre-plugin install loads alongside the plugin, listing every skill twice --- bare `ums` beside `ai-config:ums` --- which crowds the skill listing and can cost entries their descriptions, the text routing selects on.
    Measured 2026-08-27 ([#2405](https://github.com/Morrison-Lab/ai-config/issues/2405)), found by Claude Code's built-in `/doctor` rather than by this check.
 
-   **Detecting it is harder than the other three, and this file does not yet have a reliable test.**
+   **Detecting it is harder than the other three, so the instrument reports it at a lower confidence.**
    Those three are paths no client creates, so finding one is the finding.
    `~/.claude/skills` is a standard client location, holding a user's own personal skills and an account-level `synced/` bucket the client populates --- on the machine measured 2026-08-28 that bucket carried 45 directories whose names match this repo's skills, none of them a leftover.
    So neither presence nor a name match settles it, and a wrong answer is expensive in one direction: deleting that directory takes the user's own skills with it, and this corpus references `~/.claude/skills/...` paths directly in 31 places (`grep -rn '~/\.claude/skills/' --include=*.md skills/ shared/ memories/`, 2026-08-28), which the plugin install does not provide ([#2530](https://github.com/Morrison-Lab/ai-config/issues/2530)).
-   Treat a doubled listing as the symptom, investigate by hand, and see [#2528](https://github.com/Morrison-Lab/ai-config/issues/2528) for making this an instrument.
+   `python3 scripts/doctor.py` sweeps all four paths and reports rather than deletes ([#2528](https://github.com/Morrison-Lab/ai-config/issues/2528)).
+   Its `consumer_leftovers` check settles provenance only for a symlink resolving into an ai-config checkout;
+   a bare name match it reports as the doubled-listing symptom to investigate by hand.
+   Its walk of `~/.claude/skills` is one level deep, which is what keeps that bucket out of the report:
+   the bucket's skill-named directories sit at `synced/<bucket-id>/<name>` and are never reached, so only the `synced` entry itself is examined and it matches neither test.
+   It skips the sweep entirely when no ai-config plugin is enabled, since a `~/.claude` copy is then likely the machine's only install.
+   **That gate resolves `enabledPlugins` by scope precedence --- local, then project, then user --- rather than reading one file**, matching the scope walk in `skills/ai-config-hooks/run-hook.sh`.
+   Only the walk matches, and the two within-file rules are not variants of one reading: `doctor.py` parses the file and counts any truthy `ai-config@*` entry in `enabledPlugins`, since a second marketplace's copy loads the same plugin, while `run-hook.sh` parses nothing and takes the first raw-text match of `"ai-config@...": true|false` wherever it lands.
+   So the two disagree on a file naming `ai-config@Morrison-Lab` false beside `ai-config@other` true --- the check reads the plugin as enabled, the runner as disabled --- and also on text the check never reads at all, such as a commented-out `// "ai-config@Morrison-Lab": true` beside an empty `enabledPlugins`, which the runner reads as enabled ([`claude-code-settings`](../../memories/claude-code-settings.md)).
+   `enabledPlugins` resolves by precedence rather than by unioning truthy names across files, so the first file naming an `ai-config@*` entry decides and an explicit `false` there is final --- see [`claude-code-settings`](../../memories/claude-code-settings.md).
+   **Two scopes above those three stay unread, so the gate can be wrong in both directions.**
+   A managed-settings `false` over a walked `true` runs the sweep on a machine whose plugin is disabled, and reports its only install as leftovers.
+   A managed-settings or command-line `true` with no walked entry makes the sweep skip.
+
+   **A `~/.claude/shared` symlink resolving into a checkout is the documented configuration rather than a leftover, so the check reports it separately and stays green.**
+   README.md tells a reader with a global `~/.claude/CLAUDE.md` to symlink `shared/` there by hand until [#2352](https://github.com/Morrison-Lab/ai-config/issues/2352) lands, so calling it a leftover would leave `python3 scripts/doctor.py --strict` red by construction on a machine that follows the documentation.
+   A check that is red on the recommended configuration teaches its reader to ignore it, which is the opposite of what an instrument buys.
+   **An exemption is only sound while the documentation recommends exactly the form it exempts, so the two are pinned to each other.**
+   README.md used to offer a copy as an equal alternative, which left a conformant reader red anyway and moved the failure rather than removing it;
+   it now names the symlink alone, because a copy does not track the checkout and so goes stale with nothing to say so.
+   A copy of `shared/` is therefore a leftover, and the check says in its own output why it is reported and that replacing it with a symlink is the fix rather than deleting it.
+   `hooks/` and `memories/` have no documented manual step, so both stay leftovers whatever placed them.
 
    - **Do:** include `skills/` when sweeping `~/.claude` for leftovers.
    - **Do:** read a doubled listing (a bare name beside an `ai-config:`-prefixed one) as the symptom, since the cost is otherwise invisible.
+   - **Do:** run `python3 scripts/doctor.py` for the sweep rather than pasting an `ls` by hand.
+   - **Do:** check managed settings by hand when the gate's answer surprises you, in either direction.
    - **Don't:** read "the plugin serves it" as "nothing is installed to check" --- a replacement does not remove what it replaced.
+   - **Don't:** read its name-match finding as proof of a leftover --- provenance is what a symlink into a checkout settles and a shared name does not.
+   - **Don't:** read that skip as proof the machine has no plugin --- managed settings and command-line arguments are not read.
+   - **Don't:** read its leftover list as proof the plugin is enabled --- a managed-settings `false` over a lower-scope `true` produces the same list.
+   - **Do:** place `~/.claude/shared` as a symlink into the checkout rather than as a copy, so the documented step reads as green and stays fresh on a pull.
    - **Don't:** delete `~/.claude/skills` on presence or on a name match;
      neither distinguishes a leftover from the client's own skills.
+   - **Don't:** read a green `consumer_leftovers` as proof `~/.claude/shared` is absent --- the documented symlink is reported outside the leftover list.
+   - **Do:** change the documentation and the exemption together, so exactly one form of a manual step is both recommended and exempted.
+   - **Don't:** exempt one form of a step the documentation offers two ways --- a reader who took the other one is red by construction, which is the failure the exemption was meant to remove.
+   - **Do:** say the *scope walk* is the shared part when describing the plugin gate, and describe each reader's own within-file rule --- the runner's raw-text grep as well as the check's parsed `enabledPlugins` union.
+   - **Don't:** present the first-versus-union rule as the whole divergence --- the runner also matches a commented-out line and text outside `enabledPlugins`, which the check never reads.
 
    The dedicated verification instrument this section used to name (`check-install.py`, which compared installed copies against the checkout and repaired drift with `--fix`) was removed along with that symlink install and has no replacement yet either.
    Until one lands, use the manual branch-plus-diff check in this file's "The blast radius is the whole consumer surface" paragraph below, which does not depend on that instrument and still works whether the local copy is a symlink or a real copy.

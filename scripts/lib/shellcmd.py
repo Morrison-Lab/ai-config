@@ -25,7 +25,8 @@ below -- which is the argument for a module rather than a ninth copy. Those
 eight are NOT rewired here: migrating eight live guards, two of which can
 REFUSE (`no-clobbering-push.py` denies, `no-unreviewed-pr.py` blocks; the
 other six only add context), is its own change with its own review, tracked
-as ai-config#2993. This module
+as ai-config#3178 --- not by the closed ai-config#2993, which reported the
+defect and shipped this module rather than the migration. This module
 is where the fix landed and where new callers import from.
 
 WHY AN ARGV SPLIT RATHER THAN A REGEX
@@ -45,7 +46,7 @@ THREE LIMITS, ALL INHERITED FROM THE EIGHT COPIES
 The heredoc pre-pass and the newline rewrite run on RAW TEXT, ahead of `shlex`,
 so neither knows the quoting rules the paragraph above credits `shlex` with.
 State that here rather than letting the argv-split argument imply otherwise --
-this docstring is the contract ai-config#2993 will migrate eight live guards
+this docstring is the contract ai-config#3178 will migrate eight live guards
 onto, two of which can refuse.
 
   * `RX_HEREDOC_OPEN` is QUOTE-BLIND. A `<<` inside a quoted argument -- a commit
@@ -108,7 +109,7 @@ The first two fail toward silence or toward a mangled argument. The third
 fails BOTH ways -- a phantom command and a hidden one -- and is stated
 separately for that reason. Fixing any of them
 means a quote-aware pre-scan, which is a real parser and out of scope for an
-extraction; ai-config#2993 is where that belongs, alongside migrating the
+extraction; ai-config#3178 is where that belongs, alongside migrating the
 eight copies.
 """
 from __future__ import annotations
@@ -336,6 +337,38 @@ def simple_commands(command):
     newlines into `;`, then let `shlex` split and dequote. The tokens come back
     DEQUOTED, so a quoted `"git push"` arrives as one token inside some other
     command's argv rather than as its own simple command.
+
+    Subshell nesting is FLATTENED here: `(cd /a && ls)` comes back as two
+    argv lists indistinguishable from `cd /a && ls`, because the `(` and `)`
+    tokens are separators and are dropped with the rest. A caller that models
+    shell STATE rather than asking which programs ran needs the distinction,
+    since a `cd` inside a subshell moves that subshell and never the parent;
+    `simple_commands_with_scope` is the same split with each argv paired with
+    the subshell it runs in.
+    """
+    with_scope = simple_commands_with_scope(command)
+    if with_scope is None:
+        return None
+    return [argv for _scope, argv in with_scope]
+
+
+def simple_commands_with_scope(command):
+    """`simple_commands`, each argv paired with the SUBSHELL IT RUNS IN.
+
+    A scope is the tuple of subshell ids from the caller's own shell down to
+    the command, so `(0,)` is the caller's shell and `len(scope) - 1` is the
+    nesting depth. Every `(` allocates a FRESH id, so two sibling subshells
+    at the same depth carry different scopes and a caller can tell that the
+    second inherited from the parent rather than from the first.
+
+    Parens are read one character at a time rather than by net count, because
+    a single separator token can both close and open: `shlex` emits `);` and
+    `)&&(` as one token each, and only the ordered read gives `)&&(` a new id
+    on the far side. The per-token net count this replaced got the depth
+    right and the identity wrong.
+
+    `{ ... }` grouping is NOT nesting for this purpose and is not counted: it
+    runs in the current shell, so a `cd` inside one does move the caller.
     """
     # ORDER MATTERS, and the natural order is wrong. Joining continuations
     # first lets a heredoc BODY line ending in a backslash eat its own
@@ -355,16 +388,24 @@ def simple_commands(command):
         toks = list(lex)
     except ValueError:
         return None
-    cmds, cur = [], []
+    cmds, cur, scope, cur_scope, opened = [], [], [0], (0,), 0
     for tok in toks:
         if tok and set(tok) <= _SHELL_OPS:
             if cur:
-                cmds.append(cur)
+                cmds.append((cur_scope, cur))
                 cur = []
+            for ch in tok:
+                if ch == "(":
+                    opened += 1
+                    scope.append(opened)
+                elif ch == ")" and len(scope) > 1:
+                    scope.pop()
         else:
+            if not cur:
+                cur_scope = tuple(scope)
             cur.append(tok)
     if cur:
-        cmds.append(cur)
+        cmds.append((cur_scope, cur))
     return cmds
 
 
@@ -481,3 +522,89 @@ def git_subcommand(argv):
     if i >= len(rest):
         return None  # bare `git`, or global options only
     return rest[i], rest[i + 1:], env
+
+
+def resolve_cd_target(rest: list[str], cur_dir: str | None) -> str | None:
+    """The directory a `cd`, `pushd`, or `popd` leaves the shell in.
+
+    `rest` is one simple command's argv, `strip_env`-normalized, whose first
+    token is `cd`, `pushd`, or `popd`. `cur_dir` is where the shell stood
+    before it. `None` comes back when the move is INDETERMINATE rather than
+    absent -- `cd -` goes to `OLDPWD`, `popd` pops a stack this scan does not
+    simulate, and a `$VAR` target expands at runtime -- so a caller must
+    treat `None` as "somewhere I cannot name", never as "unchanged".
+
+    Adapted verbatim from `hooks/no-push-without-self-review.py`'s
+    `_resolve_cd_target`, which is the tested in-repo implementation. This is
+    a COPY and not a move: that guard still holds its own, because it can
+    refuse a push and migrating a deny-capable guard is its own change with
+    its own review --- the same call this module's header makes for the eight
+    `_simple_commands` copies. The duplication that leaves is tracked as
+    ai-config#3177, not by the closed ai-config#2993, whose scope is
+    `_simple_commands` and `_strip_env`. New callers import from here.
+    """
+    cmd_name = rest[0]
+    if cmd_name == "popd":
+        # `popd -n` suppresses the directory change, leaving cur_dir untouched.
+        if any(tok.startswith("-") and "n" in tok and tok != "-" for tok in rest[1:]):
+            return cur_dir
+        # Without a full dirstack simulation across commands, popd without -n clears the hint.
+        return None
+
+    # For `cd` and `pushd`: parse flags and positional directory target.
+    i = 1
+    target = None
+    suppress_chdir = False
+    while i < len(rest):
+        tok = rest[i]
+        if tok == "--":
+            # End of options; next token (if present) is the target directory.
+            if i + 1 < len(rest):
+                target = rest[i + 1]
+            break
+        if tok == "-":
+            # `cd -` switches to OLDPWD, which is indeterminate without shell state.
+            return None
+        if tok.startswith("+") or (tok.startswith("-") and tok[1:].isdigit()):
+            # `pushd +N` or `pushd -N` rotates the directory stack.
+            return None
+        if tok.startswith("-"):
+            # Flags like -P, -L, -e, -@ for cd, or -n for pushd
+            if cmd_name == "pushd" and "n" in tok:
+                suppress_chdir = True
+            i += 1
+            continue
+        target = tok
+        break
+
+    if cmd_name == "pushd" and suppress_chdir:
+        # `pushd -n <dir>` rotates/modifies stack without changing current working directory.
+        return cur_dir
+
+    if target is None:
+        # Bare `cd` or `cd -P` with no directory defaults to $HOME (~).
+        # For pushd with no args, it swaps top 2 stack entries (indeterminate -> None).
+        if cmd_name == "pushd":
+            return None
+        target = "~"
+
+    # Expand ~ and ~/path
+    if target == "~" or target.startswith("~/"):
+        target = os.path.expanduser(target)
+    elif target.startswith("$HOME/") or target == "$HOME" or target.startswith("${HOME}/") or target == "${HOME}":
+        home = os.path.expanduser("~")
+        if target in ("$HOME", "${HOME}"):
+            target = home
+        elif target.startswith("$HOME/"):
+            target = os.path.join(home, target[len("$HOME/"):])
+        elif target.startswith("${HOME}/"):
+            target = os.path.join(home, target[len("${HOME}/"):])
+    elif "$" in target or "`" in target:
+        # Unexpanded shell variables/substitutions cannot be resolved statically.
+        return None
+
+    if os.path.isabs(target):
+        return os.path.normpath(target)
+    if cur_dir is not None:
+        return os.path.normpath(os.path.join(cur_dir, target))
+    return os.path.normpath(target)

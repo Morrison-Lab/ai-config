@@ -518,16 +518,23 @@ under dot-prefixed directories,
 recovering only because the brief carried literal paths --- see that
 skill's step 2 ("Prepare the prompt").
 
-- **Do:** treat free-tier delegation of authoring work as feasible
-  when the acceptance test is mechanical ---
-  it is the deterministic validation step, not the model's own
-  confidence, that makes trusting the result safe.
+The routing rule this measurement licenses lives in
+[`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md)'s
+"The one measured exception: authoring work a mechanical test can
+accept" section, which summarizes the measurement in one sentence and
+cites this section for the rest.
+A later measurement belongs in this file,
+and a change to the routing rule belongs in that section.
+
 - **Do:** read this as one data point for one model id on one task,
   not as a general claim about hosted-free-tier authoring capability.
-- **Don't:** delegate authoring work to a free-tier model with no
-  deterministic way to check the result ---
-  this success was confirmed by four independent test suites,
-  not by inspecting the diff.
+- **Do:** credit the deterministic validation step --- four
+  independent test suites passing --- when recording why a delegated
+  result was trusted.
+- **Don't:** generalize this measurement to another free-tier model id
+  or another task shape --- neither was measured here.
+- **Don't:** credit the model's own confidence for the result;
+  what made trusting it safe was the acceptance test passing.
 
 ## Conversation-inheriting subagent dispatch vs. clean-context dispatch for UMS and CAI
 

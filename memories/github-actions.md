@@ -4,6 +4,7 @@ Generic Actions material: YAML authoring and the gotchas that bite any workflow.
 Reusable-workflow catalog: [`gha-reusable-workflows.md`](gha-reusable-workflows.md).
 The `@claude` bot's own behaviour lives in
 [`claude-bot-workflows.md`](claude-bot-workflows.md).
+The Jules reviewer's own misfires live in [`jules-review.md`](jules-review.md).
 
 ## YAML authoring (GitHub Actions / workflow files)
 - **Regex values with backslashes: prefer single-quoted YAML, but document both forms

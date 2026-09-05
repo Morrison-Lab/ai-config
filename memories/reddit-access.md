@@ -128,7 +128,7 @@ preflight out, whereas a Reddit 403 would confirm it.
 
 The `mcp__claude-in-chrome__*` tools drive the user's real Chrome, which has
 a real TLS fingerprint and a logged-in Reddit session.
-Four mechanics, each measured working:
+Five mechanics, each measured working:
 
 - **Establish the origin once, then fetch in-page.**
   Navigate a tab to the target subreddit, then use `javascript_tool` to run

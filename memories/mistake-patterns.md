@@ -443,13 +443,20 @@ A clean automated review from every available provider evaluating the current HE
 - **Canonical Rule**: [`fully-clean.md`](../shared/workflow/fully-clean.md)'s per-reviewer latest-verdict rule (Criterion 2, `EXCLUSIVE_BOT_IDENTITY`).
 - **Fix**: When a not-clean verdict belongs to an exclusive-login bot whose posting session is gone, do not dispatch further same-tool or cross-vendor reviews expecting supersession --- escalate to a human immediately (per `fully-clean.md`'s deadlock rule), citing #2482.
 
-## Pattern 21: A Piped or Redirected `git push` Is Parsed as a Commit-ish by the Self-Review Guard
-- **Mistake**: Appending `2>&1 | tail -3` (or any redirection/pipe) to a `git push` command in a repo guarded by `hooks/no-push-without-self-review.py`, then reading the guard's "`2` could not be resolved to a commit" refusal as a real review-state problem and re-dispatching a review that already exists.
-- **Example**: 2026-08-27, ai-config#2477: `git push origin cursor/ums-wrap-2272-32a3 2>&1 | tail -3` was blocked twice by the hook tokenizing the raw shell command line and treating the `2` from `2>&1` as a commit-ish push argument.
+## Pattern 21: The Self-Review Guard Reads Command Text, Not a Resolved Shell Command
+- **Mistake**: Writing a `git push` guarded by `hooks/no-push-without-self-review.py` in a form the guard cannot resolve to a real commit or a real repo --- a trailing redirection/pipe, or an unexpanded shell variable in a `-C` argument --- then reading the resulting refusal as a real review-state problem and re-dispatching a review that already exists.
+- **Example (1st occurrence)**: 2026-08-27, ai-config#2477: `git push origin cursor/ums-wrap-2272-32a3 2>&1 | tail -3` was blocked twice by the hook tokenizing the raw shell command line and treating the `2` from `2>&1` as a commit-ish push argument.
   The identical push with the redirection/pipe stripped succeeded immediately against an existing clean verdict.
-- **Canonical Rule**: [`no-push-without-self-review.py`](../hooks/no-push-without-self-review.py) parses the raw Bash command line, not the resolved push arguments.
+- **Example (2nd occurrence)**: 2026-09-04, ai-config#3279: `git -C "$W" push origin <sha>:refs/heads/<branch>` was refused with "`<sha>` could not be resolved to a commit," even though a matching clean verdict existed and `git cat-file -t <sha>` succeeded in the session's own shell.
+  The guard inspects command text, so it saw the literal string `"$W"` rather than the path it holds, and the refusal named the ref while the actual unresolvable token was the `-C` argument.
+  Writing the same worktree path out literally made the identical push succeed on the first attempt.
+  The trap compounds: the natural response to a refusal that misattributes its cause is to re-dispatch the reviewer in a loop that can never succeed, and from there to reach for `ALLOW_UNREVIEWED_PUSH=1` --- waving a correctly-reviewed push through the override path.
+- **Canonical Rule**: [`no-push-without-self-review.py`](../hooks/no-push-without-self-review.py) parses the raw Bash command line, not a shell-expanded or otherwise resolved argument list.
 - **Fix**: Run a bare `git push origin <branch>` with no `2>&1`, no pipe, and no trailing redirection in a guarded repo.
-  Before assuming the review state itself is stale, read the guard's refusal for a resolution error naming a suspicious token (a bare digit, a stray file target).
+  Write every `git -C <path> push` with the path spelled out literally, never as a shell variable.
+  Before assuming the review state itself is stale, read the guard's refusal for a resolution error naming a suspicious token (a bare digit, a stray file target, an unexpanded `$VAR`).
+- **Do**: write literal paths in every `git -C ... push` this guard sees, and read a "could not be resolved to a commit" refusal as a possible command-text parsing failure before treating it as a stale or missing review.
+- **Don't**: pass a shell variable to `git -C` in a guarded push, and don't respond to a resolution-failure refusal by re-dispatching the reviewer or reaching for `ALLOW_UNREVIEWED_PUSH=1` --- neither addresses a parsing failure the review itself never caused.
 
 ## Pattern 22: A Background-Dispatched Review Verdict Is Invisible to Older Push Guard Revisions
 - **Mistake**: Dispatching the final adversarial-reviewer round with `run_in_background: true` (or resuming a completed reviewer via `SendMessage`) and then pushing on the strength of its clean report, when older revisions of `hooks/no-push-without-self-review.py` only scanned the foreground tool results and missed background task notifications / TaskOutput.

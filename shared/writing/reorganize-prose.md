@@ -262,6 +262,58 @@ See [`reorganize-prose.cases.md`](reorganize-prose.cases.md),
 - **Don't:** read a green `check-links.py` as covering this; the broken
   pointer is prose, so no link check can reach it.
 
+## This same staleness arrives through a merge, not only through a deliberate move
+
+Everything above assumes a person decided to relocate prose.
+The identical defect also arrives with nobody deciding to move anything: two
+branches each append a new section at the same location in a file, git
+reports a conflict, and the resolution keeps both sections --- which is
+correct, since an append collision should keep both sides
+(see [`batch-merge-and-resolve.md`](../workflow/batch-merge-and-resolve.md)'s
+`merge=union` section).
+What is not free is the **order** the two end up in.
+
+A section's opening sentence can be a self-reference to whatever sits
+immediately above it --- "the section above governs X" --- and that sentence
+was true against its own branch's context, where nothing else stood between
+it and its actual target.
+Interposing the other branch's unrelated section between them, which is what
+keeping both in the "wrong" order does, leaves that opening sentence pointing
+at content it was never written about.
+Nothing about resolving the conflict looks like a move: no file changed
+address, no section was cut and pasted, so it is easy to conclude the
+self-reference sweep does not apply here.
+It applies exactly as it does to a deliberate relocation, because the
+sentence's target moved out from under it either way --- the resolution
+chose which section printed first, and printing order is what a relative
+pointer resolves against.
+
+The remedy is the same one this fragment already prefers over rewording: move
+one of the two sections so each one's "the section above" (or "the two rules
+above," or any other relative pointer) names its real target again --- a pure
+reorder, not a rewrite of prose neither side of the merge authored.
+Generalize past the one opening-sentence case: after resolving an append
+collision, sweep every relative pointer in **both** appended blocks, and in
+whatever content now follows them, using the self-reference and back-reference
+sweeps above.
+
+- **Do:** run the self-reference sweep on both sides of a kept append
+  collision, and reorder rather than reword when a pointer's target moved.
+- **Do:** treat a merge conflict resolution that keeps both sides as a move,
+  for the purposes of every check this fragment already requires of one.
+- **Don't:** assume a cleanly-resolved append collision needs no
+  self-reference sweep because nothing was deliberately relocated --- the
+  sweep's trigger is a pointer's target changing position, not an author's
+  intent to move it.
+- **Don't:** reword a self-reference broken by a merge instead of reordering
+  --- rewording edits prose neither branch actually wrote.
+
+(`Morrison-Lab/ai-config#3173`, 2026-09-04: an adversarial review caught an
+opening back-reference that stopped describing what sat immediately above it
+once an append-collision resolution interposed an unrelated section between
+the two.
+The fix was to reorder the two sections rather than reword either one.)
+
 ## Relationship to other rules
 
 - [`forward-references.md`](forward-references.md) is the specific case this

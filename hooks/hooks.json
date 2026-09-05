@@ -739,8 +739,8 @@
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-test-reading-package-source.py\"",
             "timeout": 10,
-            "script": "flag-unmeasured-timestamp.py",
-            "why": "CLAUDE.md 'Timestamp recaps in local time', session notebook / memory file edit surface (ai-config#2900, #2947). Warns when writing to session notebooks or memory files stating a Pacific clock time without a date reading in the turn."
+            "script": "flag-test-reading-package-source.py",
+            "why": "A test reading its own package's source from disk passes in a checkout and fails under an installed-package check (ucdavis/hac.sap#43). Warns; suggests reading the loaded artifact instead."
           }
         ]
       },
@@ -765,8 +765,8 @@
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-test-reading-package-source.py\"",
             "timeout": 10,
-            "script": "flag-unmeasured-timestamp.py",
-            "why": "CLAUDE.md 'Timestamp recaps in local time', session notebook / memory file edit surface (ai-config#2900, #2947). Warns when editing session notebooks or memory files stating a Pacific clock time without a date reading in the turn."
+            "script": "flag-test-reading-package-source.py",
+            "why": "A test reading its own package's source from disk passes in a checkout and fails under an installed-package check (ucdavis/hac.sap#43). Warns; suggests reading the loaded artifact instead."
           }
         ]
       },
@@ -791,8 +791,8 @@
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-test-reading-package-source.py\"",
             "timeout": 10,
-            "script": "flag-unmeasured-timestamp.py",
-            "why": "CLAUDE.md 'Timestamp recaps in local time', session notebook / memory file edit surface (ai-config#2900, #2947). Warns when editing session notebooks or memory files stating a Pacific clock time without a date reading in the turn."
+            "script": "flag-test-reading-package-source.py",
+            "why": "A test reading its own package's source from disk passes in a checkout and fails under an installed-package check (ucdavis/hac.sap#43). Warns; suggests reading the loaded artifact instead."
           }
         ]
       },

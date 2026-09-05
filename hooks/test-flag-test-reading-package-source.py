@@ -101,9 +101,22 @@ check(
     fires("scripts/check-thing.R", '  readLines(file.path("..", "..", "R", "x.R"))'),
     False,
 )
+# A test DIRECTORY is required. `hooks/test-*.py` here are guard tests whose
+# fixtures CONTAIN such code as payload data; three of them, including this
+# suite, fired under a filename-only rule.
 check(
-    "a test-named file outside tests/ still fires",
+    "a test-named file outside a test directory does not fire",
     fires("test_packaging.py", '    open("../../src/mod.py")'),
+    False,
+)
+check(
+    "this repo's own hook tests do not fire",
+    fires("hooks/test-remind-x.py", '  "readRDS(\\"inst/extdata/x.rds\\")"'),
+    False,
+)
+check(
+    "a nested package test dir still fires",
+    fires("pkg/tests/testthat/test-x.R", '  source("R/helpers.R")'),
     True,
 )
 
@@ -128,6 +141,35 @@ check(
     fires("tests/testthat/test-x.R", '  expected_path <- "../../R/x.R"'),
     False,
 )
+
+# --- the false positives a review measured against committed code ---------
+# Each of these fired in an earlier revision. A guard that fires on correct
+# code gets switched off, taking the real cases with it.
+for label, path, line in [
+    ("monitor_path", "tests/test_x.py",
+     'assert monitor_path("https://github.com/o/r/pull/1") == 1'),
+    ("normalizePath", "tests/testthat/test-x.R", '  p <- normalizePath("../../inst")'),
+    ("fs.path build/src", "tests/test_x.py", '    out = fs.path("build", "src/app.js")'),
+    ("sourcePath", "tests/test_x.ts", "  expect(map.sourcePath('../../src/a.ts')).toBe(1)"),
+    ("relpath", "tests/test_x.py", '    assert relpath("pkg/src/mod.py") == "m"'),
+    ("a reddit r/ URL", "tests/test_x.py", '    u = urlpath("https://reddit.com/r/python/x")'),
+    ("local_file is a write", "tests/testthat/test-x.R", '  withr::local_file("src/tmp.txt")'),
+    ("markdown prose", "tests/README.md", '  Use `readLines("../../R/x.R")` here.'),
+    ("a docstring body", "tests/test_x.py", '    """Do not open("../../src/m.py")."""'),
+    ("a block-comment star", "tests/testthat/test-x.R", "   * open('../../src/x.py')"),
+]:
+    check(f"false positive stays silent: {label}", fires(path, line), False)
+
+# The left-anchor lookbehind specifically. Without it, any identifier ENDING
+# in a listed read name matches -- these are the cases that make it
+# load-bearing rather than decorative.
+for label, line in [
+    ("mysource", '  mysource("../../src/x.R")'),
+    ("reopen", '    reopen("../../src/mod.py")'),
+    ("do_scan", '  do_scan("../../R/x.R")'),
+]:
+    check(f"the left anchor holds: {label}",
+          fires("tests/testthat/test-x.R", line), False)
 
 # --- empty and malformed input -------------------------------------------
 check("empty content is silent", fires("tests/testthat/test-x.R", ""), False)
@@ -181,6 +223,68 @@ check("end to end: ignores a non-edit tool", out.strip(), "")
 
 rc, out = run_hook({"tool_name": "Edit", "tool_input": "not a dict"})
 check("end to end: survives a malformed payload", rc, 0)
+
+# --- the output SHAPE, which exit 0 does not pin --------------------------
+# A `permissionDecision: "deny"` blocks on exit 0, so "rc == 0" is not what
+# makes a PreToolUse hook non-blocking. A mutation adding one survived the
+# first version of this suite.
+hit = {"tool_name": "Edit", "tool_input": {
+    "file_path": "tests/testthat/test-x.R",
+    "new_string": '  readLines(test_path("..", "..", "R", "x.R"))'}}
+rc, out = run_hook(hit)
+parsed = json.loads(out)
+check("no permissionDecision anywhere in the output", "permissionDecision" in out, False)
+# The quoted snippet IS the diagnostic. Truncating it to a few characters
+# left the first version of this suite green while making the message
+# useless.
+check("the full offending line is quoted back",
+      'readLines(test_path("..", "..", "R", "x.R"))'
+      in parsed["hookSpecificOutput"]["additionalContext"], True)
+check("hookEventName is present", parsed["hookSpecificOutput"]["hookEventName"], "PreToolUse")
+check("systemMessage is emitted outside Antigravity", "systemMessage" in parsed, True)
+
+env = dict(os.environ, ANTIGRAVITY_AGENT="1")
+p = subprocess.run([sys.executable, HOOK], input=json.dumps(hit),
+                   capture_output=True, text=True, env=env)
+check("systemMessage suppressed under ANTIGRAVITY_AGENT",
+      "systemMessage" in json.loads(p.stdout), False)
+
+# --- every bound tool name and payload shape ------------------------------
+for tool in ("Write", "Edit", "MultiEdit", "NotebookEdit"):
+    rc, out = run_hook({"tool_name": tool, "tool_input": {
+        "file_path": "tests/testthat/test-x.R",
+        "new_string": '  readLines(test_path("..", "..", "R", "x.R"))'}})
+    check(f"fires for tool {tool}", "additionalContext" in out, True)
+
+rc, out = run_hook({"tool_name": "Write", "tool_input": {
+    "file_path": "tests/testthat/test-x.R",
+    "content": '  readLines(test_path("..", "..", "R", "x.R"))'}})
+check("reads the Write `content` key", "additionalContext" in out, True)
+
+rc, out = run_hook({"tool_name": "MultiEdit", "tool_input": {
+    "file_path": "tests/testthat/test-x.R",
+    "edits": [{"new_string": "ok <- 1"},
+              {"new_string": '  readLines(file.path("..", "..", "R", "x.R"))'}]}})
+check("reads the MultiEdit edits[] array", "additionalContext" in out, True)
+
+rc, out = run_hook({"tool_name": "NotebookEdit", "tool_input": {
+    "notebook_path": "tests/test_nb.py",
+    "new_source": '    open("../../src/mod.py")'}})
+check("reads notebook_path and new_source", "additionalContext" in out, True)
+
+# --- fails OPEN on valid JSON that is not an object -----------------------
+for payload in ("[1,2,3]", '"hello"', "null", "42", "not json at all", ""):
+    p = subprocess.run([sys.executable, HOOK], input=payload,
+                       capture_output=True, text=True)
+    check(f"fails open on {payload[:14]!r}", (p.returncode, p.stderr.strip()), (0, ""))
+
+# --- the dry-run contract the sibling hooks implement ---------------------
+p = subprocess.run([sys.executable, HOOK, "--dry-run"],
+                   input=json.dumps({"tool_name": "Edit", "tool_input": {
+                       "file_path": "R/x.R", "new_string": "ok <- 1"}}),
+                   capture_output=True, text=True)
+check("--dry-run emits an envelope even with no hit",
+      json.loads(p.stdout)["hookSpecificOutput"]["hookEventName"], "PreToolUse")
 
 if failures:
     print("FAILED:")

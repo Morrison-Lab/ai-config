@@ -171,6 +171,60 @@ for label, line in [
     check(f"the left anchor holds: {label}",
           fires("tests/testthat/test-x.R", line), False)
 
+
+# --- the narrowings themselves, each pinned ------------------------------
+# The six false-positive assertions above were regression guards against an
+# OLD unanchored alternation. Measured: they pass identically with the
+# case-sensitive `R/` and the begin-anchoring reverted, so they pin neither.
+# These inputs do.
+check("a lowercase r/ path is not R/", 
+      fires("tests/testthat/test-x.R", '  readLines("r/notes.txt")'), False)
+check("the directory must BEGIN the path",
+      fires("tests/testthat/test-x.R", '  readLines("build/src/app.js")'), False)
+check("...and vendor/inst likewise",
+      fires("tests/testthat/test-x.R", '  readLines("vendor/inst/x.txt")'), False)
+
+# Path CONSTRUCTORS are not reads. An earlier revision listed `file.path` and
+# `test_path` as reads and fired on writes and existence checks.
+for label, line in [
+    ("dir.create", '  dir.create(file.path("..", "..", "tmpout"))'),
+    ("writeLines", '  writeLines(txt, file.path("..", "..", "out.txt"))'),
+    ("unlink", '  unlink(file.path("..", "..", "scratch"), recursive = TRUE)'),
+    ("file.exists", '  expect_true(file.exists(file.path("..", "..", "DESCRIPTION")))'),
+    ("local_dir", '  withr::local_dir(test_path("..", ".."))'),
+]:
+    check(f"a path constructor is not a read: {label}",
+          fires("tests/testthat/test-x.R", line), False)
+
+# ...but a real read THROUGH a constructor still fires.
+check("a read through file.path still fires",
+      fires("tests/testthat/test-x.R",
+            '  readLines(file.path("..", "..", "DESCRIPTION"))'), True)
+check("here::here, the standard R root idiom, fires",
+      fires("tests/testthat/test-x.R", '  src <- readLines(here::here("R", "x.R"))'), True)
+check("system.file, the installed-SAFE idiom, does not",
+      fires("tests/testthat/test-x.R",
+            '  p <- system.file("R", "x.R", package = "p")'), False)
+
+# The Python method spelling, which sat unreachable behind the left anchor.
+check("Path(...).read_text() fires",
+      fires("tests/test_x.py",
+            '    src = Path(__file__).parent.parent.joinpath("src", "m.py").read_text()'),
+      True)
+
+# Scope: the extension gate must match the read list, not overclaim.
+check("a JS test is out of scope, not silently inert",
+      mod.RX_TEST_PATH.search("tests/api.test.js") is None, True)
+
+# The real-world true positive the repo sweep found.
+check("the measured real-world instance fires",
+      fires("tests/spelling.R", '  wordlist <- readLines("inst/WORDLIST")'), True)
+
+# Each remaining directory name.
+for d in ("tests", "test", "spec", "testthat"):
+    check(f"the {d}/ directory is in scope",
+          mod.RX_TEST_PATH.search(f"{d}/x.R") is not None, True)
+
 # --- empty and malformed input -------------------------------------------
 check("empty content is silent", fires("tests/testthat/test-x.R", ""), False)
 check("empty path is silent", fires("", 'readLines("../../R/x.R")'), False)

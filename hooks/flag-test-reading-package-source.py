@@ -60,6 +60,24 @@ code in this repo. Each narrowing below answers a measured false positive:
   * Write-shaped calls (`tempfile`, `write_*`, `local_file`, `save_*`) are
     never in the read list.
 
+SIGNAL TO NOISE, MEASURED ON REAL CODE
+--------------------------------------
+Swept over 1695 test-scoped files across 137 local repositories: ONE fires,
+`ucd-serg.github.io/tests/spelling.R`:
+
+    wordlist <- if (file.exists("inst/WORDLIST")) readLines("inst/WORDLIST")
+
+and it is a true positive. An installed package relocates `inst/` contents to
+the package root, so `inst/WORDLIST` is absent under `R CMD check` -- and
+because the read is guarded by `file.exists()`, the spell check silently falls
+back to an empty wordlist and keeps passing while checking nothing.
+
+That measurement replaces an earlier one. The first version of this docstring
+claimed a sweep of this repository "fires on ZERO", which was 0 out of 0:
+requiring a test DIRECTORY leaves ai-config with no in-scope files at all, so
+reverting every other narrowing still yields zero. A detector given no input
+reports the same number as a clean one.
+
 Warns; never blocks. Reading source is occasionally right (a linter's own
 fixtures, a codegen check), and the author judges that better than a regex.
 Fails OPEN on every malformed input.
@@ -75,7 +93,12 @@ WRITE_TOOL_NAMES = {
 }
 
 # Code files only. Prose under tests/ quotes paths constantly.
-CODE_EXT = r"(?:R|r|py|jl|rb|js|ts|tsx|jsx|go|rs|java|kt|scala|sh)"
+# R and Python only, matching the read list below. An earlier revision
+# admitted eleven extensions while listing read functions for two, so it
+# was inert on JS, Go, Rust and Ruby while implying coverage -- measured:
+# `fs.readFileSync("../../src/index.js")` was silent. Extending the gate
+# without extending the list is the wrong half to widen.
+CODE_EXT = r"(?:R|r|py)"
 # A test DIRECTORY component is required, not merely a test-shaped filename.
 # `hooks/test-*.py` in this repo are guard tests whose fixtures legitimately
 # CONTAIN such code as payload data -- three of them, including this hook's
@@ -91,19 +114,29 @@ RX_TEST_PATH = re.compile(
 # positives an earlier revision was reviewed for.
 _BARE_READS = (
     r"readLines|readRDS|readr|scan|source|open|"
-    r"read_text|read_bytes|getsource|parse_file|"
-    r"read\.csv|read\.table|read\.delim|file\.path|test_path"
+    r"getsource|parse_file|"
+    r"read\.csv|read\.table|read\.delim"
 )
 _DOTTED_READS = (
     r"readr::read_[a-z_]+|xml2::read_[a-z]+|yaml::read_yaml|jsonlite::fromJSON|"
-    r"inspect\.getsource|pathlib\.Path|importlib\.resources\.files"
+    r"inspect\.getsource|pathlib\.Path|importlib\.resources\.files|"
+    # Method forms. These need the dot, so they cannot live in the
+    # left-anchored bare list -- an earlier revision put them there and
+    # made them unreachable, missing the canonical Python spelling.
+    r"\.read_text|\.read_bytes|\.readlines|\.read_bytes"
 )
 # `(?<![\w.$])` keeps `normalizePath(` and `monitor_path(` out while letting
 # `file.path(` and `test_path(` in -- they are listed above in full.
 READ_CALL = r"(?:(?<![\w.$])(?:" + _BARE_READS + r")|(?:" + _DOTTED_READS + r"))\s*\("
 
+# The two-up arm allows a path CONSTRUCTOR between the read and the path --
+# `readLines(file.path("..", "..", x))` -- without treating the constructor
+# itself as a read. An earlier revision listed `file.path` and `test_path` as
+# reads, and fired on `dir.create(file.path("..", ".."))`,
+# `writeLines(txt, file.path("..", ".."))`, `unlink(...)` and
+# `file.exists(...)`: writes and existence checks, not reads.
 RX_ESCAPE_TWO_UP = re.compile(
-    READ_CALL + r"[^)\n]*"
+    READ_CALL + r"(?:[^)\n]*(?:file\.path|test_path|here::here)\s*\()?[^)\n]*"
     r"(?:"
     r"""["']\.\.["']\s*,\s*["']\.\.["']"""
     r"|\.\./\.\./"
@@ -115,7 +148,10 @@ RX_ESCAPE_TWO_UP = re.compile(
 # path so "build/src/app.js" does not match.
 RX_PACKAGE_SRC = re.compile(
     READ_CALL + r"[^)\n]*"
-    r"""["'](?:(?-i:R)|src|inst)/[^"'\n]*["']""",
+    r"""(?:"""
+    r"""["'](?:(?-i:R)|src|inst)/[^"'\n]*["']"""      # "R/x.R"
+    r"""|["'](?:(?-i:R)|src|inst)["']\s*,"""           # here::here("R", "x.R")
+    r""")""",
     re.I,
 )
 
@@ -123,6 +159,20 @@ RX_PACKAGE_SRC = re.compile(
 # terminates it.
 _TQ = '"' * 3
 _SQ = "'" * 3
+# Python method chains put the READ LAST: `Path(...).joinpath("src", "m.py")
+# .read_text()`. The arms above all assume read-then-path, so the canonical
+# Python spelling needs its own path-then-read arm.
+_READ_METHOD = r"\.(?:read_text|read_bytes|readlines|read)\s*\("
+RX_PATH_THEN_READ = re.compile(
+    r"(?:"
+    r"""\.\./\.\./"""
+    r"""|["']\.\.["']\s*,\s*["']\.\.["']"""
+    r"""|["'](?:(?-i:R)|src|inst)/"""
+    r"""|["'](?:(?-i:R)|src|inst)["']\s*[,)]"""
+    r")[^\n]*" + _READ_METHOD,
+    re.I,
+)
+
 RX_COMMENT = re.compile(r"^\s*(?:#|//|--|\*|/\*|" + _TQ + "|" + _SQ + ")")
 RX_DOCSTRING_DELIM = re.compile(_TQ + "|" + _SQ)
 
@@ -209,7 +259,8 @@ def offending_line(target, content):
             continue
         if delims % 2 == 1:
             in_docstring = True
-        if RX_ESCAPE_TWO_UP.search(line) or RX_PACKAGE_SRC.search(line):
+        if (RX_ESCAPE_TWO_UP.search(line) or RX_PACKAGE_SRC.search(line)
+                or RX_PATH_THEN_READ.search(line)):
             return stripped
     return None
 

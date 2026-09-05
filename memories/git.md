@@ -584,10 +584,13 @@ so a fresh clone never downloads them and `git show <sha>` fails there with an
 unknown-revision error.
 
 **Settle reachability against the remote, never against your own ref set.**
-`git for-each-ref --contains` is the wrong probe here, and it errs in both
-directions: it scans every local ref, so a pre-squash SHA any local ref still
-holds comes back reachable, and one no local ref holds comes back unreachable
-even when `refs/pull/<N>/head` carries it on the remote.
+`git for-each-ref --contains` is the wrong probe here, because it answers a
+question about your own ref set rather than about a fresh clone: it scans
+every local ref, so a pre-squash SHA any local ref still holds comes back
+reachable.
+On a SHA the local object store does not have --- the fresh-clone case --- it
+does not report unreachable at all: measured on git 2.50.1, it exits 129 with
+`error: no such commit <sha>`, which reads like a mistyped SHA.
 
 ```bash
 git merge-base --is-ancestor <sha> origin/<default>   # 0 = a fresh clone reaches it

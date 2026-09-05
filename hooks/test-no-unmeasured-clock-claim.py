@@ -180,6 +180,11 @@ QUOTED_ENV_ECHO_INLINE = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "id": "call_qenv", "input": {
         "command": "LC_ALL=\"en US\" echo \"as of "
                    "$(TZ=America/Los_Angeles date \"+%H:%M %Z\")\""}}]}}
+# An unquoted substitution with a space inside an env value is one value.
+SUBST_ENV_ECHO_INLINE = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_senv", "input": {
+        "command": "FOO=$(bar=1 baz) echo \"as of "
+                   "$(TZ=America/Los_Angeles date \"+%H:%M %Z\")\""}}]}}
 # `NAME=$(` inside a quoted argument is not an assignment: the read prints as
 # part of the echoed string, and the transcript carries it.
 QUOTED_HEAD_PRINTED = {"type": "assistant", "message": {"content": [
@@ -579,6 +584,9 @@ CASES = [
     ([QUOTED_ENV_ECHO_INLINE, say("Recap: 00:59 PDT")], False,
      "#2991: a quoted env value with a space still leaves the echo as the "
      "head, so the read discharges"),
+    ([SUBST_ENV_ECHO_INLINE, say("Recap: 00:59 PDT")], False,
+     "#2991: an unquoted substitution with a space in an env value is one "
+     "value, and the echo after it is still the head"),
 ]
 
 

@@ -311,7 +311,9 @@ def _head_word(segment):
 
     The value is walked rather than matched with `\\S*`, because a quoted
     value may carry a space (`LC_ALL="en US" echo ...`) and the word after
-    it is still the head.
+    it is still the head. An unquoted substitution in the value
+    (`FOO=$(bar baz) echo ...`) is skipped whole, by the same walkers the
+    capture scan uses, so its inner space does not end the value early.
     """
     i = 0
     n = len(segment)
@@ -325,6 +327,14 @@ def _head_word(segment):
         quote = None
         while i < n and (quote or not segment[i].isspace()):
             ch = segment[i]
+            if quote != "'" and segment.startswith("$(", i):
+                stop = _substitution_end(segment, i + 2)
+                i = n if stop is None else stop
+                continue
+            if quote != "'" and ch == "`":
+                stop = _backtick_end(segment, i + 1)
+                i = n if stop is None else stop
+                continue
             if quote is None and ch in ("'", '"'):
                 quote = ch
             elif quote and ch == quote:

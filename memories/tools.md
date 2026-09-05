@@ -380,8 +380,7 @@ they are checkable facts about the *repo itself* (a grep's scope, an issue's cov
 - **Don't:** cite another file's internal names, line numbers, or mechanism details without re-deriving them from the live source first;
   this entry's own first draft fabricated hook internals from a stale issue comment, caught only by adversarial review (see `git-worktrees.md`'s companion entry).
 
-See [ai-config#3150](https://github.com/Morrison-Lab/ai-config/issues/3150) (open hook-level fix for `gh`/`glab` comment bodies;
-it does not reach comments written into shipped code).
+See [ai-config#3150](https://github.com/Morrison-Lab/ai-config/issues/3150) for a related but distinct gap: it proposes extending `remind-brief-premises.py` to detect unverified premises in `gh`/`glab` comment and issue bodies, a different hook and a different claim shape (premises, not the counts/scope/consumer claims here), and it does not reach a claim written into shipped code either way.
 
 ## Python regex features must fit the oldest runtime that will run the script
 

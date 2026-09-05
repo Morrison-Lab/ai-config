@@ -268,27 +268,31 @@ intent.**
 - **Don't:** revert a maintainer-requested change because a reviewer read the
   history as current --- rebut, and escalate rather than comply.
 
-**A defect NAMED in the PR body reads as handled, so the body can carry it
-past every subsequent round.**
+**A defect NAMED in the PR body is not thereby disposed of, and the body is
+the one record that merges with no owner.**
 The three rules above govern a body that has gone *stale*.
 This one governs a body that is accurate: it states a real, open defect, in
 the author's own voice, under a heading like "Open items".
 Nothing about it is wrong, which is exactly the problem.
 
-A named defect is a defect a reviewer can see has been *noticed*, and a
-reviewer's job is to find what the author missed.
-So the disclosure converts the item from a finding into background, and each
-subsequent round skips it for the same reason the last one did --- not through
-carelessness, but because "already known" is a genuine and usually correct
-reason to spend the round elsewhere.
-The longer it sits there the more settled it reads, so the effect strengthens
-with every round rather than decaying.
-
-Disclosure is not a disposition.
+The claim here is definitional rather than causal, which is what makes it
+usable: **disclosure is not a disposition.**
 [`ardi`](ardi.md)'s three are Address, Rebut and Defer, and all three leave
 something outside the PR body: a commit, a posted rebuttal, an issue.
 A line in the body is none of them, and it is the only one of the four that
-survives the merge with no owner.
+survives the merge with no owner --- so the item's fate after the merge does
+not depend on why any particular round left it alone.
+
+That last point is worth keeping separate from the tempting causal story, that
+a named defect reads as noticed and so converts itself from a finding into
+background.
+That story is plausible and this fragment does not establish it: a reviewer's
+silence has many available causes, and an author who wrote the item down has
+usually also decided it is low-priority, which is a cause on the author's side
+of the same observation.
+The rule does not need the causal claim.
+Whatever the reason a round passes over a disclosed item, the body is not a
+disposition and the item still ends up on `main` unowned.
 
 The remedy is to give it one of the three in the same turn.
 Filing the issue is the cheap form, and a failing test is the strong one,
@@ -297,13 +301,13 @@ re-read by nobody.
 
 This is adjacent to [`no-empty-promises`](no-empty-promises.md) and distinct
 from it: there the mechanism is absent, here the artifact exists and names the
-defect precisely, and the naming is what does the harm.
-[`metacognitive-monitoring`](metacognitive-monitoring.md) states the same
-asymmetry --- "disclosure is where the review starts" --- for a *subagent's*
-delivered work, where you are the reader.
-This is that rule with the roles reversed, which is why it needs saying twice:
-as the author you are the one whose disclosure buys the exemption, and the
-purchase does not feel like one.
+defect precisely, and the naming is what makes it feel resolved.
+[`metacognitive-monitoring`](metacognitive-monitoring.md) states the reader's
+side of it --- "disclosure is where the review starts" --- when the disclosure
+comes from a *subagent* whose work you are checking.
+This is the author's side, and it needs saying separately because there the
+suspicion a disclosure should create is one you would have to direct at
+yourself.
 [`report-mistakes-proactively`](report-mistakes-proactively.md)'s "A site the
 sweep finds and you deliberately exclude belongs in the issue too" carries a
 worked instance (ai-config#3081).
@@ -311,20 +315,23 @@ worked instance (ai-config#3081).
 - **Do:** convert a disclosed-but-unfixed defect into a filed issue or a
   failing test in the same turn that discloses it, and cite that in the body.
 - **Do:** re-read your own "open items" section at the top of each round and
-  treat each entry as an unaddressed finding, since no reviewer will.
-- **Don't:** let a PR body carry a known defect forward --- disclosure reads as
-  a disposition to every later round and is not one.
+  treat each entry as an unaddressed finding.
+- **Don't:** let a PR body carry a known defect forward --- the body is not a
+  disposition, and it is the one record that merges with no owner.
 - **Don't:** count "the reviewer did not raise it" as agreement when you told
   the reviewer about it first.
 
 (Morrison-Lab/ai-config#3180, 2026-09-04.
 A false positive in a new hook --- a value-taking short flag before `m`
 consuming the `m`, so `-Cm`/`-cm`/`-tm`/`-Sm`/`-um` were misread as carrying a
-message --- was written into the PR body's "Open items" section and carried
-forward unfixed across two rounds.
-Every adversarial round that followed left it alone.
-It was finally raised by the forge review, and fixed in `1b20884a1` --- the
-second-to-last commit on a branch that took eighteen rounds.)
+message --- was written into the PR body under the heading
+"Open items (not fixed, quota stop)" and carried forward unfixed.
+No adversarial round that followed raised it; the forge review did, and it was
+fixed in `1b20884a1`, the second-to-last commit on the branch.
+The body itself supplies two author-side reasons alongside the disclosure ---
+the round had stopped on quota, and the item is graded there as costing "one
+spurious warning" --- so this record shows the *outcome* the rule is about and
+does not isolate its cause.)
 
 **The same sync is needed when the review fix is to CODE BEHAVIOR rather than
 to wording --- and that case is easier to miss, because nothing about fixing a

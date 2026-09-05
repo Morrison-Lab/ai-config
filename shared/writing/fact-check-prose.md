@@ -672,8 +672,11 @@ cannot span two separately-merged PRs, evidence citing commits reachable from
 zero refs, an overstated reason for a rule that was itself correct, and finally
 a conjunction that could never hold.
 `85101fe1c`'s message names the move that ended it --- "the record now says
-what it can verify and names the rest as unrecoverable" --- and `bd8b1bfcc`,
-the fifth, deletes rather than replaces.
+what it can verify and names the rest as unrecoverable".
+The fifth, `bd8b1bfcc`, is 6 insertions against 7 deletions: a shorter
+replacement rather than a pure deletion, which is the usual shape of the
+convergent version --- it still says something, just less than the record
+could not support.
 Every one of those SHAs is pre-squash, so fetch `refs/pull/3180/head` before
 running `git show` on them, per
 [`git`](../../memories/git.md)'s "Citing evidence that lives in a PR's own

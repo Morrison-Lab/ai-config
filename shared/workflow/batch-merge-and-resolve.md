@@ -645,11 +645,14 @@ predicate runs on both sides.
 - **Don't:** read two green PRs as evidence their merge is green, or reach for a
   merge order to fix a breach that both orders reach.
 
-## Restoring a file wholesale is a sixth mode, and the only one you perform by hand
+## The recovery has a silent failure mode of its own, and no merge produces it
 
-Every mode above arrives *through* a merge git resolved on its own.
-This one arrives through the recovery, which is why nothing in the sections
-above reaches it: the merge behaved, and the damage is in what you typed next.
+The five modes above arrive *through* a merge git resolved on its own, and the
+batch pass below re-checks them per merge for that reason.
+This one is not a sixth member of that set, and must not be looked for the same
+way: the merge behaved, and the damage is in what you typed next.
+Its trigger is a **hand-written recovery**, so check for it after any resolution
+you performed by copying content in, whether or not a merge was involved.
 
 The shape is `git show <old-commit>:<path> > <path>` --- reaching back to a
 commit where the file was in the state you want, and taking the whole file.
@@ -685,6 +688,8 @@ it against the current file shows otherwise.
   hunk you need on top of it.
 - **Do:** diff the restored file against the pre-restore working copy, not only
   against the old commit, so what the restore *removed* is visible.
+- **Do:** run that diff after every hand-written recovery, since the batch
+  pass's per-merge re-check does not reach this one.
 - **Do:** re-derive every claim inside a restored region --- a docstring, a
   `_note_*` field, a README row --- against the file as it now stands.
 - **Don't:** write `git show <old>:<path> > <path>`; it is a whole-file revert

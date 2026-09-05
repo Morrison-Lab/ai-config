@@ -223,7 +223,10 @@ Confirm which physical branch is "ours" before you reach for `--ours` /
 - ❌ Restoring a whole file from a pre-merge commit
   (`git show <old>:<path> > <path>`) to recover one entry — that reverts every
   other change the file has taken, including everything the merge just brought
-  in. Take the baseline from `git show :<path>` (stage 0, the merged content
-  git already computed) and apply the one hunk you need on top of it. See
+  in. Take the baseline from the index rather than from an old commit: once
+  the path is resolved, `git show :<path>` is stage 0, the merged content git
+  already computed. While the path is *still conflicted* there is no stage 0
+  and that command fails --- use `:1:`/`:2:`/`:3:` (above) to rebuild the
+  resolution, then swap the one hunk you came for. See
   [`batch-merge-and-resolve`](../../shared/workflow/batch-merge-and-resolve.md)'s
   "Restoring a file wholesale is a sixth mode".

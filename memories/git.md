@@ -584,15 +584,23 @@ objects, and the default fetch refspec is `+refs/heads/*:refs/remotes/origin/*`,
 so a fresh clone never downloads them and `git show <sha>` fails there with an
 unknown-revision error.
 
-The two states look different under the right probe, and confusing them sends
-a reader to the wrong fix:
+**Settle reachability against the remote, never against your own ref set.**
+`git for-each-ref --contains` is the wrong probe here, and wrong in the
+direction that reassures: it scans every local ref, so a pre-squash SHA still
+held by the branch you are standing on comes back reachable.
+Measured in a worktree of this repo, `git for-each-ref --contains 16544c50`
+returns the local branch, while
+`git merge-base --is-ancestor 16544c50 origin/main` exits 1 --- which is the
+answer a reader in a fresh clone will get.
 
 ```bash
-git for-each-ref --contains <sha> --count=1   # empty  = present, unreachable
-                                              # exit 129 "malformed object name" = absent
-git ls-remote origin "refs/pull/<N>/head"     # non-empty = the forge still has it
+git merge-base --is-ancestor <sha> origin/<default>   # 0 = a fresh clone reaches it
+git ls-remote origin "refs/pull/<N>/head"             # non-empty = the forge still has it
 git fetch origin "refs/pull/<N>/head" && git show <sha>
 ```
+
+`--is-ancestor` needs the object present locally to answer at all, so run it
+after the fetch when the SHA does not resolve yet.
 
 So a pre-squash SHA *is* citable, provided you say where to fetch it from.
 Name the PR beside the SHA and the reader has the ref; give the bare SHA and
@@ -612,8 +620,11 @@ anyway.
 - **Do:** cite the squash commit on the default branch when one exists.
 - **Do:** name the PR number beside any pre-squash SHA, so the reader knows to
   fetch `refs/pull/<N>/head` first.
-- **Do:** distinguish unreachable from absent with `git for-each-ref
-  --contains` before deciding a cited SHA is dead.
+- **Do:** settle reachability with `git merge-base --is-ancestor <sha>
+  origin/<default>`, whose answer is the one a fresh clone gets.
+- **Don't:** settle it with `git for-each-ref --contains`, which scans your own
+  refs and reports a SHA reachable on the strength of the branch you are
+  standing on.
 - **Don't:** write a bare pre-squash SHA into durable guidance --- it resolves
   in your checkout and errors in a fresh clone, and the error looks like a
   typo.
@@ -626,10 +637,12 @@ broke it in two of its own passages --- `fully-clean.md` and
 heads of #3167, caught in `7a797d3f8`.
 A pre-existing instance is open as
 [#3275](https://github.com/Morrison-Lab/ai-config/issues/3275).
-The working fetch recipe is in
-[`grep-is-not-coverage`](../shared/workflow/grep-is-not-coverage.md); the
-measured fresh-clone failure is Instance 4 in
-[`metacognitive-monitoring.cases.md`](../shared/workflow/metacognitive-monitoring.cases.md).)
+[`grep-is-not-coverage`](../shared/workflow/grep-is-not-coverage.md) carries
+the measured recipe on a different PR: `git ls-remote origin
+refs/pull/3060/head` returns `f9068299`, the default refspec is
+`+refs/heads/*:refs/remotes/origin/*` in the measuring clone so that ref is
+not brought down, and the record anchors instead on commits that
+`git merge-base --is-ancestor ... origin/main` accepts.)
 
 That is not a hypothetical.
 This entry originally cited `082f369` as a still-reachable example, on the

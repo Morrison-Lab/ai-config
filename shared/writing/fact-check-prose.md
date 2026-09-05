@@ -998,6 +998,129 @@ the paragraph's content was "split at the clause boundary",
 and the honest form carries no numbers at all.
 Tracked as [#3158](https://github.com/Morrison-Lab/ai-config/issues/3158).)
 
+**The amend that repairs one such figure is where the next one enters, so the
+fix round is the exposure rather than the recovery.**
+The passage above treats the amend as a cost.
+What it does not say is that the amend is itself an act of composition,
+performed under exactly the conditions that produced the original ---
+describing what you just did, quickly, about a passage you are looking at
+rather than measuring.
+So the corrected message gets a fresh unmeasured figure, and the correction
+reads as diligence while carrying the same defect one layer down.
+
+Two things make this harder to catch than a first-draft error.
+The amend is *targeted*, so attention sits on the number that was wrong and a
+different number in the same sentence inherits the credibility of the fix.
+And the rewrite destroys its own evidence, per the case record above: there is
+no diff between a message and its predecessor, so nothing a later reader sees
+shows that the figure ever changed.
+
+**A *positional* figure is in scope here, not only a measurement of the
+change.**
+"Thirteen lines above", "the section three lines below", "the sibling 39 lines
+down" locate a passage rather than size an edit, so they slip past a reader
+applying the rule above, which is worded around counts of what the commit
+touched.
+They are worse than a size claim on two counts.
+They are load-bearing for nothing --- a reader who wants the passage searches
+for it --- and they go stale on the next insertion anywhere between the two
+points, so a figure that was true when written becomes false with nobody
+having edited it.
+The remedy is the one stated in
+[`An insertion asserts something about the whole file`](#an-insertion-asserts-something-about-the-whole-file-not-just-the-added-lines)'s
+own case record: naming a target beats counting to it.
+Name the section, or quote its heading, and the sentence survives every later
+edit.
+
+- **Do:** re-derive every figure in an amended message, including the ones the
+  amend was not about.
+- **Do:** name a passage by its heading or a quoted phrase, rather than by its
+  distance from where you are standing.
+- **Don't:** treat a message you are correcting as already checked --- the
+  correction is the first draft of a new sentence.
+- **Don't:** write a positional figure into a commit message on the grounds
+  that it is true right now; the next insertion falsifies it and nobody
+  re-reads it.
+
+(Morrison-Lab/ai-config#3060 and #3167, 2026-09-03, recorded here rather than
+as a sibling section because it is this same rule failing rather than a second
+one.
+Both PRs put positional figures into commit messages --- "into the corpus's
+60-to-80 range", "three lines below", "twelve lines above" --- and none was
+load-bearing.
+
+Only two of the three are checkable now, and the difference between them is
+the record worth keeping.
+`2156b439d` asserts "three lines below" in its own voice, so a reader can
+fetch the claim and test it.
+`d29d33c71` carries "twelve lines above" only to disavow it, so what survives
+there is the correction rather than the assertion --- and reading that grep
+hit as the assertion is
+[`verify-the-right-artifact`](../workflow/verify-the-right-artifact.md)'s
+substitution.
+The "60-to-80" message survives nowhere: it was amended away, and no reachable
+commit carries it.
+
+Successive drafts of this paragraph tried to say more --- that the three
+formed a chain, that one gap was ten, that another was thirteen --- and each
+attempt was refuted by the history rather than by argument.
+The reconstructions were plausible every time, which is the finding: a
+rewritten message destroys the copy a later reader would check, and nothing
+about the gap announces itself, so each attempt filled it confidently and
+wrongly.
+Cite the squash commit on the default branch, or name the PR alongside a
+pre-squash SHA.
+Such a SHA is reachable from no branch, so it does not resolve in a fresh
+clone until the reader fetches `refs/pull/<N>/head` --- which reaches the
+PR's final head and its ancestors, and so not a message that was amended
+away.
+
+That a rule gets broken while being authored is not itself the finding, and is
+already stated in this corpus three times over:
+[`learn-from-review-findings`](../workflow/learn-from-review-findings.md),
+[`no-empty-promises`](../workflow/no-empty-promises.md) and
+[`fully-clean.cases.md`](../workflow/fully-clean.cases.md) each put it as a
+rule consulted at read time and broken at composition time.
+The recordable remainder is the positional shape above, and the way a rewritten message hides its own history.
+
+Whether the condition deserved a guard was measured rather than argued.
+`hooks/flag-positional-figure-in-commit-message.py` is the result, and
+[`deterministic-tools`](../principles/deterministic-tools.md)'s
+third-occurrence bar is what licensed building it: the pattern
+`~?\b\d+\s+(?:lines?|characters?|chars?|words?)\s+(?:above|below|earlier|later)\b`
+matched 14 occurrences across 13 commit messages, measured 2026-09-03 over
+roughly 2,400 commits, and every one was the decorative-positional shape,
+with no legitimate code-move description among them.
+It warns and never blocks, because whether a figure is load-bearing is not
+lexically decidable even where its shape is.
+
+**What the measurement was for is worth stating, because it changed the
+guard.**
+A first version also matched `\b\d+-to-\d+\s+range\b`, on the strength of the
+"60-to-80 range" case recorded above being one of the three.
+That arm turned out to have exactly one match in the whole history, and the
+match was a **misfire**: a commit saying "the 60-to-80 range is human
+guidance" states what the style guide asks, locates no passage, decays on no
+insertion, and loses its meaning if the number is deleted.
+The message the arm was built for had been amended away, so it was never in
+the population at all.
+An arm with no true positive and one false positive is exactly the noise that
+costs a warn-only guard its credibility, so it was dropped --- which is the
+measurement doing the work an argument could not, since the shape was
+proposed on a real case and still failed to earn its place.
+
+The denominator is deliberately approximate and dated, and two drafts of this
+paragraph are why.
+The first said "15 of 2412 commit messages", conflating occurrences with the
+messages carrying them and pinning a total that writing the sentence had
+already moved.
+The second carried the range arm's match into the claim that every match was
+the target shape, which an adversarial review refuted by reading the commit.
+Both are this section's own rule failing inside the paragraph recording it,
+on figures load-bearing for nothing: what the measurement establishes is that
+the shape is rare and its matches are true positives, and no reader acts on
+the total.)
+
 ## A tool's behaviour quoted in a commit message is written after the measurement, not before
 
 The section above covers a figure in a commit message.

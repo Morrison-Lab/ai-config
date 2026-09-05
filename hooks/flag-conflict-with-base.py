@@ -186,8 +186,10 @@ def _git_root(directory):
 # Long options whose value is a SEPARATE token. git's parse-options accepts
 # the space form for any option with a REQUIRED argument, even where the
 # manual shows only `--opt=<value>`; an option with an OPTIONAL argument
-# (`--force-with-lease`, `--force-if-includes`, `--signed`) takes `=` alone
-# and must stay out of this set, or it swallows the remote.
+# (`--force-with-lease`, `--signed`) takes `=` alone and must stay out of this
+# set, or it swallows the remote. `--force-if-includes` stays out for a
+# stronger reason: it is `--[no-]force-if-includes`, a pure boolean with no
+# `=` form at all.
 _PUSH_VALUE_OPTS = {
     "--push-option", "--receive-pack", "--exec", "--recurse-submodules",
 }
@@ -223,7 +225,9 @@ def push_remote(argv, cwd):
     consumes its value. An option with an OPTIONAL argument does not:
     measured on git 2.50.1, `git push --force-with-lease origin feat/x`
     targets `origin`, so listing `--force-with-lease` here made this resolve
-    `feat/x`.
+    `feat/x`. `--signed` is the same shape. A pure boolean such as
+    `--[no-]force-if-includes` takes no value in any form and is a third
+    case rather than a variant of the second.
 
     A short option may also arrive in a CLUSTER. `-fo ci.skip` is `-f -o
     ci.skip`, so an exact-token test against `-o` misses it and reads

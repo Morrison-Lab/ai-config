@@ -271,10 +271,12 @@ def check_deleted_cwd():
 
     `os.getcwd()` raises FileNotFoundError there, so the fallback for a
     payload with no `cwd` has to sit inside the guarded block -- otherwise
-    the invariant this pins is broken by the one condition the hook cannot see
-    coming: once a payload is in hand, handling it exits 0 without a
-    traceback. That is narrower than either docstring heading, neither of
-    which covers a deleted working directory.
+    a deleted working directory -- the one condition the hook cannot see
+    coming -- would break the invariant this pins: once a payload is in
+    hand, handling it exits 0 without a traceback. That invariant is
+    narrower than the FAILS SILENT ON EVERY PARSE FAILURE heading, which
+    does not cover a deleted working directory because it is not a parse
+    failure.
     """
     tpath = write_transcript([PROMPT])
     gone = tempfile.mkdtemp()

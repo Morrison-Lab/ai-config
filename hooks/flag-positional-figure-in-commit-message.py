@@ -400,12 +400,12 @@ def main() -> int:
     try:
         # Inside the try: `os.getcwd()` raises FileNotFoundError when the
         # process's working directory has been deleted -- a traceback and a
-        # non-zero exit. A deleted working directory is neither a parse
-        # failure nor a broken install, so neither docstring heading covers
-        # it. The invariant it would break is narrower than "never
-        # tracebacks", which is false of the module-level import guard: once
-        # a payload is in hand, handling it never tracebacks. That is why
-        # the fallback sits inside the try.
+        # non-zero exit. A deleted working directory is not a parse
+        # failure, so the FAILS SILENT ON EVERY PARSE FAILURE heading does
+        # not cover it. The invariant it would break is narrower than
+        # "never tracebacks", which is false of the module-level import
+        # guard: once a payload is in hand, handling it never tracebacks.
+        # That is why the fallback sits inside the try.
         cwd = payload.get("cwd") or os.getcwd()
         command = (tool_input.get("command") or tool_input.get("CommandLine")
                    or tool_input.get("cmd") or tool_input.get("script"))

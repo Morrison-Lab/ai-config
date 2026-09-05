@@ -1513,6 +1513,42 @@ Committing costs one command and settles it.
   a single guard can consult all three at once, so establishing that position matters says nothing about whether the body is inert.
 - **Don't:** conclude a guard is defective from the fact that the underlying action worked --- the guard measures the record, not the effect.
 
+**The reader's side of the same rule: a refusal describes the record, and it gets read as a description of the world.**
+Everything above is the *author's* side --- choosing a shape while composing the command, before any guard has spoken.
+The reader's side is the moment after it fires, when the refusal sits in front of you and the obvious reading is that the guard is wrong about the world.
+The Don't bullet above rules that reading out.
+It does not say what to do instead, and the gap matters, because a rejected first hypothesis gets replaced by whatever comes to hand.
+
+What comes to hand is a second hypothesis of the same kind.
+Observed 2026-09-05, on a `no-unreviewed-pr.py` Stop refusal whose lead sentence read *"You pushed a new head to #3296 in this session and no SUCCESSFUL reviewer request follows that push."*
+The first response asked whether a review **existed**, found two at the right commit, and concluded the guard was wrong about the forge.
+The second found the PR merged and concluded the guard had matched the wrong PR by branch name.
+Neither reads the message.
+The third read **SUCCESSFUL**, saw that it describes the request's record and not the review's existence, and found the requests written `gh api ... >/tmp/rr.txt 2>&1; echo "POST rc=$?"; head -c 400 /tmp/rr.txt` --- not the last simple command in the call.
+Run alone, the identical request cleared the guard at once.
+
+**The strongest evidence for the rule is what the refusal itself already said.**
+The shipped guard prints a second paragraph on exactly this condition, stating that the request *"shared a call with another command, so this guard does not attribute that call's exit status to it"*.
+Only the lead sentence was quoted back during the incident.
+So either that paragraph was printed and went unread, or the firing copy predated it --- an installed copy diverging from `main` is a known failure ([#3141](https://github.com/Morrison-Lab/ai-config/issues/3141)), and `main`'s own Copilot moratorium means the version that fired cannot be established from here.
+Both readings land on the same instruction, which is why the ambiguity does not weaken it: read the whole refusal before forming any theory, and when a quoted refusal is one sentence long, suspect the quote before suspecting the guard.
+
+The procedure is short.
+Quote the words the refusal turns on, all of them.
+Then open the guard's discharge condition and check the properties it consults.
+Then, last, look at the forge.
+Going to the forge first is not a slower route to the same answer: it establishes that the action worked, and that fact is identical whether the guard is broken or the record is.
+
+- **Do:** read the entire refusal, and quote every clause of it, before forming a theory of why it fired.
+- **Do:** open the guard's discharge condition in source and check the properties it actually consults.
+- **Do:** suspect a one-sentence quotation of a refusal, since a guard that names its own condition usually does so past the lead paragraph.
+- **Don't:** answer a rejected "the guard is wrong about the world" with a second hypothesis about the world;
+  two in a row means the message went unread.
+- **Don't:** guess which property of your command the guard reads --- a plausible property the discharge never consults sends the fix somewhere harmless.
+
+(ai-config[#3299](https://github.com/Morrison-Lab/ai-config/issues/3299), 2026-09-05.
+The command shape behind it is a further occurrence of [`pr-on-claim`](pr-on-claim.md)'s "Run that `requested_reviewers` POST as the sole command in its Bash call", counted in [#3300](https://github.com/Morrison-Lab/ai-config/issues/3300) instead of in that file's ledger.)
+
 ## Measure CPU time, not wall clock, when the assertion is about work done
 
 A performance regression test asserts something about the *code*.

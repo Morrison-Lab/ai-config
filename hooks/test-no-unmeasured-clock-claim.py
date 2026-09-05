@@ -155,6 +155,26 @@ QUOTED_ARROW_SINGLE = {"type": "assistant", "message": {"content": [
 GROUPED_REDIRECT = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "id": "call_grp", "input": {
         "command": "{ TZ=America/Los_Angeles date \"+%H:%M %Z\" >> notebook.md; }"}}]}}
+# A read substituted into the argument of a command that does not reprint it:
+# the comment body carries the time, the tool result is a URL, and nothing
+# reached the transcript.
+GH_COMMENT_INLINE = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_ghc", "input": {
+        "command": "gh pr comment 123 --body \"Status as of "
+                   "$(TZ=America/Los_Angeles date \"+%H:%M %Z\"): still working\""}}]}}
+CURL_INLINE = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_curl", "input": {
+        "command": "curl -sX POST -d \"t=$(TZ=America/Los_Angeles date +%A)\" "
+                   "https://example.com/log"}}]}}
+# The same swallow through a heredoc body fed to a non-reprinting command.
+HEREDOC_TO_GH = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_ghh", "input": {
+        "command": "gh pr comment 123 --body-file - <<EOF\n"
+                   "As of $(TZ=America/Los_Angeles date \"+%H:%M %Z\")\nEOF"}}]}}
+# A reprinting head behind an env assignment still prints the substitution.
+ENV_ECHO_INLINE = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_envecho", "input": {
+        "command": "LC_ALL=C echo \"as of $(TZ=America/Los_Angeles date \"+%H:%M %Z\")\""}}]}}
 # `NAME=$(` inside a quoted argument is not an assignment: the read prints as
 # part of the echoed string, and the transcript carries it.
 QUOTED_HEAD_PRINTED = {"type": "assistant", "message": {"content": [
@@ -531,6 +551,23 @@ CASES = [
      True,
      "#2991: a redirect inside a brace group is still a redirect, so the "
      "reading went to the file"),
+
+    # --- review round 5 on #2991: a read substituted into the argument of a
+    #     command that does not reprint it was classed as printing.
+    ([GH_COMMENT_INLINE,
+      result("call_ghc", "https://github.com/o/r/pull/123#issuecomment-1"),
+      say("Recap: 01:07 PDT")], True,
+     "#2991: a read inside `gh pr comment --body \"$(date ...)\"` never "
+     "reaches the transcript; the tool result is a URL"),
+    ([CURL_INLINE, result("call_curl", "ok"), say("Recap: 01:07 PDT")], True,
+     "#2991: the same through `curl -d`"),
+    ([HEREDOC_TO_GH,
+      result("call_ghh", "https://github.com/o/r/pull/123#issuecomment-2"),
+      say("Recap: 01:07 PDT")], True,
+     "#2991: a heredoc body fed to a non-reprinting command is swallowed too"),
+    ([ENV_ECHO_INLINE, say("Recap: 00:59 PDT")], False,
+     "#2991: an echo behind an env assignment reprints the substitution, so "
+     "the read discharges"),
 ]
 
 

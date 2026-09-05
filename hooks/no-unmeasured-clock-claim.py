@@ -161,6 +161,14 @@ RX_SEGMENT_SPLIT = re.compile(r";|&&|\|\|")
 # `_split_command` already split on it, so any `;` left is quoted.
 RX_PRINTED_VAR = r"\b(?:echo|printf|print)\b[^;&|\n]*\$\{?%s\b"
 
+# A command that puts its arguments, or its standard input, back on stdout, so
+# a clock read substituted into one of them reaches the transcript. Any other
+# head (`gh pr comment --body "$(date ...)"`, `curl -d`, `git commit -m`)
+# consumes the value without printing it, and the read is then settled by
+# the command's own tool result rather than by position.
+RX_REPRINTING_HEAD = re.compile(
+    r"^\s*(?:[A-Za-z_]\w*=\S*\s+)*(?:echo|printf|print|cat|tee)\b")
+
 # The harness's own injected reading. Quoting this is correct, so it counts as
 # a measurement -- otherwise the guard would fire on the one case the rule
 # explicitly tells you to trust. Supports both Claude Code's "Current time -- local:"
@@ -295,6 +303,51 @@ def _split_command(command):
             last = k == len(parts) - 1
             out.append((part, bodies_at.get(idx, []) if last else []))
     return out
+
+
+def _mask_substitutions(text):
+    """`text` with everything inside a `$(...)` or backtick substitution
+    replaced by spaces, quotes left in place.
+
+    A substitution expands inside double quotes too, so only a single-quoted
+    span shields one. Where each substitution ends is decided by
+    `_substitution_end` and `_backtick_end`, so a quote or parenthesis inside
+    it is read the way the capture walk reads it. An unterminated one masks
+    to the end of the text.
+    """
+    out = []
+    quote = None
+    escaped = False
+    i = 0
+    n = len(text)
+    while i < n:
+        ch = text[i]
+        if escaped:
+            escaped = False
+        elif quote == "'":
+            if ch == "'":
+                quote = None
+        elif ch == "\\":
+            escaped = True
+        elif quote == '"' and ch == '"':
+            quote = None
+        elif quote is None and ch in ("'", '"'):
+            quote = ch
+        elif text.startswith("$(", i):
+            stop = _substitution_end(text, i + 2)
+            stop = n if stop is None else stop
+            out.append(" " * (stop - i))
+            i = stop
+            continue
+        elif ch == "`":
+            stop = _backtick_end(text, i + 1)
+            stop = n if stop is None else stop
+            out.append(" " * (stop - i))
+            i = stop
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
 
 
 def _mask_quoted(text, chars):
@@ -448,10 +501,17 @@ def _capture_only(command):
         # quoted `<` and `>` blanked.
         prints = not RX_STDOUT_REDIRECT.search(_mask_quoted(segment, "<>"))
         rest = _blank(segment, spans)
-        if RX_CLOCK_READ.search(rest) or any(
-                RX_CLOCK_READ.search(body) for body in bodies):
+        # A read at the top level of the segment prints on its own. One inside
+        # an inline substitution, or in a heredoc body, prints only when the
+        # command consuming it reprints its input (`echo "$(date ...)"`,
+        # `cat <<EOF`); `gh pr comment --body "$(date ...)"` swallows it, and
+        # that read is settled by the tool result instead.
+        direct = bool(RX_CLOCK_READ.search(_mask_substitutions(rest)))
+        inline = not direct and bool(RX_CLOCK_READ.search(rest))
+        in_body = any(RX_CLOCK_READ.search(body) for body in bodies)
+        if direct or inline or in_body:
             saw_read = True
-            if prints:
+            if prints and (direct or RX_REPRINTING_HEAD.match(segment)):
                 return False
         if not prints:
             continue

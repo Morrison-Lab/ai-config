@@ -139,11 +139,15 @@ import tempfile
 # of `no-unshipped-commit.py`'s patterns, and inherited the catastrophic
 # backtracking they had at the time (ai-config#3172): the `-C\s*\S+` arm and
 # the generic short-flag arm could each match `-Cx`, and that ambiguity under a
-# `*` grew exponentially in the number of flag-shaped tokens -- measured on the
-# pre-fix pattern with `-Cx ` repeated, 0.0004s / 0.0020s / 0.0231s / 0.0987s
-# at 10 / 12 / 16 / 18, roughly quadrupling every two tokens, so a few tokens
-# more is seconds. Absolute times are machine-dependent and the growth rate is
-# the point. This runs in a PreToolUse guard, before every Bash call. #3172's fix made the arms disjoint and moved them to
+# `*` grew exponentially in the number of flag-shaped tokens. Measured on the
+# pre-fix pattern with `-Cx ` repeated: roughly 0.0004s / 0.002s / 0.02s /
+# 0.1s at 10 / 12 / 16 / 18, quadrupling about every two tokens, so a few
+# tokens more is seconds. One significant figure deliberately -- repeated runs
+# on one machine spread by about 2x, and across machines by far more, so the
+# growth rate is the claim and the absolute times are not.
+# This runs in a PreToolUse guard, before every Bash call.
+#
+# #3172's fix made the arms disjoint and moved them to
 # `scripts/lib/git_cmd.py`, so importing is what keeps this hook from
 # re-acquiring a defect that has already been fixed once.
 try:

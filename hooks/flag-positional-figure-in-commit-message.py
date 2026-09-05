@@ -113,12 +113,21 @@ file documents at length: a word boundary sits happily between `commit` and
 write`, neither of which writes a commit message at all. Both are silent
 here.
 
-FAILS SILENT, ALWAYS
---------------------
+FAILS SILENT ON EVERY PARSE FAILURE
+-----------------------------------
 Every parse failure -- unbalanced quotes, an unreadable `-F` file, a
 `-F -` reading stdin, a payload shape this does not recognise -- returns
 without output. A commit is the single worst thing for a hook to break, and
 the cost of a missed warning is one stale figure in one commit message.
+
+The heading is scoped rather than absolute because one path deliberately is
+not silent: if `scripts/lib/git_cmd.py` cannot be imported this exits 1 with
+a diagnostic on stderr, since a missing pattern would make the hook match
+nothing while looking like a hook that simply found nothing to warn about.
+That is a broken install rather than a malformed command, and PreToolUse
+treats a non-zero exit as a non-blocking error, so no commit breaks either
+way. Note the sibling `no-unshipped-commit.py` chooses differently for the
+same import, falling back to a local copy of the patterns and logging why.
 
 WARNS, never blocks. Emits `hookSpecificOutput.additionalContext` plus a
 single-line `systemMessage`; never a `permissionDecision`. Fires once per
@@ -389,8 +398,8 @@ def main() -> int:
     try:
         # Inside the try: `os.getcwd()` raises FileNotFoundError when the
         # process's working directory has been deleted -- a traceback and a
-        # non-zero exit, which is exactly what "FAILS SILENT, ALWAYS" above
-        # promises never to do.
+        # non-zero exit, which is exactly what "FAILS SILENT ON EVERY PARSE
+        # FAILURE" above promises never to do for a malformed command.
         cwd = payload.get("cwd") or os.getcwd()
         command = (tool_input.get("command") or tool_input.get("CommandLine")
                    or tool_input.get("cmd") or tool_input.get("script"))

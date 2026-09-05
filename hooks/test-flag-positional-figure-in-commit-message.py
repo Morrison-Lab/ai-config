@@ -271,8 +271,8 @@ def check_deleted_cwd():
 
     `os.getcwd()` raises FileNotFoundError there, so the fallback for a
     payload with no `cwd` has to sit inside the guarded block -- otherwise
-    the "fails silent, always" contract is broken by the one condition the
-    hook cannot see coming.
+    the "fails silent on every parse failure" contract is broken by the one
+    condition the hook cannot see coming.
     """
     tpath = write_transcript([PROMPT])
     gone = tempfile.mkdtemp()

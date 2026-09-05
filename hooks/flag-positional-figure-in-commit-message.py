@@ -125,8 +125,10 @@ not silent: if `scripts/lib/git_cmd.py` cannot be imported this exits 1 with
 a diagnostic on stderr, since a missing pattern would make the hook match
 nothing while looking like a hook that simply found nothing to warn about.
 That is a broken install rather than a malformed command, and PreToolUse
-treats a non-zero exit as a non-blocking error, so no commit breaks either
-way. Note the sibling `no-unshipped-commit.py` chooses differently for the
+treats exit 1 as a non-blocking error, so no commit breaks either way. Note
+the scoping: exit 2 is Claude Code's block signal rather than a generic
+non-zero exit, per `memories/claude-code-hooks.md`, so "non-zero" would have
+been the wrong word here. Note the sibling `no-unshipped-commit.py` chooses differently for the
 same import, falling back to a local copy of the patterns and logging why.
 
 WARNS, never blocks. Emits `hookSpecificOutput.additionalContext` plus a
@@ -398,8 +400,10 @@ def main() -> int:
     try:
         # Inside the try: `os.getcwd()` raises FileNotFoundError when the
         # process's working directory has been deleted -- a traceback and a
-        # non-zero exit, which is exactly what "FAILS SILENT ON EVERY PARSE
-        # FAILURE" above promises never to do for a malformed command.
+        # non-zero exit. A deleted working directory is neither a parse
+        # failure nor a broken install, so neither docstring heading covers
+        # it; the blanket rule it would break is that this hook never
+        # tracebacks, which is why the fallback sits inside the try.
         cwd = payload.get("cwd") or os.getcwd()
         command = (tool_input.get("command") or tool_input.get("CommandLine")
                    or tool_input.get("cmd") or tool_input.get("script"))

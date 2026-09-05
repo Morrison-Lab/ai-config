@@ -481,7 +481,7 @@ A hedge stated in the file that argues for it constrains the file that cites it,
 
 (Measured 2026-09-03/04 while preparing ai-config [#3267](https://github.com/Morrison-Lab/ai-config/pull/3267).
 The rounds were **local `adversarial-reviewer` dispatches before each push**, so the PR's own comment thread carries two verdict-bearing rounds and no record of the nine --- do not read the link as the source for the count, which is why it is stated here as unciteable rather than left to look checkable.
-Nine consecutive such rounds each returned exactly one finding of this shape, and the eight-versus-four figure below comes from the same unciteable series.
+Nine consecutive such rounds each returned exactly one finding of this shape, and the eight-versus-four figure in the paragraph above comes from the same unciteable series.
 That per-round count is itself the argument for enumerating the hedges up front rather than re-reading for consistency: re-reading surfaced one break per pass, so the rounds converged only as fast as a reviewer happened to notice, while an enumeration bounds the set to check in one pass.
 Tracked as [#3271](https://github.com/Morrison-Lab/ai-config/issues/3271).)
 

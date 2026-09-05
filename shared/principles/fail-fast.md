@@ -911,14 +911,21 @@ Nothing is broken then.
 The guard is correct, the session is correct, and the two are simply unsatisfiable together, so no amount of doing the right thing clears the demand.
 
 The remedy is a **suppression the guard reads itself**, covering "a standing directive forbids the demanded action" as a first-class exemption rather than leaving the session to improvise one.
-`hooks/no-unreviewed-pr.py` is the worked example, and its own docstring states the shape: "every discharge this guard offers is the one action the directive forbids, so honoring it left the demand repeating on every turn".
+`hooks/no-unreviewed-pr.py` shows the shape, and its own docstring states the problem: "every discharge this guard offers is the one action the directive forbids, so honoring it left the demand repeating on every turn".
 Its suppression is a date constant rather than an environment flag, because a flag has to be unset by whoever remembers and a date re-arms itself.
 
-**Copy the shape, not the confidence: that suppression resolved the first incident cited below and produced the second.**
-[#1709](https://github.com/Morrison-Lab/ai-config/issues/1709) is the one it answers --- the guard had no off-switch a plugin install could reach, and reading the directive in-script is what fixed that.
-[#3141](https://github.com/Morrison-Lab/ai-config/issues/3141) is the suppression failing anyway: the constant read `2026-12-01` and the guard demanded the forbidden request regardless, because the copy that fired was a stale snapshot carrying an earlier date.
-So an in-script suppression removes the improvised-override problem and inherits the stale-payload one, where a dated constant fails **open** --- see [`keep-checkouts-fresh`](../workflow/keep-checkouts-fresh.md) for the measurement and for the resolution order that finds the copy actually running.
-The bullet twelve lines above this one applies to the remedy as much as to anything else: do not credit a suppression with protection it does not supply.
+**Read that as an unfinished worked example, not as a solved case, because the record says so in two directions.**
+Distinguish the two things first.
+What is *implemented* in that guard is a dated moratorium constant, which suppresses one specific directive.
+What this section prescribes --- a general exemption for "a standing directive forbids the demanded action" --- is **not** implemented anywhere;
+[#1709](https://github.com/Morrison-Lab/ai-config/issues/1709) carries it as a suggested fix.
+
+That issue was closed on the strength of the dated constant and **reopened 2026-09-05** when the same shape recurred, its reopening comment recording that the discharge paths added since do not cover this case and that the guard had blocked every turn.
+[#3141](https://github.com/Morrison-Lab/ai-config/issues/3141) is the constant not suppressing: it read `2026-12-01` and the guard demanded the forbidden request anyway.
+The copy captured firing on 2026-09-04 carried an earlier date;
+whether that same copy served the 2026-09-03 demands is **not established**, so read the stale snapshot as the mechanism that is measured for one firing rather than as the cause of the incident.
+An in-script suppression therefore removes the improvised-override problem and inherits the stale-payload one, where a dated constant fails **open** --- see [`keep-checkouts-fresh`](../workflow/keep-checkouts-fresh.md) for the measurement and for the resolution order that finds the copy actually running.
+The "credit a suppression with protection it does not supply" bullet at the end of the list above applies to this remedy as much as to anything it governs.
 
 - **Do:** ask whether a guard's discharge paths are available to a session already obeying every standing rule, before pricing its over-warn as cheap.
 - **Do:** give a guard whose demand a standing directive can forbid a suppression it reads itself, rather than relying on an override the session supplies.

@@ -760,7 +760,7 @@ Recorded as ai-config[#3039](https://github.com/Morrison-Lab/ai-config/issues/30
 the entry here is the inferential shape, not the guard.
 
 **Instance 2 --- the newest cache directory, read as the copy that runs.**
-A real directory carrying a real stale constant, and not what executed.
+A real directory carrying a real stale constant, and not the copy the later capture named.
 [`mistake-patterns`](../../memories/mistake-patterns.md)'s Pattern 43 Fix section already rules that proxy out by name, so this is an occurrence of a recorded Fix step being skipped rather than of a new mechanism.
 
 **Instance 3 --- a sample whose window excluded its own target.**

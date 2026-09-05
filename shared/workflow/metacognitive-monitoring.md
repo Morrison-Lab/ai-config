@@ -1045,7 +1045,7 @@ The same session settled which copy fires when the guard is deliberately trigger
 Whether that same copy served the earlier firings is not established, and [`keep-checkouts-fresh`](keep-checkouts-fresh.md) says so where it records the capture --- so the remedy below is "cause the event inside the window", not "one capture settles the question".
 That instance is recorded case-specifically in [`keep-checkouts-fresh`](keep-checkouts-fresh.md) and in [`mistake-patterns`](../../memories/mistake-patterns.md)'s Pattern 43 occurrence bullet, both added by [#3267](https://github.com/Morrison-Lab/ai-config/pull/3267).
 `keep-checkouts-fresh` already states the observation in one line, in the middle of that incident's account --- "a sample drawn when the event of interest is impossible measures the complement of what it was aimed at, and reports a clean number for doing so" --- and this section deliberately reuses its phrasing rather than inventing a second vocabulary for the same thing.
-What is added here is the check and the remedy neither file carries, in the fragment a reader consults about their own claims rather than about a plugin install.)
+Both files also carry the remedy in its concrete form --- capture the path with `ps` while deliberately triggering the guard --- so what is added here is the generalized check (name the event, confirm the window could have contained one) and that remedy stated as a rule rather than as one incident's step, in the fragment a reader consults about their own claims rather than about a plugin install.)
 
 - **Do:** name the event a sample is meant to catch, and confirm the window could have contained one, before reading the result.
 - **Do:** trigger the event inside the window when you can cause it, rather than sampling and hoping one arrives.
@@ -1131,7 +1131,7 @@ the section's standing Do/Don't list is the one that follows this paragraph.
   That fragment is the **null-result** instance of this shape --- a zero-hit
   search read as evidence about a pattern --- so it is the sharper tool when
   the measurement returned nothing, and this section is the general form.
-  Instance 4 is itself a null result, so both reach it.
+  Instance 4 of the first case record below is itself a null result, so both reach it.
   Finding a positive result read as a neighbouring fact is the case only this
   section covers.
 

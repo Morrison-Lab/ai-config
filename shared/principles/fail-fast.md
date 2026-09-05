@@ -912,30 +912,36 @@ The case that produces it is specific and worth recognizing in advance: a standi
 Nothing is broken then.
 The guard is correct, the session is correct, and if no other discharge exists the two are unsatisfiable together, so no amount of doing the right thing clears the demand.
 
-**"No discharge is available" is a claim about a set, so derive it from the guard's source rather than from the refusal message.**
-That is the whole of the remedy on the session's side, and the incident this entry comes from is a negative example of it rather than a positive one.
-`hooks/no-unreviewed-pr.py` on 2026-09-03/04 demanded a Copilot review while a standing all-repos moratorium forbade one, and a session concluded it had no correct action.
-Its discharge set was never derived.
-The hook defines `EXEMPT_LABEL = "no-ai-review"` and discharges on a successful label add, and that label exists in this repository --- `gh label list -R Morrison-Lab/ai-config` returns it, checked 2026-09-04 --- so an available path was reported as absent.
-Reading the refusal message is what produced the belief;
-reading the file is what refutes it, and costs one `grep`.
+**An exemption set can be complete on paper and empty in practice, because each path carries a precondition the set does not state.**
+That is the failure mode, and it is why "this guard has three exemptions" does not answer the question.
+`hooks/no-unreviewed-pr.py` on 2026-09-03/04 demanded a Copilot review while a standing all-repos moratorium forbade one.
+Its three paths were derived from the source and each was then unavailable: the `no-ai-review` label the refusal message names did not exist in the repository, so `gh pr edit --add-label` errored and granted nothing;
+`ALLOW_UNREVIEWED_REDACTION_PR=1` asserts a redaction that was not true;
+and the draft deferral did not apply.
+The session was blocked for many turns while doing exactly what a standing directive required.
+That is what the pricing above misses: the paths were enumerable, printed, and documented, and the set they formed was still empty.
 
-On the guard author's side the corresponding move is a **suppression the guard reads itself**, so that a directive the session must obey does not require the session to improvise an override.
+Two things follow for the author of such a guard.
+Write each exemption's **precondition** where the set is written --- a label path is only a path in a repository that has the label --- since a printed exemption reads as an available one.
+And prefer a **suppression the guard reads itself**, so that a directive the session must obey does not require the session to improvise an override.
 That guard implements one: a dated moratorium constant, chosen over an environment flag because a flag has to be unset by whoever remembers and a date re-arms itself.
+
 Read it as unfinished rather than as a solved case.
 The general exemption --- "a standing directive forbids the demanded action", as a first-class condition rather than one named directive --- is **not** implemented anywhere;
 [#1709](https://github.com/Morrison-Lab/ai-config/issues/1709) carries it as a suggested fix, and was closed on the strength of the dated constant and reopened on 2026-09-04 (Pacific) when the shape recurred.
-Its reopening comment is itself an instance of the underived-set error above, since it asserts the label does not exist.
-[#3141](https://github.com/Morrison-Lab/ai-config/issues/3141) is the dated constant not suppressing: it read `2026-12-01` and the guard demanded the forbidden request anyway.
+The `no-ai-review` label was created shortly after that reopening, in response to it, so the repository now has the path the incident lacked;
+read every sentence above about that label as describing 2026-09-03/04 rather than the state a reader checking today will find.
+[#3141](https://github.com/Morrison-Lab/ai-config/issues/3141) is the dated constant not suppressing: this repository's copy of the constant read `2026-12-01` and the guard demanded the forbidden request anyway.
 The copy captured firing on 2026-09-04 carried an earlier date;
 whether that same copy served the 2026-09-03 demands is **not established**, so read the stale snapshot as a mechanism measured for one firing rather than as the incident's cause.
 An in-script suppression therefore removes the improvised-override problem and inherits the stale-payload one, where a dated constant fails **open** --- see [`keep-checkouts-fresh`](../workflow/keep-checkouts-fresh.md) for the measurement and for the resolution order that finds the copy actually running.
 The "credit a suppression with protection it does not supply" bullet at the end of the list above applies to this remedy as much as to anything it governs.
 
-- **Do:** enumerate a guard's discharge paths from its source before reporting that none is available, and check each named artifact exists.
-- **Do:** ask whether the remaining paths are ones a session obeying every standing rule could take, before pricing a fail-closed over-warn as cheap.
+- **Do:** check each exemption path's precondition, not only that the path exists in the source --- a named label, file, or flag has to be present in the repository the guard is running against.
+- **Do:** ask whether the surviving paths are ones a session obeying every standing rule could take, before pricing a fail-closed over-warn as cheap.
 - **Do:** give a guard whose demand a standing directive can forbid a suppression it reads itself, rather than relying on an override the session supplies.
-- **Don't:** read a refusal message as the discharge set --- it names the paths the author thought to print, and the incident above turned on one it did not.
+- **Don't:** count an enumerated exemption set as a non-empty one;
+  three documented paths that each fail their own precondition leave a guard with no correct action.
 - **Don't:** count a fail-closed over-warn as one visible event when the guard re-arms every turn;
   it blocks per turn until something clears it.
 - **Don't:** read "the safe direction" as meaning a fail-closed guard is free in the case where the safe action is unreachable.

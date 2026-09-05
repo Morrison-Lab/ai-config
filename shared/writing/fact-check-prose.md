@@ -463,7 +463,7 @@ This one takes a sentence and asks whether it is true of the **document**: a pas
 The cost is that it goes wrong in the direction nothing complains about.
 An internally contradictory passage renders, parses, and reads fluently, and the reader takes away whichever half they met first --- usually the confident one, since a hedge is the half written to be unobtrusive.
 
-**No phrase sweep finds these.**
+**A phrase sweep cannot be relied on to find these.**
 A sentence that breaks a hedge re-asserts the withdrawn claim in *different words*, which is why it was not caught when the hedge was written: it shares no vocabulary with the sentence it contradicts, so a grep for the hedge's terms returns the hedge and nothing else.
 This is [`grep-is-not-coverage`](../workflow/grep-is-not-coverage.md)'s point applied to a document's own internal consistency --- the search is over strings and the property is over propositions.
 

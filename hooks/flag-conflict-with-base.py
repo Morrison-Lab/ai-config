@@ -311,7 +311,7 @@ def evaluate(command):
 
         if _git_ok(["merge-base", "--is-ancestor", "HEAD", base_ref],
                    cwd=git_root) is not None:
-            continue  # M4: HEAD is already contained in the base
+            continue  # M4b: HEAD is already contained in the base
 
         paths = conflicting_paths(git_root, base_ref)  # M5
         if not paths:

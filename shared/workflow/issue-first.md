@@ -168,3 +168,23 @@ methodology-vignette formalization, where adjacent requests kept arriving in
 quick succession --- convert propositions to theorems, sweep the chapter for
 overclaims, reformat multi-equality display equations --- several of them
 touching prose the PR had never authored.)
+
+## Label an agent-filed issue with its authorship and its model
+
+Every issue an agent files into a repo we administrate carries two labels: `ai-authored`, saying an AI wrote it, and `model:<model-id>`, naming which one.
+Add both in the command that creates the issue, not as a follow-up edit.
+
+The labels exist because the issue body cannot say it.
+[`disclose-agent-authorship`](disclose-agent-authorship.md) puts a marker line on every agent-posted forge *comment* and explicitly excludes an issue body, so an agent-filed issue discloses nothing at all.
+It is filed under the account holder's credentials, so the API reports `type: User` and a `MEMBER` or `OWNER` association, and a reader who finds it later cannot tell it from an issue the maintainer typed.
+A label closes that without touching the body, and `gh issue list --state all --label ai-authored` then answers the question for the whole tracker at once.
+The model label is separate because it makes a second sweep possible: which model wrote an issue is what a later reader needs when one model turns out to have been systematically wrong about something.
+
+[`label-agent-filed-issues`](label-agent-filed-issues.md) carries the mechanics: the `gh`, `glab`, and MCP forms, how to normalize the model id, creating the labels in a repo that lacks them, and what to do where you cannot.
+`hooks/warn-unlabelled-agent-issue.py` warns (never blocks) when an issue is created with no `ai-authored` label.
+
+- **Do:** pass `--label ai-authored --label "model:<model-id>"` in the creating command.
+- **Do:** normalize the model id to its canonical form first, so one model maps to one label.
+- **Do:** file the issue and report the gap when the labels cannot be created.
+- **Don't:** put the disclosure in the issue body instead --- that is the one place [`disclose-agent-authorship`](disclose-agent-authorship.md) rules out.
+- **Don't:** collapse the two into one label --- a combined `ai-authored:<model-id>` answers the model question, but finding AI-authored issues at all then costs one query per model spelling.

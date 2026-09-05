@@ -295,8 +295,8 @@ every push.
 Each becomes decorative the moment it shares a call with what it gates.
 
 [`pr-on-claim`](pr-on-claim.md) already states the structural sibling for one
-command: the Copilot `requested_reviewers` POST must be the sole, or last,
-command in its Bash call, so that a `Stop` hook can tell whether it ran.
+command: the Copilot `requested_reviewers` POST must be the sole command in
+its Bash call, so that a `Stop` hook can tell whether it ran.
 The reason here is different and stronger.
 There the reader is a hook, and separability is enough.
 Here the reader is you, so the query has to **finish in its own call**, with
@@ -417,6 +417,28 @@ outcome as accomplished, which is the same expiring-state claim the section
 above is about, made inside the section about it.
 Had the fix covered only the two the issue named, `Closes #3069` would have
 shut it with three sites unexamined.)
+
+## An issue's stated reasoning goes unrevisited by default, and an entry citing it inherits whatever it argues
+
+The section above is about an issue body's site list going underived at filing time.
+This is the same body one field over: its **reasoning**.
+
+A filed issue is a claim you stop re-reading the moment it is filed.
+Its *conclusion* gets revisited whenever someone picks the issue up, because the conclusion is what they came for.
+Nothing prompts a re-read of its stated reasoning, so an argument that later work refutes sits there indefinitely, still reading as the issue's justification --- and any corpus entry that cites the issue as a worked instance inherits that argument along with the citation.
+
+Measured on [#3296](https://github.com/Morrison-Lab/ai-config/pull/3296).
+[#3275](https://github.com/Morrison-Lab/ai-config/issues/3275) asserted that a pre-squash SHA "survives only in the loose-object store of whichever checkout created it", reasoning from `git for-each-ref --contains` returning zero refs.
+`git ls-remote origin refs/pull/3060/head` prints the OID `f90682991a6d...` against `refs/pull/3060/head` --- the object the issue said had survived only locally --- so the reasoning was the exact misconception [`git.md`](../../memories/git.md) was being edited to correct at the moment it cited #3275 as an instance of that misconception.
+The conclusion was unaffected, which is why nothing prompted a re-read.
+A reviewer caught the stale reasoning only by following the link and reading what the issue actually said.
+
+So when you cite your own earlier filing as an example, re-read that filing against what you now know, and correct it if the work has moved past it --- the citation is what makes its reasoning load-bearing again.
+
+- **Do:** open and re-read an issue you are about to cite, rather than citing it from what you remember filing.
+- **Do:** post a correction on the issue itself when its reasoning has been refuted, even where its conclusion still stands.
+- **Don't:** treat an unchanged conclusion as evidence the body is still accurate.
+- **Don't:** cite your own issue as a worked instance without checking that the instance still works the way the issue says.
 
 ## Relationship to existing rules
 

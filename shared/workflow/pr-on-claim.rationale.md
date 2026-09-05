@@ -65,19 +65,31 @@ gh pr checks <N>
 In a remote/web session without `gh`, use the equivalent tool
 (`mcp__github__request_copilot_review`) instead.
 
-**Run that `requested_reviewers` POST as the sole (or last) command in its Bash call.**
-The [`no-unreviewed-pr`](../../hooks/no-unreviewed-pr.py) Stop hook discharges the reviewer-request obligation only on positive evidence the request itself succeeded, and the one reliable success signal is the whole Bash call's exit status --- which belongs to that call's **last** command.
+**Run that `requested_reviewers` POST as the sole command in its Bash call.**
+The [`no-unreviewed-pr`](../../hooks/no-unreviewed-pr.py) Stop hook discharges the reviewer-request obligation only on positive evidence the request itself succeeded, and the one reliable success signal is the whole Bash call's exit status --- which the hook attributes to a command only when that command is the call's **last**.
+It does not attribute it to the last command as a rule, which would be false: a failing `&&` short-circuits everything after it, so the status can be an *earlier* command's.
+What holds is the converse the hook actually relies on --- in last position after `&&` or `;`, the status is either that command's own or a short-circuit failure, and the discharge is safe under both.
+After `||` it is neither: a succeeding left operand skips the request and exits 0, so the hook discharges on a request that never ran ([ai-config#3139](https://github.com/Morrison-Lab/ai-config/issues/3139)).
+The rule above said "sole (or last)" until this hole was found;
+it now says sole, because the safe reading of "last" is only last after `&&` or `;` --- never `<read> || <POST>`, which is the one chaining form that silently satisfies the guard while making no request at all.
 So chaining the verification reads (`gh pr view ... --json reviews`, `gh pr checks`) *after* the POST in the same call makes the request non-last, which the hook treats as ambiguous: it keeps warning even though the POST returned 200.
 Run the POST alone, then do the pending/reviews/checks verification in a **separate** later call.
 This is [`fail-fast`](../principles/fail-fast.md)'s "a combined result cannot attribute a per-step outcome" applied to a review request;
 the same rule governs a `gh pr ready` draft transition the hook tracks.
 
-**"Nothing chained after it" includes a pipe added purely to trim the output.**
+**"Nothing chained before or after it" includes a pipe added purely to trim the output.**
 The rule above is stated in terms of *verification reads*, which is how it is usually broken and is also the version a reader recognizes themselves in.
 A formatting pipe does not feel like chaining a second step --- `| tail -3` or `| jq` is a decision about how much of one command's output to look at, not an extra command in a sequence --- so it slips past a reader who has just agreed with the rule as written.
 The shell does not draw that distinction: the last command in the pipeline owns the exit status either way, so `gh api ... | tail -3` leaves the POST non-last exactly as a chained `gh pr view` does.
 Use `--silent`, or `--jq` **inside** the `gh api` call, when the output needs narrowing.
 Both keep the POST the last command.
+
+**A shell loop over several PRs bundles the same failure N times instead of once.**
+Requesting review on multiple PRs in one Bash call --- `for n in 101 102 103; do gh api "repos/o/r/pulls/$n/requested_reviewers" -X POST ...; done` --- reads as N independent, successful requests, and each POST genuinely does succeed.
+It still leaves the hook unable to discharge any of them, for the identical reason a trailing pipe does: the loop bundles several simple commands into one Bash call, so no single POST is that call's sole or last simple command, and the "last position after `&&` or `;`" safety argument above never gets to apply.
+`RX_CMD_REVIEWERS_ANY` (`hooks/no-unreviewed-pr.py`) is built to backfill a request whose PR number arrived only as an unresolved shell variable (`repos/$O/$R/pulls/$N/...`) from the tool result, but that backfill still assumes one request per call --- it does not resolve which of several bundled results belongs to which iteration.
+Adding `--jq`/a pipe on retry does not help either, for the same reason a formatting pipe never helps: it narrows output without changing how many simple commands the call contains.
+Run one PR's request per Bash call, verbatim, with the literal PR number in the URL --- not assembled from a loop variable --- exactly as the sole-command rule above already requires for a single PR.
 
 **A PreToolUse block for this was considered and rejected -- the Stop hook stays the only guard.**
 After hitting this exact mistake (a `--silent` POST followed by `&& echo`, chained in one call), the natural next question is whether a **PreToolUse** hook should refuse to run the compound command at all, rather than let it run and catch the omission afterward at Stop.

@@ -58,6 +58,28 @@ The first two transfer from `delegate-to-codex`, but for a reason that skill doe
 There, work shape and model capability were independent.
 Here they point the same way: authoring and judgment work is exactly what the free tier is worst at.
 
+## The one measured exception: authoring work a mechanical test can accept
+
+The "needs strong reasoning, judgment, or long-context synthesis" bullet above rests on two grounds at once.
+The free tier is weakest at exactly that shape of work, and a wrong answer from it costs more to catch than the quota it saved.
+Only the second ground stops binding once a deterministic check settles correctness without the returned diff having to be reviewed for it.
+The first does not, so what the check buys is that a wrong answer is cheap rather than that it is unlikely --- expect to re-run or re-route on a failed check.
+That is why this exception requires the check rather than merely permitting the dispatch.
+
+One measurement bounds the exception rather than establishing a capability: one free-tier model id, on one R refactor, given a detailed brief and accepted because a mechanical suite passed rather than because the returned diff read well.
+[`memories/delegation.md`](../../memories/delegation.md)'s "opencode free tier: a full authoring task, validated mechanically" section is that record, and carries the date, the model id, the acceptance test, and the two failures from the same session that qualify it.
+
+The separate "result must conform to a schema and you have no cheap validator" bullet is untouched by any of this.
+It never bound on that measurement, whose result was an R refactor with no schema to conform to, and it still binds on its own terms wherever a schema is required and no validator is cheap.
+
+- **Do:** delegate authoring work to a free-tier model only when the brief carries literal paths, per [step 2, "Prepare the prompt"](#2-prepare-the-prompt),
+  and the exact text each file the task creates should hold (the "exact new-file content" of the record cited above),
+  *and* a mechanical acceptance test --- a test suite, a linter, a byte comparison --- decides correctness on its own.
+- **Do:** settle the data question before the shape question --- a mechanical acceptance test does not license a hosted dispatch the consuming repo's data rules forbid.
+- **Don't:** condition the dispatch on the acceptance test alone --- a vague brief with a passing check is a combination nobody measured.
+- **Don't:** let your own reading of the returned diff stand in for the mechanical check.
+- **Don't:** apply this exception to restricted data --- a data trigger forbids OpenCode and OpenRouter dispatch, the free tier included, unless the consuming repository has explicitly approved that hosted destination.
+
 ## Hosted-only routing rule
 
 [`delegate-to-codex`](../delegate-to-codex/SKILL.md)'s "Data sensitivity is a second trigger" section says a repo can route work to codex because of **what the work reads**, that this trigger overrides the shape exceptions, and that when codex is busy the work waits rather than falling back.
@@ -75,6 +97,10 @@ that hosted destination.
 `opencode models` on 2026-08-19 listed `opencode/big-pickle` alongside six ids ending in `-free`, all under the same hosted provider.
 The suffix answers a pricing question.
 The prefix answers which hosted tier a job goes to, which is the routing question.
+
+**That answers where bytes go, not what a given account can actually call.**
+Measured 2026-09-04: on an account with no payment method on file, every non-`-free` `opencode/*` id returned `Error: No payment method.` immediately, before doing any work, while an `opencode/*-free` id and an `opencode-go/*` id both ran normally.
+So the prefix/suffix split above is right about routing and silent about reachability --- check which ids actually run (a smoke test, per the Procedure below) before picking one for real work, rather than assuming every listed `opencode/*` id is callable.
 
 As in the codex skill, do not infer a data trigger from a repo merely holding sensitive data.
 It applies where the consuming repo has written the rule down, and that repo owns the path list.
@@ -179,6 +205,10 @@ that check confirmed the subscription is active, not that the smoke test above r
 the `opencode-go/*` line is the recipe for that test,
 and its output was not observed in this session.
 
+**That gap is closed as of 2026-09-04.**
+`opencode run -m opencode-go/gpt-5.6-luna "Reply with exactly the word: PONG"` returned `PONG`, and a subsequent real dispatch (an adversarial prose review of a small diff) to the same id completed and returned a usable verdict.
+So `opencode-go/*` is a confirmed-working route for judgment-bearing sidecar work, not only an active-subscription claim --- prefer it there over a bare `opencode/*` id, per the reachability caveat in the section above.
+
 ### 2. Prepare the prompt
 
 As of 2026-08-19, `opencode run` takes the message as positional arguments, and `-f/--file` attaches files.
@@ -201,15 +231,19 @@ A brief that described the file set only by pattern, with no literal fallback, w
 
 ### 3. Run it
 
-**Pass `--agent plan` for a text-only dispatch --- the default agent stalled on exactly the prompt shape sidecar work sends.**
+**`--agent plan` is now inert; the stall it was meant to work around still reproduces.**
+Measured 2026-09-04: `opencode run --agent plan -m <id> "<prompt>"` prints `agent "plan" is a subagent, not a primary agent. Falling back to default agent` and runs the default agent anyway --- the exact remedy the paragraph below once prescribed no longer selects an agent at all, and the warning is easy to miss in a tail-trimmed transcript.
+The underlying stall reproduced the same day on a fresh default-agent run: a ~250-word review prompt produced zero output across a 300s foreground timeout and had still written nothing when backgrounded and checked later.
+So treat the section below as a historical account of a workaround that stopped working, not as a live instruction --- there is currently no known `opencode run` flag that avoids the stall, and a stalled dispatch should be killed and retried rather than trusted to eventually finish.
+
 `opencode run` defaults to the `build` agent, which runs with tools enabled.
 Measured 2026-08-23 on 1.18.21 with `openrouter/stealth/ox-alpha`: a ~350-word diagnosis prompt (a Python traceback plus a function body, JSON-only output requested) produced zero streamed output across two default-agent runs --- one killed at a 5-minute timeout, the other left running in the background and never observed to finish --- while `--agent plan` completed the identical prompt in 36 seconds, and the default agent answered trivial and medium prompts in 13-15 seconds throughout.
 A candidate explanation is the prompt's file paths inducing tool use that goes nowhere headless, but that mechanism is unconfirmed.
-The measurements above are what this section asserts.
-The fix applies to the background pattern below too: a job that silently stalls under the default agent stalls the same way inside a background-runner-plus-DONE-marker dispatch, so pass `--agent plan` there as well for pure-text batch items.
+The measurements above are what this section asserts, over the version where `--agent plan` still worked.
 
-- **Do:** dispatch pure-text work (diagnose, summarize, extract, reformat) with `--agent plan`, including inside the background-runner pattern below.
-- **Don't:** read a silent multi-minute default-agent run as model slowness --- the same model answered in seconds under the plan agent.
+- **Do:** treat a silent, multi-minute `opencode run` as a stall to kill and retry, on a different model or a shorter prompt --- `--agent plan` no longer selects an agent as of 2026-09-04, so it is not an escape from the stall.
+- **Don't:** rely on `--agent plan` to avoid the default-agent stall.
+  It now falls back to the default agent it was meant to replace.
 
 There is no sandbox flag either.
 `opencode run --help` on 2026-08-19 listed none, and permissions come from the `permission` block in the opencode config.

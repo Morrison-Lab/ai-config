@@ -383,7 +383,7 @@ Reading the test is not a substitute.
 A vacuous test usually looks targeted,
 because it was written from the same mental model that produced the fix.
 
-Seven distinct mechanisms can make a test pass against the reverted fix:
+Nine distinct mechanisms can make a test pass against the reverted fix:
 
 - **Wrong entry point.**
   The test calls a helper directly,
@@ -397,6 +397,22 @@ Seven distinct mechanisms can make a test pass against the reverted fix:
 - **Boundary fixture.**
   The fixture sits on a line or span boundary
   where existing syntax rules already make the changed behaviour irrelevant.
+- **Coincident fixture.**
+  The fixture's own values coincide with the implementation's,
+  so the buggy path and the fixed path return the same answer on it.
+  This is the mapping-and-ordering case:
+  a lookup indexed by position
+  and the same lookup indexed by name
+  agree on every input whose order matches the table's,
+  and the two paths differ on no other axis at all.
+  It differs from **Boundary fixture** in that nothing about the input
+  looks like an edge case ---
+  it is an ordinary, representative value
+  that happens to be degenerate for the one distinction under test.
+  That is also why it survives a reading:
+  a fixture chosen while thinking about the fix
+  is the fixture likeliest to be in the implementation's own order,
+  so writing the vacuous version is the default rather than the slip.
 - **Wrong expectation.**
   The asserted behaviour contradicts the specification,
   so the test protects a bug rather than the fix.
@@ -410,12 +426,47 @@ Seven distinct mechanisms can make a test pass against the reverted fix:
   It is likeliest when the defect is input-shaped,
   since the payload has to be malformed to reach the bug,
   and malformed is what the layer above rejects it for.
+- **Mirrored misunderstanding.**
+  The expectation was never checked against an authority outside the diff ---
+  it was read off the implementation itself,
+  or off the same false belief that produced the implementation,
+  so the test and the code agree with each other and disagree with the tool.
+  It differs from **Wrong expectation** in where the wrongness comes from:
+  that entry's expectation contradicts the specification however it was arrived at,
+  while this one's expectation was never derived from the specification at all.
+  It differs from **Coincident fixture** too:
+  there the fixture's *values* happen to make two paths agree;
+  here the *belief* behind the assertion is shared with the belief behind the bug,
+  on any fixture.
+  That is what makes it survive an ordinary review pass:
+  reading the test against the code confirms agreement,
+  and agreement is what a check for "does the test match the intent" is looking for ---
+  the two lines are consistent with each other and both wrong.
+  It also defeats the mutation remedy this section is about to give,
+  which is why it needs calling out separately:
+  mutating the fix assumes a correct fix already exists to mutate away from,
+  and here the wrong behaviour IS the only behaviour in place when the test is written,
+  so there is nothing yet to revert.
+  The test was measured against a manual, not mutated, to be caught.
+  Reproduced on Morrison-Lab/ai-config#3175: a parser resolved `git push`'s
+  target remote by checking `--repo` before the positional argument, and its
+  test asserted `git push --repo upstream feat/estimand` targets `upstream`.
+  `man git-push` states the opposite under `--repo=<repository>`: "This
+  option is equivalent to the `<repository>` argument.
+  If both are specified, the command-line argument takes precedence."
+  Fixing the parser to match the manual broke the test, which is how the
+  shared inversion surfaced --- not a mutation run, since no correct
+  implementation existed yet for one to revert.
 
 Those are test bugs,
 not merely weak tests.
-A suite with all seven can still be green,
+A suite with all nine can still be green,
 and coverage can still report the lines as exercised.
-Only the mutation answers whether the assertion depends on the fix.
+The mutation remedy below answers whether the assertion depends on the fix
+for eight of the nine;
+**Mirrored misunderstanding** needs the fixture's expected value checked
+against a source outside the diff instead, since there is no correct fix yet
+to mutate away from.
 
 - **Do:** mutate the exact fix and watch the new test fail before trusting it.
 - **Do:** route the fixture through the real entry point
@@ -423,11 +474,26 @@ Only the mutation answers whether the assertion depends on the fix.
 - **Do:** make "the fixture arrived" an assertion in its own right ---
   a parse step's return value, a counter, a log line ---
   rather than a thing you satisfied yourself of once by reading the code.
+- **Do:** give a mapping or ordering bug a fixture whose order differs
+  from the implementation's,
+  since the two paths agree on every fixture that shares it.
 - **Don't:** accept a test because it mentions the helper that changed,
   or because a coverage report marks the line covered.
 - **Don't:** trust a test label as evidence of what the assertion checks.
 - **Don't:** read a green guard as one whose subject ran.
   A payload rejected upstream and a working fix are the same observable.
+- **Don't:** read a representative fixture as a discriminating one ---
+  representativeness is a claim about typical inputs,
+  and a guard needs an input the two candidate behaviours disagree on.
+- **Do:** for an expected value about a third-party tool's own behaviour,
+  derive it from that tool's documentation or a fresh measurement,
+  never from what the implementation under test already returns.
+- **Don't:** trust agreement between a test and its implementation as evidence either is right ---
+  when both were written from the same mental model,
+  agreement is exactly what a **Mirrored misunderstanding** produces.
+
+See [`fact-check-code-logic.cases.md`](fact-check-code-logic.cases.md),
+"Mutate the fix, not only the test --- a fixture ordered like the table".
 
 ### A misleading test label also licenses a DELETION, which is the direction with no mutation available
 
@@ -1074,6 +1140,55 @@ which is the preceding section's failure, not this one's.
 The test of membership is whether the artifact would still be right once the
 sentence were deleted.)
 
+## A false rationale can also be load-bearing, and then the code is wrong too
+
+The section above is the harmless case: the rationale is false, and the code
+stays correct once you delete the sentence.
+This is the other branch of the same failure, and it is the more dangerous
+one, because nothing about writing the rationale marks which branch you are
+on.
+
+Here the false claim is not decoration beside working code --- it is the
+**justification the code was built from**, so the code encodes the same
+error the sentence states.
+Deleting the sentence does not fix anything; the wrong behaviour is still
+there, now with no comment explaining why someone thought it was right.
+The test from the section above still separates the two: would the artifact
+stay correct with the sentence gone?
+Here the answer is no.
+
+The check is identical to the harmless case --- find the command that would
+show the claim false, and run it before the sentence and the code it
+justifies both ship --- but the stakes are higher, because review of the
+harmless case only costs a stale comment, while review of this case has to
+catch an actual defect that reads as deliberate and documented.
+
+- **Do:** ask, for every rationale a change depends on, whether the code
+  would still be correct if the rationale turned out false --- not only
+  whether the rationale itself is checkable.
+- **Do:** run the deriving command before the rationale becomes the reason a
+  branch, precedence order, or early return exists in the code.
+- **Don't:** treat a rationale that sounds like a general property of a
+  well-known tool (git, a stdlib function, a language's own scoping rules) as
+  needing less verification than an unfamiliar one --- familiarity is not
+  evidence.
+
+(Measured 2026-09-05, `hooks/flag-stale-branch-mutation.py`
+(ai-config#3205): a docstring justified treating `git checkout <name>` as
+ambiguous whenever a same-named local branch and tracked file both exist, on
+the claim that "git itself refuses without `--`" in that case.
+[`memories/git.md`](../../memories/git.md)'s "`git checkout <name>` prefers
+an existing local branch over a same-named file, and does not refuse"
+section has the measurement: git 2.50.1 does not refuse, and resolves to the
+branch.
+The rationale was not decoration --- the hook's disambiguation order was
+built to match it, so the false claim produced code that dropped a real
+branch selection from tracked state and false-positived on the very next
+ordinary commit, the same failure mode the heuristic existed to prevent.
+Caught and fixed before merge, so the shipped hook implements the correct
+precedence; the false rationale never reached `main`, but it did reach a
+draft of the code that acted on it.)
+
 ## A reported digit finer than its Monte Carlo error is a claim about precision
 
 A simulation estimate arrives with a standard error, and the number of digits
@@ -1350,4 +1465,30 @@ This is the single-constant counterpart to the sibling-audit rule in
 ("When one parser construct becomes tolerant of a condition, audit its siblings for the same condition"):
 where that rule prescribes sweeping distinct constructs that parse the same syntax class,
 this one prescribes eliminating duplicate literals for the exact same construct outright.)
+
+## Prose about your own tests and instruments overclaims by default, and it can be the dominant finding class
+
+Every section above treats one claim at a time --- a mutation that did not apply, a needle already present, a count asserted rather than derived.
+Across a long review it compounds into something worth naming on its own: a PR whose *code* was correct within a round or two can still take many more rounds to land, because nearly every remaining finding is a **claim about the code's own tests**, not a defect in the code.
+
+The claims that keep failing this way share a shape --- each is a sentence about the session's own instruments, and each is cheap to write and expensive to check, so the writer settles for plausible:
+
+- A "superset" relation between two mutations or two test arms, asserted rather than run.
+- A phrase attributed to a rendered or generated artifact ("the docstring says X", "the comment lands in paragraph Y") without rendering it and looking.
+- A coverage claim scoped with "the only arm that ..." when a neighboring arm was never checked against the same input.
+- An enumeration claimed exhaustive ("two cases: A and B") when a third case exists in the code (an `||`, an early return, an alternate branch) and was simply not looked for.
+- A count in prose ("four mutations were confirmed") that does not match the count of items actually named in the surrounding paragraph.
+
+None of these is a hard error to catch in isolation --- each reads as a small, plausible aside in a paragraph that is otherwise doing real work, which is exactly why they survive a first self-read and only surface once a reviewer tries to reproduce the specific claim.
+
+The remedy is the same one this file gives for code: run the thing before describing it.
+
+- **Do:** run the mutation and the ablation before asserting a superset or coverage relation between them.
+- **Do:** render the artifact (the docstring, the generated message, the diff) and grep or read it before saying a phrase appears in it.
+- **Do:** enumerate the actual branches in the code (grep for the operator, walk the `if`/`elif`/`else`) before writing "the only case" or "two cases".
+- **Do:** count the items you are about to name in a sentence, and match the stated count to that count.
+- **Don't:** treat a plausible-sounding claim about your own tests as needing no check merely because it is about testing infrastructure rather than about the feature --- it is exactly as checkable, and exactly as likely to be wrong.
+- **Don't:** read "the code is right" as "the PR is ready" while claims about the code's own verification remain unmeasured.
+
+(A session working in `Morrison-Lab/gha` recorded the incident that produced this section in its own local `prose-about-my-own-tests-overclaims.md` --- project-local Claude Code auto-memory, not a file committed to any repository, so there is no link to give here: roughly eleven adversarial review rounds on one PR, where the code was correct by round two and every one of the remaining rounds found a claim of exactly the shapes listed above.)
 

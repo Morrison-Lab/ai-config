@@ -455,6 +455,45 @@ is usually the step where the abstraction went wrong.
 - **Don't:** exempt a bullet you have just rewritten to satisfy a review
   finding, since that rewrite is an edit to the rule like any other.
 
+## Check every sentence against the hedges the passage states elsewhere
+
+The checks above take a sentence and ask whether it is true of the world.
+This one takes a sentence and asks whether it is true of the **document**: a passage that marks something unestablished, withdraws a cause, or narrows a claim to one measured case has thereby constrained every other sentence in scope, and a sentence written against the un-narrowed version reads perfectly well on its own.
+
+The cost is that it goes wrong in the direction nothing complains about.
+An internally contradictory passage renders, parses, and reads fluently, and the reader takes away whichever half they met first --- usually the confident one, since a hedge is the half written to be unobtrusive.
+
+**A phrase sweep cannot be relied on to find these.**
+A sentence that breaks a hedge re-asserts the withdrawn claim in *different words*, which is why it was not caught when the hedge was written: it shares no vocabulary with the sentence it contradicts, so a grep for the hedge's terms returns the hedge and nothing else.
+This is [`grep-is-not-coverage`](../workflow/grep-is-not-coverage.md)'s point applied to a document's own internal consistency --- the search is over strings and the property is over propositions.
+
+**It is not "a later edit forgot an earlier hedge", so a diff-ordering heuristic misses it too.**
+One measured instance had the hedge and the contradicting assertion added in the **same commit**, in two different files.
+Hedging one statement of a claim and asserting another is a single act when the two live apart, because writing the careful version discharges the sense of having been careful.
+That is the same mechanism [`metacognitive-monitoring`](../workflow/metacognitive-monitoring.md)'s "A hedge you attach for one audience is owed to the other, and writing it once is the tell" describes, across a different span: there the two statements go to different **audiences**, here they sit in different **files of one change**, which is why a same-commit break does not feel like an inconsistency to write.
+
+**The test:** enumerate what the passage and its siblings mark unestablished, hedged, or withdrawn --- as a list, before reading anything else --- then ask of every other sentence whether it would still be true if one of those hedges resolved the other way.
+Enumerating first is what makes it work, since a sentence read in isolation supplies its own missing context and reads as fine.
+Derive the list from the text rather than from what you remember writing.
+A reviewer applying this to one prose PR derived **eight** hedged points where the author's own list had four --- which is the argument for deriving it, and says nothing on its own about which of the eight the breaks sat under.
+
+Run it across the sibling files a change touches, not only within one file.
+A hedge stated in the file that argues for it constrains the file that cites it, and the citing file is where the unhedged restatement lands.
+
+(Measured 2026-09-03/04 while preparing ai-config [#3267](https://github.com/Morrison-Lab/ai-config/pull/3267).
+The rounds were **local `adversarial-reviewer` dispatches before each push**, so the PR's own review activity shows two verdict-bearing rounds rather than nine;
+the count is recorded in prose in that PR's `no-ai-review` comment ("It also went through nine adversarial-reviewer rounds locally"), which is the citation for it.
+Nine consecutive such rounds each returned exactly one finding of this shape.
+The eight-versus-four figure in the paragraph above comes from the same series, whose per-round detail that comment does not carry --- so read that figure as unciteable even though the round count beside it is not.
+That per-round count is itself the argument for enumerating the hedges up front rather than re-reading for consistency: re-reading surfaced one break per pass, so the rounds converged only as fast as a reviewer happened to notice, while an enumeration bounds the set to check in one pass.
+Tracked as [#3271](https://github.com/Morrison-Lab/ai-config/issues/3271).)
+
+- **Do:** list the passage's hedged and withdrawn points explicitly before checking any other sentence against them.
+- **Do:** derive that list from the text, and expect it to be longer than the one you would have written from memory.
+- **Do:** extend the check to sibling files the same change touches, since the citing file is where an unhedged restatement lands.
+- **Don't:** grep for the hedge's wording and call the passage consistent --- a break restates the claim in words the hedge never used.
+- **Don't:** assume a break implies a later edit, and so skip a passage nothing has touched since --- one measured instance had the hedge and the break written in the same commit, which retires the ordering heuristic without supporting any claim about how often that happens.
+
 ## Check that a stated trigger actually fired
 
 A justification for why a file was split, a check was added, or a workflow was
@@ -565,6 +604,90 @@ of having left it alone.
   to whoever wrote it --- you shipped the sentence.
 - **Don't:** read this as covered by the import rule above; there is no source
   to have been faithful to, which is what removes the moment of doubt.
+
+## When each rewrite is refuted on a NEW clause, the passage is over-specified
+
+The section above governs one rewrite: every clause you carried through it is
+now yours.
+This governs the *series* --- a passage rewritten three, four, five times,
+where each round's finding is new, correct, and lands on a clause the previous
+rewrite did not touch, so nothing in any single round says stop.
+
+The rewrite count is the signal, and it is a fact about the passage rather than
+about any of the findings.
+A passage refuted five times on five different clauses is not one that keeps
+getting unlucky.
+It is one reconstructing something the record cannot settle, and each rewrite
+re-derives that reconstruction with a fresh set of details --- which is why
+plausibility is no defence.
+Every version was plausible; the plausibility is what kept producing the next
+one.
+
+Attention makes it worse rather than better, by the mechanism the section above
+names.
+A targeted rewrite fixes the refuted clause and its untouched neighbours
+inherit the credibility of the fix, so the next round's finding lands on one of
+those.
+
+**So once a passage has been rewritten a third time, stop repairing the clause
+and ask what the evidence can carry.**
+The convergent version states what is derivable, names what is not as
+unrecoverable, and deletes the connective tissue between them.
+That version is usually much shorter, and it is not a hedge.
+"This cannot be recovered, and here is why" is a claim a reader can check,
+where a softened reconstruction is the same unsupported claim with a smaller
+adverb ---
+which [`address-every-comment`](../workflow/address-every-comment.md)'s closing
+section rejects for exactly that reason.
+
+**This does not contradict
+[`algorithmatize-checks.rationale`](../workflow/algorithmatize-checks.rationale.md)'s
+"A review flagging an overclaimed check is a prompt to build it, not to soften
+the claim", and the boundary is worth stating because the two prescribe
+opposite edits.**
+There the claim is about a property of the system, which you control: deleting
+the sentence throws away a check you could have shipped, so the fix is to make
+the claim true.
+Here the claim is about a historical record, and no work available to you can
+make it true --- a rewritten message destroyed the copy that would settle it.
+The test is whether the claim is one you could go and *make* true.
+When it is, build; when it is not, say what survives and name the loss.
+
+- **Do:** count the rewrites, and read a third one as evidence about the
+  passage rather than about the latest finding.
+- **Do:** state what the record supports, name the rest as unrecoverable, and
+  delete the reconstruction joining them.
+- **Do:** ask whether the claim is one you could make true before choosing
+  deletion, so this rule does not swallow the build-the-instrument case.
+- **Don't:** answer the third refutation with a fourth reconstruction, however
+  well it fits the surviving evidence --- so did the previous three.
+- **Don't:** read the shorter passage as the weaker one; the named loss is
+  checkable and the reconstruction never was.
+
+(Morrison-Lab/ai-config#3180, 2026-09-04.
+One case-record paragraph in this file was rewritten five times ---
+`186577c62`, `85101fe1c`, `626209e68`, `7a797d3f8`, `bd8b1bfcc`, all pre-squash
+on that PR, so fetch `refs/pull/3180/head` before running `git show` on them.
+Read the five messages rather than a summary of them: each states its own
+finding, and no shorter list maps cleanly onto the five, which is itself the
+section's point.
+Two things about the series are derivable and worth stating.
+Every refutation came from the history rather than from argument, and no two
+were about the same clause: a misattributed PR, a chain that cannot span two
+separately-merged PRs, evidence resting on commits a reader could not fetch, a
+conjunction that could never hold.
+That list is deliberately shorter than the series.
+One rewrite's finding was that the *previous* rewrite had overstated its own
+reason --- so listing both as independent refutations would present a claim
+beside its own correction and count the pair twice.
+And the convergent move was named *before* it was performed: `85101fe1c`, the
+second of the five, already says "the record now says what it can verify and
+names the rest as unrecoverable", and three further refutations followed it.
+Naming the remedy is not applying it, and the three rewrites after that one are
+the evidence for this section rather than an exception to it.
+`bd8b1bfcc`, the fifth, is 6 insertions against 7 deletions --- a shorter
+replacement rather than a pure deletion, which is the usual shape of the
+convergent version.)
 
 ## A definition can resolve, render, and still say nothing
 
@@ -894,6 +1017,238 @@ The insertion additionally re-listed a set of reviewer options the same file def
 Tracked as [#1794](https://github.com/Morrison-Lab/ai-config/issues/1794), and corrected on the branch by `0cc398ca`.
 This section's own first draft then committed the same error: it opened by describing "the two sections above", carrying that framing over from its neighbour, when the section directly above it argues the opposite of what the sentence attributed to it.
 The reviewer on [#1795](https://github.com/Morrison-Lab/ai-config/pull/1795) caught it, which is worth recording as evidence about the remedy rather than about the author --- naming a target beats counting to it, exactly as [`forward-references`](forward-references.md) says, and the count was wrong here because an unrelated section had been inserted between the two being counted.)
+
+## A number in a commit message is an assertion nobody re-derives
+
+The section on your own PR descriptions above names the commit message as a
+surface this checklist covers.
+What it does not say is that the commit message is the surface where an
+unmeasured figure most reliably survives.
+Every other place a figure appears has a reader with a reason to check it:
+a PR body gets read against the diff,
+prose gets read against the file it describes,
+a changelog line gets read against the behaviour it announces.
+A commit message is read for its subject line and skimmed for its body,
+so a number inside one is asserted into permanent history and re-derived by nobody.
+
+**A figure about state the commit did not touch is an assertion the commit has no standing to make.**
+This is the mirror of
+[`An insertion asserts something about the whole file, not just the added lines`](#an-insertion-asserts-something-about-the-whole-file-not-just-the-added-lines)
+above.
+That section says an insertion claims for the whole file;
+this one says a commit message may claim only for what the commit changed.
+A `git show --stat` settles the boundary in one command,
+and it is the command nobody runs before writing the sentence,
+because describing what you just did feels like reporting rather than measuring.
+
+**The remedy is usually to delete the number, not to correct it.**
+Ask what the figure is load-bearing for.
+Where a formatting change is being explained, the answer is nothing:
+the reader needs to know the change was a split at a clause boundary,
+and the character counts on either side of it decide nothing the reader will do.
+A wrong figure then costs an amend --- or several --- to repair a sentence that was carrying no information to begin with.
+Where a figure genuinely is load-bearing, measure it,
+and re-derive it rather than inheriting it, per
+[`address-every-comment`](../workflow/address-every-comment.md)'s
+"a figure inherited from the tracking issue is both the copy git keeps and the copy nobody verified".
+
+- **Do:** state what the change did, and leave the change's measurements out of the message unless a reader has to act on them.
+- **Do:** run `git show --stat` before writing any count into a commit message, and confine the claim to the lines it reports as changed.
+- **Do:** re-derive a load-bearing figure from the artifact at the moment of writing the message.
+- **Don't:** quantify a formatting change --- a range, a character count, a line count --- to make the message sound measured.
+- **Don't:** state a measurement of a neighbouring line the commit left alone,
+  however natural it is to characterize the result rather than the edit ---
+  rationale about untouched code is ordinary and welcome, and a count of it is the claim this rules out.
+- **Don't:** treat an amend as the cheap remedy for a figure you could have omitted;
+  [`address-every-comment`](../workflow/address-every-comment.md) recommends the amend for a **wrong** figure in an unmerged message,
+  and this bullet is about not writing the figure at all.
+
+(Morrison-Lab/ai-config#3060, 2026-09-03.
+One message said a re-wrap brought a line "into the corpus's 60-to-80 range"
+when the three resulting lines measured 54, 84 and 81, none of them in range.
+Its replacement said the split "replaced a 143-character line with three of 54, 84 and 81"
+when it produced two, the third having pre-existed --- `git show --stat` on `f9068299` reporting 2 insertions and 1 deletion.
+The two errors have different causes, and only the second is about neighbouring state:
+the first misread a range against the two lines the commit created,
+while the second counted a line the commit never touched as one it had produced ---
+a claim about surrounding text the commit had no standing to make.
+Each cost a message-only amend to repair.
+The amends are why this record cites the quoted messages rather than counting the rounds:
+rewriting a message destroys the copy a later reader would check,
+so a count of them is a figure this section's own rule would refuse.
+The reviewer's closing judgement is the transferable half:
+the figures were load-bearing for nothing,
+the paragraph's content was "split at the clause boundary",
+and the honest form carries no numbers at all.
+Tracked as [#3158](https://github.com/Morrison-Lab/ai-config/issues/3158).)
+
+**The amend that repairs one such figure is where the next one enters, so the
+fix round is the exposure rather than the recovery.**
+The passage above treats the amend as a cost.
+What it does not say is that the amend is itself an act of composition,
+performed under exactly the conditions that produced the original ---
+describing what you just did, quickly, about a passage you are looking at
+rather than measuring.
+So the corrected message gets a fresh unmeasured figure, and the correction
+reads as diligence while carrying the same defect one layer down.
+
+Two things make this harder to catch than a first-draft error.
+The amend is *targeted*, so attention sits on the number that was wrong and a
+different number in the same sentence inherits the credibility of the fix.
+And the rewrite destroys its own evidence, per the case record above: there is
+no diff between a message and its predecessor, so nothing a later reader sees
+shows that the figure ever changed.
+
+**A *positional* figure is in scope here, not only a measurement of the
+change.**
+"Thirteen lines above", "the section three lines below", "the sibling 39 lines
+down" locate a passage rather than size an edit, so they slip past a reader
+applying the rule above, which is worded around counts of what the commit
+touched.
+They are worse than a size claim on two counts.
+They are load-bearing for nothing --- a reader who wants the passage searches
+for it --- and they go stale on the next insertion anywhere between the two
+points, so a figure that was true when written becomes false with nobody
+having edited it.
+The remedy is the one stated in
+[`An insertion asserts something about the whole file`](#an-insertion-asserts-something-about-the-whole-file-not-just-the-added-lines)'s
+own case record: naming a target beats counting to it.
+Name the section, or quote its heading, and the sentence survives every later
+edit.
+
+- **Do:** re-derive every figure in an amended message, including the ones the
+  amend was not about.
+- **Do:** name a passage by its heading or a quoted phrase, rather than by its
+  distance from where you are standing.
+- **Don't:** treat a message you are correcting as already checked --- the
+  correction is the first draft of a new sentence.
+- **Don't:** write a positional figure into a commit message on the grounds
+  that it is true right now; the next insertion falsifies it and nobody
+  re-reads it.
+
+(Morrison-Lab/ai-config#3060 and #3167, 2026-09-03, recorded here rather than
+as a sibling section because it is this same rule failing rather than a second
+one.
+Both PRs put positional figures into commit messages --- "into the corpus's
+60-to-80 range", "three lines below", "twelve lines above" --- and none was
+load-bearing.
+
+Only two of the three are checkable now, and the difference between them is
+the record worth keeping.
+`2156b439d` asserts "three lines below" in its own voice, so a reader can
+fetch the claim and test it.
+`d29d33c71` carries "twelve lines above" only to disavow it, so what survives
+there is the correction rather than the assertion --- and reading that grep
+hit as the assertion is
+[`verify-the-right-artifact`](../workflow/verify-the-right-artifact.md)'s
+substitution.
+The "60-to-80" message survives nowhere: it was amended away, and no reachable
+commit carries it.
+
+Successive drafts of this paragraph tried to say more --- that the three
+formed a chain, that one gap was ten, that another was thirteen --- and each
+attempt was refuted by the history rather than by argument.
+The reconstructions were plausible every time, which is the finding: a
+rewritten message destroys the copy a later reader would check, and nothing
+about the gap announces itself, so each attempt filled it confidently and
+wrongly.
+Cite the squash commit on the default branch, or name the PR alongside a
+pre-squash SHA.
+Such a SHA is reachable from no branch, so it does not resolve in a fresh
+clone until the reader fetches `refs/pull/<N>/head` --- which reaches the
+PR's final head and its ancestors, and so not a message that was amended
+away.
+
+That a rule gets broken while being authored is not itself the finding, and is
+already stated in this corpus three times over:
+[`learn-from-review-findings`](../workflow/learn-from-review-findings.md),
+[`no-empty-promises`](../workflow/no-empty-promises.md) and
+[`fully-clean.cases.md`](../workflow/fully-clean.cases.md) each put it as a
+rule consulted at read time and broken at composition time.
+The recordable remainder is the positional shape above, and the way a rewritten message hides its own history.
+
+Whether the condition deserved a guard was measured rather than argued.
+`hooks/flag-positional-figure-in-commit-message.py` is the result, and
+[`deterministic-tools`](../principles/deterministic-tools.md)'s
+third-occurrence bar is what licensed building it: the pattern
+`~?\b\d+\s+(?:lines?|characters?|chars?|words?)\s+(?:above|below|earlier|later)\b`
+matched 14 occurrences across 13 commit messages, measured 2026-09-03 over
+roughly 2,400 commits, and every one was the decorative-positional shape,
+with no legitimate code-move description among them.
+It warns and never blocks, because whether a figure is load-bearing is not
+lexically decidable even where its shape is.
+
+**What the measurement was for is worth stating, because it changed the
+guard.**
+A first version also matched `\b\d+-to-\d+\s+range\b`, on the strength of the
+"60-to-80 range" case recorded above being one of the three.
+That arm turned out to have exactly one match in the whole history, and the
+match was a **misfire**: a commit saying "the 60-to-80 range is human
+guidance" states what the style guide asks, locates no passage, decays on no
+insertion, and loses its meaning if the number is deleted.
+The message the arm was built for had been amended away, so it was never in
+the population at all.
+An arm with no true positive and one false positive is exactly the noise that
+costs a warn-only guard its credibility, so it was dropped --- which is the
+measurement doing the work an argument could not, since the shape was
+proposed on a real case and still failed to earn its place.
+
+The denominator is deliberately approximate and dated, and two drafts of this
+paragraph are why.
+The first said "15 of 2412 commit messages", conflating occurrences with the
+messages carrying them and pinning a total that writing the sentence had
+already moved.
+The second carried the range arm's match into the claim that every match was
+the target shape, which an adversarial review refuted by reading the commit.
+Both are this section's own rule failing inside the paragraph recording it,
+on figures load-bearing for nothing: what the measurement establishes is that
+the shape is rare and its matches are true positives, and no reader acts on
+the total.)
+
+## A tool's behaviour quoted in a commit message is written after the measurement, not before
+
+The section above covers a figure in a commit message.
+This covers a quotation: the error text a tool printed, the exit status it returned,
+or the behaviour a reviewer ascribed to it,
+written into the body as the reason for the change.
+The inherited-claims bullet near the top of this file governs restating such a claim in a doc or a comment,
+and "A block presented as program output is a claim, so capture it rather than composing it" above governs a block composed from memory in a doc;
+this governs the commit body, where the sentence is inherited from a reviewer's paraphrase and the draft usually precedes the measurement.
+
+A commit message is usually drafted before the commit,
+and often before the measurement the message describes has been read,
+because the change was made to answer a reviewer's finding
+and the finding already says what the tool does.
+So the body inherits the reviewer's phrasing of the tool's behaviour,
+and the phrasing is checked against nothing:
+the reviewer paraphrased, the author copied, and the tool's own output never entered the text.
+For the reason the section above gives (rewriting destroys the copy a later reader would check),
+the correction goes on the PR and into the squash body rather than into an amend,
+and the wrong quotation stays in the history.
+The same `address-every-comment` bullet the section above cites recommends the amend for a wrong figure;
+under squash merge the intermediate body never reaches `main`,
+so the squash body is the copy that rule is about, and the two agree.
+
+- **Do:** run the command, read its output and status on screen, and only then write the sentence that quotes them.
+- **Do:** when the change answers a reviewer's description of a tool's behaviour,
+  treat that description as a claim to measure before it becomes the commit's own.
+- **Don't:** write a tool's error text or exit status into a commit body from a reviewer's wording
+  or from the result you expect.
+- **Don't:** draft the body before the gate chain runs and leave it untouched after the chain prints something else.
+
+(Morrison-Lab/ai-config#3154, 2026-09-03, three times in one evening on grep alone.
+`75829fad`'s body said a `-zz` subject "exits 2 with \"invalid option\"";
+on GNU grep 3.11 `-zz` is the valid `-z` flag twice, so grep took the first path as its pattern and searched the current directory instead,
+exiting on whether that accidental pattern matched; `-Q` is the case that exits 2.
+`a51a170f`'s body quoted the error for a `[` subject as "Unmatched [", the reviewer's wording, where the tool prints "Invalid regular expression".
+The prose line that same commit added, and the prepared squash body, said a bare `(` motivates `-F`;
+`(` is a literal in grep's default BRE mode, and of the four characters the two versions of that prose line name (`[`, `(`, `.`, `*`) only `[` errors, which `27bb9588` corrected.
+The `(` case was caught by an adversarial verdict that ran the command;
+the other two surfaced while re-measuring for the next round's PR comment,
+and each correction went onto the PR and into the squash body rather than into an amend.
+The same day's fourth case was not grep:
+`e698c456`'s body called three commits "not fetchable" from a short-SHA fetch on a shallow clone,
+retracted in `709bc612`'s body on the same PR.)
 
 ## An elapsed-time claim is a computation, not a memory
 

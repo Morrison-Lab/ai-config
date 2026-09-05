@@ -157,9 +157,10 @@ Deciding where a learning belongs is a real step ---
 [`ums`](../../skills/ums/SKILL.md) step 2 routes each item either to ai-config
 or to the owning repo's own agent docs --- and once an item is routed to a repo
 we own, every later instruction reads as relative to *that* repo.
-Step 3's "grep the whole `memories/` directory" then means the destination's
-`memories/`, so the dupe check runs to completion, finds nothing, and never
-looked at ai-config at all.
+Step 3 read "the whole `memories/` directory" at `3935bfff`,
+and that wording meant the destination's,
+so the dupe check ran to completion, found nothing,
+and never looked at ai-config at all.
 
 The asymmetry is why this needs naming separately from the null-result case.
 A repo-local memory in some other repo is precisely the place nobody thinks to
@@ -194,9 +195,69 @@ The verification half of the same incident --- attempting the base form of a
 command and generalizing to a flag never passed --- is recorded separately in
 Morrison-Lab/ai-config#1174.)
 
+### The same failure has a same-repo sibling: the wrong directory
+
+The section above routes between repos;
+the same miss happens inside one repo
+when the dupe check is scoped to a directory
+that does not hold the file already owning the idea being recorded.
+
+- **Do:** grep [`skill-builder`](../../skills/skill-builder/SKILL.md) step 0's path list,
+  not only the directory the destination sits in.
+- **Don't:** read "the whole `memories/` directory", step 3's wording at `3935bfff`, as thorough;
+  the word doing the damage was `memories/`, not "whole".
+
+(Recorded 2026-09-03 on [ai-config#3060](https://github.com/Morrison-Lab/ai-config/pull/3060),
+where a markdownlint entry was added to `memories/markdownlint.md`
+while `shared/writing/semantic-line-breaks.md` already covered the same rule in three regions
+(a bare `#NNNN` at column 1 parses as an ATX heading, markdownlint's MD018),
+at `3935bfff` (`origin/main` before #3060 merged) and unchanged at `2156b439` (its squash merge):
+`git grep -n MD018 3935bfff -- shared/writing/semantic-line-breaks.md`
+and the same query at `2156b439`
+return the same five lines ---
+274, 288, 295, 861 and 995 ---
+of which the first three sit inside one bold-lead block with its own `Do`/`Don't` pair.
+What step 3's own directory-wide grep would have done is checkable:
+`git grep -il "issue reference" 3935bfff -- memories/` returns three files ---
+`memories/github.md`, `memories/preferences.md` and `memories/r-quarto.md` ---
+and the owner is not among them,
+because the owner is `shared/writing/semantic-line-breaks.md`,
+which a search of `memories/` cannot reach.
+What the [`skill-builder`](../../skills/skill-builder/SKILL.md) step 0 query
+would have done is checkable too:
+`git grep -il "issue reference" 3935bfff -- skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md`
+returns eight files at that ref ---
+`hooks/test-no-unauthorized-merge.py`,
+`hooks/warn-stale-issue-edit.py`,
+`memories/github.md`,
+`memories/preferences.md`,
+`memories/r-quarto.md`,
+`shared/workflow/address-every-comment.md`,
+`shared/writing/semantic-line-breaks.md`
+and `skills/promote-memory/SKILL.md` ---
+with the owner among them.
+The same `memories/` query returns four at `2156b439`:
+the three above plus `memories/markdownlint.md`, the file the entry was added to,
+where the entry is a cross-link to the owner rather than a restatement ---
+so the count rose by one either way,
+and a hit count cannot tell an owner from a pointer.
+Every commit on #3060's branch is still reachable on `origin` from `refs/pull/3060/head`
+(`git ls-remote origin refs/pull/3060/head` returns one line whose SHA begins `f9068299`,
+and after `git fetch --depth=200 origin refs/pull/3060/head`, `git rev-list --count 3935bfff..FETCH_HEAD` returns 33).
+The default refspec does not bring `refs/pull/3060/head` down
+(`git config --get-all remote.origin.fetch` returns `+refs/heads/*:refs/remotes/origin/*` in the measuring clone),
+and a shallow clone walks only to its fetch depth,
+so this record anchors on `main` commits, which a full fetch of `main` brings down
+(`git merge-base --is-ancestor 3935bfff origin/main` and the same for `2156b439` both exit 0).
+Note also why the wrong-corpus section's `Do` could not have caught it.
+It reads "grep the ai-config corpus as well as the destination repo's docs,
+whenever step 2 routes an item anywhere other than ai-config",
+and this item was routed to ai-config, so its trigger did not fire.)
+
 ## Searching only the rendered output is the same error one layer down
 
-The wrong-corpus section above governs searching the wrong **repo**.
+The wrong-corpus section above governs searching the wrong **repo**,
+and its subsection the wrong **directory** within one.
 This one governs searching the wrong **layer within the right repo**:
 a sweep whose file filter reaches the generated artifact and not the generator that produces it.
 
@@ -254,7 +315,8 @@ and the next regeneration would have restored the exact shape the same PR's own 
 
 ## An unmerged PR is part of the corpus a citation can be corroborated against, and no default-branch search reaches it
 
-The wrong-corpus section above governs searching the wrong **repo**.
+The wrong-corpus section above governs searching the wrong **repo**,
+and its subsection the wrong **directory** within one.
 This one governs searching the wrong **branch state within the right repo**: a citation to content that ships only in an open PR, checked by grepping the default branch.
 
 The null result here is not merely inconclusive --- it is guaranteed whether or not the cited content is genuine.
@@ -576,6 +638,64 @@ $ python3 hooks/test-no-push-without-self-review.py ./ctl-root-copy.py
 
 Identical to the mutant, so the 85 is the path and not the change.
 Note which direction that control runs, since the intuitive reading is backwards: it is the control **failing** that attributes the failure elsewhere, and a passing control at some *other* location would have settled nothing.)
+
+### Second occurrence: a retraction can land the OPPOSITE overclaim, and then do it again
+
+The section above treats the correction as a single event --- one overclaim,
+one underived replacement, one adversarial review that catches it.
+The recurrence adds the part that makes this expensive.
+**A retraction is itself a claim, so retracting it produces a third one**, and the sequence can run several rounds without anybody deriving anything.
+
+Each revision feels like the careful move, because each is *narrower* than the last, and narrowing is what the previous round asked for.
+What none of them is, is derived.
+The direction alternates --- too strong, then too weak, then too strong in a new place --- which is the signature of guessing rather than of converging.
+
+The sharpest form is a claim about a **classifier's own rule**, written as prose in a docstring or a review reply.
+Such a claim has an unusually cheap derivation available: the classifier
+answers it by being **called**, on inputs chosen to separate the candidate
+rules.
+So the whole sequence of revisions substitutes recollection for a function
+call that costs one command, and the compression each round performs ("prose
+is fine, bullets are not") is where the next counter-example gets admitted,
+since a shorter rule covers a larger population.
+
+That has practical consequences.
+A rule with an **AND** in it cannot be compressed to one clause without becoming false, so a summary that drops a conjunct is a rewrite rather than a simplification.
+And the inputs worth calling with are the ones near the boundary: the sibling spellings of a shape, not another example of the case you already agree about.
+
+- **Do:** call the classifier on boundary inputs and paste the outputs before
+  writing what its rule is.
+- **Do:** treat your own retraction as an unverified claim needing the same
+  derivation the retracted one needed.
+- **Do:** read an alternating sequence of narrowings as evidence that nothing
+  has been derived yet, and stop revising to go measure.
+- **Don't:** compress a conjunctive rule into a single memorable clause.
+  The dropped conjunct is the counter-example.
+- **Don't:** let a reviewer's agreement with a retraction stand in for evidence, since a correction that is merely *less wrong* still passes review.
+
+(Measured on [Morrison-Lab/ai-config#3100](https://github.com/Morrison-Lab/ai-config/pull/3100), merged 2026-09-03.
+A docstring in `scripts/check-review-body.py` described when a `## Findings` heading forces a not-clean verdict.
+It went through four states, three of them wrong.
+Two of those revisions did call the classifier, and their messages report the run --- so a call is not by itself the fix.
+One of those two produced a wrong state anyway, because it ran the classifier on a single body and then generalized from that one answer.
+A single call confirms a verdict.
+Only a pair of inputs differing by one line separates one candidate rule from another.
+
+The original said the heading forces not-clean regardless of contents.
+The first retraction said `_findings_section_resolves_empty` exempts any section that says there are none --- which reversed the error rather than fixing it.
+The second stated the real two-part rule and then compressed it to a two-clause slogan saying prose is fine and bullets are not.
+That compression is false, because a line **opening** with a bold span re-flags.
+The second revision's own message also records a fifth guess, written on the way to it and never committed.
+The third state dropped the compression and cited the vetoing pattern by name.
+
+The rule the code implements, read off `_findings_section_resolves_empty` in `scripts/check-pr-fully-clean.py`, is a conjunction: the first non-empty line must match the resolving-trailer pattern **and** nothing finding-shaped may follow it.
+`_SECTION_FINDING_ITEM` supplies the second conjunct.
+Read the pattern rather than an enumeration of it --- summarizing it is what went wrong three times above.
+As of 2026-09-03, on `main` after #3100 merged, its alternatives were a bare severity or class tag with optional bold and bracket wrappers, a bullet or numbered item, a location marker, a blockquote, and any line opening with a bold span.
+That makes "prose is fine" unsafe rather than merely imprecise, for two reasons.
+A line carrying a bare tag vetoes with no bullet, bold, or bracket around it, so `Defect: ...` alone is enough.
+And the pattern matches those words as ordinary line-initial English rather than as tag usage, so a sentence opening "Note that everything was re-run" vetoes too, while the same content phrased "Everything was re-run" does not.
+Each of those is one call to the function away, on inputs differing by a single line.)
 
 ## An identifier search is evidence about the identifier, not about the thing it names
 

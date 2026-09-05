@@ -43,6 +43,16 @@ and about **mechanism**
 (whether a cache is ever read),
 in exactly the same shape.
 
+**The boundary in the other direction is worth naming, because this fragment is where a reader lands first and the rule they need may be elsewhere.**
+Every shape here begins with a substitution: you read A and the claim is about B.
+The neighbouring failure has no substitution in it at all --- the artifact is the right one, it is read correctly, and the sentence after the reading answers a question that artifact does not address.
+Nothing in this fragment fires on that, because there is no wrong object to name.
+[`metacognitive-monitoring`](metacognitive-monitoring.md)'s "A sound measurement does not license the claim standing next to it" is the rule for it.
+So when a check of yours came back clean and the claim still feels under-supported, ask which of the two is happening: whether you read the wrong thing, or read the right thing and then took a step.
+
+- **Do:** send a claim to that section instead of this one when the artifact is the correct one and the doubt is about the step taken from it.
+- **Don't:** read a shape here failing to match as evidence the claim is supported --- these shapes cover substitutions only.
+
 ## The four shapes
 
 Recognizable in advance, which is the point of enumerating them:
@@ -991,3 +1001,106 @@ Prefer a recent run, since an older one may predate the definition you just read
 - **Don't:** treat a pull request having merged as evidence its check names still describe the branch --- they described it at one instant, and a later merge can retire them without touching that pull request at all.
 
 See [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md), "A merged pull request's check names written into a live ruleset".
+
+## A PR's `MERGED` status is another shape, and it is not corroboration of content
+
+The sections above each name a claim about a PR that outlives the moment it was true.
+This one is the claim made *at* the merge itself: that a PR reading `MERGED` is evidence your reviewed, verdict-clean diff reached the default branch.
+
+It is not, for an ordinary reason that has nothing to do with the merge going wrong.
+A PR branch can be merged while carrying a stale head --- another session, an `@claude` auto-sync, a rebase gone half-finished --- so the commit that lands on `main` is not the commit whose review you read.
+Nothing about the merge fails: CI is green, the merge commit exists, GitHub reports success, and the PR page shows `MERGED` exactly as it would for a clean landing.
+The status is real; it answers "did a merge happen", not "did my content land".
+Confusing the two is the same substitution [`The four shapes`](#the-four-shapes) names elsewhere: the adjacent artifact (the PR's own state field) stands in for the one the claim is actually about (the tree at `origin/<default-branch>`).
+
+The detector is cheap and belongs right after every merge you drive, not only when something looks wrong:
+
+```bash
+git merge-base --is-ancestor <your-last-pushed-sha> origin/<default-branch> && echo ok
+git grep -c '<distinctive symbol from your diff>' origin/<default-branch> -- <path>
+```
+
+The ancestry check answers whether your commit is even in the merged history at all;
+the content grep answers the sharper question, since a squash merge can be an ancestor-check false negative (the SHA changes on squash) while still needing the grep to confirm the actual lines survived.
+Pick a symbol distinctive enough that a match means your specific change, not a coincidentally similar one nearby.
+
+Recovery is not "push the stale branch again."
+A branch that has drifted this far shows the merged base's *own* subsequent work as deletions when diffed against it, so reusing it re-proposes reverting content that was never yours to touch.
+Cut a fresh branch off the current default branch and re-apply just the lost pieces instead.
+
+- **Do:** after driving a PR to merge, grep `origin/<default-branch>` for a distinctive symbol from your diff and confirm your last pushed SHA is an ancestor of it.
+- **Do:** cut a fresh branch off the current default branch to recover lost content, rather than reusing a branch that has drifted behind it.
+- **Don't:** read `MERGED` as proof your content landed --- it is proof *a* merge happened, which is a claim about the PR's state field, not about the tree.
+- **Don't:** diff a long-stale branch against the current default branch and treat what it shows as your own missing work --- some of it is the default branch's newer content read backwards.
+
+(Measured 2026-09-04 on `Morrison-Lab/ai-config#3024`: the PR showed `MERGED`, but at another session's head commit rather than the one this session had pushed and had reviewed clean.
+Three pieces of reviewed work were silently lost --- an enumeration, two corrected docstrings, and a test arm --- with nothing red anywhere.
+Recovery was `Morrison-Lab/ai-config#3179`, cut fresh off `main` rather than off the stale branch, whose own diff against `main` showed `main`'s newer work as deletions.)
+
+## Existence of a mechanism is not reachability of it
+
+[`The four shapes`](#the-four-shapes) above names a counterpart that is **missing** ---
+a cache `save` with no `restore`, a marketplace entry with no install.
+This shape is the one where the counterpart is present, correct, and never reached.
+The clearing branch is in the source, it does exactly what it should,
+and the normal path never produces the input it reads ---
+so the mechanism is real and the behaviour it promises is unavailable.
+
+It is more convincing than the missing-counterpart case,
+because finding the code that would have prevented a false positive feels like having explained the false positive.
+Reading it produces a genuine and correct conclusion --- this guard clears on a terminal state ---
+and that conclusion is about the source rather than about the run.
+Existence and reachability are different claims,
+and confirming the first is exactly what checking the second would feel like.
+
+[`The test`](#the-test) above supplies the question, so ask it of reachability rather than of existence:
+what would have to be true for this mechanism never to fire,
+and does the normal path produce the input it matches on?
+Trace the input backwards to whatever emits it.
+Where the emitter is a command, read that command's actual output
+rather than assuming it carries the fields the matcher wants.
+
+- **Do:** name the producer of a mechanism's input, and read what that producer actually emits, before saying the mechanism works.
+- **Do:** treat "the clearing branch exists" as an answer about the source and an open question about the run.
+- **Don't:** close an incident on the strength of having found the code that should have prevented it.
+- **Don't:** read a matcher's field list as evidence those fields ever arrive --- a matcher is a claim about its input, not a supply of one.
+
+(Measured 2026-09-03, and the record is the rule applied to itself three times.
+A `Stop` hook demanded a per-HEAD reviewer request on an already-merged pull request.
+The hook was read, a terminal-state matcher was found in it,
+and the incident was written off as the guard behaving correctly given what it could see ---
+a claim about the source presented as a claim about the run.
+The first retraction asserted a *cause*:
+that `gh pr merge`'s own success output carries none of that matcher's fields,
+so merging without a later `--json state` probe would leave an obligation that can never discharge.
+Adversarial review refuted that from the source of `hooks/no-unreviewed-pr.py`,
+finding a second clearing branch --- `close_ident` ---
+that discharges a merge structurally, from the command's argv and exit status,
+with the terminal-state matcher reserved for a merge performed OUTSIDE the session.
+The second retraction adopted that reading, and was wrong in the identical way,
+because it too was reasoned from the code rather than run against the artifact.
+Running the hook's own `close_ident` on the command the session actually issued settles it:
+
+```python
+close_ident("ALLOW_MERGE=1 gh pr merge 3101 -R Morrison-Lab/ai-config "
+            "--squash --delete-branch 2>&1 | tail -3")
+# -> (False, None, None, False)
+```
+
+Two independent defeats, either sufficient alone.
+The environment-variable prefix makes the first token of the parsed argv something other than `gh`,
+so the structural recogniser rejects the command outright;
+and the merge is not the last simple command in the pipeline,
+which the call site treats as ambiguous rather than as a discharge.
+The idealized command with neither feature returns a clear,
+which is the value both retractions were reasoning about.
+So both clearing branches were reachable in principle and the run reached neither ---
+one defeated by the command's shape, the other never fed its input.
+[#3152](https://github.com/Morrison-Lab/ai-config/issues/3152) was filed on the first mistaken premise;
+the correction is posted on its thread.
+The lesson survives three wrong causes intact, and is sharper for them:
+reading a matcher tells you what it would accept, and reading a recogniser tells you what it would recognize.
+Neither tells you which branch this run took.
+Only running the reader against the exact artifact does, and
+[`mistake-patterns`](../../memories/mistake-patterns.md) Pattern 17 names that move ---
+which is worth stating twice, because it was cited in the same change that failed to perform it.)

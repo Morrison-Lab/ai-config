@@ -91,8 +91,9 @@ See [`git-diffing.md`](git-diffing.md) for diff-range selection
 (`..` vs `...` vs the working tree), diff-scoped check pitfalls
 (no-op-ing on an uncommitted diff, blindness to untracked files, an
 untracked copy shadowing a tracked script), `git rev-parse <ref>:<path>`
-echoing its own input on a missing path, and the pathspec-vs-glob /
-`for-each-ref`-vs-`ls-files` matcher mismatches.
+echoing its own input on a missing path, the pathspec-vs-glob /
+`for-each-ref`-vs-`ls-files` matcher mismatches, and which reads show a merge
+commit's own content (`git diff A...B` does, `git log -p` does not).
 
 ## Git tags
 
@@ -148,17 +149,157 @@ See [`git-tags.md`](git-tags.md) for tag management (force-moving/sliding tags a
 - Flagged on ai-config#186: the first draft of the harness-override instruction included
   `git branch -r` as the fallback; reviewer (claude-review bot) caught it.
 
+## Classify a bare `#NNNN` as issue or PR with `git ls-remote origin refs/pull/NNNN/head`
+
+Linking a bare `#NNNN` needs the right path segment,
+and the clone can decide it without `gh` and without an API token:
+GitHub keeps a `refs/pull/NNNN/head` ref for every pull request and none for an
+issue, so the remote answers the question directly;
+[`git-branches`](git-branches.md)'s
+"GitHub keeps `refs/pull/N/head` forever" section owns the persistence half
+and its measurement;
+the absence of such a ref for an issue is measured here.
+Measured 2026-09-03 against `origin` = `https://github.com/Morrison-Lab/ai-config`,
+on a machine with no `gh` on `PATH`:
+
+```console
+$ git ls-remote origin refs/pull/3129/head
+0137e26179d817dbc1d8af829d06f72dfc8e4760  refs/pull/3129/head   # non-empty -> PR
+$ git ls-remote origin refs/pull/3095/head
+                                                              # empty     -> issue
+```
+
+**Test the output for the classification, and the exit status for whether the query ran.**
+An empty result means **not a PR**, which for a reference you know exists means an issue;
+a number that exists as neither also comes back empty (`refs/pull/999999/head`, empty, exit 0),
+so confirm the number is real before writing the `/issues/` path.
+Both calls in the console block above exit 0.
+`ls-remote` reports "no such ref" as an empty result rather than as a failure,
+so `if git ls-remote ...; then` classifies every number as a PR.
+A non-zero exit means the query never answered:
+measured the same day, an unreachable host and a repository the credentials cannot read
+both exit 128 with empty output,
+so a classifier that reads only the output turns a network or credential failure
+into "issue" for every number.
+Stop on a non-zero exit instead of falling through.
+
+**The wrong path still resolves, which is why the distinction has to be
+derived rather than guessed.**
+GitHub 302-redirects in **both** directions ---
+measured the same day, `/issues/3129` to `/pull/3129`
+and `/pull/3095` to `/issues/3095`.
+So a mislabeled link is undetectable by following it,
+and a link checker that only asks whether a URL resolves can never report one.
+
+Two mechanics for the rewrite itself.
+Skip any number inside a code span, which is normally a quoted literal rather
+than a citation.
+And a bare `#NNNN` at column 0 is `markdownlint`'s MD018
+(`no-missing-space-atx`, "No space after hash on atx style heading"),
+measured with `markdownlint-cli2@0.23.0`;
+the link form `[#NNNN](...)` at line start avoids it,
+since the line no longer begins with `#`.
+
+This settles the **path** only.
+Which **repository** a bare `#NNNN` belongs to is a separate question, owned by
+[`citations`](../shared/writing/citations.md)'s
+"A bare `#NNN` is repo-relative" section and
+[`ambiguous-reference`](../shared/writing/ambiguous-reference.md)'s
+"A bare `#N` takes its repo from context";
+qualify as `owner/repo#NNNN` per those before choosing a path.
+
+- **Do:** classify with `git ls-remote origin refs/pull/NNNN/head`,
+  branching on whether the output is empty.
+- **Do:** write a line-initial reference as `[#NNNN](...)`, which keeps MD018
+  quiet.
+- **Do:** stop on a non-zero exit, which means the remote never answered.
+- **Don't:** branch on a zero exit --- it is 0 for a hit and for a miss alike.
+- **Don't:** treat a resolving link as confirmation of the path;
+  GitHub redirects both ways.
+- **Don't:** rewrite a `#NNNN` that sits inside a code span.
+
+(Refs [ai-config#3129](https://github.com/Morrison-Lab/ai-config/pull/3129),
+the source PR;
+the classification was derived while linking that PR's bare references.)
+
+## A fetch by SHA needs the full 40 characters, and a shallow clone's `--is-ancestor` is bounded by its depth
+
+Two instruments whose failure reads as an answer about the *remote*
+while each answers something narrower:
+one, when its argument is shorter than 40 characters, says only whether that argument is a ref name,
+the other only what the *clone* has fetched.
+Both produced the same false claim twice on one PR,
+that three commits were "fetchable from no remote ref",
+when every one of them was an ancestor of a ref that `origin` still advertised.
+
+**`git fetch origin <sha>` takes the full 40-character SHA and nothing shorter.**
+A non-40-hex argument is resolved as a ref name, never as a `want`,
+so the failure is git's own and says nothing about whether the commit is on the remote.
+A short SHA fails with `fatal: couldn't find remote ref <sha>`,
+and it fails the same way for a commit that is the tip of an advertised ref.
+The same fetch with the full SHA succeeds on GitHub for any commit reachable on the server,
+which is [`claude-code-consumer-wiring`](claude-code-consumer-wiring.md)'s
+"any reachable commit" note from the other side.
+
+```console
+$ git fetch origin eb0cf15e
+fatal: couldn't find remote ref eb0cf15e
+$ git fetch origin eb0cf15e891c386be69c85643bd57b89f5fb2a60
+From https://github.com/Morrison-Lab/ai-config
+ * branch              eb0cf15e891c386be69c85643bd57b89f5fb2a60 -> FETCH_HEAD
+$ git fetch origin 0000000000000000000000000000000000000001
+fatal: remote error: upload-pack: not our ref 0000000000000000000000000000000000000001
+```
+
+So the fetch's own error text is the test:
+`couldn't find remote ref` means the remote has no ref by that name (retry with all 40 characters),
+and `upload-pack: not our ref` means the remote would not serve that object.
+GitHub returns the second string on protocol v2 and v0 alike.
+A plain local-path remote on v0 says `Server does not allow request for unadvertised object` instead,
+because its advertisement carries no `allow-*-sha1-in-want` capability and git refuses before sending a `want`;
+the same fetch succeeds on v2, the default, which has no such client-side gate.
+Neither `couldn't find remote ref` nor `Server does not allow request for unadvertised object` means the object is absent.
+
+**`git merge-base --is-ancestor A B` and `git rev-list --count B`
+on a shallow clone answer for the fetched depth.**
+In the incident's clone `git rev-list --count f9068299` returned 1
+and `--is-ancestor` failed for three real ancestors
+(`fatal: Not a valid commit name <sha>` at exit 128 while the ancestor's object is absent from the clone,
+a quiet exit 1 once it is present),
+because the walk stopped at the graft
+(the section above on `git log -S` describes the same stop).
+A ranged count is bounded the same way:
+`origin/main..f9068299` still walks back from `f9068299`, which is itself a graft,
+so the range returned 1 in that clone too.
+`git fetch --depth=200 origin refs/pull/3060/head` made `--is-ancestor` succeed for all three,
+so the earlier answer was about what had been fetched.
+
+- **Do:** fetch by the full SHA,
+  and read a short-SHA failure as "not a ref name", not as "not on the remote".
+- **Do:** run `git rev-parse --is-shallow-repository` before an ancestry or count query;
+  when it prints `true`, deepen the fetch (or fetch the ref itself) for an ancestry query,
+  and `git fetch --unshallow` for a total count, since no depth picked in advance is known to reach the root.
+- **Don't:** write "not fetchable" or "reachable from no remote ref"
+  from a short-SHA fetch or a shallow-clone walk;
+  a full-SHA fetch, or the ref walk on a deepened fetch, is the measurement.
+
+(Measured 2026-09-03 on git 2.43.0, the incident in a remote session's shallow clone
+and the local-path reproduction in a scratch repo,
+while driving [ai-config#3154](https://github.com/Morrison-Lab/ai-config/pull/3154);
+the claude-review round at `e698c456` caught the claim
+by fetching `refs/pull/3060/head` live from origin and walking it.)
+
 ## Git branch create/reset (`git switch -C`)
 - `git switch -C "$BRANCH"` is already safe against flag-shaped branch names: `$BRANCH` is the argument *to* `-C`, so a value like `--weird` fails cleanly as `fatal: '--weird' is not a valid branch name` rather than being parsed as an option.
-- Do NOT "harden" it to `git switch -C -- "$BRANCH"` — that form is **broken**:
+- Do NOT "harden" it to `git switch -C -- "$BRANCH"` --- that form is **broken**:
   the `--` is consumed as the branch name (the required argument to `-C`), so `$BRANCH` is parsed as the start-point instead and the command fails without creating the branch.
   (Verified on git 2.x;
 a review bot suggested the broken form on Morrison-Lab/gha#58.)
 
-## Git — `merge --continue` takes no arguments
+## Git --- `merge --continue` takes no arguments
 - `git merge --continue --no-edit` fails with `fatal: --continue expects no arguments`.
 - After resolving conflicts and staging (`git add <files>`), use `git merge --continue` alone.
-- In a non-interactive (headless) session git uses the auto-generated merge commit message without prompting — no editor opens.
+- In a non-interactive (headless) session git uses the auto-generated merge commit message without prompting --- no editor opens.
 
 ## Git merge --- editing away the conflict markers is not resolving the conflict
 - Rewriting a conflicted file to remove `<<<<<<<`/`=======`/`>>>>>>>` leaves it
@@ -242,6 +383,52 @@ whether `Lacaedemon/sparta`'s vendored `.ai-config` submodule pin was actually
 stale on `origin/main`, vs. only stale on the current feature-branch worktree
 — see the `CLAUDE.md` "Keep ai-config and repo checkouts fresh" step 4 update
 this same session added. `Lacaedemon/sparta`, 2026-07-04.)
+
+## `git checkout <name>` prefers an existing local branch over a same-named file, and does not refuse
+
+When a token could name either a local branch or a tracked file, git does not
+treat the collision as ambiguous and does not ask for `--` to disambiguate.
+It picks the branch.
+
+Measured on git 2.50.1: with both a tracked file `base.txt` and a local branch
+`base.txt` in the same repository, `git checkout base.txt` answers
+`Switched to branch 'base.txt'`, silently, with no warning about the file of
+the same name.
+git's own actual precedence, confirmed by this measurement, is:
+
+1. A token `git check-ref-format` cannot accept as a ref component --- `.`,
+   `..`, or a token starting `./`, `../`, or `/` --- is a pathspec outright;
+   no branch lookup even applies.
+2. Otherwise, a token naming an **existing local branch** selects that
+   branch, even when a same-named file also exists.
+3. Only then does an on-disk path make the token a pathspec.
+
+This contradicts a plausible-sounding assumption: that a branch and a path of
+the same name is the one case git refuses without `--`, forcing the caller to
+disambiguate.
+It does not refuse.
+It resolves silently, and in the direction most callers would not guess
+without measuring.
+
+- **Do:** measure git's actual disambiguation order before writing code or
+  docs that depend on it, rather than reasoning from "ambiguous inputs get
+  refused" as a general git property.
+- **Do:** treat an existing local branch as taking precedence over a
+  same-named tracked file in any `checkout`/`switch`-adjacent logic.
+- **Don't:** assume a name collision between a branch and a file is refused
+  by git --- write `--` explicitly when you mean the file, since git will not
+  ask.
+
+(Measured 2026-09-05 while writing `hooks/flag-stale-branch-mutation.py`
+(ai-config#3205): the hook's own docstring asserted the false claim above as
+its justification for treating a branch/file collision as ambiguous and
+resolving it in git's non-preferred direction, which dropped a real explicit
+branch selection from the session's tracked state and made the next ordinary
+commit warn --- the same false positive the heuristic existed to prevent,
+reached from the opposite side.
+See [`fact-check-code-logic.md`](../shared/coding/fact-check-code-logic.md)'s
+"A false rationale can also be load-bearing" section for the general lesson
+this is an instance of.)
 
 ## `git checkout <branch> 2>/dev/null; <next>` silently continues on the wrong branch
 
@@ -431,9 +618,92 @@ c10ed45                  fix: exclude artifact outputs from provenance (#449)  <
 So the safe default is to cite what survives **every** strategy: the PR or
 issue number, a permalink to the file at a merged commit, or the CI job URL.
 Reach for a branch SHA only when the merge has already happened and you have
-checked that specific commit with `git merge-base --is-ancestor`.
+checked that specific commit with `git merge-base --is-ancestor` --- or, when
+that check fails, only alongside the PR number, per the section below.
 
-That is not a hypothetical.
+**A pre-squash SHA is unreachable, not absent, and the difference decides the
+remedy.**
+`refs/pull/<N>/head` survives the squash and the branch deletion.
+What a squash removes is *ancestry*: nothing under `refs/heads/*` reaches those
+objects, and the default fetch refspec is `+refs/heads/*:refs/remotes/origin/*`,
+so a fresh clone never downloads them and `git show <sha>` fails there with an
+unknown-revision error.
+
+**Settle reachability against the remote, never against your own ref set.**
+`git for-each-ref --contains` is the wrong probe here, because it answers a
+question about your own ref set rather than about a fresh clone: it scans
+every local ref, so a pre-squash SHA any local ref still holds comes back
+reachable.
+Its two answers, both measured on git 2.50.1, differ by whether the object is
+in the local store.
+Present but on no local ref's ancestry --- the ordinary state after a
+squash-merge and branch deletion --- it exits 0 with zero bytes of output,
+which reads as "no ref reaches this" even when `refs/pull/<N>/head` carries it
+on the remote.
+That reading is the one [#3275](https://github.com/Morrison-Lab/ai-config/issues/3275)
+made.
+Absent, the fresh-clone case, it does not report unreachable at all: it exits
+129 with `error: no such commit <sha>`, which reads like a mistyped SHA.
+
+```bash
+git merge-base --is-ancestor <sha> origin/<default>   # 0 = a fresh clone reaches it
+git ls-remote origin "refs/pull/<N>/head"             # non-empty = the REF exists; says
+                                                      # nothing about your <sha>
+git fetch origin "refs/pull/<N>/head" && git show <sha>
+```
+
+`--is-ancestor` needs the object present locally to answer at all, so run it
+after the fetch when the SHA does not resolve yet.
+
+So a pre-squash SHA *is* citable, provided you say where to fetch it from.
+Name the PR beside the SHA and the reader has the ref; give the bare SHA and
+they get an error that reads like a typo.
+
+**What `refs/pull/<N>/head` cannot recover is anything off the final head's
+ancestry.**
+That ref points at the PR's final head, so it reaches that head and its
+ancestors and nothing else.
+Anything a force-push removed from that line --- a message that was amended, a
+commit dropped or reordered in a rebase, an intermediate squashed away --- is
+on no ancestry at all, so no ref reaches it and no fetch brings it down.
+There the honest record says so, rather than citing a SHA and leaving the
+reader to discover there is nothing to fetch.
+`shared/writing/fact-check-prose.md`'s "When each rewrite is refuted on a NEW
+clause" section is what that costs when the record tries to reconstruct it
+anyway.
+
+- **Do:** cite the squash commit on the default branch when one exists.
+- **Do:** name the PR number beside any pre-squash SHA, so the reader knows to
+  fetch `refs/pull/<N>/head` first.
+- **Do:** settle reachability with `git merge-base --is-ancestor <sha>
+  origin/<default>`, whose answer is the one a fresh clone gets.
+- **Don't:** settle it with `git for-each-ref --contains`, which scans your own
+  refs and so answers a different question than a fresh clone would.
+- **Don't:** write a bare pre-squash SHA into durable guidance --- it resolves
+  in your checkout and errors in a fresh clone, and the error looks like a
+  typo.
+- **Don't:** cite a SHA that a force-push took off the final head's ancestry;
+  `refs/pull/<N>/head` does not reach it, and no ref does.
+
+(Morrison-Lab/ai-config#3180, 2026-09-04, which broke this rule in two of its
+own passages --- `fully-clean.md` and `check-pr-fully-clean.py` both cited
+`16544c50` and `7e1294b0`, pre-squash heads of #3167, caught in `7a797d3f8`,
+which is itself pre-squash on #3180 --- so the two SHAs and the commit that
+caught them are fetched from different refs.
+A pre-existing instance is open as
+[#3275](https://github.com/Morrison-Lab/ai-config/issues/3275), whose
+conclusion stands and whose stated reasoning does not: it argues from a
+`for-each-ref` reading that the object survives only in one checkout, which is
+the misconception this section corrects.
+[`grep-is-not-coverage`](../shared/workflow/grep-is-not-coverage.md) carries
+the measured recipe on a different PR: `git ls-remote origin
+refs/pull/3060/head` returns `f9068299`, the default refspec is
+`+refs/heads/*:refs/remotes/origin/*` in the measuring clone so that ref is
+not brought down, and the record anchors instead on commits that
+`git merge-base --is-ancestor ... origin/main` accepts.)
+
+That a repository's merge strategy is chosen per pull request, and so cannot
+be read off the last one, is not a hypothetical.
 This entry originally cited `082f369` as a still-reachable example, on the
 strength of #453 having merged as a merge commit --- and #456 then
 squash-merged, so `git merge-base --is-ancestor 082f369 origin/main` returns
@@ -601,6 +871,61 @@ Tracked as [ai-config#2981](https://github.com/Morrison-Lab/ai-config/issues/298
 - **Don't:** export `ALLOW_UNREVIEWED_PUSH=1` for the whole session to work
   around the false positive; that also waives the guard for the real push.
 
+## `git push`'s option-argument grammar: required vs optional vs boolean vs clustered
+
+Measured on git 2.50.1 while writing `hooks/flag-conflict-with-base.py`'s
+argument parser (ai-config#3175).
+Four distinct shapes, and confusing them misresolves which token is the
+option's value and which is the positional remote:
+
+1. **Required argument.**
+   Accepts the space form even where the manual's synopsis prints only the
+   `=` form.
+   `--recurse-submodules on-demand` consumes `on-demand` as the value; the
+   manual shows `--recurse-submodules=check|on-demand|only|no` and nowhere
+   shows the space form, but git's `parse-options` accepts it for every
+   option whose argument is required.
+   Reading the manual's synopsis alone and concluding the space form is
+   invalid is the trap: the discriminator is required-vs-optional, not what
+   the page happens to print.
+2. **Optional argument.**
+   Takes a value only in its `=` form; the space form does not attach it, so
+   the next token is read as something else entirely (typically the
+   positional remote).
+   `--force-with-lease` and `--signed` are both this shape: `git push
+   --force-with-lease origin main` targets `origin`, not
+   `--force-with-lease`'s own value.
+3. **Pure boolean.**
+   Takes no value in any form, and is not a variant of the optional-argument
+   case even though both never consume a following token.
+   `--[no-]force-if-includes` is this shape --- git's own synopsis marks it
+   `[--force-if-includes]` with no `=` anywhere, unlike
+   `--force-with-lease[=<refname>[:<expect>]]` right beside it.
+4. **Clustered short options.**
+   A short option can arrive bundled with others in one token, and a
+   value-taking letter consumes the rest of that token (or the next token,
+   if it ends the cluster).
+   `-fo ci.skip` is git's own parse of `-f -o ci.skip`; a check for the exact
+   token `-o` misses it, since `-o` never appears as its own argv entry.
+
+- **Do:** classify a `git push` option as required-argument,
+  optional-argument, or pure-boolean before deciding whether it can take a
+  space-separated value --- the manual's synopsis alone under-determines the
+  first case and over-determines the third.
+- **Do:** walk a short-option cluster letter by letter when parsing `git
+  push` argv, so a bundled value-taking letter is not read as a bare flag.
+- **Don't:** assume an option prints its exact accepted forms in the
+  manual's synopsis line --- `--recurse-submodules=check|on-demand|only|no`
+  omits a form git actually accepts.
+- **Don't:** treat `--force-if-includes` as a third instance of the
+  optional-argument shape merely because it also takes no space-separated
+  value; it has no `=` form at all, which the other two do.
+
+(Measured 2026-09-05, `Morrison-Lab/ai-config#3175`: two review rounds each
+corrected one of these confusions in the same parser --- `--recurse-submodules`
+was first excluded from the value-consuming set on the false belief that only
+its `=` form was valid, then `--force-if-includes` was grouped with the
+optional-argument options it does not share a grammar with.)
 
 ## `git commit --amend` after a merge amends the MERGE, and the result reads as a duplicate commit
 
@@ -642,3 +967,50 @@ Where the amend also changes content, the equality no longer holds and `git diff
 - **Do:** assert tree-hash equality across a message-only rewrite.
 - **Don't:** read two same-titled consecutive commits as a duplicate to drop;
   check the parent count first.
+
+## Probing git's own argument parsing in-session: `git push --dry-run` is exempt from the self-review guard; `-h` is not
+
+`hooks/no-push-without-self-review.py` reuses `no-unreviewed-pr.py`'s
+`_argv_push`/`_push_re_heads` classification, which excludes `--dry-run`/`-n`
+and `--delete`/`-d` outright: neither re-heads a branch, so there is nothing
+for a self-review to have covered, and the guard never even reaches the
+verdict check for them.
+That makes `git push --dry-run` (optionally against a scratch repository, or
+`--repo=/nonexistent` to guarantee no network contact) the sanctioned way to
+observe git's own push behaviour --- which remote it resolves, which option
+consumes a value --- from inside a session that has not yet dispatched a
+self-review, without needing the override or a real push.
+The guard's own docstring uses exactly this form to document its measurements
+(`git push --dry-run --repo=/nonexistent origin main`).
+
+`-h`/`--help` is not on that exclusion list.
+It prints usage and touches no ref, so it is exempt for the same reason
+`--dry-run` is, but the classifier does not special-case it, so a bare `git
+push -h` with no prior clean verdict in the transcript is blocked exactly
+like a real push.
+
+`man git-push` is not a safe substitute for measuring, either.
+Its synopsis for `--recurse-submodules` prints only the `=` form
+(`--recurse-submodules=check|on-demand|only|no`), while git's `parse-options`
+accepts the space form for any required-argument option --- see this file's
+"`git push`'s option-argument grammar" section.
+A manual read settles what an option *means*; only running the command settles
+what forms it *accepts*.
+
+- **Do:** use `git push --dry-run` (against a scratch repository or a
+  nonexistent path when network contact must be avoided) to measure git's own
+  push-argument behaviour in-session, ahead of a self-review dispatch.
+- **Do:** treat a manual page as a starting hypothesis about accepted option
+  forms, and confirm it against a real invocation before relying on it.
+- **Don't:** run `git push -h` expecting it to be exempt like `--dry-run` ---
+  it is not on the guard's exclusion list and gets refused like a real push
+  with no clean verdict on record.
+- **Don't:** read the manual's synopsis line as the complete set of forms an
+  option accepts.
+
+(Measured 2026-09-05 while writing `hooks/flag-conflict-with-base.py`'s
+argument parser, `Morrison-Lab/ai-config#3175`: `git push -h` was blocked
+mid-session with no self-review yet dispatched, and `git push --dry-run
+--repo=/nonexistent origin main` was the fallback that measured git's `--repo`
+precedence without a real push or the override.)
+

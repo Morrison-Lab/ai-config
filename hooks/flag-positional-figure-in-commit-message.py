@@ -133,8 +133,10 @@ falling back to a local copy of the patterns and logging why.
 
 WARNS, never blocks. Emits `hookSpecificOutput.additionalContext` plus a
 single-line `systemMessage`; never a `permissionDecision`. Fires once per
-distinct (transcript, message, figure) via a `/tmp` sentinel, so a retried
-identical commit does not nag twice.
+distinct (transcript, COMMAND, figure) via a `/tmp` sentinel, so a retried
+identical commit does not nag twice. The command rather than the message:
+`git commit -m X` and `git commit -am X` carry the same message and the
+same figure, and each warns.
 
 See `hooks/test-flag-positional-figure-in-commit-message.py` for the fixtures.
 """

@@ -173,8 +173,11 @@ def run(payload, extra_args=(), cwd=None):
     """Run the hook end-to-end; return the parsed stdout payload, or {}.
 
     A FRESH `TMPDIR` per call: the fire-once sentinel lives in
-    `tempfile.gettempdir()`, and several cases below commit the same message,
-    so a sentinel written by one would silently suppress a later one.
+    `tempfile.gettempdir()`, so a sentinel written by one case could suppress
+    a later one. Defence rather than a fix for a live collision -- the key is
+    the whole command and all 45 cases carry distinct commands, so no
+    suppression is possible today. It keeps a future case that reuses a
+    command from being silently skipped.
     """
     tpath = write_transcript([PROMPT])
     tmpdir = tempfile.mkdtemp()
@@ -273,10 +276,9 @@ def check_deleted_cwd():
     payload with no `cwd` has to sit inside the guarded block -- otherwise
     a deleted working directory -- the one condition the hook cannot see
     coming -- would break the invariant this pins: once a payload is in
-    hand, handling it exits 0 without a traceback. That invariant is
-    narrower than the FAILS SILENT ON EVERY PARSE FAILURE heading, which
-    does not cover a deleted working directory because it is not a parse
-    failure.
+    hand, handling it exits 0 without a traceback. The FAILS SILENT ON EVERY
+    PARSE FAILURE heading does not cover this case, because a deleted working
+    directory is not a parse failure.
     """
     tpath = write_transcript([PROMPT])
     gone = tempfile.mkdtemp()
@@ -351,7 +353,12 @@ def check_dry_run():
 
 
 def check_sentinel():
-    """Once per distinct message: the second identical commit is silent."""
+    """Once per distinct COMMAND: the second identical commit is silent.
+
+    The key is the command, not the message -- `-m X` and `-am X` share a
+    message and a figure and each warn. This case only exercises the
+    identical-command path, so its label must not claim the wider one.
+    """
     tpath = write_transcript([PROMPT])
     tmpdir = tempfile.mkdtemp()
     try:
@@ -367,7 +374,7 @@ def check_sentinel():
         shutil.rmtree(tmpdir, ignore_errors=True)
         os.unlink(tpath)
     ok = "systemMessage" in first and not second.strip()
-    print(f"{'ok  ' if ok else 'FAIL'}  warns once per distinct message")
+    print(f"{'ok  ' if ok else 'FAIL'}  warns once per distinct command")
     return 0 if ok else 1
 
 

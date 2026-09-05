@@ -489,8 +489,7 @@ Tracked as [#3271](https://github.com/Morrison-Lab/ai-config/issues/3271).)
 - **Do:** derive that list from the text, and expect it to be longer than the one you would have written from memory.
 - **Do:** extend the check to sibling files the same change touches, since the citing file is where an unhedged restatement lands.
 - **Don't:** grep for the hedge's wording and call the passage consistent --- a break restates the claim in words the hedge never used.
-- **Don't:** assume a break implies a later edit;
-  the hedge and the sentence that breaks it are routinely written in one commit.
+- **Don't:** assume a break implies a later edit, and so skip a passage nothing has touched since --- one measured instance had the hedge and the break written in the same commit, which retires the ordering heuristic without supporting any claim about how often that happens.
 
 ## Check that a stated trigger actually fired
 

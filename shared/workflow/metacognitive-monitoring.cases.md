@@ -736,7 +736,7 @@ That is the **scope** claim-type from the top of this fragment, committed inside
 Which is the transferable part: knowing a rule, and having just been burned by it, does not arm the check.
 Only asking what kind of claim a sentence is arms it, and "the two sections above" does not feel like a claim at all --- it feels like navigation.
 
-## One session, five conclusions taken one step past a real artifact
+## One session, five wrong conclusions drawn from artifacts that were all real
 
 `Morrison-Lab/ai-config` and `ucdavis/rampp`, 2026-09-02/04.
 Five instances, spanning ["A sound measurement does not license the claim standing next to it"](metacognitive-monitoring.md#a-sound-measurement-does-not-license-the-claim-standing-next-to-it) and [`verify-the-right-artifact`](verify-the-right-artifact.md), and worth recording as a set rather than as five bullets --- not because they share a taxonomy, since they do not, but because what they share is invisible in any one of them.
@@ -767,7 +767,7 @@ A real directory carrying a real stale constant, and not the copy the later capt
 Twenty distinct hook command lines captured over 240 seconds, all from `$HOME/.claude/hooks/` and none from a plugin root, read as showing the plugin path inert.
 The sample is sound;
 its population is the complement of what it was aimed at, because the hook of interest could not fire during the window.
-This is the one the fragment's new sub-case is written from, and the most reusable of the five: a sample drawn when the event of interest is impossible looks identical to a sample that found nothing.
+This is the one [`metacognitive-monitoring`](metacognitive-monitoring.md)'s new sub-case is written from, and the most reusable of the five: a sample drawn when the event of interest is impossible looks identical to a sample that found nothing.
 
 **Instance 4 --- a resolved path, extended into a lifetime claim and a remedy.**
 A `ps` capture correctly resolved the path of the copy that fired during that capture.

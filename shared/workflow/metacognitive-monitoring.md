@@ -1038,8 +1038,8 @@ So state the event a sample is meant to catch, and confirm the window could have
 Where the event is something you can cause --- a guard you can trigger, a request you can send, a job you can re-run --- cause it inside the window rather than waiting for it, which converts the sample from an observation into a test.
 Where you cannot, report the sample as evidence about the population it did enumerate, and say in the same sentence that the target event did not occur in it.
 
-(Measured 2026-09-04, ai-config[#3141](https://github.com/Morrison-Lab/ai-config/issues/3141).
-A `ps` sample captured 20 hook command lines, all from `$HOME/.claude/hooks/` and none from a plugin root, and was read as showing the plugin registration path inert.
+(Measured 2026-09-03, ai-config[#3141](https://github.com/Morrison-Lab/ai-config/issues/3141).
+A 240-second `ps` sample captured 20 distinct hook command lines, all from `$HOME/.claude/hooks/` and none from a plugin root, and was read as showing the plugin registration path inert.
 `hooks/no-unreviewed-pr.py` never fired during that window, so the sample is evidence about the registration path in general and none about the firings in question.
 The same session settled which copy fires when the guard is deliberately triggered, by the opposite procedure: `ps -eo args` sampled at 0.05s **while causing the event** named a copy under `~/Library/Application Support/Claude/local-agent-mode-sessions/` that no pass had looked at.
 Whether that same copy served the earlier firings is not established, and [`keep-checkouts-fresh`](keep-checkouts-fresh.md) says so where it records the capture --- so the remedy below is "cause the event inside the window", not "one capture settles the question".
@@ -1141,7 +1141,7 @@ the two propositions are a verified **mechanism** and an unverified
 **instance** asserted to fall under it, "A mechanism verified, an unverified
 population asserted to fall under it".
 
-A second five-instance set, 2026-09-02/04, is recorded there as "One session, five conclusions taken one step past a real artifact".
+A second five-instance set, 2026-09-02/04, is recorded there as "One session, five wrong conclusions drawn from artifacts that were all real".
 Those five do not all fall under this section --- two are [`verify-the-right-artifact`](verify-the-right-artifact.md) substitutions and one is a plain misread --- and the record is worth reading for what they share instead: in each, the erroneous step felt like *reading* the evidence rather than adding to it, which is what carried every one of them through self-review.
 
 ## Writing is the instrument, when the claim can be wrong

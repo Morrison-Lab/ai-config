@@ -572,13 +572,14 @@ c10ed45                  fix: exclude artifact outputs from provenance (#449)  <
 So the safe default is to cite what survives **every** strategy: the PR or
 issue number, a permalink to the file at a merged commit, or the CI job URL.
 Reach for a branch SHA only when the merge has already happened and you have
-checked that specific commit with `git merge-base --is-ancestor`.
+checked that specific commit with `git merge-base --is-ancestor` --- or, when
+that check fails, only alongside the PR number, per the section below.
 
 **A pre-squash SHA is unreachable, not absent, and the difference decides the
 remedy.**
-GitHub keeps a PR's commits permanently under `refs/pull/<N>/head` --- closing
-the PR and deleting the branch do not remove them --- so
-`git ls-remote origin refs/pull/<N>/head` resolves long after the squash.
+`refs/pull/<N>/head` survives the squash and the branch deletion: measured on
+#3060, `git ls-remote origin refs/pull/3060/head` still returns `f90682991`
+long after that PR merged and its branch was removed.
 What a squash removes is *ancestry*: nothing under `refs/heads/*` reaches those
 objects, and the default fetch refspec is `+refs/heads/*:refs/remotes/origin/*`,
 so a fresh clone never downloads them and `git show <sha>` fails there with an
@@ -607,13 +608,15 @@ So a pre-squash SHA *is* citable, provided you say where to fetch it from.
 Name the PR beside the SHA and the reader has the ref; give the bare SHA and
 they get an error that reads like a typo.
 
-**One thing `refs/pull/<N>/head` cannot recover: a commit message that was
-amended away.**
+**What `refs/pull/<N>/head` cannot recover is anything off the final head's
+ancestry.**
 That ref points at the PR's final head, so it reaches that head and its
 ancestors and nothing else.
-An amended message leaves its predecessor on no ancestry at all, so it is
-unfetchable by anyone --- which is the case where the honest record says the
-message does not survive, rather than citing a SHA no reader can reach.
+Anything a force-push removed from that line --- a message that was amended, a
+commit dropped or reordered in a rebase, an intermediate squashed away --- is
+on no ancestry at all and is unfetchable by anyone.
+There the honest record says the commit does not survive, rather than citing a
+SHA no reader can reach.
 `shared/writing/fact-check-prose.md`'s "When each rewrite is refuted on a NEW
 clause" section is what that costs when the record tries to reconstruct it
 anyway.
@@ -629,11 +632,11 @@ anyway.
 - **Don't:** write a bare pre-squash SHA into durable guidance --- it resolves
   in your checkout and errors in a fresh clone, and the error looks like a
   typo.
-- **Don't:** cite a SHA for a message that was amended away; `refs/pull/<N>/head`
-  does not reach it, and no ref does.
+- **Don't:** cite a SHA that a force-push took off the final head's ancestry;
+  `refs/pull/<N>/head` does not reach it, and no ref does.
 
-(Morrison-Lab/ai-config#3180, 2026-09-04, which shipped this rule and then
-broke it in two of its own passages --- `fully-clean.md` and
+(Morrison-Lab/ai-config#3180, 2026-09-04, which broke this rule in two of its
+own passages --- `fully-clean.md` and
 `check-pr-fully-clean.py` both cited `16544c50` and `7e1294b0`, pre-squash
 heads of #3167, caught in `7a797d3f8`.
 A pre-existing instance is open as

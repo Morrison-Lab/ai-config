@@ -1016,6 +1016,13 @@
             "timeout": 10,
             "script": "flag-config-deletion-without-ref-check.py",
             "why": "ai-config#3096 -- a reply recommended `find \"$HOME/.claude/hooks\" -name '*.py' -delete` over what was the LIVE guard set (settings.json registered 46 of those files by explicit path). A content diff had been run, so the removal felt sanctioned; the question never asked was what POINTS AT the files. Warns rather than blocks: the condition cannot tell an orphan from a registered file without reading the config, and the point is to prompt that read."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-nonconvergent-review.py\"",
+            "timeout": 10,
+            "script": "flag-nonconvergent-review.py",
+            "why": "An adversarial review loop whose findings stop narrowing, or whose categories recur across rounds, is not converging; warns once per round asking whether the design is wrong rather than the implementation (measured 2026-09-04/05: two loops of fifteen and four rounds in one session)."
           }
         ]
       }

@@ -495,6 +495,51 @@ to mutate away from.
 See [`fact-check-code-logic.cases.md`](fact-check-code-logic.cases.md),
 "Mutate the fix, not only the test --- a fixture ordered like the table".
 
+### A test that legitimately passes both ways still has to say so
+
+**Misleading label**, above, is a test whose name overstates what it checks.
+This is the case that survives even a careful author: a test whose assertion
+is exactly right, that genuinely and correctly passes against both the old
+code and the new, and whose comment says nothing about that --- so its
+placement, sitting next to a set of ordinary regression cases, implies a
+property the test does not have.
+
+A reader who assumes every case in a suite is a regression case (fails on the
+old code, passes on the new) will not re-derive which ones are not, and two
+different tests earn this label for two different reasons.
+One guards against an over-correction: a narrower fix that only handles the
+exact case a proof-of-concept exposed would pass this test, and a wrong fix
+that reverts too far would fail it, so it discriminates between "fixed
+correctly" and "fixed too narrowly" even though it cannot discriminate
+"fixed" from "never broken."
+The other is a genuine coincidence, the **Coincident fixture** mechanism
+above, where a specific fixture happens to make two code paths agree.
+Both are worth keeping.
+Neither is a regression test, and the fix for both is the same: state in the
+test's own comment which case it is, rather than letting silence imply the
+default.
+
+- **Do:** write, in the test's own comment, whether it is a regression case,
+  an over-correction guard, or a documented coincidence --- three different
+  claims, and a reader cannot tell which one a passing assertion is making.
+- **Do:** verify a claimed over-correction guard the way the mutation
+  section above verifies a regression test: describe the narrower, wrong fix
+  it is meant to catch, and confirm that fix actually fails it.
+- **Don't:** delete a test because it passes against both the old and the new
+  code --- that is evidence it needs a comment, not evidence it needs
+  removing; see the DELETION section below for what a green suite can and
+  cannot tell you about redundancy.
+- **Don't:** let a dual-passing test sit unlabeled next to regression cases in
+  the same block; a reader triaging a failing suite will read it as one.
+
+(Morrison-Lab/ai-config#3168, 2026-09-05: a proof-of-concept test for a
+guard's attribution bypass was paired with a second case built from the same
+inputs but a different result ordering.
+The second case passed against the pre-fix hook too --- there, an earlier
+result had already emptied the queue the second one reads, so it authorized
+nothing by accident rather than by the fix's design --- and its own comment
+says exactly that, rather than presenting it as a second regression case.)
+
 ### A misleading test label also licenses a DELETION, which is the direction with no mutation available
 
 The **Misleading label** entry above treats a test name that overstates its

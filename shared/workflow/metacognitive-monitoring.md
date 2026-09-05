@@ -335,6 +335,58 @@ The two sections above find a state claim hidden inside a recommendation.
   not diagnosed yet; that is a second unchecked claim, invented to account for
   the first.
 
+## A claim written to SUPPORT an argument gets checked less than one written to MAKE one
+
+A prose assertion --- "this file contains X" --- reads as a claim and invites
+the re-query the section above prescribes.
+The identical claim, sitting inside a parenthetical offered as evidence for a
+different point, does not read that way: it reads as a detail, and a detail
+is not where the checking instinct goes looking.
+
+This is the same state-claim failure the file's other sections name, with one
+new variable: **position**, not content, is what suppressed the check.
+
+Measured 2026-09-05, on a session that had spent hours in the same sitting
+finding and fixing exactly this defect in other people's work --- an
+imaginary hook (Morrison-Lab/ai-config#3189), a citation naming a file that
+did not carry the claim (#3269), a fabricated quotation attributed to a
+hook's docstring (#3293).
+Writing a code comment to justify why a permission guard must fail closed
+under ambiguity, the same session asserted that a specific file
+(`docs/opencode-hook-mapping.md`) "carries verdict-shaped example strings" as
+supporting evidence that the failure mode arises with nobody attacking.
+It does not: `grep -ic "verdict\|reviewed-commit"` on that file returns 0 in
+every revision.
+The argument itself was sound and needed no such example --- any subagent
+output rendering an example of the guard's own report format reaches the same
+state --- so the fabricated citation was not load-bearing, only decorative,
+and it was still wrong and still shipped.
+Caught by adversarial review, not by the author who had just finished
+correcting the same class of error elsewhere.
+
+The mechanism is ordinary confirmation bias given a new hiding place.
+An assertion that makes the main point gets read back against the point it is
+making, because a wrong main claim is embarrassing in a way that is easy to
+notice.
+An assertion that only supports a point already believed for other reasons
+gets read back against nothing, because the argument would survive its
+removal --- which is exactly what makes it survive unchecked instead of
+getting removed.
+
+- **Do:** apply the "re-query a state claim" rule from the state/cause/scope
+  discipline above to every sentence naming a file's contents, whatever role
+  that sentence plays in the surrounding argument --- a supporting example is
+  not exempt because the argument does not depend on it.
+- **Do:** ask, for a supporting citation specifically, whether the argument
+  survives its removal; if it does, that is a reason to verify it before
+  keeping it, not a reason it needed no verification.
+- **Don't:** trust a claim more because it is doing less work in the
+  sentence --- a decorative example is exactly as checkable, and exactly as
+  wrong when unchecked, as a load-bearing one.
+- **Don't:** treat recent, hours-long practice at catching this defect in
+  other people's work as protection against writing it yourself in the same
+  sitting; the two are unrelated skills applied to the same blind spot.
+
 ## Question the answer that arrives without deliberation
 
 This is distinct from the confidence point above, and harder to catch.

@@ -916,6 +916,24 @@ It is adjacent to [#2483](https://github.com/Morrison-Lab/ai-config/issues/2483)
 
 - **Do:** mandate the payload-last tail in every review brief you write --- verdict, then fingerprint, then payload, and nothing after it.
 - **Do:** state the fingerprint as the **full 40-character** sha, which is what actually protects it.
+- **Do:** instruct the reviewer to **derive its own fingerprint** with `git
+  rev-parse HEAD` in its own worktree, and to confirm it resolves with `git
+  rev-parse --verify --quiet <sha>^{commit}` before writing the
+  `Reviewed-Commit:` line, rather than trusting the sha handed to it in the
+  brief.
+  This is a second, independent layer under the full-sha rule above, not a
+  restatement of it: it catches an abbreviated sha the brief-writer sent by
+  mistake (the reviewer's own `rev-parse` returns the correct full value
+  regardless of what it was told), and it catches a reviewer that would
+  otherwise transcribe an abbreviation's visible prefix and invent the rest
+  to reach 40 characters --- a fabrication a length check alone cannot see,
+  since the result is a well-formed 40-character hex string that simply does
+  not exist.
+  Every dispatch in one sweep briefed this way returned a correct
+  fingerprint (Morrison-Lab/ai-config#3295, 2026-09-05); one dispatch briefed
+  with an abbreviated sha and no derive instruction returned a fabricated
+  tail whose first 8 characters matched the abbreviation it had been given
+  and whose remaining 32 did not correspond to any real commit.
 - **Do:** read a "verdict is for commit X, but this push would ship Y" refusal as possibly a *misparsed* fingerprint rather than only a stale one --- print what the guard captured before concluding.
 - **Do:** fix the brief rather than keeping a sentinel you meet in the wild.
   It does protect an abbreviated fingerprint that is the report's last line, on every consumer that runs no trailing-content check on the shape it is handed --- `pre-push-review.py`'s persona contract, the pre-push guard's own `parse_report`, and [`scripts/cursor-self-review-check.py`](../../scripts/cursor-self-review-check.py), the Cursor Cloud recovery gate, which calls that same `parse_report` and then compares prefix-tolerantly.

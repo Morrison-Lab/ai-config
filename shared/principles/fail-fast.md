@@ -964,6 +964,61 @@ attributes success to the specific step it cares about.
 - **Don't:** trade a safe-direction over-warn for fewer nags --- that is the
   move that grows a silent-discharge hole.
 
+### An identity match with no id must poison rather than guess
+
+The section above governs a **blob** covering more than one action.
+This is the neighbouring shape: several actions each produce their own
+result, but nothing in the record says which result answers which action, so
+the guard has to guess, and guessing by order is a guess that a permission
+grant cannot afford.
+
+`hooks/no-push-without-self-review.py` reads oh-my-openagent's transcript
+format to find a reviewer's verdict.
+OMO's records carry no call id, only a tool name, so the hook paired a
+`tool_result` to the `tool_use` that dispatched it by **order alone**,
+popping a per-name queue first-in-first-out.
+Nothing in the record guarantees results return in dispatch order.
+With two `task` dispatches outstanding --- the real `adversarial-reviewer`
+and any other subagent also named `task` --- the second one's output was
+attributed to the first one's id.
+Adversarial review demonstrated a working bypass before the branch had ever
+been pushed: dispatch the reviewer, dispatch an unrelated `task`, let only
+the second return carrying verdict-shaped text naming the pushed commit, and
+the FIFO pop authorized the push with no review having completed.
+Nobody has to be attacking for this to fire --- any subagent output that
+happens to render an example of the guard's own report format reaches the
+same state, and this hook's own source and test file each already contain
+such strings.
+
+The fix generalizes past this one hook: **a tool name whose queue is ever
+ambiguous is poisoned for the rest of the transcript.**
+The moment a second use of that name is outstanding at once, its pending
+uses are dropped and no later result of that name is allowed to authorize
+anything, even one arriving on its own once the ambiguity has cleared.
+The asymmetry is what decides it, not how often the ambiguous case actually
+arises: a false refusal costs one more review round, and a false grant costs
+an unreviewed push.
+
+- **Do:** treat "which action does this result answer" as a question a
+  **granting** mechanism must be able to answer positively, never infer by
+  order, arrival sequence, or any other proxy for an identity the record does
+  not carry.
+- **Do:** poison the whole class of ambiguous identity once observed, rather
+  than clearing the ambiguity after the next result and resuming normal
+  attribution --- a narrower fix that clears after one result passes the
+  two-outstanding case and still fails the case where the first result was
+  already misattributed before the ambiguity was noticed.
+- **Don't:** price the false-refusal cost as prohibitive before pricing the
+  false-grant cost next to it --- a **reporting** mechanism can average the two
+  errors, and an **authorizing** one cannot, because only one of them is
+  reversible.
+- **Don't:** assume an input format lacking call ids is rare enough to ignore;
+  a transcript format designed for logging rather than for adjudicating
+  permission is exactly where this arises, and any adapter reading a new
+  format inherits the same question.
+
+(Morrison-Lab/ai-config#3168, 2026-09-05.)
+
 ### The FIRE condition is the mirror, and it wants corroboration rather than an absence
 
 Everything above governs what RELEASES a guard.

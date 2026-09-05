@@ -1178,3 +1178,48 @@ Until the issue resolves, or its current state is re-checked:
 - **Do:** re-read the hook's live source, not this entry or the issue comment, before asserting whether the bug still reproduces.
 - **Don't:** comply with "push the branch" when the flagged worktree belongs to a peer confirmed live;
   publishing another session's unreviewed, possibly mid-amend commits is unsafe regardless of the trigger or whether the hook's report is accurate.
+
+## An empty draft PR is not evidence that nothing was done
+
+The "A quiet worktree is not evidence the session working it has stopped"
+section above is about whether you may **touch** a quiet worktree.
+This is a step earlier: whether you should even **look**, and it can matter
+even when the worktree's session has genuinely gone quiet.
+
+`pr-on-claim` opens a draft PR from an empty commit at claim time (see
+[`pr-on-claim`](../shared/workflow/pr-on-claim.md)), so a PR's own file and
+line counts describe the branch **as last pushed**, not the branch as it
+currently sits on disk.
+Measured 2026-09-05 on `Morrison-Lab/ai-config#3168`: the PR showed 0 files
+and 0 additions and had gone unupdated for 37 hours, which reads as
+abandoned or not-yet-started.
+Its branch's worktree, at a path outside any session's own scratchpad, held
+**two unpushed commits totalling 366 insertions across 4 files** --- including
+a security-relevant guard fix (see this file's "An identity match with no id
+must poison rather than guess" cross-reference in
+[`fail-fast`](../shared/principles/fail-fast.md)).
+The owning session had exited without pushing.
+
+So the forge's view of a PR and the working tree's view can diverge
+completely, and the direction that matters is the dangerous one: real,
+reviewed-or-not, security-relevant work can sit invisible to everyone reading
+the PR, including a later session deciding whether that PR is safe to ignore
+or safe to close.
+
+The check that finds it costs two commands: `git worktree list` to find the
+branch's worktree path, then `git log origin/<branch>..HEAD` and `git status
+--short` run inside it.
+An empty or stale-looking PR is a prompt to run that check, not a conclusion
+that nothing is there.
+
+- **Do:** run `git worktree list` and check the associated worktree's
+  unpushed/uncommitted state before treating an empty or stale draft PR as
+  abandoned, un-started, or safe to close.
+- **Do:** treat a positive result from that check as the same magnitude of
+  finding whether the PR looks empty or looks active --- the PR's own
+  counters are the thing that was wrong, not a secondary signal.
+- **Don't:** infer "nothing happened here" from a PR's file/line counts or
+  its `updatedAt` alone; both describe the last push, not the branch.
+- **Don't:** conflate this with the liveness question above --- a worktree
+  can hold real unpushed work whether or not the session that wrote it is
+  still running, and this check is worth running either way.

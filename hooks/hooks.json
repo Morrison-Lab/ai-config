@@ -734,6 +734,13 @@
             "timeout": 10,
             "script": "flag-unmeasured-timestamp.py",
             "why": "CLAUDE.md 'Timestamp recaps in local time', session notebook / memory file edit surface (ai-config#2900, #2947). Warns when writing to session notebooks or memory files stating a Pacific clock time without a date reading in the turn."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-test-reading-package-source.py\"",
+            "timeout": 10,
+            "script": "flag-unmeasured-timestamp.py",
+            "why": "CLAUDE.md 'Timestamp recaps in local time', session notebook / memory file edit surface (ai-config#2900, #2947). Warns when writing to session notebooks or memory files stating a Pacific clock time without a date reading in the turn."
           }
         ]
       },
@@ -753,6 +760,13 @@
             "timeout": 10,
             "script": "flag-unmeasured-timestamp.py",
             "why": "CLAUDE.md 'Timestamp recaps in local time', session notebook / memory file edit surface (ai-config#2900, #2947). Warns when editing session notebooks or memory files stating a Pacific clock time without a date reading in the turn."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-test-reading-package-source.py\"",
+            "timeout": 10,
+            "script": "flag-unmeasured-timestamp.py",
+            "why": "CLAUDE.md 'Timestamp recaps in local time', session notebook / memory file edit surface (ai-config#2900, #2947). Warns when editing session notebooks or memory files stating a Pacific clock time without a date reading in the turn."
           }
         ]
       },
@@ -769,6 +783,13 @@
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-unmeasured-timestamp.py\"",
+            "timeout": 10,
+            "script": "flag-unmeasured-timestamp.py",
+            "why": "CLAUDE.md 'Timestamp recaps in local time', session notebook / memory file edit surface (ai-config#2900, #2947). Warns when editing session notebooks or memory files stating a Pacific clock time without a date reading in the turn."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-test-reading-package-source.py\"",
             "timeout": 10,
             "script": "flag-unmeasured-timestamp.py",
             "why": "CLAUDE.md 'Timestamp recaps in local time', session notebook / memory file edit surface (ai-config#2900, #2947). Warns when editing session notebooks or memory files stating a Pacific clock time without a date reading in the turn."

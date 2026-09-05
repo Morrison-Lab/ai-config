@@ -308,6 +308,57 @@ sweeps above.
 - **Don't:** reword a self-reference broken by a merge instead of reordering
   --- rewording edits prose neither branch actually wrote.
 
+### This is the routine conflict shape here, not an occasional one, and the judgment call is the order
+
+In a repo where many sessions independently append UMS sections to the same
+handful of shared fragments, an append collision is the **default** conflict
+shape a sync merge produces, not an unusual one.
+"Keep both sides" is therefore almost always the right resolution, and it is
+almost never the part that needs a decision --- git's own three-way merge
+already does that part correctly.
+
+What actually needs judgment every time is the **order** the two kept
+sections end up in, and that decision has a mechanical answer: read each
+appended block's opening sentence, and put first whichever block's opening
+line makes **no** back-reference to what sits above it.
+A block that opens by naming its subject outright can go in either position
+safely; a block that opens with "the section above" or an equivalent pointer
+can only go second, immediately under whatever it actually refers to.
+When both blocks' opening lines make a back-reference, neither position is
+safe as a bare append, and the resolution needs the reorder-and-name-the-real-
+target remedy above rather than a choice of which one goes first.
+
+Treat this as a checklist item on every resolved append collision in a
+UMS-heavy repo, not as a one-off fix for a reference a reviewer happened to
+catch: read both appended blocks' opening sentences before accepting the
+merge, and reorder if either one's opening line resolves against the wrong
+neighbour.
+
+- **Do:** read both appended blocks' opening sentences on every resolved
+  append collision, as a standing step rather than a reaction to a reviewer's
+  finding.
+- **Do:** order the two blocks by which one's opening sentence makes no
+  back-reference, when only one of them does.
+- **Don't:** treat "keep both sides" as the whole resolution --- it settles
+  content, and the order is a separate decision this fragment's sweep still
+  has to make.
+- **Don't:** wait for a broken pointer to surface before checking; on this
+  repo's merge frequency, the check is due on essentially every sync.
+
+A second occurrence did not break anything, and is worth recording precisely
+because of that: `memories/claude-code-hooks.md`
+([`Morrison-Lab/ai-config#3269`](https://github.com/Morrison-Lab/ai-config/pull/3269),
+merged 2026-09-05) hit the identical append collision --- `main`'s "A
+non-blocking hook must write `additionalContext` on stdout, not stderr"
+against the branch's "An invoked skill's body arrives as user-role transcript
+text and can arm an issue-scanning hook on an unrelated repo" --- and the kept
+order happened to be safe, because neither section's opening sentence makes a
+back-reference to its neighbour.
+The check still has to run every time regardless of outcome, since nothing
+about the collision itself signals in advance whether the kept order is safe;
+that is exactly why this reads as a routine sweep item rather than a
+reviewer-triggered fix.
+
 (Measured 2026-09-05 while syncing
 [`Morrison-Lab/ai-config#3173`](https://github.com/Morrison-Lab/ai-config/pull/3173)
 with `main`.

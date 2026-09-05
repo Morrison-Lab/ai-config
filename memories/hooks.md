@@ -126,6 +126,22 @@ Blocking hooks prevent the turn from ending until the missing artifact or requir
 | [`no-misattributed-quote.py`](../hooks/no-misattributed-quote.py) | **Block** | Blocks attributing a quote to a main rule file when the text resides in a `.rationale.md` or `.cases.md` companion file. | Confirm the exact file path where quoted passages reside before citing them. | None. |
 | [`require-stopping-point.py`](../hooks/require-stopping-point.py) | **Block** | Blocks final completion replies lacking an explicit stopping-point declaration. | Conclude summaries with an explicit stopping-point statement: `**Stopping Point**: Clean stopping point reached` or `**Stopping Point**: Not a clean stopping point --- [reason]`. | None. |
 
+### 3.1 A documented workaround for one guard can arm another
+
+`no-push-without-self-review.py`'s refusal on `git -C "$VAR" push` (row above)
+is worked around by pushing a literal path with an explicit
+`<sha>:refs/heads/<branch>` refspec.
+That refspec form lands the commit but sets no upstream tracking branch, which
+is exactly what `no-unshipped-commit.py` (row above) reads to decide a branch
+is unshipped.
+The second guard then blocks the turn over a commit that already reached the
+remote.
+Neither guard's message names the other.
+Run `git -C <literal-path> push -u origin <branch>` immediately after the
+refspec-form push to set the upstream the workaround skipped.
+See [`mistake-patterns.md`](mistake-patterns.md) Pattern 49 for the full
+mechanism and the guard's own no-upstream-is-undefined behaviour.
+
 ---
 
 ## 4. Detached Timers & Monitoring Services

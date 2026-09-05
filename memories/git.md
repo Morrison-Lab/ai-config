@@ -384,6 +384,52 @@ stale on `origin/main`, vs. only stale on the current feature-branch worktree
 — see the `CLAUDE.md` "Keep ai-config and repo checkouts fresh" step 4 update
 this same session added. `Lacaedemon/sparta`, 2026-07-04.)
 
+## `git checkout <name>` prefers an existing local branch over a same-named file, and does not refuse
+
+When a token could name either a local branch or a tracked file, git does not
+treat the collision as ambiguous and does not ask for `--` to disambiguate.
+It picks the branch.
+
+Measured on git 2.50.1: with both a tracked file `base.txt` and a local branch
+`base.txt` in the same repository, `git checkout base.txt` answers
+`Switched to branch 'base.txt'`, silently, with no warning about the file of
+the same name.
+git's own actual precedence, confirmed by this measurement, is:
+
+1. A token `git check-ref-format` cannot accept as a ref component --- `.`,
+   `..`, or a token starting `./`, `../`, or `/` --- is a pathspec outright;
+   no branch lookup even applies.
+2. Otherwise, a token naming an **existing local branch** selects that
+   branch, even when a same-named file also exists.
+3. Only then does an on-disk path make the token a pathspec.
+
+This contradicts a plausible-sounding assumption: that a branch and a path of
+the same name is the one case git refuses without `--`, forcing the caller to
+disambiguate.
+It does not refuse.
+It resolves silently, and in the direction most callers would not guess
+without measuring.
+
+- **Do:** measure git's actual disambiguation order before writing code or
+  docs that depend on it, rather than reasoning from "ambiguous inputs get
+  refused" as a general git property.
+- **Do:** treat an existing local branch as taking precedence over a
+  same-named tracked file in any `checkout`/`switch`-adjacent logic.
+- **Don't:** assume a name collision between a branch and a file is refused
+  by git --- write `--` explicitly when you mean the file, since git will not
+  ask.
+
+(Measured 2026-09-05 while writing `hooks/flag-stale-branch-mutation.py`
+(ai-config#3205): the hook's own docstring asserted the false claim above as
+its justification for treating a branch/file collision as ambiguous and
+resolving it in git's non-preferred direction, which dropped a real explicit
+branch selection from the session's tracked state and made the next ordinary
+commit warn --- the same false positive the heuristic existed to prevent,
+reached from the opposite side.
+See [`fact-check-code-logic.md`](../shared/coding/fact-check-code-logic.md)'s
+"A false rationale can also be load-bearing" section for the general lesson
+this is an instance of.)
+
 ## `git checkout <branch> 2>/dev/null; <next>` silently continues on the wrong branch
 
 `git checkout` is a **state-changing** command whose only report of failure is

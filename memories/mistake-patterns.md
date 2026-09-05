@@ -1077,5 +1077,11 @@ A clean automated review from every available provider evaluating the current HE
   This is already the standing ARDI/ardia/gia rule for the `@claude` reviewer (re-request after every push, including a Rebut/Defer-only round with no push).
   The near-miss this pattern names is specific to Copilot's `requested_reviewers` mutation, where the visible past success is what makes the stale state look current.
 - **Algorithmatizable?**
-  Yes, and already built: `hooks/no-unreviewed-pr.py` re-arms itself on a push whenever the session has exactly one live tracked PR, per its own "attribution by exclusion" design.
+  Yes, and already built: `hooks/no-unreviewed-pr.py` re-arms itself on a push
+  whenever the session has exactly one live tracked PR.
+  Its own docstring gives the reason ---
+  "Attribution is the hard part, and it is answered by EXCLUSION rather than
+  by guessing.
+  A push almost never names the PR it re-heads."
+  --- so the guard fires only where the push has one PR it COULD re-head.
   What is not automated is the human/session habit of reading `gh pr view --json reviews` and stopping there instead of also checking the reviewed commit against the current head.

@@ -322,7 +322,8 @@ Automatic re-arming is a real benefit and it is exactly as trustworthy as the co
 A stale flag, threshold, or allowlist can fail in either direction too, so what distinguishes this one is not the direction but the *trigger*: those change behaviour only when the value they carry is wrong for a case someone brings to them, while a dated constant changes behaviour with no case, no edit, and no event at all.
 Let the clock cross a number frozen in a snapshot and the guard computes that its own suppression has expired, then starts demanding an action a standing directive forbids --- with nobody having edited the hook, no PR having changed, and no session having done anything.
 The clock-crossing route is an argument from how the construct is built, and the case record below does not exemplify it: that incident's snapshot was already past its date when it was written.
-What the record does measure is the fail-open *direction* --- a guard that begins demanding a forbidden action with no edit and no event --- by the stale-on-arrival route instead.
+What the record does measure is the fail-open *direction* --- a guard demanding a forbidden action while its suppression should still hold --- by the stale-on-arrival route instead.
+The trigger property is what separates the two routes, so it belongs to the argued one only: this incident's snapshot was written by an install event, and the guard fired when a case reached it rather than on its own.
 
 That composes with this file's plugin-cache material into a worse failure than either part describes alone.
 Those paragraphs --- in "On the plugin path nothing else is needed", well above this section --- explain why a merged fix does not reach a running session;

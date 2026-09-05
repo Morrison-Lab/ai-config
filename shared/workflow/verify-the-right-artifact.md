@@ -1065,8 +1065,8 @@ rather than assuming it carries the fields the matcher wants.
 - **Don't:** close an incident on the strength of having found the code that should have prevented it.
 - **Don't:** read a matcher's field list as evidence those fields ever arrive --- a matcher is a claim about its input, not a supply of one.
 - **Don't:** answer a guard's refusal by querying the forge.
-  The refusal is a claim about the record the guard reads, never about the world;
-  and the forge always has something to return, so the wrong move feels like progress
+  The refusal is a claim about the record the guard reads, not about the world it left you free to query;
+  and a forge query nearly always returns something, so the wrong move feels like progress
   (2026-09-05: two responses spent confirming a review existed,
   before anyone read the condition the guard actually consults).
 

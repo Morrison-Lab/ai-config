@@ -125,11 +125,11 @@ not silent: if `scripts/lib/git_cmd.py` cannot be imported this exits 1 with
 a diagnostic on stderr, since a missing pattern would make the hook match
 nothing while looking like a hook that simply found nothing to warn about.
 That is a broken install rather than a malformed command, and PreToolUse
-treats exit 1 as a non-blocking error, so no commit breaks either way. Note
-the scoping: exit 2 is Claude Code's block signal rather than a generic
-non-zero exit, per `memories/claude-code-hooks.md`, so "non-zero" would have
-been the wrong word here. Note the sibling `no-unshipped-commit.py` chooses differently for the
-same import, falling back to a local copy of the patterns and logging why.
+treats exit 1 as a non-blocking error, so no commit breaks either way.
+Exit 2 is Claude Code's block signal rather than a generic non-zero exit
+(`memories/claude-code-hooks.md`), so the distinction is load-bearing.
+The sibling `no-unshipped-commit.py` resolves the same import differently,
+falling back to a local copy of the patterns and logging why.
 
 WARNS, never blocks. Emits `hookSpecificOutput.additionalContext` plus a
 single-line `systemMessage`; never a `permissionDecision`. Fires once per
@@ -402,8 +402,10 @@ def main() -> int:
         # process's working directory has been deleted -- a traceback and a
         # non-zero exit. A deleted working directory is neither a parse
         # failure nor a broken install, so neither docstring heading covers
-        # it; the blanket rule it would break is that this hook never
-        # tracebacks, which is why the fallback sits inside the try.
+        # it. The invariant it would break is narrower than "never
+        # tracebacks", which is false of the module-level import guard: once
+        # a payload is in hand, handling it never tracebacks. That is why
+        # the fallback sits inside the try.
         cwd = payload.get("cwd") or os.getcwd()
         command = (tool_input.get("command") or tool_input.get("CommandLine")
                    or tool_input.get("cmd") or tool_input.get("script"))

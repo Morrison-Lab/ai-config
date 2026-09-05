@@ -584,9 +584,10 @@ so a fresh clone never downloads them and `git show <sha>` fails there with an
 unknown-revision error.
 
 **Settle reachability against the remote, never against your own ref set.**
-`git for-each-ref --contains` is the wrong probe here, and wrong in the
-direction that reassures: it scans every local ref, so a pre-squash SHA any
-local ref still holds comes back reachable.
+`git for-each-ref --contains` is the wrong probe here, and it errs in both
+directions: it scans every local ref, so a pre-squash SHA any local ref still
+holds comes back reachable, and one no local ref holds comes back unreachable
+even when `refs/pull/<N>/head` carries it on the remote.
 
 ```bash
 git merge-base --is-ancestor <sha> origin/<default>   # 0 = a fresh clone reaches it
@@ -634,7 +635,10 @@ own passages --- `fully-clean.md` and `check-pr-fully-clean.py` both cited
 which is itself pre-squash on #3180 --- so the two SHAs and the commit that
 caught them are fetched from different refs.
 A pre-existing instance is open as
-[#3275](https://github.com/Morrison-Lab/ai-config/issues/3275).
+[#3275](https://github.com/Morrison-Lab/ai-config/issues/3275), whose
+conclusion stands and whose stated reasoning does not: it argues from a
+`for-each-ref` reading that the object survives only in one checkout, which is
+the misconception this section corrects.
 [`grep-is-not-coverage`](../shared/workflow/grep-is-not-coverage.md) carries
 the measured recipe on a different PR: `git ls-remote origin
 refs/pull/3060/head` returns `f9068299`, the default refspec is

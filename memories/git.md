@@ -644,7 +644,8 @@ refs/pull/3060/head` returns `f9068299`, the default refspec is
 not brought down, and the record anchors instead on commits that
 `git merge-base --is-ancestor ... origin/main` accepts.)
 
-That is not a hypothetical.
+That a repository's merge strategy is chosen per pull request, and so cannot
+be read off the last one, is not a hypothetical.
 This entry originally cited `082f369` as a still-reachable example, on the
 strength of #453 having merged as a merge commit --- and #456 then
 squash-merged, so `git merge-base --is-ancestor 082f369 origin/main` returns

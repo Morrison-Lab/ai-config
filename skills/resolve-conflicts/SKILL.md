@@ -229,4 +229,6 @@ Confirm which physical branch is "ours" before you reach for `--ours` /
   and that command fails --- use `:1:`/`:2:`/`:3:` (above) to rebuild the
   resolution, then swap the one hunk you came for. See
   [`batch-merge-and-resolve`](../../shared/workflow/batch-merge-and-resolve.md)'s
-  "Restoring a file wholesale is a sixth mode".
+  "The recovery has a silent failure mode of its own, and no merge produces
+  it" --- which is why the batch pass's per-merge re-check never surfaces this
+  one.

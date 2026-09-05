@@ -1064,7 +1064,11 @@ rather than assuming it carries the fields the matcher wants.
 - **Do:** treat "the clearing branch exists" as an answer about the source and an open question about the run.
 - **Don't:** close an incident on the strength of having found the code that should have prevented it.
 - **Don't:** read a matcher's field list as evidence those fields ever arrive --- a matcher is a claim about its input, not a supply of one.
-- **Don't:** answer a guard's refusal by checking the world it refused you access to --- the refusal is a claim about the record, the forge always has something to find, so the wrong move reliably feels like progress and repeats (a third occurrence, 2026-09-05: two responses spent confirming a review existed, before anyone read the condition the guard actually consults).
+- **Don't:** answer a guard's refusal by querying the forge.
+  The refusal is a claim about the record the guard reads, never about the world;
+  and the forge always has something to return, so the wrong move feels like progress
+  (2026-09-05: two responses spent confirming a review existed,
+  before anyone read the condition the guard actually consults).
 
 (Measured 2026-09-03, and the record is the rule applied to itself three times.
 A `Stop` hook demanded a per-HEAD reviewer request on an already-merged pull request.

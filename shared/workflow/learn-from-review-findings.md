@@ -318,11 +318,11 @@ Its prose sibling is a claim a reviewer shows to be false *in one direction*, an
 Deletion feels like the conservative response to "this is wrong", and it is the more destructive one when the claim was partly right: what leaves is invisible, since a diff shows the removed lines and nothing marks the true half among them, and anything downstream that leaned on that half silently loses its support.
 
 Measured on [#3296](https://github.com/Morrison-Lab/ai-config/pull/3296).
-`memories/git.md` said `git for-each-ref --contains` "errs in both directions".
+[`git.md`](../../memories/git.md) said `git for-each-ref --contains` "errs in both directions".
 A reviewer showed one direction was wrong, and I removed the sentence entirely --- dropping the direction that was true, which a citation fifty lines below depended on, so the section then claimed to correct a misconception it no longer described.
 The next round caught the stranded citation.
-The repair was not a smaller deletion but a split: state each answer with the state that produces it, measured rather than reasoned (present-but-on-no-local-ref exits 0 with zero bytes;
-absent exits 129 with `error: no such commit`, on git 2.50.1).
+The repair was not a smaller deletion but a split: state each answer with the state that produces it, measured rather than reasoned.
+[`git.md`](../../memories/git.md) carries both readings and their measurements, so they are not restated here --- a measurement copied to a second site desynchronizes on the first re-measurement.
 
 The general move is to **split the claim by its precondition and measure each branch**, which is what a two-directional claim was always compressing.
 Before deleting, ask what else in the file cites the clause you are about to remove --- a dependent is the thing the deletion breaks and the thing no reviewer is looking at.

@@ -1010,30 +1010,27 @@ Both PRs put positional figures into commit messages --- "into the corpus's
 60-to-80 range", "three lines below", "twelve lines above" --- and none was
 load-bearing.
 
-What this record can honestly say about them is less than three attempts at it
-assumed, and the shortfall is the point.
-Every message that *asserted* one of these figures was amended away, so each
-survives only as a quotation inside the message that replaced it: `d29d33c71`
-carries "twelve lines above" only to disavow it.
-A grep hit on the string is therefore evidence about the correction, not about
-the assertion --- which is
+Only two of the three are checkable now, and the difference between them is
+the record worth keeping.
+`2156b439d` asserts "three lines below" in its own voice, so a reader can
+fetch the claim and test it.
+`d29d33c71` carries "twelve lines above" only to disavow it, so what survives
+there is the correction rather than the assertion --- and reading that grep
+hit as the assertion is
 [`verify-the-right-artifact`](../workflow/verify-the-right-artifact.md)'s
-substitution, committed while writing the paragraph that warns about it.
+substitution.
+The "60-to-80" message survives nowhere: it was amended away, and no reachable
+commit carries it.
 
-Three specific claims were tried here and withdrawn, each refuted by the
-history rather than by argument.
-That the figures formed a chain, each written into the commit fixing the
-previous: `git log --grep` places "three lines below" in `e64e7362f`, which
-`git merge-base --is-ancestor` puts 39 commits *before* the "60-to-80" commit
-`f9068299`, so the sequence runs backwards.
-That the gap was ten: not re-derivable, and the nearest reading of
-`e64e7362f^` makes the original "three lines below" correct.
-That the gap was thirteen: it cites a message that no longer exists.
-
-So the transferable finding is not a count or a chain.
-It is that a rewritten message destroys the copy a later reader would check,
-and that the loss is invisible --- three rounds of review each produced a
-confident reconstruction, and each was wrong in a different way.
+Successive drafts of this paragraph tried to say more --- that the three
+formed a chain, that one gap was ten, that another was thirteen --- and each
+attempt was refuted by the history rather than by argument.
+The reconstructions were plausible every time, which is the finding: a
+rewritten message destroys the copy a later reader would check, and nothing
+about the gap announces itself, so each attempt filled it confidently and
+wrongly.
+Cite only commits reachable from a ref when recording such a case, since a
+pre-squash SHA resolves in the author's checkout and nowhere else.
 
 That a rule gets broken while being authored is not itself the finding, and is
 already stated in this corpus three times over:
@@ -1041,7 +1038,7 @@ already stated in this corpus three times over:
 [`no-empty-promises`](../workflow/no-empty-promises.md) and
 [`fully-clean.cases.md`](../workflow/fully-clean.cases.md) each put it as a
 rule consulted at read time and broken at composition time.
-The recordable remainder is the amend chain and the positional shape above.
+The recordable remainder is the positional shape above, and the way a rewritten message hides its own history.
 
 Whether the condition deserved a guard was measured rather than argued.
 `hooks/flag-positional-figure-in-commit-message.py` is the result, and

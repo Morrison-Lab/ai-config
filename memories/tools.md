@@ -1094,7 +1094,7 @@ Sibling embedding trap: a bare `---` at column 0 inside a YAML `run: |` block is
 
 ## awk brace handling differs by implementation, in both directions
 
-Moved to [`awk-brace-handling.md`](awk-brace-handling.md) (ai-config#694 pattern, at the 1250-line gate): `mawk` (the default `awk` on Debian/Ubuntu) treats a literal `{}` as an interval (bracket it: `\^[{][}]`) and can PANIC on a genuine `{m,n}` interval (avoid it: `^#+([ ]|$)` or unrolled).
+Moved to [`awk-brace-handling.md`](awk-brace-handling.md) (ai-config#694 pattern, at the 1250-line gate): `mawk` (the default `awk` on Debian/Ubuntu) treats a literal `{}` as an interval (bracket it: `\^[{][}]`) and can PANIC on a genuine `{m,n}` interval (avoid it: `^#+([ \t]|$)` or unrolled).
 Neither error leads to the other, and `ubuntu-latest` CI does not hit the panic, so a shipped `{m,n}` can stay latent until a consumer sets `runs-on`.
 
 ## validate-skills.py token validation

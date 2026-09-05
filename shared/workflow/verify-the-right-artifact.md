@@ -1070,7 +1070,7 @@ rather than assuming it carries the fields the matcher wants.
   The refusal is a claim about the record the guard reads, not about the world it left you free to query;
   and a forge query nearly always returns something, so the wrong move feels like progress
   (2026-09-05: two responses spent on the forge ---
-  the first confirming a review existed, the second that it had merged ---
+  the first confirming a review existed, the second that the PR had merged ---
   before anyone read the condition the guard actually consults).
 
 (Measured 2026-09-03, and the record is the rule applied to itself three times.

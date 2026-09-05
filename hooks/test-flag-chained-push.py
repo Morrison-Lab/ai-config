@@ -117,6 +117,19 @@ FIRES = [
     # 2026-09-05).
     ("chained push after a whole find -exec ... \\; invocation",
      "find . -exec rm {} " + chr(92) + "; && git push"),
+    # LEAD_RE's wrapper words each take their OWN flags/arguments before the
+    # real command -- anchoring GIT_PUSH_RE right after the bare wrapper
+    # word (with no allowance for those) regressed exactly this shape to a
+    # false negative when GIT_PUSH_RE.match() was first introduced (measured
+    # 2026-09-05 review, on the anchoring fix's own PR).
+    ("chained push after sudo with its own flag",
+     "git status && sudo -H git push"),
+    ("chained push after nice with its own flag",
+     "git status && nice -n5 git push"),
+    ("chained push after timeout with its own bare argument",
+     "git status && timeout 30 git push"),
+    ("chained push after env with its own flag",
+     "git status && env -i git push"),
 ]
 
 QUIET = [

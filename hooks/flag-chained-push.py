@@ -120,14 +120,21 @@ OPS = re.compile(r"\|\||&&|[;|\n]")
 GIT_PUSH_RE = re.compile(r"\bgit\s+(?:-C\s+\S+\s+)?push\b")
 
 # Skipped before `GIT_PUSH_RE` is anchored: leading whitespace, any number
-# of env assignments (`VAR=val `), and the handful of lead words that still
-# leave "git push" as the command actually run. Deliberately smaller than
-# `no-clobbering-push.py`'s `LEAD_WORDS` -- this hook only needs enough to
-# avoid a false negative on the common cases, not a full simple-command
-# grammar.
+# of env assignments (`VAR=val `), and a handful of wrapper commands that
+# still leave "git push" as the command actually run. Each wrapper may take
+# its OWN flags or arguments first (`sudo -H`, `nice -n5`, `timeout 30`,
+# `env -i VAR=1`), so a wrapper is followed by any run of tokens that is not
+# itself "git" -- an anchored `.match()` that stopped right after the bare
+# wrapper word regressed `sudo -H git push` (a real, common shape) to a
+# false negative, since `lead_end` landed on `-H` and `GIT_PUSH_RE` was
+# required to start exactly there (measured 2026-09-05 review). Deliberately
+# smaller than `no-clobbering-push.py`'s `LEAD_WORDS` -- this hook only
+# needs enough to avoid a false negative on common cases, not a full
+# simple-command grammar.
 LEAD_RE = re.compile(
     r"^\s*(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
-    r"(?:(?:sudo|exec|env|command|time|nohup)\s+)*"
+    r"(?:(?:sudo|exec|env|command|time|nohup|nice|timeout)\s+"
+    r"(?:(?!git\b)\S+\s+)*)*"
 )
 
 # A redirection suffix: plain or doubled `>`, its fd-duplication form

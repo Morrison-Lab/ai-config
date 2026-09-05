@@ -32,9 +32,22 @@ An `Edit`/`Write`/`NotebookEdit` whose target is a CODE file under a test
 directory, and whose new content calls one of a short, explicit list of read
 functions on a path escaping that directory:
 
-  * `test_path("..", "..", ...)` / `file.path("..", "..", ...)` -- two up
-  * a literal `../../` inside the call
-  * a quoted path BEGINNING `R/`, `src/` or `inst/`
+  * a read whose argument goes two levels up, directly or through a path
+    constructor: `readLines(test_path("..", "..", ...))`,
+    `readLines(file.path("..", "..", ...))`, a literal `../../`
+  * a read on a quoted path BEGINNING `R/`, `src/` or `inst/`, including the
+    `here::here("R", "x.R")` spelling
+  * a PATH-THEN-READ chain, which is how Python spells it:
+    `Path(...).joinpath("src", "m.py").read_text()`
+
+`test_path`, `file.path`, `here::here` and `pathlib.Path` are path
+CONSTRUCTORS rather than reads. They are passthroughs here -- a read must
+appear as well -- because listing them fired on `dir.create`, `writeLines`,
+`unlink`, `file.exists` and `.mkdir()`.
+
+Lines are continuation-joined before scanning, since the motivating call
+wraps at 80 columns under `styler`, and split on `;` afterwards, since a
+statement boundary separates an unrelated write from an unrelated read.
 
 HOW IT AVOIDS THE FALSE POSITIVES THAT GET A GUARD SWITCHED OFF
 ---------------------------------------------------------------
@@ -65,9 +78,18 @@ SIGNAL TO NOISE, MEASURED ON REAL CODE
 Swept over 1695 test-scoped files across 137 local repositories: ONE fires,
 `ucd-serg.github.io/tests/spelling.R`:
 
-    wordlist <- if (file.exists("inst/WORDLIST")) readLines("inst/WORDLIST")
+    wordlist <- if (file.exists("inst/WORDLIST")) {
+      readLines("inst/WORDLIST")
+    } else {
+      character()
+    }
 
-and it is a true positive. An installed package relocates `inst/` contents to
+(`tests/spelling.R:10-14`, quoted rather than paraphrased -- an earlier
+revision compressed it to one line in the very section whose subject is
+measurement fidelity. The hook reports only the `readLines` line, since it
+never sees the guard the argument below rests on.)
+
+It is a true positive. An installed package relocates `inst/` contents to
 the package root, so `inst/WORDLIST` is absent under `R CMD check` -- and
 because the read is guarded by `file.exists()`, the spell check silently falls
 back to an empty wordlist and keeps passing while checking nothing.
@@ -94,7 +116,7 @@ WRITE_TOOL_NAMES = {
 
 # Code files only. Prose under tests/ quotes paths constantly.
 # R and Python only, matching the read list below. An earlier revision
-# admitted eleven extensions while listing read functions for two, so it
+# admitted fifteen extensions while listing read functions for two, so it
 # was inert on JS, Go, Rust and Ruby while implying coverage -- measured:
 # `fs.readFileSync("../../src/index.js")` was silent. Extending the gate
 # without extending the list is the wrong half to widen.
@@ -113,30 +135,33 @@ RX_TEST_PATH = re.compile(
 # than reached by relaxing the anchor, which is what produced the false
 # positives an earlier revision was reviewed for.
 _BARE_READS = (
-    r"readLines|readRDS|readr|scan|source|open|"
+    # `readr` alone is not a function; its real spellings are dotted.
+    r"readLines|readRDS|scan|source|open|"
     r"getsource|parse_file|"
     r"read\.csv|read\.table|read\.delim"
 )
 _DOTTED_READS = (
     r"readr::read_[a-z_]+|xml2::read_[a-z]+|yaml::read_yaml|jsonlite::fromJSON|"
-    r"inspect\.getsource|pathlib\.Path|importlib\.resources\.files|"
+    # `pathlib.Path` and `importlib.resources.files` are CONSTRUCTORS, not
+    # reads -- the Python twins of `file.path`. Listing them fired on
+    # `.mkdir()`, `.write_text()`, `.rmdir()` and `.exists()`. The
+    # path-then-read arm covers their read forms.
+    r"inspect\.getsource|"
     # Method forms. These need the dot, so they cannot live in the
     # left-anchored bare list -- an earlier revision put them there and
     # made them unreachable, missing the canonical Python spelling.
-    r"\.read_text|\.read_bytes|\.readlines|\.read_bytes"
+    r"\.read_text|\.read_bytes|\.readlines"
 )
 # `(?<![\w.$])` keeps `normalizePath(` and `monitor_path(` out while letting
 # `file.path(` and `test_path(` in -- they are listed above in full.
 READ_CALL = r"(?:(?<![\w.$])(?:" + _BARE_READS + r")|(?:" + _DOTTED_READS + r"))\s*\("
 
-# The two-up arm allows a path CONSTRUCTOR between the read and the path --
+# `[^)\n]*` already spans a path CONSTRUCTOR between the read and the path --
 # `readLines(file.path("..", "..", x))` -- without treating the constructor
-# itself as a read. An earlier revision listed `file.path` and `test_path` as
-# reads, and fired on `dir.create(file.path("..", ".."))`,
-# `writeLines(txt, file.path("..", ".."))`, `unlink(...)` and
-# `file.exists(...)`: writes and existence checks, not reads.
+# itself as a read. An earlier revision added an explicit optional group for
+# that and it was dead code: deleting it changed nothing.
 RX_ESCAPE_TWO_UP = re.compile(
-    READ_CALL + r"(?:[^)\n]*(?:file\.path|test_path|here::here)\s*\()?[^)\n]*"
+    READ_CALL + r"[^)\n]*"
     r"(?:"
     r"""["']\.\.["']\s*,\s*["']\.\.["']"""
     r"|\.\./\.\./"
@@ -162,14 +187,22 @@ _SQ = "'" * 3
 # Python method chains put the READ LAST: `Path(...).joinpath("src", "m.py")
 # .read_text()`. The arms above all assume read-then-path, so the canonical
 # Python spelling needs its own path-then-read arm.
-_READ_METHOD = r"\.(?:read_text|read_bytes|readlines|read)\s*\("
+# No bare `.read(`: it matched sockets, HTTP responses, subprocess
+# pipes and zipfile members. Only the pathlib spellings, which name a
+# filesystem read.
+_READ_METHOD = r"\.(?:read_text|read_bytes|readlines)\s*\("
 RX_PATH_THEN_READ = re.compile(
     r"(?:"
     r"""\.\./\.\./"""
     r"""|["']\.\.["']\s*,\s*["']\.\.["']"""
     r"""|["'](?:(?-i:R)|src|inst)/"""
     r"""|["'](?:(?-i:R)|src|inst)["']\s*[,)]"""
-    r")[^\n]*" + _READ_METHOD,
+    # Bounded by DISTANCE, not by parens. A method chain crosses a closing
+    # paren by construction -- `joinpath("src", "m.py").read_text()` -- so a
+    # paren bound blocks the very shape this arm exists for. An unbounded
+    # `[^\n]*` paired an unrelated path with an unrelated read elsewhere on
+    # the line; 40 characters admits the chain and not the coincidence.
+    r")[^\n]{0,40}?" + _READ_METHOD,
     re.I,
 )
 
@@ -245,23 +278,60 @@ def offending_line(target, content):
         return None
     if not content.strip():
         return None
+    # Continuation-joined before scanning. The motivating call is 68 columns
+    # plus indentation, so `styler`/`lintr`'s 80-column default wraps it as
+    # soon as the file name grows -- and a line-oriented scan is then blind to
+    # the exact case this guard exists for. Measured: all three wrapped
+    # spellings were silent.
+    #
+    # A line ending in `(` or `,` is continued, which is how every formatter
+    # in scope breaks a call. The joined text keeps the ORIGINAL first line
+    # for reporting, so the quoted snippet still points at something the
+    # author can find.
+    raw = content.splitlines()
+    joined, origin = [], []
+    buf, first = "", None
+    for ln in raw:
+        stripped_end = ln.rstrip()
+        if first is None:
+            first = ln
+        buf += (" " if buf else "") + ln.strip()
+        if stripped_end.endswith("(") or stripped_end.endswith(","):
+            continue
+        joined.append(buf)
+        origin.append(first)
+        buf, first = "", None
+    if buf:
+        joined.append(buf)
+        origin.append(first if first is not None else buf)
+
     in_docstring = False
-    for line in content.splitlines():
+    for idx, line in enumerate(joined):
         stripped = line.strip()
         delims = len(RX_DOCSTRING_DELIM.findall(line))
         if in_docstring:
             if delims % 2 == 1:
                 in_docstring = False
             continue
+        # A read inside a TRAILING comment is still a mention, not a read.
+        # Only the leading-marker case was handled, so
+        # `x <- 1  # never readLines("R/f.R")` fired.
+        line = re.sub(r"(?<![:\w])#.*$|//.*$", "", line)
         if RX_COMMENT.match(line):
             if delims % 2 == 1:
                 in_docstring = True
             continue
         if delims % 2 == 1:
             in_docstring = True
-        if (RX_ESCAPE_TWO_UP.search(line) or RX_PACKAGE_SRC.search(line)
-                or RX_PATH_THEN_READ.search(line)):
-            return stripped
+        # Split on `;` first: it is a statement boundary in both languages,
+        # and the distance-bounded path-then-read arm otherwise pairs a write
+        # in one statement with a read in the next --
+        # `tmpfile.write_text("src/a"); assert tmpfile.read_text()`.
+        if any(RX_ESCAPE_TWO_UP.search(part) or RX_PACKAGE_SRC.search(part)
+               or RX_PATH_THEN_READ.search(part)
+               for part in line.split(";")):
+            # Report the source line the author wrote, not the joined form.
+            return (origin[idx] or line).strip()
     return None
 
 

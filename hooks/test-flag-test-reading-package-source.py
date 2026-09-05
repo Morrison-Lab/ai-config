@@ -225,6 +225,73 @@ for d in ("tests", "test", "spec", "testthat"):
     check(f"the {d}/ directory is in scope",
           mod.RX_TEST_PATH.search(f"{d}/x.R") is not None, True)
 
+
+# --- the arms a third round found unasserted or wrongly pinned ------------
+# `styler` wraps the motivating call at 80 columns, and a line-oriented scan
+# was blind to it -- the exact case this guard exists for.
+check("the motivating call still fires once styler wraps it",
+      fires("tests/testthat/test-format_sap_table.R",
+            '  src <- readLines(\n    test_path("..", "..", "R", "format_sap_table.R")\n  )'),
+      True)
+
+# Python's path constructors are the twins of `file.path` and fired on
+# writes, deletions and existence checks.
+for label, line in [
+    ("mkdir", '  pathlib.Path("../../scratch").mkdir(parents=True)'),
+    ("write_text", '  pathlib.Path("../../out.txt").write_text("hi")'),
+    ("rmdir", '  pathlib.Path("src/generated").rmdir()'),
+    ("exists", '  assert pathlib.Path("../../LICENSE").exists()'),
+]:
+    check(f"a python path constructor is not a read: {label}",
+          fires("tests/test_x.py", line), False)
+
+# A bare `.read(` matched sockets, pipes and zipfile members; the distance
+# bound and the statement split stop unrelated pairings.
+for label, line in [
+    ("subprocess pipe", 'out = subprocess.run(["ls","../../"], capture_output=True).stdout.read()'),
+    ("zipfile member", 'zf.writestr("src/mod.py", code); assert zf.read("src/mod.py")'),
+    ("unrelated fh.read", 'assert loader.paths == ["src/main.py"] and fh.read() == "x"'),
+    ("write then read", 'tmpfile.write_text("src/a"); assert tmpfile.read_text() == "src/a"'),
+    ("argparse then log", 'args = parser.parse_args(["--out","../../build"]); log.read()'),
+]:
+    check(f"an unrelated read is not paired: {label}", fires("tests/test_x.py", line), False)
+
+# The distance bound specifically: one STATEMENT carrying an unrelated path
+# and an unrelated read, too far apart to be the same expression. The
+# statement split does not reach this; only the 40-character bound does.
+for label, line in [
+    ("wide assert", 'assert cfg["src/main.py"] == expected_value_for_this_case and handle.read_text() == ok'),
+    ("wide call", 'result = compare(manifest["src/a.py"], other, tolerance=0.01, verbose=True, fh.read_text())'),
+]:
+    check(f"a distant read is not paired: {label}", fires("tests/test_x.py", line), False)
+
+# ...while the chain it exists to admit stays within the bound.
+check("a real method chain is still within the bound",
+      fires("tests/test_x.py",
+            '    src = Path(__file__).parent.joinpath("src", "m.py").read_text()'),
+      True)
+
+# Trailing comments, which the line-start-anchored detector missed.
+for line in ['  x <- 1  # never readLines("R/f.R") here',
+             '  expect_equal(f(), 1)  # cf. source("R/helpers.R")',
+             '    assert f() == 1  # open("../../src/m.py") is wrong']:
+    check("a trailing comment is a mention, not a read",
+          fires("tests/testthat/test-x.R", line), False)
+
+# Dotted reads, which were entirely unasserted.
+for label, line in [
+    ("inspect.getsource", '    src = inspect.getsource(open("../../src/m.py"))'),
+    ("xml2::read_xml", '  d <- xml2::read_xml("inst/x.xml")'),
+    ("jsonlite::fromJSON", '  j <- jsonlite::fromJSON("inst/x.json")'),
+]:
+    check(f"a dotted read fires: {label}", fires("tests/testthat/test-x.R", line), True)
+
+# The multi-line docstring state machine, whose only test was self-closing.
+check("a read inside a MULTI-line docstring is suppressed",
+      fires("tests/test_x.py",
+            '    """\n    Do not open("../../src/m.py") in a test.\n    """'),
+      False)
+
 # --- empty and malformed input -------------------------------------------
 check("empty content is silent", fires("tests/testthat/test-x.R", ""), False)
 check("empty path is silent", fires("", 'readLines("../../R/x.R")'), False)

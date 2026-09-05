@@ -418,20 +418,20 @@ above is about, made inside the section about it.
 Had the fix covered only the two the issue named, `Closes #3069` would have
 shut it with three sites unexamined.)
 
-## An issue's stated reasoning is never revisited, and a fragment citing it inherits whatever it argues
+## An issue's stated reasoning is never revisited, and an entry citing it inherits whatever it argues
 
 The section above is about an issue body's site list going underived at filing time.
 This is the same body one field over: its **reasoning**.
 
 A filed issue is a claim you stop re-reading the moment it is filed.
 Its *conclusion* gets revisited whenever someone picks the issue up, because the conclusion is what they came for.
-Its stated reasoning does not, so an argument that later work refutes sits there indefinitely, still reading as the issue's justification --- and a fragment that cites the issue as a worked instance inherits that argument along with the citation.
+Its stated reasoning does not, so an argument that later work refutes sits there indefinitely, still reading as the issue's justification --- and any corpus entry that cites the issue as a worked instance inherits that argument along with the citation.
 
 Measured on [#3296](https://github.com/Morrison-Lab/ai-config/pull/3296).
 [#3275](https://github.com/Morrison-Lab/ai-config/issues/3275) asserted that a pre-squash SHA "survives only in the loose-object store of whichever checkout created it", reasoning from `git for-each-ref --contains` returning zero refs.
-`git ls-remote origin refs/pull/3060/head` returns the object, so the reasoning was the exact misconception the fragment citing #3275 was being written to correct.
+`git ls-remote origin refs/pull/3060/head` prints `f9068299 refs/pull/3060/head` --- the OID the issue said had survived only locally --- so the reasoning was the exact misconception `memories/git.md` was being edited to correct at the moment it cited #3275 as an instance of it.
 The conclusion was unaffected, which is why nothing prompted a re-read.
-A reviewer caught it only by following the link and reading what the issue actually said.
+A reviewer caught the stale reasoning only by following the link and reading what the issue actually said.
 
 So when you cite your own earlier filing as an example, re-read that filing against what you now know, and correct it if the work has moved past it --- the citation is what makes its reasoning load-bearing again.
 

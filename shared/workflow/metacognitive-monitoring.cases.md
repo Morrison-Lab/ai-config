@@ -780,11 +780,11 @@ The remedy half is the sharper one, since ["An action you recommend is a claim a
 [`gh-cli`](../../memories/gh-cli.md) already states the rule this violates --- gating code must require `CheckRun.status === 'COMPLETED'` and a terminal `StatusContext.state`, treating anything else as still in progress --- so this instance is listed for the count rather than because anything is missing from the corpus.
 
 **A sixth arrived while this record was being written, in the write-up itself, and it is the sharpest of them.**
-Drafting the `fail-fast` entry above, this session ran `gh label list -R Morrison-Lab/ai-config`, saw `no-ai-review` returned, and wrote that ai-config[#1709](https://github.com/Morrison-Lab/ai-config/issues/1709)'s reopening comment had asserted an absent label that was in fact present --- convicting that comment of the very error this record catalogs.
+Drafting the over-warn entry this change adds to [`fail-fast`](../principles/fail-fast.md), this session ran `gh label list -R Morrison-Lab/ai-config`, saw `no-ai-review` returned, and wrote that ai-config[#1709](https://github.com/Morrison-Lab/ai-config/issues/1709)'s reopening comment had asserted an absent label that was in fact present --- convicting that comment of the very error this record catalogs.
 The label's `createdAt` is 47 minutes *after* that comment, and the comment is what caused it to be created, having proposed exactly that.
 The `gh` query was correct, current, and about a different moment than the claim it was used to settle.
 So the reading was a substitution along the **time** axis rather than the artifact axis: the repository now stood in for the repository then, which is a distinction no command in the query names.
-An adversarial round caught it, in the fourth of five rounds on this change.
+The fourth adversarial round on this change caught it.
 The transferable step is cheap: when a query is used to judge a dated claim, read the artifact's own timestamp --- `createdAt` on a label, `created_at` on a comment --- rather than only its present value.
 
 Tracked as ai-config[#3271](https://github.com/Morrison-Lab/ai-config/issues/3271).

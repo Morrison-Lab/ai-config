@@ -915,7 +915,7 @@ The guard is correct, the session is correct, and if no other discharge exists t
 **An exemption set can be complete on paper and empty in practice, because each path carries a precondition the set does not state.**
 That is the failure mode, and it is why "this guard has three exemptions" does not answer the question.
 `hooks/no-unreviewed-pr.py` on 2026-09-03/04 demanded a Copilot review while a standing all-repos moratorium forbade one.
-Its three paths were derived from the source and each was then unavailable: the `no-ai-review` label the refusal message names did not exist in the repository, so `gh pr edit --add-label` errored and granted nothing;
+Its three paths were derived from the source and each was then unavailable: the `no-ai-review` label the refusal message names did not exist in the repository, so an add would have errored and the path granted nothing;
 `ALLOW_UNREVIEWED_REDACTION_PR=1` asserts a redaction that was not true;
 and the draft deferral did not apply.
 The session was blocked for many turns while doing exactly what a standing directive required.

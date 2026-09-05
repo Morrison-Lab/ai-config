@@ -470,6 +470,7 @@ This is [`grep-is-not-coverage`](../workflow/grep-is-not-coverage.md)'s point ap
 **It is not "a later edit forgot an earlier hedge", so a diff-ordering heuristic misses it too.**
 One measured instance had the hedge and the contradicting assertion added in the **same commit**, in two different files.
 Hedging one statement of a claim and asserting another is a single act when the two live apart, because writing the careful version discharges the sense of having been careful.
+That is the same mechanism [`metacognitive-monitoring`](../workflow/metacognitive-monitoring.md)'s "A hedge you attach for one audience is owed to the other, and writing it once is the tell" describes, across a different span: there the two statements go to different **audiences**, here they sit in different **files of one change**, which is why a same-commit break does not feel like an inconsistency to write.
 
 **The test:** enumerate what the passage and its siblings mark unestablished, hedged, or withdrawn --- as a list, before reading anything else --- then ask of every other sentence whether it would still be true if one of those hedges resolved the other way.
 Enumerating first is what makes it work, since a sentence read in isolation supplies its own missing context and reads as fine.
@@ -480,8 +481,9 @@ Run it across the sibling files a change touches, not only within one file.
 A hedge stated in the file that argues for it constrains the file that cites it, and the citing file is where the unhedged restatement lands.
 
 (Measured 2026-09-03/04 while preparing ai-config [#3267](https://github.com/Morrison-Lab/ai-config/pull/3267).
-The rounds were **local `adversarial-reviewer` dispatches before each push**, so the PR's own comment thread carries two verdict-bearing rounds and no record of the nine --- do not read the link as the source for the count, which is why it is stated here as unciteable rather than left to look checkable.
-Nine consecutive such rounds each returned exactly one finding of this shape, and the eight-versus-four figure in the paragraph above comes from the same unciteable series.
+The rounds were **local `adversarial-reviewer` dispatches before each push**, so the PR's own review activity shows two verdict-bearing rounds rather than nine;
+the count is recorded in prose in that PR's `no-ai-review` comment ("It also went through nine adversarial-reviewer rounds locally"), which is the citation for it.
+Nine consecutive such rounds each returned exactly one finding of this shape, and the eight-versus-four figure in the paragraph above comes from the same series.
 That per-round count is itself the argument for enumerating the hedges up front rather than re-reading for consistency: re-reading surfaced one break per pass, so the rounds converged only as fast as a reviewer happened to notice, while an enumeration bounds the set to check in one pass.
 Tracked as [#3271](https://github.com/Morrison-Lab/ai-config/issues/3271).)
 

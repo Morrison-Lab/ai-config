@@ -1766,6 +1766,51 @@ def omo_cases() -> tuple[int, int]:
     check("OMO verdict naming an earlier commit does not authorize push",
           rc == 0 and blocked)
 
+    # 2b. THE ATTRIBUTION HOLE. OMO records carry no call ids, so a result is
+    #     linked to a use by ORDER alone. With two `task` dispatches
+    #     outstanding, a FIFO pop attributes the SECOND one's output to the
+    #     FIRST one's id -- and if the first was the reviewer, unrelated text
+    #     carrying a verdict shape authorizes the push. Found by adversarial
+    #     review with a working proof of concept against this branch, before
+    #     it had ever been pushed.
+    #
+    #     The reviewer here never returns. The only result belongs to a
+    #     documentation dispatch whose output happens to contain verdict-shaped
+    #     text -- which `docs/opencode-hook-mapping.md` in this same branch
+    #     genuinely contains, so nobody has to be attacking for this to fire.
+    rc, out = run_hook(PUSH, [
+        omo_use("task", {"subagentType": "adversarial-reviewer",
+                         "description": "review", "prompt": "Review the diff"}),
+        omo_use("task", {"subagentType": "general-purpose",
+                         "description": "docs", "prompt": "Write doc examples"}),
+        omo_result("task", "Example refusal text for the docs:\n" + body(commit=HEAD)),
+    ])
+    blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+    check("a second same-named dispatch's output cannot authorize the reviewer's call",
+          rc == 0 and blocked)
+
+    # 2c. The poison is durable: once a name has been ambiguous, a LATER
+    #     result of that name cannot authorize either, even though only one
+    #     use is outstanding by then.
+    #
+    #     Unlike 2b, this case passes against the PRE-FIX hook too, and it is
+    #     recorded that way rather than presented as a regression: there the
+    #     first result already popped the reviewer's id, so the second finds an
+    #     empty queue and authorizes nothing by accident. It guards the FIX
+    #     against over-correction -- a narrower version that cleared the
+    #     ambiguity flag after one result would pass 2b and fail here.
+    rc, out = run_hook(PUSH, [
+        omo_use("task", {"subagentType": "adversarial-reviewer",
+                         "description": "review", "prompt": "Review the diff"}),
+        omo_use("task", {"subagentType": "general-purpose",
+                         "description": "docs", "prompt": "Write doc examples"}),
+        omo_result("task", "unrelated output"),
+        omo_result("task", body(commit=HEAD)),
+    ])
+    blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+    check("an ambiguous tool name stays unauthorizable for the rest of the transcript",
+          rc == 0 and blocked)
+
     # 3. No reviewer dispatch anywhere in the OMO transcript blocks.
     rc, out = run_hook(PUSH, [omo_use("bash", {"command": "echo hi"}),
                               omo_result("bash", "hi")])

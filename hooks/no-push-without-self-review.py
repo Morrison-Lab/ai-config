@@ -1347,6 +1347,7 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
     verdict: str | None = None
     reviewed_commit: str | None = None
     pending_omo_uses: dict[str, list[str]] = {}
+    ambiguous_omo_names: set[str] = set()
 
     with open(transcript_path, "r", encoding="utf-8", errors="ignore") as f:
         for line in f:
@@ -1378,7 +1379,38 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                             saw_reviewer_call = True
                             reviewer_call_ids.add(call_id)
                 else:
-                    queue = pending_omo_uses.get(name)
+                    queue = pending_omo_uses.get(name) or []
+                    # An authorization decision must FAIL CLOSED under
+                    # ambiguity. OMO's records carry no call ids, so the only
+                    # thing linking a result to a use is order -- and order is
+                    # a guess the moment two dispatches of the SAME tool name
+                    # are outstanding at once, since nothing requires results
+                    # to arrive in dispatch order.
+                    #
+                    # Popping FIFO there is exploitable rather than merely
+                    # imprecise. Measured against this hook: dispatch the real
+                    # reviewer, dispatch any other `task`, and let only the
+                    # SECOND return, carrying verdict-shaped text naming the
+                    # pushed commit. FIFO pops the reviewer's id, so
+                    # `parse_report` reads the unrelated output and the push is
+                    # authorized with no review having completed. This branch's
+                    # own `docs/opencode-hook-mapping.md` carries verdict-shaped
+                    # example strings, so a documentation dispatch reaches that
+                    # state with nobody intending an attack.
+                    #
+                    # So a name whose queue is ever ambiguous is poisoned for
+                    # the REST of the transcript: its pending uses are dropped
+                    # and no later result of that name authorizes anything. The
+                    # cost is a false refusal in a genuinely interleaved
+                    # session, whose remedy is one more review round. The cost
+                    # of the other direction is an unreviewed push.
+                    #
+                    # The Claude-native path is unaffected: `tool_use_id` is a
+                    # real per-call identifier, not an order-derived guess.
+                    if len(queue) > 1 or name in ambiguous_omo_names:
+                        ambiguous_omo_names.add(name)
+                        pending_omo_uses[name] = []
+                        continue
                     call_id = queue.pop(0) if queue else None
                     if call_id is not None and call_id in reviewer_call_ids:
                         if not record.get("is_error"):

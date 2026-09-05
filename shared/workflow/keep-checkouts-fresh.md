@@ -330,7 +330,7 @@ a dated constant is the one payload for which *not reaching the session* is not 
 
 - **Do:** gate the re-arm on a freshness signal from outside the snapshot --- the `lastUpdated` timestamp in `~/.claude/plugins/installed_plugins.json`, or a network read --- and keep suppressing when that signal is unavailable.
   A corpus file the guard reads at runtime is not such a signal, since it is frozen in the same snapshot the constant is.
-  Neither is the pin's own `version`/`gitCommitSha`, which is an identity rather than a recency measure: it says which snapshot is served and cannot say whether that snapshot is old, so a gate reading it can never fire --- [`fail-fast`](../principles/fail-fast.md)'s precondition that "is indistinguishable from one that fires correctly and finds nothing".
+  Neither is the pin's own `version`/`gitCommitSha`, which is an identity rather than a recency measure: it says which snapshot is served and cannot say whether that snapshot is old, so a gate reading it can never fire, which [`fail-fast`](../principles/fail-fast.md) names as the worst kind: "a precondition that can never fire is indistinguishable from one that fires correctly and finds nothing".
   `lastUpdated` sits beside the rev in the same entry and does carry recency.
 - **Do:** read the constant from the copy that actually ran, when a guard demands something a standing directive forbids --- that demand is a freshness symptom before it is a policy question.
   Resolve which copy that is in this order, since the answer is frequently not the plugin at all: grep `~/.claude/settings.json` for a direct non-plugin registration of the script and read that file if one exists;
@@ -354,18 +354,18 @@ A later measurement pushes against it: a 240-second `ps -eo args` sample at 0.15
 That sample cannot close the question either, and its limit is the same shape as the incident's: `no-unreviewed-pr.py` never fired during the window, since it only fires while an unreviewed PR is open, so its absence from the capture is evidence about the registration path in general and none at all about the firings in question.
 `installed_plugins.json` pins `a9ded3e1a9df` at user scope, whose hook carries **no `MORATORIUM_END` at all**, plus a project-scope pin whose directory is absent.
 The cache holds copies in three different states at once: directories carrying `2026-09-01`, a `b0f279f8e8bd` entry carrying `2026-12-01`, and the pinned copy carrying no constant.
-No count is given deliberately.
+No *current* count is given, deliberately.
 The cache is garbage-collected, so the number decays: nine directories carried `2026-09-01` on 2026-09-03 and five carried it on 2026-09-04, with no edit in between.
 Derive it rather than citing one --- `find ~/.claude/plugins/cache -name no-unreviewed-pr.py | xargs grep -l 'MORATORIUM_END = datetime.date(2026, 9, 1)' | wc -l` --- since the argument needs only that several carry the same value, which is what makes "newest" isolate nothing.
 A second marketplace, `ai-config@d-morrison`, carries its own user-scope pin to a separate cache tree, so "which copy ran" has more candidate answers than the one marketplace suggests.
 
-**The cause is unknown, and one observation cannot separate the two explanations.**
-A copy whose constant has expired demands the review because the date passed;
-a copy with no moratorium logic demands it unconditionally, and no date is stale because no date exists.
+**The cause is unknown, and the candidate explanations do not reduce to two.**
+*If* a plugin copy fired, one observation cannot separate the obvious pair: a copy whose constant has expired demands the review because the date passed, while a copy with no moratorium logic demands it unconditionally, and no date is stale because no date exists.
 Both produce exactly the demand that was seen.
-Settling it needs one thing this incident never established: which copy `${CLAUDE_PLUGIN_ROOT}` resolved to at firing time, and what that file's constant reads.
+But that pair is not exhaustive, and the `ps` sample above is why: "no plugin copy fired at all, and some registration path not yet identified served the hook" is a third branch, and the twenty captured command lines point at it rather than away from it.
+So settling it needs the registration actually used at firing time, which this incident never established --- `${CLAUDE_PLUGIN_ROOT}`'s resolution answers that only on the branch where a plugin copy fired, and probing it while a third branch is live is the wrong-artifact substitution this section closes on.
 [#3141](https://github.com/Morrison-Lab/ai-config/issues/3141) carries the incident and now records its cause as unestablished, so cite it for the open question rather than for a mechanism.
 
 **The diagnosis itself is the transferable failure, and it is a plain instance of the rule two bullets above.**
-"The loaded copy" was identified as the cache's newest per-commit directory --- the one proxy Pattern 43's Fix section explicitly rules out --- while nine directories carried the same value, so "newest" isolated nothing.
+"The loaded copy" was identified as the cache's newest per-commit directory --- the one proxy Pattern 43's Fix section explicitly rules out --- while several directories carried the same value, so "newest" isolated nothing.
 That is [`verify-the-right-artifact`](verify-the-right-artifact.md)'s substitution with a corpus rule already naming the substituted artifact by name, which is why the resolution order above is written as steps rather than as advice.

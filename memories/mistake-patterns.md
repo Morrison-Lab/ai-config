@@ -884,8 +884,8 @@ A clean automated review from every available provider evaluating the current HE
   Several cache directories carried the same value, so newest isolated nothing --- derive the count rather than citing one, since the cache is garbage-collected and it fell from nine to five between 2026-09-03 and 2026-09-04 with no edit in between.
   The label above names the diagnostic failure rather than a stale cache, because the cause that would justify the latter is exactly what stayed unestablished.
   What the resolution order would have surfaced: the copy registered directly in `~/.claude/settings.json` carries the correct date and returns 0 before reading the transcript, `enabledPlugins` for this plugin is `false`, and the user-scope pin in `installed_plugins.json` names a hook with **no `MORATORIUM_END` at all**.
-  So an expired constant and an absent one produce the identical demand, and the cause stays unestablished;
-  only reading the file `${CLAUDE_PLUGIN_ROOT}` resolved to at firing time would settle it.
+  So an expired constant and an absent one produce the identical demand, and the cause stays unestablished --- as does whether a plugin copy fired at all, since a later `ps` sample caught twenty hook invocations and none from a plugin root.
+  Settling it needs the registration actually used at firing time, not `${CLAUDE_PLUGIN_ROOT}`'s resolution, which answers only on the branch where a plugin copy fired.
   See [`keep-checkouts-fresh.md`](../shared/workflow/keep-checkouts-fresh.md)'s dated-constant section for the resolution order and for the fail-open hazard, which is argued from the construct rather than measured here.
 - **Algorithmatizable?**
   Partially.

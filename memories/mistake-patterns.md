@@ -80,9 +80,16 @@ When a new entry lands after `main` has appended one of its own, take the next n
   and not in `ucdavis/epi204`, whose tree carries no hooks at all
   (checked 2026-09-04).
   Read the guard as unidentified rather than substituting a plausible
-  sibling: `no-stale-pr-status.py`, `no-incomplete-check-enumeration.py`,
-  and `no-handrolled-verdict-parse.py` each match part of this shape,
+  sibling.
+  Two registered `Stop` hooks match part of this shape ---
+  `no-stale-pr-status.py` and `no-incomplete-check-enumeration.py` ---
   and nothing in the record says which fired.
+  `no-handrolled-verdict-parse.py` is deliberately NOT a candidate:
+  `hooks/hooks.json` registers it under `PreToolUse`,
+  and its own docstring carries a section explaining why a `Stop`
+  matcher for this failure mode was rejected as too broad.
+  Filtering the candidate list by the hook's registered event
+  is what stops a shape match becoming a second wrong attribution.
   Never transcribe a fallback review's prose
   or call a PR ready for merge without `check-pr-fully-clean.py` exiting 0.
 - **Canonical Rule**: `AGENTS.md` ("Request review and drive every started PR to clean"),

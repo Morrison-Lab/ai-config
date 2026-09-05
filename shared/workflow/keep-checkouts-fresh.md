@@ -321,8 +321,8 @@ This narrows the recommendation above rather than leaving it untouched, so read 
 Automatic re-arming is a real benefit and it is exactly as trustworthy as the copy carrying the date, which on a plugin install is a snapshot nobody in the session controls.
 A stale flag, threshold, or allowlist can fail in either direction too, so what distinguishes this one is not the direction but the *trigger*: those change behaviour only when the value they carry is wrong for a case someone brings to them, while a dated constant changes behaviour with no case, no edit, and no event at all.
 Let the clock cross a number frozen in a snapshot and the guard computes that its own suppression has expired, then starts demanding an action a standing directive forbids --- with nobody having edited the hook, no PR having changed, and no session having done anything.
-That was an argument from how the construct is built until the case record below measured it;
-read that record for what the measurement does and does not cover, since the incident is a poor exemplar of the aging it illustrates.
+The clock-crossing route is an argument from how the construct is built, and the case record below does not exemplify it: that incident's snapshot was already past its date when it was written.
+What the record does measure is the fail-open *direction* --- a guard that begins demanding a forbidden action with no edit and no event --- by the stale-on-arrival route instead.
 
 That composes with this file's plugin-cache material into a worse failure than either part describes alone.
 Those paragraphs --- in "On the plugin path nothing else is needed", well above this section --- explain why a merged fix does not reach a running session;
@@ -336,7 +336,7 @@ a dated constant is the one payload for which *not reaching the session* is not 
   Resolve which copy that is in this order, since the answer is frequently not the plugin at all: grep `~/.claude/settings.json` for a direct non-plugin registration of the script and read that file if one exists;
   check `enabledPlugins` for whether the plugin path is live on this machine at all;
   then read the per-scope pin in `~/.claude/plugins/installed_plugins.json`, which names the snapshot the `~/.claude` plugin loader serves;
-  and --- in a desktop-app agent session, where none of the above is what runs --- the per-session snapshot under `~/Library/Application Support/Claude/local-agent-mode-sessions/<session>/.../rpm/plugin_<id>/hooks/`.
+  and --- in a desktop-app agent session, where none of the above is what runs --- the snapshot under `~/Library/Application Support/Claude/local-agent-mode-sessions/<session>/.../rpm/plugin_<id>/hooks/`.
   Three passes over this incident missed that last one because no step of this corpus mentioned it, so read the list as incomplete by construction and prefer the capture below to any list.
 - **Do:** capture the path instead of deducing it, when a guard fires repeatedly.
   `ps -eo args` sampled every 0.05s while you deliberately trigger the guard prints the interpreter's own argv, which is the resolved path and not an inference from one.
@@ -349,9 +349,9 @@ a dated constant is the one payload for which *not reaching the session* is not 
 - **Don't:** answer this by moving the switch into the environment;
   the pair above refuses that for a separate reason --- an env-readable clock or kill flag is a one-variable bypass of the guard in production --- and that refusal is untouched here.
 
-**The hazard above is measured, and the incident that established it is worth reading for how long the wrong artifact held out.**
+**The fail-open direction is measured, by a route other than the clock-crossing one above, and the incident is worth reading for how long the wrong artifact held out.**
 On 2026-09-03 `hooks/no-unreviewed-pr.py` demanded a Copilot review on two PRs while the all-repos moratorium ran to `MORATORIUM_END = 2026-12-01` ([#3078](https://github.com/Morrison-Lab/ai-config/pull/3078)).
-The mechanism is exactly the one this section describes.
+The failure is the one this section warns about --- a dated constant suppressing nothing --- though it arrived by a different route than the aging above.
 The copy that fired --- for the firings sampled on 2026-09-04;
 whether the same copy served the 2026-09-03 firings is not established --- resolves to `~/Library/Application Support/Claude/local-agent-mode-sessions/<session>/.../rpm/plugin_<id>/hooks/no-unreviewed-pr.py`, mtime 2026-09-01 22:42, carrying `MORATORIUM_END = 2026-09-01`;
 importing it and calling `moratorium_active()` returns `False`.
@@ -360,7 +360,7 @@ It was captured by sampling `ps -eo args` at 0.05s while deliberately triggering
 The guard compares `today < MORATORIUM_END`, so suppression ended at 2026-09-01 00:00 while the snapshot was written 2026-09-01 22:42 --- about 22.7 hours *after* expiry.
 It was fail-open the moment it existed.
 The hazard is still real, and a copy that is stale on arrival is a second route into it rather than the one the section describes.
-Why that tree holds a copy at all, whether it is per-session, and whether a new session would replace it are all **unestablished**: exactly one such file exists across the whole tree, one of its four outer roots is named `skills-plugin` rather than a session uuid, and the file was written a month after its containing directory was created.
+Why that tree holds a copy at all, whether it is per-session, and whether a new session would replace it are all **unestablished**: exactly one such file exists across the whole tree, one of its four outer roots is named `skills-plugin` rather than a session uuid, and the file was written a month after the outer session directory was created, while its own `plugin_<id>/` and `hooks/` directories were created in the same second as the file --- which is consistent with a snapshot written when the plugin was installed, inside a session root far older than it.
 The capture answers *which path*;
 it does not answer why that path exists or what would change it, and the first write-up extended it to both.
 

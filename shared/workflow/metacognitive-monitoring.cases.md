@@ -736,20 +736,26 @@ That is the **scope** claim-type from the top of this fragment, committed inside
 Which is the transferable part: knowing a rule, and having just been burned by it, does not arm the check.
 Only asking what kind of claim a sentence is arms it, and "the two sections above" does not feel like a claim at all --- it feels like navigation.
 
-## One session, five correctly-read artifacts over-extended by one step
+## One session, five conclusions taken one step past a real artifact
 
-`Morrison-Lab/ai-config` and `ucdavis/rampp`, 2026-09-03/04.
-A second five-instance recurrence of ["A sound measurement does not license the claim standing next to it"](metacognitive-monitoring.md#a-sound-measurement-does-not-license-the-claim-standing-next-to-it), and worth recording as a set rather than as five bullets, because the thing they share is not visible in any one of them.
+`Morrison-Lab/ai-config` and `ucdavis/rampp`, 2026-09-02/04.
+Five instances, spanning ["A sound measurement does not license the claim standing next to it"](metacognitive-monitoring.md#a-sound-measurement-does-not-license-the-claim-standing-next-to-it) and [`verify-the-right-artifact`](verify-the-right-artifact.md), and worth recording as a set rather than as five bullets --- not because they share a taxonomy, since they do not, but because what they share is invisible in any one of them.
 
-In every instance the artifact was real, was read correctly, and was the *right* artifact for some question --- just not for the question the next sentence answered.
-That is what separates this recurrence from [`verify-the-right-artifact`](verify-the-right-artifact.md), whose shapes all begin with a substitution: there, an adjacent artifact stands in for the target.
-Here nothing stands in for anything.
-The reading is sound and the step after it is silent, which is why each instance survived self-review: adding to the evidence felt identical to reading it.
+**They do not fall under one rule, and saying so is the first thing this record has to get right.**
+Instances 1 and 2 are substitutions: each artifact was real and was not the one the claim was about, and both are filed that way by their own sources --- ai-config[#3039](https://github.com/Morrison-Lab/ai-config/issues/3039) says `verify-the-right-artifact` "names this exact substitution", and [`keep-checkouts-fresh`](keep-checkouts-fresh.md) says the same of instance 2 by name.
+Instances 3 and 4 have no substitution in them: the artifact is the right one, read correctly, and the sentence after the reading answers a question it does not address.
+Instance 5 is neither, and is the plainest of the five --- a field read wrongly.
+
+What they share is a **felt sense**, not a mechanism: in each one the erroneous step felt like *reading* the evidence rather than adding to it, which is why each survived self-review.
+That is the transferable observation, and it is also the reason the taxonomy question is worth keeping separate from it.
+Knowing which of the two rules governs an instance is what tells you where to look;
+knowing that the failure feels like reading is what tells you to look at all.
 
 **Instance 1 --- a merged PR's check-run names, read as what the default branch emits.**
 The names were real and were accurate for that pull request's head.
 A ruleset's `required_status_checks` matches what the **default branch** emits on every future pull request, which is a different set once a workflow has been renamed.
-Wrong contexts were written to a live ruleset and blocked every merge in that repository, with nothing red to point at.
+Wrong contexts were written to a live ruleset, where a string no workflow emits sits as `Expected` forever and would block every merge in that repository until removed, with nothing red to point at.
+That consequence is how [#3039](https://github.com/Morrison-Lab/ai-config/issues/3039) and the guard's docstring both state it --- derived from the matching rule, not from an observed blocked merge.
 Recorded as ai-config[#3039](https://github.com/Morrison-Lab/ai-config/issues/3039) and guarded by `hooks/no-underived-required-check.py` ([#3137](https://github.com/Morrison-Lab/ai-config/pull/3137)), whose docstring carries the full account;
 the entry here is the inferential shape, not the guard.
 
@@ -758,13 +764,13 @@ A real directory carrying a real stale constant, and not what executed.
 [`mistake-patterns`](../../memories/mistake-patterns.md)'s Pattern 43 Fix section already rules that proxy out by name, so this is an occurrence of a recorded Fix step being skipped rather than of a new mechanism.
 
 **Instance 3 --- a sample whose window excluded its own target.**
-Twenty hook invocations captured, all from `$HOME/.claude/hooks/`, read as showing the plugin path inert.
+Twenty distinct hook command lines captured over 240 seconds, all from `$HOME/.claude/hooks/` and none from a plugin root, read as showing the plugin path inert.
 The sample is sound;
 its population is the complement of what it was aimed at, because the hook of interest could not fire during the window.
 This is the one the fragment's new sub-case is written from, and the most reusable of the five: a sample drawn when the event of interest is impossible looks identical to a sample that found nothing.
 
 **Instance 4 --- a resolved path, extended into a lifetime claim and a remedy.**
-A `ps` capture correctly resolved the firing hook's path.
+A `ps` capture correctly resolved the path of the copy that fired during that capture.
 That was extended to "a per-session snapshot, frozen for the life of the session" and to a "restart the session" remedy, neither of which the capture touches --- a capture names a path at an instant and says nothing about how long that path stays selected.
 Both were withdrawn.
 The remedy half is the sharper one, since ["An action you recommend is a claim about state"](metacognitive-monitoring.md#an-action-you-recommend-is-a-claim-about-state) governs it and a recommendation does not present itself as an assertion.

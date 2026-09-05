@@ -473,13 +473,15 @@ Hedging one statement of a claim and asserting another is a single act when the 
 
 **The test:** enumerate what the passage and its siblings mark unestablished, hedged, or withdrawn --- as a list, before reading anything else --- then ask of every other sentence whether it would still be true if one of those hedges resolved the other way.
 Enumerating first is what makes it work, since a sentence read in isolation supplies its own missing context and reads as fine.
-Derive the list from the text rather than from what you remember writing: a reviewer applying this to one prose PR derived **eight** hedged points where the author's own list had four, and the extra four were where the breaks were.
+Derive the list from the text rather than from what you remember writing.
+A reviewer applying this to one prose PR derived **eight** hedged points where the author's own list had four --- which is the argument for deriving it, and says nothing on its own about which of the eight the breaks sat under.
 
 Run it across the sibling files a change touches, not only within one file.
 A hedge stated in the file that argues for it constrains the file that cites it, and the citing file is where the unhedged restatement lands.
 
-(Measured 2026-09-03/04 on ai-config [#3267](https://github.com/Morrison-Lab/ai-config/pull/3267).
-Nine consecutive adversarial review rounds on one prose PR each returned exactly one finding of this shape.
+(Measured 2026-09-03/04 while preparing ai-config [#3267](https://github.com/Morrison-Lab/ai-config/pull/3267).
+The rounds were **local `adversarial-reviewer` dispatches before each push**, so the PR's own comment thread carries two verdict-bearing rounds and no record of the nine --- do not read the link as the source for the count, which is why it is stated here as unciteable rather than left to look checkable.
+Nine consecutive such rounds each returned exactly one finding of this shape, and the eight-versus-four figure below comes from the same unciteable series.
 That per-round count is itself the argument for enumerating the hedges up front rather than re-reading for consistency: re-reading surfaced one break per pass, so the rounds converged only as fast as a reviewer happened to notice, while an enumeration bounds the set to check in one pass.
 Tracked as [#3271](https://github.com/Morrison-Lab/ai-config/issues/3271).)
 

@@ -1041,9 +1041,11 @@ Where you cannot, report the sample as evidence about the population it did enum
 (Measured 2026-09-04, ai-config[#3141](https://github.com/Morrison-Lab/ai-config/issues/3141).
 A `ps` sample captured 20 hook command lines, all from `$HOME/.claude/hooks/` and none from a plugin root, and was read as showing the plugin registration path inert.
 `hooks/no-unreviewed-pr.py` never fired during that window, so the sample is evidence about the registration path in general and none about the firings in question.
-The same session settled it by the opposite procedure: `ps -eo args` sampled at 0.05s **while deliberately triggering the guard** named a copy under `~/Library/Application Support/Claude/local-agent-mode-sessions/` that no pass had looked at.
-That instance is recorded case-specifically in [`keep-checkouts-fresh`](keep-checkouts-fresh.md) and in [`mistake-patterns`](../../memories/mistake-patterns.md)'s Pattern 43 occurrence bullet, both added by [#3267](https://github.com/Morrison-Lab/ai-config/pull/3267);
-this is the general rule those two do not state.)
+The same session settled which copy fires when the guard is deliberately triggered, by the opposite procedure: `ps -eo args` sampled at 0.05s **while causing the event** named a copy under `~/Library/Application Support/Claude/local-agent-mode-sessions/` that no pass had looked at.
+Whether that same copy served the earlier firings is not established, and [`keep-checkouts-fresh`](keep-checkouts-fresh.md) says so where it records the capture --- so the remedy below is "cause the event inside the window", not "one capture settles the question".
+That instance is recorded case-specifically in [`keep-checkouts-fresh`](keep-checkouts-fresh.md) and in [`mistake-patterns`](../../memories/mistake-patterns.md)'s Pattern 43 occurrence bullet, both added by [#3267](https://github.com/Morrison-Lab/ai-config/pull/3267).
+`keep-checkouts-fresh` already states the observation in one line, in the middle of that incident's account --- "a sample drawn when the event of interest is impossible measures the complement of what it was aimed at, and reports a clean number for doing so" --- and this section deliberately reuses its phrasing rather than inventing a second vocabulary for the same thing.
+What is added here is the check and the remedy neither file carries, in the fragment a reader consults about their own claims rather than about a plugin install.)
 
 - **Do:** name the event a sample is meant to catch, and confirm the window could have contained one, before reading the result.
 - **Do:** trigger the event inside the window when you can cause it, rather than sampling and hoping one arrives.
@@ -1139,8 +1141,8 @@ the two propositions are a verified **mechanism** and an unverified
 **instance** asserted to fall under it, "A mechanism verified, an unverified
 population asserted to fall under it".
 
-A second five-instance recurrence, 2026-09-03/04, is recorded there as "One session, five correctly-read artifacts over-extended by one step".
-Its instances are worth reading together rather than singly: what unified them was that the erroneous step felt like *reading* the evidence rather than adding to it, so each one survived self-review while the artifact behind it stayed entirely sound.
+A second five-instance set, 2026-09-02/04, is recorded there as "One session, five conclusions taken one step past a real artifact".
+Those five do not all fall under this section --- two are [`verify-the-right-artifact`](verify-the-right-artifact.md) substitutions and one is a plain misread --- and the record is worth reading for what they share instead: in each, the erroneous step felt like *reading* the evidence rather than adding to it, which is what carried every one of them through self-review.
 
 ## Writing is the instrument, when the claim can be wrong
 

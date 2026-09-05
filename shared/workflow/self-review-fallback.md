@@ -12,7 +12,7 @@ A second reviewer's quota-skip carries the same shape but a different tell: `cop
 only the body distinguishes it (see [`review-verdict-pitfalls.md`](review-verdict-pitfalls.md)'s quota-refusal case and [`memories/github-mcp-tools.md`](../../memories/github-mcp-tools.md)'s `request_copilot_review` note).
 
 **Provider quotas reset independently, and each has to be checked on its own, not inferred from another provider's state.**
-[`memories/github-mcp-tools.md`](../../memories/github-mcp-tools.md) already records that Copilot and `claude-review` **fail** independently (one quota-dead does not mean the other is);
+[`memories/copilot-reviews.md`](../../memories/copilot-reviews.md) already records that Copilot and `claude-review` **fail** independently (one quota-dead does not mean the other is);
 the same independence applies to **resetting**.
 Your own Claude weekly quota resetting is a fact about *your* usage against Anthropic's service;
 it says nothing about GitHub Copilot's separately-metered review quota, which resets on its own schedule and can still be exhausted the moment yours clears.

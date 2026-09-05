@@ -630,8 +630,8 @@ anyway.
 
 (Morrison-Lab/ai-config#3180, 2026-09-04, which broke this rule in two of its
 own passages --- `fully-clean.md` and `check-pr-fully-clean.py` both cited
-`16544c50` and `7e1294b0`, pre-squash heads of #3167, caught in `7a797d3f8`
---- which is itself pre-squash on #3180, so the two SHAs and the commit that
+`16544c50` and `7e1294b0`, pre-squash heads of #3167, caught in `7a797d3f8`,
+which is itself pre-squash on #3180 --- so the two SHAs and the commit that
 caught them are fetched from different refs.
 A pre-existing instance is open as
 [#3275](https://github.com/Morrison-Lab/ai-config/issues/3275).

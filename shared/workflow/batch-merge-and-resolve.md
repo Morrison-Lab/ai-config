@@ -689,16 +689,16 @@ it against the current file shows otherwise.
 - **Do:** take the recovery baseline from the current working copy, or from
   the conflict stages (`:1:`/`:2:`/`:3:`) while the path is still conflicted,
   and apply the one hunk you need on top of it.
-- **Don't:** reach for `git show :<path>` without checking which state the path
-  is in --- it fails while the path is conflicted, and once you have staged
-  anything it returns what *you* staged, which is the bad restore itself if
-  that is what you staged.
 - **Do:** diff the restored file against the pre-restore working copy, not only
   against the old commit, so what the restore *removed* is visible.
 - **Do:** run that diff after every hand-written recovery, since the batch
   pass's per-merge re-check does not reach this one.
 - **Do:** re-derive every claim inside a restored region --- a docstring, a
   `_note_*` field, a README row --- against the file as it now stands.
+- **Don't:** reach for `git show :<path>` without checking which state the path
+  is in --- it fails while the path is conflicted, and once you have staged
+  anything it returns what *you* staged, which is the bad restore itself if
+  that is what you staged.
 - **Don't:** write `git show <old>:<path> > <path>`; it is a whole-file revert
   wearing the clothes of a targeted fix.
 - **Don't:** read an absent conflict or a green check as evidence a restore

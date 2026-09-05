@@ -1029,8 +1029,13 @@ The reconstructions were plausible every time, which is the finding: a
 rewritten message destroys the copy a later reader would check, and nothing
 about the gap announces itself, so each attempt filled it confidently and
 wrongly.
-Cite only commits reachable from a ref when recording such a case, since a
-pre-squash SHA resolves in the author's checkout and nowhere else.
+Cite commits reachable from a branch or tag when recording such a case.
+A pre-squash SHA is not lost --- GitHub keeps it under `refs/pull/<N>/head`,
+so `git fetch origin refs/pull/<N>/head` or the web UI still resolves it ---
+but it is reachable from no branch, so `git show <sha>` fails in an ordinary
+clone and `git for-each-ref --contains <sha>` returns nothing.
+Cite the squash commit, or name the PR alongside the SHA so a reader knows
+where to fetch it.
 
 That a rule gets broken while being authored is not itself the finding, and is
 already stated in this corpus three times over:

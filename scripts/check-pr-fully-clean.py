@@ -33,6 +33,8 @@ Copilot finding inside a collapsed `<details>` block is invisible too
 count performed here can see it. Measured on ai-config#3167, where this
 script printed FULLY CLEAN twice over a standing finding -- an inline comment
 at head 16544c50, and a suppressed "previously missed" item at head 7e1294b0.
+Both are pre-squash heads, reachable from no branch: fetch them from
+`refs/pull/3167/head`, or read the squash commit d29d33c71 on `main`.
 A caller reporting a PR ready runs the fragment's three queries alongside
 this script --- `pulls/<N>/comments`, `pulls/<N>/reviews` and
 `issues/<N>/comments` --- unfiltered by head SHA and printing each body. Two

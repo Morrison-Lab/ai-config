@@ -838,6 +838,9 @@ and the verdict's own conclusion every round.**
   at head `16544c50` an inline comment flagged a malformed code span, and at
   head `7e1294b0` a suppressed "previously missed" item named a missing
   cross-reference link.
+  Both heads are pre-squash, so they are reachable from no branch --- fetch
+  them from `refs/pull/3167/head`; the squash commit on `main` is
+  `d29d33c71`.
   Both were genuine, both were fixed, and neither was reachable from what
   the instrument reads.
   The instrument-side gaps are tracked as

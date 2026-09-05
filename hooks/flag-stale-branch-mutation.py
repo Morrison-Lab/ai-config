@@ -243,31 +243,53 @@ def _looks_like_pathspec(tok, cwd):
     `git switch` never takes a pathspec, so this test applies to `checkout`
     alone.
 
-    Two independent signals, either sufficient:
+    The order of the three tests below is git's own precedence, not a
+    convenience:
 
-    - The token is shaped like a path. `.`, `..`, and anything starting
-      `./`, `../` or `/` cannot be a branch name -- git rejects a ref
-      component of `.` or `..` outright.
-    - The token names something that exists on disk relative to `cwd`.
-      A branch and a path of the same name is the ambiguous case git itself
-      refuses without `--`, so declining to guess matches git's own
-      behaviour.
+    1. A token git cannot accept as a ref component is a pathspec outright.
+       `.` and `..` are forbidden by `git check-ref-format`, and a leading
+       `./`, `../` or `/` makes the token a path by construction.
+    2. **A token naming an existing local branch is a BRANCH, even when a
+       file of that name also exists.** git does not refuse the collision --
+       measured against git 2.50.1, with both a tracked `base.txt` and a
+       branch `base.txt`, `git checkout base.txt` answers
+       `Switched to branch 'base.txt'`. Deciding this the other way drops a
+       real, explicit selection from the tracked state, and the next
+       ordinary commit then warns -- the same false positive this function
+       exists to prevent, merely reached from the other side.
+    3. Only then does an on-disk path make the token a pathspec.
 
-    A glob is deliberately NOT treated as a pathspec here: `git check-ref-format`
-    forbids `*` and `?` in a ref, so such a token never reaches this hook as a
-    plausible branch name, and matching one against the filesystem would mean
-    expanding it.
+    A glob is deliberately NOT treated as a pathspec here: `git
+    check-ref-format` forbids `*` and `?` in a ref, so such a token never
+    reaches this hook as a plausible branch name, and matching one against
+    the filesystem would mean expanding it.
+
+    Every failure mode falls through to False, which records the token as a
+    branch. That is the pre-existing behaviour, so a git or filesystem error
+    can only leave this hook as it was, never make it noisier.
     """
     if tok in (".", ".."):
         return True
     if tok.startswith("./") or tok.startswith("../") or tok.startswith("/"):
         return True
-    if cwd:
-        try:
-            return os.path.exists(os.path.join(cwd, tok))
-        except (OSError, ValueError):
-            return False
-    return False
+    if not cwd:
+        return False
+    if _is_local_branch(cwd, tok):
+        return False
+    try:
+        return os.path.exists(os.path.join(cwd, tok))
+    except (OSError, ValueError):
+        return False
+
+
+def _is_local_branch(cwd, tok):
+    """True when `tok` names an existing local branch in `cwd`'s repository.
+
+    Asks git rather than guessing, and treats any failure as "not a branch"
+    so the caller falls through to the filesystem test.
+    """
+    out = _git(cwd, ["rev-parse", "--verify", "--quiet", "refs/heads/" + tok])
+    return bool(out and out.strip())
 
 
 def _selected_branch(rest, sub="checkout", cwd=None):

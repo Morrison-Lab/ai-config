@@ -410,6 +410,47 @@ def sc_switch_operand_is_never_a_pathspec(hook_path):
     return verdict_of(hso), hso.get("additionalContext", "")
 
 
+def sc_branch_shadowing_a_file_is_still_a_branch(hook_path):
+    """A plain `git checkout <name>` where a BRANCH and a FILE share the name.
+
+    git does not refuse this: measured on git 2.50.1, with a tracked
+    `base.txt` and a branch `base.txt`, `git checkout base.txt` answers
+    `Switched to branch 'base.txt'`. So the selection is real and must be
+    recorded, and the commit that follows -- on exactly that branch -- must
+    stay silent.
+
+    A pathspec test keyed on file existence alone decides this backwards,
+    drops the selection, and warns about drift from the earlier branch.
+    """
+    repo = _new_repo()
+    sid = _new_session()
+    _run(repo, "branch", "base.txt")
+    call_hook(hook_path, "git checkout -b feat/shadow", repo, sid)
+    _run(repo, "checkout", "-q", "-b", "feat/shadow")
+    call_hook(hook_path, "git checkout base.txt", repo, sid)
+    _run(repo, "checkout", "-q", "base.txt")
+    _write(repo, "other.txt", "changed\n")
+    _run(repo, "add", "other.txt")
+    hso = call_hook(hook_path, "git commit -m 'wip'", repo, sid)
+    return verdict_of(hso), hso.get("additionalContext", "")
+
+
+def sc_branch_shadowing_a_file_still_detects_drift(hook_path):
+    """The positive half of the case above: once `base.txt` IS recorded as
+    the selection, drifting off it and committing must warn, and the warning
+    must name `base.txt`."""
+    repo = _new_repo()
+    sid = _new_session()
+    _run(repo, "branch", "base.txt")
+    call_hook(hook_path, "git checkout base.txt", repo, sid)
+    _run(repo, "checkout", "-q", "base.txt")
+    _run(repo, "checkout", "-q", "-b", "feat/elsewhere3")
+    _write(repo, "other.txt", "changed\n")
+    _run(repo, "add", "other.txt")
+    hso = call_hook(hook_path, "git commit -m 'wip'", repo, sid)
+    return verdict_of(hso), hso.get("additionalContext", "")
+
+
 SHOULD_WARN = [
     ("W1", sc_incident, "TEST CASE: the incident, commit step"),
     ("W2", sc_incident_push, "TEST CASE: the incident, push step (sharper message)"),
@@ -436,6 +477,8 @@ SHOULD_WARN = [
      "a `-b` operand is a branch to create even when a file of that name exists"),
     ("W9", sc_switch_operand_is_never_a_pathspec,
      "`git switch` takes no pathspec, so a file-shaped operand is still a branch"),
+    ("W10", sc_branch_shadowing_a_file_still_detects_drift,
+     "a branch shadowing a filename is recorded, so later drift off it still warns"),
 ]
 
 SHOULD_STAY_SILENT = [
@@ -456,6 +499,8 @@ SHOULD_STAY_SILENT = [
      "`git checkout <file>` is a pathspec restore, not a branch selection"),
     ("S14", sc_pathspec_dot_keeps_selection,
      "`git checkout .` is a pathspec restore, not a branch called `.`"),
+    ("S15", sc_branch_shadowing_a_file_is_still_a_branch,
+     "a name that is BOTH a branch and a file is a branch -- git prefers the branch"),
 ]
 
 if not os.path.isfile(HOOK):
@@ -528,6 +573,21 @@ MUTATIONS = {
         [("    if actual == selected:\n        return None  # no drift",
           "    if False:\n        return None  # no drift")],
         {"S2"},  # S2 is the case that reaches this line without an in-call switch
+    ),
+    "pathspec-is-not-a-selection": (
+        "the pathspec test that stops `git checkout <file>` overwriting the "
+        "recorded selection",
+        [('        if sub == "checkout" and _looks_like_pathspec(tok, cwd):\n'
+          '            return None',
+          "        if False:\n            return None")],
+        {"S13", "S14"},
+    ),
+    "branch-beats-path": (
+        "the branch-precedence test, without which a name that is both a "
+        "branch and a file is misread as a pathspec",
+        [("    if _is_local_branch(cwd, tok):\n        return False",
+          "    if False:\n        return False")],
+        {"S15"},
     ),
     "push-must-match-selected": (
         "the push special case requires the NAMED branch to equal what this "

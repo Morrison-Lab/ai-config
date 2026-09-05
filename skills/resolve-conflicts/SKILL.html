@@ -462,6 +462,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li>❌ Committing the resolution without running the repo’s build/lint/test checks.</li>
 <li>❌ <code>git rebase --skip</code> / <code>git merge --abort</code> to dodge a conflict you were asked to resolve.</li>
 <li>❌ Force-pushing a half-resolved merge/rebase.</li>
+<li>❌ Restoring a whole file from a pre-merge commit (<code>git show &lt;old&gt;:&lt;path&gt; &gt; &lt;path&gt;</code>) to recover one entry — that reverts every other change the file has taken, including everything the merge just brought in. Rebuild the resolution from the conflict stages (<code>:1:</code>/<code>:2:</code>/<code>:3:</code>, above) and swap in only the hunk you came for. Note that <code>git show :&lt;path&gt;</code> is not a safe baseline here. While the path is conflicted it has no stage 0 and the command fails, and once you have staged a resolution stage 0 holds <em>your</em> content — so if the bad restore is what you staged, that is what comes back. See <a href="../../shared/workflow/batch-merge-and-resolve.md"><code>batch-merge-and-resolve</code></a>’s “The recovery has a silent failure mode of its own, and no merge produces it”, which is why the batch pass’s per-merge re-check never surfaces this one.</li>
 </ul>
 
 

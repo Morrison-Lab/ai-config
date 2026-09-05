@@ -1376,3 +1376,29 @@ This is the single-constant counterpart to the sibling-audit rule in
 where that rule prescribes sweeping distinct constructs that parse the same syntax class,
 this one prescribes eliminating duplicate literals for the exact same construct outright.)
 
+## Prose about your own tests and instruments overclaims by default, and it can be the dominant finding class
+
+Every section above treats one claim at a time --- a mutation that did not apply, a needle already present, a count asserted rather than derived.
+Across a long review it compounds into something worth naming on its own: a PR whose *code* was correct within a round or two can still take many more rounds to land, because nearly every remaining finding is a **claim about the code's own tests**, not a defect in the code.
+
+The claims that keep failing this way share a shape --- each is a sentence about the session's own instruments, and each is cheap to write and expensive to check, so the writer settles for plausible:
+
+- A "superset" relation between two mutations or two test arms, asserted rather than run.
+- A phrase attributed to a rendered or generated artifact ("the docstring says X", "the comment lands in paragraph Y") without rendering it and looking.
+- A coverage claim scoped with "the only arm that ..." when a neighboring arm was never checked against the same input.
+- An enumeration claimed exhaustive ("two cases: A and B") when a third case exists in the code (an `||`, an early return, an alternate branch) and was simply not looked for.
+- A count in prose ("four mutations were confirmed") that does not match the count of items actually named in the surrounding paragraph.
+
+None of these is a hard error to catch in isolation --- each reads as a small, plausible aside in a paragraph that is otherwise doing real work, which is exactly why they survive a first self-read and only surface once a reviewer tries to reproduce the specific claim.
+
+The remedy is the same one this file gives for code: run the thing before describing it.
+
+- **Do:** run the mutation and the ablation before asserting a superset or coverage relation between them.
+- **Do:** render the artifact (the docstring, the generated message, the diff) and grep or read it before saying a phrase appears in it.
+- **Do:** enumerate the actual branches in the code (grep for the operator, walk the `if`/`elif`/`else`) before writing "the only case" or "two cases".
+- **Do:** count the items you are about to name in a sentence, and match the stated count to that count.
+- **Don't:** treat a plausible-sounding claim about your own tests as needing no check merely because it is about testing infrastructure rather than about the feature --- it is exactly as checkable, and exactly as likely to be wrong.
+- **Don't:** read "the code is right" as "the PR is ready" while claims about the code's own verification remain unmeasured.
+
+(A session working in `Morrison-Lab/gha` recorded the incident that produced this section in its own local `prose-about-my-own-tests-overclaims.md` --- project-local Claude Code auto-memory, not a file committed to any repository, so there is no link to give here: roughly eleven adversarial review rounds on one PR, where the code was correct by round two and every one of the remaining rounds found a claim of exactly the shapes listed above.)
+

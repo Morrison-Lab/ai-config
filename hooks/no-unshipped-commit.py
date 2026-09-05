@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Stop-hook guard: a successful commit must be pushed before reporting done."""
+import datetime
 import hashlib
 import json
 import os
@@ -7,6 +8,27 @@ import re
 import subprocess
 import sys
 import tempfile
+
+# The shell's working directory is not this hook's to model: `cd`, `pushd`,
+# `popd`, `cd -`, a bare `cd`, `~` and `$HOME` targets, and a relative target
+# resolved against wherever the shell already stood are all handled by
+# `scripts/lib/shellcmd.py`, whose `resolve_cd_target` is the tested in-repo
+# implementation this file would otherwise re-derive. A broken install fails
+# OPEN: the directory the shell stands in simply goes untracked, which costs
+# attribution for a commit whose own call names no directory and can never
+# invent one.
+try:
+    _LIB = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+        "scripts", "lib")
+    if _LIB not in sys.path:
+        sys.path.insert(0, _LIB)
+    from shellcmd import (resolve_cd_target, simple_commands_with_scope,
+                          strip_env)
+except Exception as _exc:  # broken install; fail open and say so
+    print(f"no-unshipped-commit: cannot load scripts/lib/shellcmd.py "
+          f"({_exc}); not tracking the shell's directory", file=sys.stderr)
+    resolve_cd_target = simple_commands_with_scope = strip_env = None
 
 # `(?![\w-])`, not `\b`. A word boundary sits happily between `commit` and
 # `-`, because `-` is a non-word character -- so `git\s+commit\b` matched
@@ -40,10 +62,35 @@ import tempfile
 # The two guards' interaction guaranteed the loop: one required the prefix,
 # the other could not see prefixed pushes.
 _ENV = r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
-_GIT_FLAGS = r"(?:-(?:C\s*\S+|c\s*\S+|[a-zA-Z0-9_-]+(?:=\S*)?)\s+|--[a-zA-Z0-9_-]+(?:=\S*)?\s+)*"
+_GIT_FLAGS = (
+    r"(?:"
+    r"-[Cc]\s*\S+\s+|"
+    r"-[a-bd-zA-BD-Z0-9_][a-zA-Z0-9_-]*(?:=\S*)?\s+|"
+    r"--[a-zA-Z0-9_][a-zA-Z0-9_-]*(?:=\S*)?\s+"
+    r")*"
+)
 COMMIT = re.compile(r"(?:^|[;&|\n])\s*" + _ENV + r"git\s+" + _GIT_FLAGS + r"commit(?![\w-])", re.MULTILINE)
 PUSH = re.compile(r"(?:^|[;&|\n])\s*" + _ENV + r"git\s+" + _GIT_FLAGS + r"push(?![\w-])", re.MULTILINE)
 CREATE = re.compile(r"(?:^|[;&|\n])\s*" + _ENV + r"gh\s+pr\s+create\b", re.MULTILINE)
+
+try:
+    _LIB = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+        "scripts", "lib")
+    if _LIB not in sys.path:
+        sys.path.insert(0, _LIB)
+    from git_cmd import (  # type: ignore[no-redef]
+        _ENV as _GIT_ENV,
+        _GIT_FLAGS as _GIT_CMD_FLAGS,
+        COMMIT as _GIT_COMMIT,
+        CREATE as _GIT_CREATE,
+        PUSH as _GIT_PUSH,
+    )
+    _ENV, _GIT_FLAGS = _GIT_ENV, _GIT_CMD_FLAGS
+    COMMIT, PUSH, CREATE = _GIT_COMMIT, _GIT_PUSH, _GIT_CREATE
+except Exception as _exc:  # fallback to inline definitions; log why
+    print(f"no-unshipped-commit: cannot load scripts/lib/git_cmd.py "
+          f"({_exc}); using fallback regexes", file=sys.stderr)
 
 # A heredoc body redirected INTO A FILE is text, not commands: `cat > x <<'EOF'
 # ... EOF` writes the lines rather than running them. A corpus about git
@@ -133,74 +180,261 @@ def strip_quoted(command):
 
 
 
-CD_CMD = re.compile(
-    r"(?:^|[;&|\n])\s*" + _ENV + r"cd\s+([^\s;&|]+)",
-    re.MULTILINE
-)
 GIT_C_CMD = re.compile(
     r"(?:^|[;&|\n])\s*" + _ENV + r"git\s+-C\s+([^\s;&|]+)",
     re.MULTILINE
 )
-WORKTREE_ADD_CMD = re.compile(
-    r"(?:^|[;&|\n])\s*" + _ENV + r"git\s+worktree\s+add\s+([^;&|\n]+)",
+# Calls that MOVE HEAD, as opposed to merely naming a branch. Matched for
+# their own sake rather than for the names they carry: `git checkout -`
+# switches back and names nothing, and a switch that names nothing still has
+# to supersede the branch a commit would otherwise inherit (ai-config#2422).
+#
+# It is the ONLY source of the names a commit may inherit, and it replaces
+# them rather than adding to them. An earlier revision read those from a
+# wider pattern that matched `git branch` too, so
+# `git branch -d agy-dormant` --- the cleanup this issue's own report
+# describes performing on a squash-merged leftover --- made that branch the
+# one the next commit was attributed to, and a `git branch -d` git refuses as
+# unmerged left the session blocked on a branch it never committed to. A
+# branch only ever passed to `git branch` was never committed on.
+#
+# Three near-misses are excluded, because supersession CLEARS the carried
+# branch and clearing on a call that moved nothing loses the switched-branch
+# attribution ai-config#2737 added. `git branch feature` creates without
+# switching. `git worktree add <path> <branch>` creates a second checkout and
+# leaves this one exactly where it stood, so it belongs beside `git branch`
+# rather than here --- and so does its `-b` form, which names a branch in a
+# checkout this shell is not standing in. `git checkout -p` stages
+# hunks interactively and switches nothing, so the argument list is read
+# rather than only the command word.
+#
+# `git switch --detach` IS a move and stays included: it detaches HEAD at the
+# current commit, so a commit after it lands on no branch at all and must not
+# inherit the one the shell left.
+#
+# `(?![\w-])`, not `\b`, for the same reason COMMIT carries it: a word
+# boundary sits happily before a hyphen, so `checkout\b` matches
+# `git checkout-index`, plumbing that copies files out of the index and moves
+# HEAD nowhere. The group must stay optional-whitespace to reach a bare
+# `git checkout`, which is what makes the guard necessary here.
+SWITCH_CMD = re.compile(
+    r"(?:^|[;&|\n])\s*" + _ENV + r"git\s+(?:checkout|switch)(?![\w-])\s*([^;&|\n]*)",
     re.MULTILINE
 )
-BRANCH_CMD = re.compile(
-    r"(?:^|[;&|\n])\s*" + _ENV + r"git\s+(?:checkout|switch|branch)\s+([^;&|\n]+)",
-    re.MULTILINE
-)
+PATCH_FLAGS = {"-p", "--patch"}
+# The bare `--` token, which ends the options and makes everything after it a
+# PATHSPEC. `git checkout -- README.md` and `git checkout main -- README.md`
+# both restore a file into the working tree and move HEAD nowhere, so neither
+# may clear the carried branch --- and a path restore is far commoner in this
+# corpus's own workflows than the patch and plumbing forms above it.
+#
+# The bare `git checkout README.md` form, with no `--`, is NOT decidable from
+# the command text: git resolves it as a ref when one exists and as a path
+# otherwise, and `README.md` and `feature/x.y` are both legal branch names.
+# It is therefore left reading as a switch, which clears the carried branch
+# and names one no worktree holds --- so the guard falls silent rather than
+# blocking on a branch the session never committed to. That is the direction
+# ai-config#2422 requires: a missed block costs a reminder, a false block
+# costs every Stop in the session.
+PATHSPEC_SEP = "--"
+# A cheap pre-filter for `shell_dir_after`. Parsing every call's argv would
+# run `shlex` twice per Bash call across a whole transcript, and a Stop hook
+# has to answer promptly; a command carrying none of these three words moves
+# the shell nowhere, so the parse has nothing to find. `(?![\w-])` again, so
+# `cdate` and `cd-into` do not arm it.
+DIR_MOVE = re.compile(r"(?:^|[;&|\n(]|\s)(?:cd|pushd|popd)(?![\w-])", re.MULTILINE)
 
 
-def extract_touched_paths(command):
-    """Extract worktree paths touched by cd, git -C, or git worktree add."""
+def _moves_head(args):
+    """Whether a `git checkout`/`git switch` argument list actually moves HEAD.
+
+    The single gate `branches_after` consults before REPLACING the carried
+    branch: a form that moves supersedes whatever was carried even when it
+    names nothing, and a form that does not move must leave the carry alone.
+    An earlier revision asked that question in two places --- one deciding
+    whether to clear, the other deciding what replaces --- and they read
+    different patterns, so a command counted as naming a branch was never
+    counted as clearing one. One caller is what makes that unrepresentable
+    rather than merely unlikely.
+    """
+    if any(a in PATCH_FLAGS for a in args):
+        return False
+    return PATHSPEC_SEP not in args
+
+
+# Appended by `shell_dir_after` so the parse reports the subshell the TEXT
+# ENDS IN. `simple_commands_with_scope` pairs each command with its own scope
+# and says nothing about the separators that follow the last one, so
+# `(cd /a && git status)` and `(cd /a && ` are otherwise indistinguishable:
+# the first ends back in the parent shell, the second inside the subshell
+# where whatever follows it runs. A marker word invokes nothing and is never
+# a `cd`, so it only ever reports.
+END_MARKER = "__no_unshipped_commit_end__"
+
+
+def _scope_dir(dirs, scope, cur_dir):
+    """The directory subshell `scope` stands in, entering it if it is new.
+
+    A subshell inherits its parent's directory AT THE MOMENT IT OPENS, which
+    is what recording it lazily --- on the scope's first command --- gets
+    right: every `cd` the parent ran before the `(` has already been folded
+    into the parent's entry, and every `cd` it runs after the `)` comes later
+    and cannot reach a scope that is already closed.
+    """
+    if scope not in dirs:
+        dirs[scope] = (cur_dir if len(scope) == 1
+                       else _scope_dir(dirs, scope[:-1], cur_dir))
+    return dirs[scope]
+
+
+def shell_dir_after(text, cur_dir, parent_only=False):
+    """The directory the shell stands in WHERE `text` ENDS, given `cur_dir`,
+    or, with `parent_only`, the caller's own shell wherever `text` stopped.
+
+    `None` means INDETERMINATE, never "unchanged": `cd -`, `popd`, a `$VAR`
+    target, and an unparseable command each move the shell somewhere this
+    scan cannot name, so nothing after them may inherit the directory they
+    left. That is the whole of ai-config#2422's directory half --- a session
+    that visits a dormant foreign worktree and then returns must not attribute
+    its own later commit to the worktree it visited.
+
+    One directory per SUBSHELL, keyed on the scope
+    `simple_commands_with_scope` reports rather than on nesting depth alone:
+    a subshell inherits its parent's directory on descent, its own moves die
+    with it on ascent, and the parent's survives both. Depth alone cannot
+    say that much, because two SIBLING subshells share a depth --- so keying
+    on it let `(cd /other-worktree && git status) && (git commit -m mine`
+    carry the first subshell's move into the second and attribute the commit
+    to a checkout it never ran in, which is ai-config#2422's own false-block
+    failure on a different spelling.
+    """
+    if simple_commands_with_scope is None or not DIR_MOVE.search(text):
+        return cur_dir
+    # The marker goes on its own line, so a heredoc terminator ending `text`
+    # stays a terminator rather than becoming `EOF __no_unshipped_commit_end__`
+    # and swallowing the rest of the call. When it is swallowed anyway,
+    # `end_scope` stays the caller's own shell and the parent's directory is
+    # the answer, which is what this function returned before scopes existed.
+    argvs = simple_commands_with_scope(text + chr(10) + END_MARKER)
+    if argvs is None:
+        return None
+    dirs, end_scope = {}, (0,)
+    for scope, argv in argvs:
+        here = _scope_dir(dirs, scope, cur_dir)
+        if argv == [END_MARKER]:
+            end_scope = scope
+            break
+        _, rest = strip_env(argv)
+        if rest and rest[0] in ("cd", "pushd", "popd"):
+            dirs[scope] = resolve_cd_target(rest, here)
+    return _scope_dir(dirs, (0,) if parent_only else end_scope, cur_dir)
+
+
+def absolute_dir(path):
+    """`path` when it names a directory absolutely, else None.
+
+    A relative target resolved against an unknown starting directory comes
+    back as the literal the user typed (`hooks`), which no worktree path can
+    be compared against. Dropping it is the honest answer.
+    """
+    return path if path and os.path.isabs(path) else None
+
+
+def extract_named_paths(command):
+    """Directories a `git -C <dir>` NAMES without moving the shell into them.
+
+    `-C` points the command at a repository while leaving the shell where it
+    stood, so a `-C` the COMMIT ITSELF carries attributes that commit on its
+    own and needs no carrying forward. Where the shell IS standing is tracked
+    separately by `shell_dir_after`, because a `cd` persists across tool calls
+    while this function sees one call.
+
+    Callers attributing a commit pass the committing git invocation rather
+    than the whole call, so that only a `-C` the commit carries counts --- see
+    `scan_transcript`. `git worktree add <path>` is deliberately not read
+    here: it creates a checkout without moving the shell into it, so a commit
+    beside it lands where the shell already stood, and the only routes into
+    the new checkout --- a `cd` into it, or a `-C` naming it on the commit ---
+    are each already covered above.
+    """
     paths = set()
-    for m in CD_CMD.finditer(command):
-        p = m.group(1).strip("\"'").strip()
-        if p and not p.startswith("-"):
-            paths.add(p)
     for m in GIT_C_CMD.finditer(command):
         p = m.group(1).strip("\"'").strip()
         if p:
             paths.add(p)
-    for m in WORKTREE_ADD_CMD.finditer(command):
-        args = m.group(1).split()
-        for arg in args:
-            if arg.startswith("-") or arg == "add":
-                continue
-            p = arg.strip("\"'").strip()
-            if p and ("/" in p or os.path.exists(p)):
-                paths.add(p)
     return paths
 
 
-def extract_touched_branches(command):
-    """Extract branch names touched by checkout/switch/branch/worktree add commands."""
+def _switch_target(args):
+    """Branch names a head-moving `git checkout`/`git switch` leaves HEAD on.
+
+    An empty set is a real answer, not a miss: `git checkout -` moves away
+    while naming nothing, and `branches_after` reads that emptiness as the
+    supersession ai-config#2422 requires.
+
+    `git checkout [<tree-ish>] -- <paths>` restores files and moves HEAD
+    nowhere, so it names no branch this scan may carry --- reading the
+    pathspec as one replaced the real carried branch with a filename and lost
+    the switched-branch attribution ai-config#2737 added. `_moves_head` is
+    what excludes it, and the patch forms beside it, before this runs.
+    """
     branches = set()
-    for m in BRANCH_CMD.finditer(command):
+    skip_next = False
+    for arg in args:
+        if skip_next:
+            skip_next = False
+            continue
+        if arg in ("-b", "-B", "-c", "-C", "-d", "-D", "-m", "-M", "--create", "--orphan"):
+            continue
+        if arg.startswith("-"):
+            if arg in ("-t", "--track", "--recurse-submodules", "--set-upstream-to", "-u"):
+                skip_next = True
+            continue
+        if arg == "--":
+            continue
+        b = arg
+        if b.startswith("refs/heads/"):
+            b = b[len("refs/heads/"):]
+        if not b.startswith("-") and not b.startswith("@"):
+            branches.add(b)
+    return branches
+
+
+def branches_after(text, cur_branches):
+    """The branches a commit after `text` may sit on, given `cur_branches`.
+
+    The branch-side twin of `shell_dir_after`, and folded the same way: each
+    head-moving command is applied IN SOURCE ORDER, replacing the set rather
+    than adding to it, so the command the text ends on is the one that
+    decides. Unioning every match instead left the inspect-then-return route
+    ai-config#2422 reports open whenever both halves sat in one text ---
+    `git checkout agy-dormant && git log -1 && git checkout -` still yielded
+    the dormant branch, because the named checkout outvoted the `-` that
+    superseded it. The same union claimed `main` off the
+    `git checkout main && git pull --ff-only && git checkout -b fix/x`
+    opening this corpus writes constantly, so a local `main` sitting ahead of
+    its upstream blocked every Stop over a branch nothing was committed on.
+
+    A move that names nothing empties the set, which is the supersession
+    itself.
+
+    `git worktree add -b <name>` is NOT a source here, and adding it was a
+    false-attribution bug of exactly the kind this issue exists to remove: it
+    creates the branch in a SECOND checkout and leaves this shell's HEAD
+    where it stood, so a commit beside it lands on whatever the shell was
+    already on. Contributing the name additively also made it permanent ---
+    nothing but a later head-moving switch removes it --- so a conductor
+    session that creates several subagent worktrees, this corpus's own
+    standard shape, had its Stop blocked by any subagent's unpushed commit.
+    The session's own route into such a checkout is a `cd` into it or a
+    `-C` naming it on the commit, and `shell_dir_after` and
+    `extract_named_paths` already attribute both.
+    """
+    branches = set(cur_branches)
+    for m in SWITCH_CMD.finditer(text):
         args = m.group(1).split()
-        skip_next = False
-        for arg in args:
-            if skip_next:
-                skip_next = False
-                continue
-            if arg in ("-b", "-B", "-c", "-C", "-d", "-D", "-m", "-M", "--create", "--orphan"):
-                continue
-            if arg.startswith("-"):
-                if arg in ("-t", "--track", "--recurse-submodules", "--set-upstream-to", "-u"):
-                    skip_next = True
-                continue
-            if arg == "--":
-                continue
-            b = arg
-            if b.startswith("refs/heads/"):
-                b = b[len("refs/heads/"):]
-            if not b.startswith("-") and not b.startswith("@"):
-                branches.add(b)
-    for m in WORKTREE_ADD_CMD.finditer(command):
-        args = m.group(1).split()
-        for i, arg in enumerate(args):
-            if arg in ("-b", "-B") and i + 1 < len(args):
-                branches.add(args[i + 1])
+        if _moves_head(args):
+            branches = _switch_target(args)
     return branches
 
 
@@ -218,65 +452,182 @@ def unwrap_command(cmd):
             return cmd.replace('\\n', '\n').replace('\\"', '"')
     return cmd
 
+def _timestamp_key(record):
+    """A record's own timestamp, or None when it carries none that parses."""
+    stamp = record.get("timestamp")
+    if not isinstance(stamp, str) or not stamp:
+        return None
+    try:
+        return datetime.datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def bash_calls(path):
+    """Every Bash tool call in the transcript, in CHRONOLOGICAL order.
+
+    File order is not time order. A context compaction replays earlier
+    records, appending them BELOW newer ones while they keep their original
+    timestamps, so a replayed `cd` can land after a commit it never preceded
+    and claim it --- the "last X in the transcript" unsoundness
+    `memories/claude-code-transcripts.md` names, which fails silently because
+    every record parses correctly and the reader simply holds the wrong one.
+    Every piece of carried state below is position-keyed, so the ordering is
+    fixed once, here, rather than defended at each use.
+
+    Calls are sorted by each record's own timestamp, stably, and ONLY when
+    all of them carry one that parses and compares. A mix of stamped and
+    unstamped records has no total order to impose, and neither do aware and
+    naive stamps together, so file order stands in both cases rather than a
+    guessed one.
+    """
+    calls = []
+    with open(path, encoding="utf-8", errors="ignore") as stream:
+        for line in stream:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                record = json.loads(line)
+            except (json.JSONDecodeError, ValueError):
+                continue
+            tool_calls = []
+            if record.get("type") == "assistant" or record.get("role") == "assistant":
+                blocks = (record.get("message") or {}).get("content") or record.get("content") or []
+                if isinstance(blocks, list):
+                    for block in blocks:
+                        if isinstance(block, dict) and block.get("type") == "tool_use":
+                            tool_calls.append((block.get("name") or "", block.get("input") or {}))
+            if record.get("type") in {"PLANNER_RESPONSE", "GENERIC"} or record.get("source") == "MODEL" or "tool_calls" in record:
+                for tc in record.get("tool_calls") or []:
+                    if isinstance(tc, dict):
+                        name = tc.get("name") or (tc.get("function") or {}).get("name") or ""
+                        args = tc.get("args") or tc.get("input") or (tc.get("function") or {}).get("arguments") or {}
+                        if isinstance(args, str):
+                            try:
+                                args = json.loads(args)
+                            except Exception:
+                                args = {"command": args}
+                        tool_calls.append((name, args if isinstance(args, dict) else {}))
+            for name, inp in tool_calls:
+                if name not in {"Bash", "bash", "run_command", "terminal", "execute_command", "shell"}:
+                    continue
+                calls.append((_timestamp_key(record), len(calls), inp))
+    if calls and all(call[0] is not None for call in calls):
+        try:
+            calls.sort(key=lambda call: (call[0], call[1]))
+        except TypeError:
+            calls.sort(key=lambda call: call[1])
+    return [call[2] for call in calls]
+
+
 def scan_transcript(path):
-    """Return (saw_commit, pending, touched_branches, touched_paths) from the transcript scan.
+    """Return (saw_commit, pending, commit_branches, commit_paths).
 
     `saw_commit` is whether a real `git commit` ran at all --- the gate that
     decides whether repository state is worth consulting, so a session that
     never committed is not blocked for commits it did not make. `pending` is
     the last committed-but-never-discharged command, by the same scan.
-    `touched_branches` is the set of branch names touched via checkout/switch.
-    `touched_paths` is the set of working directories / worktree paths touched.
+
+    `commit_branches` and `commit_paths` are scoped to the tool calls that
+    actually COMMITTED, not to every branch and directory the session
+    happened to visit (ai-config#2422). Visiting is not committing: a
+    session that runs `cd /other-tool-worktree && git status` to inspect a
+    dormant Antigravity or Cursor worktree used to make that worktree
+    relevant, so a leftover branch there --- typically one whose PR already
+    squash-merged, leaving local commits no remote carries --- blocked every
+    Stop for a debt the session never incurred and often could not safely
+    discharge. The payload `cwd` stays relevant on its own, so the ordinary
+    single-checkout case is unaffected.
+
+    A commit is attributed to the state the shell was in WHEN IT RAN, which
+    is what makes both halves narrow. EVERY commit in a call is attributed
+    that way, not only the first, so `cd /a && git commit -m x && cd /b &&
+    git commit -m y` claims both checkouts. The directory is the one `cd`
+    calls EARLIER IN THE SAME CALL leave the shell in, over the
+    harness-recorded working directory of that call, over the directory
+    carried from the previous call --- so `git commit -m x && cd /elsewhere`
+    attributes where the shell stood, not where it ends up. The branch is the
+    one the LAST head-moving command earlier in the same call named, and
+    otherwise the branch carried forward: both axes fold their moves in
+    source order, so neither reports a state the shell had already left.
+    A `git -C <dir>` on the committing invocation ITSELF names the repository
+    the commit runs in and attributes on its own. A `git -C` elsewhere in the
+    same call does not, whether it precedes the commit or follows it: it
+    reads another repository without running the commit there, and
+    `git commit -m x && git -C /elsewhere log -1` used to report /elsewhere
+    --- the `cd`-after-the-commit misattribution spelled with a different
+    flag. `git worktree add <path>` likewise creates a checkout without
+    moving the shell into it, so a commit beside it lands where the shell
+    already stood --- on neither axis, the `-b` form included: the path it
+    creates is not a commit path, and the branch it creates is not a commit
+    branch, until a `cd` into that checkout or a `-C` naming it on the commit
+    says the commit ran there.
+
+    Both carried values are SUPERSEDED by a move that names nothing, whether
+    it stands in its own call or precedes the commit inside one: `git
+    checkout -` and `cd -` move away while yielding no name, and `popd` and a
+    bare `cd` do too, so inspecting a dormant worktree or branch and then
+    returning leaves the dormant one unattributed in either spelling
+    (ai-config#2422). Attribution is per commit rather than per
+    session, so a later checkout away --- the switched-branch case
+    ai-config#2737 added --- still reports the branch that holds the commit,
+    while a checkout no commit followed reports nothing.
     """
-    saw, pending, touched_branches, touched_paths = False, None, set(), set()
+    saw, pending, commit_branches, commit_paths = False, None, set(), set()
+    # The shell's running state, awaiting a commit to claim it. `cur_dir` is
+    # a single resolved absolute path rather than a set of raw literals,
+    # because the shell stands in exactly one directory; None means the last
+    # move went somewhere this scan cannot name.
+    recent_branches, cur_dir = set(), None
     try:
-        with open(path, encoding="utf-8", errors="ignore") as stream:
-            for line in stream:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    record = json.loads(line)
-                except (json.JSONDecodeError, ValueError):
-                    continue
-                tool_calls = []
-                if record.get("type") == "assistant" or record.get("role") == "assistant":
-                    blocks = (record.get("message") or {}).get("content") or record.get("content") or []
-                    if isinstance(blocks, list):
-                        for block in blocks:
-                            if isinstance(block, dict) and block.get("type") == "tool_use":
-                                tool_calls.append((block.get("name") or "", block.get("input") or {}))
-                if record.get("type") in {"PLANNER_RESPONSE", "GENERIC"} or record.get("source") == "MODEL" or "tool_calls" in record:
-                    for tc in record.get("tool_calls") or []:
-                        if isinstance(tc, dict):
-                            name = tc.get("name") or (tc.get("function") or {}).get("name") or ""
-                            args = tc.get("args") or tc.get("input") or (tc.get("function") or {}).get("arguments") or {}
-                            if isinstance(args, str):
-                                try:
-                                    args = json.loads(args)
-                                except Exception:
-                                    args = {"command": args}
-                            tool_calls.append((name, args if isinstance(args, dict) else {}))
-                for name, inp in tool_calls:
-                    if name not in {"Bash", "bash", "run_command", "terminal", "execute_command", "shell"}:
-                        continue
-                    for k in ("cwd", "workdir", "Cwd", "WorkingDirectory", "path"):
-                        val = inp.get(k)
-                        if isinstance(val, str) and val:
-                            touched_paths.add(val)
-                    command = str(inp.get("command") or inp.get("cmd") or inp.get("CommandLine") or inp.get("script") or "")
-                    command = unwrap_command(command)
-                    scanned = strip_quoted(command)
-                    touched_branches |= extract_touched_branches(scanned)
-                    touched_paths |= extract_touched_paths(scanned)
-                    if COMMIT.search(scanned):
-                        saw = True
-                        pending = command
-                    if pending and (PUSH.search(scanned) or CREATE.search(scanned)):
-                        pending = None
+        for inp in bash_calls(path):
+            harness_dirs, harness_cwd = set(), None
+            for key in ("cwd", "workdir", "Cwd", "WorkingDirectory", "path"):
+                val = inp.get(key)
+                if isinstance(val, str) and val:
+                    harness_dirs.add(val)
+                    if harness_cwd is None:
+                        harness_cwd = val
+            command = str(inp.get("command") or inp.get("cmd") or inp.get("CommandLine") or inp.get("script") or "")
+            command = unwrap_command(command)
+            scanned = strip_quoted(command)
+            start_dir = harness_cwd or cur_dir
+            # EVERY commit in the call, not only the first: a call can commit
+            # in one worktree, move, and commit in another, and attributing
+            # only the first left the second unclaimed --- so an unshipped
+            # commit went unreported and the Stop was allowed.
+            for commit in COMMIT.finditer(scanned):
+                saw = True
+                pending = command
+                before = scanned[:commit.start()]
+                # The commit's OWN match span, which runs from the start of
+                # its git invocation through the `commit` word, so a `git -C`
+                # it carries is inside it and every other one in the call is
+                # outside it.
+                invocation = scanned[commit.start():commit.end()]
+                commit_paths |= harness_dirs | extract_named_paths(invocation)
+                commit_dir = absolute_dir(shell_dir_after(before, start_dir))
+                if commit_dir:
+                    commit_paths.add(commit_dir)
+                # Supersession applies WITHIN the call as well as between
+                # calls, and is decided by the LAST head-moving command
+                # before the commit rather than by all of them at once:
+                # `git checkout agy-dormant && git log -1 && git checkout -
+                # && git commit -m mine` ends on a move that names nothing,
+                # so the inspected branch is cleared rather than inherited
+                # (ai-config#2422).
+                commit_branches |= branches_after(before, recent_branches)
+            # The carried state is updated AFTER the commit is attributed, so
+            # `git commit -m x && git checkout -` reports the branch the
+            # commit landed on rather than the one the call ended on.
+            recent_branches = branches_after(scanned, recent_branches)
+            cur_dir = absolute_dir(shell_dir_after(scanned, start_dir, parent_only=True))
+            if pending and (PUSH.search(scanned) or CREATE.search(scanned)):
+                pending = None
     except Exception:
-        return saw, pending, touched_branches, touched_paths
-    return saw, pending, touched_branches, touched_paths
+        return saw, pending, commit_branches, commit_paths
+    return saw, pending, commit_branches, commit_paths
 
 
 def pending_commit(path):
@@ -418,14 +769,17 @@ def decide(cwd, path):
     The transcript scan gates whether to look; `git rev-list --count
     @{u}..HEAD` across checkouts and branches answers (ai-config#2727,
     ai-config#2737). Inspects all linked worktrees of the repo
-    via `git worktree list --porcelain` and unpushed local branches touched
-    in this session to detect unshipped session commits left across checkouts
-    or on switched branches.
+    via `git worktree list --porcelain` and unpushed local branches this
+    session COMMITTED on, to detect unshipped session commits left across
+    checkouts or on switched branches. Relevance is the payload `cwd` plus
+    the commit-scoped sets `scan_transcript` derives, so another tool's
+    dormant worktree the session merely visited is not this session's debt
+    (ai-config#2422).
     Without a `cwd` in the hook payload, repository state is unknowable,
     so the verdict falls back to the transcript scan --- the old behaviour,
     fail-safe rather than blind.
     """
-    saw_commit, pending, touched_branches, touched_paths = scan_transcript(path)
+    saw_commit, pending, commit_branches, commit_paths = scan_transcript(path)
     if not saw_commit:
         return ""
     if not cwd:
@@ -452,12 +806,12 @@ def decide(cwd, path):
     undefined_wts = []
     checked_out_branches = set()
     cwd_real = os.path.realpath(cwd) if os.path.exists(cwd) else cwd
-    touched_paths_real = set()
-    for p in touched_paths:
+    commit_paths_real = set()
+    for p in commit_paths:
         try:
-            touched_paths_real.add(os.path.realpath(p))
+            commit_paths_real.add(os.path.realpath(p))
         except Exception:
-            touched_paths_real.add(p)
+            commit_paths_real.add(p)
 
     for wt in worktrees:
         if wt.get("bare"):
@@ -466,26 +820,27 @@ def decide(cwd, path):
         wt_path_real = os.path.realpath(wt_path) if os.path.exists(wt_path) else wt_path
         wt_branch = wt.get("branch")
 
-        # Only check checkouts active in this session (cwd, touched paths, or touched branches)
-        # cwd or touched paths may be nested subdirectories inside the worktree root
+        # Only check checkouts this session committed in (cwd, commit paths,
+        # or commit branches). cwd or a commit path may be a nested
+        # subdirectory inside the worktree root.
         is_cwd_in_wt = False
         try:
             is_cwd_in_wt = (os.path.commonpath([cwd_real, wt_path_real]) == wt_path_real)
         except (ValueError, Exception):
             is_cwd_in_wt = (cwd_real == wt_path_real)
 
-        is_touched_in_wt = False
-        for p in touched_paths_real:
+        is_commit_in_wt = False
+        for p in commit_paths_real:
             try:
                 if os.path.commonpath([p, wt_path_real]) == wt_path_real:
-                    is_touched_in_wt = True
+                    is_commit_in_wt = True
                     break
             except (ValueError, Exception):
                 if p == wt_path_real:
-                    is_touched_in_wt = True
+                    is_commit_in_wt = True
                     break
 
-        is_relevant = is_cwd_in_wt or is_touched_in_wt or (wt_branch and wt_branch in touched_branches)
+        is_relevant = is_cwd_in_wt or is_commit_in_wt or (wt_branch and wt_branch in commit_branches)
         if not is_relevant:
             continue
 
@@ -497,11 +852,12 @@ def decide(cwd, path):
         elif count is None:
             undefined_wts.append(wt)
 
-    # Check switched-away branches (local branches touched in this session not checked out in any worktree)
+    # Check switched-away branches (local branches this session committed on,
+    # not checked out in any worktree)
     unpushed_branches = []
-    if touched_branches:
+    if commit_branches:
         for branch, upstream, _ in list_local_branches(cwd):
-            if branch not in touched_branches:
+            if branch not in commit_branches:
                 continue
             if branch in checked_out_branches:
                 continue

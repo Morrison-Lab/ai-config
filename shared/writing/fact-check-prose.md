@@ -671,10 +671,14 @@ Read the five messages rather than a summary of them: each states its own
 finding, and no shorter list maps cleanly onto the five, which is itself the
 section's point.
 Two things about the series are derivable and worth stating.
-Every refutation came from the history rather than from argument --- a
-misattributed PR, a chain that cannot span two separately-merged PRs, evidence
-citing commits reachable from zero refs, an overstated reason for a rule that
-was itself correct, a conjunction that could never hold.
+Every refutation came from the history rather than from argument, and no two
+were about the same clause: a misattributed PR, a chain that cannot span two
+separately-merged PRs, evidence resting on commits a reader could not fetch, a
+conjunction that could never hold.
+That list is deliberately shorter than the series.
+One rewrite's finding was that the *previous* rewrite had overstated its own
+reason --- so listing both as independent refutations would present a claim
+beside its own correction and count the pair twice.
 And the convergent move was named *before* it was performed: `85101fe1c`, the
 second of the five, already says "the record now says what it can verify and
 names the rest as unrecoverable", and three further refutations followed it.

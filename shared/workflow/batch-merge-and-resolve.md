@@ -669,13 +669,15 @@ red check, because a registration file that lost an entry is still valid; and
 the deletion is invisible to any added-line-scoped check, which is the same
 blindness the instrument lesson above names.
 
-**Restore from the merge index instead, and swap only the hunk you came
-for.**
-`git show :<path>` is the merged content git already computed --- stage 0 for
-a path it resolved, and `:1:`/`:2:`/`:3:` for base, ours and theirs on a path
-still in conflict.
-Starting from that content and editing one hunk keeps every unrelated change
-the merge brought in, which the old-commit copy cannot.
+**Edit the file you have, rather than replacing it.**
+The content you want to keep is already in the working copy; what you need is
+one hunk from somewhere else, so apply that hunk and change nothing else.
+Where a merge is in progress the index carries the material to rebuild from ---
+`:1:`/`:2:`/`:3:` for base, ours and theirs while a path is conflicted, and
+`git show :<path>` for a path git already resolved.
+Note that `git show :<path>` reads stage 0, which holds *your* staged content
+once you have staged anything, so it is a record of what you did rather than of
+what git computed.
 
 **A wholesale restore also reinstates every claim the file made at the old
 commit**, and those claims are stale by construction, since something about
@@ -684,8 +686,13 @@ They are worse than an ordinary stale sentence: each was true when written, so
 it survives a reader checking whether it *reads* wrong, and only re-deriving
 it against the current file shows otherwise.
 
-- **Do:** take the recovery baseline from `git show :<path>`, and apply the one
-  hunk you need on top of it.
+- **Do:** take the recovery baseline from the current working copy, or from
+  the conflict stages (`:1:`/`:2:`/`:3:`) while the path is still conflicted,
+  and apply the one hunk you need on top of it.
+- **Don't:** reach for `git show :<path>` without checking which state the path
+  is in --- it fails while the path is conflicted, and once you have staged
+  anything it returns what *you* staged, which is the bad restore itself if
+  that is what you staged.
 - **Do:** diff the restored file against the pre-restore working copy, not only
   against the old commit, so what the restore *removed* is visible.
 - **Do:** run that diff after every hand-written recovery, since the batch
@@ -718,8 +725,10 @@ The same restore left three stale claims that had each been correct at the
 old commit: a docstring saying the patterns were COPIED where the file now
 imports them, a `hooks.json` `_note_fails_silent` describing a live
 catastrophic stall that `#3172` had already fixed, and a README parking row.
-Each cost its own review round --- `e89ee1e9d`, `b7e4b8d32` and the
-registration restore respectively.
+Two of the three cost their own fix commit afterwards --- `e89ee1e9d` for the
+docstring and `b7e4b8d32` for the `hooks.json` note.
+The README row cost none: `git log 9ccf8dbc3..refs/pull/3180/head -- README.md`
+is empty, so it was corrected inside the merge itself.
 `65b538bd6` is on `main`; `ca9d31bbe`, `e89ee1e9d` and `b7e4b8d32` are
 pre-squash and reachable only from `refs/pull/3180/head`, so fetch that ref
 before running `git show` on them.)

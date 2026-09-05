@@ -325,7 +325,7 @@ The repair was not a smaller deletion but a split: state each answer with the st
 [`git.md`](../../memories/git.md) carries both readings and their measurements, so they are not restated here --- a measurement copied to a second site desynchronizes on the first re-measurement.
 
 The general move is to **split the claim by its precondition and measure each branch**, which is what a two-directional claim was always compressing.
-[`check-purpose-before-reusing`](check-purpose-before-reusing.md)'s "Expect the answer to be a demotion rather than a deletion" already argues the demote-don't-delete half, and scopes itself to a trigger this case does not meet --- the act of quoting yourself into a wider question.
+[`check-purpose-before-reusing`](check-purpose-before-reusing.md)'s "Expect the answer to be a demotion rather than a deletion" already argues the demote-don't-delete half, and scopes itself to a trigger this case does not meet --- "the act of quoting yourself", which a claim falsified in place involves none of.
 What an accepted review finding adds is that someone else has now told you a piece of it is false, which makes deletion feel like compliance;
 and that the deletion is measurable per branch, where a demotion is a judgement.
 Before deleting, ask what else in the file cites the clause you are about to remove --- a dependent is the thing the deletion breaks and the thing no reviewer is looking at.

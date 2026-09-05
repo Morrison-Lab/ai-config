@@ -102,7 +102,7 @@ The `COMMIT` pattern is IMPORTED from `scripts/lib/git_cmd.py`, which is
 also where `no-unshipped-commit.py` gets it, so the two guards cannot drift
 apart on what a `git commit` invocation looks like. An earlier revision
 copied the patterns instead, and that copy is exactly how this hook
-inherited catastrophic backtracking after the original had been fixed
+still carried catastrophic backtracking after the original had been fixed
 (ai-config#3172). Change git-command recognition in `scripts/lib/git_cmd.py`
 and both guards get it; do not reintroduce a local `_ENV` or `_GIT_FLAGS`
 here.
@@ -139,8 +139,11 @@ import tempfile
 # of `no-unshipped-commit.py`'s patterns, and inherited the catastrophic
 # backtracking they had at the time (ai-config#3172): the `-C\s*\S+` arm and
 # the generic short-flag arm could each match `-Cx`, and that ambiguity under a
-# `*` cost 8.3s at 18 flag-shaped tokens -- in a PreToolUse guard, which runs
-# before every Bash call. #3172's fix made the arms disjoint and moved them to
+# `*` grew exponentially in the number of flag-shaped tokens -- measured on the
+# pre-fix pattern with `-Cx ` repeated, 0.0004s / 0.0020s / 0.0231s / 0.0987s
+# at 10 / 12 / 16 / 18, roughly quadrupling every two tokens, so a few tokens
+# more is seconds. Absolute times are machine-dependent and the growth rate is
+# the point. This runs in a PreToolUse guard, before every Bash call. #3172's fix made the arms disjoint and moved them to
 # `scripts/lib/git_cmd.py`, so importing is what keeps this hook from
 # re-acquiring a defect that has already been fixed once.
 try:

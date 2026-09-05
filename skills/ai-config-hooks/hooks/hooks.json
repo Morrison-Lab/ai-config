@@ -251,6 +251,20 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/flag-stale-branch-mutation.py\"'",
+            "timeout": 10,
+            "script": "flag-stale-branch-mutation.py",
+            "why": "2026-09-04 incident: a session ran `git checkout -b fix/909-...`, then an unisolated adversarial-reviewer subagent's own git commands left the checkout on a different branch (fix/892-...), then the session's `git commit` and `git push -u origin fix/909-...` both ran silently against the wrong branch -- the push even printed the usual \"Create a pull request\" hint. Warns, never blocks, when a MUTATING git command (or a `git push` naming the branch) runs while the actually-checked-out branch has drifted from what THIS session most recently, explicitly selected via `git checkout`/`git switch`, tracked in a small per-session per-repository state file across separate Bash calls (ai-config#3204).",
+            "_note_warns_never_blocks": [
+              "Emits `additionalContext` and a `systemMessage` and nothing else --",
+              "no `permissionDecision` key at all, so the normal permission flow is",
+              "untouched. A drifted checkout can be exactly what is wanted, so a",
+              "blocking guard would refuse legitimate work whenever the answer is",
+              "'yes, work on whatever is actually checked out'."
+            ]
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-heavy-work-on-head-node.py\"'",
             "timeout": 10,
             "script": "no-heavy-work-on-head-node.py",

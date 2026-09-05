@@ -142,7 +142,7 @@ _CMD_START = r"(?:^|[;&|\n])\s*"
 
 SWITCH = re.compile(
     _CMD_START + _ENV + r"git\s+" + _GIT_FLAGS +
-    r"(?:checkout|switch)(?![\w-])(?P<rest>[^\n;&|]*)",
+    r"(?P<sub>checkout|switch)(?![\w-])(?P<rest>[^\n;&|]*)",
     re.MULTILINE,
 )
 MUTATE = re.compile(
@@ -230,7 +230,47 @@ def _preprocess(command):
     return text
 
 
-def _selected_branch(rest):
+def _looks_like_pathspec(tok, cwd):
+    """True when `git checkout <tok>` is restoring a file, not selecting a branch.
+
+    `git checkout` is overloaded: with no `--` it takes either a branch or a
+    pathspec, and `git checkout .` to discard local edits is routine. Reading
+    that as a branch selection writes a bogus name into the session's tracked
+    state, so every later mutating command is compared against it and warns.
+    A false positive on an ordinary, undrifted command is exactly what this
+    hook exists not to do.
+
+    `git switch` never takes a pathspec, so this test applies to `checkout`
+    alone.
+
+    Two independent signals, either sufficient:
+
+    - The token is shaped like a path. `.`, `..`, and anything starting
+      `./`, `../` or `/` cannot be a branch name -- git rejects a ref
+      component of `.` or `..` outright.
+    - The token names something that exists on disk relative to `cwd`.
+      A branch and a path of the same name is the ambiguous case git itself
+      refuses without `--`, so declining to guess matches git's own
+      behaviour.
+
+    A glob is deliberately NOT treated as a pathspec here: `git check-ref-format`
+    forbids `*` and `?` in a ref, so such a token never reaches this hook as a
+    plausible branch name, and matching one against the filesystem would mean
+    expanding it.
+    """
+    if tok in (".", ".."):
+        return True
+    if tok.startswith("./") or tok.startswith("../") or tok.startswith("/"):
+        return True
+    if cwd:
+        try:
+            return os.path.exists(os.path.join(cwd, tok))
+        except (OSError, ValueError):
+            return False
+    return False
+
+
+def _selected_branch(rest, sub="checkout", cwd=None):
     """The branch a `checkout`/`switch` command targets, or None.
 
     `-b`/`-B`/`-c`/`-C` create-and-switch, so the token right after one of
@@ -238,6 +278,11 @@ def _selected_branch(rest):
     or a lone `-` (previous-branch shortcut, ambiguous without more context)
     resolve to nothing rather than a guess -- silence is the safe direction
     here, not a wrong branch name.
+
+    The same safe direction governs a `checkout` whose operand looks like a
+    pathspec: see `_looks_like_pathspec`. A token following an explicit
+    `-b`/`-B`/`-c`/`-C` is exempt, because those flags name a branch to
+    create and admit no pathspec at all.
     """
     tokens = rest.split()
     create_next = False
@@ -251,6 +296,8 @@ def _selected_branch(rest):
             return None
         if tok.startswith("-"):
             continue
+        if sub == "checkout" and _looks_like_pathspec(tok, cwd):
+            return None
         return tok
     return None
 
@@ -414,7 +461,7 @@ def evaluate(command, cwd, session_id):
         # flag-unchained-branch-switch.py's job, not this one's.
         target = None
         for m in switch_matches:
-            branch = _selected_branch(m.group("rest"))
+            branch = _selected_branch(m.group("rest"), m.group("sub"), cwd)
             if branch:
                 target = branch
         if target:

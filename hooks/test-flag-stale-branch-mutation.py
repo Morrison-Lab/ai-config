@@ -324,6 +324,92 @@ def sc_stale_state_ttl(hook_path):
     return verdict_of(hso), hso.get("additionalContext", "")
 
 
+def sc_pathspec_checkout_keeps_selection(hook_path):
+    """`git checkout <file>` restores a file and selects no branch, so it
+    must leave the recorded selection alone.
+
+    Without the pathspec test, `base.txt` is recorded as the selected
+    branch, and the very next ordinary commit -- on the branch this session
+    really did check out, with no drift at all -- compares against it and
+    warns. That is a false positive on an undrifted command, which is the
+    one outcome this hook must never produce."""
+    repo = _new_repo()
+    sid = _new_session()
+    call_hook(hook_path, "git checkout -b feat/path1", repo, sid)
+    _run(repo, "checkout", "-q", "-b", "feat/path1")
+    _write(repo, "base.txt", "scratch\n")
+    call_hook(hook_path, "git checkout base.txt", repo, sid)
+    _run(repo, "checkout", "-q", "--", "base.txt")
+    _write(repo, "base.txt", "changed\n")
+    _run(repo, "add", "base.txt")
+    hso = call_hook(hook_path, "git commit -m 'wip'", repo, sid)
+    return verdict_of(hso), hso.get("additionalContext", "")
+
+
+def sc_pathspec_dot_keeps_selection(hook_path):
+    """`git checkout .` -- the routine discard-all-local-edits form -- is a
+    pathspec, not a branch called `.`. git rejects `.` as a ref component
+    outright, so no branch of that name can exist."""
+    repo = _new_repo()
+    sid = _new_session()
+    call_hook(hook_path, "git checkout -b feat/path2", repo, sid)
+    _run(repo, "checkout", "-q", "-b", "feat/path2")
+    call_hook(hook_path, "git checkout .", repo, sid)
+    _write(repo, "base.txt", "changed\n")
+    _run(repo, "add", "base.txt")
+    hso = call_hook(hook_path, "git commit -m 'wip'", repo, sid)
+    return verdict_of(hso), hso.get("additionalContext", "")
+
+
+def sc_pathspec_does_not_mask_real_drift(hook_path):
+    """The negative control for the two cases above.
+
+    A pathspec checkout must leave the recorded selection intact rather than
+    clearing it, so a GENUINE drift after one still warns, and the warning
+    names the real selected branch."""
+    repo = _new_repo()
+    sid = _new_session()
+    call_hook(hook_path, "git checkout -b feat/path3", repo, sid)
+    _run(repo, "checkout", "-q", "-b", "feat/path3")
+    call_hook(hook_path, "git checkout .", repo, sid)
+    _run(repo, "checkout", "-q", "-b", "feat/other-path")
+    _write(repo, "base.txt", "changed\n")
+    _run(repo, "add", "base.txt")
+    hso = call_hook(hook_path, "git commit -m 'wip'", repo, sid)
+    return verdict_of(hso), hso.get("additionalContext", "")
+
+
+def sc_create_flag_operand_is_never_a_pathspec(hook_path):
+    """A token after `-b` names a branch to CREATE and admits no pathspec,
+    so the pathspec test must not fire on it even when a file of that name
+    exists. Selecting `base.txt` here is correct, so a later commit on a
+    different branch drifts and warns."""
+    repo = _new_repo()
+    sid = _new_session()
+    call_hook(hook_path, "git checkout -b base.txt", repo, sid)
+    _run(repo, "checkout", "-q", "-b", "base.txt")
+    _run(repo, "checkout", "-q", "-b", "feat/elsewhere")
+    _write(repo, "base.txt", "changed\n")
+    _run(repo, "add", "base.txt")
+    hso = call_hook(hook_path, "git commit -m 'wip'", repo, sid)
+    return verdict_of(hso), hso.get("additionalContext", "")
+
+
+def sc_switch_operand_is_never_a_pathspec(hook_path):
+    """`git switch` takes no pathspec, so a file-shaped operand there is
+    still a branch name. Guards against the pathspec test being applied to
+    the wrong subcommand."""
+    repo = _new_repo()
+    sid = _new_session()
+    _run(repo, "checkout", "-q", "-b", "base.txt")
+    _run(repo, "checkout", "-q", "-b", "feat/elsewhere2")
+    call_hook(hook_path, "git switch base.txt", repo, sid)
+    _write(repo, "base.txt", "changed\n")
+    _run(repo, "add", "base.txt")
+    hso = call_hook(hook_path, "git commit -m 'wip'", repo, sid)
+    return verdict_of(hso), hso.get("additionalContext", "")
+
+
 SHOULD_WARN = [
     ("W1", sc_incident, "TEST CASE: the incident, commit step"),
     ("W2", sc_incident_push, "TEST CASE: the incident, push step (sharper message)"),
@@ -340,6 +426,16 @@ SHOULD_WARN = [
      "a commit MESSAGE mentioning git checkout is not read as a real switch"),
     ("W5", sc_comment_mention, "a `#`-comment mentioning git checkout is not read as a real switch"),
     ("W6", sc_heredoc_mention, "a heredoc BODY mentioning git checkout is not read as a real switch"),
+    # The pathspec test must not go so far as to CLEAR the selection: these
+    # three confirm a real drift still warns after a pathspec checkout, that
+    # a `-b` operand is exempt from the test, and that `switch` never applies
+    # it. Together they are the negative control for S13/S14.
+    ("W7", sc_pathspec_does_not_mask_real_drift,
+     "a pathspec checkout leaves the selection intact, so real drift still warns"),
+    ("W8", sc_create_flag_operand_is_never_a_pathspec,
+     "a `-b` operand is a branch to create even when a file of that name exists"),
+    ("W9", sc_switch_operand_is_never_a_pathspec,
+     "`git switch` takes no pathspec, so a file-shaped operand is still a branch"),
 ]
 
 SHOULD_STAY_SILENT = [
@@ -356,6 +452,10 @@ SHOULD_STAY_SILENT = [
     ("S8", sc_push_unrelated_branch,
      "drift present, but the push names a branch this session never selected"),
     ("S12", sc_stale_state_ttl, "a state file older than the TTL is treated as unrecorded"),
+    ("S13", sc_pathspec_checkout_keeps_selection,
+     "`git checkout <file>` is a pathspec restore, not a branch selection"),
+    ("S14", sc_pathspec_dot_keeps_selection,
+     "`git checkout .` is a pathspec restore, not a branch called `.`"),
 ]
 
 if not os.path.isfile(HOOK):

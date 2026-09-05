@@ -50,6 +50,26 @@ FIRES = [
      "git fetch origin\ngit push"),
     ("chained after, with a preceding pipeline unrelated to the push",
      "echo hi | cat; git push"),
+    # `\` + newline is a line CONTINUATION, not a separator -- built with
+    # chr(92)/chr(10) rather than a literal escape, since this exact source
+    # text passing through a shell heredoc once already collapsed the
+    # intended backslash-newline into something else (see CLAUDE.md's
+    # "Tool transport collapses doubled backslashes"). A prior version of
+    # this hook read the continuation as a hard `;` split and matched
+    # `GIT_PUSH_RE` against neither half -- silent on the exact incident
+    # shape in the hook's own docstring (measured 2026-09-05 review).
+    ("git push split across a continued line",
+     'git add -A && git commit -m "x" && git ' + chr(92) + chr(10)
+     + "  push origin HEAD"),
+    # A heredoc's BODY is masked, but same-line text after the `<<TAG`
+    # introducer is real command text, not body -- `&& git push` here chains
+    # a genuine push on the very line that opens the heredoc. An earlier
+    # version's single tag-to-terminator regex swallowed this same-line text
+    # along with the real body (measured 2026-09-05 review).
+    ("chained push on the same line as a heredoc introducer",
+     "cat <<'EOF' && git push\nbody line\nEOF"),
+    ("chained push on the same line as an indented (<<-) heredoc introducer",
+     "cat <<-'EOF' && git push\n  body line\n  EOF"),
 ]
 
 QUIET = [
@@ -66,6 +86,10 @@ QUIET = [
     ("no push at all", "git status --short && git log -1"),
     ("push followed by && but nothing before or after IT specifically",
      "git push && echo done"),
+    ("git push inside a heredoc body, with unrelated text after the tag",
+     "cat <<'EOF' && echo unrelated\ngit push origin main\nEOF"),
+    ("git push inside an indented (<<-) heredoc body",
+     "cat <<-'EOF'\n  git push origin main\n  EOF"),
 ]
 
 

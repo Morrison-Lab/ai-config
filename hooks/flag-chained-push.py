@@ -68,6 +68,14 @@ A segment fires when it contains a `git push` (`git push ...` or
       `>`, `>>`, `&>`, `&>>`, or an fd-duplication form like `2>&1` --
       which is the shape that reads as a stray digit to a whole-string parser.
 
+A bare `&` (backgrounding) is deliberately NOT one of the split operators.
+`cmd1 & git push` carries the same "the prefix may not have run" risk as the
+`;`/`&&`/`||` shapes above, but backgrounding a command ahead of a push is
+rare enough in practice that adding it was left for a later pass rather than
+chased here; a miss on that shape costs nothing a refusal would not already
+surface on its own, the same argument this hook already makes for subshells
+and `case` statements.
+
 Fails open on any parse trouble.
 """
 from __future__ import annotations
@@ -77,7 +85,17 @@ import os
 import re
 import sys
 
-RX_HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1.*?\n[ \t]*\2\b", re.S)
+HEREDOC_START = re.compile(r"<<-?\s*(['\"]?)(\w+)\1")
+
+# A backslash immediately followed by a newline is a line CONTINUATION, not a
+# command separator -- `git \` + newline + `push origin HEAD` is one logical
+# `git push`. Left unhandled, the newline both split the command into two
+# segments (so `git` and `push` never shared one) and broke `GIT_PUSH_RE`'s
+# `\s+` match (the literal backslash between "git " and the newline is not
+# whitespace) -- a silent miss on the exact incident shape this hook exists
+# to catch, measured on the shape `git add -A && git commit -m "x" && git \`
+# / `  push origin HEAD` (2026-09-05 review).
+CONTINUATION_RE = re.compile(r"\\\r?\n")
 
 # Top-level shell operators this hook splits on. `||` and `&&` are listed
 # before the single-character alternatives so the regex engine consumes both
@@ -99,15 +117,62 @@ GIT_PUSH_RE = re.compile(r"\bgit\s+(?:-C\s+\S+\s+)?push\b")
 REDIRECT_RE = re.compile(r"&>{1,2}|\d*>{1,2}&?\d*")
 
 
-def _mask(command: str) -> str:
-    """`command` with heredoc bodies and quoted-string interiors replaced by
-    `x`, same length, so an operator inside either cannot split a segment and
-    a `git push` mentioned inside either cannot match.
+def _mask_heredocs(command: str) -> str:
+    """`command` with each heredoc BODY (and its terminator line) replaced by
+    `x`, same length. The introducing line -- `<<TAG`, and everything on that
+    same physical line before and after it -- is left untouched, because that
+    text can carry a real chained command: `cat <<'EOF' && git push` chains a
+    genuine `git push` on the very line that opens the heredoc, and the body
+    itself does not begin until the NEXT line.
 
-    Heredocs are masked first, on the raw command, so a quote appearing only
-    inside a heredoc body never enters the quote scan below.
+    A single regex spanning tag-to-terminator (the earlier approach) cannot
+    tell those two apart: `.*?` between the tag and the terminator matches
+    lazily across the whole span, so it swallows the same-line trailing text
+    along with the real body -- masking away exactly the `&& git push` this
+    hook exists to catch (measured 2026-09-05 review). Scanning line-by-line
+    is what keeps the same-line text visible while still masking the body.
+
+    A `<<-` heredoc's terminator line may be indented; a plain `<<` heredoc's
+    may not (POSIX). An unterminated heredoc is masked to the end of the
+    string, matching this hook's general fail-toward-silence posture for
+    malformed input -- nothing downstream should trust content that never
+    reaches a real terminator.
     """
-    command = RX_HEREDOC.sub(lambda m: "x" * len(m.group(0)), command)
+    out = list(command)
+    pos = 0
+    while True:
+        m = HEREDOC_START.search(command, pos)
+        if not m:
+            break
+        tag = m.group(2)
+        strip_indent = m.group(0).startswith("<<-")
+        line_end = command.find("\n", m.end())
+        if line_end == -1:
+            break  # no body possible; nothing left to scan
+        body_start = line_end + 1
+        pattern = r"^[ \t]*" if strip_indent else r"^"
+        terminator = re.compile(pattern + re.escape(tag) + r"$", re.M)
+        term_match = terminator.search(command, body_start)
+        mask_end = term_match.end() if term_match else len(command)
+        for i in range(body_start, mask_end):
+            out[i] = "x"
+        pos = mask_end
+    return "".join(out)
+
+
+def _mask(command: str) -> str:
+    """`command` with line continuations joined, heredoc bodies masked, and
+    quoted-string interiors replaced by `x` -- all same length, so an
+    operator inside any of those cannot split a segment and a `git push`
+    mentioned inside any of those cannot match.
+
+    Continuations are joined first (a `\\` + newline is whitespace, not a
+    separator, and not part of any string or heredoc syntax), then heredoc
+    bodies are masked, then quotes -- so a quote appearing only inside a
+    heredoc body never enters the quote scan below.
+    """
+    command = CONTINUATION_RE.sub(lambda m: " " * len(m.group(0)), command)
+    command = _mask_heredocs(command)
     out = []
     i, n = 0, len(command)
     while i < n:
@@ -133,12 +198,29 @@ def _mask(command: str) -> str:
 
 
 def _segments(command: str):
-    """`(preceding op or None, segment text, following op or None)` triples.
+    """`(preceding op or None, segment text, masked segment text, following op
+    or None)` quadruples.
 
     Operators are found in the MASKED command (so one inside a quote or a
-    heredoc body cannot split anything), and segment text is sliced from the
-    ORIGINAL command at the same offsets, since masking preserves length. A
-    literal newline is folded to `;` for the purpose named here -- a script
+    heredoc body cannot split anything), and both the segment text (sliced
+    from the ORIGINAL command) and its masked counterpart (sliced from the
+    single command-level mask) are returned at the same offsets, since
+    masking preserves length.
+
+    The masked text is sliced from the ONE mask computed here, rather than
+    recomputed per segment, deliberately: a heredoc's own body is masked as a
+    span, but the NEWLINE ending its `<<TAG` introducer line is not part of
+    that span (real text can follow the tag on that same line -- see
+    `_mask_heredocs`), so `OPS` still splits on it and the body becomes its
+    own segment. Re-masking that segment IN ISOLATION would find no `<<TAG`
+    inside it and see only ordinary text, letting a `git push` sitting inside
+    a heredoc body match once the body was carved out into its own segment
+    (measured 2026-09-05 review, on `cat <<'EOF'` immediately followed by a
+    body line containing `git push`). Slicing from the single whole-command
+    mask instead means that body is already `x`-filled at the point it
+    becomes a segment, wherever the split happened to land.
+
+    A literal newline is folded to `;` for the purpose named here -- a script
     written one command per line chains its commands exactly the way `;`
     does.
     """
@@ -151,15 +233,14 @@ def _segments(command: str):
     for idx, (s, e) in enumerate(zip(starts, ends)):
         preceding = matches[idx - 1][2] if idx > 0 else None
         following = matches[idx][2] if idx < len(matches) else None
-        segments.append((preceding, command[s:e], following))
+        segments.append((preceding, command[s:e], masked[s:e], following))
     return segments
 
 
 def evaluate(command: str) -> str | None:
     """Warning text for the first chained/suffixed `git push` found, else
     `None`."""
-    for preceding, text, following in _segments(command):
-        masked_text = _mask(text)
+    for preceding, text, masked_text, following in _segments(command):
         match = GIT_PUSH_RE.search(masked_text)
         if not match:
             continue

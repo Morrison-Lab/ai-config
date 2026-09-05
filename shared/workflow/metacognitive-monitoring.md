@@ -1027,6 +1027,30 @@ interpreter, a container built without the optional extras.
 Each shrinks what is being measured without shrinking the figure reported, and
 each makes the run faster, so the habit reinforces itself.
 
+**A sample can be complete, non-zero, and drawn entirely from the complement of what it was aimed at, when the event of interest could not occur during the window.**
+The skip case above at least announces its own gap: a skip count is a number the tool prints, and reading it is the whole of the remedy.
+This one prints nothing.
+Every observation is real, none is skipped, the count is healthy, and the event the sample was taken to settle was impossible for the duration --- so what came back is a census of everything else.
+The reading is what makes it dangerous rather than merely useless: a clean sample is exactly what "the event cannot happen here" produces, and it is also what "the event does not happen here" produces, and those are different claims.
+No feature of the output separates them.
+
+So state the event a sample is meant to catch, and confirm the window could have contained one, before reading the result.
+Where the event is something you can cause --- a guard you can trigger, a request you can send, a job you can re-run --- cause it inside the window rather than waiting for it, which converts the sample from an observation into a test.
+Where you cannot, report the sample as evidence about the population it did enumerate, and say in the same sentence that the target event did not occur in it.
+
+(Measured 2026-09-04, ai-config[#3141](https://github.com/Morrison-Lab/ai-config/issues/3141).
+A `ps` sample captured 20 hook command lines, all from `$HOME/.claude/hooks/` and none from a plugin root, and was read as showing the plugin registration path inert.
+`hooks/no-unreviewed-pr.py` never fired during that window, so the sample is evidence about the registration path in general and none about the firings in question.
+The same session settled it by the opposite procedure: `ps -eo args` sampled at 0.05s **while deliberately triggering the guard** named a copy under `~/Library/Application Support/Claude/local-agent-mode-sessions/` that no pass had looked at.
+That instance is recorded case-specifically in [`keep-checkouts-fresh`](keep-checkouts-fresh.md) and in [`mistake-patterns`](../../memories/mistake-patterns.md)'s Pattern 43 occurrence bullet, both added by [#3267](https://github.com/Morrison-Lab/ai-config/pull/3267);
+this is the general rule those two do not state.)
+
+- **Do:** name the event a sample is meant to catch, and confirm the window could have contained one, before reading the result.
+- **Do:** trigger the event inside the window when you can cause it, rather than sampling and hoping one arrives.
+- **Don't:** read a clean sample as evidence the event does not occur, when the event was impossible for the window's duration --- that is the reading the sample gives either way.
+- **Don't:** treat a non-zero observation count as answering the skip case's question;
+  a sample with nothing skipped can still have enumerated only the complement.
+
 **A different instrument answering a similarly-shaped question is not the population gap above, because there is no shared measurement for either claim to widen.**
 Every case in this section so far shares one instrument: a single command was run, and the claim reached past the population that command actually covered.
 The branches-versus-refs gap and the pipe-lines-versus-rows gap both come from one `git` or `grep` invocation whose output got mis-described.
@@ -1114,6 +1138,9 @@ See [`metacognitive-monitoring.cases.md`](metacognitive-monitoring.cases.md),
 the two propositions are a verified **mechanism** and an unverified
 **instance** asserted to fall under it, "A mechanism verified, an unverified
 population asserted to fall under it".
+
+A second five-instance recurrence, 2026-09-03/04, is recorded there as "One session, five correctly-read artifacts over-extended by one step".
+Its instances are worth reading together rather than singly: what unified them was that the erroneous step felt like *reading* the evidence rather than adding to it, so each one survived self-review while the artifact behind it stayed entirely sound.
 
 ## Writing is the instrument, when the claim can be wrong
 

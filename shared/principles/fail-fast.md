@@ -902,6 +902,27 @@ already be running.**
 - **Don't:** credit a suppression with protection it does not supply; measure
   whether it prevents the recurrence or only postpones one event of it.
 
+**An over-warn whose every discharge path is unavailable is not the cheap direction, and the ranking above is silent on it.**
+"An over-warn is visible" prices the error at one visible nag, which is right when the warning can be cleared.
+A guard that re-arms per turn and offers only discharges the session must not take costs a nag **per turn** instead, for as long as the condition holds --- so its decay is linear in turns while the silent discharge's is a single event, which is the comparison the ranking assumes away rather than makes.
+
+The case that produces it is specific and worth recognizing in advance: a standing directive forbids exactly the action the guard demands.
+Nothing is broken then.
+The guard is correct, the session is correct, and the two are simply unsatisfiable together, so no amount of doing the right thing clears the demand.
+
+The remedy is a **suppression the guard reads itself**, covering "a standing directive forbids the demanded action" as a first-class exemption rather than leaving the session to improvise one.
+`hooks/no-unreviewed-pr.py` is the worked example, and its own docstring states the shape: "every discharge this guard offers is the one action the directive forbids, so honoring it left the demand repeating on every turn".
+Its suppression is a date constant rather than an environment flag, because a flag has to be unset by whoever remembers and a date re-arms itself.
+Read that choice's countervailing hazard in [`keep-checkouts-fresh`](../workflow/keep-checkouts-fresh.md) before copying it: on a stale installed copy a dated constant fails **open**.
+
+- **Do:** ask whether a guard's discharge paths are available to a session already obeying every standing rule, before pricing its over-warn as cheap.
+- **Do:** give a guard whose demand a standing directive can forbid a suppression it reads itself, rather than relying on an override the session supplies.
+- **Don't:** count an over-warn as one visible event when the guard re-arms every turn --- price it per turn.
+- **Don't:** read "the safe direction" as meaning a fail-closed guard is free in the case where the safe action is unreachable.
+
+(ai-config[#1709](https://github.com/Morrison-Lab/ai-config/issues/1709) and [#3141](https://github.com/Morrison-Lab/ai-config/issues/3141) track the two incidents.
+Tracked as [#3271](https://github.com/Morrison-Lab/ai-config/issues/3271).)
+
 ### A combined result cannot attribute a per-step outcome
 
 The commonest way a discharge fires on false evidence: the guard reads a

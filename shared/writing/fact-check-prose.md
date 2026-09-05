@@ -455,6 +455,41 @@ is usually the step where the abstraction went wrong.
 - **Don't:** exempt a bullet you have just rewritten to satisfy a review
   finding, since that rewrite is an edit to the rule like any other.
 
+## Check every sentence against the hedges the passage states elsewhere
+
+The checks above take a sentence and ask whether it is true of the world.
+This one takes a sentence and asks whether it is true of the **document**: a passage that marks something unestablished, withdraws a cause, or narrows a claim to one measured case has thereby constrained every other sentence in scope, and a sentence written against the un-narrowed version reads perfectly well on its own.
+
+The cost is that it goes wrong in the direction nothing complains about.
+An internally contradictory passage renders, parses, and reads fluently, and the reader takes away whichever half they met first --- usually the confident one, since a hedge is the half written to be unobtrusive.
+
+**No phrase sweep finds these.**
+A sentence that breaks a hedge re-asserts the withdrawn claim in *different words*, which is why it was not caught when the hedge was written: it shares no vocabulary with the sentence it contradicts, so a grep for the hedge's terms returns the hedge and nothing else.
+This is [`grep-is-not-coverage`](../workflow/grep-is-not-coverage.md)'s point applied to a document's own internal consistency --- the search is over strings and the property is over propositions.
+
+**It is not "a later edit forgot an earlier hedge", so a diff-ordering heuristic misses it too.**
+One measured instance had the hedge and the contradicting assertion added in the **same commit**, in two different files.
+Hedging one statement of a claim and asserting another is a single act when the two live apart, because writing the careful version discharges the sense of having been careful.
+
+**The test:** enumerate what the passage and its siblings mark unestablished, hedged, or withdrawn --- as a list, before reading anything else --- then ask of every other sentence whether it would still be true if one of those hedges resolved the other way.
+Enumerating first is what makes it work, since a sentence read in isolation supplies its own missing context and reads as fine.
+Derive the list from the text rather than from what you remember writing: a reviewer applying this to one prose PR derived **eight** hedged points where the author's own list had four, and the extra four were where the breaks were.
+
+Run it across the sibling files a change touches, not only within one file.
+A hedge stated in the file that argues for it constrains the file that cites it, and the citing file is where the unhedged restatement lands.
+
+(Measured 2026-09-03/04 on ai-config [#3267](https://github.com/Morrison-Lab/ai-config/pull/3267).
+Nine consecutive adversarial review rounds on one prose PR each returned exactly one finding of this shape.
+That per-round count is itself the argument for enumerating the hedges up front rather than re-reading for consistency: re-reading surfaced one break per pass, so the rounds converged only as fast as a reviewer happened to notice, while an enumeration bounds the set to check in one pass.
+Tracked as [#3271](https://github.com/Morrison-Lab/ai-config/issues/3271).)
+
+- **Do:** list the passage's hedged and withdrawn points explicitly before checking any other sentence against them.
+- **Do:** derive that list from the text, and expect it to be longer than the one you would have written from memory.
+- **Do:** extend the check to sibling files the same change touches, since the citing file is where an unhedged restatement lands.
+- **Don't:** grep for the hedge's wording and call the passage consistent --- a break restates the claim in words the hedge never used.
+- **Don't:** assume a break implies a later edit;
+  the hedge and the sentence that breaks it are routinely written in one commit.
+
 ## Check that a stated trigger actually fired
 
 A justification for why a file was split, a check was added, or a workflow was

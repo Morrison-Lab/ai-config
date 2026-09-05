@@ -1811,6 +1811,35 @@ def omo_cases() -> tuple[int, int]:
     check("an ambiguous tool name stays unauthorizable for the rest of the transcript",
           rc == 0 and blocked)
 
+    # 2d. The `is_error` exclusion is INERT on this path, and this pins that
+    #     rather than leaving a reader to assume it guards. OMO emits no error
+    #     flag (docs/opencode-hook-mapping.md lists `is_error` among what its
+    #     shape omits), so a record carrying one is not something OMO can
+    #     produce -- and the guard authorizes on the report's content either
+    #     way. Raised in review as a non-blocking caveat; recorded as a test so
+    #     the caveat cannot quietly stop being true.
+    rc, out = run_hook(PUSH, [
+        omo_use("task", {"subagentType": "adversarial-reviewer",
+                         "description": "review", "prompt": "Review the diff"}),
+        dict(omo_result("task", body(commit=HEAD)), is_error=True),
+    ])
+    blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+    check("an is_error flag OMO cannot emit still blocks, so the clause is not dead code",
+          rc == 0 and blocked)
+
+    # 2e. The consequence stated plainly: with no error signal available, an
+    #     errored dispatch whose output carries a COMPLETE, correctly
+    #     fingerprinted report authorizes. That is weaker than the native
+    #     path's tested exclusion and is the documented cost of OMO's shape.
+    rc, out = run_hook(PUSH, [
+        omo_use("task", {"subagentType": "adversarial-reviewer",
+                         "description": "review", "prompt": "Review the diff"}),
+        omo_result("task", "dispatch failed partway\n" + body(commit=HEAD)),
+    ])
+    blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+    check("a complete report inside failed-dispatch output still authorizes (known OMO gap)",
+          rc == 0 and not blocked)
+
     # 3. No reviewer dispatch anywhere in the OMO transcript blocks.
     rc, out = run_hook(PUSH, [omo_use("bash", {"command": "echo hi"}),
                               omo_result("bash", "hi")])

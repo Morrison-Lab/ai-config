@@ -1414,6 +1414,27 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                         continue
                     call_id = queue.pop(0) if queue else None
                     if call_id is not None and call_id in reviewer_call_ids:
+                        # `is_error` is INERT here, and deliberately kept.
+                        # OMO's records carry no error flag at all --
+                        # `docs/opencode-hook-mapping.md` lists `is_error`
+                        # among what its shape omits -- so this condition is
+                        # always true on this path today. It is retained so
+                        # the two paths read alike and so the guard tightens
+                        # on its own if OMO ever adds the field, NOT because
+                        # it currently excludes anything.
+                        #
+                        # What actually carries the weight on this path is the
+                        # fingerprint: `parse_report` must find a verdict line
+                        # AND a `Reviewed-Commit:` naming a commit this push
+                        # ships. A dispatch that errored partway rarely has
+                        # both, and one that does emitted a complete report
+                        # before failing, which is a report.
+                        #
+                        # That is weaker than the native path's tested
+                        # exclusion, and saying so is the point: an errored
+                        # OMO dispatch whose output happens to carry a
+                        # complete, correctly-fingerprinted report WILL
+                        # authorize. No signal available here distinguishes it.
                         if not record.get("is_error"):
                             found, sha = parse_report(
                                 _result_text({"content": record.get("tool_output")})

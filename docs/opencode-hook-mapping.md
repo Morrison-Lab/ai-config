@@ -84,6 +84,20 @@ call IDs (`tool_use_id` pairing),
 `is_error` flags,
 and all assistant reply text.
 
+The missing `is_error` has a consequence worth stating rather than leaving to
+be discovered.
+`no-push-without-self-review.py` keeps its `is_error` exclusion on this path,
+but the flag never arrives, so the clause is inert here and the guard authorizes
+on the report's content alone.
+An errored reviewer dispatch whose output happens to carry a complete,
+correctly-fingerprinted report will therefore authorize a push, where the
+Claude-native path would have excluded it.
+The fingerprint requirement is what limits this: a truncated failure rarely
+carries both a verdict line and a `Reviewed-Commit:` naming a commit the push
+ships.
+Pinned by two cases in `hooks/test-no-push-without-self-review.py`, so the
+caveat cannot quietly stop being true.
+
 Payload-side gaps:
 
 - `PreToolUse` carries no `transcript_path` at all

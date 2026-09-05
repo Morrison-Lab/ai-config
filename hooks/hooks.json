@@ -567,11 +567,13 @@
               "abandons the whole segment rather than judging the `-m` fraction it",
               "can see, so the warning never asserts more than it observed.",
               "",
-              "One case is NOT covered by that guarantee, and is not a parse failure:",
-              "the `_GIT_FLAGS` regex copied from no-unshipped-commit.py backtracks",
-              "catastrophically on a command line carrying many flag-shaped tokens, so",
-              "such a command stalls this hook until its 10s timeout rather than",
-              "returning silently. Tracked as ai-config#3172, which covers both copies."
+              "That guarantee once had an exception, recorded here because the shape is",
+              "worth keeping: a copied `_GIT_FLAGS` regex backtracked catastrophically",
+              "on a command line carrying many flag-shaped tokens, so such a command",
+              "stalled this hook until its 10s timeout rather than returning silently.",
+              "ai-config#3172 fixed that and moved the patterns to",
+              "`scripts/lib/git_cmd.py`; this hook imports `COMMIT` from there rather",
+              "than copying it, so the exception no longer applies."
             ]
           }
         ]

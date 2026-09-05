@@ -1027,3 +1027,39 @@ A clean automated review from every available provider evaluating the current HE
 - **Algorithmatizable?**
   Yes.
   Linters or hook test suites can parse inline fallback definitions against shared library exports and test import failure execution.
+
+## Pattern 49: The Documented Fix for One Push Guard Arms Another Push Guard
+- **Mistake**: Working around `hooks/no-push-without-self-review.py`'s command-text parsing (Pattern 21 above) by pushing with a literal worktree path and an explicit `<sha>:refs/heads/<branch>` refspec, then treating the resulting successful push as fully discharged.
+  That refspec form lands the commit but sets no upstream tracking branch.
+- **Example**: 2026-09-05, ai-config#3279:
+  four branches in one sweep --- those of PRs #3198, #3173, #3269 and #3189 ---
+  were pushed via `git -C /literal/path push origin <sha>:refs/heads/<branch>`
+  to satisfy the self-review guard's inability to expand `"$W"`.
+  #3279 documents the guard's blindness on one of them;
+  the repeated refspec form, and the missing upstream it leaves behind,
+  are recorded here rather than there.
+  Do not cite #3280 for this --- that issue is unrelated `opencode` CLI drift.
+  `hooks/no-unshipped-commit.py` then measured `@{upstream}..HEAD`, found no upstream configured, and reported the branch's commits as "not on its upstream," instructing a push that had already succeeded and whose commit was already on the remote.
+- **Canonical Rule**: [`no-unshipped-commit.py`](../hooks/no-unshipped-commit.py) treats a branch with no upstream as undefined rather than shipped --- a refspec push (`<sha>:refs/heads/<branch>`) satisfies the first guard's ref-resolution requirement without ever running the `-u`/`--set-upstream-to` step the second guard checks for.
+  Neither guard's message mentions the other, so the interaction is discoverable only by reading both hooks' source or by hitting the second refusal cold.
+- **Fix**: After a refspec-form push used to work around Pattern 21, immediately run `git -C <literal-path> push -u origin <branch>` (or `git -C <literal-path> branch --set-upstream-to=origin/<branch> <branch>`) to set the upstream the first push skipped, before ending the turn.
+- **Algorithmatizable?**
+  Partial.
+  `no-unshipped-commit.py` already treats "no upstream" as undefined rather than clean, which is the correct conservative behaviour;
+  what is missing is a link between the two guards' documentation, not a code change to either.
+  A cross-reference in `memories/hooks.md`'s Stop-hooks section (added alongside this pattern) is the mechanism until a hook can detect "this exact commit was just pushed by a command in this transcript, so treat this as tracking-only rather than unshipped."
+
+## Pattern 50: A Guard That Reads Command Text Is a Property of Every Guard in the Family, Not of the One That Was Just Fixed
+- **Mistake**: Filing a mistake report scoped to the one hook where a command-text-parsing blindness was found (Pattern 21's `no-push-without-self-review.py`), then hitting the identical blindness in a *different* hook (`hooks/no-unreviewed-pr.py`) within the same session, and re-diagnosing it from scratch instead of recognizing it as the same class.
+- **Example**: 2026-09-05: `gh api "repos/Morrison-Lab/ai-config/pulls/$n/requested_reviewers" -X POST ...` run inside a shell loop over several PR numbers.
+  Every POST succeeded (confirmed independently via `gh pr view <N> --json reviews`), and `hooks/no-unreviewed-pr.py` still reported the reviewer request as outstanding for each PR, because the guard reads the literal command text and `$n` is not a resolvable PR number.
+  Retrying with `--jq` and a pipe did not clear it either, for the reason [`pr-on-claim.rationale.md`](../shared/workflow/pr-on-claim.rationale.md)'s "sole command" section already documents for this same hook: a pipe or a loop bundling several simple commands into one Bash call makes no single POST the call's last (or sole) simple command, so the guard's discharge logic --- calibrated for one literal, standalone invocation --- cannot attribute success to any of them.
+  Only the documented form, run verbatim with a literal PR number and no pipe, cleared it.
+- **Canonical Rule**: Pattern 21's canonical rule ("a guard parses raw command text, not a resolved argument list or the command's effect") is a property of the **class** of hooks that read Bash command text to decide obligations, not of any single hook in that class.
+  `no-push-without-self-review.py` and `no-unreviewed-pr.py` are two instances;
+  a third command-text-reading guard should be assumed to share the same blindness until measured otherwise.
+- **Fix**: When a guard demands a specific documented command, run it **verbatim** --- literal values, no loop, no shell variable, no pipe, no added flags --- rather than adapting it to the situation at hand, because the guard matches text and shape, not effect.
+- **Algorithmatizable?**
+  No single fix;
+  each guard's own backfill/discharge logic would need a matching update (as `no-unreviewed-pr.py`'s `RX_CMD_REVIEWERS_ANY` already attempts for a bare shell-variable PR number, without extending to a loop bundling several such calls).
+  What generalizes is the review habit: when a command-text-parsing gap is found and fixed in one hook, grep the other `PreToolUse`/`Stop` hooks for the same "reads raw command text" shape before closing the finding as hook-specific.

@@ -1074,6 +1074,55 @@ which is the preceding section's failure, not this one's.
 The test of membership is whether the artifact would still be right once the
 sentence were deleted.)
 
+## A false rationale can also be load-bearing, and then the code is wrong too
+
+The section above is the harmless case: the rationale is false, and the code
+stays correct once you delete the sentence.
+This is the other branch of the same failure, and it is the more dangerous
+one, because nothing about writing the rationale marks which branch you are
+on.
+
+Here the false claim is not decoration beside working code --- it is the
+**justification the code was built from**, so the code encodes the same
+error the sentence states.
+Deleting the sentence does not fix anything; the wrong behaviour is still
+there, now with no comment explaining why someone thought it was right.
+The test from the section above still separates the two: would the artifact
+stay correct with the sentence gone?
+Here the answer is no.
+
+The check is identical to the harmless case --- find the command that would
+show the claim false, and run it before the sentence and the code it
+justifies both ship --- but the stakes are higher, because review of the
+harmless case only costs a stale comment, while review of this case has to
+catch an actual defect that reads as deliberate and documented.
+
+- **Do:** ask, for every rationale a change depends on, whether the code
+  would still be correct if the rationale turned out false --- not only
+  whether the rationale itself is checkable.
+- **Do:** run the deriving command before the rationale becomes the reason a
+  branch, precedence order, or early return exists in the code.
+- **Don't:** treat a rationale that sounds like a general property of a
+  well-known tool (git, a stdlib function, a language's own scoping rules) as
+  needing less verification than an unfamiliar one --- familiarity is not
+  evidence.
+
+(Measured 2026-09-05, `hooks/flag-stale-branch-mutation.py`
+(ai-config#3205): a docstring justified treating `git checkout <name>` as
+ambiguous whenever a same-named local branch and tracked file both exist, on
+the claim that "git itself refuses without `--`" in that case.
+[`memories/git.md`](../../memories/git.md)'s "`git checkout <name>` prefers
+an existing local branch over a same-named file, and does not refuse"
+section has the measurement: git 2.50.1 does not refuse, and resolves to the
+branch.
+The rationale was not decoration --- the hook's disambiguation order was
+built to match it, so the false claim produced code that dropped a real
+branch selection from tracked state and false-positived on the very next
+ordinary commit, the same failure mode the heuristic existed to prevent.
+Caught and fixed before merge, so the shipped hook implements the correct
+precedence; the false rationale never reached `main`, but it did reach a
+draft of the code that acted on it.)
+
 ## A reported digit finer than its Monte Carlo error is a claim about precision
 
 A simulation estimate arrives with a standard error, and the number of digits

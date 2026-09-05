@@ -353,43 +353,30 @@ reminder that the empirical one-liner outranks any quoted documentation,
 including a reviewer's. (ucdavis/rampp #138/#111, 2026-07-17;
 re-verified on ai-config#611, 2026-07-18.)
 
-**The same failure generalizes past language/library behavior to any
-checkable claim about the repo, and it recurred at a higher rate.**
+**The same failure generalizes past language/library behavior to any checkable claim about the repo, and it recurred at a higher rate.**
 
-Measured 2026-09-04 on `ucdavis/hac.sap` PR #37: six review rounds, and
-every round after the first found a false claim in comment prose the
-session had written, never in the mechanics. Each was a one-query-checkable
-repo-state claim: a locale probe documented as "verify the PROPERTY, not
-the name" that verified neither (it measured bash's own fallback, so a
-nonexistent locale still passed; see `fact-check-code-logic.md`'s "proof
-step has its own vacuous mode"); a cited "negative control below" that did
-not exist; a claim that `git grep X` "returns that line and nothing else,"
-false and self-referentially so, since the comment itself was a second
-match; a wrong issue-number citation; a code site named as a consumer of a
-variable it never references; "whose only gate is X" when three more
-existed; an "all four sites" claim false under its own context; and
-"exactly two" where the query returns three.
+Measured 2026-09-04 on `ucdavis/hac.sap` PR #37: six review rounds, and every round after the first found a false claim in comment prose the session had written, never in the mechanics.
+Each was a one-query-checkable repo-state claim: a locale probe documented as "verify the PROPERTY, not the name" that verified neither (it measured bash's own fallback, so a nonexistent locale still passed;
+see `fact-check-code-logic.md`'s "proof step has its own vacuous mode");
+a cited "negative control below" that did not exist;
+a claim that `git grep X` "returns that line and nothing else," false and self-referentially so, since the comment itself was a second match;
+a wrong issue-number citation;
+a code site named as a consumer of a variable it never references;
+"whose only gate is X" when three more existed;
+an "all four sites" claim false under its own context;
+and "exactly two" where the query returns three.
 
-The mechanism: writing a comment reads as explaining, not asserting, so the
-claim-checking reflex `metacognitive-monitoring.md` names for State and
-Scope claims does not fire on it by default. `flag-uncounted-comment-claims.py`
-and `flag-uncited-rebuttal.py` gate only outgoing `gh`/`glab` comment
-bodies, and `fact-check-prose.md` explicitly excludes code comments, so a
-false claim written into shipped code is invisible to every existing guard.
+The mechanism: writing a comment reads as explaining, not asserting, so the claim-checking reflex `metacognitive-monitoring.md` names for State and Scope claims does not fire on it by default.
+`flag-uncounted-comment-claims.py` and `flag-uncited-rebuttal.py` gate only outgoing `gh`/`glab` comment bodies, and `fact-check-prose.md` explicitly excludes code comments, so a false claim written into shipped code is invisible to every existing guard.
 
-- **Do:** before any PR reply, ARD explanation, or code comment asserts a
-  checkable repo fact (a grep result, an issue's scope, a call site's
-  consumers, a count), run the query and cite what it returned.
-- **Do:** name a drafted comment's claim type (state, scope, count) before
-  posting or committing it.
-- **Don't:** let expository framing ("to verify X", "the only consumer is
-  Z") substitute for having verified X or enumerated every consumer of Z.
-- **Don't:** treat correct mechanics as proof the accompanying prose is
-  correct; here it wasn't, five times running.
+- **Do:** before any PR reply, ARD explanation, or code comment asserts a checkable repo fact (a grep result, an issue's scope, a call site's consumers, a count), run the query and cite what it returned.
+- **Do:** name a drafted comment's claim type (state, scope, count) before posting or committing it.
+- **Don't:** let expository framing ("to verify X", "the only consumer is Z") substitute for having verified X or enumerated every consumer of Z.
+- **Don't:** treat correct mechanics as proof the accompanying prose is correct;
+  here it wasn't, five times running.
 
-See [ai-config#3150](https://github.com/Morrison-Lab/ai-config/issues/3150)
-(open hook-level fix for `gh`/`glab` comment bodies; it does not reach
-comments written into shipped code, which is this gap).
+See [ai-config#3150](https://github.com/Morrison-Lab/ai-config/issues/3150) (open hook-level fix for `gh`/`glab` comment bodies;
+it does not reach comments written into shipped code, which is this gap).
 
 ## Python regex features must fit the oldest runtime that will run the script
 
@@ -1104,13 +1091,8 @@ a document separator that truncates the generated script.)
 
 ## awk brace handling differs by implementation, in both directions
 
-Moved to [`awk-brace-handling.md`](awk-brace-handling.md) (ai-config#694
-pattern, at the 1250-line gate): `mawk` (the default `awk` on Debian/Ubuntu)
-treats a literal `{}` as an interval (bracket it: `\^[{][}]`) and can
-PANIC on a genuine `{m,n}` interval (avoid it: `^#+([ 	]|$)` or unrolled).
-Neither error leads to the other, and `ubuntu-latest` CI does not hit the
-panic, so a shipped `{m,n}` can stay latent until a consumer sets
-`runs-on`.
+Moved to [`awk-brace-handling.md`](awk-brace-handling.md) (ai-config#694 pattern, at the 1250-line gate): `mawk` (the default `awk` on Debian/Ubuntu) treats a literal `{}` as an interval (bracket it: `\^[{][}]`) and can PANIC on a genuine `{m,n}` interval (avoid it: `^#+([ ]|$)` or unrolled).
+Neither error leads to the other, and `ubuntu-latest` CI does not hit the panic, so a shipped `{m,n}` can stay latent until a consumer sets `runs-on`.
 
 ## validate-skills.py token validation
 

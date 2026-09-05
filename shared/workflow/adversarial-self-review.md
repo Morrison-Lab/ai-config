@@ -736,6 +736,37 @@ pushing branch A afterward compares its shipped commit `X` against the held `Y`,
 - **Don't:** read that refusal as a defect in branch A's review;
   the guard has no notion of "branch" to be defective about, and the SHA comparison is doing exactly what it is built to do.
 
+**The remedy above is about pairing, not about ordering, and reading it as a sequencing preference is what lets the refusal happen anyway.**
+What has to hold is that each dispatch is followed by its own push before anything else is dispatched.
+Interleaving two branches at that granularity --- dispatch A, push A, dispatch B, push B --- satisfies it and converges fine.
+What breaks it is a push *deferred* past the next branch's dispatch, which is easy to do without deciding to: a push waiting on a checker re-run, on a finding still being addressed, or on a report being written is a push that has not happened yet, and the next branch's round proceeds in the meantime.
+So the operative question at each dispatch is not which branch to review next but whether the previous branch's verdict has already been spent.
+
+**When one has been overwritten, the sanctioned override is the correct discharge, and re-dispatching is the expensive mistake.**
+This file's own "What \"separate\" requires" section already draws that scope: `ALLOW_UNREVIEWED_PUSH=1` "covers a push whose verdict the guard cannot check, not only a push with nothing to check".
+An overwritten slot is exactly the first case.
+A genuine clean verdict for the exact commit was produced and is simply no longer the pair the guard holds, so the override reports the situation accurately rather than papering over an unreviewed push.
+What licenses it is the mechanical evidence, not the recollection: run the guard's own `read_latest_review`/`parse_report` over the transcript, as this file's "A verdict phrase separated from its heading by a line break is no verdict" section already requires of any refusal you believe is wrong, and paste what it parsed alongside the retained report's own `Reviewed-Commit:` line.
+An amend or a fixup between the review and the push is enough to make a confident narrative false.
+Re-dispatching instead spends a full adversarial pass --- **about 125k subagent tokens for one round over a four-file, 105-line prose diff, measured 2026-09-03** --- to re-derive a verdict that already existed for that exact SHA, and lands in the slot the other branch will need next.
+
+Locating the defect in the guard is the reading the pair above rules out, and it rules that reading out for the wrong reason.
+It is right that the guard has no notion of branch to be defective about;
+what it also has no notion of is *commit*, beyond the single most recent one.
+Keying verdicts by SHA --- `{sha: verdict}` rather than one latest-verdict slot --- removes this failure, and subsumes [#3131](https://github.com/Morrison-Lab/ai-config/issues/3131)'s original report (a sibling subagent's verdict leaking into the pushing thread) without anyone having to reason about which session produced a given verdict.
+
+- **Do:** push each branch on its own verdict before dispatching the next branch's review, treating a deferred push rather than an interleaved branch as the thing to avoid.
+- **Do:** use the sanctioned override when a verdict for the exact commit was produced and overwritten, pasting the parser's output over the retained report rather than asserting the SHA from memory.
+- **Don't:** re-dispatch to refill the slot;
+  it costs a full pass and the verdict it buys is the one the next branch's round overwrites.
+- **Don't:** read the refusal as saying the branch is unreviewed --- it says the guard is not holding that branch's verdict, which is a different claim.
+
+(Measured 2026-09-03 across two worktrees in one session, recorded in [#3156](https://github.com/Morrison-Lab/ai-config/issues/3156).
+Branch A reviewed clean;
+branch B then reviewed not-clean, was fixed, and re-reviewed clean;
+pushing A was then refused with "The clean verdict is for commit <B's sha>, but this push would ship <A's sha>", over a clean verdict for A's exact SHA that had been overwritten.
+The reverse happened earlier in the same session.)
+
 **The harness appends an `agentId:` trailer to a subagent's report, sometimes as its own block and sometimes concatenated onto the last line.**
 Which of those is common is the question this section could not settle, and an earlier draft asserted an answer to it by generalizing from the two dispatches it happened to watch.
 

@@ -1062,6 +1062,8 @@ rather than assuming it carries the fields the matcher wants.
 
 - **Do:** name the producer of a mechanism's input, and read what that producer actually emits, before saying the mechanism works.
 - **Do:** treat "the clearing branch exists" as an answer about the source and an open question about the run.
+- **Do:** answer a guard's refusal from the guard --- read the property its message names,
+  then its discharge condition in source --- before checking any state outside it.
 - **Don't:** close an incident on the strength of having found the code that should have prevented it.
 - **Don't:** read a matcher's field list as evidence those fields ever arrive --- a matcher is a claim about its input, not a supply of one.
 - **Don't:** answer a guard's refusal by querying the forge.

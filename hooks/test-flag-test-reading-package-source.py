@@ -292,6 +292,34 @@ check("a read inside a MULTI-line docstring is suppressed",
             '    """\n    Do not open("../../src/m.py") in a test.\n    """'),
       False)
 
+
+# --- what a fourth round found unasserted --------------------------------
+# The reported snippet for a WRAPPED call must carry the path. An earlier
+# revision returned the first physical line, `src <- readLines(`, so the
+# message named no path at all -- the useless-diagnostic defect a previous
+# round had already found once, reappearing in the fix for the wrapping.
+wrapped_hit = mod.offending_line(
+    "tests/testthat/test-format_sap_table.R",
+    '  src <- readLines(\n    test_path("..", "..", "R", "format_sap_table.R")\n  )')
+check("the wrapped snippet carries the path",
+      "format_sap_table.R" in (wrapped_hit or ""), True)
+
+# The `//` comment strip matches inside every http:// URL, so a URL before
+# the read blanked it.
+for line in [
+    '  u <- "https://x.org/a"; src <- readLines(test_path("..", "..", "R", "f.R"))',
+    '  expect_equal(parse_url("https://x.org/a"), readLines(here::here("R", "f.R")))',
+]:
+    check("a URL does not blind the scanner",
+          fires("tests/testthat/test-x.R", line), True)
+check("a real // comment still suppresses",
+      fires("tests/test_x.ts", '  // open("../../src/mod.py") is wrong'), False)
+
+# `importlib.resources.files` is a constructor like `pathlib.Path`.
+check("importlib.resources.files is not a read",
+      fires("tests/test_x.py", '    importlib.resources.files("src").joinpath("a").mkdir()'),
+      False)
+
 # --- empty and malformed input -------------------------------------------
 check("empty content is silent", fires("tests/testthat/test-x.R", ""), False)
 check("empty path is silent", fires("", 'readLines("../../R/x.R")'), False)

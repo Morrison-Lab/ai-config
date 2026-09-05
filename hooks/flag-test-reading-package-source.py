@@ -100,6 +100,25 @@ requiring a test DIRECTORY leaves ai-config with no in-scope files at all, so
 reverting every other narrowing still yields zero. A detector given no input
 reports the same number as a clean one.
 
+KNOWN LIMITS, stated rather than discovered
+-------------------------------------------
+Two shape gaps survive, both demonstrated by a running input and neither
+observed in the measured corpus:
+
+  * The 40-character distance bound in the path-then-read arm constrains SPAN,
+    not SHAPE, so a short innocent pairing fires -- `run(cfg["src/main.py"],
+    fh.read_text())`. Recognizing that the path and the read belong to
+    different expressions needs a parser, not a regex.
+  * The join predicate continues a line ending in `(` or `,`, so a
+    black-wrapped Python chain (which wraps AFTER the path) and the
+    two-statement `p = Path(...)` / `p.read_text()` form are both missed --
+    the Python twin of the styler blind spot the R arms had.
+
+Both are inherent to matching source text with regexes rather than parsing it.
+This guard is a cheap first alarm, not a decision procedure; the instrument
+that actually caught ucdavis/hac.sap#43 was `R CMD check` on a clean tree,
+within one round, and that remains the authority.
+
 Warns; never blocks. Reading source is occasionally right (a linter's own
 fixtures, a codegen check), and the author judges that better than a regex.
 Fails OPEN on every malformed input.
@@ -147,10 +166,11 @@ _DOTTED_READS = (
     # `.mkdir()`, `.write_text()`, `.rmdir()` and `.exists()`. The
     # path-then-read arm covers their read forms.
     r"inspect\.getsource|"
-    # Method forms. These need the dot, so they cannot live in the
-    # left-anchored bare list -- an earlier revision put them there and
-    # made them unreachable, missing the canonical Python spelling.
-    r"\.read_text|\.read_bytes|\.readlines"
+    # No pathlib read METHODS here: `READ_CALL` requires a path argument
+    # after the call, and `.read_text()` takes none, so they were
+    # unreachable -- neutralising them changed neither the suite nor the
+    # fire-set over 8198 real files. `RX_PATH_THEN_READ` handles them.
+    r"(?!x)x"
 )
 # `(?<![\w.$])` keeps `normalizePath(` and `monitor_path(` out while letting
 # `file.path(` and `test_path(` in -- they are listed above in full.
@@ -316,7 +336,7 @@ def offending_line(target, content):
         # A read inside a TRAILING comment is still a mention, not a read.
         # Only the leading-marker case was handled, so
         # `x <- 1  # never readLines("R/f.R")` fired.
-        line = re.sub(r"(?<![:\w])#.*$|//.*$", "", line)
+        line = re.sub(r"(?<![:\w])#.*$|(?<![:\w/])//.*$", "", line)
         if RX_COMMENT.match(line):
             if delims % 2 == 1:
                 in_docstring = True
@@ -330,13 +350,26 @@ def offending_line(target, content):
         if any(RX_ESCAPE_TWO_UP.search(part) or RX_PACKAGE_SRC.search(part)
                or RX_PATH_THEN_READ.search(part)
                for part in line.split(";")):
-            # Report the source line the author wrote, not the joined form.
-            return (origin[idx] or line).strip()
+            # Report the JOINED statement when the call was wrapped: the
+            # first physical line of the motivating case is
+            # `src <- readLines(`, which omits the very path being reported.
+            # An earlier revision returned that, reproducing the useless
+            # message an earlier round had already found once.
+            joined_line = " ".join(line.split())
+            first = (origin[idx] or line).strip()
+            return joined_line if joined_line != first else first
     return None
 
 
 def _read_payload():
-    """(payload, is_dry_run). Mirrors flag-unmeasured-timestamp.py's contract."""
+    """(payload, is_dry_run). Reads stdin only.
+
+    NOT the sibling's full contract: `flag-unmeasured-timestamp.py` also
+    parses a positional payload after `--dry-run`. This hook does not, and an
+    earlier docstring claimed it did. `scripts/test_pretooluse_dry_run.py`
+    enumerates hooks by name and does not list this one, so nothing depended
+    on the claim -- but a caller following it got silence.
+    """
     is_dry_run = any(a in ("--dry-run", "--simulate") for a in sys.argv[1:])
     try:
         raw = sys.stdin.read() if not sys.stdin.isatty() else ""

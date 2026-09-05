@@ -1069,8 +1069,9 @@ rather than assuming it carries the fields the matcher wants.
 - **Don't:** answer a guard's refusal by querying the forge.
   The refusal is a claim about the record the guard reads, not about the world it left you free to query;
   and a forge query nearly always returns something, so the wrong move feels like progress
-  (2026-09-05: two responses spent confirming a review existed,
-  before anyone read the condition the guard actually consults).
+  (2026-09-05: two responses spent on the forge --- the first confirming a review
+  existed, the second that the PR had merged --- before anyone read the condition
+  the guard actually consults).
 
 (Measured 2026-09-03, and the record is the rule applied to itself three times.
 A `Stop` hook demanded a per-HEAD reviewer request on an already-merged pull request.

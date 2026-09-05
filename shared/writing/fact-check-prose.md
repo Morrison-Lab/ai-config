@@ -624,7 +624,7 @@ Every version was plausible; the plausibility is what kept producing the next
 one.
 
 Attention makes it worse rather than better, by the mechanism the section above
-names and the amend-chain section below repeats.
+names.
 A targeted rewrite fixes the refuted clause and its untouched neighbours
 inherit the credibility of the fix, so the next round's finding lands on one of
 those.
@@ -633,9 +633,10 @@ those.
 and ask what the evidence can carry.**
 The convergent version states what is derivable, names what is not as
 unrecoverable, and deletes the connective tissue between them.
-That is usually much shorter, and it is not a hedge: "this cannot be recovered,
-and here is why" is a claim a reader can check, where a softened reconstruction
-is the same unsupported claim with a smaller adverb --- which
+That version is usually much shorter, and it is not a hedge.
+"This cannot be recovered, and here is why" is a claim a reader can check,
+where a softened reconstruction is the same unsupported claim with a smaller
+adverb --- which
 [`address-every-comment`](../workflow/address-every-comment.md)'s closing
 section rejects for exactly that reason.
 

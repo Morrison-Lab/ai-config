@@ -73,7 +73,16 @@ When a new entry lands after `main` has appended one of its own, take the next n
   and a fallback self-review comment reading "Ready for merge",
   without running `scripts/check-pr-fully-clean.py`.
   `check-pr-fully-clean.py` exited 1 because the automated review had been quota-skipped.
-  Blocked by stop hook `check-clean-claim.py`.
+  A `Stop` guard blocked the claim;
+  which one went unrecorded, and the name first written here,
+  `check-clean-claim.py`, exists in no repository ---
+  not in this corpus's `hooks/`, not in `hooks/hooks.json`,
+  and not in `ucdavis/epi204`, whose tree carries no hooks at all
+  (checked 2026-09-04).
+  Read the guard as unidentified rather than substituting a plausible
+  sibling: `no-stale-pr-status.py`, `no-incomplete-check-enumeration.py`,
+  and `no-handrolled-verdict-parse.py` each match part of this shape,
+  and nothing in the record says which fired.
   Never transcribe a fallback review's prose
   or call a PR ready for merge without `check-pr-fully-clean.py` exiting 0.
 - **Canonical Rule**: `AGENTS.md` ("Request review and drive every started PR to clean"),

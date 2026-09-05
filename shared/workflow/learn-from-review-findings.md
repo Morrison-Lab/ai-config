@@ -325,6 +325,9 @@ The repair was not a smaller deletion but a split: state each answer with the st
 [`git.md`](../../memories/git.md) carries both readings and their measurements, so they are not restated here --- a measurement copied to a second site desynchronizes on the first re-measurement.
 
 The general move is to **split the claim by its precondition and measure each branch**, which is what a two-directional claim was always compressing.
+[`check-purpose-before-reusing`](check-purpose-before-reusing.md)'s "Expect the answer to be a demotion rather than a deletion" already argues the demote-don't-delete half, and scopes itself to a trigger this case does not meet --- the act of quoting yourself into a wider question.
+What an accepted review finding adds is that someone else has now told you a piece of it is false, which makes deletion feel like compliance;
+and that the deletion is measurable per branch, where a demotion is a judgement.
 Before deleting, ask what else in the file cites the clause you are about to remove --- a dependent is the thing the deletion breaks and the thing no reviewer is looking at.
 
 - **Do:** ask what a fix does outside the finding it answers --- what it now hides, admits, or can newly fail at, and what it altered in passing --- and probe that before reporting the fix.
@@ -333,7 +336,8 @@ Before deleting, ask what else in the file cites the clause you are about to rem
 - **Do:** write at least one case on the far side of any restriction you add, varying the axis the restriction acts on.
 - **Do:** check *which* alternative made a probe fire before reading it as coverage.
 - **Do:** split a claim a finding falsifies in one direction, and measure each branch separately, rather than removing the claim.
-- **Do:** grep the file for citations of a clause before you delete it, and re-read each one against what will remain.
+- **Do:** search the file for the clause's *subject* before you delete it --- its command name, issue number or key term, not its wording --- and re-read each hit against what will remain;
+  a dependent usually paraphrases rather than quotes, so grepping the clause itself finds nothing.
 - **Don't:** answer "this half is wrong" with a deletion of the whole --- the true half leaves with no line in the diff marking it.
 - **Don't:** leave a citation you have just stranded for the next round to find --- the deletion is what broke it, so it is yours in the same commit.
 - **Don't:** treat code written in response to a finding as pre-validated --- it is a new diff and gets a new review.

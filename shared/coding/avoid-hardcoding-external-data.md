@@ -196,6 +196,68 @@ Every number in the table had been re-derived by command before publishing;
 the sentence generalizing about it had not been checked against it at all, because it carried no number to re-derive.
 Fixed in `b02e3ff`.)
 
+### A suite's pass count is a liability twice over when written as an expectation
+
+The sections above govern a claim about a block the same file carries --- a count of its items, or a generalization over them.
+A **test-suite pass count** --- a total written into a comment above the helper it describes, or into a commit message --- looks like the same defect and is worse.
+It has two independent ways of going wrong, and each is mistaken for the other.
+
+The number moves with the **suite**, so any added or removed case falsifies it on a schedule nobody watches.
+That much it shares with the counts above.
+
+What makes it expensive rather than untidy is the second failure, which those counts cannot have: a suite can report a total one short of the written one **without anything having changed**, because one case flaked.
+The comment then supplies an exact expectation for the reader to miss, and the first hypothesis they form is about the code.
+A comment with no number would have prompted nothing.
+
+**The diagnosis that follows is where this compounds**, because the count is a plausible-looking anchor and invites an explanation for the discrepancy rather than a check of the premise.
+Any difference between the two runs will do --- a different checkout, a different working directory --- and such an explanation is unfalsifiable from the numbers alone.
+So the written count first manufactures a regression and then supplies a wrong cause for it.
+A run one short of a written total is a flake until shown otherwise, and the way to see that is the failing test's **name**, which a total conceals by construction.
+
+**Assert the property, not the number.**
+"Every case still passes with the helper neutered" is checkable, cannot go stale, and says what the observation was for.
+The total says only how big the suite was that day.
+Where the count is genuinely load-bearing, make it a test rather than a sentence.
+
+**This rules out one tense and not the other.**
+A count inside a case record is evidence about a past run and keeps its literal, which is the boundary
+[the section on text that records what was observed](#where-the-rule-stops-text-that-records-what-was-observed)
+draws with the same tense-and-mood test.
+What this section rules out is the forward form: a count written as what a future reader should expect to see.
+
+- **Do:** state the property a run demonstrated, and leave the total out of a forward-looking comment.
+- **Do:** keep an exact total inside an evidentiary record, naming the tree and the command it was measured on.
+- **Don't:** write a suite total into a comment or commit message as a baseline for someone to compare against.
+- **Don't:** read a total one short of a written expectation as a regression, before checking whether the expectation was ever a stable number.
+- **Don't:** explain a discrepancy between two totals by naming a difference between the two runs.
+  That hypothesis fits any pair of numbers and tests nothing.
+
+(Measured on [Morrison-Lab/ai-config#3100](https://github.com/Morrison-Lab/ai-config/pull/3100), merged 2026-09-03.
+A comment in `scripts/test_check_review_body.py` read "754 pass with the helper neutered", and the same figure went into a commit message.
+The figure counted a *different* file's suite, `scripts/test_check_pr_fully_clean.py`, which is half the point: the number was written where nothing regenerates it and nothing names what it counts.
+That suite carries wall-clock assertions that intermittently miss a one-second budget
+([#3127](https://github.com/Morrison-Lab/ai-config/issues/3127)), so a run comes back one short.
+The baked count had that flake read as a regression.
+The revision after it then misattributed the flake to the checkout, saying in effect that both readings were right because the worktree and a scratch copy of it disagreed by one.
+They did not.
+The flake was the same in either location, and that explanation was retracted a revision later.
+
+The other half of the point is that the total really is environment-dependent, and three successive attempts named the wrong cause.
+Measured 2026-09-03 on `origin/main`, `python3 scripts/test_check_pr_fully_clean.py` reports `754 passed, 0 failed` in an ordinary checkout and `753 passed, 0 failed` under `GIT_DIR=/nonexistent`.
+The suite fetches a prior revision of the checker with `git show`, trying `origin/main` first, and emits one extra case only when some revision resolves.
+So the total turns on whether **any** of those revisions resolves, not on where the tree sits.
+A `git archive` export reports 753, having no repository at all.
+A depth-1 clone reports 754, because it still carries `origin/main`.
+So does a full clone with its remote removed, because the loop falls through to `HEAD~40`, which resolves independently of any remote.
+
+That is the discriminator, and it was one command away throughout.
+What the three wrong explanations share is that none of them varied an input.
+The first two named whatever differed between the two runs already performed --- the code change, then the checkout's location.
+The third, written while this entry was being drafted, went further and denied that 754 had ever been a real reading, on the strength of an archive measured in place of a checkout, which is
+[`verify-the-right-artifact`](../workflow/verify-the-right-artifact.md)'s substitution exactly.
+A count that varies with the environment offers an explanation for every pair of numbers, and every one of them is unfalsifiable until someone changes one thing and re-runs.
+The text that shipped gives no count as an expectation, and says why.)
+
 ### A figure with no source of truth cannot be pinned into reproducibility
 
 The count section above splits on whether a *source can be named*, and gives

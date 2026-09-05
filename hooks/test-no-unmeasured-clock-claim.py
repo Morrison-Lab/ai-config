@@ -175,6 +175,11 @@ HEREDOC_TO_GH = {"type": "assistant", "message": {"content": [
 ENV_ECHO_INLINE = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "id": "call_envecho", "input": {
         "command": "LC_ALL=C echo \"as of $(TZ=America/Los_Angeles date \"+%H:%M %Z\")\""}}]}}
+# An env value carrying a quoted space still leaves the echo as the head.
+QUOTED_ENV_ECHO_INLINE = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "call_qenv", "input": {
+        "command": "LC_ALL=\"en US\" echo \"as of "
+                   "$(TZ=America/Los_Angeles date \"+%H:%M %Z\")\""}}]}}
 # `NAME=$(` inside a quoted argument is not an assignment: the read prints as
 # part of the echoed string, and the transcript carries it.
 QUOTED_HEAD_PRINTED = {"type": "assistant", "message": {"content": [
@@ -568,6 +573,12 @@ CASES = [
     ([ENV_ECHO_INLINE, say("Recap: 00:59 PDT")], False,
      "#2991: an echo behind an env assignment reprints the substitution, so "
      "the read discharges"),
+
+    # --- review round 6 on #2991: the head regex matched the env value with
+    #     `\S*`, so a quoted value carrying a space hid the echo.
+    ([QUOTED_ENV_ECHO_INLINE, say("Recap: 00:59 PDT")], False,
+     "#2991: a quoted env value with a space still leaves the echo as the "
+     "head, so the read discharges"),
 ]
 
 

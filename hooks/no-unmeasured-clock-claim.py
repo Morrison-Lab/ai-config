@@ -166,8 +166,8 @@ RX_PRINTED_VAR = r"\b(?:echo|printf|print)\b[^;&|\n]*\$\{?%s\b"
 # head (`gh pr comment --body "$(date ...)"`, `curl -d`, `git commit -m`)
 # consumes the value without printing it, and the read is then settled by
 # the command's own tool result rather than by position.
-RX_REPRINTING_HEAD = re.compile(
-    r"^\s*(?:[A-Za-z_]\w*=\S*\s+)*(?:echo|printf|print|cat|tee)\b")
+REPRINTING_HEADS = frozenset({"echo", "printf", "print", "cat", "tee"})
+RX_ENV_ASSIGN_HEAD = re.compile(r"[A-Za-z_]\w*=")
 
 # The harness's own injected reading. Quoting this is correct, so it counts as
 # a measurement -- otherwise the guard would fire on the one case the rule
@@ -303,6 +303,39 @@ def _split_command(command):
             last = k == len(parts) - 1
             out.append((part, bodies_at.get(idx, []) if last else []))
     return out
+
+
+def _head_word(segment):
+    """The first word of `segment` after any leading `NAME=value` env
+    assignments, or "" when nothing follows them.
+
+    The value is walked rather than matched with `\\S*`, because a quoted
+    value may carry a space (`LC_ALL="en US" echo ...`) and the word after
+    it is still the head.
+    """
+    i = 0
+    n = len(segment)
+    while True:
+        while i < n and segment[i].isspace():
+            i += 1
+        m = RX_ENV_ASSIGN_HEAD.match(segment, i)
+        if not m:
+            break
+        i = m.end()
+        quote = None
+        while i < n and (quote or not segment[i].isspace()):
+            ch = segment[i]
+            if quote is None and ch in ("'", '"'):
+                quote = ch
+            elif quote and ch == quote:
+                quote = None
+            elif ch == "\\" and quote != "'":
+                i += 1
+            i += 1
+    j = i
+    while j < n and not segment[j].isspace():
+        j += 1
+    return segment[i:j]
 
 
 def _mask_substitutions(text):
@@ -511,7 +544,7 @@ def _capture_only(command):
         in_body = any(RX_CLOCK_READ.search(body) for body in bodies)
         if direct or inline or in_body:
             saw_read = True
-            if prints and (direct or RX_REPRINTING_HEAD.match(segment)):
+            if prints and (direct or _head_word(segment) in REPRINTING_HEADS):
                 return False
         if not prints:
             continue

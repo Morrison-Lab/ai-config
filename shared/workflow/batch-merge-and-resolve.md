@@ -645,6 +645,77 @@ predicate runs on both sides.
 - **Don't:** read two green PRs as evidence their merge is green, or reach for a
   merge order to fix a breach that both orders reach.
 
+## Restoring a file wholesale is a sixth mode, and the only one you perform by hand
+
+Every mode above arrives *through* a merge git resolved on its own.
+This one arrives through the recovery, which is why nothing in the sections
+above reaches it: the merge behaved, and the damage is in what you typed next.
+
+The shape is `git show <old-commit>:<path> > <path>` --- reaching back to a
+commit where the file was in the state you want, and taking the whole file.
+It is attractive precisely when a resolution has gone wrong and a known-good
+copy exists, and it reads as a targeted fix because the *reason* for it is
+targeted: one registration entry, one row in a table, one flag.
+
+What it actually performs is a whole-file revert to that commit.
+Every other change the file has taken since --- including everything the merge
+you are in the middle of just brought in from the base --- is discarded, and
+nothing reports it.
+There is no conflict, because the write happens after the merge; there is no
+red check, because a registration file that lost an entry is still valid; and
+the deletion is invisible to any added-line-scoped check, which is the same
+blindness the instrument lesson above names.
+
+**Restore from the merge index instead, and swap only the hunk you came
+for.**
+`git show :<path>` is the merged content git already computed --- stage 0 for
+a path it resolved, and `:1:`/`:2:`/`:3:` for base, ours and theirs on a path
+still in conflict.
+Starting from that content and editing one hunk keeps every unrelated change
+the merge brought in, which the old-commit copy cannot.
+
+**A wholesale restore also reinstates every claim the file made at the old
+commit**, and those claims are stale by construction, since something about
+the file changed in between or you would not be restoring it.
+They are worse than an ordinary stale sentence: each was true when written, so
+it survives a reader checking whether it *reads* wrong, and only re-deriving
+it against the current file shows otherwise.
+
+- **Do:** take the recovery baseline from `git show :<path>`, and apply the one
+  hunk you need on top of it.
+- **Do:** diff the restored file against the pre-restore working copy, not only
+  against the old commit, so what the restore *removed* is visible.
+- **Do:** re-derive every claim inside a restored region --- a docstring, a
+  `_note_*` field, a README row --- against the file as it now stands.
+- **Don't:** write `git show <old>:<path> > <path>`; it is a whole-file revert
+  wearing the clothes of a targeted fix.
+- **Don't:** read an absent conflict or a green check as evidence a restore
+  cost nothing --- both are blind to a silently dropped entry.
+
+[`sync-with-main`](sync-with-main.md)'s "The same silent reversion happens one
+line at a time" owns the version of this that *git* performs, and prescribes
+the pre-merge-tip-to-merge diff that sees it.
+Note also that [`check-purpose-before-reusing`](check-purpose-before-reusing.md)
+prescribes `git show <old-ref>:<old-path>` for a genuinely different purpose ---
+recovering content whose *home* moved --- so the same command is right there
+and wrong here; what separates them is whether the destination has changed
+since.
+
+(Morrison-Lab/ai-config#3180, 2026-09-04.
+Restoring a hook's registration copied `README.md` and both `hooks.json`
+files back from a pre-parking commit.
+`hooks/hooks.json` had gained another session's `warn-unlabelled-agent-issue`
+registration in the interval --- `65b538bd6` merged 2026-09-04 14:37 PT,
+against the parking line at `ca9d31bbe`, 2026-09-03 20:48 PT --- so the
+restore would have deregistered a hook this branch had nothing to do with.
+Recovered from the merge index.
+The same restore left three stale claims that had each been correct at the
+old commit: a docstring saying the patterns were COPIED where the file now
+imports them, a `hooks.json` `_note_fails_silent` describing a live
+catastrophic stall that `#3172` had already fixed, and a README parking row.
+Each cost its own review round --- `e89ee1e9d`, `b7e4b8d32` and the
+registration restore respectively.)
+
 ## The batch pass
 
 1. **Measure the two intervals** above, once, and say which is larger.

@@ -574,6 +574,63 @@ issue number, a permalink to the file at a merged commit, or the CI job URL.
 Reach for a branch SHA only when the merge has already happened and you have
 checked that specific commit with `git merge-base --is-ancestor`.
 
+**A pre-squash SHA is unreachable, not absent, and the difference decides the
+remedy.**
+GitHub keeps a PR's commits permanently under `refs/pull/<N>/head` --- closing
+the PR and deleting the branch do not remove them --- so
+`git ls-remote origin refs/pull/<N>/head` resolves long after the squash.
+What a squash removes is *ancestry*: nothing under `refs/heads/*` reaches those
+objects, and the default fetch refspec is `+refs/heads/*:refs/remotes/origin/*`,
+so a fresh clone never downloads them and `git show <sha>` fails there with an
+unknown-revision error.
+
+The two states look different under the right probe, and confusing them sends
+a reader to the wrong fix:
+
+```bash
+git for-each-ref --contains <sha> --count=1   # empty  = present, unreachable
+                                              # exit 129 "malformed object name" = absent
+git ls-remote origin "refs/pull/<N>/head"     # non-empty = the forge still has it
+git fetch origin "refs/pull/<N>/head" && git show <sha>
+```
+
+So a pre-squash SHA *is* citable, provided you say where to fetch it from.
+Name the PR beside the SHA and the reader has the ref; give the bare SHA and
+they get an error that reads like a typo.
+
+**One thing `refs/pull/<N>/head` cannot recover: a commit message that was
+amended away.**
+That ref points at the PR's final head, so it reaches that head and its
+ancestors and nothing else.
+An amended message leaves its predecessor on no ancestry at all, so it is
+unfetchable by anyone --- which is the case where the honest record says the
+message does not survive, rather than citing a SHA no reader can reach.
+`shared/writing/fact-check-prose.md`'s "When each rewrite is refuted on a NEW
+clause" section is what that costs when the record tries to reconstruct it
+anyway.
+
+- **Do:** cite the squash commit on the default branch when one exists.
+- **Do:** name the PR number beside any pre-squash SHA, so the reader knows to
+  fetch `refs/pull/<N>/head` first.
+- **Do:** distinguish unreachable from absent with `git for-each-ref
+  --contains` before deciding a cited SHA is dead.
+- **Don't:** write a bare pre-squash SHA into durable guidance --- it resolves
+  in your checkout and errors in a fresh clone, and the error looks like a
+  typo.
+- **Don't:** cite a SHA for a message that was amended away; `refs/pull/<N>/head`
+  does not reach it, and no ref does.
+
+(Morrison-Lab/ai-config#3180, 2026-09-04, which shipped this rule and then
+broke it in two of its own passages --- `fully-clean.md` and
+`check-pr-fully-clean.py` both cited `16544c50` and `7e1294b0`, pre-squash
+heads of #3167, caught in `7a797d3f8`.
+A pre-existing instance is open as
+[#3275](https://github.com/Morrison-Lab/ai-config/issues/3275).
+The working fetch recipe is in
+[`grep-is-not-coverage`](../shared/workflow/grep-is-not-coverage.md); the
+measured fresh-clone failure is Instance 4 in
+[`metacognitive-monitoring.cases.md`](../shared/workflow/metacognitive-monitoring.cases.md).)
+
 That is not a hypothetical.
 This entry originally cited `082f369` as a still-reachable example, on the
 strength of #453 having merged as a merge commit --- and #456 then

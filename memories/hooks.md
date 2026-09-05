@@ -135,6 +135,74 @@ Blocking hooks prevent the turn from ending until the missing artifact or requir
 
 ---
 
+## 4.5 A warn-only hook that fires and is ignored is not automatically a hook that should block
+
+The checklist below covers building a hook.
+This covers the question that arrives afterwards, when a warn-only guard fires
+on the same mistake several times in one session and the mistake happens
+anyway: does the recurrence license escalating it to a block?
+
+**Usually not, and recurrence alone never settles it.**
+[`deterministic-tools`](../shared/principles/deterministic-tools.md)'s
+third-occurrence bar decides whether an instrument should *exist*.
+It says nothing about strength, and reading it as an escalation trigger is a
+category error --- the bar counts occurrences of the mistake, while the
+strength question turns on how often the guard's condition is satisfied by
+*correct* behaviour.
+
+Three questions decide it, in order, and only the third is about the
+recurrence.
+
+1. **Is the condition decisive, or only suggestive?**
+   A blocking guard on a suggestive condition refuses correct work, and the
+   corpus's own repeated finding is that such a guard gets switched off ---
+   which costs every true positive it would ever have caught, not just the
+   false ones. Where the information needed to decide is *not in the artifact
+   the hook can see*, no amount of recurrence makes it decisive.
+2. **Does the warning already name the concrete remedy?**
+   A note that says "this is wrong" and a note that supplies the exact
+   rewrite are different instruments. Escalating before the note is
+   actionable escalates the wrong thing.
+3. **Only then: did it fire, get read, and get ignored?**
+   If 1 and 2 both hold and the mistake still recurs, the failure is in
+   reading rather than in detection, and a `PreToolUse` `additionalContext`
+   note is structurally weak against it --- the note arrives alongside a tool
+   call the model has already composed, so it argues against a decision
+   already made. That is a real limit and it is a limit of the *class*, not a
+   defect in the individual hook.
+
+- **Do:** ask whether the condition is decisive before treating a recurrence as
+  an escalation signal.
+- **Do:** record a recurrence-under-warning even when the answer is that no
+  stronger guard is warranted --- the stated reason is what stops the question
+  being reopened from scratch next time.
+- **Don't:** read `deterministic-tools`'s third-occurrence bar as a bar for
+  strength; it decides existence.
+- **Don't:** escalate a suggestive condition to a block --- a guard that
+  refuses correct work gets disabled, and its true positives go with it.
+
+(Morrison-Lab/ai-config#3180's session, 2026-09-04: reading `$?` immediately
+after a pipeline --- so the status read is `tail`'s rather than the command's
+--- recurred three times, with
+[`warn-status-read-after-pipe.py`](../hooks/warn-status-read-after-pipe.py)
+warning each time.
+Assessed against the three questions and left warn-only.
+Its condition is suggestive by construction, which its own docstring states:
+the read is correct under `pipefail` and correct whenever the last stage is
+the one meant, and *which* the author wants is not in the command string, so
+no lexical instrument can decide it.
+Its note already names both remedies with concrete rewrites --- `rc=$?` before
+the pipe, and `${PIPESTATUS[0]}` --- along with the `SIGPIPE` reason not to
+reach for `pipefail` first.
+So both earlier questions hold and the residue is question 3, which is the
+class limit above rather than something this hook can fix.
+The mechanism is owned by
+[`errexit-is-not-uniform`](../shared/coding/errexit-is-not-uniform.md)'s "A
+pipe discards the status of everything left of it"; the separate `&&`-chain
+shape the guard does not reach is recorded there and tracked separately.)
+
+---
+
 ## 5. Adding & Modifying Hooks: Checklist
 
 When authoring a new hook:

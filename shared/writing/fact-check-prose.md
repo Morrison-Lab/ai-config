@@ -605,6 +605,80 @@ of having left it alone.
 - **Don't:** read this as covered by the import rule above; there is no source
   to have been faithful to, which is what removes the moment of doubt.
 
+## When each rewrite is refuted on a NEW clause, the passage is over-specified
+
+The section above governs one rewrite: every clause you carried through it is
+now yours.
+This governs the *series* --- a passage rewritten three, four, five times,
+where each round's finding is new, correct, and lands on a clause the previous
+rewrite did not touch, so nothing in any single round says stop.
+
+The rewrite count is the signal, and it is a fact about the passage rather than
+about any of the findings.
+A passage refuted five times on five different clauses is not one that keeps
+getting unlucky.
+It is one reconstructing something the record cannot settle, and each rewrite
+re-derives that reconstruction with a fresh set of details --- which is why
+plausibility is no defence.
+Every version was plausible; the plausibility is what kept producing the next
+one.
+
+Attention makes it worse rather than better, by the mechanism the section above
+names and the amend-chain section below repeats.
+A targeted rewrite fixes the refuted clause and its untouched neighbours
+inherit the credibility of the fix, so the next round's finding lands on one of
+those.
+
+**So once a passage has been rewritten a third time, stop repairing the clause
+and ask what the evidence can carry.**
+The convergent version states what is derivable, names what is not as
+unrecoverable, and deletes the connective tissue between them.
+That is usually much shorter, and it is not a hedge: "this cannot be recovered,
+and here is why" is a claim a reader can check, where a softened reconstruction
+is the same unsupported claim with a smaller adverb --- which
+[`address-every-comment`](../workflow/address-every-comment.md)'s closing
+section rejects for exactly that reason.
+
+**This does not contradict
+[`algorithmatize-checks.rationale`](../workflow/algorithmatize-checks.rationale.md)'s
+"A review flagging an overclaimed check is a prompt to build it, not to soften
+the claim", and the boundary is worth stating because the two prescribe
+opposite edits.**
+There the claim is about a property of the system, which you control: deleting
+the sentence throws away a check you could have shipped, so the fix is to make
+the claim true.
+Here the claim is about a historical record, and no work available to you can
+make it true --- a rewritten message destroyed the copy that would settle it.
+The test is whether the claim is one you could go and *make* true.
+When it is, build; when it is not, say what survives and name the loss.
+
+- **Do:** count the rewrites, and read a third one as evidence about the
+  passage rather than about the latest finding.
+- **Do:** state what the record supports, name the rest as unrecoverable, and
+  delete the reconstruction joining them.
+- **Do:** ask whether the claim is one you could make true before choosing
+  deletion, so this rule does not swallow the build-the-instrument case.
+- **Don't:** answer the third refutation with a fourth reconstruction, however
+  well it fits the surviving evidence --- so did the previous three.
+- **Don't:** read the shorter passage as the weaker one; the named loss is
+  checkable and the reconstruction never was.
+
+(Morrison-Lab/ai-config#3180, 2026-09-04.
+One case-record paragraph in this file was rewritten five times ---
+`186577c62`, `85101fe1c`, `626209e68`, `7a797d3f8`, `bd8b1bfcc` --- each
+refuted by the history rather than by argument, and each on a clause the
+previous rewrite had not touched: a misattributed PR, an amend chain that
+cannot span two separately-merged PRs, evidence citing commits reachable from
+zero refs, an overstated reason for a rule that was itself correct, and finally
+a conjunction that could never hold.
+`85101fe1c`'s message names the move that ended it --- "the record now says
+what it can verify and names the rest as unrecoverable" --- and `bd8b1bfcc`,
+the fifth, deletes rather than replaces.
+Every one of those SHAs is pre-squash, so fetch `refs/pull/3180/head` before
+running `git show` on them, per
+[`git`](../../memories/git.md)'s "Citing evidence that lives in a PR's own
+superseded commits".)
+
 ## A definition can resolve, render, and still say nothing
 
 The "Rendered/computed artifacts" bullet above covers a computed value or a

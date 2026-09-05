@@ -438,6 +438,59 @@ The tell is a diff that *quotes no source* for a behavioural claim.
 - **Don't:** count a clean `fact-check-prose` pass as having verified a behavioural claim --- it checks the sentence, not the tool.
 - **Don't:** treat a plausible mechanism as checked because nothing in the diff contradicts it.
 
+**Reading the documentation is where this starts and not where it ends: when
+the claim is about how the tool PARSES its input, run the tool.**
+The bullets above name `--help` and the man page as the source, and for a
+claim about what a flag *means* they are.
+They are not sufficient for a claim about how flags **combine** --- which
+short flags consume the next token, what a cluster does, which spellings are
+equivalent --- because that behaviour is a property of the tool's argument
+parser and documentation describes options one at a time.
+A man page can be complete and correct about `-C` and about `-m` and say
+nothing about `-Cm`.
+
+Running it is cheap and unambiguous, and the shape is the same every time:
+a throwaway directory, one invocation per case, and the error text read rather
+than only the exit code.
+The error is what identifies *which* option consumed the token ---
+`could not lookup commit 'm'` names `-C`, `Invalid untracked files mode 'm'`
+names `-u` --- where a bare non-zero says only that something went wrong.
+Then cross-check the derived set against the tool's own complete option
+listing, so a flag you did not think to test is visible as a gap rather than
+absent from the result.
+
+**Stamp such a set with the tool VERSION, not with a date.**
+A date says when you looked; it does not say what you looked at, and a reader
+on a different version has no way to tell whether the set still holds.
+[`timestamp-volatile-claims`](../writing/timestamp-volatile-claims.md) asks for
+an absolute date on a volatile claim, and this is the case where the version is
+the stronger stamp --- a parser's option set changes on release boundaries
+rather than on calendar ones.
+Ship the re-derivation command beside the stamp, so refreshing the set costs a
+paste rather than a reconstruction of how it was obtained.
+
+- **Do:** run the tool against real cases when a diff encodes how it parses
+  flags, and read the error text to identify which option consumed what.
+- **Do:** cross-check a derived option set against the tool's own complete
+  listing, so an untested flag shows up as a gap.
+- **Do:** stamp the set with the tool version and name the command that
+  re-derives it.
+- **Don't:** treat a man page as settling how flags combine --- it documents
+  options singly, and the defect lives in the cluster.
+- **Don't:** date a derived option set instead of versioning it; the reader
+  cannot map a date onto the tool they have.
+
+(Morrison-Lab/ai-config#3180, 2026-09-04.
+A hook parsing `git commit` treated any cluster containing `m` as carrying a
+message, so `-Cm`, `-cm`, `-tm`, `-Sm` and `-um` were false positives.
+The corrected set was derived by running git 2.50.1 in a throwaway repo ---
+`-Cm x` gives `fatal: could not lookup commit 'm'`, `-um x` gives
+`fatal: Invalid untracked files mode 'm'`, while `-am` and `-sm` commit
+normally --- then cross-checked against `git commit -h`'s seventeen documented
+short flags.
+The shipped constant carries the version and the re-derivation command in a
+comment beside it.)
+
 See [`self-review-fallback.cases.md`](self-review-fallback.cases.md), "A cross-vendor reviewer found seven defects the primary never reached".
 
 

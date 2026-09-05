@@ -287,6 +287,80 @@ Ask it of the character rather than of the input, since the input you would have
 (Measured on [ai-config#1968](https://github.com/Morrison-Lab/ai-config/pull/1968), merged 2026-08-22.
 `(?<![\w/-])` entered `hooks/no-empty-promise.py` in [#1724](https://github.com/Morrison-Lab/ai-config/pull/1724) and stood unchanged on `main` until #1968 replaced it, so for that whole interval a dispatch prompt saying `/ums` did not discharge a promise.)
 
+### A lookaround excludes what sits on its own side of the anchor, not what the excluded form "contains"
+
+The section above asks what *else* an excluded character means.
+This asks something cheaper and prior: whether the character is reachable from
+where the clause sits at all.
+A lookbehind reads left of the match and a lookahead reads right of it, so a
+form whose distinguishing character follows the operator cannot be excluded by
+a lookbehind.
+The clause does not fail visibly either --- it silently excludes some other
+operator that carries the same character on the left.
+
+The worked example is a stdout-redirect matcher:
+
+```python
+RX_STDOUT_REDIRECT = r"(?<![2-9&<>])>>?\s*([^\s;&|]+)(?![&>])"
+```
+
+`&` went into the lookbehind to exclude `>&2`.
+The `&` of `>&2` sits *after* the `>`, where only the lookahead can see it, and
+the lookahead already refused it.
+What the lookbehind actually excluded was `&>` and `&>>`, the combined
+stdout-and-stderr redirect, which is a redirect to a file and needed the
+opposite verdict.
+
+Both directions stay invisible at once.
+The intended exclusion still holds, because a different clause is doing it, and
+the accidental exclusion removes a form nobody wrote a case for.
+
+- **Do:** for each character in a lookaround, name the operator it is meant to
+  exclude and check which side of the anchor that character sits on.
+- **Do:** test the operator you meant to exclude *and* every operator that
+  shares the character.
+- **Don't:** add a character to a lookbehind because the form to exclude
+  "contains" it --- containment says nothing about position.
+
+(Measured 2026-09-04 on
+[ai-config#3251](https://github.com/Morrison-Lab/ai-config/pull/3251):
+a `date ... &>>notebook.md` write read as a print rather than a file write and
+so discharged the guard it should have tripped.)
+
+### A reviewer's proposed widening of a class can overshoot the bug it fixes
+
+The sections above govern the exclusion clause you wrote.
+This governs the widening someone else proposes for it, which arrives with a
+reason attached and so escapes the same enumeration.
+The reason is almost always a claim about an *earlier stage* --- the splitter
+already removed the operators, the stripper already removed the quotes, so the
+class need not defend against them.
+That claim is about a pattern you did not write and are not looking at, and it
+is one command to open.
+
+The reported bug was real: `RX_PRINTED_VAR`'s `[^;&|\n]*` refused a `|` sitting
+inside a quoted `echo` argument.
+The proposed fix was `[^\n]*`, reasoning that the segment splitter had already
+removed every real operator.
+Reading the splitter refutes it.
+It splits on `;`, `&&`, and `||` only, so a single `|` --- as in
+`echo done | grep -c $t` --- is still a live pipe inside the segment, and the
+widened class would have swallowed it and discharged the guard.
+
+The fix that held blanked operator characters inside quoted spans and kept the
+class, so the quoted form passes without readmitting the operator.
+
+- **Do:** read the earlier stage's own pattern before accepting that it removed
+  what a proposed widening assumes it removed.
+- **Do:** test the operator the class was protecting against alongside the
+  quoted form the widening is for; a widening is right only if both pass.
+- **Don't:** accept "the splitter already handled it" as a premise --- it names
+  a regex, and reading it settles the question.
+
+(Measured 2026-09-04 on
+[ai-config#3251](https://github.com/Morrison-Lab/ai-config/pull/3251),
+review round 3.)
+
 ### An attribution claim in a guide-for-future-edits comment is settled by mutation, not by re-reading it
 
 "Test the instrument against the incident that prompted it, verbatim"'s closing **Don't** governs a comment claiming *what* a matcher matches.
@@ -402,6 +476,32 @@ Remove only that citation and keep the same clean heading: `clean` again.
 So main's not-clean flag on the cited body was never a detection of anything the body's own current verdict says;
 it was produced entirely by the literal bolded phrase inside the citation, matched exactly as if it were a live statement --- the exact false positive the PR exists to remove.
 A comparison that read the branch's `clean` on this body as "worse than main" would have had it backwards: the branch was not losing a detection main had earned, it was correctly declining to make the one main was making by accident, and isolating the citation is what showed that rather than another vocabulary patch on the branch's own scan.)
+
+## A checker that returns the same verdict on the broken tree is not evidence the fix worked
+
+The two sections above audit a control built for one comparison.
+This audits a **pre-existing** checker cited as verification --- the CI gate, the linter, the repo script you ran after the fix and reported green.
+
+Citing one feels like the strongest move available, because it is mechanical rather than a judgment, and because the rest of this file argues for exactly that.
+But an instrument earns a citation by *discriminating*, and a green verdict alone cannot say whether it did.
+A check that is silent on the property under repair reports clean on the fixed tree, on the broken tree, and on the untouched original, and all three readings are indistinguishable.
+The verification is then vacuous while reading as the most rigorous sentence in the reply.
+
+This is the default outcome rather than a rare one.
+A gate is often configured **lenient** on exactly the property a style fix is about, since a rule the corpus already violates at scale is the rule a repo turns off to get a green baseline --- so read a check's configuration rather than assuming the rule is on.
+And a green result invites no follow-up, so nobody asks the one question that settles it.
+
+So run the check against the **unfixed** tree before citing it.
+If it is green there too, it is not the instrument for this claim, and the job is to find one that discriminates --- which usually means measuring the property directly rather than looking for a gate that already exists.
+A distribution beats a pass/fail here: a property's *signature* is visible in a histogram where a threshold shows nothing.
+
+- **Do:** run the cited check against the pre-fix tree and confirm it goes red before reporting it as verification.
+- **Do:** read a check's own configuration for whether the relevant rule is enabled at all, rather than inferring it from a clean run.
+- **Do:** measure the property directly, and prefer a distribution or a count over a pass/fail, when no existing gate discriminates.
+- **Don't:** cite a green gate as evidence a fix landed --- green is the same answer it gives to no fix at all.
+- **Don't:** treat "two independent checks agree" as corroboration when neither has been shown able to disagree.
+
+See [`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md), "A citation to a check that answers the same on every tree, and two retractions of it".
 
 ## Widening an instrument invalidates every figure it produced, not only the one that exposed it
 
@@ -527,7 +627,7 @@ picking the script whose name matches the property.
   that measures it.
 
 (Measured 2026-08-19 on ai-config.
-`scripts/check-memory-file-size.py` exits `0` while printing that
+`scripts/check-memory-file-size.py` exited `0` while printing that
 `memories/github-actions.md` was over its 1200-line threshold, so the crossing
 was reported here as advisory and pushed.
 `validate` went red on both parallel runs: `scripts/test_check_memory_file_size.py`
@@ -901,6 +1001,26 @@ A grep sees all three, so it does not matter that only the last is ever printed.
 The needle was the phrase `chained AHEAD`, and `git show origin/main:hooks/no-unreviewed-pr.py | grep -n 'chained AHEAD'` returns 6 hits the fix never touches: three docstrings (lines 356, 418, 672), two inline comments (1522, 1550), and the label-exemption message (1917).
 So the assertion passed against the unfixed script, and the pre-fix control that was supposed to fail did not.)
 
+**A live guard's own substring needle has the identical failure mode, and it fires on the message that discharges it rather than only on a test fixture.**
+
+The section above is about a test's needle matching the fixture's own pre-existing text.
+The same collision reaches a shipped `Stop`/`PreToolUse` hook whenever its trigger phrase is one the corpus has to be able to *discuss*: a guard keyed on a cleanliness phrase fires on the very message that **retracts** an earlier, unsupported use of that phrase, because the retraction has to name the phrase to withdraw it.
+The guard is technically correct that the string appears --- it is wrong that the string's *appearance* still means what the guard was built to catch, because the sentence containing it is doing the opposite job: undoing the claim rather than making it.
+
+`no-placeholder-reply.py`'s whole-message anchoring, already named above, is the general answer: match the **whole** stripped message rather than a substring, specifically because this corpus quotes its own banned strings constantly.
+The same fix generalizes past that one hook.
+
+- **Do:** anchor a guard's needle on the whole message (or an unambiguous structural position within it), not a bare substring, whenever the corpus must be able to discuss the phrase it flags.
+- **Do:** exempt a sentence carrying a first-person negation of the claim ("I never ran ...", "I said X --- I never verified it") from a substring match, when whole-message anchoring is not available.
+- **Don't:** ship a guard whose needle is a bare substring of the phrase its own remedy has to use --- the remedy then trips the guard it exists to satisfy.
+- **Don't:** assume a guard is safe because its test fixtures don't happen to include a retraction of the guard's own vocabulary;
+  write that fixture deliberately.
+
+(Measured 2026-09-02: `hooks/no-incomplete-check-enumeration.py` blocked a message asserting two PRs were "clean by every instrument" on nothing but `gh pr checks` --- correctly, that is the exact short surface the guard exists to catch.
+The **next** message retracted it ("I said #3010 and #3029 were 'clean by every instrument' at merge.
+I never ran `check-pr-fully-clean.py` on either.") and the same guard, on the same phrase, blocked that retraction too --- twice, across two consecutive turns.
+Tracked as [ai-config#3053](https://github.com/Morrison-Lab/ai-config/issues/3053).)
+
 **A tenth outcome: the property under test is enforced at more than
 one independent site, and mutating one leaves the others standing
 guard.**
@@ -951,14 +1071,42 @@ unless it is written down.
   record --- it explains the survivor and loses the structural fact
   that produced it.
 
+**An eleventh outcome, and the one a hand-built mutation reaches
+first: the edit landed at the intended spot and the surrounding
+GRAMMAR absorbed it.**
+
+Outcome four covers a mutant corrupted in transit, and outcome nine a mutant that edited the wrong occurrence.
+This is neither.
+The occurrence was right, the inserted text is exactly what was intended, and the file parses.
+The construct under test nonetheless still does what it did, because the insertion changed what the *neighbouring* code is attached to.
+
+Insertion is the risky operation, and moving a statement is the risky intent.
+A move is spelled as an insertion plus a deletion, and only the insertion has a grammar to get wrong.
+In an indentation-scoped language the hazard is a block boundary: text placed at loop-body indent immediately above an `elif` re-parents that whole chain, so a guard "relocated past" an earlier branch is still governed by it.
+A brace language has the same hazard at a brace, and a template language at a block close.
+
+The result is the worst-reading outcome in this list, because SURVIVED is a publishable finding.
+A malformed mutant that crashes announces itself.
+This one produces a clean "no behaviour change", which is indistinguishable from a correct negative control, and confident enough to rebut a reviewer with.
+
+- **Do:** read the mutated source **in context** --- the lines above and below the edit, not the diff hunk alone --- before scoring any mutation, and especially before reporting SURVIVED.
+- **Do:** treat a relocation as two edits, and confirm the moved statement's new block parent is the one you meant.
+- **Do:** prefer an edit anchored on the enclosing structure, such as an AST rewrite or a whole-block replacement, over a string insertion, wherever the language's scoping is positional.
+- **Don't:** read "it parses and the suite is green" as "the mutation expressed the change I described" --- a re-parented neighbour does both.
+- **Don't:** defend a SURVIVED result against a reviewer's doubt by citing the exit code.
+  The reviewer is asking about the mutant, and only the mutant's source answers.
+
+See [`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md),
+"A relocated skip that re-parented an elif chain".
+
 **When a mutation survives, the first hypothesis is that the mutation
 was wrong --- mis-targeted, incomplete, or vacuous --- not that the
 test coverage is weak.**
 
-The ten outcomes above are what "wrong" actually looks like: a mutant
-that never applied, one that applied to the wrong spot, one that
-applied to only one of several guardians, a fixture a sibling clause
-absorbs.
+The outcomes above are what "wrong" actually looks like: a mutant
+that never applied, one that applied to the wrong spot, one whose
+insertion re-parented the code around it, one that applied to only
+one of several guardians, a fixture a sibling clause absorbs.
 Every one of them reads as a coverage gap from the outside, and every
 one of them is a defect in the mutation, not in the suite.
 Doubting the suite first spends the same effort on the wrong side of
@@ -1422,10 +1570,46 @@ Where it does not enter both measurements with the same magnitude, the ratio amp
 - **Don't:** assume min-of-N filters two measurements equally when one is much longer than the other.
 - **Don't:** read a ratio's stability on an idle machine as evidence that it is load-independent.
 
+### The same ratio compresses when the nuisance cost lands in the denominator
+
+The section above measures load pushing a growth ratio *up*, and that is one of two directions it can move.
+A ratio is large over small, so a nuisance cost that lands mostly in the **denominator** compresses it instead, and a genuinely quadratic scan then reads as sub-quadratic.
+
+Measured 2026-09-03: the negative control in `hooks/test-no-unauthorized-merge.py`, a deliberately quadratic scan whose growth then had to clear an 8x bound, read 14.5-15.3x over five runs on an idle container and 7.3x on a loaded GitHub runner, going red on a PR whose whole diff was two `memories/*.md` files ([#3098](https://github.com/Morrison-Lab/ai-config/issues/3098)).
+Nothing about the code differed between the two readings.
+
+The direction inverts what the failure looks like, which is why it is worth naming separately.
+An inflated ratio reports a regression that is not there, and reads as a finding about the code.
+A compressed one reports that the control cannot discriminate, and reads as a broken control --- so the instrument accuses itself, and the tempting repair is to loosen a bound that was working.
+
+Two repairs are on offer, and which one fits turns on whether the distortion is additive or multiplicative.
+That is measurable rather than assumable, so measure it --- and measure it under the load the distortion appears under, since an idle reading of the same quantity looks like the same number and answers a different question.
+Here it could not be: the fixed cost timeable off the runner is 0.62ms of a 6.2ms baseline, for the loop plus one zero-length scan call, which bounds the *interpreter's* share and says nothing about the runner's, since scheduler latency and a cold cache are load-dependent by construction.
+So the distortion's shape stayed a hypothesis, and the repair was chosen for surviving either shape rather than for ruling one out.
+Widening the input-size gap does that, because the quadratic term outruns the bound: at a size step of `s` the reading is `s ** 2` and the halfway bound is `s ** 1.5`, so the margin is `sqrt(s)` --- 1.9x at a 4x step against 3.6-3.7x at a 16x step, measured.
+
+**Widening the gap while leaving the bound fixed is the trap**, and it hides well because the number in the bound never changes, so nothing looks edited.
+A bound of 8.0 is the halfway line for a 4x step and sits *exactly on* the 8x a genuinely linear scan grows at an 8x step, so widening that far leaves it no margin against the shape it exists to reject.
+Measured, a linear scan read 7.55-8.09x at an 8x step on one container and 7.83-8.11x on another, crossing 8.0 in 1 run of 12 and in 3 of 12.
+At the 16x step the control actually runs at, a linear scan read 15.7-16.0x and cleared 8.0 in all six runs, so a widened control against the old bound would pass for either shape --- the one thing a control exists to rule out.
+Recompute the bound at whatever step it is read against, and pin the separation with a positive control of the opposite shape rather than arguing it.
+
+The 0.62ms, 3.6-3.7x and 7.55-8.09x figures here were read on one 4-core Linux container at load average ~2.5, through `time.process_time`, as the minimum of three baseline runs over the minimum of two target runs;
+the 7.83-8.11x and 15.7-16.0x figures came from a second 4-core container at load average ~4.1 under the same protocol, and the 14.5-15.3x readings from a quieter one at load average ~0.5.
+A timing figure is a claim about a machine, so re-measure rather than porting these.
+
+- **Do:** ask which term a nuisance cost lands in, since load can push a ratio either way.
+- **Do:** measure a fixed cost under the load it appears under before subtracting it, since an idle reading bounds the interpreter's share and not the runner's.
+- **Do:** prefer the repair that survives both shapes of distortion when you cannot measure which shape you have.
+- **Do:** recompute a bound at the size step it is read against, and pin the separation with a control of the opposite shape.
+- **Don't:** read a control's "I cannot discriminate" as evidence about the code it controls.
+- **Don't:** widen a ratio's input-size gap while leaving a bound that was derived for the old gap.
+- **Don't:** rest a causal classification on a measurement taken where the cause cannot appear.
+
 ## A slow wall-clock reading is a claim about the machine before it is a finding about the code
 
-The two sections above govern a timing **bound written into a test** --- which clock it uses, and whether a ratio cancels the noise it is meant to cancel.
-Neither reaches the reading you take **once**, by hand, in the middle of diagnosing something, and then report as a defect.
+The three sections above govern a timing **bound written into a test** --- which clock it uses, and whether a ratio cancels the noise it is meant to cancel or is instead inflated or compressed by it.
+None of them reaches the reading you take **once**, by hand, in the middle of diagnosing something, and then report as a defect.
 No assertion is being authored there and no threshold is being chosen, so nothing about the moment resembles the situation those sections describe.
 
 **The reading is self-authenticating in a way a wrong value is not**, and that is the whole of the trap.
@@ -1503,7 +1687,7 @@ rather than a decaying average over a window you did not choose.
 A reading you cannot reproduce is not a measurement of the code, and a spread that
 spans an order of magnitude names its own cause.
 
-**A timing assertion written as a regression guard is the same exposure, and the two sections above answer it** --- they are about exactly this, a busy machine inflating a wall-clock reading.
+**A timing assertion written as a regression guard is the same exposure, and the sections above answer it** --- they are about exactly this, a busy machine distorting a timed reading in either direction.
 What those sections do not separate, and what a session that has just learned its own machine was loaded most needs, is **which question the assertion asks**.
 
 A **regression bound** asks whether the code got slower.
@@ -1536,6 +1720,32 @@ That session's PR also carried a `< 1.0s` wall-clock assertion as a
 backtracking regression guard, which under the same load could have flaked ---
 the case the paragraph on regression guards above answers, and the reason it
 answers it with `process_time` rather than with a wider bound.)
+
+### A REPEATED measurement is not a CONTROLLED one
+
+The section above governs the one-off reading and names the load's likeliest source.
+This governs what happens **next**, when you disbelieve the reading and run it again --- and it is the step at which a flake gets promoted to a regression, because repetition is the one check that cannot detect sustained load.
+
+When the same result comes back a second and a third time, the failure reads as settled: it reproduces, so it is deterministic, so the change in the working tree caused it.
+That inference is wrong, and it is wrong in a way repetition can never expose.
+Re-running holds the tree constant, which is what makes it feel like a control --- and it holds the **confounder** constant with exactly the same fidelity.
+A busy machine does not stop being busy between two consecutive runs.
+
+So the section above's remedy of re-running and reporting the spread is necessary and not sufficient.
+A wide spread does establish that the machine is the variable, as that section's own 0.59s-to-8.0s re-run shows.
+A *narrow* one establishes nothing, because sustained load can hold every run in a batch at the same wrong value --- and narrowness is the reading most easily mistaken for precision.
+
+The control that repetition imitates is a **clean copy**: apply the same change to a pristine `cp -a` of the tree, run it N times there, and compare.
+Tally failures **by name** rather than by count, since the same total twice over says nothing about whether it was the same test both times, and a rotating failure is the signature of load rather than of code.
+And run the *unchanged* copy the same N times, so a green run has something to be green against.
+
+- **Do:** reproduce a suspected regression in a pristine copy of the tree before attributing it to the change.
+- **Do:** record which test failed, not how many, and read a rotating name as a flake.
+- **Do:** read a *narrow* spread across repeated runs as consistent with sustained load, not as evidence against it.
+- **Don't:** read three identical results as a control --- consecutive runs share every confounder they were meant to rule out.
+- **Don't:** report an attribution from a suite whose assertions include a wall-clock bound until the bound has been ruled out.
+
+See [`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md), "A repeated measurement is not a controlled one".
 
 ## Reading an instrument's PROSE instead of its exit status, generalized past the PR checker
 

@@ -48,7 +48,20 @@ def make_repo(tmpdir: Path) -> Path:
     # 122 lines: the "Huge" section is the clear outlier, so it should head
     # the report's per-file section list.
     big = "# Big\n\n" + "## Tiny\n" + "x\n" * 19 + "## Huge\n" + "y\n" * 99
+    # 95 lines: inside the warning band for `--max-lines 100`, whose
+    # default warn threshold is round(100 * 0.92) == 92. Under the cap, so it
+    # must never appear as a breach.
+    near = "# Near\n" + "z\n" * 94
+    # 92 and 91 lines: the two files straddling that same warn threshold, so
+    # the band's lower edge is pinned. Without them an off-by-one there --
+    # `warn_lines < len(lines)` instead of `<=` -- silently drops the file
+    # sitting exactly at the threshold and no assertion notices.
+    edge = "# Edge\n" + "z\n" * 91
+    under = "# Under\n" + "z\n" * 90
     (memories / "small.md").write_text(small, encoding="utf-8")
+    (memories / "near.md").write_text(near, encoding="utf-8")
+    (memories / "edge.md").write_text(edge, encoding="utf-8")
+    (memories / "under.md").write_text(under, encoding="utf-8")
     (memories / "big.md").write_text(big, encoding="utf-8")
     (memories / "MEMORY.md").write_text("# index\n" + "row\n" * 200, encoding="utf-8")
     (memories / "session" / "notes.md").write_text("# s\n" + "n\n" * 200, "utf-8")
@@ -92,6 +105,131 @@ with tempfile.TemporaryDirectory() as tmp:
     check("clean corpus reports no findings", "No memory file exceeds" in out)
     check("clean corpus exits 0", code == 0)
 
+    # The warning band (ai-config#3102). Reporting only the breach is what
+    # made the check arrive too late to act on, so the band has to print in
+    # the clean case too -- that is the case the old output could not
+    # distinguish from an empty corpus.
+    out, code = run_check(repo, "--max-lines", "100")
+    check(
+        "warns on a file approaching the cap",
+        "memories/near.md: 95 lines" in out,
+    )
+    check("reports the remaining headroom", "(5 lines of headroom)" in out)
+    # The header reports rather than instructs. A single imperative addressed
+    # to the whole band would advise every file in it identically -- at the
+    # shipped default it opens 100 lines below the cap, so a file with most of
+    # that room left would be told to split.
+    check(
+        "the band header is printed above the listing",
+        cmfs.BAND_HEADER in out,
+    )
+    # `reports_only` is a shape check, and its name says only what it checks:
+    # it pins the shape the retired wording had (an order appended to the
+    # report after a separator or a conjunction) plus that wording's verbs. It
+    # does NOT establish that the header cannot instruct -- any lexical rule is
+    # leaky, and a reworded order such as
+    # "Headroom before the cap, act on the fullest file." passes it. The
+    # general property is argued in `report_approaching`'s docstring, which is
+    # what a rewrite of the header has to be read against. The negative
+    # controls below are the forms this does reject, so a later edit can see
+    # where its guarantee stops.
+    def reports_only(header: str) -> bool:
+        return (
+            not any(c in header for c in ":;")
+            and " and " not in header
+            and not any(
+                word in header.lower()
+                for word in ("split", "prefer", "reroute", "trim", "recover", "append")
+            )
+        )
+
+    check(
+        "the band header carries no colon, semicolon, conjunction, or retired verb",
+        reports_only(cmfs.BAND_HEADER),
+    )
+    for label, rejected in (
+        (
+            "an order appended after a colon",
+            "Headroom before the cap, least first: act on the fullest file.",
+        ),
+        (
+            "an order appended after a semicolon",
+            "Headroom before the cap, least first; act on the fullest file.",
+        ),
+        (
+            "an order joined by a conjunction",
+            "Headroom before the cap and start with the top entry.",
+        ),
+        (
+            "an order carrying a retired verb",
+            "Headroom before the cap, split first.",
+        ),
+    ):
+        check(f"rejects {label}", not reports_only(rejected))
+    # "least first" is a claim the header makes about the listing, so check it:
+    # near.md has 5 lines of headroom and edge.md has 8.
+    check(
+        "orders the band least headroom first",
+        out.index("near.md") < out.index("edge.md"),
+    )
+    # The breach format is "<path>: <n> lines" with nothing after it, so the
+    # absence of that line is what proves the warned file was not also
+    # reported as over the cap.
+    check(
+        "the approaching file is not reported as a breach",
+        "near.md: 95 lines\n" not in out,
+    )
+    check(
+        "the breached file is not listed in the band",
+        "big.md: 122 lines (" not in out,
+    )
+    check(
+        "warns on a file at exactly the warn threshold",
+        "memories/edge.md: 92 lines (8 lines of headroom)" in out,
+    )
+    check(
+        "leaves the file one line below the warn threshold alone",
+        "under.md" not in out,
+    )
+
+    out, code = run_check(repo, "--max-lines", "122")
+    check(
+        "warns even when nothing breached",
+        "No memory file exceeds" in out
+        and "memories/big.md: 122 lines" in out,
+    )
+    check("a warning alone still exits 0", code == 0)
+
+    # A file AT the cap warns rather than breaching: the failure fires
+    # strictly above --max-lines, and that file is exactly the one that
+    # cannot take another line.
+    check(
+        "a file at exactly the cap warns with 0 headroom",
+        "memories/big.md: 122 lines (0 lines of headroom)" in out,
+    )
+
+    _, code = run_check(repo, "--max-lines", "122", "--strict")
+    check("a warning alone exits 0 under --strict", code == 0)
+
+    out, _ = run_check(repo, "--max-lines", "500", "--warn-fraction", "0.99")
+    check(
+        "--warn-fraction moves the band",
+        "No memory file is within 5 lines of the cap." in out,
+    )
+
+    # An over-cap file is past the cap, not near it, so the empty-band line
+    # would read as contradicting the breach printed directly above it.
+    out, _ = run_check(repo, "--max-lines", "100", "--warn-fraction", "0.99")
+    check(
+        "no empty-band line alongside a breach",
+        "memories/big.md: 122 lines" in out and "is within" not in out,
+    )
+
+    _, code = run_check(repo, "--max-lines", "100", "--warn-fraction", "1")
+    check("rejects a --warn-fraction of 1", code == 2)
+    _, code = run_check(repo, "--max-lines", "100", "--warn-fraction", "0")
+    check("rejects a --warn-fraction of 0", code == 2)
+
     # MEMORY.md (the index) and session/ notes are both over any threshold
     # used above, so their absence from the findings proves the exclusions
     # apply. Match the "<path>: <n> lines" finding format specifically --
@@ -124,8 +262,29 @@ with tempfile.TemporaryDirectory() as tmp:
         "memories/session/notes.md" not in globbed,
     )
 
+check(
+    "warn threshold applies the fraction of the cap",
+    cmfs.warn_line_threshold(1250, 0.92) == 1150,
+)
+# The default's product is exactly 1150.0, so the assertion above holds under
+# truncation, flooring and ceiling alike and says nothing about the rounding.
+# These two inputs are where those disagree: 1250 * 0.9207 is 1150.875, which
+# truncates to 1150 and rounds to 1151; 100 * 0.925 is exactly 92.5, which
+# ceils to 93 and rounds to 92 under Python's round-half-to-even. Together
+# they pin `round` against each neighbouring rule a later edit might reach for.
+check(
+    "warn threshold rounds a non-integral product up, not down",
+    cmfs.warn_line_threshold(1250, 0.9207) == 1151,
+)
+check(
+    "warn threshold rounds a .5 product half-to-even",
+    cmfs.warn_line_threshold(100, 0.925) == 92,
+)
+
 # The real corpus must stay under the shipped default, or the check ships red.
-findings = cmfs.oversized_files("memories", cmfs.DEFAULT_MAX_LINES)
+findings = cmfs.oversized_files(
+    cmfs.measured_files("memories"), cmfs.DEFAULT_MAX_LINES
+)
 check(
     f"this repo's own memories/ is under the {cmfs.DEFAULT_MAX_LINES}-line default",
     not findings,

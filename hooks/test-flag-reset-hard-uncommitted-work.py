@@ -324,6 +324,115 @@ def checkout_new_branch_case(path):
     return "git checkout -b feature"
 
 
+def checkout_force_ref_case(path):
+    """`git checkout -f <ref>` over a dirty tracked file. Measured on git
+    2.43.0: this prints only `Switched to branch 'other'`, exits 0, and the
+    edit is gone -- so the whole tracked tree is in scope, not the ref."""
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _run(path, "branch", "other")
+    _write(path, "tracked.txt", content="dirty\n")
+    return "git checkout -f other"
+
+
+def checkout_force_bare_case(path):
+    """`git checkout -f` with NO operand at all -- the widest form, which
+    reverts EVERY tracked file to HEAD with no output whatsoever."""
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return "git checkout -f"
+
+
+def checkout_force_new_branch_case(path):
+    """`git checkout --force -b <new>` -- creating a branch does not spare
+    the working tree once the switch is forced."""
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return "git checkout --force -b feature"
+
+
+def checkout_force_bundled_case(path):
+    """`git checkout -qf <ref>` -- the force flag bundled into a short
+    cluster rather than written as its own token."""
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _run(path, "branch", "other")
+    _write(path, "tracked.txt", content="dirty\n")
+    return "git checkout -qf other"
+
+
+def checkout_force_new_branch_bundled_case(path):
+    """`git checkout -fb mybranch` -- `-f` and the value-taking `-b` bundled
+    into one short cluster, `-b`'s value (`mybranch`) a SEPARATE next token.
+    Measured on git 2.43.0: this creates and switches to `mybranch`, exits 0,
+    and the dirty tracked edit is gone -- so `mybranch` must be consumed as
+    `-b`'s value, not misread as a pathspec that scopes the status check to
+    a nonexistent path."""
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return "git checkout -fb mybranch"
+
+
+def checkout_new_branch_bundled_case(path):
+    """`git checkout -qb mybranch`, UNFORCED -- `-q` and the value-taking
+    `-b` bundled into one short cluster, with `mybranch` as `-b`'s separate
+    next-token value. Measured on git 2.43.0: this creates and switches to
+    `mybranch`, exits 0 with no output (quiet), and the dirty tracked edit
+    survives -- so this must not warn, and `mybranch` must not be misread as
+    a pathspec."""
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return "git checkout -qb mybranch"
+
+
+def checkout_new_branch_attached_case(path):
+    """`git checkout -bfixup` -- `-b`'s value attached to the cluster.
+    Measured on git 2.43.0: this creates branch `fixup`, exits 0, and the
+    dirty tracked file survives, so the `f` in the cluster is part of the
+    branch name rather than `--force`."""
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return "git checkout -bfixup"
+
+
+def checkout_ref_dirty_case(path):
+    """`git checkout <ref>`, UNFORCED, over a dirty tracked file. Measured
+    on git 2.43.0: the change is carried across to the new branch and the
+    tree stays dirty, so nothing is discarded and this must not warn. The
+    companion to the forced case above, and the reason the force flag is
+    what decides it rather than the dirty tree."""
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _run(path, "branch", "other")
+    _write(path, "tracked.txt", content="dirty\n")
+    return "git checkout other"
+
+
+def switch_force_case(path):
+    """`git switch -f <ref>` discards the same way a forced checkout does,
+    and this hook does not read `git switch` at all -- a deliberate gap the
+    catalogs name. Pinned here so the gap is measured rather than assumed."""
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _run(path, "branch", "other")
+    _write(path, "tracked.txt", content="dirty\n")
+    return "git switch -f other"
+
+
 def mv_subcommand_case(path):
     """A different git subcommand (`mv`) carrying pathspec-shaped
     arguments must not be routed through the checkout/restore pathspec
@@ -387,6 +496,18 @@ SHOULD_WARN += [
      "regardless of the ref"),
     ("W12", checkout_ambiguous_path_wins_case,
      "a positional argument that does not resolve as a ref is a path"),
+    ("W13", checkout_force_ref_case,
+     "`git checkout -f <ref>` -- forcing removes the refusal that makes an "
+     "unforced switch safe"),
+    ("W14", checkout_force_bare_case,
+     "`git checkout -f` with no operand reverts every tracked file to HEAD"),
+    ("W15", checkout_force_new_branch_case,
+     "`git checkout --force -b <new>` still discards the working tree"),
+    ("W16", checkout_force_bundled_case,
+     "`git checkout -qf <ref>` -- force bundled into a short cluster"),
+    ("W17", checkout_force_new_branch_bundled_case,
+     "`git checkout -fb mybranch` -- `-f` bundled with the value-taking "
+     "`-b`, whose value is a separate next token, not a pathspec"),
 ]
 
 SHOULD_STAY_SILENT += [
@@ -405,6 +526,18 @@ SHOULD_STAY_SILENT += [
     ("S13", mv_subcommand_case,
      "a different git subcommand (`mv`) carrying pathspec-shaped args is "
      "not checkout/restore"),
+    ("S14", checkout_ref_dirty_case,
+     "`git checkout <ref>` UNFORCED over a dirty tree carries the change "
+     "across -- the force flag decides this, not the dirty tree"),
+    ("S15", switch_force_case,
+     "`git switch -f <ref>` is the deliberate gap: this hook does not read "
+     "`git switch`, and the catalogs say so"),
+    ("S16", checkout_new_branch_attached_case,
+     "`git checkout -bfixup` -- `-b` takes the rest of the cluster as its "
+     "value, so the `f` is not `--force`"),
+    ("S17", checkout_new_branch_bundled_case,
+     "`git checkout -qb mybranch`, unforced -- `-b`'s value is a separate "
+     "next token, not a pathspec, and the change is carried across"),
 ]
 
 
@@ -510,7 +643,18 @@ MUTATIONS = {
         "pathspec",
         [("    return _resolves_as_ref(arg) is False",
           "    return True")],
-        {"S9"},
+        # W13 and W16 ride on this clause too: misreading `other` as a
+        # pathspec scopes the status query to a path that does not exist,
+        # so the forced switch reports nothing rather than the whole tree.
+        {"S9", "W13", "W16"},
+    ),
+    "M3_forced_checkout": (
+        "a forced `git checkout` that resolves to no pathspec is scoped to "
+        "the whole tracked tree, like `reset --hard`",
+        [('            if sub == "checkout" and saw_force:\n'
+          '                return "checkout-force", " ".join(argv), None',
+          "            pass")],
+        {"W13", "W14", "W15", "W16", "W17"},
     ),
     "M4_status_gate": (
         "only a status report with at least one non-untracked entry warns",

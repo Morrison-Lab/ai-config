@@ -70,11 +70,21 @@ committed pass.
   step, or a preference wasn't encoded)
 - When the user says "did you update memories?" (the answer should be "let
   me do that now")
-- **While paused waiting on a subagent or a long-running background process
-  to complete.** That idle stretch is exactly when there's time to survey
-  what's accumulated so far and persist it, rather than only running UMS at
-  a hard stop. Don't let a real wait sit fully idle when a useful pass is
-  available to run alongside it.
+- **Before ending a turn to wait on anything** --- a subagent,
+  a long-running background process, CI, a review round,
+  or an answer from the user.
+  Run the pass before the turn ends,
+  not once the wait turns out to be long:
+  a wait's length is not knowable when it begins,
+  and the learnings sit in conversation state until it ends.
+  A dispatched subagent or background job is the case
+  where the pass runs alongside the wait rather than delaying it,
+  so don't let a real wait sit fully idle.
+  The pass is owed at the first pause
+  and again only once new learnings accumulate,
+  rather than once per wait or once per re-arm of a timer.
+  See
+  [`run-ums-proactively`](../../shared/workflow/run-ums-proactively.md).
 
 ## Procedure
 
@@ -135,7 +145,24 @@ committed pass.
      related `get_check_runs` guidance while an entry on the same tool already
      sat ~2000 lines below in the write-access cluster -- caught by the review
      bot, not by the author.)
-   - **When the target memory file is already at the 1200-line cap**,
+   - **Run `python3 scripts/check-memory-file-size.py` before writing the
+     append, and read its warning band, not only its pass/fail line.**
+     The band names every memory file near the cap and how many lines each
+     has left (ai-config#3102), so a file with almost no
+     headroom is knowable here, while the entry can still be re-wrapped or the
+     file split, rather than by tripping the gate in step 4 once the append is
+     written.
+     Read each listed file's headroom, not its membership: the band opens 100
+     lines below the cap at the shipped default, so most of it is room rather
+     than a warning.
+     - **Do:** read the reported headroom of the file the entry topically
+       belongs in, and recover lines or split that file when its headroom does
+       not comfortably cover the entry.
+     - **Don't:** pick the destination by headroom rather than by subject,
+       or redirect or split on band membership alone --- a file with most of
+       the band still ahead of it can take this entry.
+   - **When the target memory file is already at the cap
+     `scripts/check-memory-file-size.py` reports**,
      recover lines (re-wrap or drop) or split the file.
      A fold has two shapes and neither escapes every gate: a new source
      line trips `scripts/test_check_memory_file_size.py`, while folding
@@ -145,8 +172,8 @@ committed pass.
      `scripts/test_check_memory_file_size.py`
      even when every new sentence is a real lesson
      (3rd occurrence, 2026-08-25 on `memories/preferences.md` in
-     ai-config#2262: `origin/main` was exactly 1200 lines, and a
-     +5-line append reddened `validate`.
+     ai-config#2262: `origin/main` sat exactly at the cap, 1200 lines as
+     that cap then stood, and a +5-line append reddened `validate`.
      Prior: `shared/writing/semantic-line-breaks.md` ai-config#1291;
      `shared/workflow/review-verdict-pitfalls.md` ai-config#811).
    - **When step 2 routed the item to a repo other than ai-config, grep both
@@ -218,6 +245,10 @@ committed pass.
    `tools.md` on 2026-09-01 when a UMS append crossed the budget),
    `NLB_BASE_REF=origin/main python3 scripts/vendor/gha-check-new-line-breaks.py`,
    `python3 scripts/check-links.py`, and `markdownlint` on the changed files.
+
+   `check-memory-file-size.py` prints its warning band here too, but this run
+   is the pass/fail one: the band is actionable in step 3, before the append is
+   written, and by now the append already exists.
 
    **If a push is rejected non-fast-forward:** fetch first and diff before
    assuming a real conflict -- the branch may have picked up another
@@ -528,6 +559,23 @@ add a review gate for the cases that need one.
   of inside it. (Caught by `@claude` review on ai-config#335: a new 0-indent
   bullet landed between two sibling sub-bullets of an existing parent,
   breaking the nesting.)
+- ❌ Patching a sentence the entry's point does not need, round after round.
+  When successive review rounds find defects in mechanism prose no reader
+  acts on, delete the prose rather than repair it; the tell is the third
+  round on the same paragraph (ai-config#3193: five successive commits,
+  `1fff7e63` to `4af1f1ea`, each re-patched the same protocol-mechanism
+  sentences, which the entry's Do/Don't never used and `e91dda59` deleted;
+  the deleted paragraphs were not restored).
+  The same shape recurs when a fix round appends prose narrating its own
+  fixes: that prose is fresh unmeasured text, so a round that fixes N
+  findings and adds a paragraph about them adds new claims to refute
+  (ai-config#3202: the three notebook entries narrating rounds 1 to 3 were
+  deleted rather than patched at `48380505`, and the summary entry that
+  replaced them kept being re-edited, its round count rebound to each new
+  head, until the merged file's "As of `75bc0fc2`, the head round 13
+  reviewed").
+  Write the fix with no narration;
+  ai-config#3203 proposes the same brief for a fix loop's fixer.
 
 ## Proactive hook compliance
 

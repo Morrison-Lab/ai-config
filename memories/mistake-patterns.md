@@ -897,6 +897,16 @@ A clean automated review from every available provider evaluating the current HE
   followed by `Reviewed-Commit: <HEAD sha>` (the parser accepts 7-40 hex characters; give the full 40).
   A foreground dispatch is the simplest credited path and the one the hook's own refusal message recommends,
   but background fallback dispatches, tracked `TaskOutput` reads, and task notifications are credited too, per Pattern 22.
+- **2nd occurrence of the misidentified-hook-copy class, 2026-09-03** ([#3141](https://github.com/Morrison-Lab/ai-config/issues/3141), recorded in [#3156](https://github.com/Morrison-Lab/ai-config/issues/3156)), and it is an occurrence of **this bullet's own Fix step being skipped** rather than of a new mechanism.
+  `hooks/no-unreviewed-pr.py` demanded a Copilot review while the moratorium ran to `2026-12-01`, and the session identified "the loaded copy" as the newest per-commit directory under `~/.claude/plugins/cache/` --- the exact proxy the Fix above rules out.
+  Several cache directories carried the same value, so newest isolated nothing --- derive the count rather than citing one, since the cache is garbage-collected and it fell from nine to five between 2026-09-03 and 2026-09-04 with no edit in between.
+  The label above names the diagnostic failure rather than a stale cache, and stays right after the resolution below: what recurred was reading the wrong artifact, and the copy captured firing sits outside the cache this pattern is named for.
+  What the resolution order would have surfaced: the copy registered directly in `~/.claude/settings.json` carries the correct date and returns 0 before reading the transcript, `enabledPlugins` for this plugin is `false`, and the user-scope pin in `installed_plugins.json` names a hook with **no `MORATORIUM_END` at all**.
+  Resolved 2026-09-04 by capture rather than by reasoning: `ps -eo args` sampled at 0.05s while deliberately triggering the guard named a snapshot under `~/Library/Application Support/Claude/local-agent-mode-sessions/`, carrying the expired constant.
+  No pass had looked there, and no corpus step named it.
+  Three passes enumerated explanations --- two, then three --- over a candidate set nobody had established, and each list was internally sound while the true answer sat outside all of them.
+  The transferable step is to capture the resolved path (`ps` while the guard fires) instead of deducing it from registration files, since a guard that fires repeatedly hands you the measurement for free.
+  See [`keep-checkouts-fresh.md`](../shared/workflow/keep-checkouts-fresh.md)'s dated-constant section for the resolution order and for the fail-open hazard, and for what the capture leaves unestablished.
 - **Algorithmatizable?**
   Partially.
   [#2544](https://github.com/Morrison-Lab/ai-config/issues/2544)'s suggested fix 3 --- have the hook's refusal message name a user-approvable permission rule for the override --- would have resolved the measured session in one step, and remains open under [#2899](https://github.com/Morrison-Lab/ai-config/issues/2899).
@@ -988,3 +998,18 @@ A clean automated review from every available provider evaluating the current HE
   In tests guarding fallback implementations, assert `expect_equal(formals(fallback), formals(upstream))`
   and test output equivalence on representative fixtures.
   In document linters, check that a document intentionally rooted at level 3 has no orphaned level-2 headings.
+
+## Pattern 48: Silent Library Import Fallback in Standalone Hooks
+- **Do**: When providing an inline fallback in a hook script that attempts to import from a shared repository library (e.g. `scripts/lib/`), bind the exception and log an explicit diagnostic to `stderr` (`print(f"... cannot load ... ({_exc}); using fallback ...", file=sys.stderr)`).
+  In test suites, assert that inline fallback definitions stay synchronized with the shared library module, and test that the fallback error path logs as expected.
+- **Don't**: Use bare `except Exception: pass` around shared library imports in hooks.
+  A silent pass swallows broken paths, rename drifts, or syntax errors, causing the hook to run indefinitely on stale duplicate inline definitions with zero observability.
+- **Example**: 2026-09-04 on [PR #3201](https://github.com/Morrison-Lab/ai-config/pull/3201) ([Issue #3172](https://github.com/Morrison-Lab/ai-config/issues/3172)):
+  `hooks/no-unshipped-commit.py` wrapped `from git_cmd import ...` in `try: ... except Exception: pass`.
+  Automated review flagged that the silent fallback provided zero observability and lacked tests asserting that the inline fallback copies of `_ENV` and `_GIT_FLAGS` stayed synchronized with `scripts/lib/git_cmd.py`.
+- **Canonical Rule**: [`fail-fast.md`](../shared/principles/fail-fast.md) ("Never swallow an error into a silent fallback;
+  make any genuinely wanted fallback explicit, bounded, and observable").
+- **Fix**: Log a warning to `stderr` describing the import failure and fallback activation, and write regression tests in the hook's test suite asserting constant equality and fallback invocation.
+- **Algorithmatizable?**
+  Yes.
+  Linters or hook test suites can parse inline fallback definitions against shared library exports and test import failure execution.

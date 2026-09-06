@@ -589,6 +589,13 @@
               "`scripts/lib/git_cmd.py`; this hook imports `COMMIT` from there rather",
               "than copying it, so the exception no longer applies."
             ]
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-slide-major-tag.py\"",
+            "timeout": 15,
+            "script": "guard-slide-major-tag.py",
+            "why": "Denies `gh workflow run slide-major-tag.yml` when git diff tag..origin/<default> adds a job-level permission to a reusable workflow (workflow_call in on:). A called workflow cannot request permissions its caller does not grant, so sliding the tag breaks every un-updated consumer with startup_failure (Morrison-Lab/gha#830 breaking ucdavis/bcs#966; same class as gha#685). Clearable with ALLOW_BREAKING_SLIDE=1. Tracked as #3303."
           }
         ]
       },

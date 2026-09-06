@@ -947,6 +947,14 @@ It is adjacent to [#2483](https://github.com/Morrison-Lab/ai-config/issues/2483)
 - **Don't:** claim the suffix breaks a 40-character fingerprint;
   run `REVIEWED_COMMIT` over the line before asserting either way.
 - **Don't:** abbreviate the sha in a review brief's template, which is the input that turns the suffix into a silently wrong parse.
+- **Don't:** let a reviewer transcribe its `Reviewed-Commit:` from the sha
+  the brief handed it.
+  That is the anti-pattern paired with the derive-your-own-fingerprint
+  bullet above, and it is the half a reader skimming only the `Don't`
+  list would otherwise miss.
+  Transcription looks identical to derivation in the finished report ---
+  both produce a 40-character hex string in the right place --- so the
+  brief is the only place the difference can be established.
 - **Don't:** read the sentinel as part of the payload-last contract.
   It is a mitigation for the ordering that contract rules out, so a conforming report needs none.
 

@@ -1195,9 +1195,9 @@ and 0 additions and had gone unupdated for 37 hours, which reads as
 abandoned or not-yet-started.
 Its branch's worktree, at a path outside any session's own scratchpad, held
 **two unpushed commits totalling 366 insertions across 4 files** --- including
-a security-relevant guard fix (see this file's "An identity match with no id
-must poison rather than guess" cross-reference in
-[`fail-fast`](../shared/principles/fail-fast.md)).
+a security-relevant guard fix
+(see the "An identity match with no id must poison rather than guess" section
+of [`fail-fast`](../shared/principles/fail-fast.md)).
 The owning session had exited without pushing.
 
 So the forge's view of a PR and the working tree's view can diverge

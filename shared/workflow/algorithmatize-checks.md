@@ -361,6 +361,72 @@ class, so the quoted form passes without readmitting the operator.
 [ai-config#3251](https://github.com/Morrison-Lab/ai-config/pull/3251),
 review round 3.)
 
+### A proposed remedy is a claim about the fix, and it needs the same check as the bug report
+
+The section above is the regex-class instance of a wider failure: a proposed
+remedy is adopted because the *finding* that motivated it was verified, and
+verifying the finding is mistaken for having verified the fix.
+The two are different claims.
+An issue report is reproduced against the tree.
+Its suggested fix is not, because by the time it is written the bug already
+feels understood, and a remedy that closes the reported case reads as
+settled without ever running against anything the report did not show.
+
+This is the same claim
+[`address-every-comment`](address-every-comment.rationale.md)'s "the same
+check applies to a fix a reviewer describes in prose" makes for a review
+comment's suggested fix, and
+[`challenge-the-assignment`](challenge-the-assignment.md)'s "an issue body
+is an assignment you author, and its proposed fix is a second claim" makes
+for the issue-authoring side of it.
+What is new here is the domain: neither a regex read nor a check for
+internal consistency catches a remedy that fails only once the language's
+own vectorisation semantics meet it, because the proposed line is
+syntactically fine and passes wherever the reporter tried it.
+
+`hl()` aborted the whole render on a length > 1 argument, because `grepl()`
+vectorises and `if` does not.
+The issue reporting it, demonstrated against a two-element vector, offered
+two fixes: wrap the condition in `any(grepl(...))`, or vectorise the whole
+helper.
+The first was adopted, and it does stop the abort on that same two-element
+input --- the remedy was run against the report's own repro, and passed the
+one property anyone checked, which was that it no longer errors.
+
+It was still wrong.
+The row it builds is assembled by `paste0()` over several arguments
+including the text itself, and `paste0` vectorises independently of `hl()`:
+a two-element argument makes the row builder emit the whole table twice
+inside one document fragment, regardless of what `hl()` returns.
+`hl()` itself always returned one scalar string, one highlight span or
+none; `any()` only changed which *condition* selects it.
+`paste0` recycles that one string across both copies, so a filled element
+can be highlighted as though it were the unfilled one.
+Nobody had graded the fix on the *content* of its output, only on whether
+the abort was gone, so the corruption sat unnoticed for several rounds
+until a later adversarial pass rendered the fixed code on the same
+two-element input and read what it actually produced.
+The remedy that shipped took neither of the issue's two options as its
+fix: `any()` survives only as defence in depth, behind a guard that rejects
+a non-scalar argument outright, naming it, rather than trying to make one
+render correctly.
+
+- **Do:** grade a proposed remedy, the reporter's own included, on the
+  *content* of its output against the report's own input, not on whether
+  the originally reported symptom (an abort, an error, a crash) is gone.
+- **Do:** read every call downstream of a value a remedy collapses to a
+  scalar, since a sibling call can still vectorise over the original
+  argument while the collapsed value stays fixed across it.
+- **Don't:** read an issue's "suggested fix" section as pre-validated because
+  it arrived attached to a verified bug report.
+
+(Measured on [ucdavis/hac.sap#26](https://github.com/ucdavis/hac.sap/issues/26),
+filed 2026-09-02, and its fix in
+[ucdavis/hac.sap#43](https://github.com/ucdavis/hac.sap/pull/43), still open
+as of this writing.
+The corruption was caught and mutation-tested by a later adversarial-review
+round within that same PR, before it ever reached `main`.)
+
 ### An attribution claim in a guide-for-future-edits comment is settled by mutation, not by re-reading it
 
 "Test the instrument against the incident that prompted it, verbatim"'s closing **Don't** governs a comment claiming *what* a matcher matches.

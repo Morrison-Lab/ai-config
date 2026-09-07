@@ -67,6 +67,11 @@ opencode instead reads ai-config through its ordinary config fields plus convent
 
   To make ai-config available to opencode in **every** project, copy or symlink `skills/` into `~/.config/opencode/skills/` and add `instructions` entries to `~/.config/opencode/opencode.json`.
 
+  Enforcement hooks reach opencode sessions too,
+  through oh-my-openagent's Claude-hooks bridge,
+  when the non-plugin Claude install carries the catalog:
+  see [docs/opencode-hook-mapping.md](docs/opencode-hook-mapping.md).
+
 ### Codex wrappers
 
 The canonical workflow bodies stay in `skills/` for Claude Code. The
@@ -408,6 +413,13 @@ re-verify on a harness bump):
 Reconstructing `tool_result` from Cursor `postToolUse.tool_output` is
 [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241).
 The event mapping is [docs/cursor-hook-mapping.md](docs/cursor-hook-mapping.md).
+OpenCode runs the same catalog where the
+[oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent) plugin is
+installed and the non-plugin Claude install carries it:
+OMO's Claude-hooks bridge reads `~/.claude/settings.json`
+and runs the catalog inside OpenCode sessions.
+The payload gaps that remain and the per-guard status are in
+[docs/opencode-hook-mapping.md](docs/opencode-hook-mapping.md).
 
 | hook | event | enforces |
 |---|---|---|

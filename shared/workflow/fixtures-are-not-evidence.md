@@ -614,6 +614,64 @@ The mutant is faithful and behaviourally different --- `_hints_by_position("cd /
 A discriminating spelling may exist unpushed.
 What is measured here is the pushed head.)
 
+## A class assertion is masked across SITES, not only across causes
+
+The "assert the discriminating detail" passage in "A regression fixture must
+contain something the bug would destroy", above, already covers one
+producer: a row whose true/false bit has more than one possible cause.
+The same generalization, applied to a composite fixture --- a table, a
+rendered document, anything with more than one cell that could carry the
+same kind of output --- produces a second producer worth naming on its own:
+the *site*.
+An assertion checking for a class of output, such as "the render carries an
+unfilled-placeholder marker somewhere", is satisfied by any cell carrying
+one, whichever cell the test claims to be about.
+The predicate never names the site, so a marker attached to an unrelated
+column scores identically to a marker attached to the column under test, and
+a defect that moves the marker to the wrong site, or drops it from the right
+one while a neighbour still carries it, produces no visible change at all.
+
+The tell that this recurred is a *second* trip on the same finding.
+A test asserting "every placeholder call site marks its own placeholder" can
+itself say, in its own comment, that an earlier version covered a subset of
+those sites while being named for all of them, and be back in that state for
+a different subset after the comment was written to prevent it.
+
+- **Do:** assert against a value unique to the site under test (a label, a
+  column identity, a specific filled or unfilled default that appears
+  nowhere else in the fixture) rather than against membership in a class.
+- **Do:** where a unique value is awkward and every candidate site is a
+  fillable input, fill every other site so the class can occur only at the
+  site under test --- this does not help when the wrong site is a static
+  structural cell (a label, a header) that carries no input to fill, which
+  is a case only the unique-value assertion above catches.
+- **Do:** re-run a rewritten assertion against the mutant that exposed the
+  first instance, per the preceding section --- a fix written for this
+  exact failure is the least-scrutinized place for it to recur.
+- **Don't:** assert that output "carries a marker of class X" when the
+  fixture contains, or could contain, more than one site able to produce
+  one.
+- **Don't:** read a passing suite as coverage of a named site when the
+  assertion only tests for the class the site belongs to.
+
+(Measured 2026-09-04 on
+[ucdavis/hac.sap#43](https://github.com/ucdavis/hac.sap/pull/43), still open
+as of this writing, across several review rounds.
+A test named for the property that every placeholder call site marks its own
+placeholder asserted `expect_true(has_html(header(date = "<date>")))`, where
+`has_html <- function(x) grepl(hi_html, x, fixed = TRUE)` --- exactly the "a
+highlight appears somewhere" shape the test's own comment says a
+`highlighted_cells()` helper was added to defeat, because the `j = col`
+argument of the underlying `highlight()` call could be pinned to the wrong
+column with the assertion still green.
+Mutating that call site's column argument to a different column left the
+suite at `FAILURES=0 TESTS=111`: the rendered header highlighted an
+unrelated label cell and left the placeholder unmarked, and the assertion
+could not see it.
+The PR's own body records this shape recurring five times across the PR's
+review history, twice inside an assertion written to fix the previous
+instance.)
+
 ## A fixture that models the wrong record SHAPE makes a carve-out look covered while it is inert
 
 Every case above is about a fixture whose *content* was wrong --- too thin to

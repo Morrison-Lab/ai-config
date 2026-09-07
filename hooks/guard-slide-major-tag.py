@@ -33,8 +33,9 @@ When matched, it:
 
 `ALLOW_BREAKING_SLIDE=1` as an env assignment on the command records a deliberate override.
 
-Fails CLOSED (denies) when a changed workflow cannot be parsed as valid YAML or
-when PyYAML is unavailable, preventing undetected breaking releases.
+Fails CLOSED (denies) when a changed workflow containing workflow_call cannot be
+parsed as valid YAML or when PyYAML is unavailable, preventing undetected breaking
+releases.
 
 Fails OPEN (with a stderr note) when git is unavailable, the tag or remote branch does not
 resolve, or the command is not a slide. Never reads the transcript.
@@ -327,6 +328,12 @@ def evaluate(command: str, base_cwd: str | None = None) -> tuple[str, str] | Non
 
         new_content = _git(["show", f"{remote_ref}:{filepath}"], cwd=cwd)
         if not new_content:
+            continue
+
+        # Fast conservative pre-filter: skip files that do not contain 'workflow_call'
+        # anywhere in their text. In GitHub Actions, a reusable workflow must define
+        # 'workflow_call' in its trigger block, so a file lacking the token cannot be one.
+        if "workflow_call" not in new_content:
             continue
 
         if yaml is None:

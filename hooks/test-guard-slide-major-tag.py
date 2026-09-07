@@ -15,6 +15,8 @@ Verifies:
   - Missing PyYAML fails closed (denies) with PyYAML explanation.
   - Malformed workflow YAML fails closed (denies) with YAML parse error explanation.
   - Malformed workflow YAML at tag ref fails closed (denies).
+  - Unparseable non-workflow_call workflow allows.
+  - Unparseable workflow containing workflow_call denies.
   - Missing tag allows with stderr note.
   - Missing remote branch allows with stderr note.
   - Mutation check: flipping the regex to ignore 'read' fails the deny test.
@@ -418,6 +420,54 @@ def main() -> int:
             v8h == "deny" and "could not be parsed as valid YAML" in r8h and "at v2" in r8h,
             "fail closed: deny slide-major-tag when workflow YAML at tag is malformed",
             f"got verdict={v8h}, reason={r8h}",
+        )
+
+        # 8i. Regression: unparseable NON-workflow_call file allows
+        # (e.g. reusable.yml unchanged, lint.yml has syntax error without workflow_call)
+        repo8i = _make_repo()
+        lint_file8i = os.path.join(repo8i, ".github", "workflows", "lint.yml")
+        lint_content8i = (
+            "name: Lint\n"
+            "on: [push\n"
+            "jobs:\n"
+            "  lint:\n"
+            "    runs-on: ubuntu-latest\n"
+            "    steps:\n"
+            "      - run: echo ok\n"
+        )
+        _write_file(lint_file8i, lint_content8i)
+        _run(repo8i, "add", ".")
+        _run(repo8i, "commit", "-qm", "add unparseable lint.yml without workflow_call")
+        _run(repo8i, "update-ref", "refs/remotes/origin/main", "HEAD")
+        v8i, r8i, _ = run_hook(HOOK, "gh workflow run slide-major-tag.yml", repo8i)
+        check(
+            v8i == "allow",
+            "allow slide-major-tag when unparseable workflow does not contain workflow_call",
+            f"got verdict={v8i}, reason={r8i}",
+        )
+
+        # 8j. Mirror regression: unparseable file that DOES contain workflow_call still denies
+        repo8j = _make_repo()
+        lint_file8j = os.path.join(repo8j, ".github", "workflows", "lint.yml")
+        lint_content8j = (
+            "name: Lint\n"
+            "# workflow_call is mentioned here\n"
+            "on: [push\n"
+            "jobs:\n"
+            "  lint:\n"
+            "    runs-on: ubuntu-latest\n"
+            "    steps:\n"
+            "      - run: echo ok\n"
+        )
+        _write_file(lint_file8j, lint_content8j)
+        _run(repo8j, "add", ".")
+        _run(repo8j, "commit", "-qm", "add unparseable lint.yml containing workflow_call")
+        _run(repo8j, "update-ref", "refs/remotes/origin/main", "HEAD")
+        v8j, r8j, _ = run_hook(HOOK, "gh workflow run slide-major-tag.yml", repo8j)
+        check(
+            v8j == "deny" and "could not be parsed as valid YAML" in r8j and "ALLOW_BREAKING_SLIDE=1" in r8j,
+            "fail closed: deny slide-major-tag when unparseable workflow contains workflow_call token",
+            f"got verdict={v8j}, reason={r8j}",
         )
 
         # 9. Mutation check: flip regex to ignore 'read' and assert deny test fails

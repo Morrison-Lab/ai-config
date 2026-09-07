@@ -373,6 +373,41 @@ skipped by strided sampling,
 and bypassed by prose verdict checks,
 hiding 1 accepted widening and 5 fail-closed narrowings.)
 
+**A fourth mechanism belongs beside the three above, and it produces a zero
+that reads as the best possible result rather than as a null one: the
+narrowing meant to fix the false positive removes the population the sweep
+re-runs against.**
+
+A false-positive claim is usually re-checked by re-running the same sweep
+over the same corpus after tightening the guard, and reading a lower hit
+count as progress.
+When the tightening also narrows *which files are in scope* --- restricting
+a guard to a directory, a file extension, or a role a corpus barely
+contains --- the corpus supplying the sweep's population can shrink to
+nothing in the same edit that was meant to shrink only the false positives.
+The sweep then reports zero, and "0 false positives" reads identically
+whether the denominator is 40 or 0.
+
+- **Do:** report the population size (files or cases the sweep actually
+  examined) beside the hit count, every time a false-positive rate is
+  claimed --- "0/0" and "0/40" are different claims that look the same
+  without it.
+- **Do:** re-derive the trigger population from the corpus **after** a
+  scope-narrowing edit, rather than reusing a count taken before it; the
+  narrowing is exactly what can make the two differ.
+- **Don't:** cite a lower or zero hit count as evidence a narrowing worked
+  without confirming the sweep still had a population able to produce a hit.
+
+(Measured on [ai-config#3281](https://github.com/Morrison-Lab/ai-config/pull/3281),
+2026-09-05, on `hooks/flag-test-reading-package-source.py`.
+An earlier claim of "fires on zero" in this repo's own corpus was 0 out of 0:
+requiring a test directory left `ai-config` with no in-scope files, so any of
+several narrowings could have been reverted and the sweep would still have
+read zero.
+A 137-repo, 1695-file sweep run afterward, over corpora the hook's scope
+actually matched, is what the PR body cites instead, and it reports one true
+positive rather than a population-free zero.)
+
 ### Mutate the fix, not only the test
 
 The rule above says a regression test must be seen to fail.

@@ -565,33 +565,28 @@ records that the bit alone cannot tell a working row from a masked one.)
 
 ## A class assertion is masked across SITES, not only across causes
 
-The section above concerns one row whose outcome bit has two possible
-producers.
-A composite fixture opens a wider version of the same trap: a table, a
+The preceding section's "assert the discriminating detail" already covers
+one producer: a row whose true/false bit has more than one possible cause.
+The same generalization, applied to a composite fixture --- a table, a
 rendered document, anything with more than one cell that could carry the
-same kind of output.
-An assertion checking for a *class* of message, such as "the render contains
-an unfilled-placeholder warning", is satisfied by any cell carrying one,
-whichever cell the test claims to be about.
-The predicate never names the site, so a warning attached to an unrelated
-column scores identically to a warning attached to the column under test.
-
-That is a different mechanism from the section above, not a restatement of
-it.
-There, one row's true/false bit had two possible causes.
-Here, the assertion is true for the whole fixture the moment any site
-satisfies it, so a defect that moves the warning to the wrong site, or drops
-it from the right one while a neighbour still carries it, produces no visible
-change at all.
+same kind of output --- produces a second producer worth naming on its own:
+the *site*.
+An assertion checking for a class of output, such as "the render carries an
+unfilled-placeholder marker somewhere", is satisfied by any cell carrying
+one, whichever cell the test claims to be about.
+The predicate never names the site, so a marker attached to an unrelated
+column scores identically to a marker attached to the column under test, and
+a defect that moves the marker to the wrong site, or drops it from the right
+one while a neighbour still carries it, produces no visible change at all.
 
 The tell that this recurred is a *second* trip on the same finding.
 A test asserting "every placeholder call site marks its own placeholder" can
 itself say, in its own comment, that an earlier version covered a subset of
 those sites while being named for all of them, and be back in that state for
-a different subset after the comment was written to prevent it.
-A fix aimed squarely at this failure is not evidence against it recurring,
-because the fix commonly narrows the fixture or clears one site without
-changing what the assertion actually pins down.
+a different subset after the comment was written to prevent it --- which is
+what happened here: the PR's own review history records this shape
+recurring three times before the instance quoted below, on different call
+sites each time.
 
 - **Do:** assert against a value unique to the site under test (a label, a
   column identity, a specific filled or unfilled default that appears
@@ -600,15 +595,18 @@ changing what the assertion actually pins down.
   fixture that could satisfy the same class of assertion, so the class can
   occur only at the site under test.
 - **Do:** re-run a rewritten assertion against the same mutant that exposed
-  the first instance, since a fix written for this exact failure is the
-  least-scrutinized place for it to happen again.
-- **Don't:** assert that output "contains a warning of type X" when the
-  fixture carries, or could carry, more than one thing able to produce one.
+  the first instance; a fix written for this exact failure is not evidence
+  against it recurring, since the rewrite is the least-scrutinized place for
+  it to happen again.
+- **Don't:** assert that output "carries a marker of class X" when the
+  fixture contains, or could contain, more than one site able to produce
+  one.
 - **Don't:** read a passing suite as coverage of a named site when the
   assertion only tests for the class the site belongs to.
 
-(Measured across several review rounds on
-[ucdavis/hac.sap#43](https://github.com/ucdavis/hac.sap/pull/43).
+(Measured 2026-09-05 on
+[ucdavis/hac.sap#43](https://github.com/ucdavis/hac.sap/pull/43), still open
+as of this writing, across several review rounds.
 A test named for the property that every placeholder call site marks its own
 placeholder asserted `expect_true(has_html(header(date = "<date>")))`, where
 `has_html <- function(x) grepl(hi_html, x, fixed = TRUE)` --- exactly the "a

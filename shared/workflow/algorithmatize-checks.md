@@ -379,33 +379,41 @@ because the proposed line is syntactically fine and passes wherever the
 reporter tried it.
 
 `hl()` aborted the whole render on a length > 1 argument, because `grepl()`
-vectorises and `if` does not; the issue reporting it proposed `any(grepl(...))`
-as the fix.
-Adopted verbatim, `any()` collapsed the vector to one boolean before the
-function's own `paste0` call ran, and `paste0` vectorises: the whole table
-was emitted once per element, with the filled element highlighted as though
-it were the unfilled one.
-The original defect was a loud abort.
-The adopted remedy was a silent corruption of the signed document, worse
-than the bug it replaced, and it shipped because the fix was measured
-against the single value the report used to demonstrate the abort, never
-against the vector shape the function actually receives in production.
+vectorises and `if` does not.
+The issue reporting it offered two fixes: wrap the condition in
+`any(grepl(...))`, or vectorise the whole helper and let the caller `vapply`
+over it.
+The first was adopted.
+`any()` collapsed the vector to one boolean before the function's own
+`paste0` call ran, and `paste0` vectorises: the whole table was emitted once
+per element, with the filled element highlighted as though it were the
+unfilled one.
+The original defect was a loud abort on a multi-element argument.
+The adopted remedy was a silent corruption of the signed document on that
+same input, worse than the bug it replaced, and it was committed to the
+branch on the strength of the single value the report used to demonstrate
+the abort, never checked against a multi-element input, which is exactly
+the shape the report itself was about.
+The second proposed fix would not have had this failure; only the one
+actually taken did.
 
-- **Do:** run a proposed remedy, the reporter's own included, against the
-  actual data shape the code handles, not only against the value the report
-  used to demonstrate the bug.
+- **Do:** run every proposed remedy, the reporter's own included, against
+  the input shape the report itself demonstrates the bug on, not only
+  against whichever single value happens to be quoted in the issue.
 - **Do:** read the function the remedy touches for other vectorised calls
   downstream of the collapsed value, before trusting that collapsing one
   check is safe.
 - **Don't:** read an issue's "suggested fix" section as pre-validated because
   it arrived attached to a verified bug report.
 - **Don't:** grade a remedy against reproducing the original abort or error;
-  grade it against whether it produces correct output on real input.
+  grade it against whether it produces correct output on the same input.
 
-(Measured on [ucdavis/hac.sap#26](https://github.com/ucdavis/hac.sap/issues/26)
-and its fix in [ucdavis/hac.sap#43](https://github.com/ucdavis/hac.sap/pull/43).
-The corruption was caught by a later adversarial-review round in the same PR,
-mutation-tested, and fixed before merge.)
+(Measured on [ucdavis/hac.sap#26](https://github.com/ucdavis/hac.sap/issues/26),
+filed 2026-09-02, and its fix in
+[ucdavis/hac.sap#43](https://github.com/ucdavis/hac.sap/pull/43), still open
+as of this writing.
+The corruption was caught and mutation-tested by a later adversarial-review
+round within that same PR, before it ever reached `main`.)
 
 ### An attribution claim in a guide-for-future-edits comment is settled by mutation, not by re-reading it
 

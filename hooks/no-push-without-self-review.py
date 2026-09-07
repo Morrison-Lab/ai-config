@@ -176,6 +176,23 @@ def external_reviewer_command(command: str) -> bool:
     prepended `echo`, and a trailing `; echo` each leave a non-silent segment
     and are refused -- the same bare-and-unchained discipline a
     discharge-bearing command already owes, rather than a new rule to learn.
+
+    Two residues this accepts rather than closes, stated because a guard that
+    hides its own limits is worse than one that names them.
+
+    The session composes the reviewer's prompt, so it can steer toward the
+    verdict it wants. That is NOT new: the in-family path takes its brief from
+    the same session and applies `REVIEW_PROMPT_RE` to it identically, so both
+    paths rest on the author briefing the reviewer honestly rather than on the
+    guard enforcing it. Parity, not a regression.
+
+    The program name is resolved from `PATH`, so a script named `agy` earlier
+    on `PATH` would satisfy this check. That one IS new -- the in-family path
+    names a `subagent_type` the harness resolves, with no `PATH` surface. It is
+    accepted deliberately (user decision, 2026-09-06, on #3209): forging it
+    costs writing an executable that prints a verdict, which is a decision to
+    defeat the guard rather than a shape a session falls into by accident,
+    which is the line every other refusal here draws.
     """
     try:
         segments = [text for _, text in _depth_segments(command)]

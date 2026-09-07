@@ -259,10 +259,19 @@ def _strip_shell_literals(command):
 # the exact incident phrasing this hook was built to catch) went
 # unmatched while "the 25 probe cases pass" matched. Both alternatives
 # now share one subject-noun group and one tense group.
+# The bare "X pass(ed)/green/passing" alternative above catches "tests
+# passing" but not the equally ordinary copula form "tests ARE passing" /
+# "the suite IS green" -- an eighth round of adversarial review found this
+# is a distinct gap from the present/past-tense fix just above (that one
+# was about the verb's own suffix; this is about an intervening "is"/"are"
+# before a participle or adjective), and at least as common a way to
+# report results conversationally.
+_SUBJECT = r"(?:tests?|cases?|checks?|probes?|suite)"
 CLAIM_RE = re.compile(
     r"""
-      \ball\s+[\w\s]{0,40}?(?:tests?|cases?|checks?|probes?)\s+pass(?:es|ed)?\b
-    | \b(?:tests?|cases?|checks?|probes?|suite)\s+(?:pass(?:es|ed)?|green|passing)\b
+      \ball\s+[\w\s]{0,40}?""" + _SUBJECT + r"""\s+pass(?:es|ed)?\b
+    | \b""" + _SUBJECT + r"""\s+(?:pass(?:es|ed)?|green|passing)\b
+    | \b""" + _SUBJECT + r"""\s+(?:is|are)\s+(?:passing|green)\b
     | \b\d+\s*/\s*\d+\s+(?:tests?|cases?|checks?)\s+pass(?:ed)?\b
     | \b\d+\s+(?:tests?|cases?)\s+pass(?:ed)?\b
     | \b\d+\s+passed\b

@@ -66,6 +66,19 @@ CASES = [
      "second CLAIM_RE alternative, whose subject-noun set once excluded "
      "cases/probes)"),
 
+    # EIGHTH-round adversarial-review finding: the copula ("to be") plus
+    # participle/adjective form -- "tests ARE passing", "the suite IS
+    # green" -- is at least as ordinary a way to report results
+    # conversationally as the bare forms above, and was unmatched.
+    ([edit(), say("All 297 tests are passing.")], True,
+     "'tests are passing' (copula + participle) warns"),
+    ([edit(), say("The suite is green.")], True,
+     "'the suite is green' (copula + adjective) warns"),
+    ([edit(), say("The test suite is passing now.")], True,
+     "'the test suite is passing now' warns"),
+    ([edit(), say("The new error-handling branch is covered too.")], False,
+     "an unrelated 'is' near 'error' does not spuriously warn"),
+
     # Edit, no test run at all, claim of passing -- "never run" branch.
     ([edit(), say("Tests pass.")], True,
      "edit with no suite invocation anywhere, then a passing claim, warns"),

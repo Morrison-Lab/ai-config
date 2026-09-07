@@ -108,25 +108,40 @@ BASH_WRITE_RE = re.compile(
     re.I,
 )
 
+# A command-position anchor: start of the command string, or immediately
+# after a shell separator (`;`, `&&`, `||`, a single `&` or `|`, or a
+# newline). Applied ONLY to the python-invocation alternative below, not to
+# the whole list -- a python3-plus-test-file STRING embedded inside an
+# unrelated command (`echo "run python3 hooks/test-foo.py before
+# merging"`, or a `#` comment quoting the same words) must not match, but
+# the keyword alternatives (`pytest`, `cargo test`, ...) legitimately
+# appear after a wrapper with no separator (`timeout 60 pytest -q`) and
+# anchoring THEM the same way would be a fresh false negative, not a fix.
+_CMD_START = r"(?:^|;|&&|\|\||[&|]|\n)\s*"
+
 # A small, explicit set of recognizable test-suite invocation shapes. See
 # the docstring's "TEST-SUITE RECOGNITION" section for why this stays a list
 # rather than a general heuristic.
 #
 # `python3? ... test[-_]*.py` requires the file to be preceded by a Python
-# interpreter invocation (with optional flags in between), not merely
-# mentioned. Without that anchor, `cat hooks/test-foo.py`, `git diff
-# hooks/test-foo.py`, and `vim hooks/test-foo.py` all "recognized" a suite
-# run that never happened -- a false NEGATIVE that inverted this hook's own
-# documented safe direction (an unrecognized real run should be the only
-# false-positive source, never a mention standing in for a run). Confirmed
-# by adversarial review before this fix: an Edit, then `cat
-# hooks/test-foo.py`, then "All tests pass." produced no warning at all.
+# interpreter invocation (with optional flags in between) sitting at a
+# COMMAND position, not merely mentioned anywhere in the string. Without the
+# python anchor, `cat hooks/test-foo.py`, `git diff hooks/test-foo.py`, and
+# `vim hooks/test-foo.py` all "recognized" a suite run that never happened --
+# a false NEGATIVE that inverted this hook's own documented safe direction
+# (an unrecognized real run should be the only false-positive source, never
+# a mention standing in for a run). Confirmed by adversarial review before
+# that fix: an Edit, then `cat hooks/test-foo.py`, then "All tests pass."
+# produced no warning at all. Without the _CMD_START anchor added on top, a
+# SECOND round of review found the python-anchor form still matched a full
+# invocation string quoted inside `echo "..."` or a `#` comment -- still a
+# mention, not a run.
 TEST_SUITE_RE = re.compile(
     r"""
       \bpytest\b
     | \bpy\.test\b
     | \bpython[3]?\s+-m\s+(?:pytest|unittest)\b
-    | \bpython[3]?\s+(?:-\S+\s+)*[\w./-]*test[-_][\w./-]*\.py\b
+    | """ + _CMD_START + r"""python[3]?\s+(?:-\S+\s+)*[\w./-]*test[-_][\w./-]*\.py\b
     | \bdevtools::test\(
     | \btestthat::test_
     | \bR\s+CMD\s+check\b
@@ -160,14 +175,22 @@ CLAIM_RE = re.compile(
     re.I | re.X,
 )
 
-# A window checked around a CLAIM_RE hit for a disclosed failure ("12
-# passed, 3 failed"). Without this, a reply that already disclosed partial
-# results still reads as a full passing claim -- worse than a missed
-# warning, since the reply is honest and this would tell the author their
-# honest disclosure was a stale-claim violation. Conservative in the safe
-# direction for a warn-only guard: it can suppress a genuine warning (a
-# reply saying "all tests pass, no failures" nearby) but never invents one.
-FAIL_NEARBY_RE = re.compile(r"\bfail(?:ed|ing|s|ure)?\b|\berrors?\b", re.I)
+# A window checked around a CLAIM_RE hit for a disclosed failure COUNT ("12
+# passed, 3 failed", "2 errors"). Without this, a reply that already
+# disclosed partial results still reads as a full passing claim -- worse
+# than a missed warning, since the reply is honest and this would tell the
+# author their honest disclosure was a stale-claim violation. Requires a
+# NUMBER next to the fail/error word (either order), not the bare word
+# alone: a first version matched bare "error"/"errors" anywhere in the
+# window, which suppressed a genuine warning next to unrelated prose like
+# "error handling" or "no errors expected" (second-round adversarial
+# review finding) -- the wrong direction for a warn-only guard, whose whole
+# value is not missing the case it exists to catch.
+FAIL_NEARBY_RE = re.compile(
+    r"\b\d+\s+(?:fail(?:ed|ures?)?|errors?)\b"
+    r"|\b(?:fail(?:ed|ures?)?|errors?)\s*:?\s*\d+\b",
+    re.I,
+)
 NEARBY_WINDOW = 80
 
 FENCE = re.compile(r"```.*?```", re.S)

@@ -110,12 +110,34 @@ CASES = [
       say("All 12 tests pass.")], False,
      "actually invoking `python3 hooks/test-*.py ...` is recognized as a run"),
 
+    # SECOND-round adversarial-review finding: a python-invocation STRING
+    # quoted inside `echo` or a `#` comment is a MENTION, not a run, and
+    # must not be recognized as one.
+    ([edit(), bash('echo "run python3 hooks/test-foo.py before merging"'),
+      say("All tests pass.")], True,
+     "a python invocation quoted inside echo is a mention, not a run"),
+    ([edit(), bash("# reminder: python3 hooks/test-foo.py hooks/foo.py"),
+      say("All tests pass.")], True,
+     "a python invocation named in a shell comment is a mention, not a run"),
+    ([edit(), bash("cd hooks && python3 test-foo.py foo.py"),
+      say("All tests pass.")], False,
+     "a python invocation after && (a real command position) still counts"),
+
     # Adversarial-review finding: a disclosed partial result ("N passed, M
     # failed") must not read as a full passing claim.
     ([edit(), say("Ran the suite: 12 passed, 3 failed.")], False,
      "a disclosed partial result (passed AND failed nearby) does not warn"),
     ([edit(), say("2 of 297 tests failed; the rest passed.")], False,
      "an explicit failure count near a passing claim does not warn"),
+
+    # SECOND-round adversarial-review finding: the fail-nearby check must
+    # require an actual COUNT next to fail/error, not the bare word alone --
+    # otherwise unrelated prose mentioning "error" wrongly suppresses a
+    # genuine warning.
+    ([edit(), say(
+        "All tests pass. The new error-handling branch is covered too."
+    )], True,
+     "the bare word 'error' in unrelated prose does not suppress a genuine warning"),
 
     # Adversarial-review finding: intra-turn ordering. A single reply that
     # edits AND runs the real suite in the same turn, in that order, must

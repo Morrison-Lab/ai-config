@@ -147,3 +147,86 @@ get a warning added to the example/README.
   group-name pattern -- if the reusable workflow already declares an
   identically-named group on a nested job, this deadlocks rather than merely
   racing.
+
+## A missing review is not a pending one; redispatch posts a comment but does not make the PR mergeable
+
+Fourth occurrence of the same permission-mismatch class this file already
+tracks,
+now `checks: read` rather than `actions:` or `issues:`.
+Every `claude-review` run in `Morrison-Lab/ai-config` ended `startup_failure`
+from 2026-09-06T06:50Z:
+gha's reusable review job needed `checks: read`,
+which the caller had not granted,
+and a called job may not request more than its caller grants --
+so the call broke at parse time
+(ai-config#3303, Morrison-Lab/gha#830, fixed by `checks: read` in #3313).
+
+A `startup_failure` creates zero jobs and zero check runs,
+so an affected PR's checks read all-green with simply no review comment,
+and `check-pr-fully-clean.py` correctly reports "No automated review comments
+or reviews found" --
+which reads as "not yet reviewed" and is actually "the review workflow
+cannot start."
+When a PR shows green checks and no review for longer than one normal
+review round,
+check `gh run list --workflow=<review>.yml --json conclusion` for
+`startup_failure` rather than continuing to wait.
+This half held up under later measurement and is unchanged.
+
+**Corrected belief, from ai-config#3305.**
+An earlier version of this entry claimed that redispatching
+`claude-review.yml` via `workflow_dispatch` "heals every open PR," on the
+strength of `workflow_dispatch` always running the workflow file from the
+default branch.
+That premise is true and the conclusion drawn from it was wrong --
+the two were never the same claim.
+
+- **Was believed:** redispatch makes the PR fully mergeable, because it runs
+  the fixed caller and produces a clean review.
+- **Measured instead:** redispatch runs the fixed caller and DOES post a
+  review comment, so `check-pr-fully-clean.py` correctly goes green on the
+  strength of that comment -- but the run executes in the *default branch's*
+  context, so its check runs attach to `main`'s SHA, not the PR head.
+  The repo's required check (`review / require-review`) therefore never
+  appears on the PR, and `gh pr merge` still fails with "the base branch
+  policy prohibits the merge" while the fully-clean instrument reports
+  clean.
+  A green `check-pr-fully-clean.py` and an unmergeable PR are consistent
+  states here, because the two read different things: a comment, versus a
+  check run tied to a specific SHA.
+
+**A second belief in the same entry was asserted mid-session, before being
+tested, and was also wrong.**
+The claim was that a `pull_request` event uses the merge ref
+(`refs/pull/N/merge`) and so needs no branch sync to pick up a base-branch
+fix.
+Measured the same day, on branches that both still lacked the `checks: read`
+fix (`git show origin/<branch>:.github/workflows/claude-review.yml | grep -c
+"checks: read"` returned 0 for both, so branch content was not the
+variable):
+
+- #3305 closed-and-reopened (a `reopened` event, head SHA unchanged) ->
+  `startup_failure`.
+- #3312 after a push -> `success`.
+
+What differed was that a push refreshes `refs/pull/N/merge` against the
+current base; a bare reopen does not.
+
+- **Do:** read a PR with green checks and no review as a possible
+  `startup_failure`, and check `gh run list --workflow=<review>.yml` before
+  waiting longer.
+- **Do:** treat a redispatch's clean `check-pr-fully-clean.py` verdict as a
+  comment having landed, not as the PR being mergeable -- check for the
+  `review / require-review` check run on the PR head before attempting
+  merge.
+- **Do:** to get both a working review AND the required check run onto a
+  stalled PR head, push to the branch (a `main` merge is the natural push);
+  closing and reopening the PR does not refresh the merge ref and leaves
+  `startup_failure` in place.
+- **Don't:** read "No automated review comments or reviews found" from
+  `check-pr-fully-clean.py` as proof the review is merely pending -- confirm
+  the workflow actually started.
+- **Don't:** assume `workflow_dispatch`'s default-branch behavior extends to
+  making the PR mergeable, or that a `pull_request` event's merge-ref
+  semantics substitute for an actual push -- both were asserted here
+  without being measured first, and both were wrong.

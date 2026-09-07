@@ -394,6 +394,37 @@ The downstream section "A sixth: the fact that a check ran..." kept its stale or
 The author's own fix commit named the mechanism directly ([comment 3834476467](https://github.com/Morrison-Lab/ai-config/pull/1864#discussion_r3834476467)): "I grepped for the strings I *expected* to be stale...
 Derive the population of ordinals; do not search for the ones you predict.")
 
+## An enumerated summary of review findings inside a brief can suppress a valid rebuttal
+
+The population inside one review comment is closed --- it will not gain a
+finding while the subagent works --- so the closedness test above would wave
+it through.
+What breaks is different: enumerating the findings for the subagent, rather
+than handing it the query that reads them, hands over your own summary of
+what the review said instead of the review itself.
+
+A brief that told a subagent "three findings: A, B, C" produced worse work,
+in one observed case, than a brief that instead told it to run the deriving
+command itself (`gh api repos/<owner>/<repo>/issues/<n>/comments | jq ...`)
+and read the findings directly.
+The subagent given the command used the freedom to REBUT one finding with
+measured evidence, rather than complying with the summary of it it would
+otherwise have had to take on faith.
+A hand-summarized "three findings" is itself an assertion the receiving
+agent has no way to check without re-deriving the same data --- the same gap
+[`challenge-the-assignment`](challenge-the-assignment.md)'s brief-authoring
+section names for a state or count claim, applied here to review findings
+specifically rather than to file contents or a corpus fact.
+
+- **Do:** brief a subagent with the command that derives the review
+  findings, not with your own enumeration of them.
+- **Do:** treat a subagent's rebuttal of a finding you summarized as a
+  legitimate outcome of giving it the primary source, not as a failure to
+  follow the brief.
+- **Don't:** assume enumerating findings is safe merely because the
+  population is closed --- closedness rules out the set growing, not the
+  summary being wrong.
+
 ## In review
 
 Flag a brief, a plan, or a skill step that hands an agent a hard-coded list of PR or issue numbers to work through, where the tracker could gain another before the work finishes.

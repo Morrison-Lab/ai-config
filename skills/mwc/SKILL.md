@@ -438,9 +438,8 @@ The paragraph above names two.
 There is a third, independent of both: `hooks/require-gh-repo-flag.py` refuses a mutating `gh` command --- `gh pr merge` included --- that omits an explicit `-R`/`--repo`, and it is a separate `PreToolUse` registration from `no-unauthorized-merge.py`'s.
 All three can refuse the same command, in whatever order the harness happens to evaluate them, each with its own remedy, and each one's refusal text names only itself:
 
-1. `no-unauthorized-merge.py` (a corpus `PreToolUse` hook) --- remedy is `ALLOW_MERGE=1` on the command, or an active `/mwc` grant, or (for a PR targeting `Morrison-Lab/ai-config` specifically) the standing per-repository grant described above, which itself requires the `-R` flag to resolve a single target.
-2. `require-gh-repo-flag.py` (a separate corpus `PreToolUse` hook) --- remedy is adding `-R <owner>/<repo>`.
-3. Claude Code's own auto-mode permission classifier (not a corpus hook at all) --- remedy is neither of the above.
+1. `no-unauthorized-merge.py` and `require-gh-repo-flag.py`, the two corpus `PreToolUse` hooks --- see "A bare `gh pr merge <N>` refuses, and the refusal may diagnose the wrong thing" above for their measured interaction and remedies (`ALLOW_MERGE=1`, an active `/mwc` grant, the standing per-repository grant, or the `-R` flag each of those needs to resolve a single target).
+2. Claude Code's own auto-mode permission classifier (not a corpus hook at all) --- remedy is neither of the above.
    No environment variable, no `/mwc` grant, and no in-conversation user instruction clears it, because it is a harness permission-mode decision about the session rather than a question of who authorized what.
    [`remind-retry-before-declaring-blocked.py`](../../hooks/remind-retry-before-declaring-blocked.py) covers what a classifier denial does and does not license (an identical retry is still worth one try;
    varying the command or switching to a different tool for the same goal is the move Pattern 43 in `memories/mistake-patterns.md` warns feeds the classifier's own suspicion);
@@ -456,8 +455,7 @@ Here that mechanism is itself one of at least three candidates, so the first rea
   A corpus hook's denial is a statement about authorization;
   the classifier's is a claim about the session's permission mode that no amount of granted authority inside the conversation changes.
 
-**The marker is per-repository, so a grant in one repo authorizes nothing in
-another.**
+**The marker is per-repository, so a grant in one repo authorizes nothing in another.**
 `check_mwc_active()` looks for `<git-common-dir>/ai-sessions/<session>.mwc`,
 resolved from the current working directory and `CLAUDE_PROJECT_DIR`.
 Enabling MWC while working in repo A therefore leaves a merge in repo B blocked,

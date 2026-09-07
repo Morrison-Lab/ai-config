@@ -361,6 +361,52 @@ class, so the quoted form passes without readmitting the operator.
 [ai-config#3251](https://github.com/Morrison-Lab/ai-config/pull/3251),
 review round 3.)
 
+### A proposed remedy is a claim about the fix, and it needs the same check as the bug report
+
+The section above is the regex-class instance of a wider failure: a proposed
+remedy is adopted because the *finding* that motivated it was verified, and
+verifying the finding is mistaken for having verified the fix.
+The two are different claims.
+An issue report is usually reproduced against the tree.
+Its suggested fix is usually not, because by the time it is written the bug
+already feels understood, and a remedy that closes the reported case reads
+as settled without ever running against anything the report did not show.
+
+The domain need not be a regex or a review comment.
+A fix an issue proposes for itself carries exactly the same exposure, and a
+language's own vectorization semantics is a case a syntax read cannot catch,
+because the proposed line is syntactically fine and passes wherever the
+reporter tried it.
+
+`hl()` aborted the whole render on a length > 1 argument, because `grepl()`
+vectorises and `if` does not; the issue reporting it proposed `any(grepl(...))`
+as the fix.
+Adopted verbatim, `any()` collapsed the vector to one boolean before the
+function's own `paste0` call ran, and `paste0` vectorises: the whole table
+was emitted once per element, with the filled element highlighted as though
+it were the unfilled one.
+The original defect was a loud abort.
+The adopted remedy was a silent corruption of the signed document, worse
+than the bug it replaced, and it shipped because the fix was measured
+against the single value the report used to demonstrate the abort, never
+against the vector shape the function actually receives in production.
+
+- **Do:** run a proposed remedy, the reporter's own included, against the
+  actual data shape the code handles, not only against the value the report
+  used to demonstrate the bug.
+- **Do:** read the function the remedy touches for other vectorised calls
+  downstream of the collapsed value, before trusting that collapsing one
+  check is safe.
+- **Don't:** read an issue's "suggested fix" section as pre-validated because
+  it arrived attached to a verified bug report.
+- **Don't:** grade a remedy against reproducing the original abort or error;
+  grade it against whether it produces correct output on real input.
+
+(Measured on [ucdavis/hac.sap#26](https://github.com/ucdavis/hac.sap/issues/26)
+and its fix in [ucdavis/hac.sap#43](https://github.com/ucdavis/hac.sap/pull/43).
+The corruption was caught by a later adversarial-review round in the same PR,
+mutation-tested, and fixed before merge.)
+
 ### An attribution claim in a guide-for-future-edits comment is settled by mutation, not by re-reading it
 
 "Test the instrument against the incident that prompted it, verbatim"'s closing **Don't** governs a comment claiming *what* a matcher matches.

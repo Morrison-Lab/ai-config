@@ -483,6 +483,43 @@ The positive control, a grep for "read a non-empty two-dot", the phrase [#3036](
 returned `1` on the same scratch merge result.
 That `1` is what confirmed the fix survived.)
 
+### A rate reported as zero can be zero-out-of-zero
+
+The two sections above are both about a conflict or content check whose zero
+needs a control before it is trusted.
+The same blind spot reaches past merge sweeps entirely, into any claim of the
+shape "this instrument fires on zero false positives", because the sentence
+never says what the denominator was.
+
+A scope narrowing is the ordinary way the denominator disappears.
+A guard is tightened to stop matching some case, the narrowed guard is then
+re-run over its own trigger population to check for new false positives, and
+the narrowing has removed every member of that population along with the
+one it targeted.
+The sweep reports zero, which is true and reads as "verified clean", and the
+honest reading is that nothing was examined.
+
+The failure is not visible in the report, because "0 false positives" and
+"0 false positives out of 0 candidates" are the same sentence unless the
+denominator is stated.
+Trust neither reading over the other until the count is printed.
+
+- **Do:** report the population size a false-positive (or true-positive)
+  sweep examined, beside the rate, every time --- "0/0" and "0/40" are
+  different claims that read identically without it.
+- **Do:** re-derive the trigger population **after** a scope narrowing,
+  rather than reusing the population the guard matched before the narrowing
+  --- the narrowing is exactly what can make the two differ.
+- **Don't:** cite "zero false positives" as evidence a change is safe without
+  stating what was examined; it carries no more information than the matrix
+  of zeros the section above names.
+
+(Measured on a hook's own review during the same session that produced
+[ucdavis/hac.sap#43](https://github.com/ucdavis/hac.sap/pull/43): a scope
+narrowing intended to fix a false positive was reported as having reduced
+the false-positive rate to zero, and the narrowing had removed the entire
+population the sweep re-ran against.)
+
 ## A `merge=union` driver makes the batch pass more necessary, not less
 
 [`configure-gitattributes`](../../skills/configure-gitattributes/SKILL.md)

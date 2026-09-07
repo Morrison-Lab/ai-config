@@ -157,6 +157,29 @@ EXTERNAL_REVIEWER_PRINT_FLAGS = {
     "agy": ("--print", "-p"),
 }
 
+# The ONE accepted shape, matched against the raw command text:
+#
+#     agy --print 'a prompt naming the review'
+#
+# The prompt must be SINGLE-quoted, which is what makes this sound. Bash
+# performs no expansion or substitution inside single quotes and no character
+# escapes them, so every metacharacter in there is literal and the quoted run
+# ends at the next `'`. Anchoring to the whole string then leaves nowhere for a
+# second command to live.
+#
+# Matching raw text rather than `shlex.split` output is the sixth adversarial
+# finding against this check, and the reason is worth keeping: `shlex.split`
+# splits on WHITESPACE only and knows nothing of `;`, `&&`, `|` or `&`. So
+#
+#     agy --print adversarial-self-review;evilbin
+#
+# is three words to `shlex` and two commands to bash, and the second one's
+# stdout joins the first's in the tool result the verdict is read from.
+EXTERNAL_REVIEWER_COMMAND_RE = re.compile(
+    r"\A\s*(?P<program>[A-Za-z0-9_.-]+)"
+    r"\s+(?P<flag>--print|-p)"
+    r"\s+'(?P<prompt>[^']*)'\s*\Z")
+
 def external_reviewer_command(command: str) -> bool:
     """Is this Bash command a cross-family reviewer run whose output is its review?
 
@@ -170,12 +193,17 @@ def external_reviewer_command(command: str) -> bool:
 
     So the command must be ONE CANONICAL SHAPE, compared rather than parsed:
 
-        agy --print <prompt>
-        agy -p <prompt>
+        agy --print 'a prompt naming the review'
+        agy -p 'a prompt naming the review'
 
-    Exactly three shell words, the first a recognized reviewer, the second a
-    print-mode flag attested against the real CLI, the third a prompt naming
-    the review. Anything else is refused.
+    A recognized reviewer, a print-mode flag attested against the real CLI, and
+    a SINGLE-QUOTED prompt naming the review, matched against the whole raw
+    command. Anything else is refused.
+
+    The single quotes carry the weight. Bash expands nothing inside them and no
+    character escapes them, so the quoted run ends at the next `'` and every
+    metacharacter within it is literal; anchoring the match to the whole string
+    then leaves nowhere for a second command to live.
 
     That severity is the point, and it was expensive to learn. Five successive
     adversarial review rounds each produced a working end-to-end bypass of a
@@ -199,13 +227,29 @@ def external_reviewer_command(command: str) -> bool:
     program, closing one instance while feeling like it closed the class.
 
     A shape comparison ends that. It has no model of how `agy` parses anything,
-    so there is no model to be wrong. Every forgery above needs a fourth word,
-    and there is no fourth word.
+    so there is no model to be wrong.
 
-    The cost is real and deliberate. `cd /x && agy --print "..."`, a `--model`
-    flag, a prompt written as `$'...'`, and a prompt supplied on stdin are all
-    refused. Run the `cd` as its own earlier command, and pass the prompt as
-    one quoted argument.
+    A sixth round then showed why the shape must be compared against the RAW
+    command rather than against `shlex.split` output. `shlex` splits on
+    whitespace alone and knows nothing of bash's operators, so
+
+        agy --print adversarial-self-review;evilbin
+
+    is three words to it and two commands to bash, and the second program's
+    stdout joins the first's in the very tool result the verdict is read from.
+    An unquoted word cannot be certified by counting words.
+
+    The cost is real and deliberate. Refused: a double-quoted prompt, since
+    bash expands `$(...)` inside one; `$'...'`, whose leading `$` is outside
+    the quotes; a leading `cd /x &&`; any extra flag, `--model` included; and a
+    prompt supplied on stdin. A prompt containing an apostrophe is refused too,
+    which is the sharpest edge here. Run the `cd` as its own earlier command,
+    pass the prompt as one single-quoted argument, and reword an apostrophe.
+
+    Refusing `--model` means this path cannot select a model, so an invocation
+    needing a specific one falls back to the in-family dispatch. That is worth
+    revisiting only with an attested flag and a shape that keeps this
+    property, never by loosening the quoting.
 
     Two residues this accepts rather than closes, stated because a guard that
     hides its own limits is worse than one that names them.
@@ -224,18 +268,13 @@ def external_reviewer_command(command: str) -> bool:
     verdict, which is a decision to defeat the guard rather than a shape a
     session falls into by accident.
     """
-    try:
-        argv = shlex.split(command)
-    except ValueError:
+    match = EXTERNAL_REVIEWER_COMMAND_RE.match(command)
+    if match is None:
         return False
-    if len(argv) != 3:
+    if match.group("flag") not in EXTERNAL_REVIEWER_PRINT_FLAGS.get(
+            match.group("program"), ()):
         return False
-    flags = EXTERNAL_REVIEWER_PRINT_FLAGS.get(os.path.basename(argv[0]))
-    if flags is None:
-        return False
-    if argv[1] not in flags:
-        return False
-    return bool(REVIEW_PROMPT_RE.search(argv[2]))
+    return bool(REVIEW_PROMPT_RE.search(match.group("prompt")))
 
 OVERRIDE_ENV = re.compile(r"\AALLOW_UNREVIEWED_PUSH=1\Z")
 

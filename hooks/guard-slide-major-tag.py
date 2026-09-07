@@ -330,12 +330,6 @@ def evaluate(command: str, base_cwd: str | None = None) -> tuple[str, str] | Non
         if not new_content:
             continue
 
-        # Fast conservative pre-filter: skip files that do not contain 'workflow_call'
-        # anywhere in their text. In GitHub Actions, a reusable workflow must define
-        # 'workflow_call' in its trigger block, so a file lacking the token cannot be one.
-        if "workflow_call" not in new_content:
-            continue
-
         if yaml is None:
             reason = (
                 "Blocked: slide-major-tag cannot verify reusable workflow permissions because "
@@ -356,6 +350,11 @@ def evaluate(command: str, base_cwd: str | None = None) -> tuple[str, str] | Non
         try:
             new_data = yaml.safe_load(new_content)
         except Exception as exc:
+            # The raw scan is a last resort for files that cannot be parsed at all:
+            # if the raw token is absent, assume it is not a reusable workflow and skip.
+            # If the token is present, fail closed because permissions cannot be verified.
+            if "workflow_call" not in new_content:
+                continue
             reason = (
                 "Blocked: slide-major-tag cannot verify reusable workflow permissions because "
                 f"{filepath} could not be parsed as valid YAML ({exc}).\n\n"
@@ -375,6 +374,10 @@ def evaluate(command: str, base_cwd: str | None = None) -> tuple[str, str] | Non
             continue
 
         if not isinstance(new_data, dict):
+            # A file that parses into a non-mapping cannot be a valid workflow.
+            # The raw scan is a last resort for files that cannot be parsed into a mapping.
+            if "workflow_call" not in new_content:
+                continue
             reason = (
                 "Blocked: slide-major-tag cannot verify reusable workflow permissions because "
                 f"{filepath} does not contain a top-level YAML mapping.\n\n"
@@ -387,6 +390,8 @@ def evaluate(command: str, base_cwd: str | None = None) -> tuple[str, str] | Non
             )
             return "deny", reason
 
+        # For parseable files, the parsed mapping is the sole relevance test:
+        # no raw text scan involved, so YAML key encodings cannot defeat detection.
         if not _has_workflow_call(new_data):
             continue
 

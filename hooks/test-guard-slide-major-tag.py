@@ -17,9 +17,12 @@ Verifies:
   - Malformed workflow YAML at tag ref fails closed (denies).
   - Unparseable non-workflow_call workflow allows.
   - Unparseable workflow containing workflow_call denies.
+  - Unicode-escaped workflow_call key with added permission denies.
+  - Parseable workflow genuinely lacking workflow_call allows.
   - Missing tag allows with stderr note.
   - Missing remote branch allows with stderr note.
   - Mutation check: flipping the regex to ignore 'read' fails the deny test.
+  - Mutation check: consulting raw scan for parseable file fails unicode-escaped test.
 
 Run:
     python3 hooks/test-guard-slide-major-tag.py [hooks/guard-slide-major-tag.py]
@@ -495,6 +498,86 @@ def main() -> int:
         finally:
             if os.path.exists(mutant_path):
                 os.unlink(mutant_path)
+
+        # 8k. Unicode-escaped workflow_call key with added permission denies.
+        # Valid YAML resolves "\u0077orkflow_call" to "workflow_call", but raw text
+        # does not contain the substring "workflow_call". Parsing before filtering
+        # ensures the permission addition is caught.
+        repo8k = _make_repo(
+            on_block='  "\\u0077orkflow_call":\n',
+            permissions_block="    permissions:\n      contents: read\n",
+        )
+        new_content8k = (
+            "name: Workflow\n"
+            'on:\n  "\\u0077orkflow_call":\n'
+            "jobs:\n"
+            "  review:\n"
+            "    runs-on: ubuntu-latest\n"
+            "    permissions:\n"
+            "      contents: read\n"
+            "      checks: read\n"
+            "    steps:\n"
+            "      - run: echo ok\n"
+        )
+        _advance_commit(repo8k, "reusable.yml", new_content8k)
+        v8k, r8k, _ = run_hook(HOOK, "gh workflow run slide-major-tag.yml", repo8k)
+        check(
+            v8k == "deny" and "checks: read" in r8k and "reusable.yml" in r8k and "ALLOW_BREAKING_SLIDE=1" in r8k,
+            "deny added permission when workflow_call key is unicode-escaped",
+            f"got verdict={v8k}, reason={r8k}",
+        )
+
+        # 8l. Parseable file genuinely lacking workflow_call allows (step 2 does not over-deny).
+        repo8l = _make_repo(
+            on_block="  push:\n    branches: [main]\n",
+            permissions_block="    permissions:\n      contents: read\n",
+        )
+        new_content8l = (
+            "name: Workflow\n"
+            "on:\n  push:\n    branches: [main]\n"
+            "jobs:\n"
+            "  review:\n"
+            "    runs-on: ubuntu-latest\n"
+            "    permissions:\n"
+            "      contents: read\n"
+            "      checks: read\n"
+            "    steps:\n"
+            "      - run: echo ok\n"
+        )
+        _advance_commit(repo8l, "reusable.yml", new_content8l)
+        v8l, r8l, _ = run_hook(HOOK, "gh workflow run slide-major-tag.yml", repo8l)
+        check(
+            v8l == "allow",
+            "allow permission addition to parseable workflow without workflow_call (no over-deny)",
+            f"got verdict={v8l}, reason={r8l}",
+        )
+
+        # 10. Mutation check for reorder: break step 2 so it consults raw scan for parseable file.
+        # Under this mutant, the unicode-escaped key is falsely skipped and allowed instead of denied.
+        with open(HOOK, encoding="utf-8") as f:
+            src10 = f.read()
+
+        break_step2_target = "if not _has_workflow_call(new_data):"
+        break_step2_replacement = 'if "workflow_call" not in new_content or not _has_workflow_call(new_data):'
+        if break_step2_target not in src10:
+            sys.exit(f"FATAL: {break_step2_target} not found in {HOOK}")
+
+        mutant10_src = src10.replace(break_step2_target, break_step2_replacement, 1)
+        mutant10_fd, mutant10_path = tempfile.mkstemp(suffix=".py")
+        os.close(mutant10_fd)
+        _write_file(mutant10_path, mutant10_src)
+
+        try:
+            v10_mutant, _, _ = run_hook(mutant10_path, "gh workflow run slide-major-tag.yml", repo8k)
+            # Under the broken step 2 mutant, the unicode-escaped workflow is skipped (returns 'allow')
+            check(
+                v10_mutant == "allow",
+                "mutation check: consulting raw scan for parseable file flips unicode-escaped deny to allow",
+                f"expected allow under mutant, got {v10_mutant}",
+            )
+        finally:
+            if os.path.exists(mutant10_path):
+                os.unlink(mutant10_path)
 
     finally:
         for d in _TMPDIRS:

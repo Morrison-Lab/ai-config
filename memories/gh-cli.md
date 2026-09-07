@@ -200,6 +200,26 @@
     the login-filtered version of this command was flagged as stale by review on ai-config#636;
     the unscoped-across-reruns version was flagged by a follow-up review on ai-config#637 and confirmed concretely on gha#278, whose thread holds two separate `**Claude finished` comments, one per run;
     and the `gh api --jq --argjson`/pagination gaps in *that* fix were themselves flagged by a still-later review on the same PR, caught only after #637 had already merged.)
+- **Triaging many open PRs at once: extract each PR's `review-data:` payload with one `jq` pipeline instead of dispatching a subagent to read each review.**
+  Every completed `**Claude finished` review body ends with a machine-readable `<!-- review-data: {"schema_version": ..., "verdict": ..., ...} -->` comment (the same payload `scripts/lib/review_payload.py` parses).
+  For a quick multi-PR scan, capture it directly:
+  ```bash
+  gh api repos/<owner>/<repo>/issues/<N>/comments --paginate \
+    | jq -s '[.[][] | select(.body | test("\\*\\*Claude finished"))] | last.body
+             | capture("review-data:\\s*(?<j>\\{[\\s\\S]*?\\})\\s*-->").j
+             | fromjson | {verdict, findings: (.findings | length)}'
+  ```
+  The `fromjson` is load-bearing and easy to drop: `capture(...).j` yields a jq
+  *string*, so a trailing bare `| jq .` re-emits it still escaped rather than
+  parsing it, and nothing downstream (`.verdict`, `.findings`) is queryable.
+  The failure is quiet --- the output still looks like JSON.
+  Loop that over every open PR's issue-comments endpoint and the whole set's verdicts and finding counts come back without reading a single comment body by eye or spending a subagent per PR --- the deterministic-tool default [`algorithmatize-checks`](../shared/workflow/algorithmatize-checks.md) asks for, applied to review triage specifically.
+  **Do not treat this raw regex capture as the final gating signal, though** --- it has none of `review_payload.py`'s code-fence masking, so a verdict quoted inside a fenced example in the review body (an ARD template, a quoted prior round) can be captured instead of the real one.
+  Use the raw pipeline to decide *which* PRs need a closer look.
+  For an actual clean/not-clean call on one PR, read the comment through `scripts/check-pr-fully-clean.py` (or `review_payload.py` directly), the same masking-aware path `fully-clean.md` already requires.
+  - **Do:** run the jq pipeline across all open PRs first, to triage which need attention, before dispatching per-PR analysis.
+  - **Don't:** use the naive jq capture's verdict as the basis for declaring a specific PR clean or not-clean --- re-read it through the masking-aware extractor for that call.
+  (`d-morrison/rme` ardia sweep, 2026-09-06.)
 - **`jq empty` exits 0 on empty stdin: pair it with an emptiness check `[ -n "$out" ]` when validating JSON.**
   `printf "" | jq empty` exits `0`, so using `echo "$out" | jq empty` alone to validate API responses accepts an empty response body as valid JSON.
   For robust validation of API responses (e.g. `gh api`), check both non-emptiness and JSON validity: `[ -n "$out" ] && echo "$out" | jq empty 2>/dev/null`.

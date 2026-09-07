@@ -87,6 +87,14 @@ grep -nE '\\(def|providecommand|newcommand|renewcommand)\{?\\(Ep|Prf|paren|sb|cb
   inst/analyses/macros/macros.qmd
 ```
 
+**Measured 2026-09-06 on `d-morrison/rme`'s separate `latex-macros/macros.qmd` submodule (not `d-morrison/macros`).**
+A sweep pattern-matching only `\newcommand{...}`/`\providecommand{...}` reported `\vX` and `\vbeta` as undefined; both are `\def`-defined.
+Widening the grep to all four forms above found 28 defined `v`-prefixed macros and exactly 2 genuinely undefined (`\vL`, `\vl`).
+Same class as the built-in-shadowing case this step already names --- a definition-site grep is only as complete as its list of definition mechanisms, and any macros file mixing TeX primitives can use all four.
+
+- **Do:** run the four-form grep above (or an equivalent covering `\def`, `\providecommand`, `\newcommand`, `\renewcommand`) before asserting any macro is undefined, in every `.qmd`-based macros submodule, not only `d-morrison/macros`.
+- **Don't:** conclude a macro is undefined from a grep that only matches `\newcommand`/`\providecommand` --- confirm against `\def` and `\renewcommand` too.
+
 ### 4. Rewrite the math — using only defined macros
 
 Delegate the heavy rewrite to the `codex` CLI to conserve tokens (pass the macro

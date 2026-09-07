@@ -632,6 +632,19 @@ The unfiltered listing comes first: the state filter answers only whether a revi
 
 See [`CLAUDE.cases.md`](CLAUDE.cases.md), "A bot's `COMMENTED` review is the same blind spot".
 
+**The review's own required check run can itself read green over a `NOT_CLEAN` verdict --- this is a distinct failure from "CI green isn't the review verdict".**
+The paragraph above treats `statusCheckRollup` and the review verdict as two different signals that both need checking.
+That framing still assumes the review's *own* check run --- the one wired specifically to gate on the review outcome, e.g. a `review / require-clean-verdict` job from a shared reusable workflow --- tracks that outcome faithfully.
+It does not always.
+Measured on `d-morrison/rme` PRs #1132 and #1133: `gh pr view --json statusCheckRollup` showed `review / require-clean-verdict` as `SUCCESS` on both, while each PR's latest `**Claude finished review` comment carried `"verdict": "NOT_CLEAN"` in its embedded `review-data:` JSON, with open findings.
+Why the two disagree was not established.
+A stale check run from an earlier head, and a gate that never parses the embedded verdict at all, would both produce this reading, and neither was ruled out.
+The pair below does not depend on which it is: the comment is authoritative either way.
+[`review-verdict-pitfalls`](shared/workflow/review-verdict-pitfalls.md) is the catalog for this family --- add further cases there rather than here.
+
+- **Do:** treat a green review-gating check run as unverified until the latest review comment's own verdict field confirms it, even when that check run's name implies it enforces the verdict directly.
+- **Don't:** read a named review-verdict check (e.g. `require-clean-verdict`) as SUCCESS meaning the review is clean --- name and outcome can disagree.
+
 (A specific case of the standing **never assume; always verify** rule in `memories/preferences.md` — confirm the verdict with a fresh query, don't recall it.)
 
 ## Post in-chat feedback to the PR

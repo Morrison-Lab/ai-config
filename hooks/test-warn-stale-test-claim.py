@@ -171,6 +171,31 @@ CASES = [
      ), say("All tests pass.")], True,
      "a test invocation mentioned inside a heredoc BODY is not a run"),
 
+    # FOURTH-round adversarial-review finding: _CMD_START's separator
+    # characters are not quote-aware, so ORDINARY (non-adversarial) prose
+    # containing one of them inside a quoted string was still misread as a
+    # command boundary. `_strip_shell_literals` blanks quoted strings and
+    # heredoc bodies before TEST_SUITE_RE ever sees the command.
+    ([edit(), bash('echo "Build & pytest"'), say("All tests pass.")], True,
+     "'&' inside a quoted echo string is not a command separator"),
+    ([edit(), bash('git commit -m "docs: run lint; pytest; deploy steps"'),
+      say("All tests pass.")], True,
+     "';' inside a quoted commit message is not a command separator"),
+    ([edit(), bash(
+        "cat <<'EOF' > notes.txt\n"
+        "Steps: build && pytest -q && deploy\n"
+        "EOF"
+     ), say("All tests pass.")], True,
+     "'&&' inside a heredoc body is not a command separator"),
+
+    # FOURTH-round finding: a bare keyword must not match an identically
+    # named environment-variable assignment (`PYTEST=1 ./tool`), since
+    # `\b` treats `=` as a word boundary.
+    ([edit(), bash("PYTEST=1 ./mytool arg"), say("All tests pass.")], True,
+     "PYTEST=1 as an env-var assignment is not a pytest run"),
+    ([edit(), bash("RSPEC=1 ./deploy.sh"), say("All tests pass.")], True,
+     "RSPEC=1 as an env-var assignment is not an rspec run"),
+
     # Adversarial-review finding: a disclosed partial result ("N passed, M
     # failed") must not read as a full passing claim.
     ([edit(), say("Ran the suite: 12 passed, 3 failed.")], False,

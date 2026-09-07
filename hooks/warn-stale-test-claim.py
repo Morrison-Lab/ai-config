@@ -150,8 +150,8 @@ _CMD_START = r"(?:^|;|&&|\|\||[&|])\s*" + _WRAPPER
 # that was really an unrelated script (third-round finding).
 TEST_SUITE_RE = re.compile(
     _CMD_START + r"""(?:
-      pytest\b
-    | py\.test\b
+      pytest\b(?!=)
+    | py\.test\b(?!=)
     | python[3]?\s+-m\s+(?:pytest|unittest)\b
     | python[3]?\s+(?:-\S+\s+)*(?:[\w./-]*/)?test[-_][\w./-]*\.py\b
     | devtools::test\(
@@ -165,12 +165,41 @@ TEST_SUITE_RE = re.compile(
     | make\s+test\b
     | mvn\s+test\b
     | gradle\s+test\b
-    | rspec\b
-    | phpunit\b
+    | rspec\b(?!=)
+    | phpunit\b(?!=)
     | dotnet\s+test\b
     )""",
     re.I | re.X,
 )
+
+# Strip shell string literals and heredoc bodies before matching
+# TEST_SUITE_RE. Fourth-round adversarial review found that `_CMD_START`'s
+# separator characters (`;`, `&`, `&&`, `||`) are not aware of quoting: an
+# ORDINARY, non-adversarial phrase like `echo "Build & pytest"` or
+# `git commit -m "run lint; pytest; deploy"` contains those characters
+# inside a string literal, where the shell never treats them as
+# separators -- so they were still misread as real command boundaries,
+# reopening the mention-vs-run gap a fourth time. This is not full shell
+# parsing (which is out of scope, per this hook's own design constraint of
+# staying conservative rather than clever): it recognizes exactly two
+# bounded shapes -- a `'...'` or `"..."` string literal, and a `<<TAG` /
+# `<<'TAG'` heredoc body up to its closing `TAG` line -- and blanks them,
+# so a keyword sitting inside either can no longer supply a match.
+_DQUOTE_RE = re.compile(r'"(?:[^"\\]|\\.)*"')
+_SQUOTE_RE = re.compile(r"'[^']*'")
+_HEREDOC_RE = re.compile(r"<<-?\s*['\"]?(\w+)['\"]?[^\n]*\n(?:.*?\n)?\1\b", re.S)
+
+
+def _strip_shell_literals(command):
+    """Blank out quoted strings and heredoc bodies before test-run matching.
+
+    Order matters: heredocs first, since a heredoc body can itself contain
+    quote characters that would otherwise confuse the quote stripper.
+    """
+    command = _HEREDOC_RE.sub(lambda m: m.group(0).split("\n", 1)[0] + "\n", command)
+    command = _DQUOTE_RE.sub('""', command)
+    command = _SQUOTE_RE.sub("''", command)
+    return command
 
 # A claim that tests/checks/cases pass. Matched against VISIBLE prose only
 # (see visible_prose() below) so a reply quoting or discussing this rule in
@@ -332,7 +361,13 @@ def scan(path):
                 )
                 if not command:
                     continue
-                if TEST_SUITE_RE.search(command):
+                # TEST_SUITE_RE is matched against the LITERAL-STRIPPED
+                # command (see _strip_shell_literals), so a keyword sitting
+                # inside a quoted string or a heredoc body cannot supply a
+                # match. BASH_WRITE_RE is matched against the RAW command,
+                # since it exists precisely to find a redirect target that
+                # is often itself inside a quoted path.
+                if TEST_SUITE_RE.search(_strip_shell_literals(command)):
                     last_test_at = tool_idx
                 elif BASH_WRITE_RE.search(command):
                     last_edit_at = tool_idx

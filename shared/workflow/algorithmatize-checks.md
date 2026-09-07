@@ -361,6 +361,72 @@ class, so the quoted form passes without readmitting the operator.
 [ai-config#3251](https://github.com/Morrison-Lab/ai-config/pull/3251),
 review round 3.)
 
+### A proposed remedy is a claim about the fix, and it needs the same check as the bug report
+
+The section above is the regex-class instance of a wider failure: a proposed
+remedy is adopted because the *finding* that motivated it was verified, and
+verifying the finding is mistaken for having verified the fix.
+The two are different claims.
+An issue report is reproduced against the tree.
+Its suggested fix is not, because by the time it is written the bug already
+feels understood, and a remedy that closes the reported case reads as
+settled without ever running against anything the report did not show.
+
+This is the same claim
+[`address-every-comment`](address-every-comment.rationale.md)'s "the same
+check applies to a fix a reviewer describes in prose" makes for a review
+comment's suggested fix, and
+[`challenge-the-assignment`](challenge-the-assignment.md)'s "an issue body
+is an assignment you author, and its proposed fix is a second claim" makes
+for the issue-authoring side of it.
+What is new here is the domain: neither a regex read nor a check for
+internal consistency catches a remedy that fails only once the language's
+own vectorisation semantics meet it, because the proposed line is
+syntactically fine and passes wherever the reporter tried it.
+
+`hl()` aborted the whole render on a length > 1 argument, because `grepl()`
+vectorises and `if` does not.
+The issue reporting it, demonstrated against a two-element vector, offered
+two fixes: wrap the condition in `any(grepl(...))`, or vectorise the whole
+helper.
+The first was adopted, and it does stop the abort on that same two-element
+input --- the remedy was run against the report's own repro, and passed the
+one property anyone checked, which was that it no longer errors.
+
+It was still wrong.
+The row it builds is assembled by `paste0()` over several arguments
+including the text itself, and `paste0` vectorises independently of `hl()`:
+a two-element argument makes the row builder emit the whole table twice
+inside one document fragment, regardless of what `hl()` returns.
+`hl()` itself always returned one scalar string, one highlight span or
+none; `any()` only changed which *condition* selects it.
+`paste0` recycles that one string across both copies, so a filled element
+can be highlighted as though it were the unfilled one.
+Nobody had graded the fix on the *content* of its output, only on whether
+the abort was gone, so the corruption sat unnoticed for several rounds
+until a later adversarial pass rendered the fixed code on the same
+two-element input and read what it actually produced.
+The remedy that shipped took neither of the issue's two options as its
+fix: `any()` survives only as defence in depth, behind a guard that rejects
+a non-scalar argument outright, naming it, rather than trying to make one
+render correctly.
+
+- **Do:** grade a proposed remedy, the reporter's own included, on the
+  *content* of its output against the report's own input, not on whether
+  the originally reported symptom (an abort, an error, a crash) is gone.
+- **Do:** read every call downstream of a value a remedy collapses to a
+  scalar, since a sibling call can still vectorise over the original
+  argument while the collapsed value stays fixed across it.
+- **Don't:** read an issue's "suggested fix" section as pre-validated because
+  it arrived attached to a verified bug report.
+
+(Measured on [ucdavis/hac.sap#26](https://github.com/ucdavis/hac.sap/issues/26),
+filed 2026-09-02, and its fix in
+[ucdavis/hac.sap#43](https://github.com/ucdavis/hac.sap/pull/43), still open
+as of this writing.
+The corruption was caught and mutation-tested by a later adversarial-review
+round within that same PR, before it ever reached `main`.)
+
 ### An attribution claim in a guide-for-future-edits comment is settled by mutation, not by re-reading it
 
 "Test the instrument against the incident that prompted it, verbatim"'s closing **Don't** governs a comment claiming *what* a matcher matches.
@@ -476,6 +542,32 @@ Remove only that citation and keep the same clean heading: `clean` again.
 So main's not-clean flag on the cited body was never a detection of anything the body's own current verdict says;
 it was produced entirely by the literal bolded phrase inside the citation, matched exactly as if it were a live statement --- the exact false positive the PR exists to remove.
 A comparison that read the branch's `clean` on this body as "worse than main" would have had it backwards: the branch was not losing a detection main had earned, it was correctly declining to make the one main was making by accident, and isolating the citation is what showed that rather than another vocabulary patch on the branch's own scan.)
+
+## A checker that returns the same verdict on the broken tree is not evidence the fix worked
+
+The two sections above audit a control built for one comparison.
+This audits a **pre-existing** checker cited as verification --- the CI gate, the linter, the repo script you ran after the fix and reported green.
+
+Citing one feels like the strongest move available, because it is mechanical rather than a judgment, and because the rest of this file argues for exactly that.
+But an instrument earns a citation by *discriminating*, and a green verdict alone cannot say whether it did.
+A check that is silent on the property under repair reports clean on the fixed tree, on the broken tree, and on the untouched original, and all three readings are indistinguishable.
+The verification is then vacuous while reading as the most rigorous sentence in the reply.
+
+This is the default outcome rather than a rare one.
+A gate is often configured **lenient** on exactly the property a style fix is about, since a rule the corpus already violates at scale is the rule a repo turns off to get a green baseline --- so read a check's configuration rather than assuming the rule is on.
+And a green result invites no follow-up, so nobody asks the one question that settles it.
+
+So run the check against the **unfixed** tree before citing it.
+If it is green there too, it is not the instrument for this claim, and the job is to find one that discriminates --- which usually means measuring the property directly rather than looking for a gate that already exists.
+A distribution beats a pass/fail here: a property's *signature* is visible in a histogram where a threshold shows nothing.
+
+- **Do:** run the cited check against the pre-fix tree and confirm it goes red before reporting it as verification.
+- **Do:** read a check's own configuration for whether the relevant rule is enabled at all, rather than inferring it from a clean run.
+- **Do:** measure the property directly, and prefer a distribution or a count over a pass/fail, when no existing gate discriminates.
+- **Don't:** cite a green gate as evidence a fix landed --- green is the same answer it gives to no fix at all.
+- **Don't:** treat "two independent checks agree" as corroboration when neither has been shown able to disagree.
+
+See [`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md), "A citation to a check that answers the same on every tree, and two retractions of it".
 
 ## Widening an instrument invalidates every figure it produced, not only the one that exposed it
 
@@ -1045,14 +1137,42 @@ unless it is written down.
   record --- it explains the survivor and loses the structural fact
   that produced it.
 
+**An eleventh outcome, and the one a hand-built mutation reaches
+first: the edit landed at the intended spot and the surrounding
+GRAMMAR absorbed it.**
+
+Outcome four covers a mutant corrupted in transit, and outcome nine a mutant that edited the wrong occurrence.
+This is neither.
+The occurrence was right, the inserted text is exactly what was intended, and the file parses.
+The construct under test nonetheless still does what it did, because the insertion changed what the *neighbouring* code is attached to.
+
+Insertion is the risky operation, and moving a statement is the risky intent.
+A move is spelled as an insertion plus a deletion, and only the insertion has a grammar to get wrong.
+In an indentation-scoped language the hazard is a block boundary: text placed at loop-body indent immediately above an `elif` re-parents that whole chain, so a guard "relocated past" an earlier branch is still governed by it.
+A brace language has the same hazard at a brace, and a template language at a block close.
+
+The result is the worst-reading outcome in this list, because SURVIVED is a publishable finding.
+A malformed mutant that crashes announces itself.
+This one produces a clean "no behaviour change", which is indistinguishable from a correct negative control, and confident enough to rebut a reviewer with.
+
+- **Do:** read the mutated source **in context** --- the lines above and below the edit, not the diff hunk alone --- before scoring any mutation, and especially before reporting SURVIVED.
+- **Do:** treat a relocation as two edits, and confirm the moved statement's new block parent is the one you meant.
+- **Do:** prefer an edit anchored on the enclosing structure, such as an AST rewrite or a whole-block replacement, over a string insertion, wherever the language's scoping is positional.
+- **Don't:** read "it parses and the suite is green" as "the mutation expressed the change I described" --- a re-parented neighbour does both.
+- **Don't:** defend a SURVIVED result against a reviewer's doubt by citing the exit code.
+  The reviewer is asking about the mutant, and only the mutant's source answers.
+
+See [`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md),
+"A relocated skip that re-parented an elif chain".
+
 **When a mutation survives, the first hypothesis is that the mutation
 was wrong --- mis-targeted, incomplete, or vacuous --- not that the
 test coverage is weak.**
 
-The ten outcomes above are what "wrong" actually looks like: a mutant
-that never applied, one that applied to the wrong spot, one that
-applied to only one of several guardians, a fixture a sibling clause
-absorbs.
+The outcomes above are what "wrong" actually looks like: a mutant
+that never applied, one that applied to the wrong spot, one whose
+insertion re-parented the code around it, one that applied to only
+one of several guardians, a fixture a sibling clause absorbs.
 Every one of them reads as a coverage gap from the outside, and every
 one of them is a defect in the mutation, not in the suite.
 Doubting the suite first spends the same effort on the wrong side of
@@ -1666,6 +1786,32 @@ That session's PR also carried a `< 1.0s` wall-clock assertion as a
 backtracking regression guard, which under the same load could have flaked ---
 the case the paragraph on regression guards above answers, and the reason it
 answers it with `process_time` rather than with a wider bound.)
+
+### A REPEATED measurement is not a CONTROLLED one
+
+The section above governs the one-off reading and names the load's likeliest source.
+This governs what happens **next**, when you disbelieve the reading and run it again --- and it is the step at which a flake gets promoted to a regression, because repetition is the one check that cannot detect sustained load.
+
+When the same result comes back a second and a third time, the failure reads as settled: it reproduces, so it is deterministic, so the change in the working tree caused it.
+That inference is wrong, and it is wrong in a way repetition can never expose.
+Re-running holds the tree constant, which is what makes it feel like a control --- and it holds the **confounder** constant with exactly the same fidelity.
+A busy machine does not stop being busy between two consecutive runs.
+
+So the section above's remedy of re-running and reporting the spread is necessary and not sufficient.
+A wide spread does establish that the machine is the variable, as that section's own 0.59s-to-8.0s re-run shows.
+A *narrow* one establishes nothing, because sustained load can hold every run in a batch at the same wrong value --- and narrowness is the reading most easily mistaken for precision.
+
+The control that repetition imitates is a **clean copy**: apply the same change to a pristine `cp -a` of the tree, run it N times there, and compare.
+Tally failures **by name** rather than by count, since the same total twice over says nothing about whether it was the same test both times, and a rotating failure is the signature of load rather than of code.
+And run the *unchanged* copy the same N times, so a green run has something to be green against.
+
+- **Do:** reproduce a suspected regression in a pristine copy of the tree before attributing it to the change.
+- **Do:** record which test failed, not how many, and read a rotating name as a flake.
+- **Do:** read a *narrow* spread across repeated runs as consistent with sustained load, not as evidence against it.
+- **Don't:** read three identical results as a control --- consecutive runs share every confounder they were meant to rule out.
+- **Don't:** report an attribution from a suite whose assertions include a wall-clock bound until the bound has been ruled out.
+
+See [`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md), "A repeated measurement is not a controlled one".
 
 ## Reading an instrument's PROSE instead of its exit status, generalized past the PR checker
 

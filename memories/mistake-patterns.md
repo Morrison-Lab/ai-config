@@ -67,6 +67,31 @@ When a new entry lands after `main` has appended one of its own, take the next n
   Corrected by user: "stop saying mergeable when there's red CI and/or no clean review".
   Never use "mergeable" as a status verdict or conflate git mergeability with PR readiness;
   explicitly report CI check status and review verdict.
+  Re-hit 2026-09-03 (Antigravity session, working `ucdavis/epi204` wrap-up):
+  reported unrelated open [PR #384](https://github.com/ucdavis/epi204/pull/384) in wrap-up dashboard
+  as "Ready for self-merge" based on green CI checks
+  and a fallback self-review comment reading "Ready for merge",
+  without running `scripts/check-pr-fully-clean.py`.
+  `check-pr-fully-clean.py` exited 1 because the automated review had been quota-skipped.
+  A `Stop` guard blocked the claim;
+  which one went unrecorded, and the name first written here,
+  `check-clean-claim.py`, exists in no repository ---
+  not in this corpus's `hooks/`, not in `hooks/hooks.json`,
+  and not in `ucdavis/epi204`, whose tree carries no hooks at all
+  (checked 2026-09-04).
+  Read the guard as unidentified rather than substituting a plausible
+  sibling.
+  Two registered `Stop` hooks match part of this shape ---
+  `no-stale-pr-status.py` and `no-incomplete-check-enumeration.py` ---
+  and nothing in the record says which fired.
+  `no-handrolled-verdict-parse.py` is deliberately NOT a candidate:
+  `hooks/hooks.json` registers it under `PreToolUse`,
+  and its own docstring carries a section explaining why a `Stop`
+  matcher for this failure mode was rejected as too broad.
+  Filtering the candidate list by the hook's registered event
+  is what stops a shape match becoming a second wrong attribution.
+  Never transcribe a fallback review's prose
+  or call a PR ready for merge without `check-pr-fully-clean.py` exiting 0.
 - **Canonical Rule**: `AGENTS.md` ("Request review and drive every started PR to clean"),
   `fully-clean.md`, and `hooks/no-incomplete-check-enumeration.py`.
 - **Do:** Run `python3 scripts/check-pr-fully-clean.py <N> -R <owner>/<repo>`
@@ -443,13 +468,20 @@ A clean automated review from every available provider evaluating the current HE
 - **Canonical Rule**: [`fully-clean.md`](../shared/workflow/fully-clean.md)'s per-reviewer latest-verdict rule (Criterion 2, `EXCLUSIVE_BOT_IDENTITY`).
 - **Fix**: When a not-clean verdict belongs to an exclusive-login bot whose posting session is gone, do not dispatch further same-tool or cross-vendor reviews expecting supersession --- escalate to a human immediately (per `fully-clean.md`'s deadlock rule), citing #2482.
 
-## Pattern 21: A Piped or Redirected `git push` Is Parsed as a Commit-ish by the Self-Review Guard
-- **Mistake**: Appending `2>&1 | tail -3` (or any redirection/pipe) to a `git push` command in a repo guarded by `hooks/no-push-without-self-review.py`, then reading the guard's "`2` could not be resolved to a commit" refusal as a real review-state problem and re-dispatching a review that already exists.
-- **Example**: 2026-08-27, ai-config#2477: `git push origin cursor/ums-wrap-2272-32a3 2>&1 | tail -3` was blocked twice by the hook tokenizing the raw shell command line and treating the `2` from `2>&1` as a commit-ish push argument.
+## Pattern 21: The Self-Review Guard Reads Command Text, Not a Resolved Shell Command
+- **Mistake**: Writing a `git push` guarded by `hooks/no-push-without-self-review.py` in a form the guard cannot resolve to a real commit or a real repo --- a trailing redirection/pipe, or an unexpanded shell variable in a `-C` argument --- then reading the resulting refusal as a real review-state problem and re-dispatching a review that already exists.
+- **Example (1st occurrence)**: 2026-08-27, ai-config#2477: `git push origin cursor/ums-wrap-2272-32a3 2>&1 | tail -3` was blocked twice by the hook tokenizing the raw shell command line and treating the `2` from `2>&1` as a commit-ish push argument.
   The identical push with the redirection/pipe stripped succeeded immediately against an existing clean verdict.
-- **Canonical Rule**: [`no-push-without-self-review.py`](../hooks/no-push-without-self-review.py) parses the raw Bash command line, not the resolved push arguments.
+- **Example (2nd occurrence)**: 2026-09-04, ai-config#3279: `git -C "$W" push origin <sha>:refs/heads/<branch>` was refused with "`<sha>` could not be resolved to a commit," even though a matching clean verdict existed and `git cat-file -t <sha>` succeeded in the session's own shell.
+  The guard inspects command text, so it saw the literal string `"$W"` rather than the path it holds, and the refusal named the ref while the actual unresolvable token was the `-C` argument.
+  Writing the same worktree path out literally made the identical push succeed on the first attempt.
+  The trap compounds: the natural response to a refusal that misattributes its cause is to re-dispatch the reviewer in a loop that can never succeed, and from there to reach for `ALLOW_UNREVIEWED_PUSH=1` --- waving a correctly-reviewed push through the override path.
+- **Canonical Rule**: [`no-push-without-self-review.py`](../hooks/no-push-without-self-review.py) parses the raw Bash command line, not a shell-expanded or otherwise resolved argument list.
 - **Fix**: Run a bare `git push origin <branch>` with no `2>&1`, no pipe, and no trailing redirection in a guarded repo.
-  Before assuming the review state itself is stale, read the guard's refusal for a resolution error naming a suspicious token (a bare digit, a stray file target).
+  Write every `git -C <path> push` with the path spelled out literally, never as a shell variable.
+  Before assuming the review state itself is stale, read the guard's refusal for a resolution error naming a suspicious token (a bare digit, a stray file target, an unexpanded `$VAR`).
+- **Do**: write literal paths in every `git -C ... push` this guard sees, and read a "could not be resolved to a commit" refusal as a possible command-text parsing failure before treating it as a stale or missing review.
+- **Don't**: pass a shell variable to `git -C` in a guarded push, and don't respond to a resolution-failure refusal by re-dispatching the reviewer or reaching for `ALLOW_UNREVIEWED_PUSH=1` --- neither addresses a parsing failure the review itself never caused.
 
 ## Pattern 22: A Background-Dispatched Review Verdict Is Invisible to Older Push Guard Revisions
 - **Mistake**: Dispatching the final adversarial-reviewer round with `run_in_background: true` (or resuming a completed reviewer via `SendMessage`) and then pushing on the strength of its clean report, when older revisions of `hooks/no-push-without-self-review.py` only scanned the foreground tool results and missed background task notifications / TaskOutput.
@@ -853,6 +885,7 @@ A clean automated review from every available provider evaluating the current HE
   the plugin's shipped agents were absent from the session's Agent registry
   (writing `.claude/agents/adversarial-reviewer.md` into the repo mid-session does not register it immediately or reliably --- definitions load at session start, and the one measured mid-session appearance came about fifty minutes after the write, by a mechanism not yet identified),
   and the classifier denied the override in all three phrasings tried (Bash chained, Bash standalone, PowerShell `$env:`) --- consistent denials, not stochastic ones.
+  A fourth phrasing, `env VAR=1 command`, was not tried here and later succeeded on its first attempt in a separate 2026-09-06 incident where the inline `VAR=1 command` form had just been denied --- see [`claude-code-transcripts.md`](claude-code-transcripts.md)'s "A shared session's transcript can carry a genuinely later, genuinely unrelated verdict" for that record, which draws no conclusion from the single data point about why the `env` form passed.
   The [#2820](https://github.com/Morrison-Lab/ai-config/pull/2820) fallback, merged earlier that same day, was ALSO unreachable, for a distinct reason:
   the harness runs the hook from the plugin CACHE snapshot (`~/.claude/plugins/cache/Morrison-Lab/ai-config/<rev>/hooks/`, via `${CLAUDE_PLUGIN_ROOT}`),
   which predated the fix (rev `a3e0fdb`, no `FALLBACK_AGENT_NAME`);
@@ -995,3 +1028,61 @@ A clean automated review from every available provider evaluating the current HE
 - **Algorithmatizable?**
   Yes.
   Linters or hook test suites can parse inline fallback definitions against shared library exports and test import failure execution.
+
+## Pattern 49: The Documented Fix for One Push Guard Arms Another Push Guard
+- **Mistake**: Working around `hooks/no-push-without-self-review.py`'s command-text parsing (Pattern 21 above) by pushing with a literal worktree path and an explicit `<sha>:refs/heads/<branch>` refspec, then treating the resulting successful push as fully discharged.
+  That refspec form lands the commit but sets no upstream tracking branch.
+- **Example**: 2026-09-05, ai-config#3279:
+  four branches in one sweep --- those of PRs #3198, #3173, #3269 and #3189 ---
+  were pushed via `git -C /literal/path push origin <sha>:refs/heads/<branch>`
+  to satisfy the self-review guard's inability to expand `"$W"`.
+  #3279 documents the guard's blindness on one of them;
+  the repeated refspec form, and the missing upstream it leaves behind,
+  are recorded here rather than there.
+  Do not cite #3280 for this --- that issue is unrelated `opencode` CLI drift.
+  `hooks/no-unshipped-commit.py` then measured `@{upstream}..HEAD`, found no upstream configured, and reported the branch's commits as "not on its upstream," instructing a push that had already succeeded and whose commit was already on the remote.
+- **Canonical Rule**: [`no-unshipped-commit.py`](../hooks/no-unshipped-commit.py) treats a branch with no upstream as undefined rather than shipped --- a refspec push (`<sha>:refs/heads/<branch>`) satisfies the first guard's ref-resolution requirement without ever running the `-u`/`--set-upstream-to` step the second guard checks for.
+  Neither guard's message mentions the other, so the interaction is discoverable only by reading both hooks' source or by hitting the second refusal cold.
+- **Fix**: After a refspec-form push used to work around Pattern 21, immediately run `git -C <literal-path> push -u origin <branch>` (or `git -C <literal-path> branch --set-upstream-to=origin/<branch> <branch>`) to set the upstream the first push skipped, before ending the turn.
+- **Algorithmatizable?**
+  Partial.
+  `no-unshipped-commit.py` already treats "no upstream" as undefined rather than clean, which is the correct conservative behaviour;
+  what is missing is a link between the two guards' documentation, not a code change to either.
+  A cross-reference in `memories/hooks.md`'s Stop-hooks section (added alongside this pattern) is the mechanism until a hook can detect "this exact commit was just pushed by a command in this transcript, so treat this as tracking-only rather than unshipped."
+
+## Pattern 50: A Guard That Reads Command Text Is a Property of Every Guard in the Family, Not of the One That Was Just Fixed
+- **Mistake**: Filing a mistake report scoped to the one hook where a command-text-parsing blindness was found (Pattern 21's `no-push-without-self-review.py`), then hitting the identical blindness in a *different* hook (`hooks/no-unreviewed-pr.py`) within the same session, and re-diagnosing it from scratch instead of recognizing it as the same class.
+- **Example**: 2026-09-05: `gh api "repos/Morrison-Lab/ai-config/pulls/$n/requested_reviewers" -X POST ...` run inside a shell loop over several PR numbers.
+  Every POST succeeded (confirmed independently via `gh pr view <N> --json reviews`), and `hooks/no-unreviewed-pr.py` still reported the reviewer request as outstanding for each PR, because the guard reads the literal command text and `$n` is not a resolvable PR number.
+  Retrying with `--jq` and a pipe did not clear it either, for the reason [`pr-on-claim.rationale.md`](../shared/workflow/pr-on-claim.rationale.md)'s "sole command" section already documents for this same hook: a pipe or a loop bundling several simple commands into one Bash call makes no single POST the call's last (or sole) simple command, so the guard's discharge logic --- calibrated for one literal, standalone invocation --- cannot attribute success to any of them.
+  Only the documented form, run verbatim with a literal PR number and no pipe, cleared it.
+- **Canonical Rule**: Pattern 21's canonical rule ("a guard parses raw command text, not a resolved argument list or the command's effect") is a property of the **class** of hooks that read Bash command text to decide obligations, not of any single hook in that class.
+  `no-push-without-self-review.py` and `no-unreviewed-pr.py` are two instances;
+  a third command-text-reading guard should be assumed to share the same blindness until measured otherwise.
+- **Fix**: When a guard demands a specific documented command, run it **verbatim** --- literal values, no loop, no shell variable, no pipe, no added flags --- rather than adapting it to the situation at hand, because the guard matches text and shape, not effect.
+- **Algorithmatizable?**
+  No single fix;
+  each guard's own backfill/discharge logic would need a matching update (as `no-unreviewed-pr.py`'s `RX_CMD_REVIEWERS_ANY` already attempts for a bare shell-variable PR number, without extending to a loop bundling several such calls).
+  What generalizes is the review habit: when a command-text-parsing gap is found and fixed in one hook, grep the other `PreToolUse`/`Stop` hooks for the same "reads raw command text" shape before closing the finding as hook-specific.
+
+## Pattern 51: Trusting a Visible, Already-Discharged Reviewer Request Instead of Re-Checking Against the Current Head
+- **Mistake**: Treating a Copilot (or other) reviewer request on a PR as still satisfying the review obligation because `gh pr view <N> --json reviews` shows a real, successful review from earlier in the session, without checking whether any commits landed on that PR after the reviewed commit.
+- **Example**: 2026-09-05, `Morrison-Lab/ai-config` GIA sweep sidecar session: a Copilot review had been requested on a PR, confirmed via `gh pr view <N> --json reviews`, and treated as done.
+  Three further commits were then pushed to the same PR.
+  `hooks/no-unreviewed-pr.py` refused to let the turn end, because the PR's head had moved past the reviewed commit and nothing had requested a review of the new code.
+  The visible earlier review was real and was not the problem.
+  It was simply for a commit that was no longer the head.
+- **Canonical Rule**: [`hooks/no-unreviewed-pr.py`](../hooks/no-unreviewed-pr.py)'s own docstring: "A reviewer request is per-HEAD, not per-PR, so the same obligation re-arms on every push that re-heads a tracked PR."
+  A push re-arms the obligation regardless of how many earlier heads on that same PR were already reviewed.
+- **Fix**: After every push to an open PR, re-request the reviewer for the new head, even when `gh pr view --json reviews` already shows a successful review from an earlier round on that same PR.
+  This is already the standing ARDI/ardia/gia rule for the `@claude` reviewer (re-request after every push, including a Rebut/Defer-only round with no push).
+  The near-miss this pattern names is specific to Copilot's `requested_reviewers` mutation, where the visible past success is what makes the stale state look current.
+- **Algorithmatizable?**
+  Yes, and already built: `hooks/no-unreviewed-pr.py` re-arms itself on a push
+  whenever the session has exactly one live tracked PR.
+  Its own docstring gives the reason ---
+  "Attribution is the hard part, and it is answered by EXCLUSION rather than
+  by guessing.
+  A push almost never names the PR it re-heads."
+  --- so the guard fires only where the push has one PR it COULD re-head.
+  What is not automated is the human/session habit of reading `gh pr view --json reviews` and stopping there instead of also checking the reviewed commit against the current head.

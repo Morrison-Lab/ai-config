@@ -2,8 +2,11 @@
 
 Split out of [`tools.md`](tools.md) (ai-config#694 pattern) at the 1250-line gate.
 
-[`tools.md`](tools.md)'s "Two awk gotchas when an awk program is embedded in a single-quoted shell string" covers two gotchas that come from **embedding** an awk program in a single-quoted shell string.
-This one is about the awk **implementation** the machine happens to provide, and it is that file's third recorded trap.
+[`tools.md`](tools.md)'s "Two awk gotchas when an awk program is embedded in a single-quoted shell string" covers two gotchas met when writing an awk program into such a string.
+Only the first of that pair is *caused* by the quoting;
+its second, POSIX ERE having no backreferences, is a property of awk itself and reproduces from a program file.
+
+This file is about which **implementation** the machine happens to provide: the same program text is accepted by one awk and rejected by another.
 
 `mawk` is `awk` on Debian and Ubuntu, so a script that says `awk` gets it by default there, and it mishandles braces in two opposite ways:
 

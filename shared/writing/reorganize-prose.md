@@ -262,6 +262,125 @@ See [`reorganize-prose.cases.md`](reorganize-prose.cases.md),
 - **Don't:** read a green `check-links.py` as covering this; the broken
   pointer is prose, so no link check can reach it.
 
+## This same staleness arrives through a merge, not only through a deliberate move
+
+Everything above assumes a person decided to relocate prose.
+The identical defect also arrives with nobody deciding to move anything: two
+branches each append a new section at the same location in a file, git
+reports a conflict, and the resolution keeps both sections --- which is
+correct, since an append collision should keep both sides
+(see [`batch-merge-and-resolve.md`](../workflow/batch-merge-and-resolve.md)'s
+`merge=union` section).
+What is not free is the **order** the two end up in.
+
+A section's opening sentence can be a self-reference to whatever sits
+immediately above it --- "the section above governs X" --- and that sentence
+was true against its own branch's context, where nothing else stood between
+it and its actual target.
+Interposing the other branch's unrelated section between them, which is what
+keeping both in the "wrong" order does, leaves that opening sentence pointing
+at content it was never written about.
+Nothing about resolving the conflict looks like a move: no file changed
+address, no section was cut and pasted, so it is easy to conclude the
+self-reference sweep does not apply here.
+It applies exactly as it does to a deliberate relocation, because the
+sentence's target moved out from under it either way --- the resolution
+chose which section printed first, and printing order is what a relative
+pointer resolves against.
+
+The remedy is the same one this fragment already prefers over rewording: move
+one of the two sections so each one's "the section above" (or "the two rules
+above," or any other relative pointer) names its real target again --- a pure
+reorder, not a rewrite of prose neither side of the merge authored.
+Generalize past the one opening-sentence case: after resolving an append
+collision, sweep every relative pointer in **both** appended blocks, and in
+whatever content now follows them, using the self-reference and back-reference
+sweeps above.
+
+- **Do:** run the self-reference sweep on both sides of a kept append
+  collision, and reorder rather than reword when a pointer's target moved.
+- **Do:** treat a merge conflict resolution that keeps both sides as a move,
+  for the purposes of every check this fragment already requires of one.
+- **Don't:** assume a cleanly-resolved append collision needs no
+  self-reference sweep because nothing was deliberately relocated --- the
+  sweep's trigger is a pointer's target changing position, not an author's
+  intent to move it.
+- **Don't:** reword a self-reference broken by a merge instead of reordering
+  --- rewording edits prose neither branch actually wrote.
+
+### This is the routine conflict shape here, not an occasional one, and the judgment call is the order
+
+In a repo where many sessions independently append UMS sections to the same
+handful of shared fragments, an append collision is the **default** conflict
+shape a sync merge produces, not an unusual one.
+"Keep both sides" is therefore almost always the right resolution, and it is
+almost never the part that needs a decision --- git's own three-way merge
+already does that part correctly.
+
+What actually needs judgment every time is the **order** the two kept
+sections end up in, and that decision has a mechanical answer: read each
+appended block's opening sentence, and put first whichever block's opening
+line makes **no** back-reference to what sits above it.
+A block that opens by naming its subject outright can go in either position
+safely; a block that opens with "the section above" or an equivalent pointer
+can only go second, immediately under whatever it actually refers to.
+When both blocks' opening lines make a back-reference, neither position is
+safe as a bare append, and the resolution needs the reorder-and-name-the-real-
+target remedy above rather than a choice of which one goes first.
+
+Treat this as a checklist item on every resolved append collision in a
+UMS-heavy repo, not as a one-off fix for a reference a reviewer happened to
+catch: read both appended blocks' opening sentences before accepting the
+merge, and reorder if either one's opening line resolves against the wrong
+neighbour.
+
+- **Do:** read both appended blocks' opening sentences on every resolved
+  append collision, as a standing step rather than a reaction to a reviewer's
+  finding.
+- **Do:** order the two blocks by which one's opening sentence makes no
+  back-reference, when only one of them does.
+- **Don't:** treat "keep both sides" as the whole resolution --- it settles
+  content, and the order is a separate decision this fragment's sweep still
+  has to make.
+- **Don't:** wait for a broken pointer to surface before checking; on this
+  repo's merge frequency, the check is due on essentially every sync.
+
+A second occurrence did not break anything, and is worth recording precisely
+because of that: `memories/claude-code-hooks.md`
+([`Morrison-Lab/ai-config#3269`](https://github.com/Morrison-Lab/ai-config/pull/3269),
+merged 2026-09-05) hit the identical append collision --- `main`'s "A
+non-blocking hook must write `additionalContext` on stdout, not stderr"
+against the branch's "An invoked skill's body arrives as user-role transcript
+text and can arm an issue-scanning hook on an unrelated repo" --- and the kept
+order happened to be safe, because neither section's opening sentence makes a
+back-reference to its neighbour.
+The check still has to run every time regardless of outcome, since nothing
+about the collision itself signals in advance whether the kept order is safe;
+that is exactly why this reads as a routine sweep item rather than a
+reviewer-triggered fix.
+
+(Measured 2026-09-05 while syncing
+[`Morrison-Lab/ai-config#3173`](https://github.com/Morrison-Lab/ai-config/pull/3173)
+with `main`.
+The collision was in `shared/coding/avoid-hardcoding-external-data.md`, which
+that PR does touch: the branch appended "A suite's pass count is a liability
+twice over when written as an expectation" at the same point `main` had
+appended "A figure with no source of truth cannot be pinned into
+reproducibility".
+Keeping both put `main`'s section first, which stranded the branch section's
+opening line --- "The sections above govern a claim about a block the same
+file carries --- a count of its items, or a generalization over them" ---
+since the section now directly above it was about neither.
+An adversarial review caught it, and the fix was to swap the two rather than
+reword either.
+
+The event is not visible in that PR's title or its squashed subject, because
+it happened inside the sync merge rather than in the work the PR set out to
+do.
+That is the general case for this failure and the reason to name the file and
+both headings here: a merge-arrival defect leaves no artifact a bare PR
+number would lead a reader to.)
+
 ## Relationship to other rules
 
 - [`forward-references.md`](forward-references.md) is the specific case this

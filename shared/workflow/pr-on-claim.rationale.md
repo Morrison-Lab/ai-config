@@ -84,6 +84,13 @@ The shell does not draw that distinction: the last command in the pipeline owns 
 Use `--silent`, or `--jq` **inside** the `gh api` call, when the output needs narrowing.
 Both keep the POST the last command.
 
+**A shell loop over several PRs bundles the same failure N times instead of once.**
+Requesting review on multiple PRs in one Bash call --- `for n in 101 102 103; do gh api "repos/o/r/pulls/$n/requested_reviewers" -X POST ...; done` --- reads as N independent, successful requests, and each POST genuinely does succeed.
+It still leaves the hook unable to discharge any of them, for the identical reason a trailing pipe does: the loop bundles several simple commands into one Bash call, so no single POST is that call's sole or last simple command, and the "last position after `&&` or `;`" safety argument above never gets to apply.
+`RX_CMD_REVIEWERS_ANY` (`hooks/no-unreviewed-pr.py`) is built to backfill a request whose PR number arrived only as an unresolved shell variable (`repos/$O/$R/pulls/$N/...`) from the tool result, but that backfill still assumes one request per call --- it does not resolve which of several bundled results belongs to which iteration.
+Adding `--jq`/a pipe on retry does not help either, for the same reason a formatting pipe never helps: it narrows output without changing how many simple commands the call contains.
+Run one PR's request per Bash call, verbatim, with the literal PR number in the URL --- not assembled from a loop variable --- exactly as the sole-command rule above already requires for a single PR.
+
 **A PreToolUse block for this was considered and rejected -- the Stop hook stays the only guard.**
 After hitting this exact mistake (a `--silent` POST followed by `&& echo`, chained in one call), the natural next question is whether a **PreToolUse** hook should refuse to run the compound command at all, rather than let it run and catch the omission afterward at Stop.
 It was investigated and rejected, so record the reasoning here rather than re-deriving it the next time someone proposes it.

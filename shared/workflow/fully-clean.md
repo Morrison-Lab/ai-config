@@ -764,6 +764,91 @@ and the verdict's own conclusion every round.**
   Re-fetch `get_review_comments` on every review wake and act on the whole
   set, never on the wake's own payload.
 
+- **The instrument that prints `FULLY CLEAN` reads the verdict body and its
+  conclusion, and none of the other surfaces --- and its verdict is what gets
+  mistaken for this section having been performed.**
+  Every bullet above says no single check sees all the surfaces.
+  What none of them says is *which* check, and that omission is where the
+  section loses its force: a reader who runs
+  `scripts/check-pr-fully-clean.py`, gets `FULLY CLEAN`, and reports the PR
+  ready has run the tool this fragment's own criteria are named after, in
+  the vocabulary this fragment uses, and has consulted exactly one surface.
+  The instrument is sound for what it measures --- check runs, and the
+  verdict-bearing review items --- and the gap is in what a pre-merge check
+  must *additionally run*, not in the tool.
+
+  Two of the surfaces above are outside it mechanically rather than by
+  oversight.
+  Both halves of the mechanism have to be checked, because
+  `scripts/lib/payload_fetcher.py` governs only the `--from-json` path ---
+  reading it alone would miss a call added on the default one.
+  It covers, in its own words, "`gh pr view`, `gh repo view`, and the two
+  `gh api` reads".
+  The default path's call sites are the other half, and there are five:
+  `gh pr view --json` and the `/check-runs` read in
+  `scripts/lib/pull_request.py`, `gh repo view` for repo resolution, and two
+  `/actions/runs/` reads in the checker itself.
+  `pulls/<N>/comments` appears in neither half, so **inline comments are
+  never fetched at all** --- not fetched and left unresolved, never fetched.
+  And no `<summary>`-scoped match on `suppressed` exists anywhere under
+  `scripts/`, so the check prescribed by "A clean overview can hide a
+  collapsed findings block" above is prescribed and not implemented.
+  A third surface sits outside it for a different reason.
+  A body carrying findings under no parsable verdict *is* fetched, and
+  simply not counted, because the verdict scan has nothing to key on.
+  No query fixes that one --- only your reading the body does.
+
+  So run these three beside the instrument, every round, and read what they
+  print rather than the instrument's exit code, as the answer to this
+  section:
+
+  ```bash
+  # inline review comments -- never fetched by the instrument at all
+  gh api repos/<owner>/<repo>/pulls/<N>/comments --paginate \
+    --jq '.[] | "\(.user.login) \(.path):\(.line // .original_line)\n\(.body)\n"'
+  # formal review bodies -- where a collapsed suppressed block hides
+  gh api repos/<owner>/<repo>/pulls/<N>/reviews --paginate \
+    --jq '.[] | "\(.user.login) \(.commit_id[0:8]) \(.state)\n\(.body)\n"'
+  # issue comments -- where this repo's own review verdicts actually land
+  gh api repos/<owner>/<repo>/issues/<N>/comments --paginate \
+    --jq '.[] | "\(.user.login)\n\(.body)\n"'
+  ```
+
+  Three deliberate choices in those, each of which a shorter form gets
+  wrong.
+  **Each prints `.body`**, because a projection of ids and paths tells you a
+  comment exists and never what it says, which is not something you can act
+  on.
+  **None filters on the head SHA.**
+  A standing not-clean from an earlier head still vetoes, per this file's
+  own rule, so a head-filtered query drops exactly the finding that has been
+  open longest --- and on #3167 it would have returned one of the two
+  findings and hidden the other, since they landed at different heads.
+  **The third query is not redundant with the second.**
+  `pulls/<N>/reviews` returns formal reviews only, while a completed
+  `@claude` run posts its verdict as an *issue* comment --- which is why
+  `CLAUDE.md`'s own verdict query reads `issues/<N>/comments`, and why the
+  instrument reads both.
+  Measured on #3167: its `issues` endpoint carries three
+  `**Claude finished review` bodies that appear nowhere in its `pulls`
+  reviews.
+
+  Measured on [#3167](https://github.com/Morrison-Lab/ai-config/pull/3167),
+  which the instrument called `FULLY CLEAN` twice over a standing finding:
+  at head `16544c50` an inline comment flagged a malformed code span, and at
+  head `7e1294b0` a suppressed "previously missed" item named a missing
+  cross-reference link.
+  Both heads are pre-squash, so they are reachable from no branch --- fetch
+  them from `refs/pull/3167/head`; the squash commit on `main` is
+  `d29d33c71`.
+  Both were genuine, both were fixed, and neither was reachable from what
+  the instrument reads.
+  The instrument-side gaps are tracked as
+  [#3079](https://github.com/Morrison-Lab/ai-config/issues/3079) (threads)
+  and [#3170](https://github.com/Morrison-Lab/ai-config/issues/3170)
+  (the suppressed block); until they close, the queries above are the
+  coverage.
+
 - **Do:** read all review surfaces before calling a PR clean,
   every round,
   including collapsed suppressed-comments blocks.
@@ -773,6 +858,9 @@ and the verdict's own conclusion every round.**
   no block at all.
 - **Do:** distinguish "no findings" from "no verdict" explicitly, and treat
   the latter as unreviewed.
+- **Do:** run all three queries above alongside
+  `scripts/check-pr-fully-clean.py`, unfiltered by head SHA and printing
+  each body, and cite what they showed when reporting a PR ready.
 - **Don't:** report clean on a zero thread count, however many checks are
   green.
 - **Don't:** treat an empty review body as an all-clear without checking the
@@ -790,6 +878,10 @@ and the verdict's own conclusion every round.**
   nothing leaves the same zero counts as a job that found nothing.
 - **Don't:** act on a review wake's own payload --- it is one comment out of
   however many the round posted, and it never says which.
+- **Don't:** read `FULLY CLEAN` from `scripts/check-pr-fully-clean.py` as
+  having performed this section --- it covers check runs and verdict-bearing
+  review items, and the inline comments and the suppressed block are outside
+  what it fetches.
 
 **A comment can be evidence-dense, correct throughout, and state no verdict at
 all --- and its density is what gets read as the conclusion.**

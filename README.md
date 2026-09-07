@@ -67,6 +67,11 @@ opencode instead reads ai-config through its ordinary config fields plus convent
 
   To make ai-config available to opencode in **every** project, copy or symlink `skills/` into `~/.config/opencode/skills/` and add `instructions` entries to `~/.config/opencode/opencode.json`.
 
+  Enforcement hooks reach opencode sessions too,
+  through oh-my-openagent's Claude-hooks bridge,
+  when the non-plugin Claude install carries the catalog:
+  see [docs/opencode-hook-mapping.md](docs/opencode-hook-mapping.md).
+
 ### Codex wrappers
 
 The canonical workflow bodies stay in `skills/` for Claude Code. The
@@ -408,6 +413,13 @@ re-verify on a harness bump):
 Reconstructing `tool_result` from Cursor `postToolUse.tool_output` is
 [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241).
 The event mapping is [docs/cursor-hook-mapping.md](docs/cursor-hook-mapping.md).
+OpenCode runs the same catalog where the
+[oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent) plugin is
+installed and the non-plugin Claude install carries it:
+OMO's Claude-hooks bridge reads `~/.claude/settings.json`
+and runs the catalog inside OpenCode sessions.
+The payload gaps that remain and the per-guard status are in
+[docs/opencode-hook-mapping.md](docs/opencode-hook-mapping.md).
 
 | hook | event | enforces |
 |---|---|---|
@@ -424,7 +436,7 @@ The event mapping is [docs/cursor-hook-mapping.md](docs/cursor-hook-mapping.md).
 | `remind-learn-from-review.py` | `UserPromptSubmit` | reminds, never blocks, when an accepted reviewer finding has no learning or mechanism after it |
 | `remind-ums-on-scrutiny.py` | `UserPromptSubmit` | reminds, never blocks, when a review of your work was read, or a questioned claim was then corrected, with no explicit UMS after it |
 | `remind-retry-before-declaring-blocked.py` | `UserPromptSubmit` | reminds, never blocks, when an auto-mode permission-classifier denial has no later re-attempt of the same command -- ai-config#2994 measured a byte-identical command succeeding after three denials (2026-09-02), so a denial is a sample rather than a wall; scoped to the classifier's own denial, never a user's rejection or a deterministic rule/hook refusal |
-| `flag-unassigned-worktree.py` | `PreToolUse` (Agent) | warns, never blocks, on a write-capable Agent launch with no `isolation` |
+| `flag-unassigned-worktree.py` | `PreToolUse` (Agent) | warns, never blocks, on a write-capable Agent launch with no `isolation`. DENIES instead (2026-09-04, ai-config#3204) when the launch also has no isolation on a Bash-capable agent (READ_ONLY roles included -- see the module docstring), the session is off the repository's resolved default branch, and it has uncommitted tracked changes or unpushed commits a stray checkout would strand; clears with `ALLOW_UNISOLATED_AGENT_LAUNCH=1` on the single approved launch |
 | `no-fable-subagent.py` | `PreToolUse` (Agent, Task, Workflow) | denies an Agent launch that names Fable or that omits `model` while the session itself runs on Fable (inheriting is how the violation happens), unless `FABLE_SUBAGENT_OK=1` records the user's explicit grant for that launch; warns on a Workflow launch in a Fable session, whose `agent()` calls it cannot inspect -- user directive 2026-09-01 (ai-config#2927), after 8 of 10 launches in one session inherited Fable and the account hit its usage limit |
 | `no-unreviewed-pr.py` | `Stop` | blocks a reply ending a session after a PR was opened or readied with no reviewer requested, or after a push re-headed it with no reviewer requested since; deferred by draft status, by the PR having merged or closed once that transition is visible in the transcript (a terminal action, or a single-PR status read through `gh` or `pull_request_read`), or on a redaction PR by a `no-ai-review` label or an `ALLOW_UNREVIEWED_REDACTION_PR=1` assertion; wholly inert until its `MORATORIUM_END` (2026-12-01) while the standing directive forbids the Copilot request it would demand |
 | `no-unshipped-commit.py` | `Stop` | blocks a completion reply while the session's branch carries unpushed commits (derived from `git rev-list --count @{u}..HEAD`; a dropped commit no longer blocks) |
@@ -438,6 +450,7 @@ The event mapping is [docs/cursor-hook-mapping.md](docs/cursor-hook-mapping.md).
 | `remind-both-sides-from-git.py` | `UserPromptSubmit` | reminds, never blocks, when a revision-qualified blob is compared against the working-tree copy of that path |
 | `remind-deserialize-before-binary-claim.py` | `UserPromptSubmit` | reminds, never blocks, when an escalation names a serialized artifact nobody deserialized |
 | `flag-unchained-branch-switch.py` | `PreToolUse` (Bash) | warns, never blocks, when a branch switch and a later mutating git command are not joined by `&&` |
+| `flag-stale-branch-mutation.py` | `PreToolUse` (Bash) | warns, never blocks, when a mutating git command or a `git push` naming a branch runs while the actually-checked-out branch has drifted from what THIS session most recently, explicitly selected via `git checkout`/`git switch` -- tracked in a small per-session, per-repository state file so the check survives across SEPARATE Bash calls, unlike `flag-unchained-branch-switch.py`'s single-invocation scan (ai-config#3204) |
 | `flag-cd-into-main-checkout.py` | `PreToolUse` (Bash) | warns, never blocks, when a worktree-rooted session `cd`s into the MAIN checkout of its own repository, where every edit and every check silently succeeds against another branch |
 | `flag-add-a-outside-pathspec.py` | `PreToolUse` (Bash) | warns, never blocks, when `git add -A`/`--all`/`.` sweeps in an untracked file its own exclusion pathspec does not cover |
 | `flag-reset-hard-uncommitted-work.py` | `PreToolUse` (Bash) | warns, never blocks, when `git reset --hard`, `git checkout <pathspec>`, or `git restore <pathspec>` is about to discard tracked, uncommitted changes. The two path forms revert the named paths to the INDEX, or to an explicit source when one is given (`<tree-ish> --` or `-s <ref>`, which this hook also matches), so any edit made since the last `git add` is destroyed silently at exit 0 -- the shape that bit a mutation-testing restore step twice in one session (ai-config#2524). Also warns, at whole-tree scope, on a FORCED `git checkout` that resolves to no pathspec (`-f`/`--force`, with or without a ref): forcing removes the refusal, and the ref-less `git checkout -f` reverts every tracked file to HEAD with no output at all. Silent on an UNFORCED branch switch (`git checkout <ref>`), which git refuses when it would clobber local changes and otherwise carries them across, and on `git restore --staged` without `--worktree`, which rewrites only the index. NOT covered, and destructive: `git switch -f`/`--discard-changes <ref>`, which discards tracked working-tree changes silently at exit 0 -- `git switch` is a fourth command this guard does not read |
@@ -468,6 +481,7 @@ The event mapping is [docs/cursor-hook-mapping.md](docs/cursor-hook-mapping.md).
 | `flag-unmeasured-timestamp.py` | `PreToolUse` (Bash, mcp__github__.*, Write, Edit, NotebookEdit) | warns, never blocks, when a `gh pr comment`/`gh issue comment`/`gh pr review`/`gh api .../comments` body, or an MCP comment tool body, or a `Write`/`Edit`/Bash append to a session notebook (`session-*.md`) or memory file (`memory/*.md`), about to execute states a Pacific clock time (or `ish` suffix) and no clock read appears in the transcript since the current turn began, or the stamp runs ahead of the harness's injected reading (ai-config#2900, #2903, #2947) |
 | `warn-stale-issue-edit.py` | `PreToolUse` (Write, Edit, NotebookEdit) | warns, never blocks, when an issue-driven `Write`/`Edit` has no fresh VIEW_ISSUE and remote/default-branch check after the request that named the issue, or when the latest view shows the issue closed |
 | `warn-new-line-breaks-on-push.py` | `PreToolUse` (Bash) | warns, never blocks, before a `git push` carrying newly-added Markdown lines that violate semantic line breaks against the default base branch (e.g. `origin/main`), naming the file and line to fix before pushing |
+| `flag-positional-figure-in-commit-message.py` | `PreToolUse` (Bash) | warns, never blocks, when a `git commit` message about to be written states a positional figure about text --- "13 lines above", "39 lines below", "77 lines earlier", "~130 lines later" --- since a commit message is permanent history and the count is re-derived by nobody: true when typed, false as soon as anything above it changes. The warning says to DELETE the number rather than correct it, naming the target instead of counting to it. Measured on this repository's own history (2026-09-03, roughly 2400 commits): 14 occurrences across 13 commit messages, every one decoration. A bare `N characters`/`N chars`/`N words` with no positional word is deliberately NOT matched --- that shape appears in 53 commits, overwhelmingly legitimate measured facts such as a context budget or GitHub's comment cap, of which 3 also carry a positional figure and so fire on that arm anyway. A `\d+-to-\d+ range` arm was measured and dropped: its only match in the whole history was a misfire |
 
 For agent-independent monitoring across all projects and sessions, install the
 user service after the hook files are installed:

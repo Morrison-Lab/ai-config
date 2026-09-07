@@ -268,6 +268,82 @@ intent.**
 - **Don't:** revert a maintainer-requested change because a reviewer read the
   history as current --- rebut, and escalate rather than comply.
 
+**A defect NAMED in the PR body is not thereby disposed of --- the body is
+not one of ARD's three dispositions and leaves nothing behind that outlives
+the PR.**
+The rules above about a body going stale govern a body whose problem is
+drift.
+This one governs a body that is accurate: it states a real, open defect, in
+the author's own voice, under a heading like "Open items".
+Nothing about it is wrong, which is exactly the problem.
+
+The claim here is definitional rather than causal, which is what makes it
+usable: **disclosure is not a disposition.**
+[`ardi`](ardi.md)'s three are Address, Rebut and Defer, and all three leave
+something outside the PR body: a commit, a posted rebuttal, an issue.
+A line in the body is none of them: it produces no commit to point at, no
+thread another reviewer can re-raise, and no tracker entry that outlives the
+PR.
+Whether any particular item then reaches `main` unfixed depends on whether
+something else catches it, which is exactly the part a disposition would have
+taken out of the hands of luck.
+
+That last point is worth keeping separate from the tempting causal story, that
+a named defect reads as noticed and so converts itself from a finding into
+background.
+That story is plausible and this fragment does not establish it: a reviewer's
+silence has many available causes, and an author who wrote the item down has
+usually also decided it is low-priority, which is a cause on the author's side
+of the same observation.
+The rule does not need the causal claim, and it does not need an outcome claim
+either.
+The body is not a disposition; that is true of every disclosed item, including
+the ones something else happens to catch.
+
+The remedy is to give it one of the three in the same turn.
+Filing the issue is the cheap form, and a failing test is the strong one,
+because a test is re-run by an instrument on every round where a body line is
+re-read by nobody.
+
+This is adjacent to [`no-empty-promises`](no-empty-promises.md) and distinct
+from it: there the mechanism is absent, here the artifact exists and names the
+defect precisely, and the naming is what makes it feel resolved.
+[`metacognitive-monitoring`](metacognitive-monitoring.md) states the reader's
+side of it --- "disclosure is where the review starts" --- when the disclosure
+comes from a *subagent* whose work you are checking.
+This is the author's side, and it needs saying separately because there the
+suspicion a disclosure should create is one you would have to direct at
+yourself.
+[`report-mistakes-proactively`](report-mistakes-proactively.md)'s "A site the
+sweep finds and you deliberately exclude belongs in the issue too" carries a
+worked instance (ai-config#3081).
+
+- **Do:** convert a disclosed-but-unfixed defect into a filed issue or a
+  failing test in the same turn that discloses it, and cite that in the body.
+- **Do:** re-read your own "open items" section at the top of each round and
+  treat each entry as an unaddressed finding.
+- **Don't:** let a PR body carry a known defect forward --- a body line is not
+  a disposition, and it leaves no commit, thread or tracker entry behind.
+- **Don't:** count "the reviewer did not raise it" as agreement when you told
+  the reviewer about it first.
+
+(Morrison-Lab/ai-config#3180, 2026-09-04.
+A false positive in a new hook --- a value-taking short flag before `m`
+consuming the `m`, so `-Cm`/`-cm`/`-tm`/`-Sm`/`-um` were misread as carrying a
+message --- was written into the PR body under the heading
+"Open items (not fixed, quota stop)" and carried forward unfixed.
+No local adversarial round that followed raised it.
+The forge review did, in each of the three rounds before the fix, and it was
+fixed in `1b20884a1` --- pre-squash, so fetch `refs/pull/3180/head` before
+running `git show` on it --- before the PR merged.
+So this record is not an instance of a disclosed item reaching `main`: it is an
+instance of one surviving every round that was not the forge reviewer's, and
+being caught by something outside the disclosure's reach.
+Nor does it isolate a cause.
+The body supplies two author-side reasons alongside the disclosure --- the
+round had stopped on quota, and the item is graded there as costing "one
+spurious warning".)
+
 **The same sync is needed when the review fix is to CODE BEHAVIOR rather than
 to wording --- and that case is easier to miss, because nothing about fixing a
 bug points at the changelog.**

@@ -642,3 +642,72 @@ through five, and was caught by the sixth --- established by walking that file
 through each commit.
 A rationale comment is the artifact a later reader trusts in place of re-running
 the sweep, which is why four reviews read past it.)
+
+## A repeated measurement is not a controlled one
+
+(Measured on [Morrison-Lab/ai-config#3100](https://github.com/Morrison-Lab/ai-config/pull/3100), merged 2026-09-03.
+Deleting an apparently-dead local variable turned `scripts/test_check_pr_fully_clean.py` red, and the reading `753 passed, 1 failed` came back three times consecutively.
+That was reported as a deterministic regression caused by the deletion, and the deletion was defended on it.
+
+The reading was noise.
+The suite carries a number of wall-clock assertions bounding how long a scan may take, at budgets that differ from one to another.
+They share neither a phrasing nor a single helper --- most go through a `best_of_three` wrapper, whose own docstring already says a single sample makes the measurement flaky, and at least one times inline with `time.time()`.
+That is worth stating because two attempts to write this record down published a population and got it wrong: once by grepping an assertion's wording, and once by grepping the helper's name.
+Enumerating them needs a read of the file rather than either query, and a read of the current file: a count taken here against a stale local checkout differed from the same count against `origin/main`.
+Several reviewer subagents dispatched by this session were saturating the machine at the time, so every one of the three runs was taken under the same load.
+
+The control that settled it was a pristine `cp -a` copy of the same HEAD with the same deletion applied, which ran green 8 of 8.
+[#3127](https://github.com/Morrison-Lab/ai-config/issues/3127) tracks the underlying flakiness and reports it independently: 1 red in 20 unloaded runs against 4 red in 16 loaded ones.
+
+Note which direction the repetition pushed.
+Three identical readings did not merely fail to rule the confounder out --- they raised confidence, because reproducibility is what an attribution normally needs, and the load was as reproducible as the tree.)
+
+## A citation to a check that answers the same on every tree, and two retractions of it
+
+(Measured on [Morrison-Lab/ai-config#3103](https://github.com/Morrison-Lab/ai-config/pull/3103), 2026-09-03.
+Prose was reflowed across six fragments, and the reflow's correctness was reported as verified by `scripts/vendor/gha-check-new-line-breaks.py` and by markdownlint.
+Classified with the gate's own `classify_line` against the PR's merge base, the unreflowed original, a fill to 80 columns, and the clause-boundary reflow each produce zero flagged lines, so the citation distinguished nothing.
+[`semantic-line-breaks`](../writing/semantic-line-breaks.md) carries the mechanism, the per-state table, and the two measurements that do discriminate.
+
+What this record adds is what happened to the claim afterwards, over three review rounds.
+
+It was first stated too strongly and without provenance: no base, no commits, no command, and a figure whose denominator no definition reproduced.
+A reviewer then reproduced it *by construction* --- rejoining the original's lines into paragraphs and filling those to 80 --- and reported that the wrap turns the gate red in every fragment.
+That is a real property of paragraph prose and not of this PR, which had no such state, so the finding was true about a tree nobody made.
+It was accepted, and the whole claim was retracted.
+The next round re-derived it from the PR's own commits and showed the retraction was the larger error: the original claim had been right.
+
+What carries past this instance is the following.
+
+A finding can be *correct as measured* and still be about the wrong artifact, which is
+[`verify-the-right-artifact`](verify-the-right-artifact.md)'s substitution arriving from the reviewer's side rather than the author's.
+The author cannot catch it by re-reading, only by re-deriving.
+
+A retraction is an assertion, so it can overshoot in the opposite direction --- and here it did, which is
+[`grep-is-not-coverage`](grep-is-not-coverage.md)'s
+"Second occurrence: a retraction can land the OPPOSITE overclaim, and then do it again" happening to the very diff that was recording that section.
+Accepting a finding is cheap and feels rigorous.
+Deriving before accepting is what was skipped both times.
+
+And the whole exchange was avoidable at the first step.
+Had the original claim shipped with its base, its three commit shas, and the classifier it used, the second round would have re-run it in one command instead of building a substitute for it.
+Publishing provenance is not bookkeeping.
+It is what stops a reviewer having to reconstruct your measurement, and reconstruct it wrong.)
+
+## A relocated skip that re-parented an elif chain
+
+(Measured on [Morrison-Lab/ai-config#3100](https://github.com/Morrison-Lab/ai-config/pull/3100), merged 2026-09-03.
+A review found that a `continue` guarding a checker's admission step would stop guarding it if relocated below the appends.
+The rebuttal was a mutation: re-insert the skip after the first `all_items.append(` and see whether any test notices.
+It was run three times, at one HEAD, with two fixtures, and the resulting issues list was byte-identical before and after.
+SURVIVED was reported, and the review's finding was rebutted on that basis.
+
+The mutant was malformed.
+At loop-body indent the re-inserted block landed immediately above an existing `elif`, which re-parented that whole chain onto the relocated `if`.
+The skip therefore still ran ahead of admission, so the mutation never expressed the relocation it was built to test, and the identical output was correct for a tree that had not been changed in the intended way.
+
+Every signal available short of reading the source agreed with the rebuttal.
+The diff shows the intended insertion, the file parses, the suite is green, and repeating the run reproduces it.
+Only reading the mutated source next to the `elif` showed it.
+The review's measurement stood.
+The retraction records that a malformed mutant's "no behaviour change" is indistinguishable from a correct negative control.)

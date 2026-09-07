@@ -150,6 +150,26 @@ When the timer fires:
 - If review workflows are still running: schedule another timer to check back.
 - If the reviewer failed, was canceled, skipped with no replacement (e.g. quota limit), or produced a stub review with no stated verdict: invoke self-review fallback per [`self-review-fallback.md`](self-review-fallback.md) rather than stalling the loop.
 - Otherwise, fix any underlying workflow or dispatch issues discovered along the way and schedule another timer to maintain continuous monitoring until a review lands, self-review fallback triggers, or CI completes.
+
+**Runner-capacity waits are non-terminal states, not stopping points.**
+
+`pending`, `created`, `waiting_for_resource`, and equivalent forge states say
+only that the job has not completed.
+When an autonomous ARDI request reaches one,
+the monitoring timer remains armed
+and its next firing re-queries the specific pipeline and review note.
+A later terminal failure or review finding is actionable work in the existing loop,
+not a reason to wait for another user message.
+
+- **Do:** keep the scheduled monitor active through runner-capacity waits and
+  re-query the exact pipeline at every firing.
+- **Do:** diagnose and repair a terminal failure or fresh current-head review
+  finding in the same autonomous loop.
+- **Don't:** report runner capacity as a blocker and end an autonomous ARDI
+  request while its jobs are non-terminal.
+- **Don't:** require the user to say `continue` again after the pipeline reaches
+  a terminal state.
+
 This applies transitively to PR-driving
 workflows such as `gi`, `gii`, and `ardia`;
 only monitor PRs that pass `memories/reviewing-prs.md`'s scope test

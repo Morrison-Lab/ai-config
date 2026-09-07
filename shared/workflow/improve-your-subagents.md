@@ -22,6 +22,43 @@ The orchestrator then copies that entry into its own ledger, because a learning 
 "Be careful with regexes" changes nothing.
 "Enumerate the input forms, run each through an `awk 'BEGIN{...}'` block, and paste the output" is checkable, and the paste is what lets the orchestrator verify without re-deriving.
 
+**A repeating shape of finding is itself a signal about the brief, not just about the diff.**
+A dispatched adversarial review can converge on real findings and still take
+many rounds to reach clean, one round at a time, each round returning exactly
+one small (often cosmetic) finding a full CI cycle apart.
+That shape --- one finding per round, several rounds running --- is
+information the brief is failing to use: a reviewer told to find defects in
+what it is given will report the first one it sees and stop, so a
+single-track brief and a slow trickle of nits reinforce each other.
+Continuing to re-dispatch the same brief treats each round as independent
+diligence when the rounds are actually the same missed instruction, repeated.
+
+The fix is a brief change, not a patience change: ask for **one** exhaustive
+pass over the entire diff in a single response, with nothing held back for a
+later round, and give the reviewer an explicit materiality bar --- report a
+finding only if a reader would actually be misled or a check would actually
+fail, and say so explicitly when a candidate was considered and dropped for
+falling short of that bar.
+Naming the bar is what lets a clean verdict be read as "nothing material
+found" rather than "nothing found yet."
+
+[`Morrison-Lab/ai-config#3286`](https://github.com/Morrison-Lab/ai-config/pull/3286)
+(`hooks/flag-nonconvergent-review.py`, unmerged at the time of writing) is the
+algorithmatized detector for the pattern this section fixes by hand: several
+`[FINDINGS_COUNT: N]` verdicts with a recurring category or a non-shrinking
+tail.
+That hook flags the symptom and asks whether to keep going; this section is
+one concrete answer to "keep going, but change what you are asking for."
+
+- **Do:** treat two or more consecutive rounds each returning exactly one
+  small finding as a brief defect, and rewrite the brief to ask for one
+  exhaustive pass rather than dispatching the same brief again.
+- **Do:** give the reviewer a stated materiality bar, and require it to name
+  a candidate finding it dropped for not clearing that bar.
+- **Don't:** read a string of small, individually-valid findings as evidence
+  the loop is converging on its own --- a trickle can be the brief's shape,
+  not the diff's.
+
 **Measure the agent.**
 Rounds to clean per PR, and mistakes per dispatch, by class.
 Compare briefs and models against those numbers rather than against an impression of the last run.
@@ -47,3 +84,7 @@ A ledger line that has held for several sessions also belongs in the agent's del
 (Directive from the user, 2026-09-02: "cai: part of your job as an orchestrator is to find creative ways to help your subagents improve over time".
 The Do/Don't pairs and the mechanisms are inferred from that one line and the session that prompted it;
 the delegation-skill half is tracked as [ai-config#3080](https://github.com/Morrison-Lab/ai-config/issues/3080) and the re-dispatch rule as [ai-config#3073](https://github.com/Morrison-Lab/ai-config/issues/3073).)
+
+(Measured 2026-09-05 on [Morrison-Lab/ai-config#3175](https://github.com/Morrison-Lab/ai-config/pull/3175): four consecutive review rounds each returned exactly one finding, and the last two were single-line label-consistency nits (`# M4` versus `# M4b` in a comment, then the same stale label in a mutation-table key).
+Each round cost a full CI cycle.
+The brief change described above --- one exhaustive pass, nothing held back, an explicit materiality bar including a request to name a dropped candidate --- produced a clean round on the very next dispatch, which named a nit it had considered and dropped rather than reporting nothing.)

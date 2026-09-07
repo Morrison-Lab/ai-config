@@ -141,3 +141,32 @@ since a guard's severity is the one property nothing about its subject matter im
 (Measured 2026-09-03: a `Stop` hook fired on a negated sentence declining to file an issue,
 reading it as the assertion it guards against.
 Recorded on [#2988](https://github.com/Morrison-Lab/ai-config/issues/2988).)
+
+## A quotation is not an escape either
+
+The parent section's example lives in documentation.
+The negation section's sentence lives in a live message, but still asserts the thing the detector matches --- the sentence's own meaning is what trips it.
+A quotation is a third case, and the one that feels safest of the three: the sentence's meaning does not assert the pattern at all, it reports that someone *else's* words contain it.
+
+A line-oriented detector cannot read that distinction, because "someone said X" and "X is true" contain the identical substring.
+Reporting what a review bot's verdict said, in a status recap, trips the same matcher a genuine claim would --- there is no quoting syntax a substring search recognises as attribution rather than assertion, unlike the fenced fallback a structure-aware checker gets for free.
+
+This differs from the parent section's remedy in the same way negation did: rendering fixes a *token*, and neither negation nor attribution is a property of the token.
+A quoted verdict phrase is exactly the string the detector is built to catch, spelled correctly, because spelling it correctly is the entire point of a quotation.
+Rewording it to dodge the matcher would misquote the source, which trades a false positive for an actual inaccuracy --- the wrong side of that trade.
+
+The remedy here is closer to the safe-direction case in `algorithmatize-checks.md`: don't quote the verdict's wording at all when reporting on an instrument the corpus already has one for.
+Report the instrument's own exit status and finding bullets instead of the bot's phrasing, per `CLAUDE.md`'s "Re-check for latest review findings before reporting PR status" --- a paraphrase carries the same information and contains none of the matched vocabulary, where a rewording of a *negated claim* would instead have had to state a false thing to dodge the match.
+
+- **Do:** report an instrument's exit status and bullets, not a reviewer's verdict wording, when a recap would otherwise quote the matched phrase.
+- **Do:** treat this as a `hooks/no-incomplete-check-enumeration.py`-shaped instance of the general trap: any detector built on the *matched string* rather than on *who is asserting it* cannot tell a quotation from a claim.
+- **Don't:** reword a genuine quotation to dodge a matcher --- unlike the negation case, the fix is to stop quoting, not to phrase the quotation differently.
+- **Don't:** assume a blocking guard here means the recap's factual content was wrong.
+  The guard cannot see that the phrase was attributed rather than asserted.
+
+(Measured 2026-09-05: `hooks/no-incomplete-check-enumeration.py` blocked a
+status recap that quoted a review bot's "Ready for merge" wording while the
+only check readings in the transcript were `statusCheckRollup`.
+The guard's `RX_DECLARE` regex matches the phrase wherever it appears in the
+message text, with no distinction between quoting and asserting it.
+Tracked in the same GIA sweep sidecar session as the negation case above.)

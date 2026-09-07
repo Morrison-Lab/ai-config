@@ -339,7 +339,10 @@ When a verification tool or change-time test
 reports "0 regressions" or "0 widened, 0 narrowed",
 confirm that the new code path or arm was actually **reached** during the run.
 
-Three distinct mechanisms produce a false zero from a sampling instrument:
+Four distinct mechanisms produce a false zero from a sampling instrument.
+The first three below concern an arm the run never reached; the fourth,
+covered after them, concerns a population the run had nothing left to
+examine.
 
 1. **Truncation before reaching the arm.**
    A generator that yields new cases after a truncation limit
@@ -373,6 +376,45 @@ skipped by strided sampling,
 and bypassed by prose verdict checks,
 hiding 1 accepted widening and 5 fail-closed narrowings.)
 
+**The fourth mechanism produces a zero that reads as the best possible
+result rather than as a null one: the narrowing meant to fix the false
+positive removes the population the sweep re-runs against.**
+
+A false-positive claim is re-checked by re-running the same sweep over the
+same corpus after tightening the guard, and reading a lower hit count as
+progress.
+When the tightening also narrows *which files are in scope* --- restricting
+a guard to a directory, a file extension, or a role a corpus barely
+contains --- the corpus supplying the sweep's population can shrink to
+nothing in the same edit that was meant to shrink only the false positives.
+The sweep then reports zero, and "0 false positives" reads identically
+whether the denominator is 40 or 0.
+
+- **Do:** report the population size (files or cases the sweep actually
+  examined) beside the hit count, every time a false-positive rate is
+  claimed --- "0/0" and "0/40" are different claims that look the same
+  without it.
+- **Do:** re-derive the trigger population from the corpus **after** a
+  scope-narrowing edit, rather than reusing a count taken before it; the
+  narrowing is exactly what can make the two differ.
+- **Don't:** cite a lower or zero hit count as evidence a narrowing worked
+  without confirming the sweep still had a population able to produce a hit.
+
+(Measured 2026-09-04 on [ai-config#3281](https://github.com/Morrison-Lab/ai-config/pull/3281),
+a hook proposed to flag a test reading its own package's source from disk.
+An earlier claim of "fires on zero" in this repo's own corpus was 0 out of 0:
+requiring a test directory left `ai-config` with no in-scope files, so any of
+several narrowings could have been reverted and the sweep would still have
+read zero.
+A 137-repo, 1695-file sweep run afterward, over corpora the hook's scope
+actually matched, is what the PR body cites instead, and it reports one true
+positive rather than a population-free zero.
+The hook itself never merged --- the PR was closed unmerged after four
+review rounds, on the grounds that `R CMD check` already catches the class
+deterministically, with the one true positive filed as its own issue
+upstream --- but the population-zero incident is a property of that
+review's own measurement, not of the hook's fate.)
+
 ### Mutate the fix, not only the test
 
 The rule above says a regression test must be seen to fail.
@@ -383,7 +425,7 @@ Reading the test is not a substitute.
 A vacuous test usually looks targeted,
 because it was written from the same mental model that produced the fix.
 
-Seven distinct mechanisms can make a test pass against the reverted fix:
+Nine distinct mechanisms can make a test pass against the reverted fix:
 
 - **Wrong entry point.**
   The test calls a helper directly,
@@ -397,6 +439,22 @@ Seven distinct mechanisms can make a test pass against the reverted fix:
 - **Boundary fixture.**
   The fixture sits on a line or span boundary
   where existing syntax rules already make the changed behaviour irrelevant.
+- **Coincident fixture.**
+  The fixture's own values coincide with the implementation's,
+  so the buggy path and the fixed path return the same answer on it.
+  This is the mapping-and-ordering case:
+  a lookup indexed by position
+  and the same lookup indexed by name
+  agree on every input whose order matches the table's,
+  and the two paths differ on no other axis at all.
+  It differs from **Boundary fixture** in that nothing about the input
+  looks like an edge case ---
+  it is an ordinary, representative value
+  that happens to be degenerate for the one distinction under test.
+  That is also why it survives a reading:
+  a fixture chosen while thinking about the fix
+  is the fixture likeliest to be in the implementation's own order,
+  so writing the vacuous version is the default rather than the slip.
 - **Wrong expectation.**
   The asserted behaviour contradicts the specification,
   so the test protects a bug rather than the fix.
@@ -410,12 +468,47 @@ Seven distinct mechanisms can make a test pass against the reverted fix:
   It is likeliest when the defect is input-shaped,
   since the payload has to be malformed to reach the bug,
   and malformed is what the layer above rejects it for.
+- **Mirrored misunderstanding.**
+  The expectation was never checked against an authority outside the diff ---
+  it was read off the implementation itself,
+  or off the same false belief that produced the implementation,
+  so the test and the code agree with each other and disagree with the tool.
+  It differs from **Wrong expectation** in where the wrongness comes from:
+  that entry's expectation contradicts the specification however it was arrived at,
+  while this one's expectation was never derived from the specification at all.
+  It differs from **Coincident fixture** too:
+  there the fixture's *values* happen to make two paths agree;
+  here the *belief* behind the assertion is shared with the belief behind the bug,
+  on any fixture.
+  That is what makes it survive an ordinary review pass:
+  reading the test against the code confirms agreement,
+  and agreement is what a check for "does the test match the intent" is looking for ---
+  the two lines are consistent with each other and both wrong.
+  It also defeats the mutation remedy this section is about to give,
+  which is why it needs calling out separately:
+  mutating the fix assumes a correct fix already exists to mutate away from,
+  and here the wrong behaviour IS the only behaviour in place when the test is written,
+  so there is nothing yet to revert.
+  The test was measured against a manual, not mutated, to be caught.
+  Reproduced on Morrison-Lab/ai-config#3175: a parser resolved `git push`'s
+  target remote by checking `--repo` before the positional argument, and its
+  test asserted `git push --repo upstream feat/estimand` targets `upstream`.
+  `man git-push` states the opposite under `--repo=<repository>`: "This
+  option is equivalent to the `<repository>` argument.
+  If both are specified, the command-line argument takes precedence."
+  Fixing the parser to match the manual broke the test, which is how the
+  shared inversion surfaced --- not a mutation run, since no correct
+  implementation existed yet for one to revert.
 
 Those are test bugs,
 not merely weak tests.
-A suite with all seven can still be green,
+A suite with all nine can still be green,
 and coverage can still report the lines as exercised.
-Only the mutation answers whether the assertion depends on the fix.
+The mutation remedy below answers whether the assertion depends on the fix
+for eight of the nine;
+**Mirrored misunderstanding** needs the fixture's expected value checked
+against a source outside the diff instead, since there is no correct fix yet
+to mutate away from.
 
 - **Do:** mutate the exact fix and watch the new test fail before trusting it.
 - **Do:** route the fixture through the real entry point
@@ -423,11 +516,71 @@ Only the mutation answers whether the assertion depends on the fix.
 - **Do:** make "the fixture arrived" an assertion in its own right ---
   a parse step's return value, a counter, a log line ---
   rather than a thing you satisfied yourself of once by reading the code.
+- **Do:** give a mapping or ordering bug a fixture whose order differs
+  from the implementation's,
+  since the two paths agree on every fixture that shares it.
 - **Don't:** accept a test because it mentions the helper that changed,
   or because a coverage report marks the line covered.
 - **Don't:** trust a test label as evidence of what the assertion checks.
 - **Don't:** read a green guard as one whose subject ran.
   A payload rejected upstream and a working fix are the same observable.
+- **Don't:** read a representative fixture as a discriminating one ---
+  representativeness is a claim about typical inputs,
+  and a guard needs an input the two candidate behaviours disagree on.
+- **Do:** for an expected value about a third-party tool's own behaviour,
+  derive it from that tool's documentation or a fresh measurement,
+  never from what the implementation under test already returns.
+- **Don't:** trust agreement between a test and its implementation as evidence either is right ---
+  when both were written from the same mental model,
+  agreement is exactly what a **Mirrored misunderstanding** produces.
+
+See [`fact-check-code-logic.cases.md`](fact-check-code-logic.cases.md),
+"Mutate the fix, not only the test --- a fixture ordered like the table".
+
+### A test that legitimately passes both ways still has to say so
+
+**Misleading label**, above, is a test whose name overstates what it checks.
+This is the case that survives even a careful author: a test whose assertion
+is exactly right, that genuinely and correctly passes against both the old
+code and the new, and whose comment says nothing about that --- so its
+placement, sitting next to a set of ordinary regression cases, implies a
+property the test does not have.
+
+A reader who assumes every case in a suite is a regression case (fails on the
+old code, passes on the new) will not re-derive which ones are not, and two
+different tests earn this label for two different reasons.
+One guards against an over-correction: a narrower fix that only handles the
+exact case a proof-of-concept exposed would pass this test, and a wrong fix
+that reverts too far would fail it, so it discriminates between "fixed
+correctly" and "fixed too narrowly" even though it cannot discriminate
+"fixed" from "never broken."
+The other is a genuine coincidence, the **Coincident fixture** mechanism
+above, where a specific fixture happens to make two code paths agree.
+Both are worth keeping.
+Neither is a regression test, and the fix for both is the same: state in the
+test's own comment which case it is, rather than letting silence imply the
+default.
+
+- **Do:** write, in the test's own comment, whether it is a regression case,
+  an over-correction guard, or a documented coincidence --- three different
+  claims, and a reader cannot tell which one a passing assertion is making.
+- **Do:** verify a claimed over-correction guard the way the mutation
+  section above verifies a regression test: describe the narrower, wrong fix
+  it is meant to catch, and confirm that fix actually fails it.
+- **Don't:** delete a test because it passes against both the old and the new
+  code --- that is evidence it needs a comment, not evidence it needs
+  removing; see the DELETION section below for what a green suite can and
+  cannot tell you about redundancy.
+- **Don't:** let a dual-passing test sit unlabeled next to regression cases in
+  the same block; a reader triaging a failing suite will read it as one.
+
+(Morrison-Lab/ai-config#3168, 2026-09-05: a proof-of-concept test for a
+guard's attribution bypass was paired with a second case built from the same
+inputs but a different result ordering.
+The second case passed against the pre-fix hook too --- there, an earlier
+result had already emptied the queue the second one reads, so it authorized
+nothing by accident rather than by the fix's design --- and its own comment
+says exactly that, rather than presenting it as a second regression case.)
 
 ### A misleading test label also licenses a DELETION, which is the direction with no mutation available
 
@@ -1073,6 +1226,55 @@ sentence stayed arguably true while omitting which mode was selected ---
 which is the preceding section's failure, not this one's.
 The test of membership is whether the artifact would still be right once the
 sentence were deleted.)
+
+## A false rationale can also be load-bearing, and then the code is wrong too
+
+The section above is the harmless case: the rationale is false, and the code
+stays correct once you delete the sentence.
+This is the other branch of the same failure, and it is the more dangerous
+one, because nothing about writing the rationale marks which branch you are
+on.
+
+Here the false claim is not decoration beside working code --- it is the
+**justification the code was built from**, so the code encodes the same
+error the sentence states.
+Deleting the sentence does not fix anything; the wrong behaviour is still
+there, now with no comment explaining why someone thought it was right.
+The test from the section above still separates the two: would the artifact
+stay correct with the sentence gone?
+Here the answer is no.
+
+The check is identical to the harmless case --- find the command that would
+show the claim false, and run it before the sentence and the code it
+justifies both ship --- but the stakes are higher, because review of the
+harmless case only costs a stale comment, while review of this case has to
+catch an actual defect that reads as deliberate and documented.
+
+- **Do:** ask, for every rationale a change depends on, whether the code
+  would still be correct if the rationale turned out false --- not only
+  whether the rationale itself is checkable.
+- **Do:** run the deriving command before the rationale becomes the reason a
+  branch, precedence order, or early return exists in the code.
+- **Don't:** treat a rationale that sounds like a general property of a
+  well-known tool (git, a stdlib function, a language's own scoping rules) as
+  needing less verification than an unfamiliar one --- familiarity is not
+  evidence.
+
+(Measured 2026-09-05, `hooks/flag-stale-branch-mutation.py`
+(ai-config#3205): a docstring justified treating `git checkout <name>` as
+ambiguous whenever a same-named local branch and tracked file both exist, on
+the claim that "git itself refuses without `--`" in that case.
+[`memories/git.md`](../../memories/git.md)'s "`git checkout <name>` prefers
+an existing local branch over a same-named file, and does not refuse"
+section has the measurement: git 2.50.1 does not refuse, and resolves to the
+branch.
+The rationale was not decoration --- the hook's disambiguation order was
+built to match it, so the false claim produced code that dropped a real
+branch selection from tracked state and false-positived on the very next
+ordinary commit, the same failure mode the heuristic existed to prevent.
+Caught and fixed before merge, so the shipped hook implements the correct
+precedence; the false rationale never reached `main`, but it did reach a
+draft of the code that acted on it.)
 
 ## A reported digit finer than its Monte Carlo error is a claim about precision
 

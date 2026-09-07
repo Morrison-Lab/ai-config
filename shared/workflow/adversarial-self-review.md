@@ -727,6 +727,14 @@ The gap is any other brief that asks something to act as an adversarial reviewer
 (ai-config#2444, 2026-08-27: filed on the lag diagnosis, which running `read_latest_review`/`parse_report` directly against the session transcript then refuted --- it returned the older `needs_work` verdict from a mid-session dispatch rather than a stale read of a same-turn one.
 The issue's body was rewritten afterwards to lead with the corrected diagnosis and keep the lag theory behind a marked `<details>` block, so read it as the corrected account rather than the filed one.)
 
+**A verdict line that is absent altogether falls into the same trap, not a different one.**
+Measured 2026-09-04: a dispatched reviewer returned a full report ending "No findings." plus a `review-data` JSON block reading `"verdict": "CLEAN"`, with no `### Verdict:` line anywhere in the report.
+`read_latest_review` found nothing to parse from this dispatch and kept the **previous** round's `needs_work`, so the guard refused the push reporting a blocking verdict over a review that had found nothing.
+The fix is the same one this section already gives: state the required line explicitly in the brief, as a literal `### Verdict: Ready for merge` outside any code fence or HTML comment, and require the `review-data` payload to agree with it --- the two representations disagreeing (a `### Verdict: Ready for merge` line paired with a `review-data` payload naming findings) is itself a defect in the report, per this file's "Structured review data" section below.
+
+- **Do:** treat a report with no verdict line at all as the identical failure to a heading-separated one --- both leave the guard holding a stale prior verdict.
+- **Don't:** assume a report that "sounds clean" (ends in "No findings.", carries a clean JSON payload) discharges the guard without the literal verdict line the parser requires.
+
 **A separate, real constraint: the guard tracks one global latest verdict, not one per branch.**
 `read_latest_review` scans the whole transcript and keeps overwriting a single `(verdict, reviewed_commit)` pair with whatever it parses next, with no branch scoping at all.
 Reviewing branch A (clean, commit `X`) and then branch B (clean, commit `Y`) leaves `Y` as the global "latest" pair;
@@ -908,6 +916,24 @@ It is adjacent to [#2483](https://github.com/Morrison-Lab/ai-config/issues/2483)
 
 - **Do:** mandate the payload-last tail in every review brief you write --- verdict, then fingerprint, then payload, and nothing after it.
 - **Do:** state the fingerprint as the **full 40-character** sha, which is what actually protects it.
+- **Do:** instruct the reviewer to **derive its own fingerprint** with `git
+  rev-parse HEAD` in its own worktree, and to confirm it resolves with `git
+  rev-parse --verify --quiet <sha>^{commit}` before writing the
+  `Reviewed-Commit:` line, rather than trusting the sha handed to it in the
+  brief.
+  This is a second, independent layer under the full-sha rule above, not a
+  restatement of it: it catches an abbreviated sha the brief-writer sent by
+  mistake (the reviewer's own `rev-parse` returns the correct full value
+  regardless of what it was told), and it catches a reviewer that would
+  otherwise transcribe an abbreviation's visible prefix and invent the rest
+  to reach 40 characters --- a fabrication a length check alone cannot see,
+  since the result is a well-formed 40-character hex string that simply does
+  not exist.
+  Every dispatch in one sweep briefed this way returned a correct
+  fingerprint (Morrison-Lab/ai-config#3295, 2026-09-05); one dispatch briefed
+  with an abbreviated sha and no derive instruction returned a fabricated
+  tail whose first 8 characters matched the abbreviation it had been given
+  and whose remaining 32 did not correspond to any real commit.
 - **Do:** read a "verdict is for commit X, but this push would ship Y" refusal as possibly a *misparsed* fingerprint rather than only a stale one --- print what the guard captured before concluding.
 - **Do:** fix the brief rather than keeping a sentinel you meet in the wild.
   It does protect an abbreviated fingerprint that is the report's last line, on every consumer that runs no trailing-content check on the shape it is handed --- `pre-push-review.py`'s persona contract, the pre-push guard's own `parse_report`, and [`scripts/cursor-self-review-check.py`](../../scripts/cursor-self-review-check.py), the Cursor Cloud recovery gate, which calls that same `parse_report` and then compares prefix-tolerantly.
@@ -921,6 +947,14 @@ It is adjacent to [#2483](https://github.com/Morrison-Lab/ai-config/issues/2483)
 - **Don't:** claim the suffix breaks a 40-character fingerprint;
   run `REVIEWED_COMMIT` over the line before asserting either way.
 - **Don't:** abbreviate the sha in a review brief's template, which is the input that turns the suffix into a silently wrong parse.
+- **Don't:** let a reviewer transcribe its `Reviewed-Commit:` from the sha
+  the brief handed it.
+  That is the anti-pattern paired with the derive-your-own-fingerprint
+  bullet above, and it is the half a reader skimming only the `Don't`
+  list would otherwise miss.
+  Transcription looks identical to derivation in the finished report ---
+  both produce a 40-character hex string in the right place --- so the
+  brief is the only place the difference can be established.
 - **Don't:** read the sentinel as part of the payload-last contract.
   It is a mitigation for the ordering that contract rules out, so a conforming report needs none.
 

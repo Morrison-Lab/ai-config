@@ -902,6 +902,52 @@ already be running.**
 - **Don't:** credit a suppression with protection it does not supply; measure
   whether it prevents the recurrence or only postpones one event of it.
 
+**Pricing an over-warn as cheap presumes the warning can be cleared, and the ranking above never says to check that.**
+"An over-warn is visible" is right for a guard whose discharge a session can actually take.
+A **fail-closed** guard that re-arms every turn and whose discharges the session must not take does not cost one visible event: it blocks, per turn, for as long as the condition holds.
+That is not a claim that an over-warn is worse than a silent discharge, which would need a measurement nobody has run;
+it is the narrower claim that "visible, therefore cheap" stops holding once the visible thing cannot be cleared.
+
+The case that produces it is specific and worth recognizing in advance: a standing directive forbids the action the guard demands.
+Nothing is broken then.
+The guard is correct, the session is correct, and if no other discharge exists the two are unsatisfiable together, so no amount of doing the right thing clears the demand.
+
+**An exemption set can be complete on paper and empty in practice, because each path carries a precondition the set does not state.**
+That is the failure mode, and it is why "this guard has three exemptions" does not answer the question.
+`hooks/no-unreviewed-pr.py` on 2026-09-03/04 demanded a Copilot review while a standing all-repos moratorium forbade one.
+Its three paths were derived from the source and each was then unavailable: the `no-ai-review` label the refusal message names did not exist in the repository, so an add would have errored and the path granted nothing;
+`ALLOW_UNREVIEWED_REDACTION_PR=1` asserts a redaction that was not true;
+and the draft deferral did not apply.
+The session was blocked for many turns while doing exactly what a standing directive required.
+That is what the pricing above misses: the paths were enumerable, printed, and documented, and the set they formed was still empty.
+
+Two things follow for the author of such a guard.
+Write each exemption's **precondition** where the set is written --- a label path is only a path in a repository that has the label --- since a printed exemption reads as an available one.
+And prefer a **suppression the guard reads itself**, so that a directive the session must obey does not require the session to improvise an override.
+That guard implements one: a dated moratorium constant, chosen over an environment flag because a flag has to be unset by whoever remembers and a date re-arms itself.
+
+Read it as unfinished rather than as a solved case.
+The general exemption --- "a standing directive forbids the demanded action", as a first-class condition rather than one named directive --- is **not** implemented anywhere;
+[#1709](https://github.com/Morrison-Lab/ai-config/issues/1709) carries it as a suggested fix, and was closed on the strength of the dated constant and reopened on 2026-09-04 (Pacific) when the shape recurred.
+The `no-ai-review` label was created shortly after that reopening, in response to it, so the repository now has the path the incident lacked;
+read every sentence above about that label as describing 2026-09-03/04 rather than the state a reader checking today will find.
+[#3141](https://github.com/Morrison-Lab/ai-config/issues/3141) is the dated constant not suppressing: this repository's copy of the constant read `2026-12-01` and the guard demanded the forbidden request anyway.
+The copy captured firing on 2026-09-04 carried an earlier date;
+whether that same copy served the 2026-09-03 demands is **not established**, so read the stale snapshot as a mechanism measured for one firing rather than as the incident's cause.
+An in-script suppression therefore removes the improvised-override problem and inherits the stale-payload one, where a dated constant fails **open** --- see [`keep-checkouts-fresh`](../workflow/keep-checkouts-fresh.md) for the measurement and for the resolution order that finds the copy actually running.
+The "credit a suppression with protection it does not supply" bullet at the end of the list above applies to this remedy as much as to anything it governs.
+
+- **Do:** check each exemption path's precondition, not only that the path exists in the source --- a named label, file, or flag has to be present in the repository the guard is running against.
+- **Do:** ask whether the surviving paths are ones a session obeying every standing rule could take, before pricing a fail-closed over-warn as cheap.
+- **Do:** give a guard whose demand a standing directive can forbid a suppression it reads itself, rather than relying on an override the session supplies.
+- **Don't:** count an enumerated exemption set as a non-empty one;
+  three documented paths that each fail their own precondition leave a guard with no correct action.
+- **Don't:** count a fail-closed over-warn as one visible event when the guard re-arms every turn;
+  it blocks per turn until something clears it.
+- **Don't:** read "the safe direction" as meaning a fail-closed guard is free in the case where the safe action is unreachable.
+
+(Tracked as ai-config[#3271](https://github.com/Morrison-Lab/ai-config/issues/3271).)
+
 ### A combined result cannot attribute a per-step outcome
 
 The commonest way a discharge fires on false evidence: the guard reads a
@@ -917,6 +963,61 @@ attributes success to the specific step it cares about.
   status.
 - **Don't:** trade a safe-direction over-warn for fewer nags --- that is the
   move that grows a silent-discharge hole.
+
+### An identity match with no id must poison rather than guess
+
+The section above governs a **blob** covering more than one action.
+This is the neighbouring shape: several actions each produce their own
+result, but nothing in the record says which result answers which action, so
+the guard has to guess, and guessing by order is a guess that a permission
+grant cannot afford.
+
+`hooks/no-push-without-self-review.py` reads oh-my-openagent's transcript
+format to find a reviewer's verdict.
+OMO's records carry no call id, only a tool name, so the hook paired a
+`tool_result` to the `tool_use` that dispatched it by **order alone**,
+popping a per-name queue first-in-first-out.
+Nothing in the record guarantees results return in dispatch order.
+With two `task` dispatches outstanding --- the real `adversarial-reviewer`
+and any other subagent also named `task` --- the second one's output was
+attributed to the first one's id.
+Adversarial review demonstrated a working bypass before the branch had ever
+been pushed: dispatch the reviewer, dispatch an unrelated `task`, let only
+the second return carrying verdict-shaped text naming the pushed commit, and
+the FIFO pop authorized the push with no review having completed.
+Nobody has to be attacking for this to fire --- any subagent output that
+happens to render an example of the guard's own report format reaches the
+same state, and this hook's own source and test file each already contain
+such strings.
+
+The fix generalizes past this one hook: **a tool name whose queue is ever
+ambiguous is poisoned for the rest of the transcript.**
+The moment a second use of that name is outstanding at once, its pending
+uses are dropped and no later result of that name is allowed to authorize
+anything, even one arriving on its own once the ambiguity has cleared.
+The asymmetry is what decides it, not how often the ambiguous case actually
+arises: a false refusal costs one more review round, and a false grant costs
+an unreviewed push.
+
+- **Do:** treat "which action does this result answer" as a question a
+  **granting** mechanism must be able to answer positively, never infer by
+  order, arrival sequence, or any other proxy for an identity the record does
+  not carry.
+- **Do:** poison the whole class of ambiguous identity once observed, rather
+  than clearing the ambiguity after the next result and resuming normal
+  attribution --- a narrower fix that clears after one result passes the
+  two-outstanding case and still fails the case where the first result was
+  already misattributed before the ambiguity was noticed.
+- **Don't:** price the false-refusal cost as prohibitive before pricing the
+  false-grant cost next to it --- a **reporting** mechanism can average the two
+  errors, and an **authorizing** one cannot, because only one of them is
+  reversible.
+- **Don't:** assume an input format lacking call ids is rare enough to ignore;
+  a transcript format designed for logging rather than for adjudicating
+  permission is exactly where this arises, and any adapter reading a new
+  format inherits the same question.
+
+(Morrison-Lab/ai-config#3168, 2026-09-05.)
 
 ### The FIRE condition is the mirror, and it wants corroboration rather than an absence
 

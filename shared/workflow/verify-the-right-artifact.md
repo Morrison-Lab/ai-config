@@ -43,6 +43,16 @@ and about **mechanism**
 (whether a cache is ever read),
 in exactly the same shape.
 
+**The boundary in the other direction is worth naming, because this fragment is where a reader lands first and the rule they need may be elsewhere.**
+Every shape here begins with a substitution: you read A and the claim is about B.
+The neighbouring failure has no substitution in it at all --- the artifact is the right one, it is read correctly, and the sentence after the reading answers a question that artifact does not address.
+Nothing in this fragment fires on that, because there is no wrong object to name.
+[`metacognitive-monitoring`](metacognitive-monitoring.md)'s "A sound measurement does not license the claim standing next to it" is the rule for it.
+So when a check of yours came back clean and the claim still feels under-supported, ask which of the two is happening: whether you read the wrong thing, or read the right thing and then took a step.
+
+- **Do:** send a claim to that section instead of this one when the artifact is the correct one and the doubt is about the step taken from it.
+- **Don't:** read a shape here failing to match as evidence the claim is supported --- these shapes cover substitutions only.
+
 ## The four shapes
 
 Recognizable in advance, which is the point of enumerating them:
@@ -1052,8 +1062,16 @@ rather than assuming it carries the fields the matcher wants.
 
 - **Do:** name the producer of a mechanism's input, and read what that producer actually emits, before saying the mechanism works.
 - **Do:** treat "the clearing branch exists" as an answer about the source and an open question about the run.
+- **Do:** answer a guard's refusal from the guard --- read the property its message names,
+  then its discharge condition in source --- before checking any state outside it.
 - **Don't:** close an incident on the strength of having found the code that should have prevented it.
 - **Don't:** read a matcher's field list as evidence those fields ever arrive --- a matcher is a claim about its input, not a supply of one.
+- **Don't:** answer a guard's refusal by querying the forge.
+  The refusal is a claim about the record the guard reads, not about the world it left you free to query;
+  and a forge query nearly always returns something, so the wrong move feels like progress
+  (2026-09-05: two responses spent on the forge ---
+  the first confirming a review existed, the second that the PR had merged ---
+  before anyone read the condition the guard actually consults).
 
 (Measured 2026-09-03, and the record is the rule applied to itself three times.
 A `Stop` hook demanded a per-HEAD reviewer request on an already-merged pull request.

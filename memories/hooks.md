@@ -244,11 +244,9 @@ When authoring a new hook:
 
 ## 6. A guard that keeps firing after you satisfied it: stop, and read the copy that runs
 
-[`keep-checkouts-fresh`](../shared/workflow/keep-checkouts-fresh.md) already
-carries this defect in full --- the fail-open direction of a dated constant,
-why the newest cache directory is not a valid proxy for the loaded copy, and
-the `ps -eo args` capture that resolved it. Read that section for the
-mechanism; this one adds only what a second occurrence measured.
+[`keep-checkouts-fresh`](../shared/workflow/keep-checkouts-fresh.md) already carries this defect in full --- the fail-open direction of a dated constant, why the newest cache directory is not a valid proxy for the loaded copy, and the `ps -eo args` capture that resolved it.
+Read that section for the mechanism;
+this one adds only what a second occurrence measured.
 
 Confirmed again 2026-09-07, and it is the same artifact that fragment names:
 
@@ -257,9 +255,8 @@ Confirmed again 2026-09-07, and it is the same artifact that fragment names:
     MORATORIUM_END = 2026-09-01   mtime Sep  1 22:42
 ```
 
-one such file across the tree, while the repo, the marketplace clone and
-`~/.claude/hooks` all carry `2026-12-01`. Derive the cache split rather than
-citing a remembered number, since the classes are three and not two:
+one such file across the tree, while the repo, the marketplace clone and `~/.claude/hooks` all carry `2026-12-01`.
+Derive the cache split rather than citing a remembered number, since the classes are three and not two:
 
 ```bash
 cd ~/.claude/plugins/cache/<marketplace>/<plugin>
@@ -269,42 +266,22 @@ for f in */hooks/no-unreviewed-pr.py; do
 done | sort | uniq -c
 ```
 
-Here that gave 3 new, 5 old and 1 carrying no `MORATORIUM_END` at all --- and
-a first pass that branched on the new date alone scored the constant-less
-copy as old, reporting 6. Several directories sharing a value is exactly why
-that fragment rules the newest-directory proxy out.
+Here that gave 3 new, 5 old and 1 carrying no `MORATORIUM_END` at all --- and a first pass that branched on the new date alone scored the constant-less copy as old, reporting 6.
+Several directories sharing a value is exactly why that fragment rules the newest-directory proxy out.
 
 **The increment: the demanded action was not free, and not idempotent.**
-`no-unreviewed-pr.py` fired four times, each firing naming one to three PRs,
-and each was satisfied with the prescribed command and verified landing at
-the current head. Four firings is therefore ten REQUESTS, not four: the
-guard names every PR still outstanding on each firing, so the cost per
-firing grows with the number of PRs open. The ten resolve as 4 requests on
-one PR and 3 on each of two others, matching the review counts observed
-(4, 3 and 3). Ten requests later the
-account-level Copilot quota was exhausted and every resulting review read
-`Copilot was unable to review this pull request because the user ... has
-reached their quota limit` --- a skip notice, which
-[`mwc`](../skills/mwc/SKILL.md)'s Scope Limit says clears nothing. So all ten
-spent a shared quota and moved no PR toward merge.
+`no-unreviewed-pr.py` fired four times, each firing naming one to three PRs, and each was satisfied with the prescribed command and verified landing at the current head.
+Four firings is therefore ten REQUESTS, not four: the guard names every PR still outstanding on each firing, so the cost per firing grows with the number of PRs open.
+The ten resolve as 4 requests on one PR and 3 on each of two others, matching the review counts observed (4, 3 and 3).
+Ten requests later the account-level Copilot quota was exhausted and every resulting review read `Copilot was unable to review this pull request because the user ... has reached their quota limit` --- a skip notice, which [`mwc`](../skills/mwc/SKILL.md)'s Scope Limit says clears nothing.
+So all ten spent a shared quota and moved no PR toward merge.
 
-That is what makes repeating a demand costly rather than merely tedious, and
-it is the reason to break the loop at the first satisfied-and-verified
-attempt rather than the fourth.
+That is what makes repeating a demand costly rather than merely tedious, and it is the reason to break the loop at the first satisfied-and-verified attempt rather than the fourth.
 
-- **Do:** after satisfying a guard's demand ONCE and verifying the result,
-  read a repeated demand as evidence about the guard, not about your
-  compliance.
-- **Do:** resolve the loaded copy by the method
-  [`keep-checkouts-fresh`](../shared/workflow/keep-checkouts-fresh.md)
-  prescribes before concluding anything about which file is stale.
-- **Don't:** repeat a demanded action that spends a quota, a rate limit, or
-  any outward-facing side effect, merely because the guard asked again.
-- **Don't:** infer the running hook's logic from the repo checkout,
-  `~/.claude/hooks`, or the newest cache directory --- on a plugin install
-  none of the three is necessarily what executes.
+- **Do:** after satisfying a guard's demand ONCE and verifying the result, read a repeated demand as evidence about the guard, not about your compliance.
+- **Do:** resolve the loaded copy by the method [`keep-checkouts-fresh`](../shared/workflow/keep-checkouts-fresh.md) prescribes before concluding anything about which file is stale.
+- **Don't:** repeat a demanded action that spends a quota, a rate limit, or any outward-facing side effect, merely because the guard asked again.
+- **Don't:** infer the running hook's logic from the repo checkout, `~/.claude/hooks`, or the newest cache directory --- on a plugin install none of the three is necessarily what executes.
 
-(Tracked as [#3141](https://github.com/Morrison-Lab/ai-config/issues/3141),
-the original defect report; [#3156](https://github.com/Morrison-Lab/ai-config/issues/3156)
-is its corpus record and [#3185](https://github.com/Morrison-Lab/ai-config/issues/3185)
-a later recurrence.)
+(Tracked as [#3141](https://github.com/Morrison-Lab/ai-config/issues/3141), the original defect report;
+[#3156](https://github.com/Morrison-Lab/ai-config/issues/3156) is its corpus record and [#3185](https://github.com/Morrison-Lab/ai-config/issues/3185) a later recurrence.)

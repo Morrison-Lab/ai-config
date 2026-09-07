@@ -93,7 +93,8 @@ OTHER_HEAD = _git(OTHER, "rev-parse", "HEAD")
 
 
 def run_hook(cmd: str, transcript_events: list | None = None,
-             extra_env: dict | None = None) -> tuple[int, dict]:
+             extra_env: dict | None = None,
+             payload_extra: dict | None = None) -> tuple[int, dict]:
     tpath = None
     if transcript_events is not None:
         tf = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False)
@@ -104,6 +105,8 @@ def run_hook(cmd: str, transcript_events: list | None = None,
     try:
         payload = {"tool_name": "Bash", "tool_input": {"command": cmd},
                    "transcript_path": tpath or ""}
+        if payload_extra:
+            payload.update(payload_extra)
         res = subprocess.run([sys.executable, HOOK], input=json.dumps(payload),
                              capture_output=True, text=True, cwd=REPO,
                              env={**os.environ, **(extra_env or {})})
@@ -1716,6 +1719,178 @@ def fingerprint_guidance_cases() -> tuple[int, int]:
     return failures, ran
 
 
+def omo_cases() -> tuple[int, int]:
+    """oh-my-openagent's flat OpenCode transcript records (ai-config#2875).
+
+    OMO's bridge appends `{"type":"tool_use","tool_name":...,"tool_input":...}`
+    and `{"type":"tool_result","tool_name":...,"tool_output":...}` with no
+    message nesting and no call IDs (measured 4.19.4), and its PreToolUse
+    hook context never sets transcript_path -- so the fallback resolved from
+    the payload's session_id is the only transcript the guard can read there.
+    The pairing pin is positional: a result answers its name's nearest
+    outstanding use.
+    """
+    failures = 0
+    ran = 0
+
+    def check(label, ok):
+        nonlocal failures, ran
+        ran += 1
+        print(f"{'PASS' if ok else 'FAIL'}: {label}")
+        failures += not ok
+
+    def omo_use(name, inp):
+        return {"type": "tool_use", "timestamp": "2026-09-03T00:00:00Z",
+                "tool_name": name, "tool_input": inp}
+
+    def omo_result(name, output):
+        return {"type": "tool_result", "timestamp": "2026-09-03T00:00:01Z",
+                "tool_name": name, "tool_input": {}, "tool_output": output}
+
+    def omo_reviewed(commit=None, agent="adversarial-reviewer", prompt="Review the diff"):
+        return [
+            omo_use("task", {"subagentType": agent, "description": "review",
+                             "prompt": prompt}),
+            omo_result("task", body(commit=commit)),
+        ]
+
+    # 1. OMO-shaped clean review allows the push it names.
+    rc, out = run_hook(PUSH, omo_reviewed(HEAD))
+    blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+    check("OMO flat reviewer records allow the reviewed push", rc == 0 and not blocked)
+
+    # 2. An OMO clean verdict for an earlier commit still blocks -- the same
+    #    subject rule the native path enforces.
+    rc, out = run_hook(PUSH, omo_reviewed(PREV))
+    blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+    check("OMO verdict naming an earlier commit does not authorize push",
+          rc == 0 and blocked)
+
+    # 2b. THE ATTRIBUTION HOLE. OMO records carry no call ids, so a result is
+    #     linked to a use by ORDER alone. With two `task` dispatches
+    #     outstanding, a FIFO pop attributes the SECOND one's output to the
+    #     FIRST one's id -- and if the first was the reviewer, unrelated text
+    #     carrying a verdict shape authorizes the push. Found by adversarial
+    #     review with a working proof of concept against this branch, before
+    #     it had ever been pushed.
+    #
+    #     The reviewer here never returns. The only result belongs to a
+    #     documentation dispatch whose output happens to contain verdict-shaped
+    #     text -- which anything documenting this guard's report contract will,
+    #     so nobody has to be attacking for this to fire.
+    rc, out = run_hook(PUSH, [
+        omo_use("task", {"subagentType": "adversarial-reviewer",
+                         "description": "review", "prompt": "Review the diff"}),
+        omo_use("task", {"subagentType": "general-purpose",
+                         "description": "docs", "prompt": "Write doc examples"}),
+        omo_result("task", "Example refusal text for the docs:\n" + body(commit=HEAD)),
+    ])
+    blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+    check("a second same-named dispatch's output cannot authorize the reviewer's call",
+          rc == 0 and blocked)
+
+    # 2c. The poison is durable: once a name has been ambiguous, a LATER
+    #     result of that name cannot authorize either, even though only one
+    #     use is outstanding by then.
+    #
+    #     Unlike 2b, this case passes against the PRE-FIX hook too, and it is
+    #     recorded that way rather than presented as a regression: there the
+    #     first result already popped the reviewer's id, so the second finds an
+    #     empty queue and authorizes nothing by accident. It guards the FIX
+    #     against over-correction -- a narrower version that cleared the
+    #     ambiguity flag after one result would pass 2b and fail here.
+    rc, out = run_hook(PUSH, [
+        omo_use("task", {"subagentType": "adversarial-reviewer",
+                         "description": "review", "prompt": "Review the diff"}),
+        omo_use("task", {"subagentType": "general-purpose",
+                         "description": "docs", "prompt": "Write doc examples"}),
+        omo_result("task", "unrelated output"),
+        omo_result("task", body(commit=HEAD)),
+    ])
+    blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+    check("an ambiguous tool name stays unauthorizable for the rest of the transcript",
+          rc == 0 and blocked)
+
+    # 2d. The `is_error` exclusion is INERT on this path, and this pins that
+    #     rather than leaving a reader to assume it guards. OMO emits no error
+    #     flag (docs/opencode-hook-mapping.md lists `is_error` among what its
+    #     shape omits), so a record carrying one is not something OMO can
+    #     produce -- and the guard authorizes on the report's content either
+    #     way. Raised in review as a non-blocking caveat; recorded as a test so
+    #     the caveat cannot quietly stop being true.
+    rc, out = run_hook(PUSH, [
+        omo_use("task", {"subagentType": "adversarial-reviewer",
+                         "description": "review", "prompt": "Review the diff"}),
+        dict(omo_result("task", body(commit=HEAD)), is_error=True),
+    ])
+    blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+    check("an is_error flag OMO cannot emit still blocks, so the clause is not dead code",
+          rc == 0 and blocked)
+
+    # 2e. The consequence stated plainly: with no error signal available, an
+    #     errored dispatch whose output carries a COMPLETE, correctly
+    #     fingerprinted report authorizes. That is weaker than the native
+    #     path's tested exclusion and is the documented cost of OMO's shape.
+    rc, out = run_hook(PUSH, [
+        omo_use("task", {"subagentType": "adversarial-reviewer",
+                         "description": "review", "prompt": "Review the diff"}),
+        omo_result("task", "dispatch failed partway\n" + body(commit=HEAD)),
+    ])
+    blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+    check("a complete report inside failed-dispatch output still authorizes (known OMO gap)",
+          rc == 0 and not blocked)
+
+    # 3. No reviewer dispatch anywhere in the OMO transcript blocks.
+    rc, out = run_hook(PUSH, [omo_use("bash", {"command": "echo hi"}),
+                              omo_result("bash", "hi")])
+    blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+    check("OMO transcript with no reviewer dispatch blocks push", rc == 0 and blocked)
+
+    # 4. A result with no outstanding use pairs with nothing, so a verdict in
+    #    an orphan OMO tool_result is not consulted.
+    rc, out = run_hook(PUSH, [omo_result("task", body())])
+    blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+    check("unpaired OMO tool_result cannot authorize push", rc == 0 and blocked)
+
+    # 5. The fallback persona reaches the OMO path through the same dispatch
+    #    predicate: subagentType general-purpose + an adversarial-review prompt.
+    rc, out = run_hook(PUSH, omo_reviewed(
+        agent="general-purpose",
+        prompt="Perform an adversarial review of the committed diff and report Findings and a Verdict."))
+    blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+    check("OMO fallback persona with adversarial prompt allows push",
+          rc == 0 and not blocked)
+
+    # 6. The transcript resolved from session_id: OMO's PreToolUse payload
+    #    carries no transcript_path at all, and the session file lives under
+    #    CLAUDE_CONFIG_DIR/transcripts.
+    d = tempfile.mkdtemp(prefix="npwsr-omo-")
+    try:
+        sid = "ses_testfallback"
+        tdir = os.path.join(d, "transcripts")
+        os.makedirs(tdir)
+        with open(os.path.join(tdir, f"{sid}.jsonl"), "w") as f:
+            for ev in omo_reviewed(HEAD):
+                f.write(json.dumps(ev) + "\n")
+        rc, out = run_hook(
+            PUSH, [], payload_extra={"session_id": sid, "transcript_path": ""},
+            extra_env={"CLAUDE_CONFIG_DIR": d})
+        blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+        check("session_id fallback finds the OMO transcript", rc == 0 and not blocked)
+
+        # 7. A session_id that is not a bare filename component resolves to no
+        #    transcript rather than to a traversal.
+        rc, out = run_hook(
+            PUSH, [], payload_extra={"session_id": "../escape", "transcript_path": ""},
+            extra_env={"CLAUDE_CONFIG_DIR": d})
+        blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+        check("path-traversal session_id resolves to no transcript",
+              rc == 0 and blocked)
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+    return failures, ran
+
 def main():
     failed = 0
     extra = 0
@@ -1747,7 +1922,7 @@ def main():
                    fixture_branch_cases, windows_path_cases,
                    structured_payload_cases, transcript_scoping_cases,
                    cd_tracking_cases, fallback_cases,
-                   fingerprint_guidance_cases):
+                   fingerprint_guidance_cases, omo_cases):
             f, r = fn()
             failed += f
             extra += r

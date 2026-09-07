@@ -436,6 +436,31 @@ def main():
               f"(rc={out.returncode}, stdout={out.stdout!r})")
         failures += 1
 
+    # NINTH-round adversarial-review finding: a top-level JSON document
+    # that is syntactically VALID but not an object (a bare list, string,
+    # number, bool, or null) parses fine and then crashed the very next
+    # line (`payload.get(...)`) with an uncaught AttributeError. Every one
+    # of these must exit 0 with no traceback and no warning.
+    for label, raw in [
+        ("a bare JSON list", "[]"),
+        ("a bare JSON string", '"hello"'),
+        ("a bare JSON number", "42"),
+        ("a bare JSON boolean", "true"),
+        ("a bare JSON null", "null"),
+    ]:
+        out = subprocess.run(
+            [sys.executable, HOOK], input=raw,
+            capture_output=True, text=True,
+            env=dict(os.environ, TMPDIR=tempfile.mkdtemp()),
+        )
+        if out.returncode == 0 and "Traceback" not in out.stderr:
+            print(f"PASS: {label} on stdin exits cleanly, no traceback")
+            passes += 1
+        else:
+            print(f"FAIL: {label} on stdin crashed "
+                  f"(rc={out.returncode}, stderr={out.stderr!r})")
+            failures += 1
+
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 

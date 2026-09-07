@@ -444,6 +444,15 @@ def main() -> int:
     except Exception:
         return 0
 
+    # `json.load` succeeds on any valid JSON document, not just an object --
+    # a bare list, string, number, bool, or null on stdin parses fine and
+    # then crashes the very next line with an uncaught AttributeError
+    # (ninth-round adversarial review finding). A malformed *hook payload*
+    # is exactly the kind of input this guard must fail open on, same as a
+    # parse error above.
+    if not isinstance(payload, dict):
+        return 0
+
     path = payload.get("transcript_path") or payload.get("transcriptPath") or ""
     if not path or not os.path.isfile(path):
         return 0

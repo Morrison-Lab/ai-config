@@ -411,8 +411,8 @@ first; a known environmental failure signature, here the literal string
 `no suitable unused file name for pdf()`, recognized and excluded from
 scoring rather than counted as a caught mutation; and a cleanup step that
 clears the accumulating artifacts before or between batches, rather than
-relying on `.gitignore` to keep them out of
-review while they still break every run they never appear in.)
+relying on `.gitignore` to keep them out of review while they still break
+every run they never appear in.)
 
 ## There is a fourth outcome: a mutation that applies cleanly and is unfaithful
 

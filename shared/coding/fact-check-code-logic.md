@@ -279,8 +279,8 @@ the output.
 
 The general form: any check that greps an interpreter's own stdout for
 literal text also present in the invocation itself is vacuous, and the fix
-is structural rather than textual, the same shift this section's DRY-loop
-hazard above makes.
+is structural rather than textual, the same shift this section's "DRY form"
+passage above makes.
 Put verdict logic in a script file the interpreter loads and runs, so nothing
 echoes it, or have the interpreter write its verdict to a stream or file the
 invocation itself never touches, and grep that instead.

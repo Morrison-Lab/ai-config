@@ -465,7 +465,7 @@ What breaks is the assertion's shape, not the fixture's content.
 mapped things, when both land in the same observable bucket.**
 Measured on `ucdavis/hac.sap#43`, 2026-09-06: two `flextable::highlight`
 calls, one with `j = "Name"` and one with `j = "Team"`, could be swapped
-together undetected, because the test fixture placed both column's
+together undetected, because the test fixture placed both columns'
 placeholder text in the same row.
 Highlighting the wrong column for `"Name"` and the wrong column for `"Team"`
 at once left the **set** of highlighted text exactly as it was, only
@@ -507,9 +507,9 @@ claim is blind to a bug that only violates the second.
 - **Don't:** treat `expect_setequal` (or any set/multiset comparison) as
   proof against a swap between two mapped things; it is blind to any
   permutation of a set that stays a set.
-- **Don't:** treat `expect_match`/`assertthat::has_text`-style presence
-  checks as proof of correct placement; presence and position are different
-  questions, and a swap changes only the second.
+- **Don't:** treat `expect_match`-style presence checks as proof of correct
+  placement; presence and position are different questions, and a swap
+  changes only the second.
 
 ## A regression fixture must contain something the bug would destroy
 

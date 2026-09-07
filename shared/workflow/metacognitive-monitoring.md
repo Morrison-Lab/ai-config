@@ -360,10 +360,13 @@ supporting evidence that the failure mode arises with nobody attacking.
 It did not: at the revision the comment was written against (commit
 `30c32d5e6`, the only one that existed at the time), `grep -ic
 "verdict\|reviewed-commit"` on that file returned 0.
-(A later commit on the same still-open PR, `d7c92f9dd`, added a line
-matching that pattern --- itself a reminder that a state claim about a live
-branch is accurate for the revision measured and no later one, per
-[`timestamp-volatile-claims`](../writing/timestamp-volatile-claims.md).)
+(A later commit on the same PR, `d7c92f9dd`, added a line matching that
+pattern --- itself a reminder that a state claim about a live branch is
+accurate for the revision measured and no later one, per
+[`timestamp-volatile-claims`](../writing/timestamp-volatile-claims.md).
+That PR was open while this was written and merged as `0eec98658` before it
+shipped, which is the same decay one level up: the sentence making this point
+described its own subject's status, and that half went stale first.)
 The argument itself was sound and needed no such example --- any subagent
 output rendering an example of the guard's own report format reaches the same
 state --- so the fabricated citation was not load-bearing, only decorative,

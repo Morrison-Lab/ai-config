@@ -315,8 +315,11 @@ Merge-tree answers "will this apply", never "is this new".
 - **Don't:** read a non-empty `<base>..<branch>` range as unmerged work in a squash-merging repo --- it says nothing there, however fresh the base.
 - **Don't:** read a non-empty two-dot `git diff <base> <branch>` as unmerged work either.
   The base advancing past the fork point makes that diff non-empty on its own, whether or not the branch's own content ever landed --- which is the same reason the commit range cannot say it.
-  Scoping the diff to the branch's own files does not fix this --- a sibling PR that touched the same file after the fork reproduces the same confusion.
+  Scoping the diff to the branch's own files does not fix the **non-empty** case --- a sibling PR that touched the same file after the fork reproduces the same confusion.
   Use a one-directional `git diff <base>...<branch>` (three-dot, merge base on the left) to isolate the branch's own additions, then confirm those specific lines are present in the base with `git show <base>:<path> | grep -c '<distinctive phrase>'`.
+- **Do:** treat an **empty** path-scoped two-dot diff as conclusive on its own, without needing the three-dot form.
+  If every file the branch touched is byte-identical to the base, nothing on the branch is missing from it, whoever wrote the matching content.
+  The scoping caveat above is about the non-empty result staying ambiguous, not about the empty one being unreliable.
 - **Don't:** offer a clean or a conflicting `merge-tree` as evidence either way about novelty.
 
 (Measured 2026-08-22 on `Morrison-Lab/ai-config`.
@@ -331,3 +334,9 @@ Tracked as [ai-config#1999](https://github.com/Morrison-Lab/ai-config/issues/199
 Measured 2026-09-02, minutes after a later, unrelated PR ([#3016](https://github.com/Morrison-Lab/ai-config/pull/3016)) merged into `origin/main`: `git diff origin/main ums-quarto-format-scope` ran to 2839 lines across 30 files, not empty, purely because `origin/main` had moved on.
 The one-directional `git diff origin/main...ums-quarto-format-scope` isolated the branch's own additions to 120 lines in two files, and `git show origin/main:memories/quarto-sites.md | grep -c "reaches every document that declares no"` returned 1, confirming the added section was already there verbatim.
 A reader trusting the two-dot diff alone would have read this fully-merged branch as unestablished.
+
+**Third occurrence, 2026-09-07, on `ucdavis/hac.sap#43` --- and this one is the positive case, where the path-scoped diff was empty and correctly settled the question.**
+`fix/26-27-format-sap-table` squash-merged, so `git branch -d` refused as expected.
+The unrestricted `git diff origin/main fix/26-27-format-sap-table` ran to 942 lines across 7 files, again purely from `main`'s own unrelated commits since the PR was cut.
+Restricting the diff to the PR's own 9 changed paths (`gh pr view 43 --json files --jq '.files[].path'`) returned 0 lines, and the branch was deleted.
+This is the case the **Do** bullet above adds: an empty path-scoped result needs no three-dot fallback, since it is already conclusive.

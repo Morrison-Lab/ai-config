@@ -83,8 +83,9 @@ That is what keeps countermanding cheap.
     Neither `git merge-base --is-ancestor` nor a commit-range count establishes that in a squash-merging repo --- the branch's own commits are never ancestors of the squash commit, so both report merged work as unmerged.
     A two-dot `git diff <default> <branch>` is not the fix either.
     A non-empty result conflates two opposite situations: the branch carrying content the default branch lacks, which is unsafe to delete, and the default branch having simply advanced past the branch, which is irrelevant to deletion.
-    Restricting the diff to the branch's own files does not resolve it, since a sibling PR that touched the same file reproduces the same confusion.
-    [`pr-on-claim`](../../shared/workflow/pr-on-claim.md)'s "One reading it does not cover" section carries the measured case: a fully-merged branch whose two-dot diff ran to thousands of lines purely because the default branch had since taken later, unrelated merges.
+    Restricting the diff to the branch's own files does not resolve the non-empty case, since a sibling PR that touched the same file reproduces the same confusion.
+    An **empty** scoped result is still conclusive, though: if every file the branch touched matches the default branch byte-for-byte, nothing on the branch is missing from it, whoever wrote the matching content.
+    [`pr-on-claim`](../../shared/workflow/pr-on-claim.md)'s "One reading it does not cover" section carries two measured cases: a fully-merged branch whose two-dot diff ran to thousands of lines purely because the default branch had since taken later, unrelated merges, and a second occurrence where the path-scoped diff came back empty and correctly confirmed the merge.
     Settle it by asking whether the branch's own additions are present on the default branch, rather than whether the two trees differ.
     Grep the merged content --- `git show origin/<default>:<path> | grep -c '<distinctive phrase the branch added>'` --- or diff in one direction only, `git diff origin/<default>...<branch>`, three-dot so the merge base sits on the left, and confirm none of its `+` lines are missing from the default branch.
     - **Do:** confirm the branch's own additions are present on the default branch, via a grep of the merged content or a one-directional three-dot diff, before deleting.

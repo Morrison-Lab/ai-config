@@ -379,40 +379,44 @@ comment's suggested fix, and
 [`challenge-the-assignment`](challenge-the-assignment.md)'s "an issue body
 is an assignment you author, and its proposed fix is a second claim" makes
 for the issue-authoring side of it.
-What is new here is the domain: neither a regex read nor an internal-
-consistency check catches a remedy that fails only once the language's own
-vectorisation semantics meet it, because the proposed line is syntactically
-fine and passes wherever the reporter tried it.
+What is new here is the domain: neither a regex read nor a check for
+internal consistency catches a remedy that fails only once the language's
+own vectorisation semantics meet it, because the proposed line is
+syntactically fine and passes wherever the reporter tried it.
 
 `hl()` aborted the whole render on a length > 1 argument, because `grepl()`
 vectorises and `if` does not.
-The issue reporting it offered two fixes: wrap the condition in
-`any(grepl(...))`, or vectorise the whole helper and let the caller `vapply`
-over it.
-The first was adopted.
-`any()` collapsed the vector to one boolean before the function's own
-`paste0` call ran, and `paste0` vectorises: the whole table was emitted once
-per element, with the filled element highlighted as though it were the
-unfilled one.
-The original defect was a loud abort on a multi-element argument.
-The adopted remedy was a silent corruption of the signed document on that
-same input, worse than the bug it replaced, and it was committed to the
-branch on the strength of the single value the report used to demonstrate
-the abort, never checked against a multi-element input, which is exactly
-the shape the report itself was about.
-The second proposed fix would not have had this failure; only the one
-actually taken did.
+The issue reporting it, demonstrated against a two-element vector, offered
+two fixes: wrap the condition in `any(grepl(...))`, or vectorise the whole
+helper.
+The first was adopted, and it does stop the abort on that same two-element
+input --- the remedy was run against the report's own repro, and passed the
+one property anyone checked, which was that it no longer errors.
 
-- **Do:** run every proposed remedy, the reporter's own included, against
-  the input shape the report itself demonstrates the bug on, not only
-  against whichever single value happens to be quoted in the issue.
-- **Do:** read the function the remedy touches for other vectorised calls
-  downstream of the collapsed value, before trusting that collapsing one
-  check is safe.
+It was still wrong.
+The row it builds is assembled by `paste0()` over several arguments
+including the text itself, and `paste0` vectorises independently of `hl()`:
+a two-element argument makes the row builder emit the whole table twice
+inside one document fragment, regardless of what `hl()` returns.
+`hl()`'s `any()` then collapses its own return to one boolean, which
+`paste0` recycles across both copies, so a filled element can be
+highlighted as though it were the unfilled one.
+Nobody had graded the fix on the *content* of its output, only on whether
+the abort was gone, so the corruption sat unnoticed for several rounds
+until a later adversarial pass rendered the fixed code on the same
+two-element input and read what it actually produced.
+The remedy that shipped took neither of the issue's two options: it rejects
+a non-scalar argument outright, naming it, rather than trying to make one
+render correctly.
+
+- **Do:** grade a proposed remedy, the reporter's own included, on the
+  *content* of its output against the report's own input, not on whether
+  the originally reported symptom (an abort, an error, a crash) is gone.
+- **Do:** read every call downstream of a value a remedy collapses to a
+  scalar, since a sibling call can still vectorise over the original
+  argument while the collapsed value stays fixed across it.
 - **Don't:** read an issue's "suggested fix" section as pre-validated because
   it arrived attached to a verified bug report.
-- **Don't:** grade a remedy against reproducing the original abort or error;
-  grade it against whether it produces correct output on the same input.
 
 (Measured on [ucdavis/hac.sap#26](https://github.com/ucdavis/hac.sap/issues/26),
 filed 2026-09-02, and its fix in

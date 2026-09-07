@@ -640,9 +640,11 @@ a different subset after the comment was written to prevent it.
 - **Do:** assert against a value unique to the site under test (a label, a
   column identity, a specific filled or unfilled default that appears
   nowhere else in the fixture) rather than against membership in a class.
-- **Do:** where a unique value is awkward, fill every other site in the
-  fixture that could satisfy the same class of assertion, so the class can
-  occur only at the site under test.
+- **Do:** where a unique value is awkward and every candidate site is a
+  fillable input, fill every other site so the class can occur only at the
+  site under test --- this does not help when the wrong site is a static
+  structural cell (a label, a header) that carries no input to fill, which
+  is a case only the unique-value assertion above catches.
 - **Do:** re-run a rewritten assertion against the mutant that exposed the
   first instance, per the preceding section --- a fix written for this
   exact failure is the least-scrutinized place for it to recur.

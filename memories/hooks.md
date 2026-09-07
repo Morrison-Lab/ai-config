@@ -230,10 +230,12 @@ Therefore, its two error directions have sharply asymmetric costs:
 - **False negative**: Silently fails to warn about a genuinely risky command, defeating the entire purpose of the guard.
 
 When a review finding points out an edge-case false positive in a warn-only hook (such as an unrelated wrapped command like `nice mycommand git push` or flags to commands like `sudo`/`env`), attempting to narrow the regex by enumerating option grammars (`-[unskagChD]`, etc.) is an anti-pattern.
-Command wrapper flag grammars are unbounded across tools and operating systems (`sudo -p "prompt"`, `sudo -U user`, `env -S "args"`, `nice -n 5`, etc.), and enumerating them cannot converge. Each narrowing step trades a cheap false positive for an expensive, silent false negative on real commands.
+Command wrapper flag grammars are unbounded across tools and operating systems (`sudo -p "prompt"`, `sudo -U user`, `env -S "args"`, `nice -n 5`, etc.), and enumerating them cannot converge.
+Each narrowing step trades a cheap false positive for an expensive, silent false negative on real commands.
 For a warn-only hook, accept benign false positives on rare command-argument shapes as the intended, cheaper error, and keep the matcher permissive to prevent false negatives.
 
-(Measured on `hooks/flag-chained-push.py` across five review rounds, Morrison-Lab/ai-config#3302: narrowing `LEAD_RE` to silence `nice mycommand git push` introduced silent false negatives on `sudo -p`, `sudo -U`, and `env -S` chained pushes. Resolved by restoring the permissive skip-loop and documenting the trade-off.)
+(Measured on `hooks/flag-chained-push.py` across five review rounds, Morrison-Lab/ai-config#3302: narrowing `LEAD_RE` to silence `nice mycommand git push` introduced silent false negatives on `sudo -p`, `sudo -U`, and `env -S` chained pushes.
+Resolved by restoring the permissive skip-loop and documenting the trade-off.)
 
 ---
 

@@ -430,6 +430,14 @@ jobs:
         run: python3 scripts/test_check_bare_fragment_mentions.py
       - name: Run backlog-triage instrument tests
         run: python3 scripts/test_triage_backlog.py
+      - name: Run check-rendered-page tests
+        # The suite pins two decisions that a later edit would otherwise
+        # silently undo: exact class-TOKEN exclusion (substring matching
+        # swallowed a real `gt_footnotes` div), and keeping `citation` OUT of
+        # the exclusion set (Quarto puts a literal `?@fig-x` inside one, so
+        # excluding it makes the checker call a broken page clean). Neither
+        # is visible in the checker's output, only in its silence.
+        run: python3 scripts/test_check_rendered_page.py
       - name: Check for stale and orphaned records (advisory)
         # ai-config#1544. Non-blocking, and for two separate reasons.
         #

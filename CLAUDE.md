@@ -1561,6 +1561,32 @@ self-review confirms the claim, which was never the defect.
 
 [`shared/writing/citations.md`](shared/writing/citations.md)
 
+## Check the renders, not just the source
+
+[shared/workflow/check-the-renders.md](shared/workflow/check-the-renders.md)
+
+Where a repo publishes a website or a book, the deliverable is the rendered
+page, and a correct source diff is not evidence the published page is
+correct.
+An unexpanded macro, a citation key pandoc renders as `key?`, a crossref
+resolving to nothing, a list that lost its blank line, a swallowed KaTeX
+error --- none shows in the diff, none makes CI red.
+The worst case is a fixed source over an unfixed deployed page, served from a
+stale render cache; every other check in this corpus passes on it.
+`python3 scripts/check-rendered-page.py <url-or-file>` is the instrument for
+the pattern failures, taking a preview URL, a published URL, or a local
+`_site/` file.
+It cannot detect staleness, which is a relation between a page and a commit
+rather than a property of the page: for that, grep the render for the exact
+text the diff added and removed.
+
+- **Do:** check the rendered page, and the deployed preview rather than only a
+  local render where the repo caches renders.
+- **Don't:** read a correct source diff as evidence about the published page.
+
+(Directive from the user, 2026-09-07: "for repos that render websites and
+books, always check the renders".)
+
 ## Fact-check prose and internal reasoning in review
 
 [`shared/writing/fact-check-prose.md`](shared/writing/fact-check-prose.md)

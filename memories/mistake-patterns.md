@@ -1152,3 +1152,29 @@ A clean automated review from every available provider evaluating the current HE
   That is a code change to the guard (ai-config#3319), not yet made as of
   this writing; until it lands, the literal-path habit above is the only
   defense.
+
+## Pattern 53: Gating an Authoritative Parser on an Unsound Raw Text Pre-Filter
+
+- **Mistake**: putting a cheap raw-text scan *in front of* a real parser to decide which inputs are worth parsing.
+  The scan then decides relevance for inputs the parser could have judged correctly, and any encoding the format allows but the scan cannot see becomes a silent bypass.
+- **Direction of failure**: fail-open, and invisibly.
+  Nothing errors; the input is simply skipped.
+  On a blocking guard that is the expensive direction, because the guard reports success while not having looked.
+- **Measured** 2026-09-07 on `Morrison-Lab/ai-config#3304`, `hooks/guard-slide-major-tag.py`.
+  A pre-filter skipped any workflow file whose text lacked the substring `workflow_call`.
+  A reusable workflow whose key is written `"workflow_call":` parses to `workflow_call` for PyYAML and for GitHub Actions, yet its raw text never contains the substring, so an added `checks: read` job permission was allowed through.
+  Reproduced, and isolated by deleting only the pre-filter line.
+- **Fix**: it is an ordering problem, not a matching problem.
+  Parse first, and let the parsed structure be the sole test for anything that parses.
+  Consult the raw scan only for input the parser cannot read at all, where nothing better exists and its error direction can be made conservative.
+- **Why widening the scan is the wrong repair**: the same PR narrowed and re-widened a matcher across three rounds, each round fixing the named case and opening another.
+  Hand-decoding a format's escapes to decide whether to parse is the same mistake one level down.
+
+- **Do:** run the authoritative parser first, and reserve text heuristics for input that fails to parse.
+- **Do:** mutation-test the ordering --- reintroduce the scan into the parsed path and confirm an encoded-key test flips to allow.
+- **Don't:** add a pre-filter whose premise is that absence of a token proves irrelevance;
+  in any expressive format that premise is false.
+- **Don't:** treat a green suite as coverage of the fallback path, which is usually the one no test forces.
+
+(Distinct from Pattern 52, which is about a guard naming the wrong commit;
+this one is about a guard not looking at all.)

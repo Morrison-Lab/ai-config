@@ -1176,9 +1176,9 @@ A clean automated review from every available provider evaluating the current HE
   ```python
   >>> "workflow_call" in 'on:\n  "workflow_call":\n'
   True
-  >>> "workflow_call" in 'on:\n  "\u0077orkflow_call":\n'
+  >>> "workflow_call" in 'on:\n  "\\u0077orkflow_call":\n'
   False
-  >>> yaml.safe_load('on:\n  "\u0077orkflow_call":\n')
+  >>> yaml.safe_load('on:\n  "\\u0077orkflow_call":\n')
   {True: {'workflow_call': None}}
   ```
 

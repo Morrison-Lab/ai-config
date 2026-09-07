@@ -261,6 +261,33 @@ CASES = [
       bash("pytest -q"), say("All tests pass.")], False,
      "a heredoc write followed by a real suite run does not warn"),
 
+    # SIXTH-round adversarial-review finding: `sed -i`/`perl -i` edit a
+    # source file in place with no Edit tool call and no redirection for
+    # BASH_WRITE_RE to see.
+    ([bash("sed -i 's/foo/bar/' hooks/warn-stale-test-claim.py"),
+      say("All tests pass.")], True,
+     "a GNU 'sed -i' edit of a source file counts as a source edit"),
+    ([bash("sed -i.bak 's/foo/bar/' hooks/warn-stale-test-claim.py"),
+      say("All tests pass.")], True,
+     "'sed -i.bak' (suffix attached to -i) still counts as a source edit"),
+    ([bash("sed -i '' 's/foo/bar/' hooks/warn-stale-test-claim.py"),
+      say("All tests pass.")], True,
+     "BSD/macOS 'sed -i ''' (empty backup arg) still counts as a source edit"),
+    ([bash("perl -pi -e 's/foo/bar/' hooks/warn-stale-test-claim.py"),
+      say("All tests pass.")], True,
+     "a bundled 'perl -pi' edit counts as a source edit"),
+    ([bash("sed -i 's/foo/bar/' hooks/warn-stale-test-claim.py"),
+      bash("pytest -q"), say("All tests pass.")], False,
+     "a 'sed -i' edit followed by a real suite run does not warn"),
+    ([bash("sed -n '1,5p' hooks/warn-stale-test-claim.py"),
+      say("All tests pass.")], False,
+     "'sed -n' (no -i, read-only) is not an edit"),
+    ([bash("sed -i 's/x/y/' README.md"), say("All tests pass.")], False,
+     "'sed -i' on a non-source file is not a stale-code edit"),
+    ([bash("perl -Ilib -e 'print 1' hooks/warn-stale-test-claim.py"),
+      say("All tests pass.")], False,
+     "'perl -Ilib' (an unrelated include-path flag) is not an in-place edit"),
+
 ]
 
 

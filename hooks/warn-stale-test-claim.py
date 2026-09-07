@@ -108,6 +108,42 @@ BASH_WRITE_RE = re.compile(
     re.I,
 )
 
+# `sed -i`/`perl -i` in-place edits are a THIRD, common way a source file
+# changes via Bash with no Edit/Write/MultiEdit tool call and no
+# redirection for `BASH_WRITE_RE` to see (sixth-round adversarial review
+# finding). Argument order for `-i` varies by platform (GNU `sed -i
+# 's/a/b/' file.py` vs. BSD/macOS `sed -i '' 's/a/b/' file.py`), so rather
+# than parsing that precisely this checks two independent, bounded facts:
+# the command names `sed`/`perl` with an in-place flag ANYWHERE, and
+# SEPARATELY that some whitespace-delimited token in the command looks
+# like a source file path (reusing `SOURCE_EXT_RE`). Neither check alone
+# is reliable; both together catch the common shapes without attempting
+# real argument parsing.
+#
+# `sed` requires a standalone `-i` token. `perl` instead requires a
+# BUNDLED short-option token drawn only from perl's common one-liner
+# flags (`p`, `n`, `l`, `a`, `e`, `0`, `i`) -- `-pi`, `-pie`, `-ni`, bare
+# `-i`, and similar -- rather than any token merely containing the letter
+# `i`. Without that restriction, case-insensitive matching would treat
+# `perl -Ilib ...` (an unrelated `-I` include-path flag) as an in-place
+# edit purely because "lib" contains a lowercase `i`; the curated
+# character class excludes it.
+_INPLACE_TOOL_RE = re.compile(
+    r"(?i:\bsed\b)[^\n]*\s-i\b"
+    r"|(?i:\bperl\b)[^\n]*\s-[pnlae0]*i[pnlae0]*\b"
+)
+
+
+def _inplace_edit_target(command):
+    """True if `command` looks like an in-place sed/perl edit of a source file."""
+    if not _INPLACE_TOOL_RE.search(command):
+        return False
+    for token in re.split(r"\s+", command):
+        if SOURCE_EXT_RE.search(token.strip("'\"")):
+            return True
+    return False
+
+
 # A command-position anchor: start of the command string, or immediately
 # after a shell separator (`;`, `&&`, `||`, a single `&` or `|`). A bare
 # newline is DELIBERATELY EXCLUDED, unlike an earlier version of this
@@ -379,7 +415,7 @@ def scan(path):
                 # is often itself inside a quoted path.
                 if TEST_SUITE_RE.search(_strip_shell_literals(command)):
                     last_test_at = tool_idx
-                elif BASH_WRITE_RE.search(command):
+                elif BASH_WRITE_RE.search(command) or _inplace_edit_target(command):
                     last_edit_at = tool_idx
 
     return last_text, last_edit_at, last_test_at

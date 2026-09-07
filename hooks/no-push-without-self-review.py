@@ -164,6 +164,52 @@ EXTERNAL_REVIEWER_PRINT_FLAGS = {
 STDOUT_SILENT_PROGRAMS = {"cd"}
 
 
+def _drop_bash_comment(command: str) -> str:
+    """Truncate at the first unquoted `#` that starts a word, as bash does.
+
+    `_depth_segments` has no notion of a comment, so `cd /tmp # ; agy --print=...`
+    hands it a second segment bash never runs -- a command that names a reviewer
+    the shell would never invoke. Harmless while `STDOUT_SILENT_PROGRAMS` holds
+    only `cd`, which cannot emit a verdict to be read, and a hole the moment
+    that set grows.
+
+    Bash starts a comment only at a word boundary, so a `#` inside a quoted
+    string or attached to a word is literal and survives here.
+    """
+    out = []
+    quote = None
+    at_word_start = True
+    i = 0
+    while i < len(command):
+        char = command[i]
+        if quote is not None:
+            out.append(char)
+            if char == "\\" and quote == '"' and i + 1 < len(command):
+                out.append(command[i + 1])
+                i += 2
+                continue
+            if char == quote:
+                quote = None
+            i += 1
+            continue
+        if char in ("'", '"'):
+            quote = char
+            at_word_start = False
+        elif char == "\\" and i + 1 < len(command):
+            out.append(char)
+            out.append(command[i + 1])
+            i += 2
+            at_word_start = False
+            continue
+        elif char == "#" and at_word_start:
+            break
+        else:
+            at_word_start = char.isspace()
+        out.append(char)
+        i += 1
+    return "".join(out)
+
+
 def external_reviewer_command(command: str) -> bool:
     """Is this Bash command a cross-family reviewer run whose output is its review?
 
@@ -184,25 +230,34 @@ def external_reviewer_command(command: str) -> bool:
 
     The review keyword must appear in THE PRINT FLAG'S OWN VALUE -- either
     `--print=<value>`, or the single token directly after `--print` or `-p`.
-    Nowhere else counts. Two rounds of adversarial review each broke a laxer
-    rule by putting the keyword somewhere the program would not read as its
-    prompt: first in a trailing `#` comment against a match on the raw command
-    text, then in a decoy trailing argument against a match on any positional.
-    Both worked, and both were the same defect -- the matched text was not the
-    delivered prompt -- so the rule is now the narrowest one that still
-    identifies a prompt unambiguously, rather than a third attempt to model
-    which arguments a program treats as positional.
+    Nowhere else counts, and the flag must appear exactly once. Three rounds of
+    adversarial review each broke a laxer rule by putting the keyword somewhere
+    the program would not read as its prompt: in a trailing `#` comment against
+    a match on the raw command text, in a decoy trailing argument against a
+    match on any positional, then in a first `--print` against a match on any
+    occurrence, where a last-wins parser delivers only the second. All three
+    worked, and all three were one defect -- the matched text was not the
+    delivered prompt -- so the rule is now the narrowest one that identifies a
+    prompt unambiguously, rather than a fourth attempt to model how some
+    program parses its arguments.
+
+    Where a shape is ambiguous the whole command is refused rather than
+    resolved. A repeated print flag has one delivered value and several written
+    ones, and which is delivered is that parser's convention rather than
+    anything readable here; a bare `--` makes everything after it positional,
+    so a `--print` past it is not a flag at all.
 
     The cost is a false rejection: `agy --print --model X "review the diff"`
     supplies a real prompt this refuses to find. That is the safe direction,
     and the remedy is to put the prompt straight after the flag.
 
-    `shlex.split(comments=True)` handles the first of those forgeries, and its
-    rule is not bash's: bash starts a comment only at a word boundary, while
-    `shlex` truncates at any unquoted `#`. The divergence drops tokens bash
-    would keep, so it can only narrow the candidate and never invent one. A
-    bare `--` is refused outright, since everything after it is positional and
-    a `--print` past it is not a flag at all.
+    Comments are dropped before segmentation by `_drop_bash_comment`, since
+    `_depth_segments` would otherwise read a `;` inside a comment as a real
+    boundary. `shlex.split(comments=True)` then runs on each segment, and its
+    rule is stricter than bash's: bash starts a comment only at a word
+    boundary, while `shlex` truncates at any unquoted `#`. That divergence
+    drops text bash would keep, leaving a prefix of the real value, so it can
+    only narrow a candidate and never invent one.
 
     Two residues this accepts rather than closes, stated because a guard that
     hides its own limits is worse than one that names them.
@@ -226,7 +281,7 @@ def external_reviewer_command(command: str) -> bool:
     which is the line every other refusal here draws.
     """
     try:
-        segments = [text for _, text in _depth_segments(command)]
+        segments = [text for _, text in _depth_segments(_drop_bash_comment(command))]
     except Exception:
         return False
     if not segments:
@@ -257,26 +312,31 @@ def external_reviewer_command(command: str) -> bool:
     if "--" in arguments:
         return False
 
-    # The print flag's own value, and nothing else. Two rounds of adversarial
+    # The print flag's own value, and nothing else. Three rounds of adversarial
     # review broke wider rules by planting the keyword where the program would
     # not read it as the prompt, so this identifies the prompt rather than
     # guessing at it.
     candidates = []
-    in_print_mode = False
+    occurrences = 0
     for i, token in enumerate(arguments):
         inline = next((token[len(flag) + 1:] for flag in flags
                        if token.startswith(flag + "=")), None)
         if inline is not None:
-            in_print_mode = True
+            occurrences += 1
             candidates.append(inline)
         elif token in flags:
-            in_print_mode = True
+            occurrences += 1
             following = arguments[i + 1] if i + 1 < len(arguments) else None
             # A flag directly after the print flag means the prompt is
             # elsewhere -- on stdin, or past arguments this cannot attribute.
             if following is not None and not following.startswith("-"):
                 candidates.append(following)
-    if not in_print_mode:
+    # A repeated print flag has one delivered value and several written ones,
+    # and which is delivered is the argument parser's convention rather than
+    # anything readable here. Accepting any occurrence let a decoy carry the
+    # keyword while the delivered prompt asked for a fabricated verdict, so
+    # refuse the whole command instead of picking a winner.
+    if occurrences != 1:
         return False
 
     # The prompt must name the review, exactly as the in-family fallback path

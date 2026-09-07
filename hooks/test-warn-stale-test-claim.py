@@ -447,6 +447,14 @@ def main():
         ("a bare JSON number", "42"),
         ("a bare JSON boolean", "true"),
         ("a bare JSON null", "null"),
+        # TENTH-round adversarial-review finding: the dict guard above
+        # only checks the top-level payload -- a dict/list/other
+        # non-string VALUE at "transcript_path" is truthy, survives
+        # `or ""`, and reached os.path.isfile() un-typechecked.
+        ("a dict-valued transcript_path", '{"transcript_path": {"a": 1}}'),
+        ("a list-valued transcript_path", '{"transcript_path": ["a", "b"]}'),
+        ("a number-valued transcript_path", '{"transcript_path": 42}'),
+        ("a bool-valued transcript_path", '{"transcript_path": true}'),
     ]:
         out = subprocess.run(
             [sys.executable, HOOK], input=raw,

@@ -454,7 +454,13 @@ def main() -> int:
         return 0
 
     path = payload.get("transcript_path") or payload.get("transcriptPath") or ""
-    if not path or not os.path.isfile(path):
+    # The dict guard above only checks the top-level payload -- a dict or
+    # list VALUE at "transcript_path" is truthy, survives `or ""`, and
+    # reached `os.path.isfile()` un-typechecked, raising an uncaught
+    # TypeError (tenth-round adversarial review finding: `{"transcript_path":
+    # {"a": 1}}` crashed with "stat: path should be string, bytes,
+    # os.PathLike or integer, not dict").
+    if not isinstance(path, str) or not path or not os.path.isfile(path):
         return 0
 
     try:

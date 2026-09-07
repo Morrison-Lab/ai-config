@@ -339,7 +339,10 @@ When a verification tool or change-time test
 reports "0 regressions" or "0 widened, 0 narrowed",
 confirm that the new code path or arm was actually **reached** during the run.
 
-Three distinct mechanisms produce a false zero from a sampling instrument:
+Four distinct mechanisms produce a false zero from a sampling instrument.
+The first three below concern an arm the run never reached; the fourth,
+covered after them, concerns a population the run had nothing left to
+examine.
 
 1. **Truncation before reaching the arm.**
    A generator that yields new cases after a truncation limit
@@ -373,14 +376,13 @@ skipped by strided sampling,
 and bypassed by prose verdict checks,
 hiding 1 accepted widening and 5 fail-closed narrowings.)
 
-**A fourth mechanism belongs beside the three above, and it produces a zero
-that reads as the best possible result rather than as a null one: the
-narrowing meant to fix the false positive removes the population the sweep
-re-runs against.**
+**The fourth mechanism produces a zero that reads as the best possible
+result rather than as a null one: the narrowing meant to fix the false
+positive removes the population the sweep re-runs against.**
 
-A false-positive claim is usually re-checked by re-running the same sweep
-over the same corpus after tightening the guard, and reading a lower hit
-count as progress.
+A false-positive claim is re-checked by re-running the same sweep over the
+same corpus after tightening the guard, and reading a lower hit count as
+progress.
 When the tightening also narrows *which files are in scope* --- restricting
 a guard to a directory, a file extension, or a role a corpus barely
 contains --- the corpus supplying the sweep's population can shrink to
@@ -398,15 +400,19 @@ whether the denominator is 40 or 0.
 - **Don't:** cite a lower or zero hit count as evidence a narrowing worked
   without confirming the sweep still had a population able to produce a hit.
 
-(Measured on [ai-config#3281](https://github.com/Morrison-Lab/ai-config/pull/3281),
-2026-09-05, on `hooks/flag-test-reading-package-source.py`.
+(Measured 2026-09-04 on [ai-config#3281](https://github.com/Morrison-Lab/ai-config/pull/3281),
+a hook proposed to flag a test reading its own package's source from disk.
 An earlier claim of "fires on zero" in this repo's own corpus was 0 out of 0:
 requiring a test directory left `ai-config` with no in-scope files, so any of
 several narrowings could have been reverted and the sweep would still have
 read zero.
 A 137-repo, 1695-file sweep run afterward, over corpora the hook's scope
 actually matched, is what the PR body cites instead, and it reports one true
-positive rather than a population-free zero.)
+positive rather than a population-free zero.
+The hook itself never merged --- the PR was closed unmerged after four
+review rounds, on the grounds that `R CMD check` already catches the one
+real finding deterministically --- but the population-zero incident is a
+property of that review's own measurement, not of the hook's fate.)
 
 ### Mutate the fix, not only the test
 

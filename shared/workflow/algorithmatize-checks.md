@@ -367,16 +367,22 @@ The section above is the regex-class instance of a wider failure: a proposed
 remedy is adopted because the *finding* that motivated it was verified, and
 verifying the finding is mistaken for having verified the fix.
 The two are different claims.
-An issue report is usually reproduced against the tree.
-Its suggested fix is usually not, because by the time it is written the bug
-already feels understood, and a remedy that closes the reported case reads
-as settled without ever running against anything the report did not show.
+An issue report is reproduced against the tree.
+Its suggested fix is not, because by the time it is written the bug already
+feels understood, and a remedy that closes the reported case reads as
+settled without ever running against anything the report did not show.
 
-The domain need not be a regex or a review comment.
-A fix an issue proposes for itself carries exactly the same exposure, and a
-language's own vectorization semantics is a case a syntax read cannot catch,
-because the proposed line is syntactically fine and passes wherever the
-reporter tried it.
+This is the same claim
+[`address-every-comment`](address-every-comment.rationale.md)'s "the same
+check applies to a fix a reviewer describes in prose" makes for a review
+comment's suggested fix, and
+[`challenge-the-assignment`](challenge-the-assignment.md)'s "an issue body
+is an assignment you author, and its proposed fix is a second claim" makes
+for the issue-authoring side of it.
+What is new here is the domain: neither a regex read nor an internal-
+consistency check catches a remedy that fails only once the language's own
+vectorisation semantics meet it, because the proposed line is syntactically
+fine and passes wherever the reporter tried it.
 
 `hl()` aborted the whole render on a length > 1 argument, because `grepl()`
 vectorises and `if` does not.

@@ -1003,6 +1003,51 @@ the unquoted-delimiter case was written down nowhere.
 - **Do:** use a quoted heredoc delimiter (`<<'PY'`) whenever the body carries backticks or dollar signs, pass dynamic values in via a separately-exported environment variable or a placeholder substitution, and grep the emitted file for the expected spans afterwards.
 - **Don't:** choose an unquoted delimiter for the convenience of variable interpolation when the body carries markdown code spans --- each backtick span becomes a command substitution and vanishes silently on success.
 
+**Second occurrence, 2026-09-04, with the rule above loaded (ai-config#3230).**
+The payload this time was not a file but twenty-one forge bodies (one issue, ten PR bodies, ten claim comments).
+A Python script under `python3 - <<PY`, unquoted to interpolate one scratchpad path,
+filed issue ai-config#3219, opened PRs #3220 through #3229, and posted their claim comments.
+Every backtick span in those bodies ran as a shell command and was replaced by its empty output,
+so #3219 read `The branch records ... in and performs no such audit`,
+each code span deleted so that the two spaces flanking it met
+(the quote here shows one space, since the reflow script collapses a doubled one).
+All twenty-one were repaired by PATCH from a quoted-delimiter rerun,
+with the path passed as `export S=...` and read by `os.environ['S']`.
+
+Two things the first case did not draw out.
+The shell printed the substitution errors
+(`fix/3110-three-rounds-reflect: No such file or directory`, `check-links.py: command not found`)
+to stderr in the same tool result as the script's own output.
+The shell printed them at heredoc expansion, before Python started,
+but a foreground tool call returns only when the command ends,
+and this one command both composed and posted:
+issue #3219 was created at 21:16:48Z and the last claim comment at 21:17:12Z,
+so the lines were readable only once all twenty-one bodies were live.
+Those stderr lines are a detector usable before posting only when composing and posting are separate tool calls,
+or a dry run precedes the batch.
+The detector is one-sided:
+it fires only when a substituted command fails and prints;
+a backtick span or `$(...)` naming a command that succeeds quietly, and any `$VAR` expansion, are substituted and print nothing to stderr,
+so silence proves nothing and the read-back in the next sentence stays required.
+And a loop that posts to a forge should read one posted body back before posting the rest,
+since the first body is where the corruption shows.
+
+No guard was built at this occurrence, and that is a gap rather than a discharge:
+`shared/workflow/fixing-mistakes-is-top-priority.md` makes the prevention mechanism the next priority after the fix,
+and the condition is decidable,
+a `PreToolUse` regex over the Bash command for an unquoted delimiter with a backtick or dollar sign in the heredoc body,
+so `hooks/no-mistake-without-a-hook.py`'s one discharge (a mistake that cannot be mechanized) does not apply,
+and `shared/principles/deterministic-tools.md`'s third-occurrence bar is about repeated work, not a repeated mistake.
+Issue #3230's done-when asks only that a guard be considered, for a stderr-conditioned check;
+the `PreToolUse` regex above is the decidable half of that check, and building it is what closes the gap.
+
+- **Do:** compose the bodies in one tool call and post them in a second,
+  and treat `command not found` or `No such file or directory` on the first call's stderr as the payload probably having been substituted,
+  so the second call never runs.
+- **Do:** read one posted body back before a script posts the rest of its batch.
+- **Don't:** read those stderr lines as noise from an unrelated command and let the loop run on.
+- **Don't:** read an empty stderr as a clean payload, or post a whole batch and read the bodies afterwards.
+
 ## Tool result persistence & disk spillover threshold
 
 Measured 2026-08 against Claude Code v2.1 CLI runtime (v2.1.236):

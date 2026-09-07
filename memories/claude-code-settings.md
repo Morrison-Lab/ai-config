@@ -136,6 +136,50 @@ lets the first file that names an `ai-config@*` entry decide.
 - **Don't:** read one settings file as the answer, or union truthy names
   across files.
 
+**The two readers in this repo share that walk and nothing else, so cite the
+walk alone and describe each file's own within-file rule.**
+The two rules are not two variants of one reading.
+`resolve_plugin_enabled` in `scripts/doctor.py` strips JSONC comments,
+parses the file, and reads `enabledPlugins` only, counting any truthy
+`ai-config@*` entry there --- a second marketplace's copy of the plugin
+loads the same content and so still supersedes a `~/.claude` install.
+`run-hook.sh` parses nothing: it greps the raw file text
+(`grep -Eo '"ai-config@[^"]+" *: *(true|false)' ... | head -1`) and takes the
+first textual match wherever it lands.
+
+That produces two separate divergences, and naming only the first leaves the
+larger one invisible.
+
+1. **Within `enabledPlugins`, first entry versus any truthy entry.**
+   They answer
+   `{"ai-config@Morrison-Lab": false, "ai-config@other": true}` differently:
+   the check reads the plugin as enabled, the runner as disabled and fires
+   the hook.
+2. **Where the text may sit.**
+   The runner's match need not be an entry, and need not be in
+   `enabledPlugins` at all.
+   Measured 2026-09-04 against a `~/.claude/settings.json` whose
+   `enabledPlugins` is empty: a commented-out
+   `// "ai-config@Morrison-Lab": true` made the runner exit 0 without firing
+   the hook, reading the plugin as enabled, while `resolve_plugin_enabled`
+   returned `(False, None, None)`.
+   `"somethingElse": {"ai-config@Morrison-Lab": true}` beside the same empty
+   `enabledPlugins` split the two the same way.
+   Commenting the line out is the natural way to disable a plugin by hand,
+   so this is the divergence a user is likeliest to meet.
+
+Neither reading is wrong for its own question --- the runner asks whether
+*this* hook would fire twice, the check asks whether *any* ai-config plugin
+is installed --- but a reader of either file will assume they match unless
+told otherwise (ai-config#2528).
+
+- **Do:** say the *scope walk* is the shared part, and describe each file's
+  own within-file rule --- the runner's raw-text grep as well as the check's
+  parsed `enabledPlugins` union.
+- **Don't:** call the two implementations equivalent, or present the
+  first-versus-union rule as the whole divergence when the runner also
+  matches commented-out and non-`enabledPlugins` text.
+
 ## A cloud session in ai-config loads no plugin, so `hooks/hooks.json` is inert there unless a skills-directory plugin carries it
 
 The hook catalog reaches Claude Code only through a **plugin**: a project's

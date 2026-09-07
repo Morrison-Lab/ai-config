@@ -368,7 +368,8 @@ When that counting reviewer returns a clean verdict, the natural reading is "the
 
 They are easy to under-weight for two compounding reasons.
 They are attached to a superseded commit, so they read as history.
-And they often arrive as *suppressed* / low-confidence inline comments (Copilot's `<details>` block, per criterion 2's four-surfaces list), which reads as "the reviewer itself wasn't sure".
+And they often arrive as *suppressed* / low-confidence findings in the review body's collapsed `<details>` block (per criterion 2's four-surfaces list), which reads as "the reviewer itself wasn't sure".
+Those are body text rather than comment objects, so `pulls/N/comments` and a review-thread query both return nothing over them --- read the body.
 Neither makes a finding false.
 A finding about a line the later commits never touched is still live at the current head, whatever commit it was filed against.
 

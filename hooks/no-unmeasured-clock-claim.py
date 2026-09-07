@@ -47,11 +47,28 @@ running AHEAD of the last measurement cannot have been observed, and one far
 behind it has expired. Quoting the reading, which the rule prescribes, stays
 correct and stays silent.
 
-A `date` invocation discharges unconditionally, because this guard reads the
-transcript's tool *calls* and not their output, so no measured value exists to
-compare against. That is the honest limit rather than an oversight: the rule's
-remedy is to run the clock in the same message, and a session that just did so
-is the case the guard is not for.
+A `date` invocation that PRINTS discharges by position, because this guard
+reads the transcript's tool *calls* rather than their output, so no measured
+value exists to compare against. That is the honest limit rather than an
+oversight: the rule's remedy is to run the clock in the same message, and a
+session that just did so is the case the guard is not for.
+
+A `date` whose output is only ever CAPTURED does not discharge, and that
+distinction is the whole of ai-config#2991. A command of the shape
+`t=$(TZ=... date ...); cat >> notebook.md <<EOF ... EOF` reads the clock and
+puts the value in a file, so the value never reaches the transcript and the
+session never sees it -- which is exactly how four recaps came to be stamped
+from a sense of elapsed work while a real `date` sat in each of those turns.
+A reading you cannot quote is not a reading. So a capture-only invocation is
+held pending its own `tool_result`: a result carrying a clock-shaped time
+discharges it, a result whose content cannot be parsed discharges it too (fail
+open on shape), and a readable result with no time in it leaves the claim
+unmeasured. A result that never appears at all leaves it unmeasured as well,
+which is not a fail-open case but the definition -- output absent from the
+transcript is output the session could not have quoted. Correlating by
+`tool_use_id` keeps this narrow: only the output of a command already
+identified as a clock read is consulted, so an ordinary `Read` of a file full
+of timestamps still supplies nothing.
 
 Fails OPEN on any parse trouble, and fires at most once per distinct message,
 so it cannot wedge a session.
@@ -98,6 +115,59 @@ RX_CLOCK_READ = re.compile(
     r"|\[DateTime\]::UtcNow",
     re.I,
 )
+
+# A clock-shaped time anywhere in a `date` command's own output. Deliberately
+# looser than RX_CLAIM: `date` prints in many formats, and the only question
+# here is whether SOMETHING the session could have quoted reached the
+# transcript. It is applied to the result of a command already identified as a
+# clock read, never to arbitrary tool output.
+RX_VISIBLE_TIME = re.compile(r"\b(?:[01]?\d|2[0-3]):[0-5]\d\b")
+
+# The HEAD of a `VAR=$(...)` / ``VAR=`...` `` -- the shape that hides a reading
+# in a variable. Only the head is matched here: where the substitution ENDS is
+# decided by walking it (`_capture_assigns` below), because a character class
+# that excludes parentheses stops at the first one a format string contains,
+# and `date "+%H:%M (%Z)"` contains two. The assignment then goes unrecognized,
+# its text stays in the segment, and the read reads as printed -- discharging
+# the guard on exactly the capture-only shape it exists to catch. The head
+# must open a shell word: at the start of the segment, or after whitespace, a
+# separator, or an opening parenthesis. Without that bound, `NAME=$(` inside a
+# quoted argument (`echo "stamp=$(date +%H:%M)"`) reads as an assignment, the
+# read is blanked out of a segment that in fact prints it, and the guard is
+# left to the tool-result fallback to discharge.
+RX_CAPTURE_HEAD = re.compile(r"(?<![^\s;&|(])([A-Za-z_]\w*)=(\$\(|`)")
+
+# A heredoc operator and its delimiter word, quoted or not.
+RX_HEREDOC = re.compile(r"""<<-?\s*(['"]?)(\w+)\1""")
+
+# Stdout sent to a file, rather than to the transcript. Excludes a named
+# descriptor other than stdout (`2>` through `9>`) and a descriptor duplication
+# (`>&2`, caught by the lookahead on what FOLLOWS the operator). Descriptor 1
+# is stdout, so `1>` and `1>>` redirect exactly as a bare `>` and `>>` do and
+# must not be excluded. Nor may a preceding `&` be: `&>` and `&>>` send stdout
+# AND stderr to the file, so a `&` in the lookbehind would read the combined
+# redirect as a print and discharge the guard on exactly the #2991 shape.
+RX_STDOUT_REDIRECT = re.compile(r"(?<![2-9<>])>>?\s*(?![&>])\S")
+
+# Where one command in a compound command ends and the next begins.
+RX_SEGMENT_SPLIT = re.compile(r";|&&|\|\|")
+
+# `echo`/`printf` of a captured variable, which puts the value back on stdout.
+# The span between the command and the variable may not cross a REAL `|` or
+# `&` (a pipe hands the echo to another command, and `echo foo | grep $t` does
+# not print the variable), but the same characters inside a quoted argument
+# (`echo "a|b $t"`) are text, so the search runs over `_mask_quoted_operators`
+# rather than the raw segment. A `;` cannot be a boundary here at all, since
+# `_split_command` already split on it, so any `;` left is quoted.
+RX_PRINTED_VAR = r"\b(?:echo|printf|print)\b[^;&|\n]*\$\{?%s\b"
+
+# A command that puts its arguments, or its standard input, back on stdout, so
+# a clock read substituted into one of them reaches the transcript. Any other
+# head (`gh pr comment --body "$(date ...)"`, `curl -d`, `git commit -m`)
+# consumes the value without printing it, and the read is then settled by
+# the command's own tool result rather than by position.
+REPRINTING_HEADS = frozenset({"echo", "printf", "print", "cat", "tee"})
+RX_ENV_ASSIGN_HEAD = re.compile(r"[A-Za-z_]\w*=")
 
 # The harness's own injected reading. Quoting this is correct, so it counts as
 # a measurement -- otherwise the guard would fire on the one case the rule
@@ -169,6 +239,344 @@ def _skew(claimed, measured):
     return diff - 1440 if diff > 720 else diff
 
 
+def _mask_nested(line):
+    """`line` with every character inside a quoted, substituted, or grouped
+    span replaced by a space, so an operator there is not a boundary."""
+    out = []
+    stack = []
+    escaped = False
+    for ch in line:
+        top = stack[-1] if stack else None
+        inside = bool(stack)
+        if escaped:
+            escaped = False
+        elif top == "'":
+            if ch == "'":
+                stack.pop()
+        elif ch == "\\":
+            escaped = True
+        elif top in ('"', "`"):
+            if ch == top:
+                stack.pop()
+        elif ch in ("'", '"', "`", "(", "{"):
+            stack.append(ch)
+        elif top == "(" and ch == ")":
+            stack.pop()
+        elif top == "{" and ch == "}":
+            stack.pop()
+        out.append(" " if inside else ch)
+    return "".join(out)
+
+
+def _split_command(command):
+    """`[(segment, heredoc bodies fed by that segment), ...]`.
+
+    A heredoc body is lifted out of the command text and attached to the
+    segment whose redirection decides where its expansions go, so a `date`
+    inside one is not read as a command of its own.
+    """
+    lines = command.split("\n")
+    kept = []
+    bodies_at = {}
+    i = 0
+    while i < len(lines):
+        idx = len(kept)
+        kept.append(lines[i])
+        for m in RX_HEREDOC.finditer(lines[i]):
+            i += 1
+            body = []
+            while i < len(lines) and lines[i].strip() != m.group(2):
+                body.append(lines[i])
+                i += 1
+            bodies_at.setdefault(idx, []).append("\n".join(body))
+        i += 1
+    out = []
+    for idx, line in enumerate(kept):
+        masked = _mask_nested(line)
+        parts = []
+        prev = 0
+        for m in RX_SEGMENT_SPLIT.finditer(masked):
+            parts.append(line[prev:m.start()])
+            prev = m.end()
+        parts.append(line[prev:])
+        for k, part in enumerate(parts):
+            last = k == len(parts) - 1
+            out.append((part, bodies_at.get(idx, []) if last else []))
+    return out
+
+
+def _head_word(segment):
+    """The first word of `segment` after any leading `NAME=value` env
+    assignments, or "" when nothing follows them.
+
+    The value is walked rather than matched with `\\S*`, because a quoted
+    value may carry a space (`LC_ALL="en US" echo ...`) and the word after
+    it is still the head. An unquoted substitution in the value
+    (`FOO=$(bar baz) echo ...`) is skipped whole, by the same walkers the
+    capture scan uses, so its inner space does not end the value early.
+    """
+    i = 0
+    n = len(segment)
+    while True:
+        while i < n and segment[i].isspace():
+            i += 1
+        m = RX_ENV_ASSIGN_HEAD.match(segment, i)
+        if not m:
+            break
+        i = m.end()
+        quote = None
+        while i < n and (quote or not segment[i].isspace()):
+            ch = segment[i]
+            if quote != "'" and segment.startswith("$(", i):
+                stop = _substitution_end(segment, i + 2)
+                i = n if stop is None else stop
+                continue
+            if quote != "'" and ch == "`":
+                stop = _backtick_end(segment, i + 1)
+                i = n if stop is None else stop
+                continue
+            if quote is None and ch in ("'", '"'):
+                quote = ch
+            elif quote and ch == quote:
+                quote = None
+            elif ch == "\\" and quote != "'":
+                i += 1
+            i += 1
+    j = i
+    while j < n and not segment[j].isspace():
+        j += 1
+    return segment[i:j]
+
+
+def _mask_substitutions(text):
+    """`text` with everything inside a `$(...)` or backtick substitution
+    replaced by spaces, quotes left in place.
+
+    A substitution expands inside double quotes too, so only a single-quoted
+    span shields one. Where each substitution ends is decided by
+    `_substitution_end` and `_backtick_end`, so a quote or parenthesis inside
+    it is read the way the capture walk reads it. An unterminated one masks
+    to the end of the text.
+    """
+    out = []
+    quote = None
+    escaped = False
+    i = 0
+    n = len(text)
+    while i < n:
+        ch = text[i]
+        if escaped:
+            escaped = False
+        elif quote == "'":
+            if ch == "'":
+                quote = None
+        elif ch == "\\":
+            escaped = True
+        elif quote == '"' and ch == '"':
+            quote = None
+        elif quote is None and ch in ("'", '"'):
+            quote = ch
+        elif text.startswith("$(", i):
+            stop = _substitution_end(text, i + 2)
+            stop = n if stop is None else stop
+            out.append(" " * (stop - i))
+            i = stop
+            continue
+        elif ch == "`":
+            stop = _backtick_end(text, i + 1)
+            stop = n if stop is None else stop
+            out.append(" " * (stop - i))
+            i = stop
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
+def _mask_quoted(text, chars):
+    """`text` with each character in `chars` that sits inside a single- or
+    double-quoted span replaced by a space, everything else left in place.
+
+    Only the quotes are spans here: a redirect inside a brace group or a
+    substitution (`{ date > f; }`) is a real redirect, so `_mask_nested`'s
+    wider masking would hide exactly what this is used to find.
+    """
+    out = []
+    quote = None
+    escaped = False
+    for ch in text:
+        if escaped:
+            escaped = False
+        elif quote == "'":
+            if ch == "'":
+                quote = None
+        elif ch == "\\":
+            escaped = True
+        elif quote == '"':
+            if ch == '"':
+                quote = None
+        elif ch in ("'", '"'):
+            quote = ch
+        out.append(" " if quote and ch in chars else ch)
+    return "".join(out)
+
+
+def _mask_quoted_operators(text):
+    """`text` with each `;`, `&`, or `|` inside a quoted, substituted, or
+    grouped span replaced by a space, everything else left in place.
+
+    `_mask_nested` blanks whole spans, which would hide the variable this is
+    used to find; this keeps the variable and blanks only the operator
+    characters that could otherwise be read as a command boundary.
+    """
+    masked = _mask_nested(text)
+    return "".join(
+        " " if m == " " and o in ";&|" else o for o, m in zip(text, masked))
+
+
+def _substitution_end(text, pos):
+    """Index just past the `)` closing a `$(` whose body starts at `pos`.
+
+    Depth is counted rather than matched, and quoting and backslash escapes are
+    honoured the way `_mask_nested` honours them, so a parenthesis inside a
+    quoted format string neither opens nor closes the substitution. None when
+    the substitution is unterminated.
+    """
+    depth = 1
+    stack = []
+    escaped = False
+    for i in range(pos, len(text)):
+        ch = text[i]
+        top = stack[-1] if stack else None
+        if escaped:
+            escaped = False
+        elif top == "'":
+            if ch == "'":
+                stack.pop()
+        elif ch == "\\":
+            escaped = True
+        elif top == '"':
+            if ch == '"':
+                stack.pop()
+        elif ch in ("'", '"'):
+            stack.append(ch)
+        elif ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+            if depth == 0:
+                return i + 1
+    return None
+
+
+def _backtick_end(text, pos):
+    """Index just past the backtick closing a span whose body starts at `pos`.
+
+    A backslash escapes the next character, so an escaped backtick does not
+    close the span. None when the span is unterminated.
+    """
+    escaped = False
+    for i in range(pos, len(text)):
+        ch = text[i]
+        if escaped:
+            escaped = False
+        elif ch == "\\":
+            escaped = True
+        elif ch == "`":
+            return i + 1
+    return None
+
+
+def _capture_assigns(segment):
+    """`[(name, body, start, end), ...]` for each capture assignment.
+
+    `start`/`end` bound the whole `NAME=$(...)` or ``NAME=`...` ``, so the
+    caller can blank it out of the segment; `body` is what the substitution
+    runs. An unterminated substitution is skipped, and a head found INSIDE a
+    span already claimed is skipped too, so a nested assignment is not reported
+    a second time.
+    """
+    out = []
+    consumed = 0
+    for m in RX_CAPTURE_HEAD.finditer(segment):
+        if m.start() < consumed:
+            continue
+        if m.group(2) == "$(":
+            end = _substitution_end(segment, m.end())
+        else:
+            end = _backtick_end(segment, m.end())
+        if end is None:
+            continue
+        out.append((m.group(1), segment[m.end():end - 1], m.start(), end))
+        consumed = end
+    return out
+
+
+def _blank(segment, spans):
+    """`segment` with each `(_, _, start, end)` span replaced by a space."""
+    out = []
+    prev = 0
+    for _name, _body, start, end in spans:
+        out.append(segment[prev:start])
+        out.append(" ")
+        prev = end
+    out.append(segment[prev:])
+    return "".join(out)
+
+
+def _capture_only(command):
+    """True when `command` reads the clock and no read's value reaches stdout.
+
+    A value reaches stdout when a segment carrying the read, or an
+    `echo`/`printf` of the variable holding it, is not redirected to a file.
+    """
+    segments = _split_command(command)
+    assigns = [_capture_assigns(segment) for segment, _ in segments]
+    captured = set()
+    for spans in assigns:
+        for name, body, _start, _end in spans:
+            if RX_CLOCK_READ.search(body):
+                captured.add(name)
+    saw_read = bool(captured)
+    for (segment, bodies), spans in zip(segments, assigns):
+        # A `>` inside a quoted format string (`date "+%H:%M -> Checkpoint"`)
+        # is text, not a redirect, so the search runs over the segment with
+        # quoted `<` and `>` blanked.
+        prints = not RX_STDOUT_REDIRECT.search(_mask_quoted(segment, "<>"))
+        rest = _blank(segment, spans)
+        # A read at the top level of the segment prints on its own. One inside
+        # an inline substitution, or in a heredoc body, prints only when the
+        # command consuming it reprints its input (`echo "$(date ...)"`,
+        # `cat <<EOF`); `gh pr comment --body "$(date ...)"` swallows it, and
+        # that read is settled by the tool result instead.
+        direct = bool(RX_CLOCK_READ.search(_mask_substitutions(rest)))
+        inline = not direct and bool(RX_CLOCK_READ.search(rest))
+        in_body = any(RX_CLOCK_READ.search(body) for body in bodies)
+        if direct or inline or in_body:
+            saw_read = True
+            if prints and (direct or _head_word(segment) in REPRINTING_HEADS):
+                return False
+        if not prints:
+            continue
+        unquoted = _mask_quoted_operators(rest)
+        for var in captured:
+            if re.search(RX_PRINTED_VAR % re.escape(var), unquoted):
+                return False
+    return saw_read
+
+
+def _result_text(block):
+    """Best-effort text of a `tool_result`, or None when it cannot be read."""
+    content = block.get("content")
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = [p.get("text") for p in content
+                 if isinstance(p, dict) and isinstance(p.get("text"), str)]
+        return "\n".join(parts)
+    return None
+
+
 def scan(path):
     """Return (opaque_clock_idx, turn_start_idx, text, measured_minutes).
 
@@ -191,12 +599,16 @@ def scan(path):
     the harness delivers it. A `tool_result` quoting the same marker is ignored
     entirely -- neither a value nor a position -- because this file and its
     tests both quote it, so an ordinary `Read` of either would otherwise
-    discharge the guard or inject a fabricated reading.
+    discharge the guard or inject a fabricated reading. The one exception is a
+    `tool_result` belonging to a capture-only clock read, tracked by
+    `tool_use_id` in `pending`: that output is the reading itself, and nothing
+    a file happens to contain can reach it.
     """
     last_clock = -1
     turn_start = -1
     measured = None
     text = ""
+    pending = {}
     i = 0
     with open(path, errors="ignore") as fh:
         for line in fh:
@@ -269,16 +681,34 @@ def scan(path):
                     continue
                 btype = b.get("type")
                 if btype == "tool_use":
-                    blob = (b.get("name") or "") + " " + json.dumps(
-                        b.get("input") or {})
+                    inp = b.get("input") or {}
+                    blob = (b.get("name") or "") + " " + json.dumps(inp)
                     if RX_CLOCK_READ.search(blob):
-                        last_clock = i
+                        command = inp.get("command")
+                        command = command if isinstance(command, str) else ""
+                        if command and _capture_only(command):
+                            # The value went into a variable and never into the
+                            # transcript. Only this call's own output can
+                            # discharge it, so hold it pending (#2991).
+                            if b.get("id"):
+                                pending[b["id"]] = i
+                        else:
+                            last_clock = i
                 # A tool_result is deliberately not scanned for the injected
                 # marker at all, by value or by position. File content echoed
                 # into one is not a reading of the clock, whatever it quotes,
                 # and this file and its tests both quote it -- so counting it
                 # would let an ordinary `Read` of this hook discharge the guard.
-                # A real `date` run is still caught, on its tool_use above.
+                # A real `date` run is still caught, on its tool_use above --
+                # except for the capture-only shape, whose own result is
+                # consulted here and nowhere else.
+                elif btype == "tool_result":
+                    tid = b.get("tool_use_id")
+                    if tid in pending:
+                        out = _result_text(b)
+                        if out is None or RX_VISIBLE_TIME.search(out):
+                            last_clock = i
+                        pending.pop(tid, None)
                 elif btype == "text":
                     if role == "assistant" and b.get("text", "").strip():
                         text = b["text"]

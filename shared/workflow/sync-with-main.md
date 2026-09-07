@@ -386,6 +386,91 @@ An adversarial re-review caught it only via
 comparison above, and fixed it in `c0c658d2`.
 Tracked as [ai-config#2374](https://github.com/Morrison-Lab/ai-config/issues/2374).)
 
+**The reversion can also happen with NO merge at all, and then the trigger is
+a decision you made hours earlier.**
+Both cases above describe a reversion performed *by* a merge: `main` comes in,
+a region resolves toward its side, and the branch's fix is discarded.
+The mirror is a branch that never merged `main`.
+`main` gains a change while you work, your branch keeps editing the region as
+it stood when you cut the branch, and the branch now proposes putting back
+exactly what the merged PR removed.
+
+The sharpest form is a **deferral**, and it is sharp precisely because the
+reasoning was done well.
+You inspected the other PR early, saw it was open, decided to leave that
+passage to it, and recorded the decision.
+That record is what makes the later edit feel safe: the deferral is
+remembered, while its premise --- that the PR is still unmerged, and will land
+its own fix --- has quietly expired.
+A deferral to another open PR is a claim about live state, so
+[`metacognitive-monitoring`](metacognitive-monitoring.md)'s rule for a state
+claim governs it: re-query, do not recall.
+Note that a *worse* decision would have been safer here.
+Having never looked at the other PR, you would have written your own fix and
+collided visibly; having deferred, you wrote nothing, and the collision is an
+absence.
+
+**Neither neighbouring rule fires, and each asks a different question.**
+[`check-before-pushing`](check-before-pushing.md) does run at push time, but it
+asks whether the *remote branch* moved under you --- a different ref and a
+different collision --- and it is silent for as long as nothing has been pushed
+at all, which is the whole of a long session's early hours.
+This fragment's own opening rule frames a moved `main` as **staleness**, a
+branch falling behind.
+Staleness costs a merge.
+Reversion costs someone else's fix, and the result reads as intentional,
+because a re-added sentence is indistinguishable from a sentence you meant to
+write.
+
+**The instrument is one command, and it reports the collision before a
+reviewer or the forge does.**
+
+```bash
+base=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')
+base=${base:-$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name)}
+git fetch origin "$base"
+git merge-tree --write-tree "origin/$base" HEAD
+```
+
+Three details in that block are each load-bearing.
+`refs/remotes/origin/HEAD` is absent in a clone that never ran
+`git remote set-head`, so the fallback is not decoration; and the name it
+resolves to is not always `main`, which
+[`memories/preferences.md`](../../memories/preferences.md) records as a
+measured `fatal: invalid reference: origin/main` on a repo whose default is
+named otherwise.
+The `git fetch` is what stops the check being vacuous: `merge-tree` reads the
+remote-tracking ref, so an unfetched `origin/<base>` compares against the
+`main` you cloned and reports clean, which is
+[`batch-merge-and-resolve`](batch-merge-and-resolve.md)'s
+detector-that-never-ran in miniature.
+And the `--write-tree` form is the one whose **exit status** is the signal ---
+1 on conflict, 0 otherwise --- while the legacy three-argument form always
+exits 0 and needs its output grepped instead.
+
+Run it when you edit a region you deferred to another PR on, and again before
+pushing --- not once at the start.
+`hooks/flag-conflict-with-base.py` is the mechanism for the second of those:
+it warns, rather than blocking, because a conflict with the base is often
+legitimate and nothing in the command can say which.
+
+- **Do:** re-query an open PR you deferred to, before editing the region you
+  deferred on and again before pushing.
+- **Do:** run `git merge-tree --write-tree origin/<default-branch> HEAD` after
+  a fresh fetch, and read a reported conflict as a possible reversion rather
+  than only as a merge chore owed later.
+- **Do:** resolve the default branch's name from the repo; `origin/main` is an
+  assumption, and a wrong one fails loudly here and silently elsewhere.
+- **Don't:** treat a recorded deferral as durable --- the record survives, the
+  premise does not.
+- **Don't:** read a moved `main` as only staleness; the same divergence can be
+  your branch putting back what a merged PR deliberately removed.
+- **Don't:** run `merge-tree` against an unfetched remote-tracking ref, or key
+  the legacy form on exit status --- both report clean unconditionally.
+
+See [`sync-with-main.cases.md`](sync-with-main.cases.md), "A deferral to
+another open PR outliving that PR's merge".
+
 **When the whole PR is superseded, not just one file, the conflict is telling
 you to close it rather than resolve it.**
 The two cases above keep `main`'s version of a file a sibling PR already

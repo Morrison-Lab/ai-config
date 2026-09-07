@@ -86,6 +86,11 @@ ai-config#2969 (ai-config#694 pattern) to keep both files well under the
     On the two heads above that waited, a run followed the request within
     seconds, an observed sequence rather than a proven cause.
   - **Don't:** arm a check-in that waits on a round that never started.
+  - **Don't:** read a real, successful past request on this same PR as still
+    covering the current head --- the obligation is per-HEAD, not per-PR, so
+    it re-arms on every push regardless of how many earlier heads were
+    already reviewed.
+    See [`mistake-patterns.md`](mistake-patterns.md) Pattern 51.
 - **A Copilot review reporting `Comments generated: 0 new` can still carry
   findings.**
   They sit under `Suppressed comments` in the `COMMENTED` review body that

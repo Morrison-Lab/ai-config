@@ -693,99 +693,8 @@ header rather than with comparing figures.)
 
 ## A nested worktree inflates a whole-tree instrument, because the worktree lives INSIDE the repo
 
-"A repo script run from a worktree can measure the MAIN checkout" above is the
-case where an instrument reads a **different** tree than the one you stand in.
-This is the mirror: the instrument reads **your** tree, correctly, plus a second
-copy of the corpus nested inside it.
-`isolation: "worktree"` on an `Agent` call places that worktree at
-`<repo>/.claude/worktrees/agent-<id>`, so while the agent is live the repository
-physically contains another branch's checkout of every file.
-
-Whether an instrument notices depends on how it enumerates files.
-Measured on `main` at `41d82611`, with and without one worktree present:
-
-| instrument | no worktree | one worktree present |
-| --- | --- | --- |
-| `npx markdownlint-cli2` | `Linting: 512 files` | `Linting: 1207 files` |
-| `scripts/check-links.py` | 503 files | 503 files |
-| `scripts/check-context-closure.py` | 80 fragments | 80 fragments |
-| `scripts/check-hook-catalog.py` | 18 / 20 | 18 / 20 |
-
-Removing the worktree returned markdownlint to 512.
-
-What decides exposure is **how an instrument enumerates**, and the shapes are
-worth knowing because they predict which of your own tools is affected without
-re-measuring each one.
-
-Exactly one shape is exposed, which is why only one row moved:
-
-- **An unrestricted recursive glob from the repo root.**
-  `.markdownlint-cli2.jsonc` globs `**/*.md`, and its `ignores` list named
-  generated output and dependencies rather than a nested checkout.
-
-The other three rows are immune, and each for a different reason:
-
-- **A named-directory glob** never reaches it.
-  `check-links.py`'s `SCAN_GLOBS` lists `skills/**/*.md`, `memories/**/*.md`,
-  and their siblings, so `.claude/` sits outside its search space.
-- **A closure walk from named entry points** never reaches it either.
-  `check-context-closure.py`'s `walk_closure` follows references outward from
-  its roots, so a nested checkout is reachable only if something in the closure
-  cites it, and nothing does.
-- **A fixed-file read** has nothing to enumerate at all.
-  `check-hook-catalog.py` opens `hooks/hooks.json` and `README.md` by path;
-  it globs nothing.
-
-One further immune shape is worth naming even though no row above uses it,
-since much of `scripts/` is built on it: **a `git ls-files` enumeration**
-cannot see a nested worktree, because its files are untracked in the parent
-index.
-`scripts/check-memory-file-size.py` is the example.
-
-The config fix is tracked as
-[#1511](https://github.com/Morrison-Lab/ai-config/issues/1511) and proposed in
-[#1513](https://github.com/Morrison-Lab/ai-config/pull/1513), and is not what
-this entry is about.
-That PR's own `ignores` comment carries the breakdown of the 1207 --- the
-worktree's markdown, the files its `.claude/skills` symlink pulls in, and its
-`codex-skills/` escaping the root-anchored ignore --- so read the count's
-composition there rather than here.
-The enumeration question outlives that fix, since any tool added later that
-globs the repo root inherits the same exposure.
-
-**Nothing in the output flags the change.**
-`Summary: 0 issues in 0 files` is identical either way, so the inflation lives
-entirely in the `Linting:` line --- and a reader who pipes to `tail` to shorten
-the output keeps the summary and drops exactly that line.
-That is the same self-inflicted blind spot recorded in "A repo script run from a
-worktree can measure the MAIN checkout", arriving through a different fault.
-
-Note the failure direction is the opposite of
-[`fail-fast`](../shared/principles/fail-fast.md)'s "A zero-shaped
-summary can be sound, and the scope line is what decides it".
-There a sound figure is wrongly retracted; here an inflated one is published
-unremarked, and the same line separates the two cases.
-
-So **run `git worktree list` before publishing a whole-tree figure**.
-More than one row means the scan may have covered another branch's copy of the
-corpus, so the figure describes a tree nobody asked about.
-`git archive HEAD | tar -x` into a scratch directory settles it outright ---
-[`fail-fast`](../shared/principles/fail-fast.md) already prescribes that for a
-drifted working tree, and an archive of `HEAD` carries no untracked nested
-checkout either.
-
-A second consequence is a hook rather than a figure.
-A pre-commit hook running such a tool with `always_run: true` scans the nested
-checkout too, so it can fail on a file from a branch you are not on, in a commit
-that does not touch it.
-
-- **Do:** run `git worktree list` before quoting a whole-tree count.
-- **Do:** ask how an instrument enumerates --- `git ls-files`, named
-  directories, or a root glob --- before assuming it is immune.
-- **Don't:** read a stable `Summary:` line as evidence the scope was stable;
-  the scope sits on the line above it.
-- **Don't:** trust a whole-tree figure measured while a subagent was live,
-  including one you published earlier in the same session.
+Moved to [`nested-worktree-instrument-inflation.md`](nested-worktree-instrument-inflation.md) (ai-config#694 pattern, at the 1250-line gate): `isolation: "worktree"` nests a second checkout inside the repo, and a root-globbing instrument (e.g. `markdownlint-cli2`) silently counts its files too, while a named-directory glob, a closure walk, or a `git ls-files` enumeration stays immune.
+Run `git worktree list` before publishing any whole-tree count.
 
 ## A quiet worktree is not evidence the session working it has stopped
 
@@ -1248,3 +1157,24 @@ The hook fired on that single line.
 The prior instance in [`CLAUDE.cases.md`](../CLAUDE.cases.md) records the same
 unassigned-isolation slip with no harmful consequence available; this is the
 consequence.)
+
+## A read-only `cd` into a peer's worktree, or a REFUSED checkout, can arm `no-unshipped-commit.py`
+
+Sibling to the section above, same family (a repo scan drawing a conclusion from context that is not the session's own), different mechanism: `no-unshipped-commit.py` (unpushed commits, not uncommitted diffs) fired from inspecting a separate PEER worktree, not from working inside the primary one.
+
+Measured 2026-09-04 on `ucdavis/hac.sap`: a session `cd`'d into a peer's worktree only to inspect it, exactly what [`CLAUDE.md`](../CLAUDE.md)'s "Subagent worktrees are assigned" section requires, and separately ran a `git checkout -B` that git refused (`fatal: ... already used by worktree`).
+The hook then blocked `Stop`, reporting four of a live peer's unpushed commits (one a breaking `fix!:`) as this session's to push.
+
+Filed as [ai-config#3272](https://github.com/Morrison-Lab/ai-config/issues/3272) (open; do not re-file).
+Its own follow-up comment names the mechanism as it stood at filing time: a read-only visit and a failed checkout both registered as "touched."
+**Do not cite that comment's function or variable names as current** --- `no-unshipped-commit.py` has since accumulated several unrelated attribution fixes per its own docstrings (ai-config#2422, #2737), so a name correct at filing time can already be stale;
+re-derive from the live source before quoting internals, which is this entry's own near-miss on the first draft (an adversarial review caught fabricated names and a stale line range copied from the issue rather than re-checked against the code).
+A re-read of the current `scan_transcript` found that a call containing only a `cd`/`checkout` with no `git commit` in it no longer contributes to the tracked branches or paths at all (the function's own docstring: "Visiting is not committing," ai-config#2422), so the plain read-only-`cd` trigger may already be closed.
+Whether a *refused* checkout inside the same call as a real commit still registers (the command is read as text, with no exit-status check visible in that read) was not re-verified here.
+
+Until the issue resolves, or its current state is re-checked:
+
+- **Do:** inspect a peer worktree with `git -C <path>` reads (`status`, `log`, `rev-parse`), never a bare `cd`, as a general precaution regardless of this hook's current state.
+- **Do:** re-read the hook's live source, not this entry or the issue comment, before asserting whether the bug still reproduces.
+- **Don't:** comply with "push the branch" when the flagged worktree belongs to a peer confirmed live;
+  publishing another session's unreviewed, possibly mid-amend commits is unsafe regardless of the trigger or whether the hook's report is accurate.

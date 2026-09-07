@@ -61,7 +61,7 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
 
 6. **Fingerprint what you read and include structured data**
 
-   End the report, after the verdict, with the commit you reviewed
+   Immediately after the verdict, give the commit you reviewed
    as a bare line, not inside a fence:
 
    Reviewed-Commit: <full sha from `git rev-parse HEAD`>
@@ -89,9 +89,18 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
    A report without the line authorizes nothing, and one cut short before it is refused rather than read as clean.
    Write the label plainly on its own line: emphasis around it is tolerated.
 
+   The tail runs in exactly one order --- verdict, then fingerprint, then payload --- and the report ends there.
+   Putting the payload last costs the verdict line and the fingerprint nothing, because `parse_report` blanks HTML comments before both of its regex searches: a payload sitting last can neither supply nor displace either one (measured 2026-09-03).
+   That is a claim about those two searches and nothing wider.
+   The payload is still read, separately and from the raw text, and it is authoritative rather than decorative --- a payload listing any finding turns a `Ready for merge` verdict into `needs_work`, which is the standing rule stated above.
+   Do not add an `--- end of report ---` sentinel, and do not move the verdict or the fingerprint after the payload.
+   A sentinel only keeps a harness-appended trailer off a fingerprint that is the report's last line, and under this ordering the fingerprint never is: the trailer lands on the payload instead.
+   Give the sha as the full 40 characters anyway, so that a brief written elsewhere that reorders the tail cannot silently corrupt it.
+   `REVIEWED_COMMIT` captures `[0-9a-fA-F]{7,40}`, so an abbreviated fingerprint with `agentId:` glued to it captures the abbreviation plus the trailer's leading hex characters and yields a plausible but wrong sha rather than a parse failure (`abcdefa` plus that trailer captured `abcdefaa`, measured 2026-09-03).
+
 State the verdict on its own line in that exact form.
 Return the structured report as this call's own message, not as a pointer to a file.
-Emit nothing after the closing --> of the review-data comment.
+Emit nothing after the closing --> of the review-data comment, an `--- end of report ---` sentinel included.
 `parse_report()` (Claude Code's pre-push guard, and the
 Cursor Cloud recovery gate) accepts `Needs work` as well as
 `Needs more work`, an optional heading, and spaces around the colon.

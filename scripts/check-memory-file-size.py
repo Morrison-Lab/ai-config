@@ -36,6 +36,24 @@ changed line the new-line-breaks gate can flag.
 
 Run `python3 scripts/check-memory-file-size.py --strict` before pushing to match CI.
 When run without `--strict`, the script is advisory (exits 0 while printing findings).
+
+APPROACHING THE CAP (`--warn-fraction`)
+---------------------------------------
+Reporting only the breach is what made this check arrive too late to act on.
+"No memory file exceeds 1250 lines" is equally true at 3 lines and at 1250, so
+a session about to append learned a file was full by tripping the gate, then
+filed an issue about whichever file it happened to touch -- 22 near-identical
+issues across six weeks, per ai-config#3102. The information is actionable
+*before* the write, not after.
+
+So any file in the band `warn_lines <= n <= max_lines` is reported with its
+remaining headroom. A file sitting exactly AT the cap is a warning rather than
+a breach (the failure fires strictly above `max_lines`), and it is precisely
+the file that cannot take another line.
+
+Warnings never change the exit code, under `--strict` or without it. The band
+is a trend line, not a second gate: making it fail would just move the wall
+inward and re-create the same surprise 100 lines earlier.
 """
 from __future__ import annotations
 
@@ -47,6 +65,19 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 DEFAULT_MAX_LINES = 1250
+
+# Fraction of `--max-lines` above which a file is reported as approaching the
+# cap. 0.92 of 1250 is 1150, which leaves 100 lines -- room for several UMS
+# appends, so a warned file can be split at some deliberate moment rather than
+# by whichever session happens to run out of room first. A parameter rather
+# than a literal per `shared/coding/configurable-parameters.md`.
+DEFAULT_WARN_FRACTION = 0.92
+
+# The one line the warning band prints above its per-file listing. It reports
+# and does not instruct, for the reason `report_approaching` gives. Kept as a
+# named constant so `test_check_memory_file_size.py` can check its shape
+# against the string itself rather than scraping it back out of the output.
+BAND_HEADER = "Headroom before the cap, least first."
 
 # `MEMORY.md` is the index, not a memory file; `session/` holds
 # conversation-scoped notes that are never meant to persist or be split.
@@ -87,6 +118,19 @@ def tracked_memory_files(directory: str) -> list[str]:
     ]
 
 
+def measured_files(directory: str) -> list[tuple[str, list[str]]]:
+    """(path, lines) for each tracked memory file under `directory`."""
+    return [
+        (rel_path, (REPO_ROOT / rel_path).read_text(encoding="utf-8").splitlines())
+        for rel_path in tracked_memory_files(directory)
+    ]
+
+
+def warn_line_threshold(max_lines: int, warn_fraction: float) -> int:
+    """Line count at or above which a file is reported as approaching."""
+    return round(max_lines * warn_fraction)
+
+
 def section_sizes(lines: list[str]) -> list[tuple[str, int]]:
     """(heading, line-count) for each `## ` section, largest first."""
     sections: list[tuple[str, int]] = []
@@ -105,15 +149,84 @@ def section_sizes(lines: list[str]) -> list[tuple[str, int]]:
 
 
 def oversized_files(
-    directory: str, max_lines: int
+    measured: list[tuple[str, list[str]]], max_lines: int
 ) -> list[tuple[str, int, list[tuple[str, int]]]]:
-    """(path, line-count, largest sections) for each file over `max_lines`."""
-    findings = []
-    for rel_path in tracked_memory_files(directory):
-        lines = (REPO_ROOT / rel_path).read_text(encoding="utf-8").splitlines()
-        if len(lines) > max_lines:
-            findings.append((rel_path, len(lines), section_sizes(lines)[:5]))
+    """(path, line-count, largest sections) for each file over `max_lines`.
+
+    Takes an already-measured list rather than a directory so one run reads
+    the corpus once: the breach report and the warning band partition a
+    single measurement, so re-reading every file for the second half would
+    also let a mid-run edit put the two halves on different line counts.
+    """
+    findings = [
+        (rel_path, len(lines), section_sizes(lines)[:5])
+        for rel_path, lines in measured
+        if len(lines) > max_lines
+    ]
     return sorted(findings, key=lambda f: -f[1])
+
+
+def approaching_files(
+    measured: list[tuple[str, list[str]]], max_lines: int, warn_lines: int
+) -> list[tuple[str, int, int]]:
+    """(path, line-count, headroom) for each file in the warning band.
+
+    The band is `warn_lines <= n <= max_lines`, so it is disjoint from
+    `oversized_files`, which fires strictly above `max_lines`. A file at
+    exactly the cap therefore appears here, with a headroom of 0.
+
+    Takes the same already-measured list `oversized_files` does, for the
+    reason given there.
+    """
+    findings = [
+        (rel_path, len(lines), max_lines - len(lines))
+        for rel_path, lines in measured
+        if warn_lines <= len(lines) <= max_lines
+    ]
+    return sorted(findings, key=lambda f: -f[1])
+
+
+def report_approaching(
+    approaching: list[tuple[str, int, int]],
+    max_lines: int,
+    warn_lines: int,
+    announce_empty: bool = True,
+) -> None:
+    """Print the warning band, or say the band is empty.
+
+    Printed even when nothing breached, because the silence in the clean case
+    is the whole defect (ai-config#3102): a session reading "no memory file
+    exceeds 1250 lines" cannot tell 3 lines from 1250.
+
+    `announce_empty` is False when a breach was already reported. An
+    over-cap file is past the cap rather than near it, so "no memory file is
+    within N lines of the cap" would read as contradicting the finding
+    printed directly above it.
+
+    The header reports; it does not instruct. One imperative addressed to the
+    whole band would advise every file in it identically: at the shipped
+    default the band opens 100 lines below the cap, so a file with most of that
+    room still ahead of it would be told to split. That is the wall moved
+    inward which the module docstring rejects for the exit code, arriving
+    through the advice instead of through the exit status. Urgency belongs to
+    the per-file headroom the listing already carries, so the header names that
+    number and orders by it, and the procedure that acts on it lives in
+    `skills/ums/SKILL.md` step 3.
+    """
+    if not approaching:
+        if announce_empty:
+            print(
+                f"No memory file is within {max_lines - warn_lines} lines of the cap."
+            )
+        return
+
+    print(
+        f"\n{len(approaching)} memory file(s) are approaching the "
+        f"{max_lines}-line cap ({warn_lines} lines or more).\n"
+        f"{BAND_HEADER}\n"
+    )
+    for rel_path, n_lines, headroom in approaching:
+        print(f"  {rel_path}: {n_lines} lines ({headroom} lines of headroom)")
 
 
 def main() -> None:
@@ -130,16 +243,36 @@ def main() -> None:
         help=f"lines above which a file is flagged (default: {DEFAULT_MAX_LINES})",
     )
     parser.add_argument(
+        "--warn-fraction",
+        type=float,
+        default=DEFAULT_WARN_FRACTION,
+        help=(
+            "fraction of --max-lines at which a file is reported as "
+            f"approaching the cap (default: {DEFAULT_WARN_FRACTION})"
+        ),
+    )
+    parser.add_argument(
         "--strict",
         action="store_true",
         help="exit 1 if any file is over the threshold (default: advisory, exits 0)",
     )
     args = parser.parse_args()
 
-    findings = oversized_files(args.directory, args.max_lines)
+    # Fail fast rather than silently degrading the band: a fraction of 1
+    # collapses it to files at exactly the cap, one above 1 empties it, and one
+    # at or below 0 warns on every file. None of those is a usable band, and
+    # each fails silently -- the run just prints a band that says nothing.
+    if not 0 < args.warn_fraction < 1:
+        parser.error("--warn-fraction must be strictly between 0 and 1")
+
+    warn_lines = warn_line_threshold(args.max_lines, args.warn_fraction)
+    measured = measured_files(args.directory)
+    findings = oversized_files(measured, args.max_lines)
+    approaching = approaching_files(measured, args.max_lines, warn_lines)
 
     if not findings:
         print(f"No memory file exceeds {args.max_lines} lines.")
+        report_approaching(approaching, args.max_lines, warn_lines)
         return
 
     print(
@@ -157,6 +290,8 @@ def main() -> None:
         "sections,\nregister each new file in memories/MEMORY.md, and "
         "repoint inbound references."
     )
+
+    report_approaching(approaching, args.max_lines, warn_lines, announce_empty=False)
 
     if args.strict:
         sys.exit(1)

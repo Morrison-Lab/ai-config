@@ -85,3 +85,28 @@ Note which way the coupling runs.
 The payload had to be malformed to reach the defect, and malformed is
 precisely what `shlex` rejected it for, so the more layers a guard sits
 behind, the likelier this is.)
+
+## Mutate the fix, not only the test --- a fixture ordered like the table
+
+(ucdavis/bcs#913, 2026-09-03: a refactor replaced three inline
+`dplyr::recode_values()` blocks with a named-character-vector lookup,
+`labels[outcome]`.
+That silently broke factor input, because indexing a named vector by a factor
+uses the integer level codes rather than the values --- so a factor whose
+levels are ordered differently from `labels` reads the wrong label out, and one
+whose levels happen to match reads the right one.
+The fix was `labels[as.character(outcome)]`, and a regression test was written
+alongside it.
+The test was vacuous: its factor's `levels` were in the same order as
+`labels`, so level-code indexing and value indexing returned identical
+results, and it passed with the fix removed.
+Nothing about the fixture looked like a shortcut --- it was an ordinary,
+representative factor, and its order was the order anyone thinking about the
+label table would have written.
+An adversarial reviewer caught it.
+Reversing the level order made the test discriminate, and the mutation ---
+delete the `as.character()` call, confirm the suite goes red, restore, confirm
+green --- settled it in one command.
+Note which direction is cheap: reading the test a second time would not have
+found this, because the test was correct in every respect except the one that
+cannot be read off it.)

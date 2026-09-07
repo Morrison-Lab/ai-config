@@ -46,9 +46,20 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HOOKS = os.path.join(ROOT, "hooks")
 
-# Per-suite deadline. Measured 2026-08-26 on a Linux cloud runner: the
-# slowest suite (test-no-clobbering-push: 32 scratch git repos plus 17
-# mutation rounds) finished in 178s. 900s is about 5x that, so a slow
+# Per-suite deadline. The slowest suite is test-no-clobbering-push, and its
+# population is what the number below is derived from, so re-state both
+# whenever the suite grows rather than leaving a stale count behind: 32 cases
+# plus 17 mutation rounds finished in 178s on a Linux cloud runner
+# (2026-08-26), and 64 cases plus 42 rounds finished in 159s on another one
+# (2026-09-04). The unit is a test CASE, not a scratch repository: every case
+# builds a working repo AND a bare origin, and several build a clone or a
+# worktree on top, so the repositories outnumber the cases at least two to
+# one. Reading the derived number as a repository count made a per-repo cost
+# look more than twice what it is (ai-config#2451).
+# Restating it is no longer left to whoever grows the suite:
+# `scripts/test_test_hooks.py` derives both counts and FAILs on a stale one,
+# because two reviews in a row found this comment stale anyway
+# (ai-config#2451). 900s is about 5x the slower reading, so a slow
 # Windows box has headroom past the 420s kill of the hang that never
 # produced output (ai-config#2098) while still FAILing an infinite
 # stall. Override with HOOK_TEST_SUITE_TIMEOUT.
@@ -171,7 +182,19 @@ def run_one_suite(test_path, subject, timeout):
     # and was caught in review: 36 of 46 suites spawn the subject as a
     # subprocess, and a SyntaxWarning injected into one of them (verified
     # empirically) still passed cleanly under the `-W`-only form.
-    env = dict(os.environ, PYTHONWARNINGS="error::SyntaxWarning")
+    #
+    # The second entry is keyed on the warning MESSAGE rather than a category
+    # (ai-config#3114): an invalid escape sequence is a DeprecationWarning on
+    # Python 3.11 and a SyntaxWarning on 3.12 and later, so the category-only
+    # form is vacuous on whichever interpreter is not the one it names.
+    # Measured 2026-09-03: `P = "a\s"` under `error::SyntaxWarning` alone
+    # exits 0 on 3.11 and 1 on 3.12, and the message-keyed entry makes both
+    # exit 1. Keying on the message rather than adding
+    # `error::DeprecationWarning` keeps every unrelated deprecation a warning.
+    env = dict(
+        os.environ,
+        PYTHONWARNINGS="error::SyntaxWarning,error:invalid escape sequence::",
+    )
     env.pop("ANTIGRAVITY_AGENT", None)
     proc = subprocess.Popen(
         [sys.executable, test_path, subject],

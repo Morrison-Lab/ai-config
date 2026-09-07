@@ -245,8 +245,29 @@ The heading moves across PRs:
 PR #660 emitted `Comments suppressed due to low confidence (3)`,
 while PRs #1029 and #1031 emitted `Suppressed comments (4)`.
 A literal match for either phrase can return a false zero.
-Matching case-insensitively on `suppressed` strictly inside `<summary>` headings prevents false positives against overview prose
-(such as review 4837572117 whose summary table mentioned "suppressed Copilot findings" in uncollapsed text).
+Matching case-insensitively on `suppressed` in a `<summary>` element or in an ATX heading inside a collapsed `<details>` region catches ai-config#3084 review `5098574802`,
+whose block is a `### Suppressed comments (1)` heading nested under `<summary>Review details</summary>` that a `<summary>`-only match returns zero against (measured 2026-09-03).
+Prefer the heading anchor over the region, and keep the region as a fallback.
+The corpus has two measured false-positive controls, and each belongs to a PR the citation has to name --- a review id does not carry its PR number, and an earlier version of this record cited `4837572117` without one.
+They do not partition one per wider matcher form, as the superseded wording had it: an occurrence inside a `<details>` region is by definition an occurrence in the body, so region-wide's hits are a subset of body-wide's, and body-wide carries both controls while region-wide carries one.
+The body-wide-only control is ai-config#1038 review `4837572117`, whose "suppressed Copilot findings" sits in the uncollapsed overview sentence "Aligns ARDI-family guidance on deadlocks, sweep scheduling, and suppressed Copilot findings" --- not in its summary table, whose four rows contain no occurrence of the word (re-read 2026-09-04 from `get_reviews`).
+Both the heading anchor and the region-wide form exclude it.
+The other control, which both wider forms flag, is ai-config#1036 review `4837539268`, whose only occurrences of the word sit inside a collapsed `<details>` region headed `<summary>Show a summary per file</summary>`, in table rows reading "Detects suppressed Copilot findings." and "Updates suppressed-comment detection.", while the body carries no suppression block at all (measured 2026-09-04 from `get_reviews`).
+Only the heading anchor excludes it.
+`5098574802` also wraps its own `Pull request overview` and `File summaries` prose in collapsed `<details>` regions (measured 2026-09-03), so a collapsed region is no longer a proxy for "not ordinary overview prose".
+Enumerating Copilot review bodies from the `reviews` endpoint on 2026-09-04 --- 137 bodies across 39 PRs, from ai-config PRs 1000 through 1100 and 3060 through 3130 plus ai-config#660, ai-config#2913 and ai-config#2976 --- body-wide hit 80, region-wide 79 and the heading anchor 78, a `<summary>`-only match returned zero against 50 of those 78, and the only body the region-wide form flagged and the heading anchor did not is the `4837539268` control.
+Region-scoping is therefore the weaker anchor on measurement, not only in principle.
+The superseded claim that no body in the measured set turns it into a false positive was an artifact of deriving that set from a repo-wide prose grep, which enumerates the PRs this corpus happens to mention rather than the population of Copilot review bodies.
+
+[ai-config#3170](https://github.com/Morrison-Lab/ai-config/issues/3170) asks `scripts/check-pr-fully-clean.py` to implement this check, quoting [`fully-clean.md`](fully-clean.md)'s pre-change wording,
+so its Ask prescribes matching strictly inside `<summary>` --- the form measured to return zero against `5098574802`.
+The correction has to reach the issue as well as this file.
+Whoever implements #3170 opens the issue and reads its Ask, not `fully-clean.cases.md`, and the issue carried no comment recording the counter-example when this was written (2026-09-04, 00:50 PDT).
+
+- **Do:** implement the heading anchor above when closing that issue.
+- **Do:** post the counter-example on that issue --- review `5098574802`'s `### Suppressed comments (1)` nested under `<summary>Review details</summary>`, measured 2026-09-03 --- and link the comment from here, so the two records point at each other.
+- **Don't:** build the `<summary>`-only matcher its Ask names.
+- **Don't:** read this in-repo note as having corrected the Ask --- it does not sit on the surface the implementer reads.
 
 ## A review comment's header SHA can be stale
 

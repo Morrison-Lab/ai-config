@@ -902,6 +902,52 @@ already be running.**
 - **Don't:** credit a suppression with protection it does not supply; measure
   whether it prevents the recurrence or only postpones one event of it.
 
+**Pricing an over-warn as cheap presumes the warning can be cleared, and the ranking above never says to check that.**
+"An over-warn is visible" is right for a guard whose discharge a session can actually take.
+A **fail-closed** guard that re-arms every turn and whose discharges the session must not take does not cost one visible event: it blocks, per turn, for as long as the condition holds.
+That is not a claim that an over-warn is worse than a silent discharge, which would need a measurement nobody has run;
+it is the narrower claim that "visible, therefore cheap" stops holding once the visible thing cannot be cleared.
+
+The case that produces it is specific and worth recognizing in advance: a standing directive forbids the action the guard demands.
+Nothing is broken then.
+The guard is correct, the session is correct, and if no other discharge exists the two are unsatisfiable together, so no amount of doing the right thing clears the demand.
+
+**An exemption set can be complete on paper and empty in practice, because each path carries a precondition the set does not state.**
+That is the failure mode, and it is why "this guard has three exemptions" does not answer the question.
+`hooks/no-unreviewed-pr.py` on 2026-09-03/04 demanded a Copilot review while a standing all-repos moratorium forbade one.
+Its three paths were derived from the source and each was then unavailable: the `no-ai-review` label the refusal message names did not exist in the repository, so an add would have errored and the path granted nothing;
+`ALLOW_UNREVIEWED_REDACTION_PR=1` asserts a redaction that was not true;
+and the draft deferral did not apply.
+The session was blocked for many turns while doing exactly what a standing directive required.
+That is what the pricing above misses: the paths were enumerable, printed, and documented, and the set they formed was still empty.
+
+Two things follow for the author of such a guard.
+Write each exemption's **precondition** where the set is written --- a label path is only a path in a repository that has the label --- since a printed exemption reads as an available one.
+And prefer a **suppression the guard reads itself**, so that a directive the session must obey does not require the session to improvise an override.
+That guard implements one: a dated moratorium constant, chosen over an environment flag because a flag has to be unset by whoever remembers and a date re-arms itself.
+
+Read it as unfinished rather than as a solved case.
+The general exemption --- "a standing directive forbids the demanded action", as a first-class condition rather than one named directive --- is **not** implemented anywhere;
+[#1709](https://github.com/Morrison-Lab/ai-config/issues/1709) carries it as a suggested fix, and was closed on the strength of the dated constant and reopened on 2026-09-04 (Pacific) when the shape recurred.
+The `no-ai-review` label was created shortly after that reopening, in response to it, so the repository now has the path the incident lacked;
+read every sentence above about that label as describing 2026-09-03/04 rather than the state a reader checking today will find.
+[#3141](https://github.com/Morrison-Lab/ai-config/issues/3141) is the dated constant not suppressing: this repository's copy of the constant read `2026-12-01` and the guard demanded the forbidden request anyway.
+The copy captured firing on 2026-09-04 carried an earlier date;
+whether that same copy served the 2026-09-03 demands is **not established**, so read the stale snapshot as a mechanism measured for one firing rather than as the incident's cause.
+An in-script suppression therefore removes the improvised-override problem and inherits the stale-payload one, where a dated constant fails **open** --- see [`keep-checkouts-fresh`](../workflow/keep-checkouts-fresh.md) for the measurement and for the resolution order that finds the copy actually running.
+The "credit a suppression with protection it does not supply" bullet at the end of the list above applies to this remedy as much as to anything it governs.
+
+- **Do:** check each exemption path's precondition, not only that the path exists in the source --- a named label, file, or flag has to be present in the repository the guard is running against.
+- **Do:** ask whether the surviving paths are ones a session obeying every standing rule could take, before pricing a fail-closed over-warn as cheap.
+- **Do:** give a guard whose demand a standing directive can forbid a suppression it reads itself, rather than relying on an override the session supplies.
+- **Don't:** count an enumerated exemption set as a non-empty one;
+  three documented paths that each fail their own precondition leave a guard with no correct action.
+- **Don't:** count a fail-closed over-warn as one visible event when the guard re-arms every turn;
+  it blocks per turn until something clears it.
+- **Don't:** read "the safe direction" as meaning a fail-closed guard is free in the case where the safe action is unreachable.
+
+(Tracked as ai-config[#3271](https://github.com/Morrison-Lab/ai-config/issues/3271).)
+
 ### A combined result cannot attribute a per-step outcome
 
 The commonest way a discharge fires on false evidence: the guard reads a

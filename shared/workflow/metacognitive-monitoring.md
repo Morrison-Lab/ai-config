@@ -1027,6 +1027,33 @@ interpreter, a container built without the optional extras.
 Each shrinks what is being measured without shrinking the figure reported, and
 each makes the run faster, so the habit reinforces itself.
 
+**A sample can be complete, non-zero, and drawn entirely from the complement of what it was aimed at, when the event of interest could not occur during the window.**
+The skip case above at least announces its own gap: a skip count is a number the tool prints, and reading it is the whole of the remedy.
+This one prints nothing.
+Every observation is real, none is skipped, the count is healthy, and the event the sample was taken to settle was impossible for the duration --- so what came back is a census of everything else.
+The reading is what makes it dangerous rather than merely useless: a clean sample is exactly what "the event cannot happen here" produces, and it is also what "the event does not happen here" produces, and those are different claims.
+No feature of the output separates them.
+
+So state the event a sample is meant to catch, and confirm the window could have contained one, before reading the result.
+Where the event is something you can cause --- a guard you can trigger, a request you can send, a job you can re-run --- cause it inside the window rather than waiting for it, which converts the sample from an observation into a test.
+Where you cannot, report the sample as evidence about the population it did enumerate, and say in the same sentence that the target event did not occur in it.
+
+(Measured 2026-09-03, ai-config[#3141](https://github.com/Morrison-Lab/ai-config/issues/3141).
+A 240-second `ps` sample captured 20 distinct hook command lines, all from `$HOME/.claude/hooks/` and none from a plugin root, and was read as showing the plugin registration path inert.
+`hooks/no-unreviewed-pr.py` never fired during that window --- it fires only with an unreviewed PR open --- so what the sample enumerated is the `settings.json`-registered hooks, and it says nothing about the firings in question.
+Both registration paths are live at once, which is why enumerating one of them refutes nothing about the other.
+The same session settled which copy fires when the guard is deliberately triggered, by the opposite procedure: `ps -eo args` sampled at 0.05s **while causing the event** named a copy under `~/Library/Application Support/Claude/local-agent-mode-sessions/` that no pass had looked at.
+Whether that same copy served the earlier firings is not established, and [`keep-checkouts-fresh`](keep-checkouts-fresh.md) says so where it records the capture --- so the remedy below is "cause the event inside the window", not "one capture settles the question".
+That instance is recorded case-specifically in [`keep-checkouts-fresh`](keep-checkouts-fresh.md) and in [`mistake-patterns`](../../memories/mistake-patterns.md)'s Pattern 43 occurrence bullet, both added by [#3267](https://github.com/Morrison-Lab/ai-config/pull/3267).
+`keep-checkouts-fresh` already states the observation in one line, in the middle of that incident's account --- "a sample drawn when the event of interest is impossible measures the complement of what it was aimed at, and reports a clean number for doing so" --- and this section deliberately reuses its phrasing rather than inventing a second vocabulary for the same thing.
+Both files also carry the remedy in its concrete form --- capture the path with `ps` while deliberately triggering the guard --- so what is added here is the generalized check (name the event, confirm the window could have contained one) and that remedy stated as a rule rather than as one incident's step, in the fragment a reader consults about their own claims rather than about a plugin install.)
+
+- **Do:** name the event a sample is meant to catch, and confirm the window could have contained one, before reading the result.
+- **Do:** trigger the event inside the window when you can cause it, rather than sampling and hoping one arrives.
+- **Don't:** read a clean sample as evidence the event does not occur, when the event was impossible for the window's duration --- that is the reading the sample gives either way.
+- **Don't:** treat a non-zero observation count as answering the skip case's question;
+  a sample with nothing skipped can still have enumerated only the complement.
+
 **A different instrument answering a similarly-shaped question is not the population gap above, because there is no shared measurement for either claim to widen.**
 Every case in this section so far shares one instrument: a single command was run, and the claim reached past the population that command actually covered.
 The branches-versus-refs gap and the pipe-lines-versus-rows gap both come from one `git` or `grep` invocation whose output got mis-described.
@@ -1102,10 +1129,8 @@ the section's standing Do/Don't list is the one that follows this paragraph.
   not reported that they pass.
 - **Don't:** treat [`grep-is-not-coverage`](grep-is-not-coverage.md) as a
   rival rule here.
-  That fragment is the **null-result** instance of this shape --- a zero-hit
-  search read as evidence about a pattern --- so it is the sharper tool when
-  the measurement returned nothing, and this section is the general form.
-  Instance 4 is itself a null result, so both reach it.
+  That fragment is the **null-result** instance of this shape --- a zero-hit search read as evidence about a pattern --- so it is the sharper tool when the measurement returned nothing, and this section is the general form.
+  Instance 4 of the first case record below is itself a null result, so both reach it.
   Finding a positive result read as a neighbouring fact is the case only this
   section covers.
 
@@ -1114,6 +1139,9 @@ See [`metacognitive-monitoring.cases.md`](metacognitive-monitoring.cases.md),
 the two propositions are a verified **mechanism** and an unverified
 **instance** asserted to fall under it, "A mechanism verified, an unverified
 population asserted to fall under it".
+
+A second five-instance set, 2026-09-02/04, is recorded there as "One session, five wrong conclusions drawn from artifacts that were all real".
+Those five do not all fall under this section --- two are [`verify-the-right-artifact`](verify-the-right-artifact.md) substitutions and one is a plain misread --- and the record is worth reading for what they share instead: in each, the erroneous step felt like *reading* the evidence rather than adding to it, which is what carried every one of them through self-review.
 
 ## Writing is the instrument, when the claim can be wrong
 

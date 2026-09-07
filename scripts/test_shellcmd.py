@@ -285,6 +285,77 @@ check("and still records its value",
       shellcmd.env_value(shellcmd.strip_env(["FOO=1", "git", "push"])[0],
                          "FOO"), "1")
 
+# ------------------------------------------------- resolve_cd_target
+#
+# A CALLER MUST BE ABLE TO TELL "MOVED SOMEWHERE I CANNOT NAME" FROM
+# "DID NOT MOVE". `hooks/no-unshipped-commit.py` attributes a commit to the
+# directory the shell stands in, so reading `cd -` as "unchanged" leaves a
+# dormant worktree the session merely visited standing as the answer --- the
+# false block ai-config#2422 reports. Each indeterminate spelling is pinned
+# here rather than left to that hook's own suite.
+
+check("an absolute target is the new directory",
+      shellcmd.resolve_cd_target(["cd", "/srv/repo"], "/home/me"), "/srv/repo")
+check("a relative target resolves against where the shell stood",
+      shellcmd.resolve_cd_target(["cd", "hooks"], "/srv/repo"), "/srv/repo/hooks")
+check("`cd -` is indeterminate, not unchanged",
+      shellcmd.resolve_cd_target(["cd", "-"], "/srv/repo"), None)
+check("`popd` is indeterminate without a simulated stack",
+      shellcmd.resolve_cd_target(["popd"], "/srv/repo"), None)
+check("`popd -n` moves nothing",
+      shellcmd.resolve_cd_target(["popd", "-n"], "/srv/repo"), "/srv/repo")
+check("bare `cd` goes home rather than staying put",
+      shellcmd.resolve_cd_target(["cd"], "/srv/repo"), os.path.expanduser("~"))
+check("`pushd <dir>` moves like `cd`",
+      shellcmd.resolve_cd_target(["pushd", "/srv/other"], "/srv/repo"), "/srv/other")
+check("an unexpanded variable target is indeterminate",
+      shellcmd.resolve_cd_target(["cd", "$WT"], "/srv/repo"), None)
+
+# ------------------------------------------------- subshell nesting depth
+#
+# `simple_commands` FLATTENS `( ... )`, which is right for a caller asking
+# which programs ran and wrong for one modelling the shell's own state: a
+# `cd` inside a subshell moves that subshell and dies with it, so the parent
+# never left. `(cd /other && git status)` is the routine way to read another
+# checkout without leaving your own.
+check("a subshell cd is flattened away by simple_commands",
+      shellcmd.simple_commands("(cd /a && git status)"),
+      [["cd", "/a"], ["git", "status"]])
+check("the scope-aware split keeps the nesting",
+      shellcmd.simple_commands_with_scope("(cd /a && git status)"),
+      [((0, 1), ["cd", "/a"]), ((0, 1), ["git", "status"])])
+check("a cd outside the parens stays in the caller's shell",
+      shellcmd.simple_commands_with_scope("cd /r && (cd /a && ls) && git commit"),
+      [((0,), ["cd", "/r"]), ((0, 1), ["cd", "/a"]), ((0, 1), ["ls"]),
+       ((0,), ["git", "commit"])])
+# `{ ... }` runs in the CURRENT shell, so a `cd` inside one does move the
+# caller and must not be counted as nesting.
+check("brace grouping is not subshell nesting",
+      shellcmd.simple_commands_with_scope("f() { cd /a; }"),
+      [((0,), ["f"]), ((0,), ["{", "cd", "/a"]), ((0,), ["}"])])
+# A DEPTH IS NOT AN IDENTITY. Two sibling subshells sit at the same depth and
+# share none of their state, so a caller carrying a per-level directory needs
+# the scope-aware split to tell them apart --- `(cd /a) && (git commit` reads
+# as `(cd /a && git commit` from the depths alone.
+check("sibling subshells get distinct scopes",
+      shellcmd.simple_commands_with_scope("(cd /a) && (git commit)"),
+      [((0, 1), ["cd", "/a"]), ((0, 2), ["git", "commit"])])
+check("one subshell keeps one scope throughout",
+      shellcmd.simple_commands_with_scope("(cd /a && git commit)"),
+      [((0, 1), ["cd", "/a"]), ((0, 1), ["git", "commit"])])
+# `shlex` emits `)&&(` as ONE separator token, whose net paren count is zero
+# --- so only the ordered per-character read opens a fresh scope on the far
+# side of it.
+check("a close-and-open in one token still opens a new scope",
+      shellcmd.simple_commands_with_scope("(cd /a)&&(git commit)"),
+      [((0, 1), ["cd", "/a"]), ((0, 2), ["git", "commit"])])
+check("nesting is a scope path, and the depth is its length",
+      shellcmd.simple_commands_with_scope("(cd /a && (cd /b; ls)); cd /c"),
+      [((0, 1), ["cd", "/a"]), ((0, 1, 2), ["cd", "/b"]),
+       ((0, 1, 2), ["ls"]), ((0,), ["cd", "/c"])])
+check("a parse error is None on the scope-aware split too",
+      shellcmd.simple_commands_with_scope("git commit -m \'unclosed"), None)
+
 # ------------------------------------------------- source-level hygiene
 #
 # THIS MODULE QUOTES REGEX SOURCE IN ITS PROSE, so a docstring can carry an

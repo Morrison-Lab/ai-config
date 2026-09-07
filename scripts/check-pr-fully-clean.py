@@ -18,6 +18,31 @@ A later CLEAN from a different reviewer does not: any reviewer's standing
 not-clean vetoes, including under mwc (ai-config#2274).
 See shared/workflow/fully-clean.md.
 
+NOT COVERED. A `FULLY CLEAN` line here is not the whole of that fragment's
+"Findings hide on several surfaces" check, and the difference is mechanical
+rather than a matter of thoroughness. Both halves of the mechanism say so.
+scripts/lib/payload_fetcher.py, which governs the `--from-json` path, maps
+`gh pr view`, `gh repo view`, and two `gh api` reads; the default path's own
+call sites are `gh pr view --json` and the `/check-runs` read in
+scripts/lib/pull_request.py, `gh repo view` for repo resolution, and the two
+`/actions/runs/` reads below. `pulls/<N>/comments` is in neither, so inline
+review comments are invisible here, resolved or not (ai-config#3079). No
+`<summary>`-scoped match on `suppressed` exists in this file either, so a
+Copilot finding inside a collapsed `<details>` block is invisible too
+(ai-config#3170): it creates no inline comment and states no verdict, so no
+count performed here can see it. Measured on ai-config#3167, where this
+script printed FULLY CLEAN twice over a standing finding -- an inline comment
+at head 16544c50, and a suppressed "previously missed" item at head 7e1294b0.
+Both are pre-squash heads, reachable from no branch: fetch them from
+`refs/pull/3167/head`, or read the squash commit d29d33c71 on `main`.
+A caller reporting a PR ready runs the fragment's three queries alongside
+this script --- `pulls/<N>/comments`, `pulls/<N>/reviews` and
+`issues/<N>/comments` --- unfiltered by head SHA and printing each body. Two
+of them cover the blind spots named above; the third is there because a
+verdict-bearing review body can land as an issue comment rather than as a
+review, which this script's own scan reads but a caller checking only the
+`pulls` endpoints would miss.
+
 Which repository is being asked about is resolved once, at startup, and threaded
 through every `gh` call. It is NOT hardcoded: the same value reaches the PR
 lookup and the check-runs query, so the two halves cannot describe different
@@ -38,6 +63,7 @@ import argparse
 import json
 import re
 import bisect
+import shlex
 import subprocess
 import sys
 import unicodedata
@@ -117,10 +143,47 @@ def run_cmd(cmd: List[str]) -> str:
         # guard fail-fast.md describes -- the guard's presence reads as the
         # hazard being handled everywhere. See Morrison-Lab/ai-config#1330 for
         # the standing dependency on `gh` itself, which this does not remove.
-        die(
-            f"`{cmd[0]}` is not installed or not on PATH.\n"
-            "This script requires the GitHub CLI; -R cannot substitute for it."
-        )
+        message = f"`{cmd[0]}` is not installed or not on PATH."
+        if cmd[0] == "gh":
+            # fail-fast.md asks a failure to name its own remedy, and the line
+            # above names only the dependency. What this used to say next --
+            # "This script requires the GitHub CLI; -R cannot substitute for
+            # it." -- read as a closed door: it ruled out the one alternative
+            # it mentioned and stopped. It was also false, because the remedy
+            # ships in this same directory (`build-pr-payload.py`,
+            # ai-config#2908) and needs no CLI. That remedy was reachable only
+            # from `fully-clean.md` or that script's `--help`, both of which
+            # require already suspecting it exists -- so a stranded session
+            # hand-built the payload instead (ai-config#2938) or skipped the
+            # check. The error message is the one surface such a session is
+            # guaranteed to read (ai-config#3113).
+            #
+            # Two details the recipe cannot omit and stay executable. The
+            # paths are derived from `__file__` rather than written relative
+            # to the repo root, because this script is routinely invoked by
+            # absolute path from an unrelated cwd, where
+            # `scripts/build-pr-payload.py` resolves to nothing. And the token
+            # is named because `build-pr-payload.py`'s `_token()` dies without
+            # GITHUB_TOKEN or GH_TOKEN, so a recipe that omitted it would send
+            # the reader into a second dead end.
+            #
+            # Gated on `gh` because this `die` serves every command run_cmd is
+            # handed, and neither `--from-json` nor anything about the GitHub
+            # CLI answers a missing `git`.
+            here = Path(__file__).resolve()
+            message += (
+                "\n`-R` alone cannot substitute for it, but the GitHub CLI is"
+                " not required: score a JSON payload instead."
+                " `build-pr-payload.py` assembles one from plain REST, and"
+                " needs GITHUB_TOKEN or GH_TOKEN set:\n"
+                f"  python3 {shlex.quote(str(here.parent / 'build-pr-payload.py'))}"
+                " OWNER/REPO N /tmp/pr.json\n"
+                f"  python3 {shlex.quote(str(here))}"
+                " N -R OWNER/REPO --from-json /tmp/pr.json"
+            )
+        else:
+            message += "\nInstall it, or put it on PATH, and re-run."
+        die(message)
     if res.returncode != 0:
         # `stderr` is exposed to the same reader-thread decode failure as
         # `stdout`, so it can be None here even though the exit code arrived.

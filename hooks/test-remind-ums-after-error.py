@@ -121,6 +121,29 @@ REMIND = [
      "it filtered ... rather than"),
     ([txt("That was my mistake; the count was off by one.")],
      "my mistake (ai-config#1898 anchored form still fires)"),
+    # The other side of the irrealis guard (ai-config#2997). A guard scoped to
+    # the window before the hit must not swallow a real admission that merely
+    # shares a sentence with a hypothetical, and must not read a marker out of
+    # the middle of a word.
+    ([txt("Even if the poller were enough, I was wrong about the base branch.")],
+     "irrealis marker on a DIFFERENT clause still fires"),
+    ([txt("It is caught even if I misread the status. I was wrong about the "
+          "base branch.")],
+     "a guarded hit is skipped, not treated as the end of the search"),
+    ([txt("The animated gif I misread as a screenshot came from the docs.")],
+     "`gif` merely ends in `if` -- word-boundary control on the guard"),
+    ([txt("The commit had my mistake baked in.")],
+     "`had` before a real admission is not an irrealis marker"),
+    ([txt("I need to check whether\n\nI was wrong about the pin.")],
+     "a marker in an earlier paragraph does not reach across the break"),
+    # Review nit on #2997 itself: the lead's whitespace class excluded EVERY
+    # newline, so a marker hard-wrapped across one line break ("even if\nI
+    # misread") never matched the guard and the admission fired falsely. A
+    # blank line (a paragraph break) is a different case and must still
+    # fire, exercising the same boundary the single-newline control below
+    # (in IRREALIS_2997) exercises from the other side.
+    ([txt("The check still runs even if\n\nI was wrong about the base branch.")],
+     "a blank line after the marker is a paragraph break, not a wrap -- fires"),
     ([txt("My earlier claim was wrong about the pin.")],
      "my earlier claim was wrong (ai-config#1898 anchored form still fires)"),
 ]
@@ -137,6 +160,45 @@ ANCHOR_1898 = [
      "anatomy error (word ending in my + mistake|error)"),
     ([txt("The academy previous claim was wrong.")],
      "academy previous claim was wrong (word ending in my + earlier-claim form)"),
+]
+
+# Irrealis clauses (ai-config#2997). Each names a mistake that explicitly has
+# NOT happened, so none is an admission. The "revert mutation" block at the
+# bottom of this file disables the guard and checks that every one of them then
+# FIRES, so each control is known to discriminate rather than merely to pass.
+IRREALIS_2997 = [
+    ([txt("The poller tracks note count as well as job status, so a posted "
+          "review is caught even if I misread the job status.")],
+     "issue #2997 exact quote: even if I misread"),
+    ([txt("Unless I misread the diff, the two branches are identical.")],
+     "unless I misread"),
+    ([txt("The retry exists in case I miscounted the open notes.")],
+     "in case I miscounted"),
+    ([txt("It is worth re-checking whether I miscounted the fragments.")],
+     "whether I miscounted"),
+    ([txt("Whether or not I was wrong about the pin, the check still runs.")],
+     "whether or not I was wrong"),
+    ([txt("Suppose I was wrong about the base branch; the guard still holds.")],
+     "suppose I was wrong"),
+    ([txt("Assuming that I was wrong about the count, the conclusion is "
+          "unchanged.")],
+     "assuming that I was wrong"),
+    ([txt("If I was wrong about the repo being public, the scan would say so.")],
+     "if I was wrong (bare if)"),
+    ([txt("The second signal is there lest I misread the job status.")],
+     "lest I misread"),
+    ([txt("Supposing I was wrong about the base branch, the guard still "
+          "holds.")],
+     "supposing I was wrong"),
+    # Review nit on #2997 itself: the old lead's `[^\S\n]+$` excluded every
+    # newline, so a marker hard-wrapped across a single line break was not
+    # recognized as irrealis and a hypothetical fired as a false admission.
+    ([txt("The poller tracks job status as well as note count, so a posted "
+          "review is caught even if\nI misread the job status.")],
+     "a single newline between the marker and the clause is still irrealis"),
+    ([txt("The poller tracks job status as well as note count, so a posted "
+          "review is caught even if\n    I misread the job status.")],
+     "a single newline plus indentation is still irrealis"),
 ]
 
 SILENT = [
@@ -234,6 +296,7 @@ SILENT = [
     ([txt("The dummy query missed edge cases.")],
      "dummy query missed (word ending in my)"),
     *ANCHOR_1898,
+    *IRREALIS_2997,
     ([txt("The sour query missed the target.")],
      "sour query missed (word ending in our)"),
     ([txt("The rule fires on phrases like `I was wrong` in a message.")],
@@ -389,6 +452,54 @@ try:
                     "same transcript, first prompt"))
         seq.append(("REMIND" if out[1] else "silent", "silent",
                     "same transcript again -- fires once per admission"))
+
+        # ai-config#2997. The transcript GROWS, and the grown turn repeats the
+        # same phrase -- which is what explaining a misfire looks like, since
+        # the explanation has to name the phrase in prose. With the record
+        # index in the sentinel key that is a new key and the reminder
+        # re-fires, so this is the case that pins the index out of the key.
+        with open(same_path, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(user("was that a false positive?")) + "\n")
+            fh.write(json.dumps(txt(
+                "It was: the hook matched on I was wrong, which sat inside a "
+                "sentence describing the match rather than making it.")) + "\n")
+        out_again = subprocess.run(
+            [sys.executable, HOOK], input=payload, capture_output=True,
+            text=True, env=env).stdout.strip()
+        seq.append(("REMIND" if out_again else "silent", "silent",
+                    "same phrase at a LATER index -- explaining a misfire "
+                    "does not re-fire it"))
+
+        # The control that keeps the case above from passing vacuously: the
+        # sentinel is per PHRASE, not a blanket per-session mute, so a
+        # different admission later in the same transcript still fires.
+        with open(same_path, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(txt("I miscounted the open PRs.")) + "\n")
+        out_other = subprocess.run(
+            [sys.executable, HOOK], input=payload, capture_output=True,
+            text=True, env=env).stdout.strip()
+        seq.append(("REMIND" if out_other else "silent", "REMIND",
+                    "a DIFFERENT admission in the same session still fires"))
+
+        # Review finding on #2997 itself: keying purely on content hash with
+        # NO distance bound meant that once "I was wrong" had fired, it never
+        # fired again for the rest of the session -- a genuinely later,
+        # unrelated admission that happens to share that short phrase was
+        # silently swallowed. The suppressed repeat two cases above never
+        # advanced the sentinel (still recorded at record index 0), so enough
+        # filler records push the NEXT occurrence of the same phrase past
+        # LOOP_WINDOW records from that index, and it must fire again.
+        with open(same_path, "a", encoding="utf-8") as fh:
+            for i in range(8):
+                fh.write(json.dumps(user(f"filler turn {i}")) + "\n")
+            fh.write(json.dumps(
+                txt("I was wrong about a different thing entirely.")) + "\n")
+        out_far = subprocess.run(
+            [sys.executable, HOOK], input=payload, capture_output=True,
+            text=True, env=env).stdout.strip()
+        seq.append(("REMIND" if out_far else "silent", "REMIND",
+                    "the same phrase far beyond the window is a new "
+                    "admission and fires again"))
     finally:
         os.unlink(same_path)
 finally:
@@ -425,6 +536,32 @@ for got, desc in mutation:
     wrong += got != "REMIND"
     print(f"  {got:<7} {desc}")
 
-total = len(REMIND) + len(SILENT) + len(seq) + len(mutation)
+# Revert mutation (ai-config#2997): disable the irrealis skip in a copy of the
+# hook and run the IRREALIS_2997 controls against it. Every one must REMIND
+# under the mutant, otherwise a control that is silent for some unrelated
+# reason -- a phrase no alternative matches at all -- would pass without
+# exercising the guard.
+print("\nrevert mutation (#2997 irrealis guard disabled -- each control must fire):")
+GUARD_LINE = "if self.lead.search(before):"
+mutant_2997 = source.replace(GUARD_LINE, "if False and self.lead.search(before):")
+if mutant_2997 == source:
+    sys.exit(
+        "FATAL: the #2997 irrealis skip was not found in the hook, so the "
+        "mutation is inert"
+    )
+fd, mutant_path = tempfile.mkstemp(suffix=".py")
+with os.fdopen(fd, "w", encoding="utf-8") as fh:
+    fh.write(mutant_2997)
+try:
+    HOOK = mutant_path
+    mutation_2997 = [(run(recs), desc) for recs, desc in IRREALIS_2997]
+finally:
+    HOOK = real_hook
+    os.unlink(mutant_path)
+for got, desc in mutation_2997:
+    wrong += got != "REMIND"
+    print(f"  {got:<7} {desc}")
+
+total = len(REMIND) + len(SILENT) + len(seq) + len(mutation) + len(mutation_2997)
 print(f"\n{total - wrong}/{total} correct" + ("" if wrong == 0 else f"  ({wrong} WRONG)"))
 sys.exit(1 if wrong else 0)

@@ -23,7 +23,7 @@ passes. See README.md, "Shared content".
 @shared/workflow/run-ums-proactively.md
 
 Don't wait for `/clear`, a wrap-up step, or a merge to run `ums` (Update Memories and Skills) --- run it the moment a learning shows up: a corrected mistake, a new preference, a tool quirk, a workflow gap.
-The fragment above walks through the specific moments this gets skipped even by someone trying to follow the rule --- an offer to run it standing in for running it, a new instruction preempting an owed pass, a recommendation to `/clear` or start fresh while a pass is still owed, a PR-count worry used to justify deferring it, a corrected belief or a corrected false state-claim that never gets banked because nothing merged, reading a review and treating ARD work as the pass, and answering a questioned claim ("are you sure about that?") with the corrected fact so nothing looks like an admission --- and gives the fix for each: run the pass now, delegate it as pre-authorized sidecar work, and report it in the past tense rather than announcing an intention.
+The fragment above walks through the specific moments this gets skipped even by someone trying to follow the rule --- an offer to run it standing in for running it, a new instruction preempting an owed pass, a recommendation to `/clear` or start fresh while a pass is still owed, a PR-count worry used to justify deferring it, a corrected belief or a corrected false state-claim that never gets banked because nothing merged, reading a review and treating ARD work as the pass, answering a questioned claim ("are you sure about that?") with the corrected fact so nothing looks like an admission, and a pause that ends the turn with the pass still owed, waiting on CI, a review round, or an answer from the user --- and gives the fix for each: run the pass now, delegate it as pre-authorized sidecar work, and report it in the past tense rather than announcing an intention.
 
 ## Record both the pattern and the anti-pattern
 
@@ -285,8 +285,18 @@ The next real reading, taken when a PR head commit's timestamp was needed, came 
 The brief that dispatched this entry itself asserted that `claim-pr` inserts the timestamp, which the skill's templates do not do.
 The review caught it, and it is the same class of unmeasured claim.)
 
+**Run the clock so its value lands in the transcript, not only in a file.**
+A command of the shape `t=$(TZ=America/Los_Angeles date "+%H:%M %Z")` followed by a heredoc writing `$t` into a notebook does read the clock, and you still never see the reading --- so the next stamp you type comes from a sense of elapsed work exactly as if no command had run.
+A reading you cannot quote is not a reading, however honestly it was measured.
+
 - **Do:** run the clock command again immediately before typing a time into a forge comment, exactly as before a chat recap or a file edit.
+- **Do:** print the reading --- run the clock command on its own, so the value comes back in a tool result you can read and quote.
 - **Don't:** infer a clock time from the number of tool calls or actions taken since the last real reading.
+- **Do:** derive a time written into a file from a `date` read in the *same* command that writes it, so a heredoc heading cannot be typed from memory.
+- **Don't:** treat a reading captured into a shell variable whose only destination is that file as a measurement for a chat or comment claim ---
+  the session never observes it, so print it as well (`echo "$now"`) when the same reading will be quoted.
+
+See [`CLAUDE.cases.md`](CLAUDE.cases.md), "A notebook heading typed from the last reading, with the rule loaded".
 
 Two hooks are this rule's mechanism, one per surface.
 `hooks/no-unmeasured-clock-claim.py` reads the reply at `Stop`.
@@ -306,7 +316,7 @@ The tool result already returns a clock time (e.g. "Next wakeup scheduled for 08
 
 ## Bare keyword directives
 
-Two families of slash skill read as directives when I write them **without** the leading slash: the **queue commands** that amend the task list, and the **judgment grants** that hand a decision back to you.
+Three families of slash skill read as directives when I write them **without** the leading slash: the **queue commands** that amend the task list, the **judgment grants** that hand a decision back to you, and the **orchestration commands** that cap a run already in flight.
 
 ### Queue commands
 
@@ -324,6 +334,15 @@ Read a bare "do as you think best" as `daytb`, not as `away` -- the session-wide
 `dmmhyh` ("don't make me hold your hand") is a correction rather than a proactive grant: it fires when I'm asking for more guidance than the moment calls for.
 It resolves the pending item like `daytb`, raises the decide-vs-ask threshold for the rest of the session like `away`'s judgment-call test, and -- unlike either -- writes the correction down as a memory entry so it doesn't have to be re-taught next session.
 See [`dmmhyh`](skills/dmmhyh/SKILL.md).
+
+### Orchestration commands
+
+`fw` ("finish the current wave but don't start a new one", longhand `finish-wave`) caps an orchestration run at the wave already in flight.
+It bounds *issue grabs* only, so the review rounds, fixes, and the owed UMS pass that finish the wave's PRs all run under it.
+See [`finish-wave`](skills/finish-wave/SKILL.md).
+
+- **Do:** read a bare "finish the current wave" as `fw`, hold every new grab, and drive the wave's open PRs to a terminal state.
+- **Don't:** read it as "open no more PRs" --- a UMS PR or a follow-up issue is not a grab from the backlog.
 
 ## Link PRs in tables
 
@@ -593,12 +612,25 @@ gh api repos/<owner>/<repo>/issues/<N>/comments --paginate \
 
 `memories/gh-cli.md` carries the full statement, including the placeholder-wording trap when polling a run still in flight.
 
-**Also check formal GitHub reviews, not just issue-style comments — a human's `CHANGES_REQUESTED` can be invisible to a comments-only scan.** A review submitted via GitHub's review UI (as opposed to a plain PR comment) shows up in `gh pr view N --json reviews`, and its top-level `body` is frequently **empty** — the actual finding lives entirely in a per-line inline comment, which only appears via `gh api repos/<owner>/<repo>/pulls/N/comments` (a different endpoint from issue comments). Checking `--json comments` alone can miss the review's existence entirely. Before declaring a PR ready, also run:
+**Also check formal GitHub reviews, not just issue-style comments --- a review's findings can sit where a comments-only scan never looks, whoever posted it and whatever state it carries.**
+A review submitted via GitHub's review UI (as opposed to a plain PR comment) shows up in `gh pr view N --json reviews`, and its top-level `body` is frequently **empty** --- the actual finding lives entirely in a per-line inline comment, which only appears via `gh api repos/<owner>/<repo>/pulls/N/comments` (a different endpoint from issue comments).
+The mirror case is a finding in the top-level `body` itself, plainly or inside a collapsed `<details>` suppression block: neither shape produces a comment object, so `pulls/N/comments` and a thread query both return nothing over it.
+[`fully-clean`](shared/workflow/fully-clean.md) carries the matcher for the collapsed block, and what fails that bar is the finding rather than the state.
+So a bot's `COMMENTED` review carrying a finding fails that bar exactly as a human's `CHANGES_REQUESTED` does.
+Checking `--json comments` alone can miss the review's existence entirely.
+Before declaring a PR ready, also run:
 ```
+gh pr view N --json reviews --jq '.reviews[] | [.state, .author.login, .submittedAt, ((.body // "") | split("\n") | map(select(length > 0)) | .[0] // "(empty body)")] | @tsv'
 gh pr view N --json reviews --jq '.reviews[] | select(.state == "CHANGES_REQUESTED") | "\(.author.login) \(.submittedAt)"'
 gh api repos/<owner>/<repo>/pulls/N/comments --jq '.[] | "\(.path):\(.line // .original_line // "?") \(.user.login) \(.body)"'
 ```
 A `CHANGES_REQUESTED` state is blocking regardless of whether an automated re-review later says "Ready for merge" — that bot verdict doesn't clear a human's own review state, which only the human (or an explicit dismissal) can resolve.
+The unfiltered listing comes first: the state filter answers only whether a review *state* blocks the merge button, which the forge lets `CHANGES_REQUESTED` alone do.
+
+- **Do:** read every formal review's state and body, whoever posted it, and treat a finding in a review body --- a collapsed suppression block included --- as blocking.
+- **Don't:** pass over a review because its author is a bot or its state is `COMMENTED`, nor read that state as blocking on its own.
+
+See [`CLAUDE.cases.md`](CLAUDE.cases.md), "A bot's `COMMENTED` review is the same blind spot".
 
 (A specific case of the standing **never assume; always verify** rule in `memories/preferences.md` — confirm the verdict with a fresh query, don't recall it.)
 
@@ -1570,9 +1602,15 @@ math, apply this in addition to the fact-check above.
 
 Applies wherever `code-review`/`ard`/`ardi` already reviews a prose diff, alongside the fact-check and ambiguous-terminology checks above.
 
+`python3 scripts/check-bare-fragment-mentions.py` is the instrument for this corpus's own version of the miss: a fragment linked once and then named as plain prose further down the same file.
+Advisory, always exits 0, and wired into `validate.yml` as a non-gating step.
+
+- **Do:** run it over a prose diff that names a fragment more than once.
+- **Don't:** link a fragment on its first mention and then repeat the basename bare further down.
+
 ## Remove forward-pointing phrases from prose, not just crossref divs
 
-The section above covers formal Quarto crossref-div ordering for term/result definitions specifically.
+The section above covers this repo's own linked-once-then-bare miss, and formal Quarto crossref-div ordering for term/result definitions.
 The same problem shows up more broadly as plain-text signposting — "as discussed below", "in the following section", "we'll cover this later" — pointing at content the reader hasn't reached yet, in any prose (not just documents with crossref divs).
 
 [shared/writing/forward-references.md](shared/writing/forward-references.md)

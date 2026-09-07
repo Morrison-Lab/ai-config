@@ -298,9 +298,9 @@ would have confirmed the wrong version just as readily.)
 
 (Morrison-Lab/ai-config#1067, 2026-08-02: a UMS pass took `memories/git.md`
 from 1172 to 1315 lines.
-`scripts/check-memory-file-size.py` exits 0 and its `validate.yml` step is
-labelled advisory, both genuinely so, and the threshold was therefore reported
-as non-blocking on #1007.
+`scripts/check-memory-file-size.py` exits 0 without `--strict`, and its
+`validate.yml` step was then labelled advisory, both genuinely so, and the
+threshold was therefore reported as non-blocking on #1007.
 `scripts/test_check_memory_file_size.py` asserts this repo's own `memories/`
 are under the default and hard-fails, turning `validate` red on the next push.
 The claim had to be retracted on #1007 as well as fixed in the PR.)

@@ -59,7 +59,7 @@ Blocking hooks deny execution (exit code 2), while warning hooks emit actionable
 | [`flag-unchained-branch-switch.py`](../hooks/flag-unchained-branch-switch.py) | Warn | Warns when a branch switch and a subsequent mutating git command are not chained with `&&`. | Always chain `git checkout` / `git switch` with `&&` before subsequent operations (e.g. `git checkout -b fix && git commit ...`), or execute branch switching in its own separate call. | None. |
 | [`no-heavy-work-on-head-node.py`](../hooks/no-heavy-work-on-head-node.py) | **Block** | Blocks CPU-heavy R/Quarto/test commands on SLURM cluster login/head nodes. | Run heavy computation and test suites via `sbatch` or within `salloc` interactive compute nodes. | Inert off cluster head nodes. |
 | [`flag-add-a-outside-pathspec.py`](../hooks/flag-add-a-outside-pathspec.py) | Warn | Warns when `git add -A` / `git add .` sweeps in untracked files not covered by explicit exclusion pathspecs. | Run `git status` first and stage explicit paths (`git add <path>`) rather than blanket staging. | None. |
-| [`flag-reset-hard-uncommitted-work.py`](../hooks/flag-reset-hard-uncommitted-work.py) | Warn | Warns when `git reset --hard` is executed in a working tree containing tracked, uncommitted modifications. | Inspect `git status` before resetting. Stash (`git stash`) or commit desired work before invoking `git reset --hard`. | None. |
+| [`flag-reset-hard-uncommitted-work.py`](../hooks/flag-reset-hard-uncommitted-work.py) | Warn | Warns when `git reset --hard`, `git checkout <pathspec>`, or `git restore <pathspec>` is about to discard tracked, uncommitted modifications. The two path forms revert the named paths to the index, or to an explicit source when one is given (`<tree-ish> --` or `-s <ref>`, which this hook also matches), so an edit made since the last `git add` is destroyed silently at exit 0 (ai-config#2524). Also warns, at whole-tree scope, on a FORCED `git checkout` that resolves to no pathspec (`-f`/`--force`, with or without a ref): forcing removes the refusal, and the ref-less `git checkout -f` reverts every tracked file to HEAD with no output at all. Silent on an UNFORCED branch switch (`git checkout <ref>`), which git refuses when it would clobber local changes and otherwise carries them across, and on `git restore --staged` without `--worktree`, which rewrites only the index. Not matched, and destructive: `git switch -f`/`--discard-changes <ref>`, which discards tracked working-tree changes silently at exit 0 -- `git switch` is a fourth command this guard does not read. | Inspect `git status` before resetting or restoring, scoping it to the paths the command names (`git status --porcelain -- <path>`). Commit or `git stash -u` the work you mean to keep before invoking `git reset --hard`, `git checkout <pathspec>`, `git restore <pathspec>`, a forced `git checkout -f`/`--force` (with or without a ref), or `git switch -f`/`--discard-changes` -- the hook warns on every form but the last, so the forced `git switch` needs that check by hand. | None. |
 | [`no-handrolled-verdict-parse.py`](../hooks/no-handrolled-verdict-parse.py) | **Block** | Blocks ad-hoc grep/regex evaluation of review comments for cleanliness. | Always use `python3 scripts/check-pr-fully-clean.py <pr>` as the definitive authority for PR review cleanliness. | Set `ALLOW_HANDROLLED_VERDICT_PARSE=1 <cmd>` when querying raw comments for other purposes. |
 | [`warn-pr-create-without-dupe-check.py`](../hooks/warn-pr-create-without-dupe-check.py) | Warn | Warns when creating a PR or issue without an earlier search query in the session to check for duplicates. | Run `gh pr list --state all --search "<keywords>"` or `gh issue list --state all --search "<keywords>"` in a separate command before creating a PR or issue. | None. |
 | [`flag-stale-adjacent-comment.py`](../hooks/flag-stale-adjacent-comment.py) | Warn | Warns when a `git commit` modifies a numeric/string literal while an adjacent comment within 10 lines retains the old value. | Check nearby comments when modifying constants, thresholds, or counts, and update comments to match the new code values. | None. |
@@ -75,6 +75,7 @@ Blocking hooks deny execution (exit code 2), while warning hooks emit actionable
 | [`flag-uncounted-comment-claims.py`](../hooks/flag-uncounted-comment-claims.py) | Warn | Warns when a forge comment asserts file counts or lists identifiers without a deriving command. | Run deriving commands (`grep -c`, `wc -l`, `ls`, etc.) in the session and cite the deriving command when stating cardinality. | None. |
 | [`flag-unmeasured-timestamp.py`](../hooks/flag-unmeasured-timestamp.py) | Warn | Warns when a `gh` comment or review body states a Pacific clock time (`HH:MM`, optional seconds, optional AM/PM, then `PDT`, `PST`, or `PT`) with no clock read in the current turn, or when the body cannot be read (a `--body-file` not yet on disk). | Run `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"` immediately before typing a time into a claim or status comment, and restate the stamp from its output. | None. |
 | [`flag-cd-into-main-checkout.py`](../hooks/flag-cd-into-main-checkout.py) | Warn | Warns when a worktree-rooted session `cd`s into the primary/main checkout of the repository. | Keep all file edits and command executions rooted within the dedicated worktree directory. | None. |
+| [`warn-unlabelled-agent-issue.py`](../hooks/warn-unlabelled-agent-issue.py) | Warn | Warns when `gh issue create` / `glab issue create` runs with no `ai-authored` label in the command. | Pass `--label ai-authored --label "model:<model-id>"` (both CLIs also accept the comma-separated `--label "ai-authored,model:<model-id>"`) in the creating command, per `shared/workflow/issue-first.md`. | None. |
 
 ### 2.2 Agent, Task & SendMessage Interceptors
 
@@ -90,6 +91,7 @@ Blocking hooks deny execution (exit code 2), while warning hooks emit actionable
 |---|---|---|---|
 | [`no-unauthorized-merge.py`](../hooks/no-unauthorized-merge.py) | **Block** | Blocks `merge_pull_request` MCP calls without authorization. | Do not invoke MCP merge tools without explicit permission or active `/mwc`. |
 | [`warn-pr-create-without-dupe-check.py`](../hooks/warn-pr-create-without-dupe-check.py) | Warn | Warns when creating PRs/issues via MCP without a prior search query. | Run `search_issues` or `search_pull_requests` before creating items via MCP tools. |
+| [`warn-unlabelled-agent-issue.py`](../hooks/warn-unlabelled-agent-issue.py) | Warn | Warns when `mcp__github__issue_write` (`method: create`) files an issue with no `ai-authored` label. | Pass `labels: ["ai-authored", "model:<model-id>"]` on the create call. |
 | [`require-agent-disclosure.py`](../hooks/require-agent-disclosure.py) | Warn | Warns when posting comments via MCP without the disclosure trailer. | Include `\n\n_Posted by <Agent Name> (AI agent) --- not written by a human._` in the `body` argument of MCP comment tools. |
 | [`flag-unmeasured-timestamp.py`](../hooks/flag-unmeasured-timestamp.py) | Warn | Warns when the `body` of any `mcp__github__` comment tool that `require-agent-disclosure.py` covers states a Pacific clock time with no clock read in the current turn. | Run `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"` before typing a time into the `body` argument of MCP comment tools. |
 
@@ -124,12 +126,98 @@ Blocking hooks prevent the turn from ending until the missing artifact or requir
 | [`no-misattributed-quote.py`](../hooks/no-misattributed-quote.py) | **Block** | Blocks attributing a quote to a main rule file when the text resides in a `.rationale.md` or `.cases.md` companion file. | Confirm the exact file path where quoted passages reside before citing them. | None. |
 | [`require-stopping-point.py`](../hooks/require-stopping-point.py) | **Block** | Blocks final completion replies lacking an explicit stopping-point declaration. | Conclude summaries with an explicit stopping-point statement: `**Stopping Point**: Clean stopping point reached` or `**Stopping Point**: Not a clean stopping point --- [reason]`. | None. |
 
+### 3.1 A documented workaround for one guard can arm another
+
+`no-push-without-self-review.py`'s refusal on `git -C "$VAR" push` (row above)
+is worked around by pushing a literal path with an explicit
+`<sha>:refs/heads/<branch>` refspec.
+That refspec form lands the commit but sets no upstream tracking branch, which
+is exactly what `no-unshipped-commit.py` (row above) reads to decide a branch
+is unshipped.
+The second guard then blocks the turn over a commit that already reached the
+remote.
+Neither guard's message names the other.
+Run `git -C <literal-path> push -u origin <branch>` immediately after the
+refspec-form push to set the upstream the workaround skipped.
+See [`mistake-patterns.md`](mistake-patterns.md) Pattern 49 for the full
+mechanism and the guard's own no-upstream-is-undefined behaviour.
+
 ---
 
 ## 4. Detached Timers & Monitoring Services
 
-- **[`monitor-open-prs.py`](../hooks/monitor-open-prs.py)**: Background daemon reconciling all open GitHub PRs and GitLab merge requests authored by the authenticated user every two minutes (`gh` and/or `glab`).
+- **[`monitor-open-prs.py`](../hooks/monitor-open-prs.py)**: Background daemon reconciling every open GitHub PR the authenticated user opened or is assigned to, plus every one the `github-actions` app opened under an owner that user works under, and every GitLab merge request they authored, every two minutes (`gh` and/or `glab`).
 - **Detached Execution**: Automatically started and verified via `ensure-open-pr-monitor.py` on session start.
+
+---
+
+## 4.5 A warn-only hook that fires and is ignored is not automatically a hook that should block
+
+The checklist below covers building a hook.
+This section covers the question that arrives afterwards, when a warn-only
+guard fires on the same mistake several times in one session and the mistake
+happens anyway: does the recurrence license escalating it to a block?
+
+**Usually not, and recurrence alone never settles it.**
+[`deterministic-tools`](../shared/principles/deterministic-tools.md)'s
+third-occurrence bar decides whether an instrument should *exist*.
+It says nothing about strength, and reading it as an escalation trigger is a
+category error --- the bar counts occurrences of the mistake, while the
+strength question turns on how often the guard's condition is satisfied by
+*correct* behaviour.
+
+Three questions decide it, in order, and only the third is about the
+recurrence.
+
+1. **Is the condition decisive, or only suggestive?**
+   A blocking guard on a suggestive condition refuses correct work, and the
+   corpus's own repeated finding is that such a guard gets switched off ---
+   which costs every true positive it would ever have caught, not just the
+   false ones.
+   Where the information needed to decide is *not in the artifact the hook can
+   see*, no amount of recurrence makes it decisive.
+2. **Does the warning already name the concrete remedy?**
+   A note that says "this is wrong" and a note that supplies the exact
+   rewrite are different instruments.
+   Escalating before the note is actionable escalates the wrong thing.
+3. **Only then: did it fire, get read, and get ignored?**
+   If 1 and 2 both hold and the mistake still recurs, the failure is in
+   reading rather than in detection, and a `PreToolUse` `additionalContext`
+   note is structurally weak against it --- the note arrives alongside a tool
+   call the model has already composed, so it argues against a decision
+   already made.
+   That is a real limit, and a limit of the *class* rather than a defect in
+   the individual hook.
+
+- **Do:** ask whether the condition is decisive before treating a recurrence as
+  an escalation signal.
+- **Do:** record a recurrence-under-warning even when the answer is that no
+  stronger guard is warranted --- the stated reason is what stops the question
+  being reopened from scratch next time.
+- **Don't:** read `deterministic-tools`'s third-occurrence bar as a bar for
+  strength; it decides existence.
+- **Don't:** escalate a suggestive condition to a block --- a guard that
+  refuses correct work gets disabled, and its true positives go with it.
+
+(Morrison-Lab/ai-config#3180's session, 2026-09-04: reading `$?` immediately
+after a pipeline --- so the status read is `tail`'s rather than the command's
+--- recurred three times, with
+[`warn-status-read-after-pipe.py`](../hooks/warn-status-read-after-pipe.py)
+warning each time.
+Assessed against the three questions and left warn-only.
+Its condition is suggestive by construction, which its own docstring states:
+the read is correct under `pipefail` and correct whenever the last stage is
+the one meant, and *which* the author wants is not in the command string, so
+no lexical instrument can decide it.
+Its note already names both remedies with concrete rewrites --- `rc=$?` before
+the pipe, and `${PIPESTATUS[0]}` --- along with the `SIGPIPE` reason not to
+reach for `pipefail` first.
+So both earlier questions hold and the residue is question 3, which is the
+class limit above rather than something this hook can fix.
+The mechanism is owned by
+[`errexit-is-not-uniform`](../shared/coding/errexit-is-not-uniform.md)'s "A
+pipe discards the status of everything left of it"; the separate `&&`-chain
+shape the guard does not reach is recorded there and tracked separately.)
 
 ---
 
@@ -143,6 +231,9 @@ When authoring a new hook:
    The row's matcher list must equal the `hooks.json` groups for that script joined by `, `, in file order:
    `check-hook-catalog.py` concatenates the groups as it meets them and compares the string, so `(Agent, Task, Workflow)` fails against a manifest that lists `Task` before `Agent`.
    Write the manifest first, then copy its order into the row (measured 2026-09-01, ai-config#2930).
+   An alternation matcher such as `Write|Edit|NotebookEdit` is ONE group, so it occupies one item of that list;
+   its pipes must be backslash-escaped in the README cell (`Write\|Edit\|NotebookEdit`), because a bare `|` ends a markdown table cell.
+   A bare pipe makes the row fail to parse at all, which surfaces as the unrelated-sounding "registered but undocumented" failure rather than as a row-syntax complaint (ai-config#2535).
 5. Update this catalog in [`memories/hooks.md`](hooks.md).
 6. Validate with:
    ```bash

@@ -20,6 +20,7 @@ Run:  python3 hooks/test-no-clobbering-push.py hooks/no-clobbering-push.py
 """
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -45,8 +46,18 @@ def _commit(path, name, content):
     _run(path, "commit", "-qm", f"add {name}")
 
 
-def bash(command):
-    return {"tool_name": "Bash", "tool_input": {"command": command}}
+def bash(command, payload_cwd=None):
+    payload = {"tool_name": "Bash", "tool_input": {"command": command}}
+    if payload_cwd is not None:
+        payload["cwd"] = payload_cwd
+    return payload
+
+
+# `case_id -> directory`, filled in by the fixture that builds it. For each
+# entry, every `git -C ...` line the warning emits must survive `shlex.split`
+# and name that directory as one argument. A substring check cannot see this:
+# `git -C /tmp/a b/wt fetch ...` contains `git -C ` and is still unrunnable.
+ROUNDTRIP = {}
 
 
 # ---------------------------------------------------------------- fixtures
@@ -98,6 +109,72 @@ def _local_advances(path):
 def _named_remote(path, bare, name):
     """Add a second remote under a name that is NOT the config fallback."""
     _run(path, "remote", "add", name, bare)
+
+
+def _second_worktree(path, branch, start="HEAD", leaf="wt"):
+    """A second worktree of `path`, checked out on a new `branch`.
+
+    `HEAD` is per-worktree; branch refs are not. That asymmetry is why every
+    cross-worktree case below pushes `HEAD:<branch>` rather than a named
+    source ref: a named branch resolves identically in both directories, so it
+    could not tell the two readings apart.
+
+    `leaf` names the directory inside the holder. Every other caller leaves it
+    alone; the one that does not passes a name carrying a SPACE, which is the
+    only way to tell a quoted remediation command from an unquoted one.
+    """
+    holder = tempfile.mkdtemp()
+    _TMPDIRS.append(holder)
+    target = os.path.join(holder, leaf)
+    _run(path, "worktree", "add", "-q", "-b", branch, target, start)
+    return target
+
+
+def _diverged_peer_worktree(path, branch, leaf="wt", target=None):
+    """A second worktree whose HEAD diverges from `origin/<branch>`, while the
+    session's own HEAD equals that remote tip exactly.
+
+    Both halves are load-bearing. The worktree half is the divergence the
+    guard exists to report; the session half is what it read instead, and it
+    reads as "already pushed" -- so resolving HEAD in the session's directory
+    is a false NEGATIVE here, not merely a wrongly-worded warning.
+
+    `target` places the worktree at an EXACT path rather than inside a fresh
+    holder. Only the two `-C` cases pass it, and they need it: what they pin
+    is a `-C` value the guard must DECLINE, and a decline is observable only
+    where the literal path the guard would otherwise build is itself a real
+    diverged worktree.
+    """
+    _commit(path, "shared.txt", "shared\n")
+    _run(path, "push", "-q", "origin", "main")
+    if target is None:
+        wt = _second_worktree(path, branch, "HEAD~1", leaf)
+    else:
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        _run(path, "worktree", "add", "-q", "-b", branch, target, "HEAD~1")
+        wt = target
+    _commit(wt, "peer.txt", "peer\n")
+    _run(wt, "push", "-q", "origin", branch)
+    _run(path, "push", "-q", "-f", "origin", f"main:{branch}")
+    return wt
+
+
+def _wrong_repo_worktree(path, bare, branch):
+    """A second worktree whose push is an ordinary fast-forward, while the
+    session's own directory diverges from `origin/<branch>`.
+
+    The mirror of `_diverged_peer_worktree`: there a reading taken in the
+    session's directory is a false NEGATIVE, here it is a false POSITIVE. Any
+    case built on this one is silent only if the guard read the right
+    repository, or declined to read at all.
+    """
+    _remote_advances(path, bare, keep_object=False)
+    _local_advances(path)
+    wt = _second_worktree(path, branch)
+    _commit(wt, "first.txt", "first\n")
+    _run(wt, "push", "-q", "origin", branch)
+    _commit(wt, "second.txt", "second\n")
+    return wt
 
 
 # --- should DENY ---------------------------------------------------------
@@ -250,6 +327,107 @@ def explicit_current_branch_case(path, bare):
     return "git push origin main"
 
 
+def cross_worktree_diverged_case(path, bare):
+    """The push runs in a second worktree, via a leading `cd`, and diverges
+    there while the session's own directory shows nothing to report."""
+    wt = _diverged_peer_worktree(path, "peer")
+    return f"cd {wt} && git push origin HEAD:peer"
+
+
+def dash_c_worktree_case(path, bare):
+    """`git -C <worktree> push` moves the push without a `cd`, so the `-C`
+    values have to be read out rather than skipped as option noise."""
+    wt = _diverged_peer_worktree(path, "peer-c")
+    return f"git -C {wt} push origin HEAD:peer-c"
+
+
+def subshell_push_case(path, bare):
+    """`(cd <worktree> && git push)` -- the `cd` and the push are in the SAME
+    subshell, so the `cd` does apply. The counterpart to S21, which is the
+    same `cd` with the push outside the parentheses."""
+    wt = _diverged_peer_worktree(path, "peer-inner")
+    return f"(cd {wt} && git push origin HEAD:peer-inner)"
+
+
+def brace_group_case(path, bare):
+    """`{ cd <worktree>; } && git push` -- a brace group runs in the CURRENT
+    shell rather than forking, so its `cd` outlives the closing brace.
+
+    `_simple_commands` splits on operators only, so the opening brace arrives
+    attached to the `cd` as a word; without stripping it the `cd` is invisible
+    and the push is read in the session's own repository -- ai-config#2451's
+    wrong-repository reading by a third route.
+    """
+    wt = _diverged_peer_worktree(path, "peer-brace")
+    return f"{{ cd {wt}; }} && git push origin HEAD:peer-brace"
+
+
+def case_pattern_push_case(path, bare):
+    """`(cd <worktree> && case a in a) git push;; esac)` -- the pattern's `)`
+    is not the subshell's.
+
+    Both characters are the same, so popping a scope on the pattern recorded
+    the push OUTSIDE the parentheses it really runs in and dropped the `cd`
+    beside it -- the wrong-repository reading of ai-config#2451, and here it
+    is SILENT rather than merely misworded: the session's own HEAD equals the
+    remote tip, which reads as already pushed. Real bash puts the push in the
+    worktree (`bash -c '(cd wt && case a in a) pwd;; esac)'` prints it).
+    """
+    wt = _diverged_peer_worktree(path, "peer-casebug")
+    return (f"(cd {wt} && case a in a) "
+            "git push origin HEAD:peer-casebug;; esac)")
+
+
+def two_clause_case_push_case(path, bare):
+    """The push sits in the SECOND clause, so its pattern's `)` follows a
+    `;;` rather than the `in`.
+
+    A case returns to pattern position at each clause terminator. Without
+    that, the first pattern's `)` is the only one read as a pattern and `b)`
+    pops the enclosing subshell -- the same wrong-repository reading, arriving
+    one clause later than the case above.
+    """
+    wt = _diverged_peer_worktree(path, "peer-case2")
+    return (f"(cd {wt} && case b in a) true;; b) "
+            "git push origin HEAD:peer-case2;; esac)")
+
+
+def case_substitution_subject_case(path, bare):
+    """`(cd <worktree> && case $(echo a) in a) git push;; esac)` -- the case
+    SUBJECT carries parentheses of its own.
+
+    Pattern position begins at the `in`, not at the `case`: reading it from
+    the keyword makes the substitution's `(` a pattern opener, its `)` the
+    pattern's close, and the real pattern's `)` a subshell pop again -- the
+    same wrong-repository reading, one shape further along.
+    """
+    wt = _diverged_peer_worktree(path, "peer-casesubj")
+    return (f"(cd {wt} && case $(echo a) in a) "
+            "git push origin HEAD:peer-casesubj;; esac)")
+
+
+def spaced_worktree_case(path, bare):
+    """The worktree the push runs in lives under a directory carrying a space.
+
+    The verdict is the same warning W8 gets; what this case pins is that the
+    emitted `git -C <dir>` survives a round trip through `shlex.split`.
+    Unquoted, git reads the first word as the directory and the rest as stray
+    arguments, so advice whose whole purpose is to be runnable is not -- and
+    every other fixture here uses a `tempfile.mkdtemp()` path with no space,
+    which is what kept the omission invisible.
+    """
+    wt = _diverged_peer_worktree(path, "peer-space", leaf="my worktree")
+    ROUNDTRIP["W13"] = wt
+    return f"cd {shlex.quote(wt)} && git push origin HEAD:peer-space"
+
+
+def payload_cwd_case(path, bare):
+    """The Bash call's own `cwd` names a different directory from the hook
+    process's, with no `cd` and no `-C` to reveal it."""
+    wt = _diverged_peer_worktree(path, "peer-payload")
+    return "git push origin HEAD:peer-payload", wt
+
+
 def value_cluster_remote_case(path, bare):
     """`-uo ci.skip upstream HEAD`: `o` eats `ci.skip`, so the remote is
     `upstream`. Without that, `ci.skip` is read as the remote and the reading
@@ -305,6 +483,272 @@ def new_branch_case(path, bare):
     _run(path, "checkout", "-q", "-b", "feature/new")
     _local_advances(path)
     return "git push -u origin HEAD"
+
+
+def cross_worktree_fast_forward_case(path, bare):
+    """ai-config#2451 verbatim: the push is an ordinary fast-forward in the
+    worktree it runs from, while the session's own directory sits on an
+    unrelated branch.
+
+    Resolving HEAD there reported a divergence that did not exist, named the
+    pushing session's own commits as somebody else's, and prescribed a
+    `git merge origin/<branch>` that would have merged a branch into itself.
+    """
+    wt = _wrong_repo_worktree(path, bare, "ums-lessons")
+    return f"cd {wt} && git push origin HEAD:ums-lessons"
+
+
+def git_dir_option_case(path, bare):
+    """`--git-dir`/`--work-tree` move the repository a push reads without
+    moving any directory, so resolving the directory alone reads the
+    session's. Declining is the answer, as for `pushd`."""
+    wt = _wrong_repo_worktree(path, bare, "gitdir-opt")
+    return (f"git --git-dir {wt}/.git --work-tree {wt} "
+            "push origin HEAD:gitdir-opt")
+
+
+def git_dir_env_case(path, bare):
+    """The same redirection spelled as an env prefix, which `_lead_prefix`
+    skips along with every other assignment."""
+    wt = _wrong_repo_worktree(path, bare, "gitdir-env")
+    return (f"GIT_DIR={wt}/.git GIT_WORK_TREE={wt} "
+            "git push origin HEAD:gitdir-env")
+
+
+def subshell_cd_case(path, bare):
+    """A `cd` inside a subshell dies at the `)`, so this push runs in the
+    call's own directory.
+
+    Reading it in the subshell's directory is a warning about a repository the
+    push never touches -- the wrong-repository reading of ai-config#2451, and
+    one this guard introduced for itself when it started tracking `cd` at all.
+    """
+    wt = _diverged_peer_worktree(path, "peer-subshell")
+    return f"(cd {wt} && true) && git push origin HEAD:peer-subshell"
+
+
+def sibling_subshell_cd_case(path, bare):
+    """`(cd <worktree> && true) && (git push ...)` -- two SIBLING subshells.
+
+    Both sit at the same nesting depth, so a directory kept per depth hands
+    them one slot and the first one's `cd` leaks into the second. That is the
+    wrong-repository reading of ai-config#2451 arriving through the very
+    mechanism added to stop it, which is why the pair with S21 is the pin
+    rather than S21 alone: S21's push sits OUTSIDE the parentheses, so it is
+    silent under either keying.
+    """
+    wt = _diverged_peer_worktree(path, "peer-sibling")
+    return (f"(cd {wt} && true) && "
+            "(git push origin HEAD:peer-sibling)")
+
+
+def case_pattern_fast_forward_case(path, bare):
+    """The WARN case above with nothing to report: the case-wrapped push is an
+    ordinary fast-forward in the worktree it runs from, while the session's
+    own directory diverges.
+
+    The two-sided pin. Its partner shows the reading arriving where the push
+    runs; this one shows that popping the scope at the pattern does not merely
+    lose a warning but invents one, about a repository the push never touches.
+    """
+    wt = _wrong_repo_worktree(path, bare, "case-ff")
+    return (f"(cd {wt} && case a in a) "
+            "git push origin HEAD:case-ff;; esac)")
+
+
+def subshell_in_case_body_case(path, bare):
+    """A real subshell NESTED INSIDE a case body, with the push after the
+    whole statement: `(cd <worktree> && case a in a) (true);; esac) && git
+    push`.
+
+    The mirror of W14. There a `)` had to stop popping; here one still has to
+    pop, and the two are told apart by the depth the case was opened at. A fix
+    that declined every `)` while a case is open leaves the inner subshell
+    unclosed, so the statement's own `)` pops it instead and the push reads
+    the worktree it never runs in.
+    """
+    wt = _diverged_peer_worktree(path, "peer-casesub")
+    return (f"(cd {wt} && case a in a) (true);; esac) && "
+            "git push origin HEAD:peer-casesub")
+
+
+def conditional_cd_case(path, bare):
+    """`if ...; then cd <worktree>; fi; git push` with a FALSE condition.
+
+    A real shell never runs the `cd`, so the push is an already-pushed no-op
+    in the call's own directory. `_simple_commands` splits on operators and
+    models no short-circuiting, so the branch body arrives as an ordinary
+    `cd` command and applying it warns about a repository the push never
+    touches -- the wrong-repository reading of ai-config#2451.
+    """
+    wt = _diverged_peer_worktree(path, "peer-cond")
+    return (f"if [ -d /nonexistent-ncp ]; then cd {wt}; fi; "
+            "git push origin HEAD:peer-cond")
+
+
+def alternative_cd_case(path, bare):
+    """`cd <here> || cd <worktree>; git push` -- the first `cd` succeeds, so
+    the alternative never runs.
+
+    The counterpart to the branch body above, and the shape that shows why
+    `&&` and `||` cannot be treated alike: a `cd` after `||` runs only when
+    what preceded it FAILED.
+    """
+    wt = _diverged_peer_worktree(path, "peer-alt")
+    return f"cd {path} || cd {wt}; git push origin HEAD:peer-alt"
+
+
+def branch_body_cd_case(path, bare):
+    """`if ...; then echo no; cd <worktree>; fi; git push` -- a branch body of
+    MORE than one command.
+
+    The keyword that opens a body attaches to that body's FIRST command, so
+    the `cd` here carries none at all. Recognizing the keyword declined S23
+    and applied this one, which is the same wrong-repository reading of
+    ai-config#2451 arriving one command further along (measured 2026-09-04).
+    """
+    wt = _diverged_peer_worktree(path, "peer-body")
+    return (f"if [ -d /nonexistent-ncp ]; then echo no; cd {wt}; fi; "
+            "git push origin HEAD:peer-body")
+
+
+def else_arm_cd_case(path, bare):
+    """`if [ -d / ]; then true; else true && cd <worktree>; fi; git push` --
+    the `then` branch is the one taken, so the `else` arm never runs.
+
+    Its `cd` follows `&&`, the one separator this guard deliberately keeps, so
+    no operator can decline it: only the region the `if` opened can.
+    """
+    wt = _diverged_peer_worktree(path, "peer-else")
+    return (f"if [ -d / ]; then true; else true && cd {wt}; fi; "
+            "git push origin HEAD:peer-else")
+
+
+def background_cd_case(path, bare):
+    """`cd <worktree> & git push` -- a backgrounded `cd` runs in a subshell,
+    so the push runs where the Bash call started.
+
+    The operator that reveals the fork FOLLOWS the `cd`. The one before it is
+    the start of the command, which is what an ordinary `cd` carries too.
+    """
+    wt = _diverged_peer_worktree(path, "peer-bg")
+    return f"cd {wt} & git push origin HEAD:peer-bg"
+
+
+def pipeline_cd_case(path, bare):
+    """`cd <worktree> | cat; git push` -- a pipeline element is forked as
+    well, so this `cd` moves no directory the push can see."""
+    wt = _diverged_peer_worktree(path, "peer-pipe")
+    return f"cd {wt} | cat; git push origin HEAD:peer-pipe"
+
+
+def condition_cd_if_case(path, bare):
+    """`if cd <worktree>; then git push ...; fi` -- the `cd` is the CONDITION.
+
+    It shares one argv with the keyword that opens the region, so the region
+    never sees it and the operators recorded either side belong to the whole
+    `if` rather than to the `cd`. Leaving it unseen read the push in the
+    session's own repository, which diverges here: the
+    wrong-repository warning of ai-config#2451, its misattributed commit list
+    and its branch-into-itself merge included (measured 2026-09-04).
+
+    A condition runs in the current shell, so declining is the answer rather
+    than resolving: whether the shell is still there after `fi` depends on
+    whether the condition succeeded.
+    """
+    wt = _wrong_repo_worktree(path, bare, "cond-if")
+    return f"if cd {wt}; then git push origin HEAD:cond-if; fi"
+
+
+def condition_cd_while_case(path, bare):
+    """`while cd <worktree>; do git push ...; done` -- the same argv shape
+    under a different keyword, so a fix keyed on `if` alone would miss it."""
+    wt = _wrong_repo_worktree(path, bare, "cond-while")
+    return f"while cd {wt}; do git push origin HEAD:cond-while; done"
+
+
+def background_cd_newline_case(path, bare):
+    """S29 with the `&` at the END OF A LINE, which is how a multi-line Bash
+    call spells it.
+
+    A newline is rewritten to `;` before parsing, so the fork arrives as the
+    single punctuation run `&;`. Folding the run reported the `;` and
+    discarded the `&`, which applied a `cd` a real shell forks -- the
+    wrong-repository reading arriving through the very clause added to stop it
+    (measured 2026-09-04).
+    """
+    wt = _diverged_peer_worktree(path, "peer-bg-nl")
+    return f"cd {wt} &\ngit push origin HEAD:peer-bg-nl"
+
+
+def background_list_cd_case(path, bare):
+    """`cd <worktree> && true & git push` -- the `&` backgrounds the whole
+    AND-OR list, so the `cd` is forked even though `&&` follows it.
+
+    The operator after the `cd` is the one separator this guard deliberately
+    keeps, so only propagating the `&` backwards over the chain can decline
+    it.
+    """
+    wt = _diverged_peer_worktree(path, "peer-bg-list")
+    return f"cd {wt} && true & git push origin HEAD:peer-bg-list"
+
+
+def alternative_cd_newline_case(path, bare):
+    """S24 with the `||` at the END OF A LINE, so the run is `||;`."""
+    wt = _diverged_peer_worktree(path, "peer-alt-nl")
+    return f"true ||\ncd {wt}\ngit push origin HEAD:peer-alt-nl"
+
+
+def pipeline_rhs_cd_newline_case(path, bare):
+    """S31 with the `|` at the END OF A LINE, so the run is `|;`."""
+    wt = _diverged_peer_worktree(path, "peer-pipe-rhs-nl")
+    return f"echo x |\ncd {wt}\ngit push origin HEAD:peer-pipe-rhs-nl"
+
+
+def pipeline_rhs_cd_case(path, bare):
+    """`echo x | cd <worktree>; git push` -- the same fork read from the other
+    side, where the `|` PRECEDES the `cd` rather than following it."""
+    wt = _diverged_peer_worktree(path, "peer-pipe-rhs")
+    return f"echo x | cd {wt}; git push origin HEAD:peer-pipe-rhs"
+
+
+def dash_c_unexpanded_case(path, bare):
+    """`git -C "$WT" push` -- the variable is unexpanded, so no directory is
+    named.
+
+    The worktree really is at `<path>/$WT`, which is the only way to tell a
+    decline from the silence a nonexistent directory produces anyway: joining
+    the token on as a literal path component lands exactly there and warns.
+    """
+    _diverged_peer_worktree(path, "peer-var",
+                            target=os.path.join(path, "$WT"))
+    return 'git -C "$WT" push origin HEAD:peer-var'
+
+
+def dash_c_tilde_case(path, bare):
+    """`git -C ~ncp-nosuchuser/wt push` -- a `~` git never sees, because the
+    SHELL is what expands one.
+
+    Joining it on as a literal path component is what the worktree at
+    `<path>/~ncp-nosuchuser/wt` catches. Expanding it is the right answer and
+    an unknown user has none, so the reading is declined.
+    """
+    _diverged_peer_worktree(
+        path, "peer-tilde",
+        target=os.path.join(path, "~ncp-nosuchuser", "wt"))
+    return "git -C ~ncp-nosuchuser/wt push origin HEAD:peer-tilde"
+
+
+def indeterminate_cd_case(path, bare):
+    """`cd -` needs OLDPWD, which no static scan has.
+
+    Declining is the point: the session's directory genuinely diverges here,
+    so falling back to it would produce a confident warning about a repository
+    the push may never touch.
+    """
+    _remote_advances(path, bare, keep_object=False)
+    _local_advances(path)
+    return "cd - && git push origin HEAD"
 
 
 def quoted_mention_case(path, bare):
@@ -409,6 +853,30 @@ SHOULD_WARN = [
     ("W6", named_branch_case,
      "`git push origin feature-x` from `main` compares against local "
      "`feature-x`, not HEAD"),
+    ("W8", cross_worktree_diverged_case,
+     "`cd <worktree> && git push` reads HEAD where the push runs"),
+    ("W9", dash_c_worktree_case,
+     "`git -C <worktree> push` moves the push without a `cd`"),
+    ("W10", payload_cwd_case,
+     "the Bash call's own `cwd`, with no `cd` and no `-C` to reveal it"),
+    ("W11", subshell_push_case,
+     "`(cd <worktree> && git push)` -- the `cd` shares the subshell, so it "
+     "does apply"),
+    ("W12", brace_group_case,
+     "`{ cd <worktree>; } && git push` -- a brace group does not fork, so "
+     "the `cd` outlives it"),
+    ("W13", spaced_worktree_case,
+     "a worktree path carrying a space -- the emitted `git -C` must still "
+     "parse as one argument"),
+    ("W14", case_pattern_push_case,
+     "`(cd <worktree> && case a in a) git push;; esac)` -- a case pattern's "
+     "`)` closes no subshell"),
+    ("W15", two_clause_case_push_case,
+     "`case b in a) true;; b) git push;; esac` -- a `;;` returns the case to "
+     "pattern position, so the second clause's `)` is a pattern too"),
+    ("W16", case_substitution_subject_case,
+     "`case $(echo a) in a)` -- pattern position begins at the `in`, so the "
+     "subject's own parentheses are a subshell"),
 ]
 
 SHOULD_STAY_SILENT = [
@@ -432,6 +900,69 @@ SHOULD_STAY_SILENT = [
     ("S16", named_branch_source_missing_case,
      "the pushed source ref does not resolve locally -- decline, don't fall "
      "back to HEAD"),
+    ("S17", cross_worktree_fast_forward_case,
+     "ai-config#2451: a fast-forward in the worktree the push runs from"),
+    ("S18", indeterminate_cd_case,
+     "`cd -` is indeterminate -- decline rather than read the session's own "
+     "directory"),
+    ("S19", git_dir_option_case,
+     "`--git-dir`/`--work-tree` name a repository, not a directory -- "
+     "decline"),
+    ("S20", git_dir_env_case,
+     "`GIT_DIR=`/`GIT_WORK_TREE=` redirect the same way as an env prefix"),
+    ("S21", subshell_cd_case,
+     "`(cd <worktree> && true) && git push` -- the `cd` dies at the `)`"),
+    ("S22", sibling_subshell_cd_case,
+     "`(cd <worktree> && true) && (git push)` -- a sibling subshell starts "
+     "from the caller's directory, not its predecessor's"),
+    ("S23", conditional_cd_case,
+     "`if ...; then cd <worktree>; fi; git push` -- the branch is not taken, "
+     "so the `cd` never runs"),
+    ("S24", alternative_cd_case,
+     "`cd <here> || cd <worktree>; git push` -- the alternative never runs"),
+    ("S25", dash_c_unexpanded_case,
+     "`git -C \"$WT\" push` -- an unexpanded variable names no directory"),
+    ("S26", dash_c_tilde_case,
+     "`git -C ~ncp-nosuchuser/wt push` -- a `~` is expanded, not joined on "
+     "as a literal path component"),
+    ("S27", branch_body_cd_case,
+     "`if ...; then echo no; cd <worktree>; fi` -- a branch body of more than "
+     "one command, whose `cd` carries no keyword"),
+    ("S28", else_arm_cd_case,
+     "`else true && cd <worktree>` -- an untaken arm whose `cd` follows the "
+     "one separator the guard keeps"),
+    ("S29", background_cd_case,
+     "`cd <worktree> & git push` -- a backgrounded `cd` forks"),
+    ("S30", pipeline_cd_case,
+     "`cd <worktree> | cat; git push` -- a pipeline element forks too"),
+    ("S31", pipeline_rhs_cd_case,
+     "`echo x | cd <worktree>; git push` -- the same fork with the `|` before "
+     "the `cd`"),
+    ("S32", condition_cd_if_case,
+     "`if cd <worktree>; then git push; fi` -- the `cd` is the condition, "
+     "which shares an argv with the keyword"),
+    ("S33", condition_cd_while_case,
+     "`while cd <worktree>; do git push; done` -- the same shape under "
+     "another keyword"),
+    ("S34", background_cd_newline_case,
+     "`cd <worktree> &` at the end of a line -- the newline joins the fork "
+     "into one punctuation run"),
+    ("S35", background_list_cd_case,
+     "`cd <worktree> && true & git push` -- the `&` backgrounds the whole "
+     "AND-OR list"),
+    ("S36", alternative_cd_newline_case,
+     "`true ||` at the end of a line -- the newline joins the alternative "
+     "into one punctuation run"),
+    ("S37", pipeline_rhs_cd_newline_case,
+     "`echo x |` at the end of a line -- the same run with the fork operator "
+     "before the `cd`"),
+    ("S38", case_pattern_fast_forward_case,
+     "a case-wrapped push that is a fast-forward where it runs -- popping the "
+     "scope at the pattern invents a divergence"),
+    ("S39", subshell_in_case_body_case,
+     "`(cd <worktree> && case a in a) (true);; esac) && git push` -- a "
+     "subshell inside a case body still closes, so the statement's `)` pops "
+     "the outer one"),
 ]
 
 
@@ -459,10 +990,82 @@ LABEL_EXPECT = {
            ["your local `", "git checkout "]),
     "W7": (["git log --oneline main..origin/main"],
            ["git checkout ", "you are not on the branch being pushed"]),
+    # The commit SUBJECT is the directory-sensitive half here: `add shared.txt`
+    # is what `local..tip` contains only when `local` was resolved in the
+    # worktree the push runs from. Asserting the branch name alone would pass
+    # on a reading taken in the session's own directory.
+    #
+    # W8, W9 and W11 additionally pin the DIRECTORY the reading was taken in.
+    # The reader's shell is still where the Bash call started, so a bare
+    # `git merge origin/peer` typed there merges into whatever is checked out
+    # THERE -- the branch-into-itself merge of ai-config#2451 with the
+    # directory axis substituted for the ref one. Asserting the bare form's
+    # ABSENCE is the half that catches a regression: `read in` could be added
+    # while the commands stayed unqualified.
+    "W8": (["your local HEAD", "log --oneline HEAD..origin/peer",
+            "add shared.txt", "read in `", "git -C "],
+           ["git checkout ", "git log --oneline HEAD..origin/peer",
+            "git fetch origin peer"]),
+    "W9": (["your local HEAD", "log --oneline HEAD..origin/peer-c",
+            "add shared.txt", "read in `", "git -C "],
+           ["git checkout ", "git log --oneline HEAD..origin/peer-c",
+            "git fetch origin peer-c"]),
+    "W11": (["your local HEAD", "log --oneline HEAD..origin/peer-inner",
+             "add shared.txt", "read in `", "git -C "],
+            ["git checkout ", "git log --oneline HEAD..origin/peer-inner",
+             "git fetch origin peer-inner"]),
+    "W12": (["your local HEAD", "log --oneline HEAD..origin/peer-brace",
+             "add shared.txt", "read in `", "git -C "],
+            ["git checkout ", "git log --oneline HEAD..origin/peer-brace",
+             "git fetch origin peer-brace"]),
+    "W13": (["your local HEAD", "log --oneline HEAD..origin/peer-space",
+             "add shared.txt", "read in `", "git -C "],
+            ["git checkout ", "git log --oneline HEAD..origin/peer-space",
+             "git fetch origin peer-space"]),
+    "W14": (["your local HEAD", "log --oneline HEAD..origin/peer-casebug",
+             "add shared.txt", "read in `", "git -C "],
+            ["git checkout ", "git log --oneline HEAD..origin/peer-casebug",
+             "git fetch origin peer-casebug"]),
+    "W15": (["your local HEAD", "log --oneline HEAD..origin/peer-case2",
+             "add shared.txt", "read in `", "git -C "],
+            ["git checkout ", "git log --oneline HEAD..origin/peer-case2",
+             "git fetch origin peer-case2"]),
+    "W16": (["your local HEAD", "log --oneline HEAD..origin/peer-casesubj",
+             "add shared.txt", "read in `", "git -C "],
+            ["git checkout ", "git log --oneline HEAD..origin/peer-casesubj",
+             "git fetch origin peer-casesubj"]),
+    # W10 is the opposite pin: the push runs in the call's OWN directory, so
+    # naming it would be noise and `git -C` would be wrong.
+    "W10": (["your local HEAD", "git log --oneline HEAD..origin/peer-payload",
+             "add shared.txt"],
+            ["git checkout ", "read in `", "git -C "]),
 }
 
 
-def verdict(hook_path, repo, command, case_id=None):
+def _reconcile_runs(context, want_dir):
+    """True when every `git -C ...` line in `context` names `want_dir`.
+
+    Vacuously true when the case declared no directory, so this costs the
+    other cases nothing. `comments=True` drops the trailing `# or rebase, ...`
+    the reconcile block appends, which is a shell comment rather than an
+    argument.
+    """
+    if want_dir is None:
+        return True
+    for line in context.splitlines():
+        line = line.strip()
+        if not line.startswith("git -C "):
+            continue
+        try:
+            argv = shlex.split(line, comments=True)
+        except ValueError:
+            return False
+        if len(argv) < 3 or argv[2] != want_dir:
+            return False
+    return True
+
+
+def verdict(hook_path, repo, command, case_id=None, payload_cwd=None):
     # sys.executable, not a bare "python3": that guarantees the same
     # interpreter running this test, rather than whatever (if anything)
     # "python3" resolves to on the machine's PATH. ai-config#2098 flagged a
@@ -473,7 +1076,8 @@ def verdict(hook_path, repo, command, case_id=None):
     # block. Keep sys.executable for the guaranteed-correct-interpreter
     # reason; don't restate the blocking hypothesis as settled.
     proc = subprocess.run(
-        [sys.executable, hook_path], input=json.dumps(bash(command)),
+        [sys.executable, hook_path],
+        input=json.dumps(bash(command, payload_cwd)),
         capture_output=True, text=True, cwd=repo,
     )
     if proc.returncode != 0:
@@ -499,6 +1103,8 @@ def verdict(hook_path, repo, command, case_id=None):
     want, unwanted = LABEL_EXPECT.get(case_id, ([], []))
     if any(w not in context for w in want) or any(u in context for u in unwanted):
         return "WARN-WRONGLABEL"
+    if not _reconcile_runs(context, ROUNDTRIP.get(case_id)):
+        return "WARN-UNRUNNABLE"
     return "WARN"
 
 
@@ -506,21 +1112,28 @@ def verdict(hook_path, repo, command, case_id=None):
 #
 # This is not a shortcut: the guard is read-only by construction (`ls-remote`,
 # `rev-parse`, `merge-base`, `cat-file`, `log`), so no variant can leave a
-# fixture in a state a later variant would see. Rebuilding per variant cost
-# 32 x 17 = 544 repo-plus-bare-remote constructions and pushed the suite past
-# two minutes; building once costs 32 and loses nothing.
+# fixture in a state a later variant would see. Rebuilding per variant cost one
+# repo-plus-bare-remote PAIR per case and per mutation clause; building once
+# costs one pair per case and loses nothing.
 _BUILT = {}
 
 
 def build_all(cases):
+    """Build every fixture. A builder returns its command, or that command
+    paired with the `cwd` the Bash payload should carry -- which is how the
+    tool call's own directory is exercised separately from the hook process's.
+    """
     for case_id, builder in cases.items():
         path, bare = _new_repo()
-        _BUILT[case_id] = (path, builder(path, bare))
+        built = builder(path, bare)
+        command, payload_cwd = built if isinstance(built, tuple) else (built,
+                                                                       None)
+        _BUILT[case_id] = (path, command, payload_cwd)
 
 
 def build_and_verdict(hook_path, case_id):
-    path, command = _BUILT[case_id]
-    return verdict(hook_path, path, command, case_id)
+    path, command, payload_cwd = _BUILT[case_id]
+    return verdict(hook_path, path, command, case_id, payload_cwd)
 
 
 if not os.path.isfile(HOOK):
@@ -634,8 +1247,8 @@ MUTATIONS = {
         "the local side of the comparison is the ref being PUSHED, not HEAD",
         [('        local = _git(["rev-parse", "--verify", "--quiet", '
           'source + "^{commit}"],\n'
-          "                     timeout=5)",
-          '        local = _git(["rev-parse", "HEAD"], timeout=5)')],
+          "                     timeout=5, cwd=cwd)",
+          '        local = _git(["rev-parse", "HEAD"], timeout=5, cwd=cwd)')],
         # Also covers the deletion and wildcard refspecs: this one read is
         # what declines them, so reverting it makes both warn about the
         # currently checked-out branch instead.
@@ -643,10 +1256,11 @@ MUTATIONS = {
     ),
     "deny_scans_every_command": (
         "the refusal pass examines every simple command, not just the first",
-        [("    for argv, flags, _pos, _repo, _ok, override in parsed:\n"
+        [("    for argv, flags, _pos, _repo, _ok, override, _cwd in parsed:\n"
           '        if flags["force"] and not flags["dry_run"] '
           "and not override:",
-          "    for argv, flags, _pos, _repo, _ok, override in parsed[:1]:\n"
+          "    for argv, flags, _pos, _repo, _ok, override, _cwd in "
+          "parsed[:1]:\n"
           '        if flags["force"] and not flags["dry_run"] '
           "and not override:")],
         {"D9"},
@@ -660,9 +1274,9 @@ MUTATIONS = {
     "reconcile_uses_the_pushed_ref": (
         "the remediation commands operate on the ref being pushed",
         [("        if on_source:\n"
-          '            reconcile = (f"    git fetch origin {branch}\\n"',
+          '            reconcile = (f"    {gitc}fetch origin {branch}\\n"',
           "        if True:\n"
-          '            reconcile = (f"    git fetch origin {branch}\\n"')],
+          '            reconcile = (f"    {gitc}fetch origin {branch}\\n"')],
         {"W6"},
     ),
     "warning_names_the_pushed_ref": (
@@ -680,15 +1294,269 @@ MUTATIONS = {
           "        if False:\n            continue")],
         # S1, S2 and S11 are fast-forward pushes too, so removing the gate
         # makes all of them warn -- the harness caught this set being
-        # under-declared the first time.
-        {"S1", "S2", "S5", "S11"},
+        # under-declared the first time. S17 and S38 join them: each is a
+        # fast-forward READ IN THE RIGHT DIRECTORY, so both flip here as well
+        # as under the `cd` clause below.
+        {"S1", "S2", "S5", "S11", "S17", "S38"},
     ),
     "subcommand": (
         "only `git push` matches, not another git subcommand",
         [('    if i >= len(argv) or argv[i] != "push":\n'
-          "        return None, False",
+          "        return None, False, ()",
           "    pass")],
         {"S10"},
+    ),
+    "cd_moves_the_push": (
+        "a `cd` earlier in the compound command moves the directory the push "
+        "runs in",
+        [("        if head and head[0] in CD_WORDS:\n"
+          "            if region or sep in BRANCH_SEPS or after in "
+          "FORK_SEPS:\n"
+          "                dirs[scope] = None\n"
+          "            else:\n"
+          "                dirs[scope] = _resolve_cd(head, dirs[scope])\n"
+          "            continue",
+          "        if head and head[0] in CD_WORDS:\n"
+          "            continue")],
+        # S23, S24 and S27-S31 do NOT flip: their `cd` is declined rather than
+        # applied, and a `cd` that is not applied at all leaves the same
+        # directory. W14-W16 and S38 do flip: a case statement changes which
+        # scope the push lands in, never whether the `cd` before it applies.
+        {"S17", "S18", "S38", "W8", "W11", "W12", "W13", "W14", "W15",
+         "W16"},
+    ),
+    "branch_region_declines": (
+        "a compound statement opens a REGION, so every `cd` in its body is "
+        "declined rather than only the one carrying the keyword",
+        # Anchored on the region's USE rather than on `BLOCK_OPEN`: the
+        # condition test below sits inside the same `head[0] in BLOCK_OPEN`
+        # arm, so emptying that set would revert two clauses at once and
+        # report a flip set neither of them owns.
+        [("            if region or sep in BRANCH_SEPS or after in "
+          "FORK_SEPS:",
+          "            if sep in BRANCH_SEPS or after in FORK_SEPS:")],
+        # S27 and S28 are the shapes a keyword-only test missed: their `cd` is
+        # not the body's first command, so no keyword reaches it. S32 and S33
+        # do NOT flip: their `cd` is the condition rather than the body, and
+        # a separate clause declines it.
+        {"S23", "S27", "S28"},
+    ),
+    "alternative_cd_declines": (
+        "a `cd` the shell may never reach -- an `||` alternative, or a "
+        "pipeline element -- makes the directory indeterminate rather than "
+        "moving it",
+        [('BRANCH_SEPS = {"||", "|"}', "BRANCH_SEPS = set()")],
+        {"S24", "S31", "S36", "S37"},
+    ),
+    "forked_cd_declines": (
+        "a `cd` the shell forks into a subshell of its own -- backgrounded, "
+        "or piped -- moves no directory the push can see",
+        [('FORK_SEPS = {"&", "|"}', "FORK_SEPS = set()")],
+        # S34 and S35 are the same decline reached by two shapes whose `&`
+        # this clause could not see until it was recovered: one written at the
+        # end of a line, and one backgrounding the whole AND-OR list.
+        {"S29", "S30", "S34", "S35"},
+    ),
+    "separator_is_tracked": (
+        "each simple command carries the operator before it, which is what "
+        "tells an `||` alternative from an `&&` chain",
+        [("                        sep = _next_sep(sep, ch)",
+          "                        pass")],
+        # S23, S27 and S28 cannot see this: their decline comes from the
+        # region an `if` opened, which no separator reports.
+        {"S24", "S31", "S36", "S37"},
+    ),
+    "separator_reads_the_first_operator": (
+        "the leading punctuation run reports the operator it STARTS with, so "
+        "the `;` a newline leaves behind cannot overwrite the `||` or `|` "
+        "before it",
+        [("                    if sep and ch != sep[-1]:\n"
+          "                        frozen = True\n"
+          "                    else:\n"
+          "                        sep = _next_sep(sep, ch)",
+          "                    sep = _next_sep(sep, ch)")],
+        # Only the end-of-line spelling can see this: S24 and S31 write the
+        # operator and the `cd` on one line, so each run is one operator --
+        # `||` and `|` -- which folding leaves unchanged.
+        {"S36", "S37"},
+    ),
+    "trailing_separator_is_tracked": (
+        "each simple command also carries the operator after it, which is the "
+        "only side a fork is visible from",
+        # Anchored on the assignment alone rather than on the loop around it:
+        # the loop now also carries the first-operator break, and blanking the
+        # pair would revert two clauses at once.
+        [("                trailing = _next_sep(trailing, ch)",
+          "                pass")],
+        {"S29", "S30", "S34", "S35"},
+    ),
+    "trailing_separator_reads_the_first_operator": (
+        "a punctuation run reports the operator it STARTS with, so the `;` a "
+        "newline leaves behind cannot overwrite the `&` before it",
+        [("                if trailing and ch != trailing[-1]:\n"
+          "                    break\n", "")],
+        # Only the end-of-line spelling can see this: S29 writes the `&` and
+        # the next command on one line, so its run is a single character.
+        {"S34"},
+    ),
+    "background_forks_the_whole_list": (
+        "a `&` backgrounds the AND-OR list before it, so the trailing "
+        "operator propagates backwards across `&&` and `||`",
+        [("        prev, here = cmds[i - 1], cmds[i]\n"
+          '        if here[3] == "&" and prev[3] in ("&&", "||") '
+          "and prev[0] == here[0]:\n"
+          '            cmds[i - 1] = (prev[0], prev[1], prev[2], "&")',
+          "        pass")],
+        {"S35"},
+    ),
+    "condition_cd_declines": (
+        "a `cd` in a compound statement's own condition is declined, though "
+        "it shares an argv with the keyword and the region never sees it",
+        [("            if skip < len(cond) and cond[skip] in CD_WORDS:\n"
+          "                dirs[scope] = None",
+          "            if False:\n"
+          "                dirs[scope] = None")],
+        {"S32", "S33"},
+    ),
+    "unexpanded_value_declines": (
+        "a `$name` or a command substitution names no directory, so it is "
+        "declined rather than joined on as a literal path component",
+        [('    if "$" in target or "`" in target:\n'
+          "        return None  # unexpanded; resolving it means simulating "
+          "the shell",
+          "    pass")],
+        {"S25"},
+    ),
+    "tilde_is_expanded": (
+        "a leading `~` is expanded the way the shell would have expanded it, "
+        "and an unknown user declines",
+        [('    if target.startswith("~"):\n'
+          "        target = os.path.expanduser(target)\n"
+          '        if target.startswith("~"):\n'
+          "            return None  # an unknown user",
+          "    pass")],
+        {"S26"},
+    ),
+    "indeterminate_cd_declines": (
+        "a `cd` that cannot be resolved declines the reading rather than "
+        "falling back to the hook's own directory",
+        [("        if cwd is None:\n            continue",
+          "        if cwd is None:\n            cwd = os.getcwd()")],
+        # S19 and S20 reach the same gate by a different route: their
+        # directory is indeterminate because the REPOSITORY was redirected,
+        # not because a `cd` was. S32 and S33 reach it because a `cd` in a
+        # condition is declined without being resolved.
+        {"S18", "S19", "S20", "S32", "S33"},
+    ),
+    "dash_c_moves_the_push": (
+        "the push's own `-C` values are read out, not skipped as option noise",
+        [('            if argv[i] == "-C" and i + 1 < len(argv):\n'
+          "                cdirs.append(argv[i + 1])\n"
+          "            i += 2",
+          "            i += 2")],
+        {"W9"},
+    ),
+    "base_is_the_payload_cwd": (
+        "the directory a push starts in is the Bash call's own `cwd`, not the "
+        "hook process's",
+        [('        verdict = evaluate(command, payload.get("cwd"))',
+          "        verdict = evaluate(command)")],
+        {"W10"},
+    ),
+    "subshell_scopes_cd": (
+        "a subshell's parentheses are tracked, so a `cd` inside one does not "
+        "leak onto a push outside it",
+        # Anchored on the parenthesis clause alone, NOT on the `for ch in t`
+        # loop around it: that loop also derives the separator each simple
+        # command carries and tracks the `case` statements open, and blanking
+        # it would revert three clauses at once and report a flip set none of
+        # them owns. Only the PUSH is suppressed, which is enough: with
+        # nothing ever pushed, `len(scopes) > 1` is never true and the pop
+        # below cannot fire either.
+        [('                if ch == "(" and not pattern:\n'
+          "                    opened += 1\n"
+          "                    scopes.append(scopes[-1] + (opened,))",
+          "                if False:\n"
+          "                    opened += 1\n"
+          "                    scopes.append(scopes[-1] + (opened,))")],
+        # W11's `cd` shares the subshell with its push, so it still applies
+        # when every command reads as root -- which is what makes the pair a
+        # two-sided pin rather than one case asserting silence. S39 is the
+        # same pin around a case statement: its `cd` is in the OUTER subshell,
+        # so a leak past the closing parenthesis reaches the push after it.
+        {"S21", "S22", "S39"},
+    ),
+    "subshells_have_identities": (
+        "a subshell is identified, not merely counted, so a `cd` in one does "
+        "not leak into its next SIBLING",
+        [("                    opened += 1\n"
+          "                    scopes.append(scopes[-1] + (opened,))",
+          "                    scopes.append(scopes[-1] + (len(scopes),))")],
+        # S21's push sits outside the parentheses, so a depth-shaped label
+        # leaves it correct; only the sibling shape can see the difference.
+        {"S22"},
+    ),
+    "case_pattern_is_not_a_subshell": (
+        "a `)` that closes a `case` pattern pops no subshell, though it is "
+        "the same character one closes with",
+        [('                elif ch == ")" and pattern:\n'
+          "                    cases[-1][1] = False\n"
+          '                elif ch == ")" and len(scopes) > 1:',
+          '                elif ch == ")" and len(scopes) > 1:')],
+        {"W14", "W15", "W16", "S38"},
+    ),
+    "case_terminator_restores_pattern_position": (
+        "a `;;` returns the case to pattern position, so every clause's `)` "
+        "is read as a pattern and not only the first one's",
+        [('                elif (ch in ";&" and prev == ";" and cases\n'
+          "                        and cases[-1][0] == len(scopes)):\n"
+          "                    cases[-1][1] = True",
+          "                elif False:\n"
+          "                    cases[-1][1] = True")],
+        # Only a case of MORE than one clause can see this: W14's push sits in
+        # the first clause, whose pattern position comes from the `in`.
+        {"W15"},
+    ),
+    "case_pattern_begins_at_in": (
+        "pattern position begins at the case's `in`, so parentheses in the "
+        "SUBJECT are read as a subshell rather than as a pattern",
+        [("        cases.append([depth, False, False])",
+          "        cases.append([depth, True, True])")],
+        {"W16"},
+    ),
+    "brace_group_is_transparent": (
+        "a brace group's punctuation is stripped as a lead word, so the `cd` "
+        "inside one is visible and outlives the closing brace",
+        [('              "{", "}"}', "              }")],
+        {"W12"},
+    ),
+    "remediation_quotes_the_directory": (
+        "the directory is shell-quoted, so a `git -C` line naming a path with "
+        "a space is still runnable",
+        [("        gitc = f\"git -C {shlex.quote(cwd)} \" if moved else "
+          '"git "',
+          '        gitc = f"git -C {cwd} " if moved else "git "')],
+        {"W13"},
+    ),
+    "git_dir_option_declines": (
+        "`--git-dir`/`--work-tree` name a repository, so the reading is "
+        "declined rather than taken in the session's",
+        [('GIT_REPO_OPTS = {"--git-dir", "--work-tree"}',
+          "GIT_REPO_OPTS = set()")],
+        {"S19"},
+    ),
+    "git_dir_env_declines": (
+        "the `GIT_DIR=`/`GIT_WORK_TREE=` env spellings decline the same way",
+        [('GIT_ENV_REDIRECT = ("GIT_DIR=", "GIT_WORK_TREE=")',
+          "GIT_ENV_REDIRECT = ()")],
+        {"S20"},
+    ),
+    "warning_names_the_directory": (
+        "a reading taken somewhere other than the call's own directory says "
+        "where, and qualifies every remediation command with `git -C`",
+        [("        moved = os.path.realpath(cwd) != os.path.realpath(base)",
+          "        moved = False")],
+        {"W8", "W9", "W11", "W12", "W13", "W14", "W15", "W16"},
     ),
     "heredoc_blanking": (
         "a heredoc body is blanked before parsing, so a mention inside one "

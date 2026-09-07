@@ -27,8 +27,10 @@ for settings in \
   "$project/.claude/settings.json" \
   "${HOME:-}/.claude/settings.json"; do
   [ -f "$settings" ] || continue
-  # First ai-config@* entry in this file, value included; `|| true` because
-  # a file that names no such entry is the common case, not an error.
+  # First raw-text match in this file, value included -- no JSON parse, so
+  # this also matches a commented-out line or a name outside enabledPlugins,
+  # which `scripts/doctor.py` does not (memories/claude-code-settings.md).
+  # `|| true` because a file with no such text is the common case, not an error.
   entry="$(grep -Eo '"ai-config@[^"]+" *: *(true|false)' "$settings" | head -1 || true)"
   [ -n "$entry" ] || continue
   case "$entry" in

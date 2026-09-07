@@ -4,12 +4,17 @@
 import json
 import os
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
+
+# Any skill this checkout ships; the doubled-name test must not turn on one
+# skill directory staying in the repo under its current name.
+A_REPO_SKILL = sorted(p.name for p in (REPO_ROOT / "skills").iterdir() if p.is_dir())[0]
 
 import doctor
 
@@ -170,7 +175,8 @@ class TestDoctor(unittest.TestCase):
     @patch("doctor.check_context_closure")
     @patch("doctor.check_jsonc_configs")
     @patch("doctor.check_ai_clis")
-    def test_run_doctor_healthy(self, m_ai, m_jsonc, m_closure, m_hooks, m_wrappers, m_subm, m_git):
+    @patch("doctor.check_consumer_leftovers")
+    def test_run_doctor_healthy(self, m_leftovers, m_ai, m_jsonc, m_closure, m_hooks, m_wrappers, m_subm, m_git):
         m_git.return_value = {"name": "git_status", "ok": True, "status": "OK", "details": "ok"}
         m_subm.return_value = {"name": "submodules", "ok": True, "status": "OK", "details": "ok"}
         m_wrappers.return_value = {"name": "codex_wrappers", "ok": True, "status": "OK", "details": "ok"}
@@ -178,6 +184,7 @@ class TestDoctor(unittest.TestCase):
         m_closure.return_value = {"name": "context_budget", "ok": True, "status": "OK", "details": "ok"}
         m_jsonc.return_value = {"name": "jsonc_configs", "ok": True, "status": "OK", "details": "ok"}
         m_ai.return_value = {"name": "ai_clis", "ok": True, "status": "OK", "details": "ok"}
+        m_leftovers.return_value = {"name": "consumer_leftovers", "ok": True, "status": "OK", "details": "ok"}
 
         report = doctor.run_doctor()
         self.assertTrue(report["all_ok"])
@@ -186,6 +193,391 @@ class TestDoctor(unittest.TestCase):
         text = doctor.format_text_report(report)
         self.assertIn("HEALTHY", text)
         self.assertIn("ai-config Doctor Diagnostic Report", text)
+
+
+class TestConsumerLeftovers(unittest.TestCase):
+    """Test the `~/.claude` pre-plugin leftover sweep."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.home = Path(self._tmp.name)
+        self.addCleanup(self._tmp.cleanup)
+        # A hermetic project root too: the scope walk reads the project's
+        # `.claude/` settings above the user file, so leaving it at this
+        # checkout would let a developer's own settings.local.json decide.
+        self._proj = tempfile.TemporaryDirectory()
+        self.project = Path(self._proj.name)
+        self.addCleanup(self._proj.cleanup)
+        (self.project / ".claude").mkdir()
+        env = patch.dict(
+            os.environ,
+            {"CLAUDE_HOME": str(self.home), "CLAUDE_PROJECT_DIR": str(self.project)},
+        )
+        env.start()
+        self.addCleanup(env.stop)
+
+    def write_settings(self, path: Path, enabled: bool):
+        path.write_text(
+            json.dumps({"enabledPlugins": {"ai-config@Morrison-Lab": enabled}}),
+            encoding="utf-8",
+        )
+
+    def enable_plugin(self):
+        self.write_settings(self.home / "settings.json", True)
+
+    def symlink(self, target: Path, link: Path):
+        try:
+            os.symlink(str(target), str(link))
+        except OSError:  # Windows without developer mode
+            self.skipTest("symlinks unavailable on this platform")
+
+    def test_skips_sweep_when_plugin_not_enabled(self):
+        self.write_settings(self.home / "settings.json", False)
+        (self.home / "shared").mkdir()
+        res = doctor.check_consumer_leftovers()
+        self.assertTrue(res["ok"])
+        self.assertEqual(res["status"], "OK")
+        self.assertFalse(res["plugin_enabled"])
+        self.assertEqual(res["leftovers"], [])
+        self.assertIn("Skipped", res["details"])
+
+    def test_unparsable_settings_is_reported_not_swallowed(self):
+        (self.home / "settings.json").write_text("{not json", encoding="utf-8")
+        res = doctor.check_consumer_leftovers()
+        self.assertFalse(res["ok"])
+        self.assertEqual(res["status"], "WARN")
+        self.assertIsNone(res["plugin_enabled"])
+        self.assertIn("did not yield usable settings", res["details"])
+
+    def test_settings_parsing_to_a_non_object_are_reported_not_swallowed(self):
+        # A top level that is valid JSON but not an object still leaves the
+        # sweep unable to say whether the plugin route is in use. Returning
+        # an empty dict would read as "this scope names no entry" and let a
+        # lower scope decide, which is the silent fallback fail-fast rules
+        # out.
+        (self.home / "settings.json").write_text("[]", encoding="utf-8")
+        res = doctor.check_consumer_leftovers()
+        self.assertFalse(res["ok"])
+        self.assertEqual(res["status"], "WARN")
+        self.assertIsNone(res["plugin_enabled"])
+        self.assertIn("did not yield usable settings", res["details"])
+        self.assertIn("top-level value is list", res["details"])
+
+    def test_non_object_enabled_plugins_is_reported_not_swallowed(self):
+        # A settings file whose top level is an object but whose
+        # `enabledPlugins` is not leaves the same question open, so it must
+        # not fall through to a lower scope either.
+        (self.home / "settings.json").write_text(
+            json.dumps({"enabledPlugins": ["ai-config@Morrison-Lab"]}),
+            encoding="utf-8",
+        )
+        res = doctor.check_consumer_leftovers()
+        self.assertFalse(res["ok"])
+        self.assertEqual(res["status"], "WARN")
+        self.assertIsNone(res["plugin_enabled"])
+        self.assertIn("enabledPlugins is list, not an object", res["details"])
+
+    def test_null_enabled_plugins_is_reported_not_swallowed(self):
+        # An explicit `null` is present and is not an object either, so it
+        # must report rather than read as a scope naming no entry.
+        (self.home / "settings.json").write_text(
+            json.dumps({"enabledPlugins": None}),
+            encoding="utf-8",
+        )
+        res = doctor.check_consumer_leftovers()
+        self.assertFalse(res["ok"])
+        self.assertEqual(res["status"], "WARN")
+        self.assertIsNone(res["plugin_enabled"])
+        self.assertIn("enabledPlugins is NoneType, not an object", res["details"])
+
+    def test_clean_home_reports_ok(self):
+        self.enable_plugin()
+        res = doctor.check_consumer_leftovers()
+        self.assertTrue(res["ok"])
+        self.assertEqual(res["status"], "OK")
+        self.assertEqual(res["leftovers"], [])
+        self.assertEqual(res["doubled_skills"], [])
+
+    def test_reports_leftover_directories(self):
+        self.enable_plugin()
+        (self.home / "shared").mkdir()
+        (self.home / "memories").mkdir()
+        res = doctor.check_consumer_leftovers()
+        self.assertFalse(res["ok"])
+        self.assertEqual(res["status"], "WARN")
+        self.assertEqual(len(res["leftovers"]), 2)
+        self.assertTrue(any("shared" in item for item in res["leftovers"]))
+        self.assertTrue(any("memories" in item for item in res["leftovers"]))
+
+    def test_reports_skill_symlink_into_checkout(self):
+        self.enable_plugin()
+        (self.home / "skills").mkdir()
+        self.symlink(REPO_ROOT / "skills" / "ums", self.home / "skills" / "ums")
+        res = doctor.check_consumer_leftovers()
+        self.assertEqual(res["status"], "WARN")
+        self.assertEqual(len(res["leftovers"]), 1)
+        self.assertIn("symlink -> ", res["leftovers"][0])
+        self.assertEqual(res["doubled_skills"], [])
+
+    def test_reports_whole_skills_directory_symlinked_into_checkout(self):
+        # ai-config#2405's own shape: `~/.claude/skills` is itself the
+        # symlink, so every skill lists twice. Settled provenance, so it is
+        # one leftover rather than a name match per skill.
+        self.symlink(REPO_ROOT / "skills", self.home / "skills")
+        self.enable_plugin()
+        res = doctor.check_consumer_leftovers()
+        self.assertEqual(res["status"], "WARN")
+        self.assertEqual(len(res["leftovers"]), 1)
+        self.assertIn(str(self.home / "skills"), res["leftovers"][0])
+        self.assertIn("symlink -> ", res["leftovers"][0])
+        self.assertEqual(res["doubled_skills"], [])
+
+    def test_whole_skills_directory_symlinked_outside_a_checkout_is_not_a_leftover(self):
+        # The provenance half of the branch above: pointing `~/.claude/skills`
+        # at your own dotfiles skills folder is a real setup, and reporting it
+        # as a settled-provenance leftover is the expensive false positive.
+        outside = tempfile.TemporaryDirectory()
+        self.addCleanup(outside.cleanup)
+        mine = Path(outside.name)
+        (mine / "ums").mkdir()
+        (mine / "my-skill").mkdir()
+        self.symlink(mine, self.home / "skills")
+        self.enable_plugin()
+        res = doctor.check_consumer_leftovers()
+        # It falls through to the ordinary walk, so the shared name is
+        # reported as the doubled-listing symptom and nothing is reported
+        # as a settled-provenance leftover.
+        self.assertEqual(res["leftovers"], [])
+        self.assertEqual(res["doubled_skills"], ["ums"])
+
+    def test_personal_skill_inside_claude_home_is_not_a_leftover(self):
+        # `~/.claude/CLAUDE.md` is the standard user memory file and a
+        # leftover `hooks/` copy supplies `hooks/hooks.json`, so an
+        # unbounded parent walk reads the Claude home itself as a checkout.
+        self.enable_plugin()
+        (self.home / "CLAUDE.md").write_text("user memory", encoding="utf-8")
+        (self.home / "hooks").mkdir()
+        (self.home / "hooks" / "hooks.json").write_text("{}", encoding="utf-8")
+        (self.home / "personal" / "my-skill").mkdir(parents=True)
+        (self.home / "skills").mkdir()
+        self.symlink(self.home / "personal" / "my-skill", self.home / "skills" / "my-skill")
+        res = doctor.check_consumer_leftovers()
+        self.assertFalse(any("my-skill" in item for item in res["leftovers"]))
+        self.assertEqual(res["leftovers"], [f"{self.home / 'hooks'} (copy)"])
+
+    def test_ignores_client_sync_bucket_and_personal_skills(self):
+        # Pins the depth of the walk: `ums` is one of this repo's skills, so
+        # a recursive walk would report the bucket's copy of it. Only the
+        # `synced` entry itself is examined, and it is neither a symlink into
+        # a checkout nor a name this repo ships.
+        self.enable_plugin()
+        synced = self.home / "skills" / "synced" / "bucket-id"
+        synced.mkdir(parents=True)
+        (synced / "ums").mkdir()
+        (self.home / "skills" / "session-start-hook").mkdir()
+        res = doctor.check_consumer_leftovers()
+        self.assertTrue(res["ok"])
+        self.assertEqual(res["leftovers"], [])
+        self.assertEqual(res["doubled_skills"], [])
+
+    def test_any_truthy_entry_in_one_file_enables_the_sweep(self):
+        # Within one file the entries are unioned, not intersected: a second
+        # marketplace's copy loads the same plugin, so one truthy
+        # `ai-config@*` entry is enough even beside an explicit `false`.
+        (self.home / "settings.json").write_text(
+            json.dumps(
+                {"enabledPlugins": {"ai-config@Morrison-Lab": False, "ai-config@other": True}}
+            ),
+            encoding="utf-8",
+        )
+        (self.home / "shared").mkdir()
+        res = doctor.check_consumer_leftovers()
+        self.assertTrue(res["plugin_enabled"])
+        self.assertEqual(len(res["leftovers"]), 1)
+
+    def test_higher_scope_false_beats_user_scope_true(self):
+        # `enabledPlugins` resolves by precedence rather than by unioning,
+        # so a project `false` over a user `true` means the plugin is off
+        # and `~/.claude/shared` may be this machine's only install.
+        self.enable_plugin()
+        self.write_settings(self.project / ".claude" / "settings.json", False)
+        (self.home / "shared").mkdir()
+        res = doctor.check_consumer_leftovers()
+        self.assertTrue(res["ok"])
+        self.assertFalse(res["plugin_enabled"])
+        self.assertEqual(res["leftovers"], [])
+        self.assertIn("Skipped", res["details"])
+
+    def test_higher_scope_true_enables_sweep_with_no_user_entry(self):
+        # The other direction of the same walk: a project `true` with no
+        # user entry is a real plugin install, so the sweep must run.
+        self.write_settings(self.project / ".claude" / "settings.json", True)
+        (self.home / "shared").mkdir()
+        res = doctor.check_consumer_leftovers()
+        self.assertFalse(res["ok"])
+        self.assertTrue(res["plugin_enabled"])
+        self.assertEqual(len(res["leftovers"]), 1)
+
+    def test_local_scope_false_beats_project_scope_true(self):
+        # Local settings outrank project settings, so the first file in
+        # the walk that names an entry has to be the one that decides.
+        self.write_settings(self.project / ".claude" / "settings.local.json", False)
+        self.write_settings(self.project / ".claude" / "settings.json", True)
+        (self.home / "shared").mkdir()
+        res = doctor.check_consumer_leftovers()
+        self.assertTrue(res["ok"])
+        self.assertFalse(res["plugin_enabled"])
+        self.assertEqual(res["leftovers"], [])
+
+    def test_no_scope_names_the_plugin_skips_the_sweep(self):
+        (self.home / "shared").mkdir()
+        res = doctor.check_consumer_leftovers()
+        self.assertTrue(res["ok"])
+        self.assertFalse(res["plugin_enabled"])
+        self.assertEqual(res["leftovers"], [])
+        self.assertIn("no local, project, or user settings file", res["details"])
+
+    def test_claude_home_that_is_itself_a_checkout_stops_the_walk(self):
+        # The home stop, isolated from the `.git` requirement: this home
+        # carries `.git` as well as `CLAUDE.md` and `hooks/hooks.json`, so
+        # only stopping at the home keeps a personal skill under it out of
+        # the settled-provenance half.
+        self.enable_plugin()
+        (self.home / ".git").mkdir()
+        (self.home / "CLAUDE.md").write_text("user memory", encoding="utf-8")
+        (self.home / "hooks").mkdir()
+        (self.home / "hooks" / "hooks.json").write_text("{}", encoding="utf-8")
+        (self.home / "personal" / "my-skill").mkdir(parents=True)
+        (self.home / "skills").mkdir()
+        self.symlink(self.home / "personal" / "my-skill", self.home / "skills" / "my-skill")
+        res = doctor.check_consumer_leftovers()
+        self.assertFalse(any("my-skill" in item for item in res["leftovers"]))
+        self.assertEqual(res["leftovers"], [f"{self.home / 'hooks'} (copy)"])
+
+    def test_non_git_directory_holding_both_files_is_not_a_checkout(self):
+        # The `.git` requirement, isolated from the home stop: this target
+        # sits outside the Claude home entirely, so the home stop never
+        # fires and only the `.git` test can reject it.
+        self.enable_plugin()
+        outside = tempfile.TemporaryDirectory()
+        self.addCleanup(outside.cleanup)
+        faux = Path(outside.name)
+        (faux / "CLAUDE.md").write_text("looks like a corpus", encoding="utf-8")
+        (faux / "hooks").mkdir()
+        (faux / "hooks" / "hooks.json").write_text("{}", encoding="utf-8")
+        # A name this repo does not ship, so the name test cannot fire and
+        # only the provenance test decides. The fallthrough from one test to
+        # the other is pinned by
+        # `test_name_matching_skill_symlink_outside_a_checkout_is_doubled`.
+        (faux / "skills" / "my-skill").mkdir(parents=True)
+        (self.home / "skills").mkdir()
+        self.symlink(faux / "skills" / "my-skill", self.home / "skills" / "my-skill")
+        res = doctor.check_consumer_leftovers()
+        self.assertEqual(res["leftovers"], [])
+        self.assertEqual(res["doubled_skills"], [])
+
+    def test_documented_shared_symlink_does_not_turn_the_check_red(self):
+        # README.md tells a reader with a global `~/.claude/CLAUDE.md` to
+        # place `shared/` by hand until ai-config#2352 lands, so red here
+        # would leave `--strict` red by construction on a conformant machine.
+        self.enable_plugin()
+        self.symlink(REPO_ROOT / "shared", self.home / "shared")
+        res = doctor.check_consumer_leftovers()
+        self.assertTrue(res["ok"])
+        self.assertEqual(res["status"], "OK")
+        self.assertEqual(res["leftovers"], [])
+        self.assertEqual(len(res["documented"]), 1)
+        self.assertIn("documented manual link", res["details"])
+
+    def test_documented_exemption_covers_only_a_shared_symlink(self):
+        # The exemption is scoped three ways, and each way is a leftover:
+        # a `shared` copy does not track the checkout, a `shared` symlink
+        # landing outside one is not the documented step, and `hooks` has
+        # no documented manual step at all.
+        self.enable_plugin()
+        outside = tempfile.TemporaryDirectory()
+        self.addCleanup(outside.cleanup)
+        self.symlink(Path(outside.name), self.home / "shared")
+        self.symlink(REPO_ROOT / "hooks", self.home / "hooks")
+        (self.home / "memories").mkdir()
+        res = doctor.check_consumer_leftovers()
+        self.assertFalse(res["ok"])
+        self.assertEqual(res["documented"], [])
+        self.assertEqual(len(res["leftovers"]), 3)
+
+    def test_shared_copy_is_still_a_leftover_and_explains_itself(self):
+        # README.md documents symlinking this path and not copying it, so a
+        # copy is a leftover -- but it is the leftover a reader is likeliest
+        # to have placed deliberately, so the details say why it is reported
+        # and what to do instead. Without that the WARN reads as unexplained.
+        self.enable_plugin()
+        (self.home / "shared").mkdir()
+        res = doctor.check_consumer_leftovers()
+        self.assertFalse(res["ok"])
+        self.assertEqual(res["documented"], [])
+        self.assertEqual(res["leftovers"], [f"{self.home / 'shared'} (copy)"])
+        self.assertIn("is a copy", res["details"])
+        self.assertIn("ai-config#2352", res["details"])
+        self.assertIn("replace it with a symlink", res["details"])
+
+    def test_readme_documents_the_symlink_and_not_a_copy(self):
+        # The exemption above is only sound while README recommends exactly
+        # the form the check exempts. Offering a copy there would leave
+        # `--strict` red by construction on a conformant machine, which is
+        # the failure the exemption exists to remove.
+        readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+        self.assertIn("symlink `shared/` there by hand", readme)
+        self.assertNotIn("symlink or copy `shared/`", readme)
+
+    def test_readme_qualifies_the_doctor_claim_on_the_plugin_gate(self):
+        # The check is doubly conditional: it exempts only a symlink that
+        # resolves into a checkout, and it reports nothing at all when the
+        # plugin gate says disabled. README is a reader's first account of
+        # it, so an unconditional sentence there promises a report the
+        # sweep does not make.
+        readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+        self.assertIn("When an ai-config plugin is enabled", readme)
+        self.assertNotIn(
+            "`python3 scripts/doctor.py` follows that split, reporting", readme
+        )
+
+    def test_memory_names_the_runners_raw_text_rule_not_only_first_versus_union(self):
+        # The divergence section exists to enumerate how the two readers
+        # differ, so it goes stale the moment it names only the
+        # within-`enabledPlugins` rule: the runner also matches a
+        # commented-out line and text outside `enabledPlugins`, which this
+        # check never reads.
+        memory = (REPO_ROOT / "memories" / "claude-code-settings.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("greps the raw file text", memory)
+        self.assertIn("commented-out", memory)
+
+    def test_name_matching_skill_symlink_outside_a_checkout_is_doubled(self):
+        # The provenance test and the name test run in order rather than on
+        # disjoint entry kinds: the client loads a symlinked personal skill
+        # exactly as it loads a real directory, so a shared name doubles the
+        # listing either way and the report must not turn on which it is.
+        self.enable_plugin()
+        outside = tempfile.TemporaryDirectory()
+        self.addCleanup(outside.cleanup)
+        mine = Path(outside.name)
+        (mine / "ums").mkdir()
+        (self.home / "skills").mkdir()
+        self.symlink(mine / "ums", self.home / "skills" / "ums")
+        res = doctor.check_consumer_leftovers()
+        self.assertEqual(res["status"], "WARN")
+        self.assertEqual(res["leftovers"], [])
+        self.assertEqual(res["doubled_skills"], ["ums"])
+
+    def test_name_match_reports_symptom_without_prescribing_removal(self):
+        self.enable_plugin()
+        (self.home / "skills" / A_REPO_SKILL).mkdir(parents=True)
+        res = doctor.check_consumer_leftovers()
+        self.assertEqual(res["status"], "WARN")
+        self.assertEqual(res["leftovers"], [])
+        self.assertEqual(res["doubled_skills"], [A_REPO_SKILL])
+        self.assertIn("by hand", res["details"])
 
 
 if __name__ == "__main__":

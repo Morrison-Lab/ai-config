@@ -117,6 +117,284 @@ CASES = [
      "a semicolon-joined clause is its own sentence boundary too -- a "
      "negation before the ';' must not suppress an unrelated genuine "
      "stale-clean claim after it (ai-config#1770)"),
+
+    # ai-config#3038. A retraction puts the claim first and the correction
+    # after it, so a prefix-only negation scan reads a withdrawal as a fresh
+    # assertion -- and the retraction vocabulary is not negation vocabulary.
+    ([QUERY, PUSH, say('But "fully clean" was wrong too, and for a third reason.')], False,
+     "the measured sentence: a retraction quoting the phrase it retracts"),
+    ([QUERY, PUSH, say('My earlier "ready to merge" call was incorrect.')], False,
+     "retraction vocabulary AFTER the phrase, in the same sentence"),
+    ([QUERY, PUSH, say("I overstated the 11 pass reading.")], False,
+     "retraction vocabulary BEFORE the phrase, with no clause break between"),
+    ([QUERY, PUSH, say('The reviewer is wrong that #1689 is conflict-free.')], False,
+     "'is wrong' is a retraction even without a first-person subject -- the "
+     "measured sentence has none either, so the source hook's first-person "
+     "anchor cannot be ported"),
+    ([QUERY, PUSH, say('My earlier "fully clean" call\nwas wrong.')], False,
+     "a retraction wrapped onto the next line under semantic line breaks -- "
+     "the trailing scan must not stop at a bare newline"),
+
+    ([QUERY, PUSH, say("All checks green. My earlier count was wrong, but that is "
+                       "a separate claim.")], True,
+     "a retraction in a LATER sentence must not suppress an unnegated claim"),
+
+    # The attachment guard. Each of these puts retraction vocabulary in the
+    # same sentence as a genuine stale-clean claim, in a DIFFERENT clause.
+    # Delete RX_CLAUSE_SEPARATOR and every one of them stops blocking.
+    ([QUERY, PUSH, say("PR #1689 is fully clean -- the earlier blocker was inaccurate.")], True,
+     "a prose dash separates the retraction from the claim"),
+    ([QUERY, PUSH, say("The reviewer was wrong about the lint failure, but all "
+                       "checks green.")], True,
+     "a comma and 'but' separate a leading third-person retraction from the claim"),
+    ([QUERY, PUSH, say("All checks green, but the reviewer overstated the risk.")], True,
+     "'overstated' in a trailing 'but' clause retracts nothing about the claim"),
+    ([QUERY, PUSH, say("All checks green after I misread the earlier log.")], True,
+     "a subordinating conjunction separates a first-person retraction too"),
+    ([QUERY, PUSH, say("| #1689 | fully clean |\n| #1690 | my count was wrong |")], True,
+     "a table cell boundary separates the rows -- the trailing scan crosses a "
+     "bare newline, so the markdown boundary is what has to stop it here"),
+    ([QUERY, PUSH, say("#1689 is fully clean after the reviewer confirmed every "
+                       "finding was addressed, including the one about the wrong "
+                       "variable name.")], True,
+     "an unrelated 'wrong' several clauses away must not suppress a genuine claim"),
+
+    # Attachment reads the two directions separately, and each direction has
+    # its own failure. Trailing first: a retraction that does not attach says
+    # nothing about a LEADING one that does, so the trailing verdict must not
+    # short-circuit the leading scan. Make the trailing scan return its verdict
+    # instead of falling through and this stops allowing.
+    ([QUERY, PUSH, say("I was wrong that #1689 is fully clean, and the count "
+                       "was overstated too.")], False,
+     "a leading retraction survives an unrelated trailing retraction word in "
+     "the same clause"),
+    # Leading second: a retraction states its claim as its own object, and
+    # `when` is the complementizer for that, so the leading scan alone drops it.
+    # Set RX_LEADING_SEPARATOR to RX_CLAUSE_SEPARATOR and this stops allowing.
+    ([QUERY, PUSH, say("I was wrong when I said all checks green.")], False,
+     "'wrong when I said' is one clause -- the plainest correction there is"),
+    # `because` deliberately still breaks, in BOTH directions: it introduces a
+    # reason rather than the retraction's object, so the claim still stands.
+    ([QUERY, PUSH, say("All checks green because the earlier reading was "
+                       "wrong.")], True,
+     "a reason clause is not a retraction of the claim it explains"),
+    # `when` is the only direction-asymmetric separator. `:` breaks attachment
+    # in BOTH directions, so it needs a blocking case on each side. Delete `:`
+    # from _CLAUSE_SEPARATORS and all three below stop blocking -- silently,
+    # since a suppressed guard emits nothing.
+    ([QUERY, PUSH, say("All checks green: the earlier reviewer was wrong.")], True,
+     "a colon separates a trailing retraction from the claim"),
+    # The leading pair. A colon after a retraction introduces the CORRECTED
+    # claim at least as often as the retracted one, and that reading is a fresh
+    # stale-clean assertion. Put `:` back in RX_CLAUSE_SEPARATOR alone and both
+    # of these stop blocking while the trailing case above stays green.
+    ([QUERY, PUSH, say("I was wrong: all checks green now.")], True,
+     "a colon after a retraction introduces a fresh claim, not the withdrawn "
+     "one -- the same sentence with a period blocks, so the colon must too"),
+    ([QUERY, PUSH, say("Correcting my earlier status: #1689 is fully clean.")], True,
+     "correcting an earlier status is not retracting the claim that follows "
+     "the colon"),
+
+    # Round 3 review. A prose dash is a clause separator too, and listing only
+    # the ASCII double hyphen made the verdict turn on one keystroke: the
+    # `--` case above blocked while every other spelling of the same sentence
+    # allowed, which is the silent direction. Delete the dash alternative from
+    # _CLAUSE_SEPARATORS and all four of these stop blocking.
+    ([QUERY, PUSH, say("PR #1689 is fully clean - the earlier blocker was "
+                       "inaccurate.")], True,
+     "a spaced single hyphen separates the retraction from the claim"),
+    ([QUERY, PUSH, say("PR #1689 is fully clean \u2014 the earlier blocker was "
+                       "inaccurate.")], True,
+     "so does an em-dash -- assistant prose is not held to this repo's "
+     "ASCII-punctuation rule, so the guard has to read the glyph"),
+    ([QUERY, PUSH, say("PR #1689 is fully clean \u2013 the earlier blocker was "
+                       "inaccurate.")], True,
+     "so does an en-dash"),
+    ([QUERY, PUSH, say("I was wrong \u2014 all checks green now.")], True,
+     "the dash is shared like the colon: after a retraction it introduces the "
+     "corrected claim, which is a fresh stale-clean assertion"),
+    # The whitespace requirement on the ASCII hyphen is what keeps a hyphenated
+    # word from reading as a clause break. Drop it and this stops allowing.
+    ([QUERY, PUSH, say("I overstated the pre-push reading of all checks green.")], False,
+     "an unspaced hyphen inside a word is not a clause separator"),
+    ([QUERY, PUSH, say("All checks green / the earlier note was wrong.")], True,
+     "a spaced slash separates them too"),
+    ([QUERY, PUSH, say("All checks green \u2192 the earlier note was wrong.")], True,
+     "so does an arrow"),
+    ([QUERY, PUSH, say("All checks green \u2026 the earlier note was wrong.")], True,
+     "so does an ellipsis glyph, which the ASCII spelling already handled "
+     "through the sentence-break scan"),
+
+    # `now that` is a reason connective like `because`, and only the two-word
+    # spelling is one -- a bare `now` separates nothing. Delete it from
+    # _CLAUSE_SEPARATORS and this stops blocking.
+    ([QUERY, PUSH, say("All checks green now that the earlier reading was "
+                       "wrong.")], True,
+     "'now that' introduces a reason, so the claim it explains still stands"),
+
+    # The relative pronouns join `when` in the trailing-only set: after the
+    # claim they open a clause about a different noun, so they break there.
+    # Delete each from _TRAILING_ONLY_SEPARATORS and its case stops blocking.
+    ([QUERY, PUSH, say("#1689 is fully clean where the earlier note was "
+                       "wrong.")], True,
+     "'where' opens a clause about a different proposition"),
+    ([QUERY, PUSH, say("#1689 is fully clean per the note which was wrong.")], True,
+     "'which' modifies the note, not the claim"),
+    ([QUERY, PUSH, say("#1689 is fully clean per the reviewer who was wrong.")], True,
+     "'who' modifies the reviewer, not the claim"),
+    ([QUERY, PUSH, say("#1689 is fully clean per the reviewer whose note was "
+                       "wrong.")], True,
+     "'whose' modifies the reviewer's note, not the claim"),
+    ([QUERY, PUSH, say("All checks green according to the reviewer whom I "
+                       "earlier said was wrong.")], True,
+     "'whom' likewise"),
+    # And the other direction, which is why they are trailing-only rather than
+    # shared. Move either into _CLAUSE_SEPARATORS alone and these stop allowing.
+    ([QUERY, PUSH, say("I was wrong where I said all checks green.")], False,
+     "before the claim a relative pronoun takes it as the retraction's own "
+     "object, exactly as 'when' does"),
+    ([QUERY, PUSH, say("Correcting my earlier status which claimed all checks "
+                       "green.")], False,
+     "same for 'which'"),
+    # `that` is the commonest word on either side of that split, so leaving it
+    # out left the guard switchable off by one word. Delete it from
+    # _TRAILING_ONLY_SEPARATORS and the two blocking cases stop blocking; move
+    # it into _CLAUSE_SEPARATORS and the two allow cases stop allowing.
+    ([QUERY, PUSH, say("#1689 is fully clean per the note that was wrong.")], True,
+     "'that' is a restrictive relative pronoun after the claim -- it modifies "
+     "the note, exactly as 'which' does"),
+    ([QUERY, PUSH, say("All checks green per the check that was mistaken.")], True,
+     "same shape without a PR number"),
+    ([QUERY, PUSH, say("I was wrong that all checks green.")], False,
+     "before the claim 'that' is the complementizer taking it as the "
+     "retraction's own object"),
+
+    # `until` is a time connective like `after` and `before` beside it, so a
+    # retraction reaching across it is about a different proposition. Its
+    # terminative sense is a separate question this guard does not read: only
+    # the retraction vocabulary withdraws a claim, so a claim bounded by a time
+    # is still a claim. Delete `until` from _CLAUSE_SEPARATORS and this stops
+    # blocking.
+    ([QUERY, PUSH, say("All checks green until I noticed my earlier count was "
+                       "overstated.")], True,
+     "what follows 'until' is a time, so the retraction here is about the "
+     "earlier COUNT rather than about the claim -- not because a bounded "
+     "claim still holds, which 'until' in fact denies"),
+
+    # A bracketed aside is a parenthesized one in the other bracket style, and
+    # pinning only the parens let the verdict turn on which style was typed.
+    # Delete the parens from _CLAUSE_SEPARATORS, or the brackets from
+    # _TRAILING_ONLY_SEPARATORS, and the matching case stops blocking.
+    ([QUERY, PUSH, say("All checks green (the earlier note was wrong).")], True,
+     "a parenthesized aside is about the note, not the claim"),
+    ([QUERY, PUSH, say("All checks green [the earlier note was wrong].")], True,
+     "so is the same aside in square brackets"),
+    # Before the claim a bracketed span is USUALLY markdown, so a citation
+    # inside a leading retraction must not read as an aside. RX_MARKDOWN_SPAN
+    # deletes the markdown shapes from the connector; delete that sub and all
+    # three of these stop allowing, which blocks a plain retraction -- the
+    # class ai-config#3038 was filed to stop blocking.
+    ([QUERY, PUSH, say("Retracting the status [#1689][pr] all checks green.")], False,
+     "a reference-style markdown link inside a leading retraction is not a "
+     "clause break"),
+    ([QUERY, PUSH, say("I misread [^1] all checks green.")], False,
+     "nor is a footnote marker"),
+    ([QUERY, PUSH, say("I was wrong in [the note](http://x/y) that said all "
+                       "checks green.")], False,
+     "nor is an inline link, whose parens would otherwise break the "
+     "connector too"),
+    # Deleting the markdown rather than exempting the bracket CHARACTER is
+    # what keeps the two aside styles in step. Take the brackets back out of
+    # _CLAUSE_SEPARATORS and the first two stop blocking while the paren case
+    # keeps blocking, which is the same style-dependent verdict the trailing
+    # pair above was written to remove.
+    ([QUERY, PUSH, say("[The earlier note was wrong] all checks green.")], True,
+     "a leading bracketed aside is a clause break, exactly as the paren one "
+     "below is -- it retracts the note and then asserts a fresh green state"),
+    ([QUERY, PUSH, say("(The earlier note was wrong) all checks green.")], True,
+     "the identical sentence in parens, pinned beside it so the two families "
+     "cannot diverge again unnoticed"),
+    ([QUERY, PUSH, say("The earlier reading was wrong [ci] all checks green "
+                       "now.")], True,
+     "a bare bracketed token is not one of the markdown shapes, so it stays "
+     "an aside -- nothing distinguishes a shortcut link from one"),
+    # The sub runs on the trailing connector too, for the same reason: with the
+    # brackets shared, a citation between the claim and its retraction would
+    # read as an aside. Drop the sub from the trailing branch alone and this
+    # stops allowing.
+    ([QUERY, PUSH, say('My earlier "ready to merge" call [^1] was '
+                       'incorrect.')], False,
+     "a footnote marker between the claim and its retraction is not an aside "
+     "either"),
+
+    # The head noun of a trailing relative clause is USUALLY some other noun,
+    # which is what puts the relative pronouns in the trailing-only set. When
+    # it refers back to the claim instead, the clause withdraws exactly the
+    # claim, so RX_METALINGUISTIC_HEAD drops that head phrase from the
+    # connector. Delete the RX_METALINGUISTIC_HEAD.sub call and all three of
+    # these stop allowing.
+    ([QUERY, PUSH, say("All checks green is a claim that was wrong.")], False,
+     "the head noun refers back to the claim, so the relative clause retracts "
+     "it rather than modifying some other noun"),
+    ([QUERY, PUSH, say("#1689 is fully clean is the line that was wrong.")], False,
+     "same shape naming the line rather than the claim"),
+    ([QUERY, PUSH, say("All checks green is a claim which was wrong.")], False,
+     "the hole predates 'that' -- the 'which' spelling blocked from the round "
+     "that added the relative pronouns"),
+    ([QUERY, PUSH, say("All checks green is a claim that was overstated.")], False,
+     "an auxiliary may sit between the pronoun and the retraction -- a bare "
+     "\\Z anchor on RX_METALINGUISTIC_HEAD blocks this participle form"),
+    ([QUERY, PUSH, say("All checks green is a claim that was later overstated.")], False,
+     "an adverb may sit beside the auxiliary too"),
+    ([QUERY, PUSH, say("All checks green is a claim that has now been retracted.")], False,
+     "and between two auxiliaries"),
+    ([QUERY, PUSH, say("All checks green is a claim that reviewers overstated.")], True,
+     "an unmarked plural subject fills no slot in the head phrase, so that "
+     "object relative still breaks attachment"),
+    ([QUERY, PUSH, say("All checks green is a claim that family overstated.")], True,
+     "the adverb slot is a closed list, so a lowercase noun ending in -ly "
+     "fills no slot and the object relative still breaks attachment"),
+    ([QUERY, PUSH, say("All checks green is a claim that supply overstated.")], True,
+     "same shape with a verb-or-noun ending in -ly"),
+    ([QUERY, PUSH, say("All checks green is a claim that Kelly overstated.")], True,
+     "a capitalized name fills no adverb slot either"),
+    ([QUERY, PUSH, say("All checks green is a claim that was clearly overstated.")], False,
+     "a listed adverb between the auxiliary and the retraction still "
+     "attaches"),
+    # Only the head phrase is dropped, never the rest of the connector. Widen
+    # the carve-out to swallow the whole connector and this stops blocking.
+    ([QUERY, PUSH, say("All checks green is a claim that survives, though my "
+                       "count was wrong.")], True,
+     "a separator past the head phrase still breaks attachment"),
+    # The carve-out must also REACH the retraction. Unanchor its right end and
+    # both of these stop blocking: the head noun matches, so the phrase is
+    # stripped, while the relative clause is about a different noun entirely.
+    ([QUERY, PUSH, say("#1689 is fully clean is the note that the reviewer "
+                       "misread.")], True,
+     "an object relative puts its own subject after the pronoun, so the error "
+     "sits on the reviewer and the claim still stands"),
+    ([QUERY, PUSH, say("All checks green is the reading that the earlier "
+                       "reviewer overstated.")], True,
+     "same shape with a different head noun and retraction verb"),
+
+    # The copula guard. Attributive "wrong" sits in the SAME clause as the
+    # claim, so attachment cannot rule it out; only the copula requirement can.
+    # Delete the `(?:was|were|is|are)\s+` prefix from RX_RETRACTION and this
+    # stops blocking.
+    ([QUERY, PUSH, say("All checks green with the wrong path fixed.")], True,
+     "attributive 'wrong' in the same clause is not a retraction -- the "
+     "copula is required"),
+
+    # Plain negation stays scoped to the text BEFORE the phrase. Reading it
+    # after the phrase too silently disabled the guard on the archetypal recap
+    # shape, where the negation is about something other than the claim.
+    ([QUERY, PUSH, say("All checks green at this head, and I have not merged it yet.")], True,
+     "a trailing plain negation about a different clause must not suppress "
+     "the claim"),
+    ([QUERY, PUSH, say("#1689 is fully clean and there are no findings I did not "
+                       "address.")], True,
+     "nor must a trailing 'did not' -- this is the phrasing the RX_NEGATION "
+     "comment says the guard must keep catching"),
 ]
 
 

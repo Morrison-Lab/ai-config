@@ -14,15 +14,35 @@ assert subject.POLL_SECONDS == 120
 # pid recorded in it, so a rename would leave two daemons and two files.
 assert subject.STATE_PATH.endswith("all-open-prs.json")
 assert "all_open_prs" in subject.poll_once.__code__.co_consts
-assert any(isinstance(c, (str, tuple, list)) and "--author" in c for c in subject.open_prs.__code__.co_consts)
+# The GitHub search covers the three arms of memories/reviewing-prs.md's
+# PR-scope test that a query can express (ai-config#2919): PRs the user
+# opened, PRs assigned to the user, and PRs the `github-actions` app
+# opened. The fourth arm, named in the request, is a property of a
+# conversation rather than of a PR, so no query can carry it. Each arm is
+# its own source key, so one failing costs only its own entry.
+assert subject.GITHUB_ARMS == (
+    ("github_prs/authored", ("--author", "@me")),
+    ("github_prs/assigned", ("--assignee", "@me")),
+), subject.GITHUB_ARMS
+assert subject.GITHUB_WORKFLOW_BOT_ARM == "github_prs/workflow-bot"
+BOT_CONSTS = [
+    value
+    for const in subject.workflow_bot_prs.__code__.co_consts
+    for value in (const if isinstance(const, (tuple, list)) else (const,))
+]
+# The workflow-bot arm is the one that is not self-scoping, so it must be
+# bounded by owner: unqualified, it searches all of GitHub.
+for arm in ("--author", "app/github-actions", "--owner"):
+    assert arm in BOT_CONSTS, arm
 # The command must run the absolutely-resolved GH_PATH; the literal "gh"
-# reappearing in open_prs would be a revert of the #1953 fix. CPython folds
-# a list display into a tuple inside co_consts, so nested consts are
+# reappearing at a gh call site would be a revert of the #1953 fix. CPython
+# folds a list display into a tuple inside co_consts, so nested consts are
 # searched too -- a top-level-only check passes on the reverted code.
-assert not any(
-    value == "gh"
-    for const in subject.open_prs.__code__.co_consts
-    for value in (const if isinstance(const, (tuple, list)) else (const,)))
+for gh_caller in (subject.workflow_bot_prs, subject.gh_search_prs, subject.gh_owners):
+    assert not any(
+        value == "gh"
+        for const in gh_caller.__code__.co_consts
+        for value in (const if isinstance(const, (tuple, list)) else (const,))), gh_caller
 assert any(isinstance(c, (str, tuple, list)) and "created_by_me" in c for c in subject.host_merge_requests.__code__.co_consts)
 assert "--hostname" in subject.host_merge_requests.__code__.co_consts
 assert "--paginate" in subject.host_merge_requests.__code__.co_consts
@@ -310,14 +330,15 @@ finally:
 # accumulate an error_streak; a full success resets it.
 with tempfile.TemporaryDirectory() as d:
     orig_path = subject.STATE_PATH
-    real_open_prs = subject.open_prs
+    real_gh_search_prs = subject.gh_search_prs
+    real_workflow_bot_prs = subject.workflow_bot_prs
     real_glab_hosts = subject.glab_hosts
     real_host_merge_requests = subject.host_merge_requests
 
-    def failing():
+    def failing(*qualifiers):
         raise OSError("[Errno 2] No such file or directory: 'gh'")
 
-    def working():
+    def working(*qualifiers):
         return [{"number": 7}]
 
     def one_host():
@@ -333,11 +354,12 @@ with tempfile.TemporaryDirectory() as d:
         subject.GH_PATH = subject.GH_PATH or "gh"
         subject.GLAB_PATH = subject.GLAB_PATH or "glab"
         subject.STATE_PATH = os.path.join(d, "streak.json")
-        subject.open_prs = failing
+        subject.gh_search_prs = failing
+        subject.workflow_bot_prs = failing
         subject.glab_hosts = one_host
         subject.host_merge_requests = working_gitlab
         state = subject.poll_once({})
-        assert "github_prs" not in state["data"]
+        assert not [key for key in state["data"] if key.startswith("github_prs")], state
         assert state["data"]["gitlab_merge_requests/gitlab.com"] == [{"iid": 8}]
         assert "github_prs" in state["error"]
         assert state["error_streak"] == 1
@@ -347,10 +369,11 @@ with tempfile.TemporaryDirectory() as d:
         # A different error text restarts the streak: the streak counts
         # consecutive polls of the SAME error, so a new failure mode earns
         # its own persistent report downstream.
-        def failing_differently():
+        def failing_differently(*qualifiers):
             raise OSError("connection timed out")
 
-        subject.open_prs = failing_differently
+        subject.gh_search_prs = failing_differently
+        subject.workflow_bot_prs = failing_differently
         state = subject.poll_once(state)
         assert "connection timed out" in state["error"]
         assert state["error_streak"] == 1
@@ -380,12 +403,15 @@ with tempfile.TemporaryDirectory() as d:
                 raise OSError("connection refused")
             return [{"iid": 8}]
 
-        subject.open_prs = working
+        subject.gh_search_prs = working
+        subject.workflow_bot_prs = working
         subject.glab_hosts = two_hosts
         subject.host_merge_requests = one_down
         state = subject.poll_once(state)
         assert state["data"] == {
-            "github_prs": [{"number": 7}],
+            "github_prs/authored": [{"number": 7}],
+            "github_prs/assigned": [{"number": 7}],
+            "github_prs/workflow-bot": [{"number": 7}],
             "gitlab_merge_requests/gitlab.com": [{"iid": 8}]
         }, state
         assert json.loads(state["error"]) == {"gitlab_merge_requests/down.example.org": "connection refused"}
@@ -408,7 +434,9 @@ with tempfile.TemporaryDirectory() as d:
         assert "error" not in state
         assert state["error_streak"] == 0
         assert state["data"] == {
-            "github_prs": [{"number": 7}],
+            "github_prs/authored": [{"number": 7}],
+            "github_prs/assigned": [{"number": 7}],
+            "github_prs/workflow-bot": [{"number": 7}],
             "gitlab_merge_requests/gitlab.com": [{"iid": 8}]
         }
 
@@ -431,11 +459,127 @@ with tempfile.TemporaryDirectory() as d:
         finally:
             subject.GH_PATH = gh_before
     finally:
-        subject.open_prs = real_open_prs
+        subject.gh_search_prs = real_gh_search_prs
+        subject.workflow_bot_prs = real_workflow_bot_prs
         subject.glab_hosts = real_glab_hosts
         subject.host_merge_requests = real_host_merge_requests
         subject.GH_PATH, subject.GLAB_PATH = saved_paths
         subject.STATE_PATH = orig_path
+
+# The GitHub arms end to end against a stub gh: each arm is searched and
+# sorted on its own, the workflow-bot arm is bounded to the owners
+# `gh api` resolved, and a denied owner lookup costs that arm alone. The
+# stub records its argv so the flags are asserted rather than assumed.
+with tempfile.TemporaryDirectory() as d:
+    gh_argv_log = os.path.join(d, "gh-argv.log")
+    owners_file = os.path.join(d, "owners.txt")
+    with open(owners_file, "w", encoding="utf-8") as stream:
+        stream.write("ezra\nMorrison-Lab\nUCD-SERG\n")
+    gh_stub = os.path.join(d, "gh")
+    with open(gh_stub, "w", encoding="utf-8") as stream:
+        stream.write(
+            "#!/usr/bin/env python3\n"
+            "import json, os, sys\n"
+            f"open({gh_argv_log!r}, 'a').write(' '.join(sys.argv[1:]) + chr(10))\n"
+            f"owners = open({owners_file!r}, encoding='utf-8').read().split()\n"
+            "if sys.argv[1] == 'api':\n"
+            "    if 'user/orgs' in sys.argv and os.environ.get('GH_STUB_ORGS_DENIED'):\n"
+            "        sys.stderr.write('Resource not accessible by integration' + chr(10))\n"
+            "        sys.exit(1)\n"
+            "    listed = owners[1:] if 'user/orgs' in sys.argv else owners[:1]\n"
+            "    sys.stdout.write(''.join(name + chr(10) for name in listed))\n"
+            "    sys.exit(0)\n"
+            "shape = os.environ.get('GH_STUB_SHAPE', '')\n"
+            "if shape == 'object':\n"
+            "    sys.stdout.write(json.dumps({'message': 'Bad credentials'}))\n"
+            "elif shape == 'scalars':\n"
+            "    sys.stdout.write(json.dumps([1, 2]))\n"
+            "else:\n"
+            "    def pr(number):\n"
+            "        return {'number': number, 'url': 'https://example.com/p/%d' % number}\n"
+            "    if 'app/github-actions' in sys.argv:\n"
+            "        out = [pr(4)]\n"
+            "    elif '--assignee' in sys.argv:\n"
+            "        out = [pr(2), pr(1)]\n"
+            "    else:\n"
+            "        out = [pr(1), pr(3)]\n"
+            "    sys.stdout.write(json.dumps(out))\n")
+    os.chmod(gh_stub, os.stat(gh_stub).st_mode | stat.S_IEXEC)
+    gh_before = subject.GH_PATH
+    try:
+        if os.name == "nt":
+            print("SKIP: stub-gh end-to-end block (needs a POSIX executable stub)")
+        else:
+            subject.GH_PATH = gh_stub
+            def pr(number):
+                return {"number": number, "url": "https://example.com/p/%d" % number}
+            # One search per arm of the scope test a query can express
+            # (ai-config#2919): opened by the user, assigned to the user,
+            # opened by the `github-actions` app. Each arm sorts its own
+            # results (the assignee arm's stub answers out of order).
+            assert subject.gh_search_prs("--author", "@me") == [pr(1), pr(3)]
+            assert subject.gh_search_prs("--assignee", "@me") == [pr(1), pr(2)]
+            assert subject.workflow_bot_prs() == [pr(4)]
+            with open(gh_argv_log, encoding="utf-8") as stream:
+                gh_calls = stream.read().splitlines()
+            assert gh_calls[0].endswith("--author @me"), gh_calls
+            assert gh_calls[1].endswith("--assignee @me"), gh_calls
+            # The two `@me` arms are self-scoping and carry no owner; the
+            # workflow-bot arm is not, so it is bounded to every owner the
+            # lookup resolved. Unbounded, it would search every open
+            # workflow-bot PR on GitHub.
+            assert "--owner" not in gh_calls[0] and "--owner" not in gh_calls[1], gh_calls
+            assert gh_calls[2] == "api user --jq .login", gh_calls
+            assert gh_calls[3] == "api --paginate user/orgs --jq .[].login", gh_calls
+            assert gh_calls[4].endswith(
+                "--author app/github-actions --owner ezra --owner Morrison-Lab "
+                "--owner UCD-SERG"), gh_calls
+            assert len(gh_calls) == 5, gh_calls
+            # A response that is not an array of objects is refused, never
+            # stored: poll_once catches ValueError into the source's error
+            # entry, where the AttributeError a non-object would raise
+            # would instead end the daemon.
+            for shape, message in (("object", "expected a JSON array"),
+                                   ("scalars", "expected PR objects")):
+                os.environ["GH_STUB_SHAPE"] = shape
+                try:
+                    subject.gh_search_prs("--author", "@me")
+                    raise AssertionError(f"a {shape} response should raise")
+                except ValueError as error:
+                    assert message in str(error), error
+                finally:
+                    del os.environ["GH_STUB_SHAPE"]
+            # A token that cannot read `user/orgs` costs the workflow-bot
+            # arm alone: the authored and assigned arms still land under
+            # "data", where one key over all three arms lost them too.
+            saved_for_poll = (subject.GLAB_PATH, subject.STATE_PATH)
+            os.environ["GH_STUB_ORGS_DENIED"] = "1"
+            try:
+                subject.GLAB_PATH = None
+                subject.STATE_PATH = os.path.join(d, "orgs-denied.json")
+                state = subject.poll_once({})
+            finally:
+                del os.environ["GH_STUB_ORGS_DENIED"]
+                subject.GLAB_PATH, subject.STATE_PATH = saved_for_poll
+            assert state["data"] == {
+                "github_prs/authored": [pr(1), pr(3)],
+                "github_prs/assigned": [pr(1), pr(2)],
+            }, state
+            denied = json.loads(state["error"])
+            assert list(denied) == ["github_prs/workflow-bot"], denied
+            assert "not accessible by integration" in denied["github_prs/workflow-bot"], denied
+
+            # No resolvable owner is an error rather than a silently
+            # unbounded-then-empty workflow-bot arm.
+            with open(owners_file, "w", encoding="utf-8") as stream:
+                stream.write("")
+            try:
+                subject.gh_owners()
+                raise AssertionError("no resolvable owner should raise")
+            except OSError as error:
+                assert "no owner" in str(error), error
+    finally:
+        subject.GH_PATH = gh_before
 
 # alive() must be truthful on every platform: signal-0 does not track
 # liveness on Windows (#2082), so the probe is OpenProcess there.
@@ -449,4 +593,5 @@ if os.name == "nt":
     assert subject._alive_windows(os.getpid()) is True
 
 print("PASS: GitHub and GitLab CLIs are resolved or refused at startup; "
+      "the GitHub search covers the opened, assigned, and workflow-bot arms; "
       "failures accumulate an error streak that success resets")

@@ -140,6 +140,49 @@ The first `git branch -D` failed with the worktree message, and `git worktree li
 
 (`rme`#988/`epi204`#362: both cited `shared/writing/math-derivation-steps.md` in present tense while `ai-config`#502 was still open and each repo's `.ai-config` pin predated it --- flagged as a dangling reference by review in both, fixed by bumping the pin once #502 merged and hedging the still-open `gha`#228 half of the same citation.)
 
+## Timestamp recaps in local time --- A notebook heading typed from the last reading, with the rule loaded
+
+2nd measured occurrence, 2026-09-04, after the 2026-09-01 case the rule itself
+records.
+One real reading at 16:17 PDT was followed by two session-notebook headings
+written through a Bash heredoc as "16:20 PDT" and "16:23 PDT"; the next real
+read came back 16:19 PDT, so both stamps ran ahead of the clock they were
+extrapolated from.
+
+The remedy used since reads the clock inside the same command that writes the
+heading, so the time cannot be typed from memory at all:
+
+```bash
+now=$(TZ=America/Los_Angeles date "+%H:%M %Z")
+cat >> "$notebook" <<EOF
+
+## $now --- what happened
+EOF
+```
+
+Coverage, as the queries that settle it rather than as a recollection.
+`hooks/flag-unmeasured-timestamp.py` is registered in `hooks/hooks.json` under
+the `Write`, `Edit`, and `NotebookEdit` matchers for this surface
+(ai-config#2947) and under `Bash` and `mcp__github__.*` for the forge-comment
+surface (ai-config#2903), read off
+`json.load(open('hooks/hooks.json'))['hooks']['PreToolUse']`.
+Its `Bash` path does read a heredoc write, contrary to the natural assumption
+that only the `Write`/`Edit` tools are covered: `RX_BASH_REDIRECT_NOTEBOOK`
+matches a `>`, `>>`, or `tee` redirect whose target is a `session-*.md` or a
+`memories/` file, and `RX_IN_COMMAND_DATE` treats an in-command `date`
+substitution as measured by construction --- which is exactly the remedy above.
+So the matcher was not the gap.
+In this remote session `~/.claude/settings.json` carries no `hooks` key and no
+`enabledPlugins`, so no ai-config hook was active at all when the two headings
+were written (ai-config#2004, ai-config#1683).
+
+- **Do:** derive a written heading time from a `date` read in the same command
+  that writes it.
+- **Don't:** type a heading time into a heredoc from the last reading, however
+  recent that reading feels.
+- **Don't:** read a hook's existence as coverage --- a matcher can be right
+  while nothing in the session has the hook enabled.
+
 ## Surface merge-order constraints --- Draft-gating is the last resort, not the default
 
 (`UCD-SERG/ucd-serg.github.io`
@@ -178,6 +221,23 @@ asked.)
 
 (Morrison-Lab/ai-config#1054, 2026-08-03: the round-3 verdict --- **Ready for merge**, all four findings independently re-verified --- posted as `github-actions[bot]` at `03:04:19Z`.
 The login-filtered query returned the round-2 comment from `02:12:52Z` instead, so a clean PR read as unreviewed.)
+
+## Re-check for latest review findings before reporting PR status --- A bot's `COMMENTED` review is the same blind spot
+
+(Morrison-Lab/ai-config#3084, 2026-09-03.
+Re-derived from `get_reviews` and `get_review_comments` on 2026-09-03, because the issue body's own account of it was wrong in a way worth recording.
+Three Copilot reviews at head `6f10014` --- `5098574802`, `5098854246`, `5098881593` --- were submitted in state `COMMENTED`, two headed "Changes recommended" and the third "Needs a closer look".
+Each carried one finding in a collapsed `### Suppressed comments (1)` block, and a suppressed finding never becomes a comment object, so a review-thread query and `pulls/N/comments` both return nothing over it.
+Two of the three *also* posted an ordinary inline comment, which is what the issue body missed when it said the suppression block meant they "created no review thread":
+the visible comment and the suppressed finding sit in the same review, so a threads query sees the review and still under-reports it.
+At the 16:25:36Z merge the PR carried three threads, one of them --- `r3926471670`, opened at 16:20:48Z by review `5104271634` on the merged head `bf55824` --- unresolved and ordinary rather than suppressed.
+So the two resolved threads the pre-merge check reported were a reading taken before 16:20:48Z, and the defect reached `main` past a stale thread query as well as past the suppressed findings.
+This section was loaded in context throughout and did not fire, because it named "a human's `CHANGES_REQUESTED`" and the reviewer was a bot.
+Filed as [ai-config#3121](https://github.com/Morrison-Lab/ai-config/issues/3121).)
+
+The headline is no filter either: "Changes recommended", "Needs a closer look", and "generated no new comments" have each led a body carrying real findings.
+Nor is the state --- the forge enforces only `CHANGES_REQUESTED`, so a `COMMENTED` review sets no blocking state and needs no dismissal, which is precisely why nothing stops a merge over its findings.
+[`skills/pr-status/SKILL.md`](skills/pr-status/SKILL.md)'s *Check for a blocking human CHANGES_REQUESTED* section carries what its per-review line does and does not settle, and why the full body of every review it names has to be read.
 
 ## Use the existing PR branch, not the harness-specified branch --- Prefer stacking the fix, not superseding the PR
 

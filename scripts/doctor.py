@@ -5,11 +5,19 @@ Inspects repository health, git worktree status, generated wrapper
 freshness, hook catalogs, context budgets, and submodule integrity in a
 single fast pass.
 
-Consumer symlink freshness is no longer part of this check: `bootstrap.sh`
+Consumer symlink *freshness* is no longer part of this check: `bootstrap.sh`
 no longer symlinks skills/commands into a consumer's home directory (Claude
 Code and Cursor now install this repo as a native plugin instead, and Codex
 has no replacement install path yet -- see ai-config#2352), so there is
 nothing left for a `check-install.py`-style comparison to audit.
+
+Consumer *leftovers* are a separate question, and this check still sweeps for
+them: a replacement install does not remove what earlier installs placed. A
+`~/.claude/skills` symlink predating the plugin survived one such change and
+listed every skill twice (ai-config#2405). `check_consumer_leftovers` reports
+what it finds and never deletes -- `~/.claude/skills` also holds a user's own
+skills and the client's account-level `synced/` bucket, so removal is a human
+decision.
 
 Usage:
     python3 scripts/doctor.py
@@ -329,6 +337,292 @@ def check_ai_clis() -> Dict[str, Any]:
     }
 
 
+# `bootstrap.sh` placed these three under `~/.claude` before the plugin
+# install replaced it, and no plugin equivalent has landed (ai-config#2352),
+# so a copy or symlink found there today was placed by an earlier install,
+# or by the one manual step README.md still documents while that issue is
+# open -- which `DOCUMENTED_MANUAL_LINKS` exempts and reports separately.
+LEFTOVER_NAMES = ("shared", "hooks", "memories")
+
+# README.md tells a reader with a global `~/.claude/CLAUDE.md` to *symlink*
+# `shared/` there by hand until ai-config#2352 lands, so a `~/.claude/shared`
+# symlink resolving into a checkout is the documented configuration rather
+# than a leftover, and reporting it red would leave `--strict` red by
+# construction on a README-conformant machine. A *copy* is not that step:
+# README names only the symlink, precisely because a copy does not track the
+# checkout and so goes stale silently. `copy_note` below says that to a
+# reader who has one, rather than reporting it as an unexplained leftover.
+DOCUMENTED_MANUAL_LINKS = ("shared",)
+
+
+def claude_home() -> Path:
+    """Return the consumer Claude Code home, honoring CLAUDE_HOME."""
+    return Path(os.environ.get("CLAUDE_HOME") or (Path.home() / ".claude"))
+
+
+def read_settings(path: Path) -> tuple[Dict[str, Any], Optional[str]]:
+    """Return (settings, parse_error) for a Claude Code settings file.
+
+    A missing file is not an error -- it simply enables no plugin *here*.
+    A file that exists and does not yield a settings object is reported
+    rather than swallowed: it leaves the sweep unable to say whether the
+    plugin route is in use. That covers a top level that parses to
+    something other than an object (a list, a string, `null`) as well as
+    one that does not parse at all -- returning `{}` for either would be
+    read as "this scope names no entry" and let a lower scope decide, which
+    is the silent fallback `shared/principles/fail-fast.md` rules out.
+
+    One scope per call; `resolve_plugin_enabled` walks them in order.
+    """
+    if not path.is_file():
+        return {}, None
+    try:
+        data = json.loads(strip_jsonc_comments(path.read_text(encoding="utf-8")))
+    except Exception as exc:
+        return {}, str(exc)
+    if not isinstance(data, dict):
+        return {}, f"top-level value is {type(data).__name__}, not an object"
+    return data, None
+
+
+def settings_scope_paths(home: Path) -> List[Path]:
+    """Return the `enabledPlugins` settings files to read, highest scope first.
+
+    Local, then project, then user, matching the *scope walk* in
+    `skills/ai-config-hooks/run-hook.sh`. The walk is the only part the two
+    share; each reads a file differently -- see `resolve_plugin_enabled`.
+    The project root is `CLAUDE_PROJECT_DIR` when the harness exports it,
+    and this checkout otherwise.
+    """
+    project = Path(os.environ.get("CLAUDE_PROJECT_DIR") or REPO_ROOT)
+    return [
+        project / ".claude" / "settings.local.json",
+        project / ".claude" / "settings.json",
+        home / "settings.json",
+    ]
+
+
+def resolve_plugin_enabled(home: Path) -> tuple[Optional[bool], Optional[Path], Optional[str]]:
+    """Resolve whether an ai-config plugin is enabled, by scope precedence.
+
+    Returns `(enabled, source, parse_error)`. `source` is the file that
+    decided, or None when no scope named an `ai-config@*` entry at all.
+    `enabled` is None only when a settings file exists and does not yield
+    usable settings, which leaves the answer unknown rather than false.
+
+    Scope-resolved rather than read from one file, per
+    `memories/claude-code-settings.md`: `enabledPlugins` resolves by
+    precedence rather than by unioning truthy names across files, so the
+    first file that names an entry decides and an explicit `false` there is
+    final. Within one file any truthy `ai-config@*` entry counts, since a
+    second marketplace's copy loads the same plugin.
+
+    Only the scope walk is shared with `skills/ai-config-hooks/run-hook.sh`,
+    which parses nothing: it greps the raw file text and takes the *first*
+    match of `"ai-config@...": true|false` wherever it lands. That diverges
+    from this function twice. Within `enabledPlugins` the two disagree on
+    `{"ai-config@Morrison-Lab": false, "ai-config@other": true}`: this reads
+    the plugin as enabled, the runner as disabled. And the runner's match
+    need not be an entry at all -- a commented-out
+    `// "ai-config@Morrison-Lab": true`, or one inside any other object,
+    reads as enabled there while this function, which strips comments and
+    reads `enabledPlugins` only, does not see it.
+    See `memories/claude-code-settings.md`.
+
+    Two scopes above these three stay unread, so the answer can still be
+    wrong in both directions: a managed-settings `false` over a walked
+    `true` makes the sweep run on a machine whose plugin is disabled and
+    report its only install as leftovers, and a managed-settings or
+    command-line `true` with no walked entry makes the sweep skip. Managed
+    settings live at an OS-specific path and command-line arguments are not
+    readable from here at all.
+    """
+    from lib.plugin_overlap import ai_config_entries
+
+    for path in settings_scope_paths(home):
+        settings, parse_error = read_settings(path)
+        if parse_error is not None:
+            return None, path, parse_error
+        if "enabledPlugins" in settings and not isinstance(settings["enabledPlugins"], dict):
+            kind = type(settings["enabledPlugins"]).__name__
+            return None, path, f"enabledPlugins is {kind}, not an object"
+        entries = ai_config_entries(settings)
+        if entries:
+            return any(entries.values()), path, None
+    return False, None, None
+
+
+def describe_path(path: Path) -> str:
+    """Describe a leftover path as a symlink (with its target) or a copy."""
+    if path.is_symlink():
+        try:
+            return f"symlink -> {os.readlink(path)}"
+        except OSError:
+            return "symlink"
+    return "copy"
+
+
+def points_into_ai_config(path: Path) -> bool:
+    """Report whether `path` resolves inside something shaped like this repo.
+
+    Provenance, not a name or content test: the account-level skill sync
+    carries this repo's skill names and differing contents alike, so only a
+    link that lands in a checkout identifies a leftover install.
+
+    The walk stops at the Claude home rather than climbing through it,
+    because that directory reaches the checkout shape on exactly the
+    machines this sweep targets: `~/.claude/CLAUDE.md` is the standard
+    user memory file, and a leftover `hooks/` copy supplies
+    `~/.claude/hooks/hooks.json`. A candidate must also carry `.git`, so
+    a directory merely holding both files is not read as a checkout.
+    """
+    try:
+        resolved = path.resolve()
+    except OSError:
+        return False
+    home = claude_home().resolve()
+    for candidate in (resolved, *resolved.parents):
+        if candidate == home:
+            return False
+        if not (candidate / ".git").exists():
+            continue
+        if (candidate / "CLAUDE.md").is_file() and (candidate / "hooks" / "hooks.json").is_file():
+            return True
+    return False
+
+
+def find_skill_leftovers(home: Path) -> tuple[List[str], List[str]]:
+    """Return (linked, doubled) skill leftovers under `home`/skills.
+
+    `linked` entries resolve into an ai-config checkout, so their provenance
+    is settled. `doubled` entries only share a name with this repo's skills,
+    which is the doubled-listing symptom rather than proof of a leftover --
+    a user's own skill may legitimately carry the same name.
+
+    The two tests run in that order rather than on disjoint entry kinds: an
+    entry whose provenance test fails still gets the name test, so a symlink
+    landing outside a checkout is reported as a doubled name exactly as a
+    real directory is. The client loads both the same way, so the symptom
+    does not turn on which one a user happens to have.
+
+    The walk is one level deep, which is what keeps the client's
+    account-level `synced/` bucket out of both lists: its skill-named
+    directories sit at `synced/<bucket-id>/<name>` and are never reached,
+    so only the `synced` entry itself is examined and it matches neither
+    test. Deepening the walk would need a skip for that bucket.
+    """
+    skills = home / "skills"
+    if skills.is_symlink() and points_into_ai_config(skills):
+        return ([f"{skills} ({describe_path(skills)})"], [])
+    if not skills.is_dir():
+        return ([], [])
+
+    repo_skills = {p.name for p in (REPO_ROOT / "skills").iterdir() if p.is_dir()}
+    linked: List[str] = []
+    doubled: List[str] = []
+    for entry in sorted(skills.iterdir()):
+        if entry.is_symlink() and points_into_ai_config(entry):
+            linked.append(f"{entry} ({describe_path(entry)})")
+        elif entry.is_dir() and entry.name in repo_skills:
+            doubled.append(entry.name)
+    return (linked, doubled)
+
+
+def check_consumer_leftovers() -> Dict[str, Any]:
+    """Report `~/.claude` copies and symlinks left by pre-plugin installs."""
+    home = claude_home()
+    enabled, source, parse_error = resolve_plugin_enabled(home)
+    if parse_error is not None:
+        return {
+            "name": "consumer_leftovers",
+            "ok": False,
+            "status": "WARN",
+            "plugin_enabled": None,
+            "leftovers": [],
+            "doubled_skills": [],
+            "documented": [],
+            "details": f"Not swept: {source} did not yield usable settings ({parse_error}), so whether the plugin route is in use is unknown.",
+        }
+
+    if not enabled:
+        decided = (
+            f"{source} disables the ai-config plugin"
+            if source is not None
+            else "no local, project, or user settings file names an ai-config plugin"
+        )
+        return {
+            "name": "consumer_leftovers",
+            "ok": True,
+            "status": "OK",
+            "plugin_enabled": False,
+            "leftovers": [],
+            "doubled_skills": [],
+            "documented": [],
+            "details": f"Skipped: {decided} (managed settings and command-line arguments are not read), so a ~/.claude copy may be this machine's only install.",
+        }
+
+    leftovers: List[str] = []
+    documented: List[str] = []
+    manual_copies: List[str] = []
+    for name in LEFTOVER_NAMES:
+        path = home / name
+        if not (path.is_symlink() or path.exists()):
+            continue
+        entry = f"{path} ({describe_path(path)})"
+        if name in DOCUMENTED_MANUAL_LINKS and path.is_symlink() and points_into_ai_config(path):
+            documented.append(entry)
+            continue
+        if name in DOCUMENTED_MANUAL_LINKS and not path.is_symlink():
+            manual_copies.append(str(path))
+        leftovers.append(entry)
+    linked_skills, doubled_skills = find_skill_leftovers(home)
+    leftovers.extend(linked_skills)
+
+    documented_note = (
+        f" {len(documented)} documented manual link(s), not leftovers: {'; '.join(documented)}"
+        " -- README.md documents symlinking ~/.claude/shared by hand while ai-config#2352 is open."
+        if documented
+        else ""
+    )
+    copy_note = (
+        f" {'; '.join(manual_copies)} is a copy: README.md documents symlinking that path by hand"
+        " while ai-config#2352 is open, and a copy does not track the checkout, so replace it with"
+        " a symlink into one rather than deleting it."
+        if manual_copies
+        else ""
+    )
+
+    if not leftovers and not doubled_skills:
+        return {
+            "name": "consumer_leftovers",
+            "ok": True,
+            "status": "OK",
+            "plugin_enabled": True,
+            "leftovers": [],
+            "doubled_skills": [],
+            "documented": documented,
+            "details": f"No pre-plugin install leftovers under {home}.{documented_note}",
+        }
+
+    parts = []
+    if leftovers:
+        parts.append(f"{len(leftovers)} leftover(s): {'; '.join(leftovers)}")
+    if doubled_skills:
+        parts.append(
+            f"{len(doubled_skills)} skill name(s) shared with this repo, so the listing may be doubled: {', '.join(doubled_skills)}"
+        )
+    return {
+        "name": "consumer_leftovers",
+        "ok": False,
+        "status": "WARN",
+        "plugin_enabled": True,
+        "leftovers": leftovers,
+        "doubled_skills": doubled_skills,
+        "documented": documented,
+        "details": f"Under {home}: {'. '.join(parts)}. Swept because {source} enables the ai-config plugin.{documented_note}{copy_note} Reported only -- inspect each by hand before removing anything: ~/.claude/skills also holds your own skills (see shared/workflow/keep-checkouts-fresh.md).",
+    }
+
+
 def run_doctor() -> Dict[str, Any]:
     """Execute all diagnostic health checks."""
     checks = [
@@ -339,6 +633,7 @@ def run_doctor() -> Dict[str, Any]:
         check_context_closure(),
         check_jsonc_configs(),
         check_ai_clis(),
+        check_consumer_leftovers(),
     ]
 
     all_ok = all(c["ok"] for c in checks)

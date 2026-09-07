@@ -501,6 +501,30 @@ DEF=$(git remote show origin | sed -n 's/.*HEAD branch: //p')
 See [`challenge-the-assignment.cases.md`](challenge-the-assignment.cases.md),
 "A brief's own command contradicted its own disclaimer".
 
+**A gate command in a brief is a claim about the *branch*, not only about the
+machine.**
+The section above reads a supplied command as an assertion about the
+recipient's environment, and "environment" pulls toward the machine --- a
+`PATH`, a shell, a default branch name.
+A fixer dispatched to repair an older branch has the same machine, the same
+repo, and the same tools, and still cannot run a gate whose script landed on
+`main` after that branch was cut.
+The brief's author verifies the command in the only tree they have open, which
+is the one tree where it cannot fail.
+
+The tell is that the recipient's branch is older *by construction* --- being
+behind is why it needs repair --- so a gate list copied from `main` is wrong in
+exactly the direction the task guarantees.
+
+- **Do:** derive the gate list from the branch under repair
+  (`ls scripts/check-*.py` there), or mark a recently-landed gate "if present".
+- **Don't:** copy a gate list from `main` into a brief for an older branch ---
+  your own checkout is the one place every command in it is guaranteed to run.
+
+(Measured 2026-09-04: `scripts/check-python-escapes.py` exists on `main` and
+not on branches cut before it landed, and fixers briefed to run it reported it
+missing.)
+
 **A brief you re-send each round carries a measurement, and the measurement
 expires while the sentence does not.**
 Both sections above fail because the author never derived the claim, or could

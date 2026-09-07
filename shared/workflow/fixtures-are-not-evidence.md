@@ -452,6 +452,65 @@ rather than on the code.
 - **Don't:** drop a finding because its number was unattainable; re-derive the
   bound and keep the fix.
 
+## A fifth direction: the fixture varies, differs, and is still invariant under the one swap that matters
+
+The three directions above all ask whether a fixture's **values** carry
+information.
+This one asks whether the fixture's **arrangement** does, and it survives
+every check above: the input varies, the two paths differ, and the target is
+reachable.
+What breaks is the assertion's shape, not the fixture's content.
+
+**A set-membership assertion cannot see a coordinated swap between two
+mapped things, when both land in the same observable bucket.**
+Measured on `ucdavis/hac.sap#43`, 2026-09-06: two `flextable::highlight`
+calls, one with `j = "Name"` and one with `j = "Team"`, could be swapped
+together undetected, because the test fixture placed both columns'
+placeholder text in the same row.
+Highlighting the wrong column for `"Name"` and the wrong column for `"Team"`
+at once left the **set** of highlighted text exactly as it was, only
+permuted between two columns, and `expect_setequal` compares sets, so a
+permutation of an unchanged set passes.
+Either swap alone was caught; the pair together was not.
+The fix was to place the two placeholders on different rows, so a wrong
+mapping for either one changes which row is highlighted, a value
+`expect_setequal` can see, rather than only which of two already-highlighted
+columns produced it.
+
+**A presence assertion cannot see a value that landed in the wrong slot.**
+Round-trip tests on the same PR asserted `expect_match(out, "SENTINEL")`
+after rendering, which passes when the sentinel appears anywhere in the
+output, including the wrong cell.
+Swapping which argument backs which output slot survived at three separate
+call sites this way, because each swap still left every sentinel present
+somewhere in the rendered table.
+An assertion over presence answers "is this value anywhere", never "is this
+value here", and a slot swap only ever changes the second answer.
+
+Both failures share one shape: the fixture is fine and the assertion checks
+a coarser property (set membership, textual presence) than the one the
+mutation actually breaks (which mapping, which slot).
+A fixture "has the right values" is not the same claim as a fixture "puts
+the right value in the right place", and an assertion built for the first
+claim is blind to a bug that only violates the second.
+
+- **Do:** when testing a mapping between two things (a column and its
+  highlight, an argument and its output slot), assert the pairing itself,
+  not the set of values on either side --- an ordering or keyed assertion
+  (`expect_equal` against a named vector, a per-row or per-slot check)
+  subsumes a presence or set-membership check and catches a swap that the
+  coarser form cannot.
+- **Do:** when a fixture backs a mapping test, put each mapped pair's
+  distinguishing value where the coarser assertion would still fail on a
+  swap --- different rows, different cells, different text --- rather than
+  co-locating values that a permutation would leave looking identical.
+- **Don't:** treat `expect_setequal` (or any set/multiset comparison) as
+  proof against a swap between two mapped things; it is blind to any
+  permutation of a set that stays a set.
+- **Don't:** treat `expect_match`-style presence checks as proof of correct
+  placement; presence and position are different questions, and a swap
+  changes only the second.
+
 ## A regression fixture must contain something the bug would destroy
 
 The sections above concern what a fixture's *behaviour* licenses you to
